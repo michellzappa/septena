@@ -14,6 +14,8 @@ struct MedicationsDestinationView: View {
   @State private var creating = false
   /// Medication whose per-item detail (adherence heatmap + history) is open.
   @State private var viewingMed: MedicationDefinitionEntity?
+  /// Whether the medication-type management sheet is open (from detail "Edit").
+  @State private var managingDefs = false
   // Medications is an editable dual section: Log = the day's dose list
   // (time-travelable); Patterns = adherence heatmap (taken vs daily target).
   // Default Log — the dose list is what you act on.
@@ -67,13 +69,11 @@ struct MedicationsDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
-        DrawerSection("Summary") {
-          StatStrip(stats: [
-            Stat(value: "\(takenCount)", label: "taken", tint: accent),
-            Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
-            Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
-          ])
-        }
+        DrawerSummary(stats: [
+          Stat(value: "\(takenCount)", label: "taken", tint: accent),
+          Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
+          Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
+        ])
 
         DrawerSection("Doses", padding: .none) {
           if dayDoses.isEmpty {
@@ -109,7 +109,8 @@ struct MedicationsDestinationView: View {
                            dose: dose)
     }
     // Tapping a medication opens its per-item detail — adherence heatmap, taken
-    // count, recent doses. "Edit" there opens a fresh dose log sheet.
+    // count, recent doses. "Edit" there opens medication-type management
+    // (rename/archive), mirroring how habit/supplement/chore detail "Edit" works.
     .adaptiveDetail(item: $viewingMed) { def in
       LoggableDetailView(
         title: def.title,
@@ -117,8 +118,11 @@ struct MedicationsDestinationView: View {
         accent: accent,
         doneVerb: "taken",
         fetch: { ChecklistMirror.medicationTakenDates(context: $0, medicationID: def.id) },
-        onEdit: { viewingMed = nil; creating = true }
+        onEdit: { viewingMed = nil; managingDefs = true }
       )
+    }
+    .sheet(isPresented: $managingDefs) {
+      MedicationDefinitionsSheet()
     }
   }
 

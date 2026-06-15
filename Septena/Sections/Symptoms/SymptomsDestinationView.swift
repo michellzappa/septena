@@ -16,6 +16,8 @@ struct SymptomsDestinationView: View {
   @State private var creating = false
   /// Symptom whose per-symptom detail (severity heatmap + history) is open.
   @State private var viewingSymptom: SymptomDefinitionEntity?
+  /// Symptom definition being renamed/retagged from its detail's "Edit".
+  @State private var editingDefinition: SymptomDefinitionEntity?
   // Symptoms is an editable dual section, but an event log (not a checklist):
   // Log = the day's events (time-travelable); Patterns = 30-day severity trend +
   // a timing rhythm wheel. Default Log — an empty symptom day is good news, so
@@ -40,13 +42,11 @@ struct SymptomsDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
-        DrawerSection("Summary") {
-          StatStrip(stats: [
-            Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
-            Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
-            Stat(value: averageSeverityText, label: "average", tint: accent),
-          ])
-        }
+        DrawerSummary(stats: [
+          Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
+          Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
+          Stat(value: averageSeverityText, label: "average", tint: accent),
+        ])
 
         DrawerSection("Log", padding: .none) {
           if dayEvents.isEmpty {
@@ -91,15 +91,19 @@ struct SymptomsDestinationView: View {
                          event: event)
     }
     // Tapping a symptom opens its per-symptom detail — severity heatmap, headline
-    // stats, and recent occurrences. "Edit" there jumps to a fresh log sheet.
+    // stats, and recent occurrences. "Edit" there edits the symptom *type*
+    // (rename/retag), mirroring how habit/supplement/chore detail "Edit" works.
     .adaptiveDetail(item: $viewingSymptom) { def in
       SymptomDetailView(
         symptomID: def.id,
         title: def.title,
         emoji: def.emoji,
         accent: accent,
-        onEdit: { viewingSymptom = nil; creating = true }
+        onEdit: { viewingSymptom = nil; editingDefinition = def }
       )
+    }
+    .sheet(item: $editingDefinition) { def in
+      SymptomDefinitionEditor(definition: def)
     }
   }
 
