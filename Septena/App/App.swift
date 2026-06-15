@@ -523,8 +523,11 @@ private struct ICloudRequirementModifier: ViewModifier {
 
   /// Warn only for a definitively-missing account AND only once the welcome
   /// is behind us — the welcome owns the first-launch screen on its own.
+  /// Demo-seed (screenshot / UI-test) builds skip CloudKit entirely, so the
+  /// warning would be both false and a tap-blocking alert mid-capture; suppress
+  /// it there.
   private func shouldWarn(_ status: CKAccountStatus) -> Bool {
-    welcomeCompleted && Self.accountMissing(status)
+    !DemoSeedMode.isOn && welcomeCompleted && Self.accountMissing(status)
   }
 
   /// Definitive "no usable account" states. `.couldNotDetermine` and

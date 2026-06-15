@@ -148,8 +148,18 @@ final class ScreenshotTests: XCTestCase {
     row.tap()
     dwell()
     capture(app, shot)
-    app.swipeDown(); app.swipeDown()                   // dismiss the sheet
-    dwell(0.5)
+    dismissDrawer(app)
+  }
+
+  /// Dismiss the compact section drawer. On iPhone, sections open as a bottom-
+  /// sheet drawer (`.medium`/`.large` detents) with a tap-away backdrop. A blind
+  /// `swipeDown` lands inside the drawer and scrolls its content instead of
+  /// dismissing — leaving it open over the next section's row, which cascades
+  /// into skipped captures. Tapping the backdrop in the top safe-area inset
+  /// (uncovered at both detents) fires the drawer's tap-away dismissal reliably.
+  @MainActor private func dismissDrawer(_ app: XCUIApplication) {
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+    dwell(0.8)
   }
 
   /// Let async section loads (training/nutrition fetches) finish before capture.
