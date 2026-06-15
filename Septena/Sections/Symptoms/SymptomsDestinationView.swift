@@ -14,6 +14,8 @@ struct SymptomsDestinationView: View {
   @State private var viewingDate = SeptenaDate.today
   @State private var editing: SymptomEventEntity?
   @State private var creating = false
+  /// Symptom whose per-symptom detail (severity heatmap + history) is open.
+  @State private var viewingSymptom: SymptomDefinitionEntity?
   // Symptoms is an editable dual section, but an event log (not a checklist):
   // Log = the day's events (time-travelable); Patterns = 30-day severity trend +
   // a timing rhythm wheel. Default Log — an empty symptom day is good news, so
@@ -76,6 +78,7 @@ struct SymptomsDestinationView: View {
         } else {
           severityTrendSection
           rhythmSection
+          bySymptomSection
         }
       }
     }
@@ -86,6 +89,17 @@ struct SymptomsDestinationView: View {
       SymptomEventEditor(date: viewingDate,
                          definitions: activeDefinitions,
                          event: event)
+    }
+    // Tapping a symptom opens its per-symptom detail — severity heatmap, headline
+    // stats, and recent occurrences. "Edit" there jumps to a fresh log sheet.
+    .adaptiveDetail(item: $viewingSymptom) { def in
+      SymptomDetailView(
+        symptomID: def.id,
+        title: def.title,
+        emoji: def.emoji,
+        accent: accent,
+        onEdit: { viewingSymptom = nil; creating = true }
+      )
     }
   }
 
@@ -182,6 +196,54 @@ struct SymptomsDestinationView: View {
           .frame(maxWidth: .infinity)
       }
     }
+  }
+
+  // MARK: - Per-symptom breakdown
+
+  private struct SymptomTally { let count: Int; let peak: Int }
+
+  /// Event count + peak severity per symptomID, across all history.
+  private var tallies: [String: SymptomTally] {
+    var counts: [String: Int] = [:]
+    var peaks: [String: Int] = [:]
+    for e in events {
+      counts[e.symptomID, default: 0] += 1
+      peaks[e.symptomID] = max(peaks[e.symptomID] ?? 0, e.severity)
+    }
+    return counts.reduce(into: [:]) { acc, kv in
+      acc[kv.key] = SymptomTally(count: kv.value, peak: peaks[kv.key] ?? 0)
+    }
+  }
+
+  /// One tappable row per active symptom that has any history — tap to open its
+  /// own severity heatmap. Mirrors how habits/supplements drill into a per-item
+  /// consistency heatmap.
+  @ViewBuilder
+  private var bySymptomSection: some View {
+    let tally = tallies
+    let rows = activeDefinitions
+      .filter { (tally[$0.id]?.count ?? 0) > 0 }
+      .sorted { (tally[$0.id]?.count ?? 0) > (tally[$1.id]?.count ?? 0) }
+    if !rows.isEmpty {
+      DrawerSection("By symptom", padding: .none) {
+        ForEach(rows) { def in
+          let t = tally[def.id]!
+          Button { viewingSymptom = def } label: {
+            LogRow(title: definitionTitle(def),
+                   detail: "\(t.count) logged · peak \(t.peak)/10",
+                   trailing: "›",
+                   tint: accent,
+                   isSelected: viewingSymptom?.id == def.id)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+  }
+
+  private func definitionTitle(_ def: SymptomDefinitionEntity) -> String {
+    if let emoji = def.emoji, !emoji.isEmpty { return "\(emoji) \(def.title)" }
+    return def.title
   }
 }
 

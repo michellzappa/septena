@@ -70,6 +70,9 @@ struct LogDetail {
   var subtitle: String = ""
   var tiles: [LogStat] = []
   var heatmap: LogHeatmap? = nil
+  /// Title for the heatmap card. "Consistency" reads right for done/skipped
+  /// logs (habits, supplements); graded logs (symptoms) override it.
+  var heatmapTitle: String = "Consistency"
   var cards: [LogCard] = []
   var recent: [LogRecent] = []
   var recentTitle: String = "Recent"
@@ -86,7 +89,7 @@ struct LogDetailBody: View {
       VStack(spacing: Theme.Spacing.xxl) {
         masthead
         if !detail.tiles.isEmpty { tiles }
-        if let hm = detail.heatmap { heatmap(hm) }
+        if let hm = detail.heatmap { heatmap(hm, title: detail.heatmapTitle) }
         ForEach(detail.cards) { card in cardView(card) }
         if !detail.recent.isEmpty { recent }
       }
@@ -144,8 +147,8 @@ struct LogDetailBody: View {
     }
   }
 
-  private func heatmap(_ hm: LogHeatmap) -> some View {
-    ChartCard(title: "Consistency", detail: hm.detail) {
+  private func heatmap(_ hm: LogHeatmap, title: String) -> some View {
+    ChartCard(title: title, detail: hm.detail) {
       ConsistencyHeatmap(
         endDate: Date(),
         firstDataDate: hm.firstDate,
