@@ -227,7 +227,8 @@ enum RhythmData {
     for t in timed {
       guard let e = TimeOfDayWheel.Event(
         id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
-        windowDays: windowDays, color: colors[t.sectionKey], wakingDay: wakingDay
+        windowDays: windowDays, color: colors[t.sectionKey],
+        magnitude: t.magnitude, wakingDay: wakingDay
       ) else { continue }
       snap.eventsBySection[t.sectionKey, default: []].append(e)
     }
@@ -352,6 +353,17 @@ enum RhythmData {
   /// when calendar access isn't granted (no prompt from here). Clamped to the
   /// day so a multi-day event reads as a single block.
   private static func calendarBands(on day: Date, fallback: Color) -> [TimeOfDayWheel.Band] {
+    // Screenshot builds have no real calendar access; synthesize a couple of
+    // thin meeting arcs so the dial shows scheduled time alongside the logged
+    // dots. Morning standup + an afternoon block.
+    if DemoSeedMode.isOn {
+      return [
+        TimeOfDayWheel.Band(id: "demo-cal-1", start: 9.0 / 24, end: 9.5 / 24,
+                            daysAgo: 0, color: fallback, thin: true),
+        TimeOfDayWheel.Band(id: "demo-cal-2", start: 14.0 / 24, end: 15.5 / 24,
+                            daysAgo: 0, color: fallback, thin: true),
+      ]
+    }
     guard CalendarBridge.shared.access == .granted else { return [] }
     let cal = Calendar.current
     let dayStart = cal.startOfDay(for: day)

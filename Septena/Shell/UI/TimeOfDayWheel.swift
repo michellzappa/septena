@@ -25,6 +25,11 @@ struct TimeOfDayWheel: View {
     /// Per-event tint. `nil` falls back to the wheel's `accent` (single-section
     /// detail use); the holistic homepage wheel sets each dot's section color.
     var color: Color? = nil
+    /// Optional intrinsic size (e.g. a meal's kcal). When set, the dot is sized
+    /// proportional to it (area ∝ magnitude) instead of the flat density-based
+    /// default — a snack reads small, a big plate blooms. `nil` keeps the
+    /// uniform/density sizing. Only nutrition sets this today.
+    var magnitude: Double? = nil
   }
 
   /// A duration drawn as an arc (e.g. a night's sleep, bedtime → wake).
@@ -261,9 +266,13 @@ struct TimeOfDayWheel: View {
     let opacity: Double
   }
 
-  /// Lay out the shown events as dots. Density (events sharing a 30-min
-  /// slot) grows the dot: today uses the day-timeline's bubble sizing
-  /// (5pt single → 8pt capped), week scales relative to the busiest slot.
+  /// Lay out the shown events as dots. An event with a `magnitude` (a meal's
+  /// kcal) is sized proportional to it — area ∝ kcal, anchored to a reference
+  /// meal so the size reads absolutely (a snack stays small, a big plate
+  /// blooms), independent of the today/week window. Events without a magnitude
+  /// keep the density sizing: events sharing a 30-min slot grow the dot — today
+  /// uses the day-timeline's bubble sizing (5pt single → 6pt capped), week
+  /// scales relative to the busiest slot.
   func dotMarks(side: CGFloat) -> [DotMark] {
     let center = CGPoint(x: side / 2, y: side / 2)
     let ringR = side / 2 - margin
@@ -282,10 +291,22 @@ struct TimeOfDayWheel: View {
     return shownEvents.sorted { $0.daysAgo > $1.daysAgo }.map { e in
       let count = Double(density[Int(e.fraction * Double(slots)) % slots] ?? 1)
       let norm = maxCount > 1 ? (count - 1) / (maxCount - 1) : 0
-      // Aggregated dots (many events sharing a slot) cap ~25% smaller than the
-      // old 8pt ceiling — a single dot stays its size; a busy slot just doesn't
-      // bloom as large. today: 5pt single → 6pt cap; week: scales to a 6pt max.
-      let dotR: CGFloat = effectiveWindow == 1 ? min(6, 4 + count) / 2 : (2.2 + norm * 0.8)
+      let dotR: CGFloat
+      if let mag = e.magnitude, mag > 0 {
+        // Proportional meal dot: radius ∝ √kcal so the dot's *area* tracks the
+        // meal's energy. Anchored to a reference meal (≈one full plate) so the
+        // size reads absolutely rather than relative to the busiest day, and
+        // clamped so a snack still registers and an outlier feast doesn't swamp
+        // the dial. Window-independent — kcal means the same today and last week.
+        let refKcal = 550.0, capKcal = 1300.0
+        let scale = (min(mag, capKcal) / refKcal).squareRoot()
+        dotR = max(1.8, min(4.6, 2.6 * CGFloat(scale)))
+      } else {
+        // Aggregated dots (many events sharing a slot) cap ~25% smaller than the
+        // old 8pt ceiling — a single dot stays its size; a busy slot just doesn't
+        // bloom as large. today: 5pt single → 6pt cap; week: scales to a 6pt max.
+        dotR = effectiveWindow == 1 ? min(6, 4 + count) / 2 : (2.2 + norm * 0.8)
+      }
       return DotMark(id: e.id, center: point(e.fraction, dotRing),
                      diameter: dotR * 2, color: e.color ?? accent,
                      opacity: min(fade(e.daysAgo), dotMaxOpacity))
@@ -643,6 +664,7 @@ extension TimeOfDayWheel.Event {
         todayStart: Date,
         windowDays: Int = 7,
         color: Color? = nil,
+        magnitude: Double? = nil,
         wakingDay: WakingDay = WakingDay(enabled: false),
         calendar: Calendar = .current) {
     guard occurredAt > .distantPast else { return nil }
@@ -652,6 +674,7 @@ extension TimeOfDayWheel.Event {
     self.init(id: id,
               fraction: (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440,
               daysAgo: daysAgo,
-              color: color)
+              color: color,
+              magnitude: magnitude)
   }
 }

@@ -3600,6 +3600,14 @@ protocol LoggedEvent {
   var id: String { get }
   var occurredAt: Date { get }
   var sectionKey: String { get }
+  /// Optional intrinsic "size" of the event, for proportional visualization
+  /// (meal kcal on the rhythm wheel). `nil` = no magnitude; the consumer uses
+  /// its default. Defaulted to `nil` so only sections that have one override it.
+  var magnitude: Double? { get }
+}
+
+extension LoggedEvent {
+  var magnitude: Double? { nil }
 }
 
 extension GutEventEntity: LoggedEvent { var sectionKey: String { "gut" } }
@@ -3620,6 +3628,11 @@ extension IntakeEventEntity: LoggedEvent { var sectionKey: String { "intake" } }
 extension NutritionEntryEntity: LoggedEvent {
   var occurredAt: Date { loggedAt }
   var sectionKey: String { "nutrition" }
+  /// Meal size = caloric energy, when present (>0) — the same kcal the meal
+  /// detail row sizes its macro bar against. Drives the rhythm wheel's
+  /// proportional meal dots; pure-hydration rows (water, no kcal) carry no
+  /// magnitude and fall back to the default dot size.
+  var magnitude: Double? { (kcal ?? 0) > 0 ? kcal : nil }
 }
 
 /// Cross-section event queries powered by `occurredAt` — the payoff of the
@@ -3702,7 +3715,8 @@ enum LoggedEvents {
     func grab<E: PersistentModel & LoggedEvent>(_ desc: FetchDescriptor<E>) {
       let rows = (try? context.fetch(desc)) ?? []
       out.append(contentsOf: rows.map {
-        TimedEvent(id: $0.id, sectionKey: $0.sectionKey, occurredAt: $0.occurredAt)
+        TimedEvent(id: $0.id, sectionKey: $0.sectionKey, occurredAt: $0.occurredAt,
+                   magnitude: $0.magnitude)
       })
     }
     grab(FetchDescriptor<GutEventEntity>(predicate: #Predicate { $0.occurredAt >= date }))
@@ -3729,4 +3743,7 @@ public struct TimedEvent: Sendable, Identifiable {
   public let id: String
   public let sectionKey: String
   public let occurredAt: Date
+  /// Optional intrinsic size (meal kcal) for proportional plotting; `nil` for
+  /// sections with no magnitude. Defaulted so existing call sites are unaffected.
+  public var magnitude: Double? = nil
 }
