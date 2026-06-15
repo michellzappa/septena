@@ -870,7 +870,7 @@
 		3478D00EF04684D27A69EECF /* NutritionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		356B3BA1FD42A9CB75318D25 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskConvo.swift; sourceTree = "<group>"; };
 		3BA5382DB2297A2101E4C886 /* LoggableDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggableDetailView.swift; sourceTree = "<group>"; };
@@ -963,8 +963,8 @@
 		7665B2DC0D88761C66A7600D /* MCPToolCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolCatalog.swift; sourceTree = "<group>"; };
 		7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPatternsSection.swift; sourceTree = "<group>"; };
 		77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueFlowView.swift; sourceTree = "<group>"; };
-		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		78BD3A7769358CC755D5E3E3 /* CoachContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachContextBuilder.swift; sourceTree = "<group>"; };
 		78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementIntents.swift; sourceTree = "<group>"; };
 		79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNutritionEntrySheet.swift; sourceTree = "<group>"; };
@@ -1138,7 +1138,7 @@
 		F026D3432CFBCE4FE8412750 /* HomepageDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageDomain.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
 		F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
-		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F19A6EE7622D933F115B075D /* WorkoutLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLogEntity.swift; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
 		F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextBlocks.swift; sourceTree = "<group>"; };
@@ -3285,6 +3285,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -3321,6 +3322,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Septena;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
