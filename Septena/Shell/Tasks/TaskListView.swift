@@ -271,7 +271,16 @@ struct TaskListView: View {
 
   private var taskList: some View {
     taskListContent
+    // macOS: `.inset` gives the modern content-list look — a rounded, inset
+    // selection capsule (Reminders / Notes / Mail), consistent with the
+    // sidebar's `.sidebar` style — instead of `.plain`'s full-bleed square bar.
+    // iOS keeps `.plain`: the standard edge-to-edge task list (selection there
+    // is edit-mode circles, not a row highlight).
+    #if os(macOS)
+    .listStyle(.inset)
+    #else
     .listStyle(.plain)
+    #endif
     .scrollContentBackground(.hidden)
     .background(Theme.paperBackground)
     .scrollDismissesKeyboard(.interactively)
@@ -424,21 +433,6 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var taskListHeader: some View {
-    #if os(macOS)
-    // Reach this list's backing NSTableView and disable its native selection
-    // highlight, so the only selection indicator is our on-theme bubble
-    // (`rowBackground`) — not the system-blue full-bleed bar. Selection itself
-    // (click / ⌘ / ⇧ / ↑↓ keyboard nav) is untouched; we just stop AppKit from
-    // painting the highlight. Lives in a hairline row so the introspector sits
-    // *inside* the table and resolves to the right one (never the sidebar's).
-    Color.clear
-      .frame(height: 1)
-      .background(PlainListSelectionHighlightDisabler())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .listRowInsets(EdgeInsets())
-      .selectionDisabled()
-    #endif
     titleRow
     newTodosBannerRow
     remindersRow
@@ -1004,32 +998,24 @@ struct TaskListView: View {
     #endif
   }
 
-  /// The one selection / active indicator: an on-theme rounded "bubble" in the
-  /// tasks accent. This is the modern macOS list-selection look (Things,
-  /// Reminders, Notes) and stays on-brand — the system-blue full-bleed native
-  /// highlight is neutralized with `.tint(.clear)` on the List, so this is the
-  /// only thing the user sees. A *selected* row reads at full strength (and Esc
-  /// / clicking away clears it via `selection`); a row whose inspector is open
-  /// but isn't the keyboard cursor keeps a lighter ghost so it stays anchored
-  /// while the cursor moves elsewhere. On iOS/iPad `selection` is empty outside
-  /// edit mode, so the detail-open ghost is the sole indicator there.
+  /// Selection leans entirely on the native `List(selection:)` highlight (the
+  /// system accent) — the modern SwiftUI standard, identical to Reminders /
+  /// Notes. macOS draws nothing custom here.
+  ///
+  /// The one gap native selection can't fill: on iPhone/iPad a `Set` selection
+  /// only renders in edit mode, so outside it there's no native highlight to
+  /// mark which row's detail is currently open. A light on-theme ghost anchors
+  /// that open row there. (Edit-mode multi-select circles are unaffected.)
   @ViewBuilder
   private func rowBackground(for task: SeptenaTask) -> some View {
-    // The on-theme bubble IS the selection on both platforms — the native
-    // full-bleed highlight is suppressed on macOS via the table's
-    // `selectionHighlightStyle` (see `PlainListSelectionHighlightDisabler`), and
-    // on iOS the clear `.listRowBackground` keeps the system fill from showing.
-    // A selected row reads at full strength; a row whose inspector is open but
-    // isn't the keyboard cursor keeps a lighter ghost so it stays anchored.
-    // (On iPhone `selection` is empty outside edit mode, so the ghost is the
-    // only indicator there; on iPad keyboard nav now shows the same bubble as
-    // macOS. Edit-mode multi-select circles are unaffected.)
-    let isSelected = selection.contains(task.id)
+    #if os(iOS)
     let isOpen = editingDetail?.id == task.id
-    let opacity: Double = isSelected ? 0.18 : (isOpen ? 0.10 : 0)
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(theme.color(for: "tasks").opacity(opacity))
+      .fill(theme.color(for: "tasks").opacity(isOpen ? 0.10 : 0))
       .padding(.horizontal, Theme.hPadding - 6)
+    #else
+    Color.clear
+    #endif
   }
 
   private func applySuggestion(task: SeptenaTask,

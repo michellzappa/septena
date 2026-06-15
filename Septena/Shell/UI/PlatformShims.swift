@@ -88,18 +88,10 @@ extension View {
 #if os(macOS)
 import AppKit
 
-/// Transparent AppKit view that fires `action` on a secondary-click and then
-/// gets out of the way so SwiftUI's `.contextMenu` opens the menu itself.
-///
-/// We deliberately NEVER claim the event: `hitTest(_:)` runs `action` (e.g.
-/// "select this row") the instant a right-click lands, then returns `nil` so
-/// the click falls straight THROUGH to the SwiftUI content beneath. Because the
-/// event is never forwarded up the responder chain to the backing
-/// `NSTableView`, the table never paints its own right-click row emphasis — that
-/// emphasis is drawn independently of `selectionHighlightStyle` and would
-/// otherwise stack on top of our on-theme selection bubble, producing the
-/// "double selection" highlight. All other events (primary click, hover, drag)
-/// pass through untouched too.
+/// Transparent AppKit view that fires `action` on right-mouse-down then
+/// forwards to the next responder so SwiftUI's `.contextMenu` still opens.
+/// `hitTest(_:)` returns self only for secondary-click events; all other
+/// events pass through to the SwiftUI content beneath.
 struct RightClickCatcher: NSViewRepresentable {
   let action: () -> Void
 
@@ -116,14 +108,24 @@ struct RightClickCatcher: NSViewRepresentable {
     }
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Only claim the hit for secondary-click events. Everything else
+    /// (primary click, hover, drag) falls through to SwiftUI.
     override func hitTest(_ point: NSPoint) -> NSView? {
       guard super.hitTest(point) != nil else { return nil }
-      guard NSApp.currentEvent?.type == .rightMouseDown else { return nil }
-      // Update selection now, then let the click reach SwiftUI's `.contextMenu`
-      // below by returning nil. `action` (selectOnly) is idempotent, so the
-      // occasional repeated hit-test during menu tracking is harmless.
+      guard let event = NSApp.currentEvent else { return nil }
+      switch event.type {
+      case .rightMouseDown, .rightMouseUp, .rightMouseDragged:
+        return self
+      default:
+        return nil
+      }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
       action()
-      return nil
+      // Forward up the responder chain so SwiftUI's contextMenu still
+      // opens — without this, returning self in hitTest would swallow it.
+      nextResponder?.rightMouseDown(with: event)
     }
   }
 }
@@ -166,51 +168,6 @@ struct DoubleClickCatcher: NSViewRepresentable {
   }
 }
 
-/// Reaches the `NSTableView` backing a SwiftUI `List` and turns OFF its native
-/// selection highlight (`selectionHighlightStyle = .none`). Selection stays
-/// fully live — click, ⌘/⇧-click, and ↑↓ keyboard nav all still update the
-/// `List(selection:)` set — we just stop AppKit from painting the system-blue
-/// full-bleed bar, so a view can draw its own on-theme selection background
-/// instead. `.tint(.clear)` does NOT achieve this on a `.plain` macOS list;
-/// the highlight style does.
-///
-/// Self-scoping: place it inside a list row (its host view is then a descendant
-/// of the table), and it walks UP the superview chain to the first enclosing
-/// `NSTableView` — guaranteed to be *that* list's table, never a sibling
-/// list/sidebar in another split-view pane. Re-applies on every SwiftUI update
-/// so it survives the list rebuilding its table (e.g. on a filter swap).
-struct PlainListSelectionHighlightDisabler: NSViewRepresentable {
-  func makeNSView(context: Context) -> NSView { Host() }
-  func updateNSView(_ nsView: NSView, context: Context) {
-    (nsView as? Host)?.disableHighlight()
-  }
-
-  final class Host: NSView {
-    private weak var table: NSTableView?
-
-    override func viewDidMoveToWindow() {
-      super.viewDidMoveToWindow()
-      // Defer one runloop hop so the List's NSTableView is in the tree.
-      DispatchQueue.main.async { [weak self] in self?.disableHighlight() }
-    }
-
-    func disableHighlight() {
-      if let table {
-        table.selectionHighlightStyle = .none
-        return
-      }
-      var ancestor = superview
-      while let current = ancestor {
-        if let found = current as? NSTableView {
-          found.selectionHighlightStyle = .none
-          table = found
-          return
-        }
-        ancestor = current.superview
-      }
-    }
-  }
-}
 #endif
 
 /// Click-to-edit title: renders as `Text` until tapped, then becomes a
