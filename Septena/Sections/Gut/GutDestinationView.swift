@@ -15,6 +15,8 @@ struct GutDestinationView: View {
   @State private var creating: Bool = false
   /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
   @State private var weekPoints: [WheelPoint] = []
+  /// Movement dates over the trailing ~17 weeks for the frequency heatmap.
+  @State private var freqDates: [String] = []
   /// The day the drawer is viewing. Bound to `SectionDrawer`'s
   /// `currentDate` slot so the user can step prev/next from the date
   /// strip and `reload()` re-fetches for that day. Defaults to today.
@@ -60,6 +62,9 @@ struct GutDestinationView: View {
           }
         }
       case .patterns:
+        EventFrequencySection(
+          title: "How often", accent: accent, dates: freqDates,
+          emptyText: loading ? nil : "Log a few movements and a daily-frequency heatmap appears here.")
         rhythmSection
       }
     }
@@ -110,8 +115,21 @@ struct GutDestinationView: View {
       ChecklistMirror.loadGutDay(context: $0, date: date)
     }
     await reloadWeek()
+    await reloadFrequency()
     loading = false
     applyEmptyStateNudgeIfNeeded()
+  }
+
+  /// Movement dates over the trailing ~17 weeks (119 days) for the frequency
+  /// heatmap — one entry per event, so multiple-per-day darkens that cell.
+  private func reloadFrequency() async {
+    let cutoff = Calendar.current.date(byAdding: .day, value: -118, to: todayStart) ?? todayStart
+    freqDates = await MirrorReader.shared.read { ctx in
+      let desc = FetchDescriptor<GutEventEntity>(
+        predicate: #Predicate { $0.occurredAt >= cutoff }
+      )
+      return ((try? ctx.fetch(desc)) ?? []).map(\.date)
+    }
   }
 
   /// Editable dual sections open in Patterns when today's Log is empty: an empty

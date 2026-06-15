@@ -59,6 +59,7 @@ struct ChoresDestinationView: View {
       case .patterns:
         CompletionPatternsSection(title: "Completion", accent: accent,
                                   days: history, loading: !model.hasLoaded)
+        byChoreSection
       }
     }
     .tint(accent)
@@ -95,6 +96,25 @@ struct ChoresDestinationView: View {
         onDone: { _ in Task { await model.load() } }
       )
     }
+  }
+
+  /// Per-chore drill-in for Patterns mode — every chore, tap to open its
+  /// detail (completion history + learned cadence; same detail the Log rows
+  /// open). Subtitle shows when it was last done.
+  private var byChoreSection: some View {
+    let rows = model.chores
+      .sorted { $0.name < $1.name }
+      .map { chore in
+        BreakdownRow(id: chore.id,
+                     title: chore.emoji.map { "\($0) \(chore.name)" } ?? chore.name,
+                     detail: chore.lastCompleted.map { "last done \(LogDetailFormat.relativeDay($0))" }
+                       ?? "not done yet")
+      }
+    return SectionBreakdownList(
+      title: "By chore", rows: rows, accent: accent,
+      selectedID: viewing?.id,
+      onTap: { id in viewing = model.chores.first { $0.id == id } }
+    )
   }
 
   /// Single source of truth for chore rows in all three sections. Tap

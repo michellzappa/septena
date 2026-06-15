@@ -40,6 +40,14 @@ struct SymptomsDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
+        DrawerSection("Summary") {
+          StatStrip(stats: [
+            Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
+            Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
+            Stat(value: averageSeverityText, label: "average", tint: accent),
+          ])
+        }
+
         DrawerSection("Log", padding: .none) {
           if dayEvents.isEmpty {
             Text("Nothing logged yet.")
@@ -59,14 +67,6 @@ struct SymptomsDestinationView: View {
               )
             }
           }
-        }
-
-        DrawerSection("Summary") {
-          StatStrip(stats: [
-            Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
-            Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
-            Stat(value: averageSeverityText, label: "average", tint: accent),
-          ])
         }
       case .patterns:
         if events.isEmpty {
@@ -216,29 +216,25 @@ struct SymptomsDestinationView: View {
   }
 
   /// One tappable row per active symptom that has any history — tap to open its
-  /// own severity heatmap. Mirrors how habits/supplements drill into a per-item
-  /// consistency heatmap.
-  @ViewBuilder
+  /// own severity heatmap. The shared `SectionBreakdownList` is the same drill-in
+  /// surface habits/supplements/chores/medications use. Sorted most-logged first
+  /// (symptom catalogs are uncurated and can be long).
   private var bySymptomSection: some View {
     let tally = tallies
     let rows = activeDefinitions
       .filter { (tally[$0.id]?.count ?? 0) > 0 }
       .sorted { (tally[$0.id]?.count ?? 0) > (tally[$1.id]?.count ?? 0) }
-    if !rows.isEmpty {
-      DrawerSection("By symptom", padding: .none) {
-        ForEach(rows) { def in
-          let t = tally[def.id]!
-          Button { viewingSymptom = def } label: {
-            LogRow(title: definitionTitle(def),
-                   detail: "\(t.count) logged · peak \(t.peak)/10",
-                   trailing: "›",
-                   tint: accent,
-                   isSelected: viewingSymptom?.id == def.id)
-          }
-          .buttonStyle(.plain)
-        }
+      .map { def -> BreakdownRow in
+        let t = tally[def.id]!
+        return BreakdownRow(id: def.id,
+                            title: definitionTitle(def),
+                            detail: "\(t.count) logged · peak \(t.peak)/10")
       }
-    }
+    return SectionBreakdownList(
+      title: "By symptom", rows: rows, accent: accent,
+      selectedID: viewingSymptom?.id,
+      onTap: { id in viewingSymptom = activeDefinitions.first { $0.id == id } }
+    )
   }
 
   private func definitionTitle(_ def: SymptomDefinitionEntity) -> String {

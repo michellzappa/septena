@@ -73,6 +73,7 @@ struct HabitsDestinationView: View {
       case .patterns:
         CompletionPatternsSection(title: "Completion", accent: accent,
                                   days: history, loading: !model.hasLoaded)
+        byHabitSection
       }
     }
     .tint(accent)
@@ -206,6 +207,24 @@ struct HabitsDestinationView: View {
     checklistMutator.deleteHabit(id: habit.id)
     model.habits.removeAll { $0.id == habit.id }
     Haptics.warning()
+  }
+
+  // MARK: - Patterns breakdown
+
+  /// Per-habit drill-in for Patterns mode — every habit in the stack, tap to
+  /// open its consistency heatmap (the same detail the Log rows open). Subtitle
+  /// reuses the already-loaded 30-day completion rate, so no extra query.
+  private var byHabitSection: some View {
+    let rows = model.habits.map { habit in
+      BreakdownRow(id: habit.id,
+                   title: habit.emoji.map { "\($0) \(habit.name)" } ?? habit.name,
+                   detail: "\(rates[habit.id] ?? 0)% last 30 days")
+    }
+    return SectionBreakdownList(
+      title: "By habit", rows: rows, accent: accent,
+      selectedID: viewing?.id,
+      onTap: { id in viewing = model.habits.first { $0.id == id } }
+    )
   }
 
   // MARK: - Sections

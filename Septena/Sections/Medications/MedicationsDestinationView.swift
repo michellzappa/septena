@@ -12,6 +12,8 @@ struct MedicationsDestinationView: View {
   @State private var viewingDate = SeptenaDate.today
   @State private var editing: MedicationDoseEventEntity?
   @State private var creating = false
+  /// Medication whose per-item detail (adherence heatmap + history) is open.
+  @State private var viewingMed: MedicationDefinitionEntity?
   // Medications is an editable dual section: Log = the day's dose list
   // (time-travelable); Patterns = adherence heatmap (taken vs daily target).
   // Default Log — the dose list is what you act on.
@@ -65,6 +67,14 @@ struct MedicationsDestinationView: View {
                   mode: $mode) {
       switch mode {
       case .log:
+        DrawerSection("Summary") {
+          StatStrip(stats: [
+            Stat(value: "\(takenCount)", label: "taken", tint: accent),
+            Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
+            Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
+          ])
+        }
+
         DrawerSection("Doses", padding: .none) {
           if dayDoses.isEmpty {
             Text("Nothing logged yet.")
@@ -85,16 +95,9 @@ struct MedicationsDestinationView: View {
             }
           }
         }
-
-        DrawerSection("Summary") {
-          StatStrip(stats: [
-            Stat(value: "\(takenCount)", label: "taken", tint: accent),
-            Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
-            Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
-          ])
-        }
       case .patterns:
         CompletionPatternsSection(title: "Adherence", accent: accent, days: adherenceDays)
+        byMedicationSection
       }
     }
     .tint(accent)
@@ -105,6 +108,36 @@ struct MedicationsDestinationView: View {
                            definitions: activeDefinitions,
                            dose: dose)
     }
+    // Tapping a medication opens its per-item detail — adherence heatmap, taken
+    // count, recent doses. "Edit" there opens a fresh dose log sheet.
+    .adaptiveDetail(item: $viewingMed) { def in
+      LoggableDetailView(
+        title: def.title,
+        emoji: nil,
+        accent: accent,
+        doneVerb: "taken",
+        fetch: { ChecklistMirror.medicationTakenDates(context: $0, medicationID: def.id) },
+        onEdit: { viewingMed = nil; creating = true }
+      )
+    }
+  }
+
+  /// Per-medication drill-in for Patterns mode — every active med, tap to open
+  /// its adherence heatmap. Subtitle counts taken doses from the in-memory
+  /// dose list, so no extra query.
+  private var byMedicationSection: some View {
+    var takenByMed: [String: Int] = [:]
+    for d in doses where d.status == "taken" { takenByMed[d.medicationID, default: 0] += 1 }
+    let rows = activeDefinitions.map { def in
+      BreakdownRow(id: def.id,
+                   title: def.title,
+                   detail: "\(takenByMed[def.id] ?? 0) taken")
+    }
+    return SectionBreakdownList(
+      title: "By medication", rows: rows, accent: accent,
+      selectedID: viewingMed?.id,
+      onTap: { id in viewingMed = activeDefinitions.first { $0.id == id } }
+    )
   }
 
   private func definition(for dose: MedicationDoseEventEntity) -> MedicationDefinitionEntity? {

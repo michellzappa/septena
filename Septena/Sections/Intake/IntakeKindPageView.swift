@@ -20,6 +20,8 @@ struct IntakeKindPageView: View {
   @State private var lastEventAt: Date? = nil
   /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
   @State private var weekPoints: [IntakeReader.IntakeInstant] = []
+  /// Event dates over the trailing ~17 weeks for the frequency heatmap.
+  @State private var freqDates: [String] = []
   @State private var loading = true
   @State private var viewingDate: String = SeptenaDate.today
   @State private var editing: IntakeEntryDTO? = nil
@@ -94,6 +96,9 @@ struct IntakeKindPageView: View {
           }
         }
       case .patterns:
+        EventFrequencySection(
+          title: "How often", accent: accent, dates: freqDates,
+          emptyText: loading ? nil : "Log a few and a daily-frequency heatmap appears here.")
         rhythmSection
       }
     }
@@ -328,6 +333,9 @@ struct IntakeKindPageView: View {
     // The wheel's window is the trailing 7 days from *today* (not the viewing
     // date), so compute it on the main actor from the day clock before the read.
     let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    // Frequency heatmap window — trailing ~17 weeks. `weekInstants` just filters
+    // by `since`, so a 119-day floor reuses it for the full history pull.
+    let histStart = Calendar.current.date(byAdding: .day, value: -118, to: todayStart) ?? todayStart
     let bundle = await MirrorReader.shared.read { ctx -> PageBundle in
       let kind = IntakeReader.loadKind(context: ctx, id: id)
       let entries = IntakeReader.loadDay(context: ctx, kindID: id, date: date)
@@ -339,8 +347,11 @@ struct IntakeKindPageView: View {
       }
       let lastAt = IntakeReader.lastEventInstant(context: ctx, kindID: id)
       let week = IntakeReader.weekInstants(context: ctx, kindID: id, since: weekStart)
+      let hist = IntakeReader.weekInstants(context: ctx, kindID: id, since: histStart)
+        .compactMap { SeptenaDate.format($0.at) }
       return PageBundle(kind: kind, entries: entries, items: items,
-                        lastContainerCount: last, lastEventAt: lastAt, weekPoints: week)
+                        lastContainerCount: last, lastEventAt: lastAt,
+                        weekPoints: week, freqDates: hist)
     }
     kind = bundle.kind
     entries = bundle.entries
@@ -348,6 +359,7 @@ struct IntakeKindPageView: View {
     lastContainerCount = bundle.lastContainerCount
     lastEventAt = bundle.lastEventAt
     weekPoints = bundle.weekPoints
+    freqDates = bundle.freqDates
     loading = false
     applyEmptyStateNudgeIfNeeded()
   }
@@ -371,6 +383,7 @@ struct IntakeKindPageView: View {
     let lastContainerCount: Int?
     let lastEventAt: Date?
     let weekPoints: [IntakeReader.IntakeInstant]
+    let freqDates: [String]
   }
 }
 

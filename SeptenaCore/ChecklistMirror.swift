@@ -265,6 +265,18 @@ enum ChecklistMirror {
     return Array(Set(states.map(\.date))).sorted()
   }
 
+  /// Dates a medication was taken (YYYY-MM-DD, de-duplicated, ascending).
+  /// Counterpart to `supplementCompletionDates` for the per-medication detail
+  /// view. Multiple doses on one day collapse to a single date — the heatmap
+  /// reads "taken that day", not how many times.
+  static func medicationTakenDates(context: ModelContext, medicationID: String) -> [String] {
+    let takenStatus = "taken"
+    let doses = (try? context.fetch(FetchDescriptor<MedicationDoseEventEntity>(
+      predicate: #Predicate { $0.medicationID == medicationID && $0.status == takenStatus }
+    ))) ?? []
+    return Array(Set(doses.map(\.date))).sorted()
+  }
+
   /// Per-habit completion rate over the trailing `days` window (default 30),
   /// as a 0–100 percentage of days done. One query for the whole stack
   /// (grouped client-side) so a checklist can show every row's rate without a

@@ -53,6 +53,7 @@ struct SupplementsDestinationView: View {
       case .patterns:
         CompletionPatternsSection(title: "Adherence", accent: accent,
                                   days: history, loading: !model.hasLoaded)
+        bySupplementSection
       }
     }
     .tint(accent)
@@ -96,6 +97,24 @@ struct SupplementsDestinationView: View {
         onDone: { _ in Task { await model.load() } }
       )
     }
+  }
+
+  // MARK: - Patterns breakdown
+
+  /// Per-supplement drill-in for Patterns mode — every supplement in the stack,
+  /// tap to open its consistency heatmap (same detail the Log rows open).
+  /// Subtitle reuses the already-loaded 30-day rate, so no extra query.
+  private var bySupplementSection: some View {
+    let rows = model.supplements.map { supp in
+      BreakdownRow(id: supp.id,
+                   title: supp.emoji.map { "\($0) \(supp.name)" } ?? supp.name,
+                   detail: "\(rates[supp.id] ?? 0)% last 30 days")
+    }
+    return SectionBreakdownList(
+      title: "By supplement", rows: rows, accent: accent,
+      selectedID: viewing?.id,
+      onTap: { id in viewing = model.supplements.first { $0.id == id } }
+    )
   }
 
   // MARK: - Today
