@@ -142,8 +142,18 @@ final class SpotlightIndexer {
     _ entities: [E], type: E.Type, snapshotKey: String
   ) async where E.ID == String {
     let currentIDs = Set(entities.map(\.id))
-    let removed = loadSnapshot(snapshotKey).subtracting(currentIDs)
-    guard !entities.isEmpty || !removed.isEmpty else { return }
+    let previous = loadSnapshot(snapshotKey)
+    let added = currentIDs.subtracting(previous)
+    let removed = previous.subtracting(currentIDs)
+    // Nothing entered or left the index since the last reconcile. Bail BEFORE
+    // touching CoreSpotlight: `.septenaDataChanged` fires in bursts (drawer
+    // open/close, CK no-op fetch loops, post-write refreshes), and without this
+    // guard each one re-pushes the ENTIRE set — hundreds of meals/workouts —
+    // through `indexAppEntities` on the main actor, wedging the app inside
+    // CoreSpotlight (NSOrderedSet/XPC) until the OS terminates it. The id-set is
+    // unchanged in all those cases, so the whole storm collapses to no-ops; a
+    // genuine add/remove still re-indexes once below.
+    guard !added.isEmpty || !removed.isEmpty else { return }
 
     let index = CSSearchableIndex.default()
     do {
