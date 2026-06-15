@@ -39,8 +39,20 @@ struct TaskComposerCard: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Environment(\.adaptiveDetailClose) private var adaptiveClose
+  // Inspector (iPad/macOS) vs. bottom sheet (iPhone) — the same flag
+  // `.adaptiveDetail` switches on. Edit mode only autofocuses in the inspector,
+  // where the keyboard doesn't fight the half-height sheet detent.
+  @Environment(\.usesPushNavigation) private var useInspector
   @State private var draft = TaskDraft()
   @State private var seeded = false
+  #if os(iOS)
+  /// Bottom-sheet height (iPhone only — the iPad/macOS inspector ignores this).
+  /// New tasks open full so the autofocused title sits above the keyboard from
+  /// the start; edits open at half height (no autofocus) and only promote to
+  /// full when a field is tapped. Seeded per-mode in `init` (before first
+  /// presentation, so editing opens at half height without flashing full first).
+  @State private var detent: PresentationDetent = .large
+  #endif
   /// Single keyboard cursor across the whole form (title, pills, terminal
   /// actions). Replaces the old title-only `titleFocused` bool.
   @FocusState private var focus: TaskEditFocus?
@@ -55,6 +67,20 @@ struct TaskComposerCard: View {
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
+
+  init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
+       onDone: @escaping () -> Void) {
+    self.mode = mode
+    self.areas = areas
+    self.projects = projects
+    self.accent = accent
+    self.onDone = onDone
+    #if os(iOS)
+    // Seed the iPhone sheet height before first presentation so editing opens
+    // directly at half height instead of flashing full then snapping down.
+    if case .edit = mode { _detent = State(initialValue: .medium) }
+    #endif
+  }
 
   private var isEditing: Bool {
     if case .edit = mode { return true }
@@ -123,6 +149,13 @@ struct TaskComposerCard: View {
       .onKeyPress(.space) { activateFocused() }
       .onKeyPress(.return) { activateFocused() }
     }
+    #if os(iOS)
+    // Half-height-when-possible bottom sheet; `detent` is seeded per-mode. The
+    // keyboard auto-promotes the sheet to `.large`, so edit mode stays half
+    // until you tap a field. (No-op for the iPad/macOS docked inspector.)
+    .presentationDetents([.medium, .large], selection: $detent)
+    .presentationContentInteraction(.scrolls)
+    #endif
     .onAppear(perform: seed)
     // Autosave on any close (Esc / swipe / click-away / Done). Idempotent via
     // `savedOrSkipped`, so the explicit Save and terminal-action paths that
@@ -317,11 +350,15 @@ struct TaskComposerCard: View {
       // happens on Save, and only when the edit actually (re)places it (see
       // `persist`).
       //
-      // Open with the cursor already in the title (keyboard-driven open: a row
-      // is opened with Return, so you can edit immediately). Same settle delay
-      // as create — an immediate focus is dropped before the field joins the
-      // responder chain.
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
+      // On the iPhone sheet, editing opens at half height (seeded in `init`)
+      // with no autofocus: you're reviewing an existing task, not entering one,
+      // so we don't raise the keyboard (which would force the sheet to full).
+      // Tapping the title focuses it and the system promotes the sheet then.
+      // In the iPad/macOS inspector there's no detent to protect, so keep the
+      // keyboard-driven "open row with Return, edit immediately" focus.
+      if useInspector {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
+      }
     }
   }
 
@@ -859,15 +896,6 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder card: @escaping () -> Card
   ) -> some View {
-    adaptiveDetail(isPresented: isPresented) {
-      card()
-      #if os(iOS)
-        // On iPhone the drawer is a bottom sheet: open at half height when the
-        // content fits, with a drag-up to full. (No-op on iPad/macOS, where
-        // `adaptiveDetail` docks an inspector that ignores presentation detents.)
-        .presentationDetents([.medium, .large])
-        .presentationContentInteraction(.scrolls)
-      #endif
-    }
+    adaptiveDetail(isPresented: isPresented) { card() }
   }
 }
