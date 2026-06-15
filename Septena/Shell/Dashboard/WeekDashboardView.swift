@@ -60,15 +60,11 @@ struct WeekDashboardView: View {
   /// that resets back to Tiles. Phases 3-5 land the actual renderers.
   @AppStorage(SettingsKey.homepageLayout)
   private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
-  @AppStorage(SettingsKey.homepageShowWelcome)
-  private var showWelcome: Bool = true
-  /// "Today at a glance" between the greeting and the layout grid: the
-  /// circular Day dial hero, the linear timeline strip, or hidden
-  /// (`DayViewStyle`, Settings ▸ Home).
+  /// "Today at a glance" at the top of the layout grid: the circular Day dial
+  /// hero, the linear timeline strip, or hidden (`DayViewStyle`, Settings ▸
+  /// Home).
   @AppStorage(SettingsKey.homepageDayView)
   private var dayViewRaw: String = DayViewStyle.dial.rawValue
-  @AppStorage(SettingsKey.welcomeDataAware)
-  private var welcomeDataAware: Bool = false
   /// Fasting tracking master toggle + heatmap metric preference. When
   /// off, both the tile and the heatmap render protein like before;
   /// when on, the tile morphs based on the live `FastingState` and the
@@ -304,14 +300,6 @@ struct WeekDashboardView: View {
           #if os(macOS)
           ClaudeReconnectCue(.card)
           #endif
-          if showWelcome {
-            // Self-observes DayClock so the 60s `now` tick re-renders only the
-            // header, not the whole tile grid. (Reading `clock.now` here in the
-            // parent body would invalidate every tile each minute.)
-            WelcomeHeaderSection(dataAware: welcomeDataAware,
-                                 todayTaskCount: taskCounts?.todayCount ?? 0,
-                                 dailies: dailies)
-          }
           // The day view — today at a glance, circular or linear.
           switch DayViewStyle(rawValue: dayViewRaw) ?? .dial {
           case .dial:
