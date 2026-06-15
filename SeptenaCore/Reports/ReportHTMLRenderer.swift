@@ -71,8 +71,9 @@ public enum ReportHTMLRenderer {
     } else {
       let charts = s.charts.map { chart(_:$0, accent: accent) }.joined(separator: "\n")
       let tables = s.tables.map(table).joined(separator: "\n")
+      let goalsBlock = s.goals.isEmpty ? "" : goals(s.goals, accent: accent)
       let statsBlock = stats.isEmpty ? "" : "<div class=\"stats\">\(stats)</div>"
-      body = statsBlock + charts + tables
+      body = statsBlock + charts + tables + goalsBlock
     }
 
     return """
@@ -81,6 +82,27 @@ public enum ReportHTMLRenderer {
       \(body)
     </section>
     """
+  }
+
+  private static func goals(_ gs: [ReportGoal], accent: String) -> String {
+    let rows = gs.map { g -> String in
+      let check = g.hit ? "<span class=\"gh\">✓</span>" : ""
+      let bar: String
+      if let f = g.fraction {
+        let pct = Int((min(1, max(0, f)) * 100).rounded())
+        bar = "<div class=\"gbar\"><div class=\"gfill\" style=\"width:\(pct)%;background:\(accent)\"></div></div>"
+      } else {
+        bar = ""
+      }
+      let detail = g.detail.isEmpty ? "" : "<span class=\"gd\">\(esc(g.detail))</span>"
+      return """
+      <div class="goal">
+        <div class="grow"><span class="gt">\(check)\(esc(g.text))</span>\(detail)</div>
+        \(bar)
+      </div>
+      """
+    }.joined()
+    return "<div class=\"chart\"><div class=\"ct\">Goals</div>\(rows)</div>"
   }
 
   private static func table(_ t: ReportTable) -> String {
@@ -288,6 +310,13 @@ public enum ReportHTMLRenderer {
   .tbl td { text-align: right; padding: 7px 8px; border-bottom: 1px solid #f0f0f2; font-variant-numeric: tabular-nums; }
   .tbl td.rl { text-align: left; font-weight: 500; }
   .tbl tr:last-child td { border-bottom: none; }
+  .goal { margin: 10px 0; }
+  .grow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .gt { font-size: 14px; font-weight: 500; }
+  .gh { color: #22c55e; font-weight: 700; margin-right: 5px; }
+  .gd { font-size: 12px; color: #8e8e93; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gbar { height: 6px; background: #ececef; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+  .gfill { height: 100%; border-radius: 3px; }
   .empty { color: #a0a0a5; font-size: 14px; font-style: italic; margin: 4px 0 0; }
   .foot { margin-top: 28px; padding: 0 4px; color: #a0a0a5; font-size: 12px; }
   .foot p { margin: 4px 0; }

@@ -41,6 +41,11 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
   /// How many days the shared link stays live, from each push. nil = never
   /// expires. Default 90.
   public var linkExpiryDays: Int?
+  /// Whether to surface each included section's related goals + live progress.
+  /// Optional so reports saved before this field decode cleanly (nil → true).
+  public var includeGoals: Bool?
+  /// Resolved accessor — goals are included unless explicitly turned off.
+  public var showsGoals: Bool { includeGoals ?? true }
 
   public init(id: String,
               title: String,
@@ -51,7 +56,8 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
               mcpEnabled: Bool = false,
               token: String? = nil,
               linkURL: String? = nil,
-              linkExpiryDays: Int? = 90) {
+              linkExpiryDays: Int? = 90,
+              includeGoals: Bool? = true) {
     self.id = id
     self.title = title
     self.note = note
@@ -62,6 +68,7 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
     self.token = token
     self.linkURL = linkURL
     self.linkExpiryDays = linkExpiryDays
+    self.includeGoals = includeGoals
   }
 }
 
@@ -186,6 +193,9 @@ public struct ReportSection: Codable, Sendable, Identifiable {
   public var charts: [ReportChart]
   /// Tabular detail (e.g. the exercise breakdown: working weight × sets × reps).
   public var tables: [ReportTable]
+  /// Related goals + live progress for this section (read-only). Populated on
+  /// the main actor (goal evaluation is UI-layer) after the section is built.
+  public var goals: [ReportGoal]
   /// True when no live aggregates were available for this section in the
   /// prototype (renders a quiet "not yet aggregated" note instead of charts).
   public var unavailable: Bool
@@ -198,6 +208,7 @@ public struct ReportSection: Codable, Sendable, Identifiable {
               stats: [ReportStat] = [],
               charts: [ReportChart] = [],
               tables: [ReportTable] = [],
+              goals: [ReportGoal] = [],
               unavailable: Bool = false) {
     self.key = key
     self.label = label
@@ -205,7 +216,24 @@ public struct ReportSection: Codable, Sendable, Identifiable {
     self.stats = stats
     self.charts = charts
     self.tables = tables
+    self.goals = goals
     self.unavailable = unavailable
+  }
+}
+
+public struct ReportGoal: Codable, Sendable {
+  public var text: String
+  /// "12 / 12 sessions this week", "21% (target 18–22)", etc. Empty for a
+  /// free-text goal with no measurable target.
+  public var detail: String
+  /// 0…1 progress for the bar; nil for a free-text goal (renders text only).
+  public var fraction: Double?
+  public var hit: Bool
+  public init(text: String, detail: String, fraction: Double?, hit: Bool) {
+    self.text = text
+    self.detail = detail
+    self.fraction = fraction
+    self.hit = hit
   }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import WebKit
 #if os(macOS)
 import AppKit
@@ -128,15 +129,54 @@ struct ReportsSettingsPane: View {
     let owner = store.serverSettings?.welcomeName ?? ""
     let weightUnit = store.serverSettings?.units?.weight ?? "kg"
     Task {
-      let payload = await MirrorReader.shared.read { ctx in
+      let built = await MirrorReader.shared.read { ctx in
         ReportPayloadBuilder.build(bundle: bundle, meta: meta, owner: owner, weightUnit: weightUnit, context: ctx)
       }
-      let html = ReportHTMLRenderer.html(for: payload)
       await MainActor.run {
+        var payload = built
+        // Goal progress is evaluated on the main actor (it dispatches through
+        // section plugins), so merge it here rather than in the off-main builder.
+        if bundle.showsGoals {
+          let gmap = goalsForReport(bundle.sectionKeys)
+          payload.sections = payload.sections.map { s in
+            var s = s; s.goals = gmap[s.key] ?? []; return s
+          }
+        }
+        let html = ReportHTMLRenderer.html(for: payload)
         preview = ReportPreview(bundle: bundle, payload: payload, html: html)
         renderingID = nil
       }
     }
+  }
+
+  // Related goals + live progress per section, evaluated on the main actor.
+  private func goalsForReport(_ keys: [String]) -> [String: [ReportGoal]] {
+    let ctx = LocalStore.shared.container.mainContext
+    let entities = (try? ctx.fetch(FetchDescriptor<GoalEntity>())) ?? []
+    let goals = entities.map { Goal($0) }
+    var out: [String: [ReportGoal]] = [:]
+    for key in keys {
+      let related = goals.filter { $0.sections.contains(key) }
+      let rg: [ReportGoal] = related.map { g in
+        guard let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx) else {
+          return ReportGoal(text: g.text, detail: "", fraction: nil, hit: false)
+        }
+        let cur = fmtNum(p.current), tgt = fmtNum(p.target), u = p.unitLabel
+        let detail: String
+        switch p.comparator {
+        case "lte":   detail = "\(cur) / ≤\(tgt) \(u)"
+        case "range": detail = "\(cur) \(u) (target \(tgt)–\(fmtNum(p.targetUpper ?? p.target)))"
+        default:      detail = "\(cur) / \(tgt) \(u)"
+        }
+        return ReportGoal(text: g.text, detail: detail, fraction: p.fraction, hit: p.hit)
+      }
+      if !rg.isEmpty { out[key] = rg }
+    }
+    return out
+  }
+
+  private func fmtNum(_ d: Double) -> String {
+    d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
   }
 
   // Section label + accent resolved on-main and handed to the off-main builder.
@@ -211,6 +251,17 @@ struct ReportBuilderSheet: View {
             Text("Never").tag(0)
           }
           .pickerStyle(.segmented)
+        }
+
+        SwiftUI.Section {
+          Toggle(isOn: Binding(get: { draft.showsGoals },
+                               set: { draft.includeGoals = $0 })) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Include related goals")
+              Text("Show each section's goals and live progress toward target (read-only).")
+                .font(.caption).foregroundStyle(.secondary)
+            }
+          }
         }
 
         SwiftUI.Section {

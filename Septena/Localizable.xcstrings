@@ -3723,6 +3723,9 @@
         }
       }
     },
+    "Include related goals" : {
+
+    },
     "Include this section's entries in the Next timeline." : {
       "localizations" : {
         "pt-BR" : {
@@ -6091,6 +6094,9 @@
           }
         }
       }
+    },
+    "Show each section's goals and live progress toward target (read-only)." : {
+
     },
     "Show in Next" : {
       "localizations" : {
