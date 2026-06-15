@@ -70,9 +70,7 @@ public struct ReportBundle: Codable, Identifiable, Hashable, Sendable {
 /// Where report payloads are pushed / served from. Defaults to the deployed
 /// prototype Worker; overridable via UserDefaults for testing.
 public enum ReportEndpoint {
-  // Flips to https://reports.septena.app once that custom domain is bound on the
-  // septena.app Cloudflare zone (wrangler.toml already declares the route).
-  public static let defaultBaseURL = URL(string: "https://septena-reports.mz-508.workers.dev")!
+  public static let defaultBaseURL = URL(string: "https://reports.septena.app")!
 
   public static var baseURL: URL {
     if let s = UserDefaults.standard.string(forKey: "septena.reports.baseURL"),

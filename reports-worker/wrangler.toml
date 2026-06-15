@@ -7,6 +7,8 @@ compatibility_date = "2024-11-01"
 # keeps working as a fallback. Cloudflare provisions the DNS record + cert on
 # deploy.
 account_id = "50894cc73fc5188e3efb7eb9819c54e9"
+# Served only at reports.septena.app (the *.workers.dev URL is intentionally
+# disabled — links live under the brand domain).
 routes = [{ pattern = "reports.septena.app", custom_domain = true }]
 
 # Created with: wrangler kv namespace create REPORTS
