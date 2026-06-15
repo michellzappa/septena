@@ -690,6 +690,10 @@ struct SettingsView: View {
                         preferredCompactColumn: $preferredCompactColumn) {
       sidebarList(selection: $selection)
         .navigationTitle("Settings")
+        // The sidebar is always shown — Settings is a fixed-size window with
+        // only ten root rows, so the collapse affordance just invited an
+        // awkward detail-only state. Drop the toolbar toggle entirely.
+        .toolbar(removing: .sidebarToggle)
     } detail: {
       NavigationStack {
         let dest = selection ?? .sections
@@ -778,7 +782,7 @@ struct SettingsView: View {
     Label {
       Text(title(for: dest))
     } icon: {
-      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
+      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 20, glyphRatio: 0.38)
     }
   }
 
