@@ -204,6 +204,29 @@ public enum ReportPayloadBuilder {
       tables.append(ReportTable(title: "Exercises", columns: ["Exercise", "Last set", "Best", "Sessions"], rows: rows))
     }
 
+    // Weekly volume by muscle group — sets per primary muscle, normalized to a
+    // per-week landmark (the way a coach programs volume). Joins entries to the
+    // exercise catalog's primaryMuscle.
+    let defs = ChecklistMirror.loadExerciseDefinitions(context: ctx)
+    var nameToMuscle: [String: Muscle] = [:]
+    for d in defs {
+      guard let m = d.primaryMuscle else { continue }
+      nameToMuscle[d.name.lowercased()] = m
+      for a in (d.aliases ?? []) { nameToMuscle[a.lowercased()] = m }
+    }
+    var setsByMuscle: [Muscle: Int] = [:]
+    for e in strength {
+      guard let nm = e.exercise?.lowercased(), let m = nameToMuscle[nm], let s = intOf(e.sets) else { continue }
+      setsByMuscle[m, default: 0] += s
+    }
+    if !setsByMuscle.isEmpty {
+      let weeks = max(1.0, Double(days) / 7.0)
+      let mrows = setsByMuscle.sorted { $0.value > $1.value }.map { (m, sets) in
+        [m.label, "\(sets)", String(format: "%.1f", Double(sets) / weeks)]
+      }
+      tables.append(ReportTable(title: "Volume by muscle", columns: ["Muscle", "Sets", "Sets / wk"], rows: mrows))
+    }
+
     let unavailable = sessionDates.isEmpty && cardioActive.isEmpty
     return ReportSection(key: "training", label: label, colorHex: color, stats: stats, charts: charts,
                          tables: tables, unavailable: unavailable)
