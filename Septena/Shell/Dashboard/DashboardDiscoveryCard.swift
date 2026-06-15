@@ -58,7 +58,9 @@ struct DashboardDiscoveryCard: View {
   }
 
   var body: some View {
-    if !dismissed, !suggestions.isEmpty {
+    // Screenshot builds hide the discovery card — it's an onboarding nudge, not
+    // part of the dashboard story the marketing shots are meant to show.
+    if !DemoSeedMode.isOn, !dismissed, !suggestions.isEmpty {
       VStack(alignment: .leading, spacing: 0) {
         header
         ForEach(suggestions, id: \.self) { row(for: $0) }

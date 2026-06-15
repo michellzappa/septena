@@ -21,6 +21,13 @@ SIM=$(xcrun simctl list devices available | grep "$SIM_NAME (" | head -1 \
 [ -z "$SIM" ] && { echo "No '$SIM_NAME' simulator found"; exit 1; }
 xcrun simctl boot "$SIM" 2>/dev/null || true
 xcrun simctl ui "$SIM" appearance "$APPEARANCE" 2>/dev/null || true
+# Classic Apple marketing status bar: 9:41, full signal, full battery. The
+# override needs a booted device and persists until `status_bar … clear`.
+xcrun simctl status_bar "$SIM" override \
+  --time "9:41" \
+  --dataNetwork wifi --wifiMode active --wifiBars 3 \
+  --cellularMode active --cellularBars 4 \
+  --batteryState charged --batteryLevel 100 2>/dev/null || true
 
 rm -rf "$RESULT"
 xcodebuild test -scheme Septena \

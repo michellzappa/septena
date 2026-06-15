@@ -44,8 +44,12 @@ final class ScreenshotTests: XCTestCase {
     app.swipeUp(); dwell(); capture(app, "overview-scrolled")
     app.swipeDown(); dwell()
     tapTab(app, "Next");  capture(app, "next")
-    tapTab(app, "Tasks"); capture(app, "tasks")
-    tapTab(app, "Goals"); capture(app, "goals")
+    // Tasks: scroll past the smart-list cards to reveal the seeded Areas /
+    // Projects below, then capture there.
+    tapTab(app, "Tasks"); app.swipeUp(); dwell(); capture(app, "tasks")
+    // "Goals" is not a tab — goals live in the Coach tab's Goals band. Capture
+    // that, so the shot isn't a duplicate of Tasks.
+    tapTab(app, "Coach"); capture(app, "goals")
 
     // Pass 2 — Heatmap layout. Terminate + relaunch reseeds the in-memory store.
     app.terminate()
@@ -68,7 +72,7 @@ final class ScreenshotTests: XCTestCase {
     // (one shot per app area, docs/MESSAGING.md §4) and the App Store both draw
     // from one capture set. Names match the site's vocabulary.
     captureSection(app, "Nutrition", "nutrition")
-    captureSection(app, "Training", "exercise")
+    captureSection(app, "Training", "training")
     captureSection(app, "Sleep", "sleep")
     captureSection(app, "Mood", "mood")
     captureSection(app, "Body", "body")
@@ -151,14 +155,16 @@ final class ScreenshotTests: XCTestCase {
     dismissDrawer(app)
   }
 
-  /// Dismiss the compact section drawer. On iPhone, sections open as a bottom-
-  /// sheet drawer (`.medium`/`.large` detents) with a tap-away backdrop. A blind
-  /// `swipeDown` lands inside the drawer and scrolls its content instead of
-  /// dismissing — leaving it open over the next section's row, which cascades
-  /// into skipped captures. Tapping the backdrop in the top safe-area inset
-  /// (uncovered at both detents) fires the drawer's tap-away dismissal reliably.
+  /// Dismiss the section drawer. Screenshot builds open it full-height (`.large`
+  /// only), so the backdrop is just a top sliver that overlaps the
+  /// non-interactive status bar — a tap there often misses and leaves the drawer
+  /// open over the next section's row, cascading into skipped captures. Instead
+  /// drag the grabber (top edge of the sheet) straight down: the canonical
+  /// dismissal gesture, reliable regardless of detent.
   @MainActor private func dismissDrawer(_ app: XCUIApplication) {
-    app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+    let grabber = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.07))
+    let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+    grabber.press(forDuration: 0.1, thenDragTo: bottom)
     dwell(0.8)
   }
 

@@ -171,8 +171,12 @@ struct SeptenaApp: App {
             // Direct inserts post no change notifications, so the dashboard's
             // first loadAll() can race ahead of the seed (its synchronous
             // history reads land empty). Nudge a full reload now that the data
-            // exists — onTaskChange → loadAll().
+            // exists: `.septenaTasksChanged` reloads tasks; `.septenaDataChanged`
+            // reloads the mirror-backed tiles (nutrition, training, mood, gut,
+            // intake, chores, groceries, hydration…) and recomputes their
+            // derived caches — without it those rows show 0 despite seeded data.
             NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+            NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
           }
           #endif
           // Stash the engine on the platform's app delegate so silent

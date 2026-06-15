@@ -51,6 +51,8 @@ public enum DemoSeed {
     seedChores(ctx, &rng)
     seedNutrition(ctx, &rng, trainDay: trainDay)
     seedTraining(ctx, &rng, trainDay: trainDay)
+    seedIntake(ctx, &rng, caffGrams: caffGrams, caffLate: caffLate)
+    seedActivity(ctx, &rng, trainDay: trainDay)
     seedSleep(ctx, &rng, scores: sleep)
     seedMood(ctx, &rng, scores: sleep)
     seedBody(ctx, &rng)
@@ -199,17 +201,18 @@ public enum DemoSeed {
     let meals: [(Int, String, [String])] = [
       (8, "🥣", ["Oats, blueberries, yogurt", "Eggs and toast", "Protein smoothie"]),
       (13, "🥗", ["Chicken, quinoa, veg", "Salmon poke bowl", "Turkey wrap"]),
+      (16, "🍎", ["Apple and almonds", "Greek yogurt", "Protein bar"]),
       (19, "🍝", ["Salmon, pasta, salad", "Steak and potatoes", "Tofu stir-fry"]),
     ]
     for d in 0..<days {
       let wknd = isWeekend(-d)
       for (mi, m) in meals.enumerated() {
-        let protein = Double([22, 42, 40][mi] + (trainDay[d] ? 6 : 0) + rng.int(-4, 6))
-        let carbs = Double([56, 50, 64][mi] + (wknd ? 10 : 0) + rng.int(-8, 12))
-        let fat = Double([10, 16, 24][mi] + rng.int(-3, 6))
+        let protein = Double([22, 42, 12, 40][mi] + (trainDay[d] ? 6 : 0) + rng.int(-4, 6))
+        let carbs = Double([56, 50, 22, 64][mi] + (wknd ? 10 : 0) + rng.int(-8, 12))
+        let fat = Double([10, 16, 8, 24][mi] + rng.int(-3, 6))
         ctx.insert(NutritionEntryEntity(
           id: "demo-meal-\(d)-\(mi)", loggedAt: at(-d, m.0), emoji: m.1,
-          foods: m.2[rng.int(0, m.2.count - 1)], mealType: ["breakfast", "lunch", "dinner"][mi],
+          foods: m.2[rng.int(0, m.2.count - 1)], mealType: ["breakfast", "lunch", "snack", "dinner"][mi],
           proteinG: protein, fatG: fat, carbsG: carbs,
           kcal: 4 * protein + 9 * fat + 4 * carbs, waterMl: Double(300 + rng.int(0, 220))))
       }
@@ -220,10 +223,11 @@ public enum DemoSeed {
     ctx.insert(SessionTypeEntity(id: "upper", label: "Upper", emoji: "💪",
                                  exercises: ["bench-press", "row", "overhead-press"], sortIndex: 0))
     ctx.insert(SessionTypeEntity(id: "lower", label: "Lower", emoji: "🦵", exercises: ["squat", "deadlift"], sortIndex: 1))
-    ctx.insert(SessionTypeEntity(id: "cardio", label: "Cardio", emoji: "🏃", exercises: ["run"], sortIndex: 2))
+    ctx.insert(SessionTypeEntity(id: "cardio", label: "Cardio", emoji: "🏃", exercises: ["run", "zone-2"], sortIndex: 2))
     for (slug, name, type) in [("bench-press", "Bench press", "strength"), ("row", "Barbell row", "strength"),
                                ("overhead-press", "Overhead press", "strength"), ("squat", "Back squat", "strength"),
-                               ("deadlift", "Deadlift", "strength"), ("run", "Run", "cardio")] {
+                               ("deadlift", "Deadlift", "strength"), ("run", "Run", "cardio"),
+                               ("zone-2", "Zone 2", "cardio")] {
       ctx.insert(ExerciseDefinitionEntity(id: slug, name: name, type: type))
     }
     var n = 0
@@ -248,6 +252,49 @@ public enum DemoSeed {
       default:
         add(-d, "cardio", "run", min: Double(28 + rng.int(0, 12)), dist: Double(4600 + rng.int(0, 1800)), hour: 7)
       }
+    }
+    // Daily Zone 2: a steady easy-cardio block most days (incl. today) so the
+    // weekly Z2 minutes land near the 150 target and the per-day cardio bars in
+    // the Training drawer are populated rather than empty. Morning slot, away
+    // from the evening lifts. Skipped on the heaviest run days (kind 2) where a
+    // dedicated run already covers cardio.
+    for d in 0..<days {
+      if trainDay[d] && d % 3 == 2 { continue }     // run day already logs cardio
+      if d == 0 || rng.chance(0.7) {                // today forced; ~5 days/week otherwise
+        add(-d, "cardio", "zone-2", min: Double(22 + rng.int(0, 16)), hour: 8)
+      }
+    }
+  }
+
+  /// Caffeine intake — coffee + matcha, from the canonical first-run template
+  /// so the Caffeine section and the day dial both light up. The shared
+  /// `caffGrams`/`caffLate` signals (which already model the caffeine→sleep
+  /// headline) become the timestamped events the dial plots as dots. `today`
+  /// (offset 0) always gets a morning pour + matcha so the hero dial reads full
+  /// regardless of the modeled signal or capture time.
+  private static func seedIntake(_ ctx: ModelContext, _ rng: inout SeededRNG,
+                                 caffGrams: [Double?], caffLate: [Bool]) {
+    let seed = IntakeTemplates.caffeine()
+    let kind = IntakeKindEntity(
+      id: seed.id, name: seed.name, symbol: seed.symbol, color: seed.color,
+      sortIndex: 0, unit: seed.unit, doseStyle: seed.doseStyle,
+      catalogNoun: seed.catalogNoun, flourish: seed.flourish,
+      metricMode: seed.metricMode, objective: seed.objective, templateID: seed.templateID)
+    kind.methods = seed.methods
+    ctx.insert(kind)
+
+    var n = 0
+    func cup(_ off: Int, _ h: Int, _ m: Int, method: String, grams: Double) {
+      let e = IntakeEventEntity(id: "demo-intake-\(n)", kindID: seed.id,
+                                date: day(off), method: method, amount: grams)
+      e.occurredAt = at(off, h, m); ctx.insert(e); n += 1
+    }
+    for d in 0..<days {
+      // Today is forced; other days follow the modeled caffeine signal.
+      guard let g = caffGrams[d] ?? (d == 0 ? 20 : nil) else { continue }
+      cup(-d, 7, 30, method: "v60", grams: g)                     // morning pour-over
+      if d == 0 || rng.chance(0.45) { cup(-d, 10, 30, method: "matcha", grams: 2) }
+      if caffLate[d] { cup(-d, 15, 30, method: "v60", grams: (g * 0.8).rounded()) }  // afternoon cup
     }
   }
 
@@ -332,6 +379,22 @@ public enum DemoSeed {
     }
   }
 
+  /// Apple Health activity — steps, active kcal, exercise minutes per day, so
+  /// the Activity tile has a sparkline and a real headline instead of an empty
+  /// HealthKit-unavailable placeholder. Active days (training) skew higher.
+  private static func seedActivity(_ ctx: ModelContext, _ rng: inout SeededRNG, trainDay: [Bool]) {
+    for d in 0..<days {
+      let base = trainDay[d] ? 9500 : 7200
+      let steps = base + rng.int(-1800, 3200)
+      let exMin = (trainDay[d] ? 38 : 18) + rng.int(-6, 14)
+      ctx.insert(ActivityDayEntity(
+        id: day(-d), date: day(-d),
+        stepCount: max(2200, steps),
+        activeKcal: Double(280 + steps / 22 + rng.int(-40, 80)),
+        exerciseMinutes: max(0, exMin)))
+    }
+  }
+
   private static func seedGoals(_ ctx: ModelContext) {
     let goals: [(String, [String])] = [
       ("Sleep 7+ hours most nights", ["sleep"]),
@@ -374,15 +437,30 @@ public enum DemoSeed {
       "intake": "#92400e", "body": "#ec4899", "gut": "#b45309",
       "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
     ]
-    let show: Set<String> = [
-      "tasks", "habits", "training", "chores", "supplements", "sleep", "nutrition",
-      "hydration", "groceries", "intake", "body", "gut", "mood", "activity",
+    // Tile order: sparkline-rich sections lead; list-only sections with no
+    // history strip (groceries) sink to the bottom so the dashboard reads dense
+    // from the top down. `show` is the enabled set; `order` drives sortIndex.
+    let order = [
+      "tasks", "training", "nutrition", "sleep", "activity", "body", "habits",
+      "supplements", "mood", "hydration", "intake", "gut", "chores", "groceries",
     ]
+    let show = Set(order)
     for r in (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? [] {
       if let c = palette[r.id] { r.color = c }
       if show.contains(r.id) {
         r.isEnabled = true; r.showInToday = true; r.hasOnboarded = true
       }
+    }
+    // Persist the tile order via the settings payload's `section_order` (the
+    // same field SettingsMirror reads). Merge into any existing payload so
+    // other settings survive; create the singleton row if absent.
+    let existing = (try? ctx.fetch(FetchDescriptor<SettingsEntity>()))?.first
+    var payload = (existing?.payloadData)
+      .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+    payload["section_order"] = order
+    if let data = try? JSONSerialization.data(withJSONObject: payload) {
+      if let e = existing { e.payloadData = data; e.updatedAt = .now }
+      else { ctx.insert(SettingsEntity(payloadData: data)) }
     }
   }
 }

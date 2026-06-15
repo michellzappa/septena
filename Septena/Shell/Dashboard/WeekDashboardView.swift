@@ -374,7 +374,8 @@ struct WeekDashboardView: View {
     }
     .sheet(item: intakeKindSheetBinding) { ref in
       NavigationStack { IntakeKindPageView(kindID: ref.value) }
-        .sectionDrawerPresentation()
+        // A single tracker's log (coffee, matcha…) is content-light — medium.
+        .sectionDrawerPresentation(shortInDemo: true)
     }
     .sheet(isPresented: $creatingIntakeKind) {
       IntakeKindWizard(onCreated: { _ in Task { await reloadIntake() } })
@@ -543,8 +544,12 @@ struct WeekDashboardView: View {
     // All sheet/presentation chrome (detents, translucent background, glass
     // surface style) lives in one owner so the drawer look can't drift between
     // here and SectionDrawer.
-    .sectionDrawerPresentation()
+    .sectionDrawerPresentation(shortInDemo: Self.shortDrawerSections.contains(dest.rawValue))
   }
+
+  /// Sections whose drawer content is short enough that a full-height demo
+  /// capture would be mostly empty — keep them at the medium detent.
+  private static let shortDrawerSections: Set<String> = ["gut", "nutrition"]
 
   // MARK: - Cache keys
   //

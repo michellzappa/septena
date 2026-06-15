@@ -602,10 +602,17 @@ extension View {
   /// clear to match. iPad/macOS (non-sheet hosts) get sized framing and keep the
   /// default `.solid` surface. Keeping all of this in one modifier is what
   /// prevents the drawer look from drifting between the drawer and its presenter.
-  func sectionDrawerPresentation() -> some View {
+  /// `shortInDemo` keeps a content-light section (gut, caffeine, nutrition) at
+  /// the medium detent in screenshot builds, where full-height would just be
+  /// empty space below the content.
+  func sectionDrawerPresentation(shortInDemo: Bool = false) -> some View {
     #if os(iOS)
     self
-      .presentationDetents([.medium, .large])
+      // Screenshot/UI-test builds open every drawer full-height so captures show
+      // the whole section, not a half-sheet — except content-light ones, which
+      // stay medium. Real builds keep the medium↔large resize.
+      .presentationDetents(
+        DemoSeedMode.isOn ? (shortInDemo ? [.medium] : [.large]) : [.medium, .large])
       .presentationDragIndicator(.visible)
       // Translucent COLOR, not a Material: a floating sheet with background
       // interaction enabled gives a Material no backdrop to blur, so it would
