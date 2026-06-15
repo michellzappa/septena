@@ -63,7 +63,7 @@ struct TaskPatternsSection: View {
             accent: accent,
             getDay: { iso in
               let count = byDate[iso] ?? 0
-              return HeatmapDay(level: Self.level(count), label: Self.label(iso: iso, count: count))
+              return HeatmapDay(level: HeatmapLevel.volume(count: count), label: Self.label(iso: iso, count: count))
             }
           )
         }
@@ -85,19 +85,6 @@ struct TaskPatternsSection: View {
       Text(caption)
         .font(.caption)
         .foregroundStyle(.secondary)
-    }
-  }
-
-  /// Map a day's completion count to the heatmap's 0…4 ramp. Fixed buckets
-  /// tuned for a personal to-do list (a handful of tasks is a strong day): any
-  /// completion lifts to at least level 1.
-  static func level(_ count: Int) -> Int {
-    switch count {
-    case ..<1: return 0
-    case 1...2: return 1
-    case 3...4: return 2
-    case 5...7: return 3
-    default: return 4
     }
   }
 

@@ -14,6 +14,64 @@ struct HeatmapDay {
   let label: String
 }
 
+/// Canonical 0…4 ramp convention, shared by every heatmap surface so a cell's
+/// intensity means the same thing whether it's drawn on a checklist's
+/// completion view, a symptom's severity view, or a stream's frequency view:
+///
+///   0 — nothing that day
+///   1 — partial / minimal (a skip, <25% of a stack, a very mild reading)
+///   2 — baseline positive (one occurrence; the "yes, this happened" floor)
+///   3 — elevated
+///   4 — full / peak (done, whole stack complete, most-intense reading)
+///
+/// All per-section `level()` mappings funnel through here instead of re-deriving
+/// bands locally, so the ramp can't drift between surfaces.
+enum HeatmapLevel {
+  /// Binary "did it happen": done → full (4); an explicit skip → minimal (1);
+  /// neither → empty (0).
+  static func done(_ done: Bool, skipped: Bool = false) -> Int {
+    done ? 4 : (skipped ? 1 : 0)
+  }
+
+  /// A stack's completion fraction (0–100%) → ramp. Any progress lifts off 0;
+  /// each 25% adds a level.
+  static func completion(percent: Int) -> Int {
+    percent <= 0 ? 0 : min(4, max(1, Int((Double(percent) / 25.0).rounded(.up))))
+  }
+
+  /// Count of events logged in a day for a *sparse* stream (gut, intake) → ramp.
+  /// One occurrence is the baseline positive (2); busier days darken. Use this
+  /// when a single event a day is the norm and "did it happen" matters most.
+  static func frequency(count: Int) -> Int {
+    switch count {
+    case ...0: return 0
+    case 1: return 2
+    case 2: return 3
+    default: return 4
+    }
+  }
+
+  /// Count for a *dense* stream where magnitude matters (completed tasks/day) →
+  /// a wider GitHub-style ramp so a busy day stands out from a light one.
+  static func volume(count: Int) -> Int {
+    switch count {
+    case ...0: return 0
+    case 1...2: return 1
+    case 3...4: return 2
+    case 5...7: return 3
+    default: return 4
+    }
+  }
+
+  /// A graded reading on a 0…`max` scale (e.g. symptom severity) spread across
+  /// 1…4 in even quartiles; 0 stays empty.
+  static func intensity(_ value: Int, max: Int) -> Int {
+    guard value > 0, max > 0 else { return 0 }
+    let step = Double(max) / 4.0
+    return Swift.min(4, Swift.max(1, Int((Double(value) / step).rounded(.up))))
+  }
+}
+
 struct ConsistencyHeatmap: View {
   let endDate: Date
   /// Earliest date with data. Determines the left edge column (snapped to

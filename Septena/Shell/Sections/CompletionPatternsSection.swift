@@ -107,12 +107,9 @@ struct CompletionPatternsSection: View {
     }
   }
 
-  /// Map a 0–100 completion percent to the heatmap's 0…4 ramp (0 only for an
-  /// empty day; any progress lifts to at least level 1).
-  static func level(_ pct: Int) -> Int {
-    if pct <= 0 { return 0 }
-    return min(4, max(1, Int((Double(pct) / 25.0).rounded(.up))))
-  }
+  /// Map a 0–100 completion percent to the heatmap's 0…4 ramp via the shared
+  /// `HeatmapLevel` convention (0 only for an empty day; any progress ≥ 1).
+  static func level(_ pct: Int) -> Int { HeatmapLevel.completion(percent: pct) }
 
   private static func label(iso: String, day: CompletionDay?) -> String {
     guard let day, day.total > 0 else { return iso }

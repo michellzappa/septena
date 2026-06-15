@@ -30,7 +30,7 @@ struct EventFrequencySection: View {
           accent: accent,
           getDay: { iso in
             let count = countByDate[iso] ?? 0
-            return HeatmapDay(level: Self.level(count),
+            return HeatmapDay(level: HeatmapLevel.frequency(count: count),
                               label: count > 0 ? "\(iso): \(count)" : iso)
           }
         )
@@ -45,14 +45,4 @@ struct EventFrequencySection: View {
     }
   }
 
-  /// Events-per-day → 0…4 band. Any logged day reads clearly (≥ level 2);
-  /// busier days darken. An empty day stays at 0.
-  static func level(_ count: Int) -> Int {
-    switch count {
-    case ...0: return 0
-    case 1: return 2
-    case 2: return 3
-    default: return 4
-    }
-  }
 }

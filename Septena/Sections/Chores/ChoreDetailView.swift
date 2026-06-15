@@ -70,7 +70,7 @@ struct ChoreDetailView: View {
     if !dates.isEmpty {
       let done = Set(dates)
       d.heatmap = LogHeatmap(firstDate: LogDetailFormat.firstDate(dates),
-                             level: { done.contains($0) ? 4 : 0 })
+                             level: { HeatmapLevel.done(done.contains($0)) })
     }
     d.recent = dates.reversed().prefix(12).map {
       LogRecent(title: LogDetailFormat.longDay($0), trailing: LogDetailFormat.relativeDay($0))

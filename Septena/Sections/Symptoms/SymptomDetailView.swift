@@ -64,7 +64,7 @@ struct SymptomDetailView: View {
     for e in events { peakByDate[e.date] = max(peakByDate[e.date] ?? 0, e.severity) }
     d.heatmap = LogHeatmap(
       firstDate: LogDetailFormat.firstDate(Array(distinctDays)),
-      level: { iso in severityLevel(peakByDate[iso] ?? 0) },
+      level: { iso in HeatmapLevel.intensity(peakByDate[iso] ?? 0, max: 10) },
       detail: "peak by day"
     )
 
@@ -77,18 +77,6 @@ struct SymptomDetailView: View {
                 status: .none)
     }
     return d
-  }
-
-  /// Severity 0…10 → heatmap intensity band 0…4. Empty days stay at 0; the
-  /// remaining ten points spread across the four accent stops.
-  static func severityLevel(_ severity: Int) -> Int {
-    switch severity {
-    case ...0: return 0
-    case 1...2: return 1
-    case 3...4: return 2
-    case 5...7: return 3
-    default: return 4
-    }
   }
 
   private static func recentDetail(_ e: SymptomEventEntity) -> String {

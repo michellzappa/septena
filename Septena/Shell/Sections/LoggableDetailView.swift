@@ -64,7 +64,7 @@ struct LoggableDetailView: View {
     if !allDates.isEmpty {
       d.heatmap = LogHeatmap(
         firstDate: LogDetailFormat.firstDate(allDates),
-        level: { iso in done.contains(iso) ? 4 : (skips.contains(iso) ? 1 : 0) }
+        level: { iso in HeatmapLevel.done(done.contains(iso), skipped: skips.contains(iso)) }
       )
     }
 
