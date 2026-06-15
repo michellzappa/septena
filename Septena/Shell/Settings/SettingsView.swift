@@ -2767,32 +2767,21 @@ struct SectionDetailPane: View {
 
   @ViewBuilder
   private var sectionExportRow: some View {
-    // Build payload lazily on render. Empty Data → ShareLink still renders
-    // but the file will be near-empty; that's the user's signal that this
-    // section has no exportable rows yet (or a code path missing in
-    // ImportExportService.collectTables).
-    let payload = (try? ImportExportService.exportSection(sectionKey)) ?? Data()
-    let filename = "septena-\(sectionKey)-\(ImportExportService.todayStamp).json"
-    ShareLink(item: ExportFile(data: payload, suggestedName: filename),
+    // Serialize lazily — ExportFile carries the closure, so the section's
+    // records are fetched + encoded only when the share sheet pulls them, not
+    // on every render of this pane.
+    let key = sectionKey
+    let filename = "septena-\(key)-\(ImportExportService.todayStamp).json"
+    ShareLink(item: ExportFile(suggestedName: filename) {
+                try ImportExportService.exportSection(key)
+              },
               preview: SharePreview(filename, image: Image(systemName: "square.and.arrow.up"))) {
       HStack {
         Label("Export Data", systemImage: "square.and.arrow.up")
           .foregroundStyle(.primary)
         Spacer()
-        Text(SectionDetailPane.formatBytes(payload.count))
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
       }
     }
-  }
-
-  // Local copy of byteSize — ImportExportSettingsPane's helper is private.
-  // Cheap; not worth refactoring shared state for one call site.
-  private static func formatBytes(_ bytes: Int) -> String {
-    let f = ByteCountFormatter()
-    f.allowedUnits = [.useBytes, .useKB, .useMB]
-    f.countStyle = .file
-    return f.string(fromByteCount: Int64(bytes))
   }
 
   @ViewBuilder
