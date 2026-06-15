@@ -196,6 +196,9 @@ public struct ReportSection: Codable, Sendable, Identifiable {
   /// Related goals + live progress for this section (read-only). Populated on
   /// the main actor (goal evaluation is UI-layer) after the section is built.
   public var goals: [ReportGoal]
+  /// Free-text notes (e.g. recent session notes), each a preformatted line
+  /// like "Jun 3 — felt strong, left knee tight".
+  public var notes: [String]
   /// True when no live aggregates were available for this section in the
   /// prototype (renders a quiet "not yet aggregated" note instead of charts).
   public var unavailable: Bool
@@ -209,6 +212,7 @@ public struct ReportSection: Codable, Sendable, Identifiable {
               charts: [ReportChart] = [],
               tables: [ReportTable] = [],
               goals: [ReportGoal] = [],
+              notes: [String] = [],
               unavailable: Bool = false) {
     self.key = key
     self.label = label
@@ -217,6 +221,7 @@ public struct ReportSection: Codable, Sendable, Identifiable {
     self.charts = charts
     self.tables = tables
     self.goals = goals
+    self.notes = notes
     self.unavailable = unavailable
   }
 }

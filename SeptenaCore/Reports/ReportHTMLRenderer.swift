@@ -24,12 +24,13 @@ public enum ReportHTMLRenderer {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>\(esc(payload.title))</title>
+    \(socialMeta)
     <style>\(css)</style>
     </head>
     <body>
     <main class="report">
       <header class="head">
-        <a class="brand" href="https://www.septena.app">Septena</a>
+        <a class="brand" href="https://www.septena.app">\(logoSVG)<span>Septena</span></a>
         <h1>\(esc(payload.title))</h1>
         \(ownerLine)
         \(noteLine)
@@ -49,6 +50,42 @@ public enum ReportHTMLRenderer {
     </html>
     """
   }
+
+  /// Social/link-unfurl metadata. Deliberately **generic and branded** — the
+  /// preview never exposes the report's personal title/owner, only Septena's
+  /// marketing. `noindex` keeps health-report links out of search engines. The
+  /// OG image reuses the site's marketing card. This is the link's marketing
+  /// surface; the report content itself is only seen once the recipient opens it.
+  private static let socialMeta = """
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Septena">
+  <meta property="og:title" content="A private health report, shared with Septena">
+  <meta property="og:description" content="An aggregate, read-only summary — shared securely from Septena, one private app for everything you track.">
+  <meta property="og:image" content="https://www.septena.app/opengraph-image">
+  <meta property="og:url" content="https://www.septena.app">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="A private health report, shared with Septena">
+  <meta name="twitter:description" content="An aggregate, read-only summary — shared securely from Septena.">
+  <meta name="twitter:image" content="https://www.septena.app/opengraph-image">
+  <meta name="theme-color" content="#f4f5f7">
+  """
+
+  /// The Septena mark — the seven-circle ring (matches public/icon.svg),
+  /// inlined so the report stays self-contained.
+  private static let logoSVG = """
+  <svg viewBox="0 0 512 512" width="30" height="30" aria-hidden="true">
+    <g transform="translate(256 256) scale(0.95) translate(-256 -256)">
+      <circle cx="256" cy="107" r="49" fill="#ef4444"/>
+      <circle cx="373" cy="162" r="49" fill="#f97316"/>
+      <circle cx="402" cy="290" r="49" fill="#eab308"/>
+      <circle cx="321" cy="391" r="49" fill="#22c55e"/>
+      <circle cx="191" cy="391" r="49" fill="#06b6d4"/>
+      <circle cx="110" cy="290" r="49" fill="#3b82f6"/>
+      <circle cx="139" cy="162" r="49" fill="#8b5cf6"/>
+    </g>
+  </svg>
+  """
 
   // MARK: - Section card
 
@@ -72,8 +109,9 @@ public enum ReportHTMLRenderer {
       let charts = s.charts.map { chart(_:$0, accent: accent) }.joined(separator: "\n")
       let tables = s.tables.map(table).joined(separator: "\n")
       let goalsBlock = s.goals.isEmpty ? "" : goals(s.goals, accent: accent)
+      let notesBlock = s.notes.isEmpty ? "" : notesHTML(s.notes)
       let statsBlock = stats.isEmpty ? "" : "<div class=\"stats\">\(stats)</div>"
-      body = statsBlock + charts + tables + goalsBlock
+      body = statsBlock + charts + tables + goalsBlock + notesBlock
     }
 
     return """
@@ -82,6 +120,11 @@ public enum ReportHTMLRenderer {
       \(body)
     </section>
     """
+  }
+
+  private static func notesHTML(_ notes: [String]) -> String {
+    let rows = notes.map { "<div class=\"note\">\(esc($0))</div>" }.joined()
+    return "<div class=\"chart\"><div class=\"ct\">Session notes</div>\(rows)</div>"
   }
 
   private static func goals(_ gs: [ReportGoal], accent: String) -> String {
@@ -282,8 +325,10 @@ public enum ReportHTMLRenderer {
   }
   .report { max-width: 820px; margin: 0 auto; padding: 32px 20px 60px; }
   .head { padding: 8px 4px 20px; }
-  .brand { display: inline-block; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8e8e93; font-weight: 600; text-decoration: none; }
-  .brand:hover { color: #636366; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+  .brand svg { display: block; flex: none; }
+  .brand span { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: #8e8e93; font-weight: 600; }
+  .brand:hover span { color: #636366; }
   .head h1 { font-size: 26px; line-height: 1.2; margin: 6px 0 2px; font-weight: 700; }
   .owner { font-size: 16px; color: #3a3a3c; font-weight: 500; }
   .note { margin: 12px 0 0; color: #3a3a3c; background: #fff; border-radius: 10px; padding: 12px 14px; border: 1px solid #e5e5ea; }
@@ -317,6 +362,8 @@ public enum ReportHTMLRenderer {
   .gd { font-size: 12px; color: #8e8e93; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .gbar { height: 6px; background: #ececef; border-radius: 3px; margin-top: 5px; overflow: hidden; }
   .gfill { height: 100%; border-radius: 3px; }
+  .note { font-size: 13px; color: #3a3a3c; padding: 8px 0; border-bottom: 1px solid #f0f0f2; line-height: 1.45; }
+  .note:last-child { border-bottom: none; }
   .empty { color: #a0a0a5; font-size: 14px; font-style: italic; margin: 4px 0 0; }
   .foot { margin-top: 28px; padding: 0 4px; color: #a0a0a5; font-size: 12px; }
   .foot p { margin: 4px 0; }

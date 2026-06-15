@@ -19,6 +19,7 @@ public enum ReportPayloadBuilder {
   public static let supportedKeys: Set<String> = [
     "habits", "supplements", "chores", "gut",
     "training", "nutrition", "mood", "activity",
+    "sleep", "body", "hydration",
   ]
 
   public static func build(bundle: ReportBundle,
@@ -58,6 +59,9 @@ public enum ReportPayloadBuilder {
     case "nutrition":   return nutrition(label, colorHex, days, context)
     case "mood":        return mood(label, colorHex, days, context)
     case "activity":    return activity(label, colorHex, days, context)
+    case "sleep":       return sleep(label, colorHex, days, context)
+    case "body":        return body(label, colorHex, days, weightUnit, context)
+    case "hydration":   return hydration(label, colorHex, days, context)
     default:
       return ReportSection(key: key, label: label, colorHex: colorHex, unavailable: true)
     }
@@ -227,9 +231,19 @@ public enum ReportPayloadBuilder {
       tables.append(ReportTable(title: "Volume by muscle", columns: ["Muscle", "Sets", "Sets / wk"], rows: mrows))
     }
 
+    // Session notes — one per session (date), most recent first.
+    var seenDates = Set<String>()
+    var notes: [String] = []
+    for e in entries where !(e.note ?? "").isEmpty {
+      guard !seenDates.contains(e.date) else { continue }
+      seenDates.insert(e.date)
+      notes.append("\(SeptenaDate.friendlyLabel(e.date)) — \(e.note!)")
+      if notes.count >= 8 { break }
+    }
+
     let unavailable = sessionDates.isEmpty && cardioActive.isEmpty
     return ReportSection(key: "training", label: label, colorHex: color, stats: stats, charts: charts,
-                         tables: tables, unavailable: unavailable)
+                         tables: tables, notes: notes, unavailable: unavailable)
   }
 
   private static func nutrition(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
@@ -298,6 +312,97 @@ public enum ReportPayloadBuilder {
                                                   points: rows.compactMap { r in r.stepCount.map { ReportPoint(label: r.date, value: Double($0)) } })]
     return ReportSection(key: "activity", label: label, colorHex: color, stats: stats, charts: charts,
                          unavailable: steps.isEmpty)
+  }
+
+  private static func sleep(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+    let since = isoDaysAgo(days)
+    let desc = FetchDescriptor<OuraNightEntity>(
+      predicate: #Predicate { $0.id >= since },
+      sortBy: [SortDescriptor(\.id)]
+    )
+    let rows = (try? ctx.fetch(desc)) ?? []
+    let scores = rows.compactMap { $0.sleepScore }
+    let durations = rows.compactMap { $0.totalH }
+    let readiness = rows.compactMap { $0.readinessScore }
+    var stats: [ReportStat] = []
+    if !scores.isEmpty {
+      stats.append(ReportStat(label: "Avg sleep score", value: "\(scores.reduce(0,+) / scores.count)"))
+    }
+    if !durations.isEmpty {
+      let avg = durations.reduce(0,+) / Double(durations.count)
+      stats.append(ReportStat(label: "Avg duration", value: String(format: "%.1f h", avg)))
+    }
+    if !readiness.isEmpty {
+      stats.append(ReportStat(label: "Avg readiness", value: "\(readiness.reduce(0,+) / readiness.count)"))
+    }
+    stats.append(ReportStat(label: "Nights", value: "\(max(scores.count, durations.count))"))
+    var charts: [ReportChart] = []
+    if !scores.isEmpty {
+      charts.append(ReportChart(title: "Sleep score", kind: .line,
+                                points: rows.compactMap { r in r.sleepScore.map { ReportPoint(label: r.id, value: Double($0)) } }))
+    }
+    if !durations.isEmpty {
+      charts.append(ReportChart(title: "Total sleep", kind: .line, unit: "h",
+                                points: rows.compactMap { r in r.totalH.map { ReportPoint(label: r.id, value: $0) } }))
+    }
+    return ReportSection(key: "sleep", label: label, colorHex: color, stats: stats, charts: charts,
+                         unavailable: scores.isEmpty && durations.isEmpty)
+  }
+
+  private static func body(_ label: String, _ color: String, _ days: Int, _ weightUnit: String, _ ctx: ModelContext) -> ReportSection {
+    let since = isoDaysAgo(days)
+    let desc = FetchDescriptor<WithingsRowEntity>(
+      predicate: #Predicate { $0.id >= since },
+      sortBy: [SortDescriptor(\.id)]
+    )
+    let rows = (try? ctx.fetch(desc)) ?? []
+    let toUnit = weightUnit == "lb" ? 2.20462 : 1.0
+    let weights = rows.compactMap { r in r.weightKg.map { (r.id, $0 * toUnit) } }
+    let fats = rows.compactMap { r in r.fatPct.map { (r.id, $0) } }
+    var stats: [ReportStat] = []
+    if let last = weights.last {
+      let delta = weights.first.map { last.1 - $0.1 } ?? 0
+      let sign = delta > 0 ? "+" : ""
+      stats.append(ReportStat(label: "Weight", value: "\(trimNum(last.1)) \(weightUnit)",
+                              detail: weights.count > 1 ? "\(sign)\(trimNum(delta)) over window" : nil))
+    }
+    if let last = fats.last {
+      stats.append(ReportStat(label: "Body fat", value: String(format: "%.1f%%", last.1)))
+    }
+    stats.append(ReportStat(label: "Weigh-ins", value: "\(weights.count)"))
+    var charts: [ReportChart] = []
+    if !weights.isEmpty {
+      charts.append(ReportChart(title: "Weight", kind: .line, unit: weightUnit,
+                                points: weights.map { ReportPoint(label: $0.0, value: $0.1) }))
+    }
+    if !fats.isEmpty {
+      charts.append(ReportChart(title: "Body fat", kind: .line, unit: "%",
+                                points: fats.map { ReportPoint(label: $0.0, value: $0.1) }))
+    }
+    return ReportSection(key: "body", label: label, colorHex: color, stats: stats, charts: charts,
+                         unavailable: weights.isEmpty && fats.isEmpty)
+  }
+
+  private static func hydration(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+    let ml = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days)  // oldest→newest, length days
+    let base = SeptenaDate.parse(SeptenaDate.today) ?? Date()
+    let active = ml.filter { $0 > 0 }
+    let avg = active.isEmpty ? 0 : active.reduce(0,+) / active.count
+    let stats = [
+      ReportStat(label: "Avg intake", value: "\(avg) ml", detail: "per logged day"),
+      ReportStat(label: "Days logged", value: "\(active.count)"),
+    ]
+    var charts: [ReportChart] = []
+    if !active.isEmpty {
+      let n = ml.count
+      let points: [ReportPoint] = ml.enumerated().map { (i, v) in
+        let d = Calendar.current.date(byAdding: .day, value: -(n - 1 - i), to: base) ?? base
+        return ReportPoint(label: SeptenaDate.format(d) ?? SeptenaDate.today, value: Double(v))
+      }
+      charts.append(ReportChart(title: "Daily intake", kind: .bar, unit: "ml", points: points))
+    }
+    return ReportSection(key: "hydration", label: label, colorHex: color, stats: stats, charts: charts,
+                         unavailable: active.isEmpty)
   }
 
   // MARK: - Helpers

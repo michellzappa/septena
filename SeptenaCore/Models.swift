@@ -700,6 +700,9 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
   var file: String?
   var concludedAt: String?
   var loggedAt: String?
+  /// Free-text note. Used as a per-session note (stored on the session's
+  /// concluding entry), surfaced in the session view and practitioner reports.
+  var note: String?
 
   /// Identifier: server's `file` is unique per entry; fall back to a
   /// composite when missing (older logs).
@@ -721,6 +724,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     file = try c.decodeIfPresent(String.self, forKey: .file)
     concludedAt = try c.decodeIfPresent(String.self, forKey: .concludedAt)
     loggedAt = try c.decodeIfPresent(String.self, forKey: .loggedAt)
+    note = try c.decodeIfPresent(String.self, forKey: .note)
   }
 
   private static func decodeIntOrString(_ c: KeyedDecodingContainer<CodingKeys>,
@@ -730,7 +734,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case date, session, exercise, weight, sets, reps, difficulty, level, file
+    case date, session, exercise, weight, sets, reps, difficulty, level, file, note
     case durationMin = "duration_min"
     case distanceM = "distance_m"
     case concludedAt = "concluded_at"
@@ -751,7 +755,8 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
        level: Double?,
        file: String?,
        concludedAt: String?,
-       loggedAt: String?) {
+       loggedAt: String?,
+       note: String? = nil) {
     self.date = date
     self.session = session
     self.exercise = exercise
@@ -765,6 +770,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     self.file = file
     self.concludedAt = concludedAt
     self.loggedAt = loggedAt
+    self.note = note
   }
 }
 
@@ -1391,6 +1397,11 @@ struct AppSettings: Codable {
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var onboardedAt: Date? = nil
 
+  /// Saved practitioner-report definitions, synced across the user's devices
+  /// via the settings blob (no separate CloudKit record type). Defaulted so
+  /// existing settings payloads decode cleanly. See [[project_practitioner_reports]].
+  var reports: [ReportBundle]? = nil
+
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
@@ -1399,6 +1410,7 @@ struct AppSettings: Codable {
     case morningCutoffHour = "morning_cutoff_hour"
     case afternoonCutoffHour = "afternoon_cutoff_hour"
     case onboardedAt = "onboarded_at"
+    case reports
   }
 }
 

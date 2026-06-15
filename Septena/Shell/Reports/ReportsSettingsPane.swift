@@ -18,11 +18,16 @@ import UIKit
 
 struct ReportsSettingsPane: View {
   @Environment(SettingsStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
 
-  @State private var bundles: [ReportBundle] = ReportStore.load()
   @State private var draft: ReportBundle?          // builder sheet
   @State private var preview: ReportPreview?       // preview sheet
   @State private var renderingID: String?
+
+  /// Report definitions live in the synced settings blob, so the same reports
+  /// appear on every device (no separate CloudKit record type).
+  private var bundles: [ReportBundle] { store.serverSettings?.reports ?? [] }
 
   var body: some View {
     Form {
@@ -53,22 +58,43 @@ struct ReportsSettingsPane: View {
             reportRow(bundle)
           }
           .onDelete { idx in
-            for i in idx { ReportStore.delete(id: bundles[i].id) }
-            bundles = ReportStore.load()
+            let ids = Set(idx.map { bundles[$0].id })
+            persist(bundles.filter { !ids.contains($0.id) })
           }
         }
       }
     }
     .formStyle(.grouped)
+    .task { migrateLocalReportsIfNeeded() }
     .sheet(item: $draft) { d in
       ReportBuilderSheet(draft: d, enabledSections: enabledSections) { saved in
-        ReportStore.upsert(saved)
-        bundles = ReportStore.load()
+        upsertBundle(saved)
       }
     }
     .sheet(item: $preview) { p in
-      ReportPreviewSheet(preview: p) { bundles = ReportStore.load() }
+      ReportPreviewSheet(preview: p, onUpsert: { upsertBundle($0) })
     }
+  }
+
+  // MARK: Synced persistence
+
+  private func persist(_ next: [ReportBundle]) {
+    store.setReports(next, context: modelContext, engine: ckEngine)
+  }
+
+  private func upsertBundle(_ b: ReportBundle) {
+    var all = bundles
+    if let i = all.firstIndex(where: { $0.id == b.id }) { all[i] = b } else { all.append(b) }
+    persist(all)
+  }
+
+  /// One-time lift of any locally-saved (pre-sync) reports into the synced
+  /// settings blob. Runs only when the blob has never held reports.
+  private func migrateLocalReportsIfNeeded() {
+    guard store.serverSettings?.reports == nil else { return }
+    let local = ReportStore.load()
+    guard !local.isEmpty else { return }
+    persist(local)
   }
 
   // MARK: Row
@@ -94,7 +120,7 @@ struct ReportsSettingsPane: View {
       Button { openPreview(bundle) } label: { Label("Preview", systemImage: "eye") }
       Button { draft = bundle } label: { Label("Edit", systemImage: "pencil") }
       Button(role: .destructive) {
-        ReportStore.delete(id: bundle.id); bundles = ReportStore.load()
+        persist(bundles.filter { $0.id != bundle.id })
       } label: { Label("Delete", systemImage: "trash") }
     }
   }
@@ -323,16 +349,16 @@ struct ReportBuilderSheet: View {
 struct ReportPreviewSheet: View {
   @Environment(\.dismiss) private var dismiss
   let preview: ReportPreview
-  /// Called after the link is created/refreshed so the hub list can refresh.
-  var onUpdate: () -> Void = {}
+  /// Persist the bundle (token/link changes) back to the synced store.
+  var onUpsert: (ReportBundle) -> Void = { _ in }
 
   @State private var linkURL: String?
   @State private var creating = false
   @State private var errorMessage: String?
 
-  init(preview: ReportPreview, onUpdate: @escaping () -> Void = {}) {
+  init(preview: ReportPreview, onUpsert: @escaping (ReportBundle) -> Void = { _ in }) {
     self.preview = preview
-    self.onUpdate = onUpdate
+    self.onUpsert = onUpsert
     _linkURL = State(initialValue: preview.bundle.linkURL)
   }
 
@@ -356,7 +382,20 @@ struct ReportPreviewSheet: View {
         #else
         ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         ToolbarItem(placement: .primaryAction) {
-          ShareLink(item: exportURL()) { Image(systemName: "square.and.arrow.up") }
+          Menu {
+            if creating {
+              Text("Working…")
+            } else if linkURL?.isEmpty == false {
+              Button { copyLink() } label: { Label("Copy Link", systemImage: "link") }
+              Button(role: .destructive) { revokeLink() } label: { Label("Revoke Link", systemImage: "trash") }
+            } else {
+              Button { createLink() } label: { Label("Create Link", systemImage: "link.badge.plus") }
+            }
+            ShareLink(item: exportURL()) { Label("Share HTML", systemImage: "square.and.arrow.up") }
+          } label: {
+            if creating { ProgressView() }
+            else { Image(systemName: "ellipsis.circle") }
+          }
         }
         #endif
       }
@@ -420,12 +459,11 @@ struct ReportPreviewSheet: View {
                                                  expiresAt: expiresAt, baseURL: ReportEndpoint.baseURL)
         bundle.token = token
         bundle.linkURL = url.absoluteString
-        ReportStore.upsert(bundle)
         await MainActor.run {
           linkURL = url.absoluteString
           creating = false
           copyLink()
-          onUpdate()
+          onUpsert(bundle)
         }
       } catch {
         await MainActor.run {
@@ -444,11 +482,10 @@ struct ReportPreviewSheet: View {
       try? await ReportPublisher.revoke(token: token, baseURL: ReportEndpoint.baseURL)
       bundle.linkURL = nil
       bundle.token = nil
-      ReportStore.upsert(bundle)
       await MainActor.run {
         linkURL = nil
         creating = false
-        onUpdate()
+        onUpsert(bundle)
       }
     }
   }

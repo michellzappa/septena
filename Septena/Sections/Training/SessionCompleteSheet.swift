@@ -10,6 +10,10 @@ struct SessionStats: Identifiable {
   let id = UUID()
   let routineLabel: String
   let kind: SessionKind
+  /// The session bucket (date + type) so the completion sheet can persist a
+  /// note via TrainingMutator.setSessionNote.
+  let date: String
+  let sessionType: String
   let startedAt: Date?
   let concludedAt: Date
   let doneCount: Int
@@ -41,6 +45,8 @@ struct SessionStats: Identifiable {
   init(from draft: DraftSession, kind: SessionKind) {
     self.routineLabel = draft.label
     self.kind = kind
+    self.date = draft.date
+    self.sessionType = draft.sessionType
     self.concludedAt = Date()
 
     let isoF = ISO8601DateFormatter()
@@ -100,10 +106,14 @@ struct SessionCompleteSheet: View {
   let stats: SessionStats
   let accent: Color
   let onDone: () -> Void
+  /// Persist an optional session note (how it felt, niggles…). Called on
+  /// "Back to dashboard" with the field's current text (empty clears).
+  var onSaveNote: (String) -> Void = { _ in }
 
   /// Bumped on appear → fires the completion flourish. One celebration
   /// per presentation; no looping.
   @State private var celebrate = 0
+  @State private var note = ""
 
   var body: some View {
     ScrollView {
@@ -113,7 +123,8 @@ struct SessionCompleteSheet: View {
         if !stats.doneEntries.isEmpty {
           loggedList
         }
-        Button(action: onDone) {
+        noteField
+        Button(action: { onSaveNote(note); onDone() }) {
           Text("Back to dashboard")
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -142,6 +153,25 @@ struct SessionCompleteSheet: View {
       Haptics.play(completionMotion.hapticSpec(intensity: completionIntensity))
       celebrate += 1
     }
+  }
+
+  /// Optional note on the session — how it felt, niggles, a back-off set.
+  /// Persisted to the session's concluding entry on "Back to dashboard".
+  private var noteField: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("NOTE")
+        .font(.caption2.weight(.semibold)).tracking(1.5)
+        .foregroundStyle(.secondary)
+      TextField("How did it feel? Niggles, energy, anything to remember…",
+                text: $note, axis: .vertical)
+        .textFieldStyle(.plain)
+        .lineLimit(2...5)
+        .padding(12)
+        .background(Theme.paperBackground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .stroke(Color.secondary.opacity(0.15)))
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   /// Did any logged entry break a personal record this session?

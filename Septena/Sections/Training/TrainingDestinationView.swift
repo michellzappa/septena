@@ -186,6 +186,14 @@ struct TrainingDestinationView: View {
       }
       .font(.subheadline)
       .padding(.horizontal, 16)
+      if let note = block.entries.compactMap(\.note).first(where: { !$0.isEmpty }) {
+        HStack(alignment: .top, spacing: 6) {
+          Image(systemName: "note.text").font(.caption2)
+          Text(note).font(.caption)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+      }
       DrawerSection(padding: .none) {
         ForEach(block.entries) { entry in
           if entry.file != nil {
@@ -1974,10 +1982,18 @@ struct TrainingSessionView: View {
       }
     }
     .sheet(item: $completionStats) { stats in
-      SessionCompleteSheet(stats: stats, accent: accent) {
-        completionStats = nil
-        dismiss()
-      }
+      SessionCompleteSheet(
+        stats: stats,
+        accent: accent,
+        onDone: {
+          completionStats = nil
+          dismiss()
+        },
+        onSaveNote: { text in
+          guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+          SeptenaServices.shared.trainingMutator.setSessionNote(
+            date: stats.date, sessionType: stats.sessionType, note: text)
+        })
       #if os(iOS)
       .presentationDetents([.large])
       .presentationDragIndicator(.visible)

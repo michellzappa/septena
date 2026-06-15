@@ -4888,6 +4888,9 @@
         }
       }
     },
+    "NOTE" : {
+
+    },
     "Nothing for today yet. Tap + to add a task." : {
       "localizations" : {
         "pt-BR" : {
@@ -7472,6 +7475,9 @@
           }
         }
       }
+    },
+    "Working…" : {
+
     },
     "Write to Health" : {
       "localizations" : {

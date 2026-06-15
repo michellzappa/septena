@@ -1187,7 +1187,8 @@ enum ChecklistMirror {
                   level: e.level,
                   file: e.id,
                   concludedAt: e.concludedAt,
-                  loggedAt: e.loggedAt)
+                  loggedAt: e.loggedAt,
+                  note: e.note)
   }
 
   // MARK: Suggested workout

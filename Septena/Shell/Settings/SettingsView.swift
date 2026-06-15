@@ -403,6 +403,17 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
+  /// Persist the saved practitioner-report definitions into the synced
+  /// settings blob so the same reports show on every device.
+  func setReports(_ reports: [ReportBundle], context: ModelContext, engine: CKEngine?) {
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.reports = reports
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Reconcile the CloudKit-synced welcome name with the local @AppStorage
   /// key that `WelcomeHeader` reads for instant, offline-safe display.
   ///

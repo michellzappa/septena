@@ -3181,6 +3181,22 @@ final class TrainingMutator {
     return changed
   }
 
+  /// Attach a free-text note to a session — written to the session's
+  /// concluding entry (latest `occurredAt` among entries sharing date +
+  /// sessionType). A "session" is just that bucket (same model as
+  /// `retagSession`), so there's no dedicated record to hang it on. Empty
+  /// note clears it. Returns true if an entry was found to write to.
+  @discardableResult
+  func setSessionNote(date: String, sessionType: String, note: String) -> Bool {
+    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      predicate: #Predicate { $0.date == date && $0.sessionType == sessionType }
+    ))) ?? []
+    guard let concluding = entries.max(by: { $0.occurredAt < $1.occurredAt }) else { return false }
+    let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+    updateEntry(id: concluding.id, note: .some(trimmed.isEmpty ? nil : trimmed))
+    return true
+  }
+
   func deleteEntry(id: String) {
     guard let entity = fetchEntry(id: id) else { return }
     context.delete(entity)
