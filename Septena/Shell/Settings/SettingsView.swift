@@ -72,18 +72,11 @@ enum SettingsKey {
   /// trailing 7-day overlay. Same literal as `TimeOfDayWheel.windowDefaultsKey`
   /// — tapping a wheel writes this same key, so the setting stays in sync.
   static let wheelTodayOnly = "timeOfDayWheel.todayOnly"
-  /// Whether the time-of-day welcome (greeting + subtitle) renders at the
-  /// very top of the homepage. Default on; mirrors the webapp's overview
-  /// dashboard header.
-  static let homepageShowWelcome = "septena.homepage.showWelcome"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
   /// Voice of the generated welcome greeting. Raw value of `WelcomeTone`.
   static let welcomeTone = "septena.homepage.welcomeTone"
-  /// Whether the greeting may reference today's already-loaded progress
-  /// (tasks/habits/supplements remaining). Off by default.
-  static let welcomeDataAware = "septena.homepage.welcomeDataAware"
   /// Today's on-device generated welcome lines, JSON-encoded and keyed by
   /// phase. Reset whenever the day or `welcomeName` changes.
   static let welcomeCache = "septena.homepage.welcomeCache"
@@ -668,7 +661,7 @@ struct SettingsView: View {
     case about
     case advanced        // dev + diagnostics, reached from About
     // Sub-panes reached from the hubs above.
-    case layout, correlations, timeOfDay, welcome
+    case layout, correlations, timeOfDay
     case quickActions, appIcon
     case skills, localMcp, motionGallery, dataTools
     case milestonePreview   // DEBUG bench: fire each milestone celebration
@@ -806,7 +799,6 @@ struct SettingsView: View {
     case .layout:       return "Layout"
     case .correlations: return "Insights"
     case .timeOfDay:    return "Time of Day"
-    case .welcome:      return "Welcome"
     case .notifications: return "Notifications"
     case .connections:  return "Connections"
     case .data:         return "Data"
@@ -841,7 +833,6 @@ struct SettingsView: View {
     case .layout:       return "square.grid.2x2"
     case .correlations: return "chart.dots.scatter"
     case .timeOfDay:    return "clock"
-    case .welcome:      return "sun.horizon"
     case .notifications: return "bell.badge"
     case .connections:  return "app.connected.to.app.below.fill"
     case .data:         return "externaldrive"
@@ -891,7 +882,6 @@ struct SettingsView: View {
     case .layout:            LayoutSettingsPane()
     case .correlations:      CorrelationsSettingsPane()
     case .timeOfDay:         TimeOfDaySettingsPane()
-    case .welcome:           WelcomeSettingsPane()
     case .notifications:     NotificationsOverviewPane()
     case .connections:       IntegrationsSettingsPane()
     case .data:              ImportExportSettingsPane(mode: .full)
@@ -1058,14 +1048,6 @@ struct HomeSettingsPane: View {
       }
 
       Section {
-        NavigationLink(value: SettingsView.SettingsDestination.welcome) {
-          Label("Welcome", systemImage: "sun.horizon")
-        }
-      } footer: {
-        Text("The greeting at the top of the home tab — your name, tone, and how aware of your day it is.")
-      }
-
-      Section {
         Picker(selection: Binding(
           get: { DayViewStyle(rawValue: dayViewRaw) ?? .dial },
           set: { dayViewRaw = $0.rawValue }
@@ -1143,68 +1125,6 @@ struct GeneralSettingsPane: View {
         }
       } footer: {
         Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
-      }
-    }
-    .formStyle(.grouped)
-  }
-}
-
-// MARK: - Welcome (dedicated page)
-
-struct WelcomeSettingsPane: View {
-  @AppStorage(SettingsKey.homepageShowWelcome)
-  private var showWelcome: Bool = true
-  @AppStorage(SettingsKey.welcomeName)
-  private var welcomeName: String = ""
-  @AppStorage(SettingsKey.welcomeTone)
-  private var welcomeToneRaw: String = WelcomeTone.warm.rawValue
-  @AppStorage(SettingsKey.welcomeDataAware)
-  private var welcomeDataAware: Bool = false
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SettingsStore.self) private var store
-
-  var body: some View {
-    Form {
-      Section {
-        Toggle(isOn: $showWelcome) {
-          Label("Show welcome", systemImage: "sun.horizon")
-        }
-      } footer: {
-        Text("A centered greeting at the top of the home tab.")
-      }
-
-      if showWelcome {
-        Section {
-          TextField("Your name", text: $welcomeName)
-            .textContentType(.givenName)
-            #if os(iOS)
-            .textInputAutocapitalization(.words)
-            #endif
-            // Mirror the local edit up to the CloudKit-synced payload. Per-
-            // keystroke writes are coalesced by CKSyncEngine into one push.
-            .onChange(of: welcomeName) { _, newValue in
-              store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
-            }
-        } footer: {
-          Text("Used to personalize the greeting. With Apple Intelligence it's freshly written through the day.")
-        }
-
-        Section {
-          Picker(selection: $welcomeToneRaw) {
-            ForEach(WelcomeTone.allCases) { tone in
-              Text(tone.label).tag(tone.rawValue)
-            }
-          } label: {
-            Label("Tone", systemImage: "textformat")
-          }
-
-          Toggle(isOn: $welcomeDataAware) {
-            Label("Aware of your day", systemImage: "sun.max")
-          }
-        } footer: {
-          Text("“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar.")
-        }
       }
     }
     .formStyle(.grouped)

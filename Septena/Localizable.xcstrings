@@ -34,6 +34,7 @@
       }
     },
     "“Aware of your day” lets the greeting nod to what's left on today's list and what's coming up next on your calendar." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -856,6 +857,7 @@
       "shouldTranslate" : false
     },
     "A centered greeting at the top of the home tab." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6705,6 +6707,7 @@
 
     },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7161,6 +7164,7 @@
 
     },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
