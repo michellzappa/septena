@@ -664,6 +664,7 @@ struct SettingsView: View {
     case connections     // Apple + service integrations (was Integrations)
     case privacy
     case data            // import / export (was Import & Export)
+    case reports         // practitioner reports — scoped shareable section bundles
     case about
     case advanced        // dev + diagnostics, reached from About
     // Sub-panes reached from the hubs above.
@@ -777,7 +778,7 @@ struct SettingsView: View {
     // Nine intent groups, Apple-style. Local MCP folds into Claude & AI;
     // Advanced folds into About — neither is a root row.
     [.sections, .home, .notifications, .general, .claudeAI,
-     .connections, .privacy, .data, .about]
+     .connections, .privacy, .data, .reports, .about]
   }
 
   private func staticRow(_ dest: SettingsDestination) -> some View {
@@ -809,6 +810,7 @@ struct SettingsView: View {
     case .notifications: return "Notifications"
     case .connections:  return "Connections"
     case .data:         return "Data"
+    case .reports:      return "Reports"
     case .skills:       return "Skills"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
@@ -843,6 +845,7 @@ struct SettingsView: View {
     case .notifications: return "bell.badge"
     case .connections:  return "app.connected.to.app.below.fill"
     case .data:         return "externaldrive"
+    case .reports:      return "chart.bar.doc.horizontal"
     case .skills:       return "book.closed"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
@@ -892,6 +895,7 @@ struct SettingsView: View {
     case .notifications:     NotificationsOverviewPane()
     case .connections:       IntegrationsSettingsPane()
     case .data:              ImportExportSettingsPane(mode: .full)
+    case .reports:           ReportsSettingsPane()
     case .dataTools:         ImportExportSettingsPane(mode: .dataTools)
     case .skills:            SkillsSettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
