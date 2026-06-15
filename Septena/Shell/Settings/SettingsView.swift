@@ -705,6 +705,11 @@ struct SettingsView: View {
         // only ten root rows, so the collapse affordance just invited an
         // awkward detail-only state. Drop the toolbar toggle entirely.
         .toolbar(removing: .sidebarToggle)
+        // ...and pin the column so the divider can't be dragged at all: the
+        // window is a fixed 820×600, so a resizable/collapsible sidebar only
+        // let the user throw the proportions off. min == ideal == max leaves
+        // the divider no range to drag, which also blocks the fold-away.
+        .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
     } detail: {
       NavigationStack {
         let dest = selection ?? .sections
@@ -793,7 +798,11 @@ struct SettingsView: View {
     Label {
       Text(title(for: dest))
     } icon: {
+      #if os(macOS)
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 20, glyphRatio: 0.38)
+      #else
+      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
+      #endif
     }
   }
 
@@ -5102,17 +5111,18 @@ struct ImportExportSettingsPane: View {
                          systemImage: String,
                          fileBase: String,
                          build: @escaping () throws -> Data) -> some View {
-    let payload = (try? build()) ?? Data()
+    // Serialize lazily — the JSON blob is built only when the user actually
+    // invokes the share sheet (ExportFile carries the closure, not the data).
+    // Building eagerly here meant every body re-render of the Data pane ran a
+    // full SwiftData fetch + JSON encode for all ~10 exports on the main
+    // thread, which is why this pane loaded far slower than the others.
     let filename = "\(fileBase)-\(ImportExportService.todayStamp).json"
-    ShareLink(item: ExportFile(data: payload, suggestedName: filename),
+    ShareLink(item: ExportFile(suggestedName: filename, build: build),
               preview: SharePreview(filename, image: Image(systemName: systemImage))) {
       HStack {
         Label(label, systemImage: systemImage)
           .foregroundStyle(.primary)
         Spacer()
-        Text(byteSize(payload.count))
-          .font(.caption.monospacedDigit())
-          .foregroundStyle(.secondary)
         Image(systemName: "square.and.arrow.up")
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -5432,23 +5442,21 @@ struct ImportExportSettingsPane: View {
     return "circle.fill"
   }
 
-  private func byteSize(_ bytes: Int) -> String {
-    let f = ByteCountFormatter()
-    f.allowedUnits = [.useKB, .useMB]
-    f.countStyle = .file
-    return f.string(fromByteCount: Int64(bytes))
-  }
 }
 
 // MARK: - ShareLink payload
 
 private struct ExportFile: Transferable {
-  let data: Data
   let suggestedName: String
+  /// Deferred serializer. Held instead of the bytes so the (expensive,
+  /// main-context) export only runs when the share sheet actually pulls the
+  /// representation — not on every render of the row.
+  let build: () throws -> Data
 
   static var transferRepresentation: some TransferRepresentation {
     DataRepresentation(exportedContentType: .json) { item in
-      item.data
+      // The build touches `mainContext`; hop to the main actor to run it.
+      try await MainActor.run { try item.build() }
     }
     .suggestedFileName { $0.suggestedName }
   }

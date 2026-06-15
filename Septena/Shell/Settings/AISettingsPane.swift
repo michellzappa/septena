@@ -62,6 +62,7 @@ struct ClaudeAISettingsPane: View {
       connectionsSection
       skillsSection
     }
+    .formStyle(.grouped)
     .sheet(isPresented: $showExplainer) { AIExplainerView() }
     .onAppear { aiStatus = OnDeviceAI.status }
     .onChange(of: scenePhase) { _, phase in

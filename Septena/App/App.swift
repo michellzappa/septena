@@ -443,6 +443,11 @@ struct SeptenaApp: App {
         .environment(logCommit)
         .modelContainer(localStore.container)
     }
+    // Hidden title bar so the sidebar background runs to the top of the window
+    // and the traffic lights float over it — the System Settings layout. The
+    // window title text is dropped along with the strip; SettingsView already
+    // labels each pane in the detail column, so nothing is lost.
+    .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
     .defaultPosition(.center)
     #endif
