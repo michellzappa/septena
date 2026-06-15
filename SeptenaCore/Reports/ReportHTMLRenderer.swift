@@ -29,7 +29,7 @@ public enum ReportHTMLRenderer {
     <body>
     <main class="report">
       <header class="head">
-        <div class="brand">Septena</div>
+        <a class="brand" href="https://www.septena.app">Septena</a>
         <h1>\(esc(payload.title))</h1>
         \(ownerLine)
         \(noteLine)
@@ -42,7 +42,7 @@ public enum ReportHTMLRenderer {
       \(sectionsHTML)
       <footer class="foot">
         <p>Aggregated trends only — no individual entries are shared. Generated on the owner's device. This view can be revoked at any time.</p>
-        <p class="gen">Septena · personal life data, shared on the owner's terms.</p>
+        <p class="gen">Made with <a href="https://www.septena.app">Septena</a> — one private app for everything you track. <a href="https://www.septena.app">www.septena.app</a></p>
       </footer>
     </main>
     </body>
@@ -243,7 +243,8 @@ public enum ReportHTMLRenderer {
   }
   .report { max-width: 820px; margin: 0 auto; padding: 32px 20px 60px; }
   .head { padding: 8px 4px 20px; }
-  .brand { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8e8e93; font-weight: 600; }
+  .brand { display: inline-block; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #8e8e93; font-weight: 600; text-decoration: none; }
+  .brand:hover { color: #636366; }
   .head h1 { font-size: 26px; line-height: 1.2; margin: 6px 0 2px; font-weight: 700; }
   .owner { font-size: 16px; color: #3a3a3c; font-weight: 500; }
   .note { margin: 12px 0 0; color: #3a3a3c; background: #fff; border-radius: 10px; padding: 12px 14px; border: 1px solid #e5e5ea; }
@@ -268,6 +269,8 @@ public enum ReportHTMLRenderer {
   .foot { margin-top: 28px; padding: 0 4px; color: #a0a0a5; font-size: 12px; }
   .foot p { margin: 4px 0; }
   .foot .gen { color: #c7c7cc; }
+  .foot a { color: #8e8e93; text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
   @media (prefers-color-scheme: dark) {
     body { background: #000; color: #f2f2f7; }
     .note, .card { background: #1c1c1e; border-color: #38383a; }

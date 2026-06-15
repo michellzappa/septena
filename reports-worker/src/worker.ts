@@ -141,5 +141,5 @@ function renderHTML(p: ReportPayload): string {
 ${p.note ? `<p>${esc(p.note)}</p>` : ""}
 <div style="color:#8e8e93;font-size:13px">Trailing ${p.windowDays}d · Data as of ${esc(p.asOf)}</div>
 ${sections}
-<div class=foot>Aggregated trends only — no individual entries. Generated on the owner's device. Revocable at any time.</div></div>`;
+<div class=foot>Aggregated trends only — no individual entries. Generated on the owner's device. Revocable at any time.<br>Made with <a href="https://www.septena.app" style="color:#8e8e93">Septena</a> — www.septena.app</div></div>`;
 }
