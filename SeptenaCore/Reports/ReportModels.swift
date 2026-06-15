@@ -184,6 +184,8 @@ public struct ReportSection: Codable, Sendable, Identifiable {
   public var stats: [ReportStat]
   /// Trend charts rendered as inline SVG.
   public var charts: [ReportChart]
+  /// Tabular detail (e.g. the exercise breakdown: working weight × sets × reps).
+  public var tables: [ReportTable]
   /// True when no live aggregates were available for this section in the
   /// prototype (renders a quiet "not yet aggregated" note instead of charts).
   public var unavailable: Bool
@@ -195,13 +197,26 @@ public struct ReportSection: Codable, Sendable, Identifiable {
               colorHex: String,
               stats: [ReportStat] = [],
               charts: [ReportChart] = [],
+              tables: [ReportTable] = [],
               unavailable: Bool = false) {
     self.key = key
     self.label = label
     self.colorHex = colorHex
     self.stats = stats
     self.charts = charts
+    self.tables = tables
     self.unavailable = unavailable
+  }
+}
+
+public struct ReportTable: Codable, Sendable {
+  public var title: String
+  public var columns: [String]
+  public var rows: [[String]]
+  public init(title: String, columns: [String], rows: [[String]]) {
+    self.title = title
+    self.columns = columns
+    self.rows = rows
   }
 }
 

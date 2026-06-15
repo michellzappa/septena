@@ -24,11 +24,12 @@ public enum ReportPayloadBuilder {
   public static func build(bundle: ReportBundle,
                            meta: [String: ReportSectionMeta],
                            owner: String,
+                           weightUnit: String = "kg",
                            context: ModelContext) -> ReportPayload {
     let days = max(1, bundle.windowDays)
     let sections: [ReportSection] = bundle.sectionKeys.map { key in
       let m = meta[key] ?? ReportSectionMeta(label: key.capitalized, colorHex: "#64748b")
-      return section(for: key, label: m.label, colorHex: m.colorHex, days: days, context: context)
+      return section(for: key, label: m.label, colorHex: m.colorHex, days: days, weightUnit: weightUnit, context: context)
     }
     return ReportPayload(
       title: bundle.title,
@@ -46,13 +47,14 @@ public enum ReportPayloadBuilder {
                               label: String,
                               colorHex: String,
                               days: Int,
+                              weightUnit: String,
                               context: ModelContext) -> ReportSection {
     switch key {
     case "habits":      return habits(label, colorHex, days, context)
     case "supplements": return supplements(label, colorHex, days, context)
     case "chores":      return chores(label, colorHex, days, context)
     case "gut":         return gut(label, colorHex, days, context)
-    case "training":    return training(label, colorHex, days, context)
+    case "training":    return training(label, colorHex, days, weightUnit, context)
     case "nutrition":   return nutrition(label, colorHex, days, context)
     case "mood":        return mood(label, colorHex, days, context)
     case "activity":    return activity(label, colorHex, days, context)
@@ -135,28 +137,76 @@ public enum ReportPayloadBuilder {
                          unavailable: withData.isEmpty)
   }
 
-  private static func training(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
+  private static func training(_ label: String, _ color: String, _ days: Int, _ weightUnit: String, _ ctx: ModelContext) -> ReportSection {
     let cardio = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: days)
     let since = isoDaysAgo(days)
     let entries = ChecklistMirror.loadTrainingEntries(context: ctx, since: since)
     let sessionDates = Set(entries.map { $0.date })
-    let totalCardio = cardio.daily.map { $0.minutes }.reduce(0, +)
-    var stats = [
-      ReportStat(label: "Sessions", value: "\(sessionDates.count)", detail: "days trained"),
-      ReportStat(label: "Cardio", value: "\(totalCardio) min", detail: "last \(days)d"),
-    ]
-    if cardio.targetWeeklyMin > 0 {
-      stats.append(ReportStat(label: "Weekly target", value: "\(cardio.targetWeeklyMin) min"))
+    let strength = entries.filter { ($0.weight ?? 0) > 0 }
+
+    // Volume per day = Σ(weight × sets × reps). Skips entries with non-numeric
+    // sets/reps (e.g. "AMRAP").
+    var volByDate: [String: Double] = [:]
+    for e in strength {
+      guard let w = e.weight, let s = intOf(e.sets), let r = intOf(e.reps) else { continue }
+      volByDate[e.date, default: 0] += w * Double(s) * Double(r)
     }
+    let totalCardio = cardio.daily.map { $0.minutes }.reduce(0, +)
+    let totalVol = volByDate.values.reduce(0, +)
+
+    var stats = [ReportStat(label: "Sessions", value: "\(sessionDates.count)", detail: "days trained, last \(days)d")]
+    if totalVol > 0 {
+      stats.append(ReportStat(label: "Total volume", value: trimNum(totalVol) + " \(weightUnit)", detail: "weight × sets × reps"))
+    }
+    if totalCardio > 0 { stats.append(ReportStat(label: "Cardio", value: "\(totalCardio) min")) }
+    if cardio.targetWeeklyMin > 0 { stats.append(ReportStat(label: "Weekly cardio target", value: "\(cardio.targetWeeklyMin) min")) }
+
     var charts: [ReportChart] = []
+    if !volByDate.isEmpty {
+      let pts = volByDate.keys.sorted().map { ReportPoint(label: $0, value: volByDate[$0]!) }
+      charts.append(ReportChart(title: "Training volume per day", kind: .bar, unit: weightUnit, points: pts))
+    }
     let cardioActive = cardio.daily.filter { $0.minutes > 0 }
     if !cardioActive.isEmpty {
-      charts.append(ReportChart(title: "Cardio minutes per day", kind: .bar,
+      charts.append(ReportChart(title: "Cardio minutes per day", kind: .bar, unit: "min",
                                 points: cardio.daily.map { ReportPoint(label: $0.date, value: Double($0.minutes)) }))
     }
+
+    // Per-exercise progression — working weight over time for the most-trained
+    // strength lifts (cap at 6 so the report stays scannable).
+    let byExercise = Dictionary(grouping: strength.filter { !($0.exercise ?? "").isEmpty },
+                                by: { $0.exercise! })
+    let ranked = byExercise.sorted { $0.value.count > $1.value.count }
+    for (name, es) in ranked.prefix(6) {
+      var maxByDate: [String: Double] = [:]
+      for e in es { if let w = e.weight { maxByDate[e.date] = max(maxByDate[e.date] ?? 0, w) } }
+      let pts = maxByDate.keys.sorted().map { ReportPoint(label: $0, value: maxByDate[$0]!) }
+      if pts.count >= 2 {
+        charts.append(ReportChart(title: "\(name) — working weight", kind: .line, unit: weightUnit, points: pts))
+      }
+    }
+
+    // Exercises table: working set, best, and frequency per lift.
+    var rows: [[String]] = []
+    for (name, es) in ranked {
+      let sorted = es.sorted { ($0.loggedAt ?? $0.date) < ($1.loggedAt ?? $1.date) }
+      guard let last = sorted.last else { continue }
+      let best = es.compactMap { $0.weight }.max()
+      rows.append([
+        name,
+        setString(last, unit: weightUnit),
+        best.map { trimNum($0) + " \(weightUnit)" } ?? "—",
+        "\(Set(es.map { $0.date }).count)",
+      ])
+    }
+    var tables: [ReportTable] = []
+    if !rows.isEmpty {
+      tables.append(ReportTable(title: "Exercises", columns: ["Exercise", "Last set", "Best", "Sessions"], rows: rows))
+    }
+
     let unavailable = sessionDates.isEmpty && cardioActive.isEmpty
     return ReportSection(key: "training", label: label, colorHex: color, stats: stats, charts: charts,
-                         unavailable: unavailable)
+                         tables: tables, unavailable: unavailable)
   }
 
   private static func nutrition(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
@@ -228,6 +278,24 @@ public enum ReportPayloadBuilder {
   }
 
   // MARK: - Helpers
+
+  private static func intOf(_ s: String?) -> Int? {
+    guard let s else { return nil }
+    return Int(s.trimmingCharacters(in: .whitespaces))
+  }
+
+  private static func trimNum(_ d: Double) -> String {
+    d == d.rounded() ? String(Int(d)) : String(format: "%.1f", d)
+  }
+
+  /// "80 kg · 3×5" from an entry's weight/sets/reps (any part may be absent).
+  private static func setString(_ e: ExerciseEntry, unit: String) -> String {
+    var parts: [String] = []
+    if let w = e.weight { parts.append("\(trimNum(w)) \(unit)") }
+    if let s = e.sets, let r = e.reps, !s.isEmpty, !r.isEmpty { parts.append("\(s)×\(r)") }
+    else if let r = e.reps, !r.isEmpty { parts.append("\(r) reps") }
+    return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+  }
 
   private static func isoDaysAgo(_ n: Int) -> String {
     let base = SeptenaDate.parse(SeptenaDate.today) ?? Date()

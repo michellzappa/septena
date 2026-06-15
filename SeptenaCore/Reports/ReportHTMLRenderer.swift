@@ -66,12 +66,13 @@ public enum ReportHTMLRenderer {
     }.joined()
 
     let body: String
-    if s.unavailable && s.charts.isEmpty {
+    if s.unavailable && s.charts.isEmpty && s.tables.isEmpty {
       body = "<p class=\"empty\">No data logged in this window — or this section's aggregate view isn't available yet.</p>"
     } else {
       let charts = s.charts.map { chart(_:$0, accent: accent) }.joined(separator: "\n")
+      let tables = s.tables.map(table).joined(separator: "\n")
       let statsBlock = stats.isEmpty ? "" : "<div class=\"stats\">\(stats)</div>"
-      body = statsBlock + charts
+      body = statsBlock + charts + tables
     }
 
     return """
@@ -79,6 +80,22 @@ public enum ReportHTMLRenderer {
       <div class="ch"><span class="swatch"></span><h2>\(esc(s.label))</h2></div>
       \(body)
     </section>
+    """
+  }
+
+  private static func table(_ t: ReportTable) -> String {
+    let head = t.columns.map { "<th>\(esc($0))</th>" }.joined()
+    let body = t.rows.map { row in
+      "<tr>" + row.enumerated().map { i, cell in
+        let cls = i == 0 ? " class=\"rl\"" : ""
+        return "<td\(cls)>\(esc(cell))</td>"
+      }.joined() + "</tr>"
+    }.joined()
+    return """
+    <div class="chart">
+      <div class="ct">\(esc(t.title))</div>
+      <table class="tbl"><thead><tr>\(head)</tr></thead><tbody>\(body)</tbody></table>
+    </div>
     """
   }
 
@@ -265,6 +282,12 @@ public enum ReportHTMLRenderer {
   svg.g { width: 100%; height: auto; display: block; }
   .axd { font-size: 10px; fill: #a0a0a5; }
   .axn { font-size: 10px; fill: #c7c7cc; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: right; font-weight: 600; color: #8e8e93; padding: 6px 8px; border-bottom: 1px solid #e5e5ea; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tbl th:first-child { text-align: left; }
+  .tbl td { text-align: right; padding: 7px 8px; border-bottom: 1px solid #f0f0f2; font-variant-numeric: tabular-nums; }
+  .tbl td.rl { text-align: left; font-weight: 500; }
+  .tbl tr:last-child td { border-bottom: none; }
   .empty { color: #a0a0a5; font-size: 14px; font-style: italic; margin: 4px 0 0; }
   .foot { margin-top: 28px; padding: 0 4px; color: #a0a0a5; font-size: 12px; }
   .foot p { margin: 4px 0; }

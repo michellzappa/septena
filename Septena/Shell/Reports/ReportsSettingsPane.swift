@@ -126,9 +126,10 @@ struct ReportsSettingsPane: View {
     renderingID = bundle.id
     let meta = metaMap(for: bundle.sectionKeys)
     let owner = store.serverSettings?.welcomeName ?? ""
+    let weightUnit = store.serverSettings?.units?.weight ?? "kg"
     Task {
       let payload = await MirrorReader.shared.read { ctx in
-        ReportPayloadBuilder.build(bundle: bundle, meta: meta, owner: owner, context: ctx)
+        ReportPayloadBuilder.build(bundle: bundle, meta: meta, owner: owner, weightUnit: weightUnit, context: ctx)
       }
       let html = ReportHTMLRenderer.html(for: payload)
       await MainActor.run {
