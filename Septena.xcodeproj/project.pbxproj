@@ -92,6 +92,7 @@
 		1D9688F8151A47D8555D18FB /* CanonicalExerciseName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6458F5784F01C48C06CAE489 /* CanonicalExerciseName.swift */; };
 		1DCDA337088FC9FEA65F9F73 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
 		1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */; };
+		1E49405865D5B2F03CC98499 /* AppAttestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */; };
 		1E695C8629B03CA4D8A8BA37 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */; };
 		1EA4599B775EAD7A9E472565 /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F13269D0CDB1EB49B2351D6 /* TaskDetailView.swift */; };
 		1ECE3B53F9AE3460A9066B57 /* DayDialHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3407AF16908C1033DF4DA6 /* DayDialHero.swift */; };
@@ -521,6 +522,7 @@
 		B97B4B6B0070C0E28FD67B5C /* HydrationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19D6CEBE8804EB7CD5D0256 /* HydrationPlugin.swift */; };
 		B9F5B342F1C2D83582E41B1B /* IntakeKindWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ACB218DB75B6E2F3B47FE57 /* IntakeKindWizard.swift */; };
 		BA110C8B6611A56723B23E66 /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
+		BB01E5596948745ABE6D9A40 /* AppAttestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */; };
 		BB19A2F7287FB286F1725A9C /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */; };
 		BBA737CEEE52190FE9486AA6 /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */; };
 		BC0A7CBC554735ABF30A8001 /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */; };
@@ -817,6 +819,7 @@
 		061EC1492AC575A632A4A686 /* CoachVoiceEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachVoiceEditor.swift; sourceTree = "<group>"; };
 		089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodQuickAddMenu.swift; sourceTree = "<group>"; };
 		096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditMoodEntrySheet.swift; sourceTree = "<group>"; };
+		09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestClient.swift; sourceTree = "<group>"; };
 		0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
 		0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGutEntrySheet.swift; sourceTree = "<group>"; };
 		0C35D898846EB8A48B77811E /* AddInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSheet.swift; sourceTree = "<group>"; };
@@ -2043,6 +2046,7 @@
 		FBD3FE9D91D0A6D83EA2E57B /* Reports */ = {
 			isa = PBXGroup;
 			children = (
+				09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */,
 				95D72EAF704F67D254707B97 /* ReportHTMLRenderer.swift */,
 				CD891B290B495297685543B8 /* ReportModels.swift */,
 				B48750329451455744523A40 /* ReportPayloadBuilder.swift */,
@@ -2434,6 +2438,7 @@
 				91693AEE32D3825C811733E8 /* AddTrainingPage.swift in Sources */,
 				262BCA840BF28F47B44CE247 /* AmbientLight.swift in Sources */,
 				2933A423AA89C0FC06C738DD /* App.swift in Sources */,
+				1E49405865D5B2F03CC98499 /* AppAttestClient.swift in Sources */,
 				DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */,
 				E666EB185C74070004ACD166 /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */,
@@ -2803,6 +2808,7 @@
 				6600263164A28E6F185190DA /* AddTrainingPage.swift in Sources */,
 				04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */,
 				1872D480184BC0A84068D022 /* App.swift in Sources */,
+				BB01E5596948745ABE6D9A40 /* AppAttestClient.swift in Sources */,
 				887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */,
 				DEF6485917B66FBC2949A92D /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */,

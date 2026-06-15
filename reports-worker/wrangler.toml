@@ -17,6 +17,30 @@ routes = [{ pattern = "reports.septena.app", custom_domain = true }]
 binding = "REPORTS"
 id = "893586324c144d1fb6402b8a4427d49d"
 
+[[kv_namespaces]]
+binding = "ATTEST"        # keyId → {publicKey, counter}
+id = "49eb6eeeb8464ee2ac4cf2525bd0c13f"
+
+[[kv_namespaces]]
+binding = "CHALLENGES"    # one-time attest nonces (short TTL)
+id = "42a48498c7484b2e80b0d0c3c1246f2e"
+
+[[kv_namespaces]]
+binding = "RL"            # rate-limit buckets
+id = "53b8c369bd334ecea8e1f368385cfce4"
+
+[vars]
+# "off" | "audit" (verify + log, never reject) | "enforce".
+# Stays "audit" until App Attest is validated on a real device — see
+# docs/PRACTITIONER_REPORTS_PROTOTYPE.md. Flip to "enforce" with:
+#   npx wrangler deploy --var ATTEST_MODE:enforce   (or edit here)
+ATTEST_MODE = "audit"
+# App Attest appId(s) = "<TEAM_ID>.<bundleId>". REPLACE the team id, and list
+# both bundles (comma-separated) since reports can be created from iOS and Mac.
+# Until set correctly the rpId check fails — harmless in audit, required for enforce.
+APP_ATTEST_APP_ID = "TEAMID.com.septena.cloud,TEAMID.com.septena.cloud.mac"
+APP_ATTEST_ENV = "production"
+
 # To serve on septena.app/r/* later, add a route here and remove workers.dev:
 # [[routes]]
 # pattern = "septena.app/r/*"

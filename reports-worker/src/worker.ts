@@ -1,14 +1,17 @@
 /**
- * Septena Practitioner Reports — minimal Cloudflare Worker (PROTOTYPE).
+ * Septena Practitioner Reports — Cloudflare Worker.
  *
- * Phase-1.5 transport only. NOT hardened: no App Attest yet, no expiry
- * enforcement beyond the stored timestamp, no rate limiting. See
- * docs/PRACTITIONER_REPORTS_SPEC.md for the production design (App Attest gate,
- * D1 metadata, per-report MCP token).
+ * Routes:
+ *   POST /api/attest/challenge                → one-time nonce for App Attest
+ *   POST /api/attest/register                 → verify + store a device key
+ *   PUT  /api/reports/:id  {token,payload,html,expiresAt}  → store (App Attest-gated)
+ *   DELETE /api/reports/:token                → revoke (App Attest-gated)
+ *   GET  /r/:token                            → render the report HTML
  *
- * Two routes:
- *   PUT  /api/reports/:id    body = { token, payload }   → store payload blob
- *   GET  /r/:token                                        → render HTML
+ * Write hardening = App Attest (see src/attest.ts, the SHARED verifier the
+ * Feedback worker reuses) + per-key/IP rate limiting. Gate runs in ATTEST_MODE
+ * "audit" by default (verify + log, never reject) until validated on a real
+ * device; flip to "enforce" then. Expiry/revoke already enforced.
  *
  * Storage: a single KV namespace `REPORTS`, key = view token, value = the
  * ReportPayload JSON the app computed. The app re-PUTs on foreground
@@ -20,8 +23,37 @@
  *   wrangler deploy
  */
 
-export interface Env {
+import {
+  type AttestEnv, issueChallenge, verifyAttestation, verifyAssertion, rateLimited,
+} from "./attest";
+
+export interface Env extends AttestEnv {
   REPORTS: KVNamespace;
+  /** "off" | "audit" (verify+log, never reject) | "enforce". Default "audit". */
+  ATTEST_MODE?: string;
+}
+
+/**
+ * Gate a write. In "audit" it verifies + logs but always allows (so the live
+ * feature can't break before App Attest is validated on a real device); in
+ * "enforce" it rejects missing/invalid assertions. Rate limit always applies.
+ */
+async function attestGate(
+  env: Env, headers: Headers, bodyBytes: Uint8Array
+): Promise<{ allow: boolean; status: string }> {
+  const mode = env.ATTEST_MODE ?? "audit";
+  const keyId = headers.get("X-Attest-Key-Id") ?? "";
+  const assertion = headers.get("X-Attest-Assertion") ?? "";
+  const challenge = headers.get("X-Attest-Challenge") ?? "";
+  const rlId = keyId || headers.get("CF-Connecting-IP") || "anon";
+  if (await rateLimited(env, rlId)) return { allow: false, status: "ratelimited" };
+  if (mode === "off") return { allow: true, status: "off" };
+  if (!keyId || !assertion || !challenge) {
+    return { allow: mode !== "enforce", status: "missing-assertion" };
+  }
+  const res = await verifyAssertion(env, { keyId, assertionB64: assertion, challenge, body: bodyBytes });
+  if (res.ok) return { allow: true, status: "verified" };
+  return { allow: mode !== "enforce", status: `failed:${res.reason}` };
 }
 
 interface StoredReport {
@@ -58,10 +90,32 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
 
+    // POST /api/attest/challenge → one-time nonce the app signs over.
+    if (req.method === "POST" && path === "/api/attest/challenge") {
+      return json({ challenge: await issueChallenge(env) });
+    }
+
+    // POST /api/attest/register → verify + store a device's attestation key.
+    if (req.method === "POST" && path === "/api/attest/register") {
+      try {
+        const b = (await req.json()) as { keyId?: string; attestation?: string; challenge?: string };
+        if (!b.keyId || !b.attestation || !b.challenge) return json({ error: "missing fields" }, 400);
+        const res = await verifyAttestation(env, { keyId: b.keyId, attestationB64: b.attestation, challenge: b.challenge });
+        console.log(`attest.register key=${b.keyId.slice(0, 8)} ok=${res.ok} reason=${res.reason ?? ""}`);
+        return res.ok ? json({ ok: true }) : json({ error: res.reason }, 400);
+      } catch {
+        return json({ error: "bad request" }, 400);
+      }
+    }
+
     // PUT /api/reports/:id  → upsert payload, keyed by its view token.
     if (req.method === "PUT" && path.startsWith("/api/reports/")) {
       try {
-        const body = (await req.json()) as { token?: string; payload?: ReportPayload; html?: string; expiresAt?: string };
+        const bytes = new Uint8Array(await req.arrayBuffer());
+        const gate = await attestGate(env, req.headers, bytes);
+        console.log(`attest.put status=${gate.status} allow=${gate.allow}`);
+        if (!gate.allow) return json({ error: `attestation ${gate.status}` }, 403);
+        const body = JSON.parse(new TextDecoder().decode(bytes)) as { token?: string; payload?: ReportPayload; html?: string; expiresAt?: string };
         if (!body.token || !body.payload) return json({ error: "token and payload required" }, 400);
         const stored: StoredReport = {
           token: body.token, payload: body.payload, html: body.html,
@@ -77,6 +131,10 @@ export default {
     // DELETE /api/reports/:token  → revoke (remove the blob; link 404s).
     if (req.method === "DELETE" && path.startsWith("/api/reports/")) {
       const token = path.slice("/api/reports/".length);
+      // Revoke binds its assertion to the token bytes (no JSON body).
+      const gate = await attestGate(env, req.headers, new TextEncoder().encode(token));
+      console.log(`attest.delete status=${gate.status} allow=${gate.allow}`);
+      if (!gate.allow) return json({ error: `attestation ${gate.status}` }, 403);
       if (token) await env.REPORTS.delete(token);
       return json({ ok: true });
     }

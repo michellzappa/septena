@@ -31,6 +31,9 @@ public enum ReportPublisher {
     let body = PushBody(token: token, payload: payload, html: html, expiresAt: expiresAt)
     guard let data = try? JSONEncoder().encode(body) else { throw PublishError.encoding }
     req.httpBody = data
+    // App Attest assertion bound to the exact body bytes (best-effort: nil on
+    // Simulator / when unsupported — the worker accepts unattested in audit mode).
+    await attach(&req, body: data, baseURL: baseURL, session: session)
 
     let (_, response) = try await session.data(for: req)
     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
@@ -44,6 +47,8 @@ public enum ReportPublisher {
                             session: URLSession = .shared) async throws {
     var req = URLRequest(url: baseURL.appendingPathComponent("api/reports/\(token)"))
     req.httpMethod = "DELETE"
+    // Revoke binds its assertion to the token bytes (no JSON body).
+    await attach(&req, body: Data(token.utf8), baseURL: baseURL, session: session)
     let (_, response) = try await session.data(for: req)
     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
     guard (200..<300).contains(code) else { throw PublishError.badResponse(code) }
@@ -54,6 +59,15 @@ public enum ReportPublisher {
     guard let days else { return nil }
     let date = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
     return ISO8601DateFormatter().string(from: date)
+  }
+
+  /// Attach App Attest headers if a valid assertion can be produced. No-op when
+  /// unsupported — keeps dev/Simulator working while the worker is in audit mode.
+  private static func attach(_ req: inout URLRequest, body: Data, baseURL: URL, session: URLSession) async {
+    guard let a = await AppAttestClient.shared.assertion(forBody: body, baseURL: baseURL, session: session) else { return }
+    req.setValue(a.keyId, forHTTPHeaderField: "X-Attest-Key-Id")
+    req.setValue(a.assertionB64, forHTTPHeaderField: "X-Attest-Assertion")
+    req.setValue(a.challenge, forHTTPHeaderField: "X-Attest-Challenge")
   }
 
   private struct PushBody: Encodable {

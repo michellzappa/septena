@@ -10,3 +10,6 @@ Config/Secrets.xcconfig
 
 # Cloudflare Wrangler local cache/tmp (reports-worker)
 .wrangler/
+
+# reports-worker npm deps (restore with `npm install`)
+reports-worker/node_modules/

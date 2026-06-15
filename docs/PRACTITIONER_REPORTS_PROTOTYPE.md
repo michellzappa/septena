@@ -68,8 +68,40 @@ push of *real* data happens only when the user taps Create Link.
 
 Redeploy after Worker edits: `cd reports-worker && npx wrangler deploy`.
 
+## App Attest hardening — built, running in AUDIT mode
+
+Write endpoints (`PUT`/`DELETE /api/reports/*`) are gated by **App Attest** +
+per-key/IP rate-limiting, so only the genuine, unmodified Septena app on a real
+Apple device can mint / refresh / revoke a link — even though the client ships
+no API key and is open-source. Viewing (`GET /r/:token`) stays gated by the
+token alone.
+
+- **Shared verifier:** `reports-worker/src/attest.ts` is GENERIC (no
+  reports-specifics) — the Feedback worker imports it verbatim. It pins Apple's
+  App Attest Root CA, verifies the cert chain + nonce on registration, and
+  verifies the assertion signature + counter on each write.
+- **Swift client:** `SeptenaCore/Reports/AppAttestClient.swift` — also generic,
+  reusable by Feedback. `ReportPublisher` attaches assertions best-effort
+  (no-op on Simulator / unsupported, so dev keeps working).
+- **Mode:** `ATTEST_MODE` var, default **`audit`** — verifies and logs but
+  never rejects, so the live feature can't break before it's proven on a device.
+  KV: `ATTEST` (keyId→{pubkey,counter}), `CHALLENGES`, `RL`.
+
+**Before flipping to `enforce` (the checklist):**
+1. Set `APP_ATTEST_APP_ID` in `wrangler.toml` to the real `TEAM_ID.bundleId`
+   for **both** bundles (`com.septena.cloud`, `com.septena.cloud.mac`) and add
+   the **App Attest entitlement** to the app targets.
+2. Create a real report from an iPhone/iPad/Mac and watch `wrangler tail` —
+   confirm `attest.register ok=true` and `attest.put status=verified`. Fix any
+   signature-encoding (DER↔P1363) or aaguid mismatches the logs reveal.
+3. `npx wrangler deploy --var ATTEST_MODE:enforce`.
+
+> ⚠️ The crypto is implemented to Apple's spec but **not yet validated against a
+> real device's attestation** — that's exactly what audit mode + step 2 are for.
+> Don't enforce until the logs are clean.
+
 ## Not built (deferred to the spec phases)
-- Secure token auth / App Attest gate / expiry + revoke enforcement.
+- Secure token auth (the token is the view credential; expiry + revoke enforced).
 - Auto-refresh push on foreground.
 - The scoped, read-only MCP endpoint (per-report opt-in).
 - Sleep / Body / GitHub aggregates (no local SwiftData mirror to read at

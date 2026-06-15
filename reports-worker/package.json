@@ -7,6 +7,10 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
+  "dependencies": {
+    "@peculiar/x509": "^1.12.3",
+    "cbor-x": "^1.6.0"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241101.0",
     "wrangler": "^3.80.0"
