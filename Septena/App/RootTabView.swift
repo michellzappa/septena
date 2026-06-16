@@ -32,6 +32,14 @@ enum SeptenaTab: Hashable {
 struct RootTabView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  // Tasks is the one tab gated on section enabled-state. `SettingsStore` is
+  // `@Observable`; reading `sections` in `body` re-renders the bar live when
+  // the user toggles the Tasks section in Settings. Week, Next, and Coach are
+  // always present — Week/Next are aggregate surfaces with no 1:1 section, and
+  // Coach is left always-on deliberately: the `goals` section is an
+  // `.appFunction` whose only Enabled toggle is reached *through* the Coach
+  // tab, so gating the tab on it would strand the user with no way back.
+  @Environment(SettingsStore.self) private var settingsStore
   // Gates the in-flight training pill below the tab bar. Read here (not
   // just inside the accessory) so the `.tabViewBottomAccessory` modifier
   // is attached only mid-workout — an empty accessory content still draws
@@ -42,9 +50,21 @@ struct RootTabView: View {
   #endif
   @State private var tabSelection = TabSelection()
 
+  // Default to shown when a section row hasn't loaded yet, so a tab never
+  // flickers out during launch. Keyed by the manifest `key`, not the tab enum.
+  private var tasksEnabled: Bool {
+    settingsStore.sections.first { $0.key == "tasks" }?.isEnabled ?? true
+  }
+
   var body: some View {
     @Bindable var nav = nav
     rootTabView
+      // If the user disables Tasks while sitting on its tab, that tab vanishes
+      // from the bar — fall the selection back to Week so we never sit on a tag
+      // with no matching tab. Week/Next/Coach are always present.
+      .onChange(of: tasksEnabled) { _, on in
+        if !on, tabSelection.current == .tasks { tabSelection.current = .week }
+      }
       .tint(theme.accent)
       // Resolve the push-vs-sheet rule once, here at the shell root, and
       // publish it to every tab via `\.usesPushNavigation`. The Week
@@ -205,9 +225,13 @@ struct RootTabView: View {
         .tabItem { Label("Next", systemImage: "arrow.right") }
         .tag(SeptenaTab.next)
 
-      ContentView()
-        .tabItem { Label("Tasks", systemImage: "checkmark") }
-        .tag(SeptenaTab.tasks)
+      if tasksEnabled {
+        ContentView()
+          .tabItem {
+            Label("Tasks", systemImage: "checkmark")
+          }
+          .tag(SeptenaTab.tasks)
+      }
 
       CoachView()
         .tabItem {
