@@ -224,7 +224,12 @@ enum NutritionPlugin: SectionPlugin {
     case "nutrition.fiber_sum":
       return entries.reduce(0.0) { $0 + ($1.fiberG ?? 0) }
     case "nutrition.kcal_sum":
-      return entries.reduce(0.0) { $0 + ($1.kcal ?? 0) }
+      // Mirror the section UI: when an entry has no stored kcal, derive it from
+      // macros (4·protein + 9·fat + 4·carbs + 7·alcohol) so macro-only meals
+      // aren't silently counted as zero. See ChecklistMirror.makeNutritionEntry.
+      return entries.reduce(0.0) {
+        $0 + ($1.kcal ?? (4 * $1.proteinG + 9 * $1.fatG + 4 * $1.carbsG + 7 * ($1.alcoholG ?? 0)))
+      }
     case "nutrition.water_sum":
       return entries.reduce(0.0) { $0 + ($1.waterMl ?? 0) }
     default:
