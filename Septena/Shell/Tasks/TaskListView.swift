@@ -224,7 +224,9 @@ struct TaskListView: View {
   /// What `rowActionsMenu` operates on — always a single task now (the per-row
   /// context menu). Kept as a one-case enum so the menu builder's call sites
   /// stay stable.
-  fileprivate enum ActionTarget {
+  // Internal (not fileprivate) so the shared `TaskRowActions` modifier — used
+  // on the Next surface — can drive the same `TaskListRowContextMenu`.
+  enum ActionTarget {
     case single(SeptenaTask)
     var ids: [String] {
       switch self {
@@ -1108,7 +1110,18 @@ struct TaskListView: View {
                             by: { $0.area! })
     let loose = pool.filter { $0.project == nil && $0.area == nil }
 
-    // Loose tasks first — uncategorized, no header.
+    // Loose tasks first — uncategorized, no header. On Today with an Inbox
+    // stacked above, draw a hairline seam first so the first ratified row
+    // doesn't read as a 4th Inbox entry (see docs/TRIAGE_BAND_SPEC.md). Skip it
+    // when the Inbox is collapsed — its own header hairline already abuts the
+    // Today rows, so a second line would just stack on top of it.
+    if filter == .today && !triageItems.isEmpty && !loose.isEmpty && !inboxCollapsed {
+      Hairline()
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .plainListChrome()
+    }
     ForEach(loose) { task in row(task).asTaskRow(id: task.id) }
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
@@ -1662,7 +1675,9 @@ private struct TopLevelChromeModifier: ViewModifier {
 }
 
 
-private struct TaskListModalPresenter: ViewModifier {
+// Internal so the shared `TaskRowActions` modifier can host the same
+// When / Deadline / Move / Repeat picker sheets on the Next surface.
+struct TaskListModalPresenter: ViewModifier {
   @Binding var whenSheet: TaskListView.WhenSheet?
   @Binding var showingMoveSheet: Bool
   @Binding var moveTargetId: String?
@@ -1742,7 +1757,9 @@ private struct TaskListModalPresenter: ViewModifier {
   }
 }
 
-private struct TaskListRowContextMenu: View {
+// Internal (shared with `TaskRowActions`) so the Next surface renders the
+// exact same per-row task menu as the Tasks list — single source of truth.
+struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?

@@ -124,6 +124,11 @@ struct TodayTasksSection: View {
                          areas: areas, projects: projects,
                          isSelected: selectedTaskId == task.id,
                          onOpen: onOpenTask.map { open in { open(task) } })
+              // The full task menu (Edit Details… / When… / Deadline… / Move… /
+              // Repeat… / Today / Cancel / Delete) + its picker sheets, shared
+              // with the Tasks list so the two surfaces never drift.
+              .taskRowActions(task: task, areas: areas, projects: projects,
+                              mutator: mutator, onOpenDetail: onOpenTask)
               .transition(.opacity)
           }
         }
@@ -179,50 +184,9 @@ struct TodayTaskRow: View {
       },
       onTap: onOpen
     )
-    // Same app-wide pattern as the other rows: long-press → menu. "Edit Task"
-    // mirrors the row tap (open the edit / agent pane); the richer scheduling
-    // menu (When… / Move… / Repeat…) stays in TaskListView, since those need
-    // sheet state the Next surface doesn't host. Here we keep the subset that
-    // works standalone (open, Today toggle, Cancel, Delete).
-    .contextMenu {
-      if let onOpen {
-        Button {
-          Haptics.tick()
-          onOpen()
-        } label: {
-          Label("Edit Task", systemImage: "pencil")
-        }
-        Divider()
-      }
-      if task.isOnToday {
-        Button {
-          Haptics.tick()
-          mutator.removeFromToday(id: task.id)
-        } label: {
-          Label("Remove from Today", systemImage: "sun.min")
-        }
-      } else {
-        Button {
-          Haptics.tick()
-          mutator.moveToToday(id: task.id, today: true)
-        } label: {
-          Label("Move to Today", systemImage: "sun.max.fill")
-        }
-      }
-      Button {
-        Haptics.tick()
-        mutator.cancel(id: task.id)
-      } label: {
-        Label("Cancel Task", systemImage: "xmark.circle")
-      }
-      Divider()
-      Button(role: .destructive) {
-        Haptics.warning()
-        mutator.delete(id: task.id)
-      } label: {
-        Label("Delete", systemImage: "trash")
-      }
-    }
+    // The per-row context menu + its picker sheets are attached by the caller
+    // via `.taskRowActions(...)` (see `TaskRowActions`) — the same shared menu
+    // the Tasks list uses, so Next and the list can't drift.
   }
 }
 
@@ -894,6 +858,63 @@ struct NextDoneSection: View {
   /// training / completed tasks).
   var passive: [DoneEvent]
   @Environment(SectionTheme.self) private var theme
+  @Environment(\.modelContext) private var modelContext
+
+  // Edit/Delete from the Done log for the kinds whose `DoneEvent.id` resolves
+  // back to a single live entity (mood / gut / nutrition). Training is a
+  // collapsed session and "woke up" has no record, so those stay read-only.
+  @State private var editingMood: MoodEntry?
+  @State private var editingGut: GutEntry?
+  @State private var editingNutrition: NutritionEntry?
+
+  private static let editableKeys: Set<String> = ["mood", "gut", "nutrition"]
+  private func isEditable(_ e: DoneEvent) -> Bool { Self.editableKeys.contains(e.sectionKey) }
+
+  /// `DoneEvent.id` is "<prefix>-<entityID>"; strip the prefix (which differs
+  /// from the section key for nutrition — "nut-") to recover the entity id.
+  private func entityID(_ e: DoneEvent) -> String? {
+    let prefix: String
+    switch e.sectionKey {
+    case "mood": prefix = "mood-"
+    case "gut": prefix = "gut-"
+    case "nutrition": prefix = "nut-"
+    default: return nil
+    }
+    guard e.id.hasPrefix(prefix) else { return nil }
+    return String(e.id.dropFirst(prefix.count))
+  }
+
+  // Re-resolve the live entity (the Done log keeps only a denormalized,
+  // Sendable DoneEvent) and open its section's existing editor — the same
+  // sheet the home surface presents.
+  private func beginEdit(_ e: DoneEvent) {
+    guard let id = entityID(e) else { return }
+    switch e.sectionKey {
+    case "mood":
+      editingMood = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
+        .entries.first { $0.id == id }
+    case "gut":
+      editingGut = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+        .entries.first { $0.id == id }
+    case "nutrition":
+      editingNutrition = ChecklistMirror.loadNutritionToday(context: modelContext)
+        .first { $0.id == id }
+    default: break
+    }
+  }
+
+  // Delete through the section mutator (the write boundary); the feed refreshes
+  // off the mutator's change notification, same as the open rows.
+  private func delete(_ e: DoneEvent) {
+    guard let id = entityID(e) else { return }
+    Haptics.warning()
+    switch e.sectionKey {
+    case "mood":      SeptenaServices.shared.moodMutator.deleteEntry(id: id)
+    case "gut":       SeptenaServices.shared.gutMutator.deleteEntry(id: id)
+    case "nutrition": SeptenaServices.shared.nutritionMutator.deleteEntry(id: id)
+    default: break
+    }
+  }
 
   /// Merge the trio's live done splits with the passive logs into one
   /// newest-first stream.
@@ -921,26 +942,66 @@ struct NextDoneSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(events) { event in
-        DoneEventRow(event: event)
+        DoneEventRow(
+          event: event,
+          // Mood / gut / nutrition get their home Edit + Delete menu; the rest
+          // of the log (tasks, the trio's done splits, training, wake) stays a
+          // read-through record.
+          onEdit: isEditable(event) ? { beginEdit(event) } : nil,
+          onDelete: isEditable(event) ? { delete(event) } : nil
+        )
       }
     }
     // Sit in the same rounded "pill" card the open Next blocks use so the
     // Done log reads as one quiet card rather than floating bare on the
     // grouped background.
     .nextSectionCard()
+    // The same editors the home surfaces use — `adaptiveDetail` is a drop-in
+    // `.sheet(item:)` (sheet on iPhone, docked inspector on iPad/Mac). The feed
+    // refreshes from the mutator's change notification, so onSave is a no-op.
+    .adaptiveDetail(item: $editingMood) { entry in
+      EditMoodEntrySheet(date: SeptenaDate.today, original: entry, onSave: {})
+    }
+    .adaptiveDetail(item: $editingGut) { entry in
+      EditGutEntrySheet(date: SeptenaDate.today, original: entry, onSave: { _ in })
+    }
+    .adaptiveDetail(item: $editingNutrition) { entry in
+      EditNutritionEntrySheet(original: entry, onDone: {})
+    }
   }
 }
 
 /// One timeline row: time chip · section-color dot · label · trailing detail.
 private struct DoneEventRow: View {
   let event: DoneEvent
+  /// Open the entry's editor. nil → read-only row (no menu).
+  var onEdit: (() -> Void)? = nil
+  /// Delete the entry. nil → read-only row (no menu).
+  var onDelete: (() -> Void)? = nil
   @Environment(SectionTheme.self) private var theme
   @Environment(\.rowHInset) private var rowHInset
 
   var body: some View {
+    // Attach the menu only when the row is actionable — an empty `.contextMenu`
+    // would arm a long-press that opens nothing.
+    if onEdit == nil && onDelete == nil {
+      row
+    } else {
+      row.contextMenu {
+        if let onEdit {
+          Button { onEdit() } label: { Label("Edit", systemImage: "pencil") }
+        }
+        if let onDelete {
+          Button(role: .destructive) { onDelete() } label: { Label("Delete", systemImage: "trash") }
+        }
+      }
+    }
+  }
+
+  private var row: some View {
     let color = event.moodQuadrant.flatMap { MoodQuadrant(rawValue: $0)?.color }
       ?? theme.color(for: event.sectionKey)
-    HStack(spacing: 10) {
+    return HStack(spacing: 10) {
       Text(event.time ?? "—")
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)
@@ -1200,53 +1261,31 @@ struct ChoreRow: View {
 
 // MARK: - Shared chrome
 
-/// Section chrome for the Next feed.
-///
-/// On **regular** width (iPad / macOS) each section is a rounded "pill" card —
-/// the same `secondaryGroupedBackground` fill + 22pt corners the Tasks / Goals
-/// drawers use — which is also what lets `NextMasonry` tile sections into
-/// columns (the card edge delineates one column from the next).
-///
-/// On **compact** width (iPhone) the feed goes **borderless** so it reads like
-/// the Tasks list it sits beside: no fill, and `rowHInset` collapses to 0 so
-/// row content lands at the surface's `pageGutter` (20pt) — exactly where a
-/// Tasks row's content sits. The tinted header above each section tracks the
-/// same inset via `.nextHeaderInset()`.
-private struct NextSectionCard: ViewModifier {
-  @Environment(\.horizontalSizeClass) private var hSizeClass
-
-  func body(content: Content) -> some View {
-    let borderless = hSizeClass == .compact
-    content
-      // Carded: rows sit 16pt in from the card edge (which is 20pt off the
-      // screen), aligned with the header. Borderless: 0, so rows align with
-      // the surface gutter like a Tasks row.
-      .environment(\.rowHInset, borderless ? 0 : Theme.Spacing.xl)
+extension View {
+  /// Wraps a stack of Next rows in the same rounded "pill" card (white bubble)
+  /// that the Tasks / Goals drawers use (`DrawerSection`): a secondary-grouped
+  /// fill with 22pt continuous corners. Lets the Next screen read as grouped
+  /// cards on the light page background — matching the Tasks surface beside it
+  /// — and gives `NextMasonry` the card edge it tiles into columns on wide
+  /// panes. The section's tinted header sits *above* this card (not inside),
+  /// mirroring the drawer convention.
+  func nextSectionCard() -> some View {
+    self
+      // De-stacking: the card already sits `pageGutter` off the screen edge, so
+      // rows inside read this tighter inset (aligned with the header above)
+      // instead of stacking a second gutter.
+      .environment(\.rowHInset, Theme.Spacing.xl)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(borderless ? Color.clear : Theme.secondaryGroupedBackground)
+          .fill(Theme.secondaryGroupedBackground)
       )
-      .clipShape(RoundedRectangle(cornerRadius: borderless ? 0 : Theme.cornerRadius,
-                                  style: .continuous))
+      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
   }
-}
 
-/// Horizontal inset for a Next section's header, matched to the row content
-/// below it: 0 when the feed is borderless (compact), `Spacing.xl` when it's
-/// carded (regular) — the mirror of `NextSectionCard`'s `rowHInset`.
-private struct NextHeaderInset: ViewModifier {
-  @Environment(\.horizontalSizeClass) private var hSizeClass
-  func body(content: Content) -> some View {
-    content.padding(.horizontal, hSizeClass == .compact ? 0 : Theme.Spacing.xl)
-  }
-}
-
-extension View {
-  func nextSectionCard() -> some View { modifier(NextSectionCard()) }
-  /// Apply to a Next section header so it stays aligned with the row content
-  /// in both the carded (regular) and borderless (compact) layouts.
-  func nextHeaderInset() -> some View { modifier(NextHeaderInset()) }
+  /// Horizontal inset for a Next section header, matched to the row content in
+  /// the card below it (`rowHInset` = `Spacing.xl`).
+  func nextHeaderInset() -> some View { padding(.horizontal, Theme.Spacing.xl) }
 }
 
 // Reused across HabitRow / SupplementRow / ChoreRow for "Done" / "Skipped"

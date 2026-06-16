@@ -1192,3 +1192,128 @@ struct Hairline: View {
       .padding(.leading, leadingInset)
   }
 }
+
+// MARK: - Shared per-row task actions
+
+/// The full task context menu + its picker sheets, bundled into one modifier so
+/// any surface (the Tasks list, the Next feed) attaches the *same* menu — Edit
+/// Details…, Move to / Remove from Today, When…, Deadline…, Move…, Repeat…,
+/// Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
+/// `TaskListModalPresenter`, both shared with `TaskListView`, so the two
+/// surfaces can't drift. Which picker is open is owned per-row.
+///
+/// Mutations go straight through `TaskMutator`; the surface refreshes off the
+/// mutator's change notifications (same as the row's checkbox), so no explicit
+/// reload is threaded here. The Inbox "file here" suggestions are a
+/// Tasks-list-only affordance and stay nil elsewhere.
+struct TaskRowActions: ViewModifier {
+  let task: SeptenaTask
+  var filter: TaskFilter = .today
+  var areas: [Area] = []
+  var projects: [Project] = []
+  let mutator: TaskMutator
+  /// Opens the task's edit / agent composer ("Edit Details…"). nil hides it.
+  var onOpenDetail: ((SeptenaTask) -> Void)? = nil
+
+  @State private var whenSheet: TaskListView.WhenSheet?
+  @State private var showingMoveSheet = false
+  @State private var moveTargetId: String?
+  @State private var showingRepeatSheet = false
+  @State private var repeatTargetId: String?
+
+  func body(content: Content) -> some View {
+    content
+      .contextMenu {
+        TaskListRowContextMenu(
+          target: .single(task),
+          filter: filter,
+          rankedSuggestions: nil,
+          onOpenDetail: { onOpenDetail?($0) },
+          onApplySuggestion: { _, _ in },
+          onMoveToToday: { ids, today in
+            Haptics.tick()
+            for id in ids {
+              if today { mutator.moveToToday(id: id, today: true) }
+              else { mutator.removeFromToday(id: id) }
+              mutator.acknowledge(id: id)
+            }
+          },
+          onOpenWhen: { _ in whenSheet = .init(taskId: task.id, kind: .scheduled) },
+          onOpenDeadline: { _ in whenSheet = .init(taskId: task.id, kind: .deadline) },
+          onOpenMove: { _ in moveTargetId = task.id; showingMoveSheet = true },
+          onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
+          onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) } },
+          onDelete: { _ in Haptics.warning(); mutator.delete(id: task.id) }
+        )
+      }
+      .modifier(TaskListModalPresenter(
+        whenSheet: $whenSheet,
+        showingMoveSheet: $showingMoveSheet,
+        moveTargetId: $moveTargetId,
+        showingRepeatSheet: $showingRepeatSheet,
+        repeatTargetId: $repeatTargetId,
+        areas: areas,
+        projects: projects,
+        currentTask: { _ in task },
+        currentScheduled: { _ in task.scheduled.flatMap(SeptenaDate.parse) },
+        currentDeadline: { _ in task.deadline.flatMap(SeptenaDate.parse) },
+        currentRecurrence: { _ in task.recurrence },
+        applyWhen: applyWhen,
+        applyMove: applyMove,
+        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule) }
+      ))
+  }
+
+  // Mirrors `TaskListView.applyWhen` — Things-style "Today" pin vs. future
+  // scheduled date vs. cleared. Kept in lockstep with that method.
+  private func applyWhen(id: String, kind: TaskListView.WhenKind, date: Date?) {
+    Haptics.tick()
+    switch kind {
+    case .deadline:
+      mutator.setDeadline(id: id, date: date)
+    case .scheduled:
+      if let d = date {
+        if Calendar.current.isDateInToday(d) {
+          mutator.schedule(id: id, date: nil)
+          mutator.moveToToday(id: id, today: true)
+        } else {
+          mutator.moveToToday(id: id, today: false)
+          mutator.schedule(id: id, date: d)
+        }
+      } else {
+        mutator.schedule(id: id, date: nil)
+        mutator.moveToToday(id: id, today: false)
+      }
+    }
+    mutator.acknowledge(id: id)
+  }
+
+  // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
+  // bookkeeping (no classifier on surfaces that use this).
+  private func applyMove(id: String, areaId: String?, projectId: String?) {
+    Haptics.tick()
+    if projectId != nil {
+      mutator.moveToProject(id: id, project: projectId)
+    } else {
+      mutator.moveToArea(id: id, area: areaId)
+      mutator.moveToProject(id: id, project: nil)
+    }
+    mutator.acknowledge(id: id)
+  }
+}
+
+extension View {
+  /// Attach the shared task context menu + picker sheets to a row — see
+  /// `TaskRowActions`. Use this anywhere a task row appears so the menu stays
+  /// identical to the Tasks list.
+  func taskRowActions(task: SeptenaTask,
+                      filter: TaskFilter = .today,
+                      areas: [Area] = [],
+                      projects: [Project] = [],
+                      mutator: TaskMutator,
+                      onOpenDetail: ((SeptenaTask) -> Void)? = nil) -> some View {
+    modifier(TaskRowActions(task: task, filter: filter, areas: areas,
+                            projects: projects, mutator: mutator,
+                            onOpenDetail: onOpenDetail))
+  }
+}
