@@ -65,14 +65,12 @@ struct TasksDestinationView: View {
     SectionDrawer(sectionKey: "tasks",
                   title: "Tasks",
                   quickAdd: DrawerQuickAdd("New task") { openCreate() },
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        logContent
-      case .patterns:
-        TaskPatternsSection(accent: accent, days: history)
-      }
-    }
+                  mode: $mode,
+                  log: {
+      logContent
+    }, patterns: {
+      TaskPatternsSection(accent: accent, days: history)
+    })
     .tint(accent)
     .task { reload() }
     // Host the composer here so it stacks on top of the drawer sheet and

@@ -39,49 +39,47 @@ struct SymptomsDestinationView: View {
     SectionDrawer(sectionKey: "symptoms",
                   quickAdd: DrawerQuickAdd("Log symptom", systemImage: "waveform.path.ecg") { creating = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        DrawerSummary(stats: [
-          Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
-          Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
-          Stat(value: averageSeverityText, label: "average", tint: accent),
-        ])
+                  mode: $mode,
+                  log: {
+      DrawerSummary(stats: [
+        Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
+        Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
+        Stat(value: averageSeverityText, label: "average", tint: accent),
+      ])
 
-        DrawerSection("Log", padding: .none) {
-          if dayEvents.isEmpty {
-            Text("Nothing logged yet.")
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 12)
-          } else {
-            ForEach(dayEvents) { event in
-              LogEntryRow(
-                title: title(for: event),
-                detail: detail(for: event),
-                trailing: EventTimestamp.hhmm(from: event.occurredAt),
-                tint: accent,
-                isSelected: editing?.id == event.id,
-                onEdit: { editing = event },
-                onDelete: { delete(event) }
-              )
-            }
-          }
-        }
-      case .patterns:
-        if events.isEmpty {
-          DrawerSection("Patterns") {
-            Text("Log a few symptoms and your severity trend and timing pattern appear here.")
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
+      DrawerSection("Log", padding: .none) {
+        if dayEvents.isEmpty {
+          Text("Nothing logged yet.")
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         } else {
-          severityTrendSection
-          rhythmSection
-          bySymptomSection
+          ForEach(dayEvents) { event in
+            LogEntryRow(
+              title: title(for: event),
+              detail: detail(for: event),
+              trailing: EventTimestamp.hhmm(from: event.occurredAt),
+              tint: accent,
+              isSelected: editing?.id == event.id,
+              onEdit: { editing = event },
+              onDelete: { delete(event) }
+            )
+          }
         }
       }
-    }
+    }, patterns: {
+      if events.isEmpty {
+        DrawerSection("Patterns") {
+          Text("Log a few symptoms and your severity trend and timing pattern appear here.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+      } else {
+        severityTrendSection
+        rhythmSection
+        bySymptomSection
+      }
+    })
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["symptoms"]) {}

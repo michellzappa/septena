@@ -38,37 +38,35 @@ struct GutDestinationView: View {
     SectionDrawer(sectionKey: "gut",
                   quickAdd: DrawerQuickAdd("Log movement") { creating = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        gutSummary
-        DrawerSection("Today", padding: .none) {
-          if let today, !today.entries.isEmpty {
-            ForEach(Array(today.entries.reversed())) { entry in
-              LogEntryRow(
-                title: bristolLabel(entry.bristol),
-                detail: detailLine(entry),
-                trailing: entry.time,
-                tint: accent,
-                isSelected: editing?.id == entry.id,
-                onEdit: { editing = entry },
-                onDelete: { delete(entry) }
-              )
-            }
-          } else if !loading {
-            Text("Nothing logged yet.")
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 12)
+                  mode: $mode,
+                  log: {
+      gutSummary
+      DrawerSection("Today", padding: .none) {
+        if let today, !today.entries.isEmpty {
+          ForEach(Array(today.entries.reversed())) { entry in
+            LogEntryRow(
+              title: bristolLabel(entry.bristol),
+              detail: detailLine(entry),
+              trailing: entry.time,
+              tint: accent,
+              isSelected: editing?.id == entry.id,
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
           }
+        } else if !loading {
+          Text("Nothing logged yet.")
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
-      case .patterns:
-        EventFrequencySection(
-          title: "How often", accent: accent, dates: freqDates,
-          emptyText: loading ? nil : "Log a few movements and a daily-frequency heatmap appears here.")
-        rhythmSection
       }
-    }
+    }, patterns: {
+      EventFrequencySection(
+        title: "How often", accent: accent, dates: freqDates,
+        emptyText: loading ? nil : "Log a few movements and a daily-frequency heatmap appears here.")
+      rhythmSection
+    })
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["gut"]) { await reload() }

@@ -119,46 +119,44 @@ struct TrainingDestinationView: View {
     SectionDrawer(sectionKey: "training",
                   quickAdd: DrawerQuickAdd("Start session", systemImage: "play.fill") { nav.showTrainingSession = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        trainingSummary
-        if isViewingToday {
-          // Active draft + the rolling session list. Older sessions live
-          // behind the time-travel control, not dumped inline; the trend
-          // charts moved to Patterns.
-          if let d = draftStore.draft {
-            activeSessionSection(d)
-          }
-          ForEach(defaultSessions, id: \.key) { block in
+                  mode: $mode,
+                  log: {
+      trainingSummary
+      if isViewingToday {
+        // Active draft + the rolling session list. Older sessions live
+        // behind the time-travel control, not dumped inline; the trend
+        // charts moved to Patterns.
+        if let d = draftStore.draft {
+          activeSessionSection(d)
+        }
+        ForEach(defaultSessions, id: \.key) { block in
+          sessionBlockView(block)
+        }
+        if !loading && entries.isEmpty {
+          ContentUnavailableView("No sessions yet",
+                                 systemImage: theme.icon(for: "training"),
+                                 description: Text("Tap + to log a session."))
+        }
+      } else {
+        // Time-travel view: just the picked day's sessions.
+        if viewingSessions.isEmpty {
+          Text("No sessions logged on this day")
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        } else {
+          ForEach(viewingSessions, id: \.key) { block in
             sessionBlockView(block)
           }
-          if !loading && entries.isEmpty {
-            ContentUnavailableView("No sessions yet",
-                                   systemImage: theme.icon(for: "training"),
-                                   description: Text("Tap + to log a session."))
-          }
-        } else {
-          // Time-travel view: just the picked day's sessions.
-          if viewingSessions.isEmpty {
-            Text("No sessions logged on this day")
-              .font(.caption).foregroundStyle(.secondary)
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(.horizontal, 16)
-              .padding(.vertical, 12)
-          } else {
-            ForEach(viewingSessions, id: \.key) { block in
-              sessionBlockView(block)
-            }
-          }
         }
-      case .patterns:
-        z2CardioSection
-        strengthVolumeSection   // merged headline + 8-week trend in one card
-        muscleLoadSection       // per-muscle sets, trailing 7 days
-        progressionSection      // always renders its card (pills + chart/empty)
       }
-    }
+    }, patterns: {
+      z2CardioSection
+      strengthVolumeSection   // merged headline + 8-week trend in one card
+      muscleLoadSection       // per-muscle sets, trailing 7 days
+      progressionSection      // always renders its card (pills + chart/empty)
+    })
     .tint(accent)
     .task {
       paintFromCache()

@@ -66,40 +66,38 @@ struct MedicationsDestinationView: View {
     SectionDrawer(sectionKey: "medications",
                   quickAdd: DrawerQuickAdd("Log dose") { creating = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        DrawerSummary(stats: [
-          Stat(value: "\(takenCount)", label: "taken", tint: accent),
-          Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
-          Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
-        ])
+                  mode: $mode,
+                  log: {
+      DrawerSummary(stats: [
+        Stat(value: "\(takenCount)", label: "taken", tint: accent),
+        Stat(value: "\(skippedCount)", label: "skipped", tint: accent),
+        Stat(value: "\(activeDefinitions.count)", label: "active meds", tint: accent),
+      ])
 
-        DrawerSection("Doses", padding: .none) {
-          if dayDoses.isEmpty {
-            Text("Nothing logged yet.")
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 12)
-          } else {
-            ForEach(dayDoses) { dose in
-              LogEntryRow(
-                title: title(for: dose),
-                detail: detail(for: dose),
-                trailing: EventTimestamp.hhmm(from: dose.occurredAt),
-                tint: accent,
-                isSelected: editing?.id == dose.id,
-                onEdit: { editing = dose },
-                onDelete: { delete(dose) }
-              )
-            }
+      DrawerSection("Doses", padding: .none) {
+        if dayDoses.isEmpty {
+          Text("Nothing logged yet.")
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+        } else {
+          ForEach(dayDoses) { dose in
+            LogEntryRow(
+              title: title(for: dose),
+              detail: detail(for: dose),
+              trailing: EventTimestamp.hhmm(from: dose.occurredAt),
+              tint: accent,
+              isSelected: editing?.id == dose.id,
+              onEdit: { editing = dose },
+              onDelete: { delete(dose) }
+            )
           }
         }
-      case .patterns:
-        CompletionPatternsSection(title: "Adherence", accent: accent, days: adherenceDays)
-        byMedicationSection
       }
-    }
+    }, patterns: {
+      CompletionPatternsSection(title: "Adherence", accent: accent, days: adherenceDays)
+      byMedicationSection
+    })
     .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["medications"]) {}

@@ -47,22 +47,20 @@ struct ChoresDestinationView: View {
   var body: some View {
     SectionDrawer(sectionKey: "chores",
                   quickAdd: DrawerQuickAdd("New chore") { creating = true },
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        choresSummary
-        if !today.isEmpty {
-          DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
-        }
-        if !later.isEmpty {
-          DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
-        }
-      case .patterns:
-        CompletionPatternsSection(title: "Completion", accent: accent,
-                                  days: history, loading: !model.hasLoaded)
-        byChoreSection
+                  mode: $mode,
+                  log: {
+      choresSummary
+      if !today.isEmpty {
+        DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
       }
-    }
+      if !later.isEmpty {
+        DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
+      }
+    }, patterns: {
+      CompletionPatternsSection(title: "Completion", accent: accent,
+                                days: history, loading: !model.hasLoaded)
+      byChoreSection
+    })
     .tint(accent)
     .task {
       model.paintFromCache()

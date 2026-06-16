@@ -47,28 +47,28 @@ struct BodyDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "body", mode: $mode) {
-      switch mode {
-      case .log:
-        statsSection
-        DrawerSection("Recent weigh-ins", padding: .none) {
-          ForEach(rows) { row in
-            LogRow(
-              title: friendlyDate(row.date),
-              detail: detailLine(row),
-              trailing: row.weightKg.map { "\($0.decimalString()) kg" }
-            )
-          }
+    SectionDrawer(sectionKey: "body", mode: $mode,
+                  log: {
+      statsSection
+      DrawerSection("Recent weigh-ins", padding: .none) {
+        ForEach(rows) { row in
+          LogRow(
+            title: friendlyDate(row.date),
+            detail: detailLine(row),
+            trailing: row.weightKg.map { "\($0.decimalString()) kg" }
+          )
         }
-      case .patterns:
-        chartsSection
       }
+      // No-data state lives with the Log half (the default mode) — when Withings
+      // isn't connected there are no charts to show on the Patterns side either.
       if !loading && rows.isEmpty {
         ContentUnavailableView("No Withings data",
                                systemImage: theme.icon(for: "body"),
                                description: Text("Connect Withings in Settings › Integrations."))
       }
-    }
+    }, patterns: {
+      chartsSection
+    })
     .tint(accent)
     .task {
       paintFromCache()

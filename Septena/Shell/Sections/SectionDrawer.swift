@@ -349,6 +349,13 @@ struct SectionDrawer<Content: View>: View {
   /// so today's logging owns the top of the drawer.
   @State private var showingTimeTravel = false
 
+  /// True once a dual-mode body has gone side-by-side (Log + Patterns shown
+  /// together on a wide pane). Raised by `DrawerModeColumns` through
+  /// `DrawerSideBySideKey`; the toolbar drops the now-meaningless Log/Patterns
+  /// toggle while it's set, and the day controls stay visible even when the
+  /// remembered mode is Patterns (the Log half still wants its calendar).
+  @State private var modeShowsBoth = false
+
   /// Whether the deep-linked Settings sheet (this section's pane) is open.
   /// Presented over the drawer so closing it returns the user here.
   #if os(macOS)
@@ -383,6 +390,12 @@ struct SectionDrawer<Content: View>: View {
   /// calendar/time-travel control hides here — Patterns is range-windowed, never
   /// stepped to a single past day.
   private var inPatterns: Bool { mode?.wrappedValue == .patterns }
+
+  /// Whether the day-scoped controls (calendar button, "viewing past day" pill)
+  /// should show. They hide in a pure Patterns view (range-windowed, never
+  /// date-stepped) but stay when the drawer is side-by-side, since the Log half
+  /// is on screen and still wants its day controls regardless of `mode`.
+  private var showsDayControls: Bool { !inPatterns || modeShowsBoth }
 
   /// Whether ←/→ day-stepping is live: a day-scoped drawer on a pushed pane
   /// (Mac / iPad regular width). Compact iPhone sheets keep the tap-only
@@ -422,7 +435,7 @@ struct SectionDrawer<Content: View>: View {
         // the time-travel context is never invisible — tap it to reopen the
         // picker or jump back to today. On today the drawer stays clean and
         // the calendar lives only in the toolbar.
-        if isTimeTraveling, !inPatterns, let currentDate {
+        if isTimeTraveling, showsDayControls, let currentDate {
           TimeTravelPill(date: currentDate.wrappedValue) { showingTimeTravel = true }
         }
         if case .failed(let message) = loadState {
@@ -477,6 +490,11 @@ struct SectionDrawer<Content: View>: View {
       )
       .ignoresSafeArea()
       .allowsHitTesting(false)
+    }
+    // A dual-mode body raises this once it splits Log + Patterns side-by-side, so
+    // the toolbar can drop the Log/Patterns toggle (nothing left to switch).
+    .onPreferenceChange(DrawerSideBySideKey.self) { value in
+      modeShowsBoth = value
     }
     // ←/→ step the viewed day back / forward on the pushed panes (Mac, iPad
     // regular width). Programmatic focus (not a bare `.focusable`) so the keys
@@ -542,9 +560,11 @@ struct SectionDrawer<Content: View>: View {
         }
       }
       // Mode toggle — leading edge, leftmost, present only for dual-mode
-      // (Log + Patterns) sections. Sits before the calendar so the two read
-      // left-to-right as "which view · which day".
-      if let mode {
+      // (Log + Patterns) sections, and only while a single mode is shown. When
+      // the drawer is wide enough to show both side-by-side there's nothing to
+      // switch, so the toggle drops out. Sits before the calendar so the two
+      // read left-to-right as "which view · which day".
+      if let mode, !modeShowsBoth {
         ToolbarItem(placement: leadingPlacement) {
           DrawerModeToggle(mode: mode, storageKey: modeStorageKey ?? sectionKey,
                            accent: resolvedAccent)
@@ -557,7 +577,7 @@ struct SectionDrawer<Content: View>: View {
       // GlassButtonStyle) pins it to a clear Liquid Glass capsule at all times
       // instead of relying on the system's automatic toolbar-glass, which it can
       // drop at rest; prominent stays reserved for the trailing "+".
-      if currentDate != nil, !inPatterns {
+      if currentDate != nil, showsDayControls {
         ToolbarItem(placement: leadingPlacement) {
           Button {
             showingTimeTravel = true
@@ -1260,6 +1280,129 @@ private struct DrawerRowSeparator: View {
     Theme.divider
       .frame(height: 1 / max(scale, 1))
       .padding(.leading, inset)
+  }
+}
+
+// MARK: - Dual-mode side-by-side
+
+/// Preference a dual-mode body raises once it has split Log + Patterns
+/// side-by-side on a wide pane, so `SectionDrawer` can hide the now-meaningless
+/// Log/Patterns toggle and keep the day controls visible. Default false —
+/// single-mode drawers and narrow dual drawers never raise it.
+private struct DrawerSideBySideKey: PreferenceKey {
+  static let defaultValue = false
+  static func reduce(value: inout Bool, nextValue: () -> Bool) {
+    value = value || nextValue()
+  }
+}
+
+/// The dual-mode (Log + Patterns) body, with one width-driven rule shared by
+/// every section so they can't drift:
+///   • **Narrow** (compact iPhone, a slide-over, a small window): show only the
+///     active `mode`, flowed through `DrawerColumns` exactly as a single-mode
+///     drawer — so a wide-enough single mode still goes two-up. The toolbar
+///     toggle flips which one is shown. This path is byte-for-byte today's
+///     behavior.
+///   • **Wide enough for both** (an unfolded foldable iPhone, iPad at regular
+///     width, a wide Mac window): drop the mode entirely and lay Log on the
+///     left, Patterns on the right, each a single column. The toggle disappears.
+///
+/// The decision is measured from the *actual* available width (not the size
+/// class) so it tracks live window resizing and unfold, and it's raised via
+/// `DrawerSideBySideKey` so the drawer chrome reads the same single source
+/// rather than recomputing the threshold a second time.
+struct DrawerModeColumns<Log: View, Patterns: View>: View {
+  @Binding var mode: DrawerMode
+  /// Gap between the two columns and between stacked cards. Matches the drawer's
+  /// between-section spacing so the split reads as one rhythm.
+  var spacing: CGFloat = Theme.Spacing.xxl
+  /// Minimum width each half needs before the drawer splits. Matches
+  /// `DrawerColumns.minColumnWidth` so the split kicks in just past the point a
+  /// single mode would itself have gone two-up — the next step in the same
+  /// width progression rather than a competing threshold.
+  var minHalfWidth: CGFloat = 330
+  @ViewBuilder var log: () -> Log
+  @ViewBuilder var patterns: () -> Patterns
+
+  @State private var sideBySide = false
+
+  private var splitThreshold: CGFloat { minHalfWidth * 2 + spacing }
+
+  var body: some View {
+    layout
+      .onGeometryChange(for: CGFloat.self) { proxy in
+        proxy.size.width
+      } action: { width in
+        let wide = width >= splitThreshold
+        if wide != sideBySide { sideBySide = wide }
+      }
+      .preference(key: DrawerSideBySideKey.self, value: sideBySide)
+  }
+
+  @ViewBuilder
+  private var layout: some View {
+    if sideBySide {
+      HStack(alignment: .top, spacing: spacing) {
+        column { log() }
+        column { patterns() }
+      }
+    } else {
+      DrawerColumns(spacing: spacing) {
+        switch mode {
+        case .log: log()
+        case .patterns: patterns()
+        }
+      }
+    }
+  }
+
+  /// One half of the side-by-side split — a single column that fills its share
+  /// of the width and top-aligns so the two halves start level.
+  private func column<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+    VStack(alignment: .leading, spacing: spacing) { content() }
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+  }
+}
+
+extension SectionDrawer {
+  /// Dual-mode (Log + Patterns) drawer. Instead of switching on `mode` itself,
+  /// the section hands its two halves as `log:` / `patterns:` builders and the
+  /// drawer owns the wide/narrow rule: one mode at a time on a narrow pane
+  /// (toggled), both side-by-side on a wide one. This is the single place that
+  /// rule lives, so every dual section behaves identically. `mode` is
+  /// non-optional here — supplying it is what makes a drawer dual.
+  init<Log: View, Patterns: View>(
+    sectionKey: String,
+    title: String? = nil,
+    accent: Color? = nil,
+    quickAdd: DrawerQuickAdd? = nil,
+    loadState: DrawerLoadState = .idle,
+    onRetry: (() -> Void)? = nil,
+    currentDate: Binding<String>? = nil,
+    mode: Binding<DrawerMode>,
+    modeStorageKey: String? = nil,
+    showsSettingsLink: Bool = true,
+    @ViewBuilder log: @escaping () -> Log,
+    @ViewBuilder patterns: @escaping () -> Patterns
+  ) where Content == DrawerModeColumns<Log, Patterns> {
+    self.init(
+      sectionKey: sectionKey,
+      title: title,
+      accent: accent,
+      quickAdd: quickAdd,
+      loadState: loadState,
+      onRetry: onRetry,
+      currentDate: currentDate,
+      mode: mode,
+      modeStorageKey: modeStorageKey,
+      showsSettingsLink: showsSettingsLink,
+      // The dual body runs its own column layout (single mode → masonry; both
+      // → two halves), so the drawer hands it the full content width rather
+      // than wrapping it in the standard `DrawerColumns` masonry.
+      usesColumns: false
+    ) {
+      DrawerModeColumns(mode: mode, log: log, patterns: patterns)
+    }
   }
 }
 

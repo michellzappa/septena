@@ -54,29 +54,27 @@ struct HabitsDestinationView: View {
     SectionDrawer(sectionKey: "habits",
                   quickAdd: DrawerQuickAdd("New habit") { creating = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        if isViewingToday {
-          if !model.habits.isEmpty { habitsSummary }
-          // Today folds into an accordion: the current time bucket is open with
-          // a "time left" countdown, the others tuck behind their headers. The
-          // minute tick lets the open bucket follow the clock until the user
-          // taps a header (which freezes the fold state).
-          TimelineView(.periodic(from: .now, by: 60)) { _ in
-            ForEach(model.habitBuckets, id: \.self) { bucket in
-              bucketSection(bucket)
-            }
+                  mode: $mode,
+                  log: {
+      if isViewingToday {
+        if !model.habits.isEmpty { habitsSummary }
+        // Today folds into an accordion: the current time bucket is open with
+        // a "time left" countdown, the others tuck behind their headers. The
+        // minute tick lets the open bucket follow the clock until the user
+        // taps a header (which freezes the fold state).
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+          ForEach(model.habitBuckets, id: \.self) { bucket in
+            bucketSection(bucket)
           }
-        } else {
-          pastDaySection
         }
-      case .patterns:
-        CompletionPatternsSection(title: "Completion", accent: accent,
-                                  days: history, loading: !model.hasLoaded)
-        byHabitSection
+      } else {
+        pastDaySection
       }
-    }
+    }, patterns: {
+      CompletionPatternsSection(title: "Completion", accent: accent,
+                                days: history, loading: !model.hasLoaded)
+      byHabitSection
+    })
     .tint(accent)
     .task {
       model.paintFromCache()

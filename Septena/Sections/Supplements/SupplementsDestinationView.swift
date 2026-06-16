@@ -42,21 +42,19 @@ struct SupplementsDestinationView: View {
     SectionDrawer(sectionKey: "supplements",
                   quickAdd: DrawerQuickAdd("New supplement") { creating = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        if isViewingToday {
-          if !model.supplements.isEmpty { supplementsSummary }
-          todaySections
-        } else {
-          pastDaySection
-        }
-      case .patterns:
-        CompletionPatternsSection(title: "Adherence", accent: accent,
-                                  days: history, loading: !model.hasLoaded)
-        bySupplementSection
+                  mode: $mode,
+                  log: {
+      if isViewingToday {
+        if !model.supplements.isEmpty { supplementsSummary }
+        todaySections
+      } else {
+        pastDaySection
       }
-    }
+    }, patterns: {
+      CompletionPatternsSection(title: "Adherence", accent: accent,
+                                days: history, loading: !model.hasLoaded)
+      bySupplementSection
+    })
     .tint(accent)
     .task {
       model.paintFromCache()

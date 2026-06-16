@@ -41,23 +41,21 @@ struct MoodDestinationView: View {
     SectionDrawer(sectionKey: "mood",
                   quickAdd: DrawerQuickAdd("Log mood") { addingNew = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        moodSummary
-        todaySection
-      case .patterns:
-        breakdownSection
-        rhythmSection
-        if monthEntries.isEmpty, wheelEvents.count < 3, !loading {
-          DrawerSection("Patterns") {
-            Text("Not enough check-ins yet to chart your week — keep logging and your rhythm and quadrant mix appear here.")
-              .font(.subheadline)
-              .foregroundStyle(.secondary)
-          }
+                  mode: $mode,
+                  log: {
+      moodSummary
+      todaySection
+    }, patterns: {
+      breakdownSection
+      rhythmSection
+      if monthEntries.isEmpty, wheelEvents.count < 3, !loading {
+        DrawerSection("Patterns") {
+          Text("Not enough check-ins yet to chart your week — keep logging and your rhythm and quadrant mix appear here.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
       }
-    }
+    })
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["mood"]) { await reload() }
     .adaptiveDetail(isPresented: $addingNew) {

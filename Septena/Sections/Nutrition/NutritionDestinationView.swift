@@ -199,22 +199,20 @@ struct NutritionDestinationView: View {
     SectionDrawer(sectionKey: "nutrition",
                   quickAdd: DrawerQuickAdd("Log meal") { searchingMeals = true },
                   currentDate: $viewingDate,
-                  mode: $mode) {
-      switch mode {
-      case .log:
-        // The meal log, time-travelable. Full macro tiles live in Patterns;
-        // a compact day-total readout leads the Log for consistency with the
-        // other editable sections.
-        nutritionSummary
-        entriesList
-      case .patterns:
-        // Today-anchored macro trend tiles + the trailing-7-day meal rhythm
-        // wheel. Both ignore the viewing date by design. Tiles always render,
-        // so Patterns is never blank.
-        macroTilesGrid
-        mealRhythmSection
-      }
-    }
+                  mode: $mode,
+                  log: {
+      // The meal log, time-travelable. Full macro tiles live in Patterns;
+      // a compact day-total readout leads the Log for consistency with the
+      // other editable sections.
+      nutritionSummary
+      entriesList
+    }, patterns: {
+      // Today-anchored macro trend tiles + the trailing-7-day meal rhythm
+      // wheel. Both ignore the viewing date by design. Tiles always render,
+      // so Patterns is never blank.
+      macroTilesGrid
+      mealRhythmSection
+    })
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data. The
     // sectionReload wire below drives the reload (initial load, day

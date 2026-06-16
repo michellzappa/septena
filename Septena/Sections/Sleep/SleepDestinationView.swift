@@ -50,29 +50,29 @@ struct SleepDestinationView: View {
   }
 
   var body: some View {
-    SectionDrawer(sectionKey: "sleep", mode: $mode) {
-      switch mode {
-      case .log:
-        scoresSection
-        durationSection
-        DrawerSection("Recent nights", padding: .none) {
-          ForEach(nights.prefix(14)) { night in
-            LogRow(
-              title: friendlyDate(night.date),
-              detail: detailLine(night),
-              trailing: night.totalH.map(formatHours)
-            )
-          }
+    SectionDrawer(sectionKey: "sleep", mode: $mode,
+                  log: {
+      scoresSection
+      durationSection
+      DrawerSection("Recent nights", padding: .none) {
+        ForEach(nights.prefix(14)) { night in
+          LogRow(
+            title: friendlyDate(night.date),
+            detail: detailLine(night),
+            trailing: night.totalH.map(formatHours)
+          )
         }
-      case .patterns:
-        chartsSection
       }
+      // No-data state lives with the Log half (the default mode) — when Oura
+      // isn't connected there are no charts to show on the Patterns side either.
       if !loading && nights.isEmpty {
         ContentUnavailableView("No Oura data",
                                systemImage: theme.icon(for: "sleep"),
                                description: Text("Connect Oura in Settings › Integrations."))
       }
-    }
+    }, patterns: {
+      chartsSection
+    })
     .tint(accent)
     .task {
       paintFromCache()

@@ -66,40 +66,38 @@ struct IntakeKindPageView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   modeStorageKey: "intake.\(kindID)",
-                  showsSettingsLink: false) {
-      switch mode {
-      case .log:
-        if let kind {
-          DrawerSummary(stats: statTiles(kind))
-        }
-        DrawerSection("Log", padding: .none) {
-          if !entries.isEmpty {
-            ForEach(entries.reversed()) { entry in
-              LogEntryRow(
-                title: methodLabel(entry.method),
-                detail: detailLine(entry),
-                trailing: entry.time,
-                accessory: capsuleAccessory(entry),
-                tint: accent,
-                isSelected: editing?.id == entry.id,
-                onEdit: { editing = entry },
-                onDelete: { delete(entry) }
-              )
-            }
-          } else if !loading {
-            Text("Nothing logged yet.")
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 14)
-              .padding(.vertical, 12)
-          }
-        }
-      case .patterns:
-        EventFrequencySection(
-          title: "How often", accent: accent, dates: freqDates,
-          emptyText: loading ? nil : "Log a few and a daily-frequency heatmap appears here.")
-        rhythmSection
+                  showsSettingsLink: false,
+                  log: {
+      if let kind {
+        DrawerSummary(stats: statTiles(kind))
       }
-    }
+      DrawerSection("Log", padding: .none) {
+        if !entries.isEmpty {
+          ForEach(entries.reversed()) { entry in
+            LogEntryRow(
+              title: methodLabel(entry.method),
+              detail: detailLine(entry),
+              trailing: entry.time,
+              accessory: capsuleAccessory(entry),
+              tint: accent,
+              isSelected: editing?.id == entry.id,
+              onEdit: { editing = entry },
+              onDelete: { delete(entry) }
+            )
+          }
+        } else if !loading {
+          Text("Nothing logged yet.")
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+        }
+      }
+    }, patterns: {
+      EventFrequencySection(
+        title: "How often", accent: accent, dates: freqDates,
+        emptyText: loading ? nil : "Log a few and a daily-frequency heatmap appears here.")
+      rhythmSection
+    })
     .tint(accent)
     // In-page flourish host — see handleLogAction: on iPhone this page is a
     // sheet, which covers the app-root overlay, so the snap plays here.
