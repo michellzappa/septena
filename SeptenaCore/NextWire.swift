@@ -94,6 +94,10 @@ struct RingMetricWire: Codable, Hashable {
   var value: Double
   /// The target the ring fills toward — a full ring means it's been reached.
   var goal: Double?
+  /// The metric's authored color (hex / hsl token), so the wrist ring matches
+  /// the user's Settings color for that metric. Optional — absent on metrics
+  /// with no color source, where the complication falls back to a fixed hue.
+  var colorHex: String? = nil
 }
 
 /// One re-loggable meal on the wire: enough for a remote surface (watch) to

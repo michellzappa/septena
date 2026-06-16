@@ -36,6 +36,9 @@ struct ComplicationRing: Codable, Hashable {
   var key: String
   var value: Double
   var goal: Double?
+  /// The metric's authored color (hex / hsl), mirrored from the user's Settings
+  /// so the ring matches the section. Nil → the complication's fixed fallback hue.
+  var colorHex: String? = nil
 }
 
 /// Snapshot for the macro-ring complication, mirrored from the phone's
@@ -75,11 +78,13 @@ struct MacroComplicationData: Codable {
   /// show only empty tracks).
   static let sample = MacroComplicationData(
     rings: [
-      .init(key: "kcal",    value: 1400, goal: 2200),
-      .init(key: "protein", value: 90,   goal: 150),
-      .init(key: "carbs",   value: 120,  goal: 220),
-      .init(key: "fat",     value: 40,   goal: 70),
-      .init(key: "fiber",   value: 14,   goal: 30),
+      // colorHex mirrors the MacroCatalog defaults so the DEBUG sim previews the
+      // real Settings palette, not the fixed fallback.
+      .init(key: "kcal",    value: 1400, goal: 2200, colorHex: "#eab308"),
+      .init(key: "protein", value: 90,   goal: 150,  colorHex: "#ef4444"),
+      .init(key: "carbs",   value: 120,  goal: 220,  colorHex: "#3b82f6"),
+      .init(key: "fat",     value: 40,   goal: 70,   colorHex: "#f59e0b"),
+      .init(key: "fiber",   value: 14,   goal: 30,   colorHex: "#10b981"),
     ],
     updatedAt: .distantPast)
 }

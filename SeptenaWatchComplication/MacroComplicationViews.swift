@@ -12,9 +12,12 @@ enum MacroStyle {
   static let order = ["kcal", "protein", "carbs", "fat", "fiber"]
 
   static func color(_ key: String) -> Color {
+    // Deliberately off Apple's Activity-ring triad (red / green / cyan): an
+    // orange-anchored, green-free palette so the macro rings never read as the
+    // Move/Exercise/Stand rings on the same face.
     switch key {
-    case "kcal":    return .red
-    case "protein": return .green
+    case "kcal":    return .indigo
+    case "protein": return .pink
     case "carbs":   return .blue
     case "fat":     return .yellow
     case "fiber":   return .purple
@@ -75,10 +78,10 @@ private struct CircularMacroView: View {
   let rings: [ComplicationRing]
 
   var body: some View {
-    // Five rings don't read at ~50pt — show the three headline macros, the rest
-    // live on the rectangular family.
-    RingsView(rings: Array(rings.prefix(3)), color: MacroStyle.color,
-              lineWidth: 5, spacing: 1.5)
+    // The four drawn macros (kcal/protein/carbs/fat) — same set as the
+    // rectangular face; fiber stays a legend-only number.
+    RingsView(rings: Array(rings.prefix(4)), color: MacroStyle.color,
+              lineWidth: 4.0, spacing: 1.5)
       .padding(2)
       .widgetAccentable(false)
   }
@@ -91,12 +94,21 @@ private struct RectangularMacroView: View {
 
   private var kcal: ComplicationRing? { rings.first { $0.key == "kcal" } }
 
-  /// protein / carbs / fat / fiber in ring order.
+  /// protein / carbs / fat / fiber in ring order — the full legend.
   private var macros: [ComplicationRing] { rings.filter { $0.key != "kcal" } }
+
+  /// Drawn rings: drop fiber so four thicker rings read more cleanly than five
+  /// thin ones. Fiber stays in the legend below, so no number is lost.
+  private var drawnRings: [ComplicationRing] { rings.filter { $0.key != "fiber" } }
+
+  /// The ring's authored Settings color, else the fixed macro hue.
+  private func tint(_ ring: ComplicationRing) -> Color {
+    Color(hexToken: ring.colorHex) ?? MacroStyle.color(ring.key)
+  }
 
   var body: some View {
     HStack(spacing: 9) {
-      RingsView(rings: rings, color: MacroStyle.color, lineWidth: 3.5, spacing: 1.5)
+      RingsView(rings: drawnRings, color: MacroStyle.color, lineWidth: 3.4, spacing: 1.6)
         .widgetAccentable(false)
 
       VStack(alignment: .leading, spacing: 4) {
@@ -105,7 +117,7 @@ private struct RectangularMacroView: View {
           HStack(alignment: .firstTextBaseline, spacing: 1) {
             Text("\(Int(kcal.value.rounded()))")
               .font(.system(size: 15, weight: .semibold))
-              .foregroundStyle(MacroStyle.color("kcal"))
+              .foregroundStyle(tint(kcal))
             if let goal = kcal.goal {
               Text("/\(Int(goal.rounded()))")
                 .font(.system(size: 10))
@@ -149,7 +161,7 @@ private struct RectangularMacroView: View {
         .font(.system(size: 8, weight: .semibold))
         .foregroundStyle(.secondary)
     }
-    .foregroundStyle(MacroStyle.color(ring.key))
+    .foregroundStyle(tint(ring))
     .lineLimit(1)
     .minimumScaleFactor(0.6)
     .gridColumnAlignment(.leading)

@@ -1,6 +1,24 @@
 import WidgetKit
 import SwiftUI
 
+extension Color {
+  /// Parse a "#RRGGBB" / "#RGB" hex token (the per-metric Settings colors the
+  /// rings carry) into a Color, or nil for anything unparseable so callers fall
+  /// back to a fixed hue. watchOS-safe — `AdaptiveColor`'s dynamic provider is
+  /// unavailable here, and the watch face is dark, so no light/dark adaptation
+  /// is needed.
+  init?(hexToken: String?) {
+    guard var s = hexToken?.trimmingCharacters(in: .whitespaces), !s.isEmpty
+    else { return nil }
+    if s.hasPrefix("#") { s.removeFirst() }
+    if s.count == 3 { s = s.map { "\($0)\($0)" }.joined() }
+    guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+    self = Color(red:   Double((v >> 16) & 0xff) / 255,
+                 green: Double((v >> 8)  & 0xff) / 255,
+                 blue:  Double( v        & 0xff) / 255)
+  }
+}
+
 /// Apple-Activity-style concentric rings — one per metric, each filling toward
 /// its target. A nil goal (no target set) draws just the faint track. Sized to
 /// the smaller side of its frame so it stays circular in any family. Generic
@@ -28,7 +46,9 @@ struct RingsView: View {
 
   @ViewBuilder
   private func ringArc(_ ring: ComplicationRing) -> some View {
-    let c = color(ring.key)
+    // The metric's authored Settings color when present (matches the section),
+    // else the domain's fixed fallback hue.
+    let c = Color(hexToken: ring.colorHex) ?? color(ring.key)
     let fraction: Double = {
       guard let goal = ring.goal, goal > 0 else { return 0 }
       return min(ring.value / goal, 1)

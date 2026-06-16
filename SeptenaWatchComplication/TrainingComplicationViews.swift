@@ -78,7 +78,8 @@ private struct CircularTrainingView: View {
   let rings: [ComplicationRing]
 
   var body: some View {
-    RingsView(rings: rings, color: TrainingStyle.color, lineWidth: 5, spacing: 1.5)
+    // Match the macro circular's stroke so the two round faces read as a pair.
+    RingsView(rings: rings, color: TrainingStyle.color, lineWidth: 4.5, spacing: 1.5)
       .padding(2)
       .widgetAccentable(false)
   }
@@ -91,7 +92,8 @@ private struct RectangularTrainingView: View {
 
   var body: some View {
     HStack(spacing: 9) {
-      RingsView(rings: rings, color: TrainingStyle.color, lineWidth: 4, spacing: 2)
+      // Three rings, a touch fatter than the macro face's five.
+      RingsView(rings: rings, color: TrainingStyle.color, lineWidth: 5, spacing: 1.5)
         .widgetAccentable(false)
 
       VStack(alignment: .leading, spacing: 3) {

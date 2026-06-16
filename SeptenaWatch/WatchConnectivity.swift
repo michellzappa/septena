@@ -563,7 +563,7 @@ final class WatchConnectivity {
   /// there's nothing to update on a local wrist log.
   private func updateMacroComplication(_ wire: NutritionRingsWire?) {
     let rings = (wire?.rings ?? []).map {
-      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal)
+      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
     MacroComplicationData(rings: rings, updatedAt: Date()).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaMacroRings")
@@ -574,7 +574,7 @@ final class WatchConnectivity {
   /// rings — nothing to update on a local wrist log.
   private func updateTrainingComplication(_ wire: TrainingRingsWire?) {
     let rings = (wire?.rings ?? []).map {
-      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal)
+      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
     TrainingComplicationData(rings: rings, updatedAt: Date()).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaTraining")
