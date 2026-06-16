@@ -1,0 +1,54 @@
+#!/bin/bash
+# wt-done <name> — merge a worktree's committed work back to main, green-gated.
+#
+# Flow:  require worktree fully committed  →  require main clean  →  stage merge
+#        (no-commit)  →  build the MERGED tree  →  finalize + push only if green,
+#        else abort the merge and leave main untouched. Then remove the worktree
+#        and delete the branch.
+#
+# Usage:  scripts/wt-done <name>
+set -euo pipefail
+
+name="${1:?usage: wt-done <name>}"
+branch="wt/$name"
+
+main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
+[ -n "$main" ] || { echo "wt-done: no worktree is on 'main'"; exit 1; }
+
+path="$(dirname "$main")/septena-$name"
+[ -d "$path" ] || { echo "wt-done: no worktree at $path"; exit 1; }
+
+# Chunking commits is the agent's/cron's job — wt-done only integrates committed work.
+if [ -n "$(git -C "$path" status --porcelain)" ]; then
+  echo "✗ $path has uncommitted changes — commit them on $branch first, then re-run"; exit 1
+fi
+if [ -n "$(git -C "$main" status --porcelain)" ]; then
+  echo "✗ main worktree ($main) is dirty — let the cron/agent commit it before merging"; exit 1
+fi
+
+echo "merging $branch → main (staged, not finalized)…"
+if ! git -C "$main" merge --no-ff --no-commit "$branch"; then
+  echo "✗ merge conflict. Resolve in $main (hotspot files — xcstrings/pbxproj/CloudKitSchema.md"
+  echo "  — are usually union merges: keep both additions). Then:"
+  echo "    git -C \"$main\" commit && scripts/build.sh && git -C \"$main\" push"
+  echo "    git -C \"$main\" worktree remove \"$path\" && git -C \"$main\" branch -d \"$branch\""
+  exit 1
+fi
+
+echo "building merged main before finalizing…"
+if ! "$main/scripts/build.sh"; then
+  echo "✗ merged tree is RED — aborting merge, main left untouched"
+  git -C "$main" merge --abort
+  exit 1
+fi
+
+git -C "$main" commit --no-edit
+echo "✓ merged $branch into main (green)"
+
+if git -C "$main" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  git -C "$main" push && echo "✓ pushed main"
+fi
+
+git -C "$main" worktree remove "$path"
+git -C "$main" branch -d "$branch"
+echo "✓ removed worktree $path and branch $branch"

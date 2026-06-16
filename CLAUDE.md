@@ -34,6 +34,15 @@ Schemes: `Septena` (iOS, embeds Watch + widgets + live activity), `SeptenaMac`,
 references them but does not generate them) — container / app-group / bundle-id
 strings live there and are edited by hand.
 
+**Build once per logical unit, never concurrently.** Make a coherent change, then
+run **one** verifying build before leaving the tree green — not after every file
+touch. With 3–5 parallel sessions plus the hourly commit-cron, concurrent
+`xcodebuild`/`xcodegen` against shared state corrupts incremental builds, so
+**build through `scripts/build.sh`** (defaults to the iOS `Septena` scheme): it
+takes a shared `mkdir` lock at `/tmp/septena-build.lock.d` so builds serialize
+across every session and the cron. The compile is the only green gate before the
+cron pushes — a tree that doesn't build must never be left behind.
+
 Debug builds use `SWIFT_OPTIMIZATION_LEVEL: -Osize` on purpose: plain `-Onone`
 makes SwiftUI/SwiftData/Observation 10–50× slower on-device. Trade-off:
 step-debugging is imprecise (locals "optimized out"). For a true breakpoint
@@ -78,6 +87,27 @@ twice. Work on `main`; commit green units directly. Avoid recreating that:
   `git rev-list --count main..<b>` / `<b>..main`, dry-run merges with
   `git merge-tree`, and confirm a deleted branch's content isn't unique before
   dropping it (a stale branch's work is often already redone on `main`).
+
+**Running parallel sessions? Use git worktrees, not one shared tree.** The user
+typically runs 3–5 Claude sessions at once; in a single working tree they silently
+clobber each other's files (no conflict, no warning — just lost work). One worktree
+per session fixes it structurally: separate working dir (no file collisions) and
+separate path-keyed DerivedData (no build contention). Use the helpers:
+
+```bash
+scripts/wt-new <name>     # creates ../septena-<name> on a short-lived wt/<name> branch
+#  …work the session in that dir, build with scripts/build.sh, commit on the branch…
+scripts/wt-done <name>    # green-gated merge back to main (build the MERGED tree,
+                          # finalize + push only if green, else abort), then cleanup
+```
+
+The `wt/<name>` branch is the **sanctioned exception** to "no branches" precisely
+because `wt-done` merges it back the *same session* and deletes it — that's the
+opposite of the long-lived forks that caused the divergence. Hotspot files
+(`*.xcstrings`, `project.pbxproj`, `CloudKitSchema.md`) still conflict at merge;
+that's the *good* failure mode — a conflict you resolve (union merge) beats a
+silent clobber. `wt-done` refuses to merge a dirty main or an uncommitted worktree;
+commit on the branch first (or let the cron do it).
 
 ## Architecture invariants (do not violate)
 

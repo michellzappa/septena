@@ -1,0 +1,29 @@
+#!/bin/bash
+# wt-new <name> — spin up an isolated git worktree for one parallel Claude session.
+#
+# Each session gets its own working dir (no file collisions) and its own
+# path-keyed DerivedData (no build contention). Branch wt/<name> is SHORT-LIVED:
+# merge it back the same session with `wt-done <name>`. This is the sanctioned
+# exception to the no-branches rule precisely because it's merged immediately.
+#
+# Usage:  scripts/wt-new <name>      e.g.  scripts/wt-new sky
+set -euo pipefail
+
+name="${1:?usage: wt-new <name>}"
+branch="wt/$name"
+
+main=$(git worktree list --porcelain | awk '/^worktree /{w=$2} /^branch refs\/heads\/main$/{print w; exit}')
+[ -n "$main" ] || { echo "wt-new: no worktree is on 'main'"; exit 1; }
+
+path="$(dirname "$main")/septena-$name"
+[ -e "$path" ] && { echo "wt-new: $path already exists"; exit 1; }
+git -C "$main" show-ref --verify --quiet "refs/heads/$branch" \
+  && { echo "wt-new: branch $branch already exists"; exit 1; }
+
+git -C "$main" fetch origin main --quiet 2>/dev/null || true
+git -C "$main" worktree add -b "$branch" "$path" main
+
+echo "✓ worktree ready: $path   (branch $branch, off main)"
+echo "  start a session:   cd \"$path\" && claude"
+echo "  build (locked):    scripts/build.sh"
+echo "  finish & merge:    scripts/wt-done $name"
