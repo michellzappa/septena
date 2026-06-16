@@ -1126,22 +1126,29 @@ final class SeptenaServices {
           SeptenaLog.info("[CKEngine] applyDeleted: unknown recordType \(recordType) id=\(recordID.recordName)")
         }
       }
-      ckEngine.applyDidFinishBatch = {
+      ckEngine.applyDidFinishBatch = { notify in
         PerfTrace.spanSync("ck.applyBatch.save", "\(batchApplied) records") {
           try? context.save()
         }
         batchApplied = 0
-        if batchTouchedTasks {
-          NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-        }
-        if batchTouchedStructure {
-          NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
-        }
-        if batchTouchedData {
-          // Deliberately UNSCOPED — a CK batch can touch any mix of record
-          // types (cross-device writes), so every listener refreshes. Local
-          // mutations post scoped instead (see `DataChange.post`).
-          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+        // `notify == false` is our own sent records echoing back: the save
+        // above folds in their fresh system fields, but the user-visible data
+        // was already applied optimistically and the mutator already posted a
+        // scoped change. Skipping the repaint here is what stops every local
+        // edit from triggering a second, app-wide reload wave.
+        if notify {
+          if batchTouchedTasks {
+            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+          }
+          if batchTouchedStructure {
+            NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
+          }
+          if batchTouchedData {
+            // Deliberately UNSCOPED — an inbound CK batch can touch any mix of
+            // record types (cross-device writes), so every listener refreshes.
+            // Local mutations post scoped instead (see `DataChange.post`).
+            NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+          }
         }
         batchTouchedTasks = false
         batchTouchedStructure = false

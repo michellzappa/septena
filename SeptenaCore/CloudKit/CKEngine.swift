@@ -75,7 +75,14 @@ var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) -> Void)?
   /// post one repaint notification instead of N. During a 553-row
   /// migrate the per-record save-and-notify path was taking 60+ sec
   /// of main-actor work; the batched version is sub-second.
-var applyDidFinishBatch: (() -> Void)?
+  ///
+  /// `notify` is true for genuine inbound changes (remote/other-device
+  /// fetches, conflict resolution) that the UI hasn't seen yet, and false
+  /// for our own just-sent records echoing back: those only fold in
+  /// CloudKit system fields — the user-visible data was already applied
+  /// optimistically and the mutator already posted a scoped change. Posting
+  /// again would re-run the whole app's reload path for nothing.
+var applyDidFinishBatch: ((_ notify: Bool) -> Void)?
 
   /// Current iCloud account status. Refreshed on init, when the system
   /// posts `.CKAccountChanged`, and any time `refreshAccountStatus()` is
@@ -466,7 +473,7 @@ func handleEvent(
       logger.info("CKEngine accountChange: \(String(describing: change), privacy: .public)")
 
     case .fetchedRecordZoneChanges(let changes):
-      SeptenaLog.info("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(applyingResetCascade)")
+      Log.cloudKit.debug("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(self.applyingResetCascade)")
       // Force every closure invocation onto MainActor. The closures
       // touch SwiftData's mainContext, which isn't thread-safe — and
       // @MainActor on the enclosing class isn't sufficient because
@@ -482,7 +489,8 @@ func handleEvent(
           }
           applyDeletedRecord?(del.recordID, del.recordType)
         }
-        applyDidFinishBatch?()
+        // Inbound remote changes — the UI hasn't seen these; repaint.
+        applyDidFinishBatch?(true)
       }
 
     case .sentRecordZoneChanges(let sent):
@@ -493,7 +501,7 @@ func handleEvent(
       // CKSyncEngine's `fetchChanges` won't redeliver them (the engine
       // already knows about them), so this is the only path that
       // updates `cloudKitSystemFields` post-send.
-      SeptenaLog.info("[CKEngine] sent: saves=\(sent.savedRecords.count) deletes=\(sent.deletedRecordIDs.count) failedSaves=\(sent.failedRecordSaves.count) failedDeletes=\(sent.failedRecordDeletes.count)")
+      Log.cloudKit.debug("[CKEngine] sent: saves=\(sent.savedRecords.count) deletes=\(sent.deletedRecordIDs.count) failedSaves=\(sent.failedRecordSaves.count) failedDeletes=\(sent.failedRecordDeletes.count)")
 
       // For serverRecordChanged (oplock) failures: CKSyncEngine doesn't
       // populate CKError.serverRecord in this context, so we fetch the
@@ -533,7 +541,12 @@ func handleEvent(
             failedDeletes: Array(sent.failedRecordDeletes)
           )
         }
-        applyDidFinishBatch?()
+        // Our own writes echoing back. Fold in system fields (the save in the
+        // batch handler), but only repaint when an oplock conflict made the
+        // server's version win — otherwise the optimistic write + the
+        // mutator's scoped post already brought the UI current, and a second
+        // app-wide reload here is the per-edit hitch we're eliminating.
+        applyDidFinishBatch?(!freshServerRecords.isEmpty)
       }
 
     case .fetchedDatabaseChanges, .sentDatabaseChanges,

@@ -5301,7 +5301,7 @@ struct ImportExportSettingsPane: View {
       for record in records {
         ckEngine.applyFetchedRecord?(record)
       }
-      ckEngine.applyDidFinishBatch?()
+      ckEngine.applyDidFinishBatch?(true)
       let types = Set(records.map(\.recordType)).count
       repairState = .success(recordCount: records.count, typeCount: types)
     } catch {
