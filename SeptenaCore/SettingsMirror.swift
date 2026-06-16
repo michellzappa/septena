@@ -333,6 +333,28 @@ enum SettingsMirror {
     }
   }
 
+  /// Set a section's accent `color` (hex). Same shape as the other single-key
+  /// section setters — the write boundary for `SectionEntity.color`, so views
+  /// never fetch-mutate-save the row directly. Persists, syncs, never deletes.
+  static func setSectionColor(_ key: String,
+                              hex: String,
+                              context: ModelContext,
+                              engine: CKEngine? = nil) {
+    let descriptor = FetchDescriptor<SectionEntity>(
+      predicate: #Predicate { $0.id == key }
+    )
+    guard let entity = try? context.fetch(descriptor).first else { return }
+    guard entity.color != hex else { return }
+    entity.color = hex
+    entity.updatedAt = .now
+    do {
+      try context.save()
+      engine?.noteSectionChange(id: key)
+    } catch {
+      SeptenaLog.error("SettingsMirror.setSectionColor", error)
+    }
+  }
+
   /// Toggle `showInToday` on a single section. Same shape as
   /// `setSectionEnabled`: persists, syncs, never deletes.
   static func setSectionShowInToday(_ key: String,

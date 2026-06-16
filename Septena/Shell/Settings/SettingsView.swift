@@ -2977,14 +2977,11 @@ struct SectionDetailPane: View {
   }
 
   private func updateColor(_ hex: String) {
-    let descriptor = FetchDescriptor<SectionEntity>(
-      predicate: #Predicate { $0.id == sectionKey }
-    )
-    guard let entity = try? modelContext.fetch(descriptor).first else { return }
-    entity.color = hex
-    entity.updatedAt = .now
-    try? modelContext.save()
-    ckEngine.noteSectionChange(id: sectionKey)
+    // Route through the SettingsMirror write boundary instead of
+    // fetch-mutate-saving the SectionEntity here (matches enable / showInToday
+    // / showInSpotlight). Persists + syncs via CKEngine.
+    SettingsMirror.setSectionColor(sectionKey, hex: hex,
+                                   context: modelContext, engine: ckEngine)
     store.sections = store.sections.map { config in
       config.key == sectionKey
         ? SectionConfig(key: config.key,
