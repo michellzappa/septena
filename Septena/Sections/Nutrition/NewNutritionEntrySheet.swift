@@ -97,7 +97,7 @@ struct NewNutritionEntrySheet: View {
           macroField("Sodium (mg)", text: $sodiumMg)
           macroField("Cholesterol (mg)", text: $cholesterolMg)
           macroField("Potassium (mg)", text: $potassiumMg)
-          macroField("Water (ml)", text: $waterMl)
+          macroField("Water (\(VolumeUnit.current.suffix))", text: $waterMl)
         }
       }
   }
@@ -154,7 +154,7 @@ struct NewNutritionEntrySheet: View {
         sodiumMg: parseOpt(sodiumMg),
         cholesterolMg: parseOpt(cholesterolMg),
         potassiumMg: parseOpt(potassiumMg),
-        waterMl: parseOpt(waterMl),
+        waterMl: parseOpt(waterMl).map { VolumeUnit.current.toMillilitersDouble($0) },
         photoAssetID: photoAssetID
       )
       AddInfoSection.nutrition.notifyTilesChanged()

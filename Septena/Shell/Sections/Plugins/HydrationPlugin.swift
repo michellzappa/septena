@@ -112,11 +112,13 @@ enum HydrationPlugin: SectionPlugin {
   // MARK: - Notifications
 
   static var notificationDescriptors: [NotificationDescriptor] {
-    [NotificationDescriptor(
+    // The quick-actions still add a fixed 250/500 ml; label them in the unit.
+    let u = VolumeUnit.current
+    return [NotificationDescriptor(
       id: "hydration.behind", sectionKey: "hydration", title: String(localized: "Behind-on-water nudge", comment: "Scheduled notification name"),
       actions: [
-        NotificationAction(id: NotificationActionID.hydrationAdd250, title: "💧 +250 ml"),
-        NotificationAction(id: NotificationActionID.hydrationAdd500, title: "+500 ml"),
+        NotificationAction(id: NotificationActionID.hydrationAdd250, title: "💧 +\(u.display(250)) \(u.suffix)"),
+        NotificationAction(id: NotificationActionID.hydrationAdd500, title: "+\(u.display(500)) \(u.suffix)"),
       ],
       priority: 5)]
   }
@@ -137,8 +139,9 @@ enum HydrationPlugin: SectionPlugin {
     guard dayMl < target else { return nil }   // hit the target → suppress
 
     // A late-afternoon check-in: enough of the day left to act on it.
+    let u = VolumeUnit.current
     return NotificationPlan(descriptorID: descriptorID, title: String(localized: "Hydration"),
-                            body: String(localized: "You’re at \(dayMl) of \(target) ml — log a glass?"),
+                            body: String(localized: "You’re at \(u.display(dayMl)) of \(u.display(target)) \(u.suffix) — log a glass?"),
                             threadID: "hydration", hour: 17, minute: 0)
   }
 }
@@ -151,6 +154,8 @@ private struct HydrationDestinationView: View {
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(DayClock.self) private var clock
   @AppStorage("hydration.dailyTargetMl") private var targetMl: Int = 2000
+  @AppStorage(VolumeUnit.defaultsKey) private var volumeUnitRaw = VolumeUnit.ml.rawValue
+  private var vol: VolumeUnit { VolumeUnit.resolve(volumeUnitRaw) }
   /// Total ml on the currently-viewed day (today, or a past day reached
   /// via the drawer's time-travel strip). Includes water recorded on
   /// meals, matching the daily-total convention.
@@ -215,10 +220,10 @@ private struct HydrationDestinationView: View {
     DrawerSection("Today") {
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text("\(dayMl)").font(.system(.largeTitle, design: .rounded).weight(.semibold))
-          Text("ml").font(.body).foregroundStyle(.secondary)
+          Text("\(vol.display(dayMl))").font(.system(.largeTitle, design: .rounded).weight(.semibold))
+          Text(vol.suffix).font(.body).foregroundStyle(.secondary)
           Spacer()
-          Text("of \(targetMl)")
+          Text("of \(vol.display(targetMl))")
             .font(.callout)
             .foregroundStyle(.secondary)
             .monospacedDigit()
@@ -235,8 +240,8 @@ private struct HydrationDestinationView: View {
   private var pastDayHeader: some View {
     DrawerSection {
       HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Text("\(dayMl)").font(.system(.title, design: .rounded).weight(.semibold))
-        Text("ml").font(.body).foregroundStyle(.secondary)
+        Text("\(vol.display(dayMl))").font(.system(.title, design: .rounded).weight(.semibold))
+        Text(vol.suffix).font(.body).foregroundStyle(.secondary)
         Spacer()
         Text(viewingDate)
           .font(.callout)
@@ -248,17 +253,16 @@ private struct HydrationDestinationView: View {
 
   // MARK: Quick-add
 
-  private let presets: [Int] = [250, 330, 500]
-
   @ViewBuilder
   private var quickAddCard: some View {
     DrawerSection("Quick add") {
       HStack(spacing: 10) {
-        ForEach(presets, id: \.self) { ml in
-          Button { commit(ml: ml) } label: {
+        // Round amounts in the user's unit; stored as the equivalent ml.
+        ForEach(vol.quickPresets, id: \.self) { amount in
+          Button { commit(ml: vol.toMilliliters(amount)) } label: {
             VStack(spacing: 2) {
-              Text("\(ml)").font(.body.weight(.semibold)).monospacedDigit()
-              Text("ml").font(.caption2).foregroundStyle(.secondary)
+              Text("\(amount)").font(.body.weight(.semibold)).monospacedDigit()
+              Text(vol.suffix).font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
           }
@@ -291,7 +295,7 @@ private struct HydrationDestinationView: View {
       } else {
         ForEach(entries) { e in
           LogEntryRow(
-            title: "💧 \(Int(e.waterMl ?? 0)) ml",
+            title: "💧 \(vol.display(Int(e.waterMl ?? 0))) \(vol.suffix)",
             trailing: timeString(e.loggedAt),
             onDelete: { delete(e) }
           )
@@ -305,11 +309,14 @@ private struct HydrationDestinationView: View {
   @ViewBuilder
   private var preferencesCard: some View {
     DrawerSection("Daily target") {
-      Stepper(value: $targetMl, in: 500...5000, step: 250) {
+      // Stepper works in the user's unit; `targetMl` stays milliliters.
+      let target = Binding(get: { vol.display(targetMl) },
+                           set: { targetMl = vol.toMilliliters($0) })
+      Stepper(value: target, in: vol.targetRange, step: vol.targetStep) {
         HStack {
           Text("Target")
           Spacer()
-          Text("\(targetMl) ml")
+          Text("\(vol.display(targetMl)) \(vol.suffix)")
             .foregroundStyle(.secondary)
             .monospacedDigit()
         }
@@ -348,6 +355,7 @@ private struct HydrationDestinationView: View {
         motion: .fill,
         intensity: 1.4,
         announce: "Hydration goal reached — \(dayMl + ml) of \(targetMl) ml.",
+        canvas: true,
         logCommit: logCommit,
         write: write
       )
@@ -403,21 +411,25 @@ private struct CustomAmountSheet: View {
   let accent: Color
   let onCommit: (Int) -> Void
   @Environment(\.dismiss) private var dismiss
-  @State private var ml: Int = 400
+  @AppStorage(VolumeUnit.defaultsKey) private var volumeUnitRaw = VolumeUnit.ml.rawValue
+  private var vol: VolumeUnit { VolumeUnit.resolve(volumeUnitRaw) }
+  // Held in the user's unit; converted to ml on commit.
+  @State private var amount: Int = 0
 
   var body: some View {
     NavigationStack {
       Form {
-        Stepper(value: $ml, in: 50...2000, step: 50) {
+        Stepper(value: $amount, in: vol.customRange, step: vol.customStep) {
           HStack {
             Text("Amount")
             Spacer()
-            Text("\(ml) ml")
+            Text("\(amount) \(vol.suffix)")
               .foregroundStyle(.secondary)
               .monospacedDigit()
           }
         }
       }
+      .onAppear { if amount == 0 { amount = vol.display(400) } }
       .formStyle(.grouped)
       .navigationTitle("Custom amount")
       #if os(iOS)
@@ -429,7 +441,7 @@ private struct CustomAmountSheet: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Log") {
-            onCommit(ml)
+            onCommit(vol.toMilliliters(amount))
             dismiss()
           }
           .tint(accent)

@@ -82,6 +82,15 @@ enum SettingsKey {
   /// `MCPDefaultsKey.enabled`). Written by `SettingsStore.setWeightUnit` /
   /// `reconcileUnits`; seeded from the device locale on first launch.
   static let weightUnit = WeightUnit.defaultsKey
+  /// Device-local mirror of `AppSettings.units.distance` ("km"/"mi"), paired
+  /// with `weightUnit` — the one metric/imperial switch sets both. Read by the
+  /// cardio distance/speed readouts via `@AppStorage` / `DistanceUnit.current`.
+  static let distanceUnit = DistanceUnit.defaultsKey
+  /// Device-local mirror of the fluid-volume unit ("ml"/"floz"), derived from
+  /// the same metric/imperial choice. Not a separate `AppUnits` field — it
+  /// rides the weight decision, so old synced payloads need no migration. Read
+  /// by the hydration / nutrition-water surfaces via `VolumeUnit.current`.
+  static let volumeUnit = VolumeUnit.defaultsKey
   /// Voice of the generated welcome greeting. Raw value of `WelcomeTone`.
   static let welcomeTone = "septena.homepage.welcomeTone"
   /// Today's on-device generated welcome lines, JSON-encoded and keyed by
@@ -423,6 +432,10 @@ final class SettingsStore {
   func setWeightUnit(_ unit: WeightUnit, context: ModelContext, engine: CKEngine?) {
     UserDefaults.standard.set(unit.rawValue, forKey: SettingsKey.weightUnit)
     let distance = unit == .kg ? "km" : "mi"
+    UserDefaults.standard.set(distance, forKey: SettingsKey.distanceUnit)
+    // Volume rides the same metric/imperial decision (mirror only, not synced).
+    UserDefaults.standard.set(unit == .kg ? VolumeUnit.ml.rawValue : VolumeUnit.flOz.rawValue,
+                              forKey: SettingsKey.volumeUnit)
     guard serverSettings?.units?.weight != unit.rawValue
             || serverSettings?.units?.distance != distance else { return }
     var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
@@ -443,16 +456,30 @@ final class SettingsStore {
   ///   on the launch path (engine in hand) — push that seed up so it syncs.
   func reconcileUnits(context: ModelContext, engine: CKEngine?) {
     let key = SettingsKey.weightUnit
+    let distKey = SettingsKey.distanceUnit
     if let synced = serverSettings?.units?.weight, !synced.isEmpty {
       if UserDefaults.standard.string(forKey: key) != synced {
         UserDefaults.standard.set(synced, forKey: key)
       }
+      // Distance rides with the weight choice; mirror the synced value (or
+      // derive it if an older payload only carried weight).
+      let dist = serverSettings?.units?.distance ?? (synced == "kg" ? "km" : "mi")
+      if UserDefaults.standard.string(forKey: distKey) != dist {
+        UserDefaults.standard.set(dist, forKey: distKey)
+      }
+      // Volume derives from the weight choice (no synced field of its own).
+      let vol = synced == "kg" ? VolumeUnit.ml.rawValue : VolumeUnit.flOz.rawValue
+      if UserDefaults.standard.string(forKey: SettingsKey.volumeUnit) != vol {
+        UserDefaults.standard.set(vol, forKey: SettingsKey.volumeUnit)
+      }
       return
     }
-    // No synced preference. Adopt the locale default into the local mirror the
+    // No synced preference. Adopt the locale defaults into the local mirrors the
     // first time we see this install so display is right immediately.
     if UserDefaults.standard.string(forKey: key) == nil {
       UserDefaults.standard.set(WeightUnit.localeDefault.rawValue, forKey: key)
+      UserDefaults.standard.set(DistanceUnit.localeDefault.rawValue, forKey: distKey)
+      UserDefaults.standard.set(VolumeUnit.localeDefault.rawValue, forKey: SettingsKey.volumeUnit)
     }
     // Persist the local choice up to the synced payload on the launch path.
     if engine != nil {
@@ -1196,13 +1223,13 @@ struct GeneralSettingsPane: View {
     Form {
       Section {
         Picker(selection: unitsBinding) {
-          Text("Metric (kg)").tag(WeightUnit.kg)
-          Text("Imperial (lb)").tag(WeightUnit.lb)
+          Text("Metric (kg, km)").tag(WeightUnit.kg)
+          Text("Imperial (lb, mi)").tag(WeightUnit.lb)
         } label: {
           Label("Units", systemImage: "scalemass")
         }
       } footer: {
-        Text("Whether weights show in kilograms or pounds across Training and Body. Your data is always stored the same way — this only changes how it’s displayed and entered.")
+        Text("Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered.")
       }
 
       Section {
@@ -2407,15 +2434,16 @@ struct MotionGalleryPane: View {
       }
     }
 
+    // Where each motion *ships* now that the canvas is reserved (see footer).
     var subtitle: String {
       switch self {
-      case .burst:    return "Confetti — celebratory (Mood HAP, groceries)"
-      case .snap:     return "Ring + flash — releasing tension (Mood HAN)"
-      case .bloom:    return "Soft swell — settling (intake, training session)"
-      case .sink:     return "Quiet dot — acknowledgment (Mood LAN, gut)"
-      case .ripple:   return "Full-screen sonar — intake log, training PR payoff"
-      case .arc:      return "Comet arc — day cleared (last Today task)"
-      case .fill:     return "Full-page flood — target logs (hydration, nutrition)"
+      case .burst:    return "Confetti — clearing a daily stack: habits/supplements/chores (canvas); Mood HAP (in-sheet)"
+      case .snap:     return "Ring + flash — Mood HAN (in-sheet), intake tracker (in-page)"
+      case .bloom:    return "Soft swell — fast-breaking meal (canvas); training session (in-sheet)"
+      case .sink:     return "Quiet dot — acknowledgment (Mood LAN, in-sheet)"
+      case .ripple:   return "Full-screen sonar — training PR payoff (in-sheet)"
+      case .arc:      return "Comet arc — last Today task cleared (canvas)"
+      case .fill:     return "Full-page flood — hydration target reached (canvas)"
       case .ignition: return "Rings + streak number — milestone (7/30/100/365)"
       }
     }
@@ -2476,7 +2504,7 @@ struct MotionGalleryPane: View {
       } header: {
         Text("Checkbox feels")
       } footer: {
-        Text("Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise).")
+        Text("Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The full-screen canvas is reserved for milestones (habit streaks, PRs, goal rungs — Ignition / Milestone) and at-most-once-a-day completion moments: clearing your last Today task (Arc), hitting your hydration target (Fill), the first meal that breaks your fast (Bloom), and clearing your whole day's habits, supplements, or chores (Burst). Everyday logs — gut, symptoms, medications, repeat intake, groceries — confirm with haptic + VoiceOver only; Mood and a finished training session play inside their own sheet.")
       }
 
       Section("Accent") {

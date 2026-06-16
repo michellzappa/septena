@@ -96,7 +96,7 @@ struct EditNutritionEntrySheet: View {
           macroField("Sodium (mg)", text: $sodiumMg)
           macroField("Cholesterol (mg)", text: $cholesterolMg)
           macroField("Potassium (mg)", text: $potassiumMg)
-          macroField("Water (ml)", text: $waterMl)
+          macroField("Water (\(VolumeUnit.current.suffix))", text: $waterMl)
         }
       }
   }
@@ -161,7 +161,7 @@ struct EditNutritionEntrySheet: View {
       sodiumMg       = optString(original.sodiumMg)
       cholesterolMg  = optString(original.cholesterolMg)
       potassiumMg    = optString(original.potassiumMg)
-      waterMl        = optString(original.waterMl)
+      waterMl        = optString(original.waterMl.map { VolumeUnit.current.displayDouble($0) })
       photoAssetID   = original.photoAssetID
       time = EventTimestamp.from(date: original.date, time: original.time)
     } else {
@@ -229,7 +229,7 @@ struct EditNutritionEntrySheet: View {
           sodiumMg: parseOpt(sodiumMg),
           cholesterolMg: parseOpt(cholesterolMg),
           potassiumMg: parseOpt(potassiumMg),
-          waterMl: parseOpt(waterMl),
+          waterMl: parseOpt(waterMl).map { VolumeUnit.current.toMillilitersDouble($0) },
           photoAssetID: photoArg
         )
         AddInfoSection.nutrition.notifyTilesChanged()
@@ -256,7 +256,7 @@ struct EditNutritionEntrySheet: View {
           sodiumMg: parseOpt(sodiumMg),
           cholesterolMg: parseOpt(cholesterolMg),
           potassiumMg: parseOpt(potassiumMg),
-          waterMl: parseOpt(waterMl),
+          waterMl: parseOpt(waterMl).map { VolumeUnit.current.toMillilitersDouble($0) },
           photoAssetID: photoAssetID
         )
         AddInfoSection.nutrition.notifyTilesChanged()

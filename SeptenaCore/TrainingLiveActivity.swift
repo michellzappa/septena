@@ -8,7 +8,11 @@ struct TrainingActivityAttributes: ActivityAttributes {
     var totalCount: Int
     var nextExercise: String?
     var cardioMinutes: Int
-    var liftedKg: Int
+    /// Total lifted volume already converted into `liftedUnit` for display —
+    /// the widget extension can't read the app's unit preference, so the app
+    /// resolves it when building the state. Stored data stays kg.
+    var lifted: Int
+    var liftedUnit: String
     /// Rest-timer deadline. When in the future the widget shows a countdown
     /// (instead of session-elapsed); nil / past means not resting.
     var restEndsAt: Date?

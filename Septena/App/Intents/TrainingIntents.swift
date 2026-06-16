@@ -146,6 +146,11 @@ struct LogTrainingIntent: SectionLogIntent {
   @Parameter(title: "Reps")
   var reps: Int?
 
+  // Input contract is kilograms. An App Intent parameter title is a static
+  // LocalizedStringResource resolved by Shortcuts at edit time, so it can't
+  // track the runtime kg/lb preference — relabeling it without a reliable
+  // per-user unit would mislabel real kg-stored data. So the wire stays kg
+  // (like MCP); only readouts (WorkoutLogEntity) honor the display preference.
   @Parameter(title: "Weight (kg)")
   var weightKg: Double?
 

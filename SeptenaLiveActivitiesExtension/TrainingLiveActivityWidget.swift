@@ -93,7 +93,7 @@ private struct TrainingLockScreenView: View {
       HStack(spacing: 18) {
         metric(progressText(context.state), "done")
         metric("\(context.state.cardioMinutes)m", "cardio")
-        metric("\(context.state.liftedKg)kg", "lifted")
+        metric("\(context.state.lifted)\(context.state.liftedUnit)", "lifted")
       }
     }
     .foregroundStyle(.primary)

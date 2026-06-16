@@ -257,7 +257,7 @@ struct SessionCompleteSheet: View {
         statTile(
           label: "Avg pace",
           value: stats.totalDurationMin > 0
-            ? "\(Int((stats.totalDistanceM / stats.totalDurationMin).rounded())) m/min"
+            ? TrainingProgressFormat.pace(stats.totalDistanceM / stats.totalDurationMin)
             : "—"
         )
       }
@@ -389,7 +389,6 @@ struct SessionCompleteSheet: View {
 
   private func formatDistance(_ m: Double) -> String {
     guard m > 0 else { return "—" }
-    if m >= 1000 { return "\((m / 1000).decimalString(1)) km" }
-    return "\(Int(m)) m"
+    return DistanceUnit.current.format(meters: m)
   }
 }

@@ -88,7 +88,8 @@ final class TrainingLiveActivityCoordinator {
           totalCount: 0,
           nextExercise: nil,
           cardioMinutes: 0,
-          liftedKg: 0,
+          lifted: 0,
+          liftedUnit: WeightUnit.current.suffix,
           restEndsAt: nil
         ),
         staleDate: nil
@@ -105,12 +106,14 @@ final class TrainingLiveActivityCoordinator {
   }
 
   private static func contentState(for draft: DraftSession) -> TrainingActivityAttributes.ContentState {
-    TrainingActivityAttributes.ContentState(
+    let unit = WeightUnit.current
+    return TrainingActivityAttributes.ContentState(
       doneCount: draft.doneCount,
       totalCount: draft.totalCount,
       nextExercise: draft.nextPendingIndex.map { draft.entries[$0].exercise.liveActivityDisplayName },
       cardioMinutes: Int(draft.completedCardioMinutes.rounded()),
-      liftedKg: Int(draft.completedLiftedKg.rounded()),
+      lifted: Int(unit.display(draft.completedLiftedKg).rounded()),
+      liftedUnit: unit.suffix,
       // Only forward a still-future deadline so a stale draft never opens the
       // Live Activity already "resting".
       restEndsAt: draft.restEndsAt.flatMap { $0 > Date() ? $0 : nil }

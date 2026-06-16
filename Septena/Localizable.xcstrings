@@ -1955,7 +1955,7 @@
     "Check a few things off and your completion pattern shows up here." : {
 
     },
-    "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The canvas is reserved for at-most-once-a-day moments: clearing your last Today task (Arc), habit streak milestones (Ignition), and finishing a training session (Ripple on a PR, Bloom otherwise)." : {
+    "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The full-screen canvas is reserved for milestones (habit streaks, PRs, goal rungs — Ignition / Milestone) and at-most-once-a-day completion moments: clearing your last Today task (Arc), hitting your hydration target (Fill), the first meal that breaks your fast (Bloom), and clearing your whole day's habits, supplements, or chores (Burst). Everyday logs — gut, symptoms, medications, repeat intake, groceries — confirm with haptic + VoiceOver only; Mood and a finished training session play inside their own sheet." : {
 
     },
     "Checkbox feels" : {
@@ -3674,7 +3674,7 @@
     "Immediately" : {
 
     },
-    "Imperial (lb)" : {
+    "Imperial (lb, mi)" : {
 
     },
     "Import" : {
@@ -4432,7 +4432,7 @@
         }
       }
     },
-    "Metric (kg)" : {
+    "Metric (kg, km)" : {
 
     },
     "Minimal" : {
@@ -7272,6 +7272,9 @@
         }
       }
     },
+    "View previous days" : {
+
+    },
     "View This Day" : {
       "localizations" : {
         "pt-BR" : {
@@ -7473,7 +7476,7 @@
         }
       }
     },
-    "Whether weights show in kilograms or pounds across Training and Body. Your data is always stored the same way — this only changes how it’s displayed and entered." : {
+    "Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered." : {
 
     },
     "Whose turn?" : {
@@ -7608,6 +7611,7 @@
       }
     },
     "You’re at %lld of %lld ml — log a glass?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {

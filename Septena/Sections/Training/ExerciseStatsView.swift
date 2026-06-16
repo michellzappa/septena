@@ -191,7 +191,7 @@ struct ExerciseStatsView: View {
   }
 
   private static func formatDistance(_ m: Double) -> String {
-    m >= 1000 ? "\((m / 1000).decimalString(1)) km" : "\(Int(m)) m"
+    DistanceUnit.current.format(meters: m)
   }
 
   private static let clockFormatter: DateFormatter = {

@@ -44,7 +44,12 @@ struct WorkoutLogEntity: AppEntity, IndexedEntity {
     } else if let sets = e.sets {
       bits.append("\(sets) sets")
     }
-    if let w = e.weight, w > 0 { bits.append("\(String(format: "%g", w)) kg") }
+    // Stored in kg; render in the user's weight unit (the Shortcuts input
+    // contract stays kg — see LogTrainingIntent — but readouts honor the pref).
+    if let w = e.weight, w > 0 {
+      let u = WeightUnit.current
+      bits.append("\(String(format: "%g", u.display(w))) \(u.suffix)")
+    }
     if let d = e.durationMin, d > 0 { bits.append("\(Int(d.rounded())) min") }
     let detail = bits.joined(separator: " · ")
     return WorkoutLogEntity(id: e.id, exercise: e.exercise, detail: detail,
