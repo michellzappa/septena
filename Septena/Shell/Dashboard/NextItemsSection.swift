@@ -96,52 +96,6 @@ final class TodayTasksModel {
   }
 }
 
-struct TodayTasksSection: View {
-  var model: TodayTasksModel
-  /// Open a task's edit / agent pane (the composer is hosted up at `NextView`
-  /// so its inspector docks to the page on iPad/macOS). nil → the row stays a
-  /// read-through checklist (tap only toggles).
-  var onOpenTask: ((SeptenaTask) -> Void)? = nil
-  /// Id of the task currently open in the composer — drives the row highlight.
-  var selectedTaskId: String? = nil
-  @Environment(TaskMutator.self) private var mutator
-  @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
-  /// Backing catalog for each row's project / area subtitle. Loaded once from
-  /// the local mirror — areas / projects are small and effectively static.
-  @State private var areas: [Area] = []
-  @State private var projects: [Project] = []
-
-  var body: some View {
-    let tasks = model.openTasks
-    if !tasks.isEmpty {
-      VStack(alignment: .leading, spacing: 0) {
-        sectionHeader("Tasks", tint: theme.color(for: "tasks"))
-        VStack(spacing: 0) {
-          ForEach(tasks) { task in
-            TodayTaskRow(task: task, model: model, mutator: mutator,
-                         tint: theme.color(for: "tasks"),
-                         areas: areas, projects: projects,
-                         isSelected: selectedTaskId == task.id,
-                         onOpen: onOpenTask.map { open in { open(task) } })
-              // The full task menu (Edit Details… / When… / Deadline… / Move… /
-              // Repeat… / Today / Cancel / Delete) + its picker sheets, shared
-              // with the Tasks list so the two surfaces never drift.
-              .taskRowActions(task: task, areas: areas, projects: projects,
-                              mutator: mutator, onOpenDetail: onOpenTask)
-              .transition(.opacity)
-          }
-        }
-        .nextSectionCard()
-      }
-      .task {
-        areas = LocalCache.areas(in: modelContext)
-        projects = LocalCache.projects(in: modelContext)
-      }
-    }
-  }
-}
-
 struct TodayTaskRow: View {
   let task: SeptenaTask
   var model: TodayTasksModel
@@ -490,12 +444,18 @@ final class NextItemsModel {
 struct NextOpenSection: View {
   var model: NextItemsModel
   var tasksModel: TodayTasksModel
+  /// Backing catalog for each task row's project / area subtitle + the task
+  /// menu's pickers. Loaded once up in `NextView` (small, effectively static)
+  /// and threaded down so the Tasks block doesn't re-fetch.
+  var areas: [Area] = []
+  var projects: [Project] = []
   /// Open a task's edit / agent pane — handed down to the Tasks block's rows.
   /// nil keeps tasks a read-through checklist.
   var onOpenTask: ((SeptenaTask) -> Void)? = nil
   /// Id of the task currently open in the composer, for the row highlight.
   var selectedTaskId: String? = nil
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(TaskMutator.self) private var taskMutator
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(SectionTheme.self) private var theme
   // Per-section "carry over missed items" prefs (see `NextLinger`). Read here
@@ -503,23 +463,6 @@ struct NextOpenSection: View {
   // feed in sync the instant either is flipped.
   @AppStorage(NextLinger.supplementsKey) private var lingerSupplements = NextLinger.supplementsDefault
   @AppStorage(NextLinger.habitsKey) private var lingerHabits = NextLinger.habitsDefault
-
-  /// Live width offered to the section stack, measured below. Drives the
-  /// column count without leaning on `horizontalSizeClass`, so a resizable
-  /// macOS window and an iPad split view both reflow from real pixels (same
-  /// approach as the homepage timeline / Dense layout).
-  @State private var availableWidth: CGFloat = 0
-
-  /// Wide screens tile the section cards into balanced columns instead of
-  /// one long scroll. Thresholds are tuned so iPhone (any orientation) and a
-  /// narrow split view stay single-column, iPad portrait gets two, and iPad
-  /// landscape / a roomy Mac window gets three. Widths are the *inset* page
-  /// width (NextView already trims 20pt each side).
-  private func columnCount(for width: CGFloat) -> Int {
-    if width >= 1040 { return 3 }
-    if width >= 680  { return 2 }
-    return 1
-  }
 
   /// The Next blocks in the user's saved section order, via the shared
   /// `NextFeed` ordering rule (the same one the watch snapshot uses) so the
@@ -559,39 +502,15 @@ struct NextOpenSection: View {
     }
   }
 
+  // One native `Section` per visible block, in the user's saved order. A
+  // `ForEach` whose closure yields `Section`s is SwiftUI's dynamic-sections
+  // pattern — `List` flattens them into the grouped layout (was a hand-rolled
+  // VStack of "pill" cards + a wide-screen masonry, both retired with the
+  // single-column List).
   var body: some View {
     let visible = orderedKeys.filter { !isEmpty($0) }
-    let columns = columnCount(for: availableWidth)
-    // Each block is a tinted header above its own rounded "pill" card (see
-    // `nextSectionCard`); the cards + the header's top inset separate the
-    // sections, so there's no hairline between them anymore.
-    VStack(spacing: 0) {
-      // Zero-height width probe (same pattern as DenseHomepageView): a real
-      // view gives the background GeometryReader a concrete frame to measure.
-      Color.clear
-        .frame(maxWidth: .infinity, maxHeight: 0)
-        .background(
-          GeometryReader { geo in
-            Color.clear.preference(key: NextSectionWidthKey.self, value: geo.size.width)
-          }
-        )
-        .onPreferenceChange(NextSectionWidthKey.self) { availableWidth = $0 }
-
-      if columns > 1 {
-        // Wide: pack the variable-height cards into balanced columns so a
-        // short section (e.g. 2 supplements) doesn't leave a tall ragged
-        // gap beside a long one.
-        NextMasonry(keys: visible, columnCount: columns) { key in
-          block(for: key)
-        }
-      } else {
-        // Compact: the original single open list, untouched.
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(visible, id: \.self) { key in
-            block(for: key)
-          }
-        }
-      }
+    ForEach(visible, id: \.self) { key in
+      block(for: key)
     }
   }
 
@@ -599,50 +518,57 @@ struct NextOpenSection: View {
   private func block(for key: String) -> some View {
     switch key {
     case "tasks":
-      // TodayTasksSection renders its own "Tasks" header + pill card.
-      TodayTasksSection(model: tasksModel,
-                        onOpenTask: onOpenTask,
-                        selectedTaskId: selectedTaskId)
+      Section {
+        ForEach(tasksModel.openTasks) { task in
+          TodayTaskRow(task: task, model: tasksModel, mutator: taskMutator,
+                       tint: theme.color(for: "tasks"),
+                       areas: areas, projects: projects,
+                       isSelected: selectedTaskId == task.id,
+                       onOpen: onOpenTask.map { open in { open(task) } })
+            // The full task menu (Edit Details… / When… / Deadline… / Move… /
+            // Repeat… / Today / Cancel / Delete) + its picker sheets, shared
+            // with the Tasks list so the two surfaces never drift.
+            .taskRowActions(task: task, areas: areas, projects: projects,
+                            mutator: taskMutator, onOpenDetail: onOpenTask)
+            .septenaNextRow()
+        }
+      } header: {
+        sectionHeader("Tasks", tint: theme.color(for: "tasks"))
+      }
 
     case "chores":
-      VStack(alignment: .leading, spacing: 0) {
-        sectionHeader("Chores", tint: theme.color(for: "chores"))
-        VStack(spacing: 0) {
-          ForEach(model.openChores) { chore in
-            ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                     tint: theme.color(for: "chores"))
-              .transition(.opacity)
-          }
+      Section {
+        ForEach(model.openChores) { chore in
+          ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
+                   tint: theme.color(for: "chores"))
+            .septenaNextRow()
         }
-        .nextSectionCard()
+      } header: {
+        sectionHeader("Chores", tint: theme.color(for: "chores"))
       }
 
     case "habits":
-      VStack(alignment: .leading, spacing: 0) {
+      Section {
+        ForEach(habitsNow) { habit in
+          HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
+                   tint: theme.color(for: "habits"))
+            .septenaNextRow()
+        }
+      } header: {
         bucketSectionHeader("Habits", tint: theme.color(for: "habits"),
                             showsCountdown: !lingerHabits)
-        VStack(spacing: 0) {
-          ForEach(habitsNow) { habit in
-            HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                     tint: theme.color(for: "habits"))
-              .transition(.opacity)
-          }
-        }
-        .nextSectionCard()
       }
 
     case "supplements":
-      VStack(alignment: .leading, spacing: 0) {
+      Section {
+        ForEach(supplementsNow) { supp in
+          SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
+                        tint: theme.color(for: "supplements"))
+            .septenaNextRow()
+        }
+      } header: {
         bucketSectionHeader("Supplements", tint: theme.color(for: "supplements"),
                             showsCountdown: !lingerSupplements)
-        VStack(spacing: 0) {
-          ForEach(supplementsNow) { supp in
-            SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                          tint: theme.color(for: "supplements"))
-              .transition(.opacity)
-          }
-        }
-        .nextSectionCard()
       }
 
     default:
@@ -652,80 +578,6 @@ struct NextOpenSection: View {
       let _ = { assertionFailure("NextOpenSection.block(for:) has no case for '\(key)'") }()
       EmptyView()
     }
-  }
-}
-
-// MARK: - Column tiling (wide screens)
-
-/// Reports the section stack's offered width up to `NextOpenSection`, which
-/// turns it into a column count.
-private struct NextSectionWidthKey: PreferenceKey {
-  static let defaultValue: CGFloat = 0
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
-/// Per-tile measured heights, keyed by section key, collected up the tree so
-/// the masonry can pack each card into the currently-shortest column.
-private struct NextTileHeightsKey: PreferenceKey {
-  static let defaultValue: [String: CGFloat] = [:]
-  static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
-    value.merge(nextValue()) { _, new in new }
-  }
-}
-
-/// Masonry layout for the Next section cards. Greedily assigns each card (in
-/// the user's saved section order) to the shortest column, so cards of wildly
-/// different heights pack tightly instead of aligning to a grid row's tallest
-/// cell. Columns are equal-width, so a card's height is independent of which
-/// column it lands in — the greedy pass therefore converges in a single
-/// reflow rather than oscillating.
-///
-/// Before the first height measurement lands every tile reports a nominal
-/// height, so the opening frame round-robins by count instead of dumping every
-/// card into column 0; the real heights then refine the balance.
-private struct NextMasonry<Block: View>: View {
-  let keys: [String]
-  let columnCount: Int
-  var columnSpacing: CGFloat = 16
-  @ViewBuilder let block: (String) -> Block
-
-  @State private var heights: [String: CGFloat] = [:]
-
-  /// Nominal height for a not-yet-measured tile. Only used on the first
-  /// frame; large enough that unknown tiles spread across columns by count.
-  private static var estimatedHeight: CGFloat { 240 }
-
-  private var columns: [[String]] {
-    var cols = Array(repeating: [String](), count: columnCount)
-    var colHeights = Array(repeating: CGFloat(0), count: columnCount)
-    for key in keys {
-      let h = heights[key] ?? Self.estimatedHeight
-      let target = colHeights.enumerated().min { $0.element < $1.element }?.offset ?? 0
-      cols[target].append(key)
-      colHeights[target] += h
-    }
-    return cols
-  }
-
-  var body: some View {
-    let cols = columns
-    HStack(alignment: .top, spacing: columnSpacing) {
-      ForEach(0..<columnCount, id: \.self) { col in
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(cols[col], id: \.self) { key in
-            block(key)
-              .background(
-                GeometryReader { geo in
-                  Color.clear.preference(key: NextTileHeightsKey.self,
-                                         value: [key: geo.size.height])
-                }
-              )
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-      }
-    }
-    .onPreferenceChange(NextTileHeightsKey.self) { heights = $0 }
   }
 }
 
@@ -940,7 +792,7 @@ struct NextDoneSection: View {
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
+    Section {
       ForEach(events) { event in
         DoneEventRow(
           event: event,
@@ -950,12 +802,14 @@ struct NextDoneSection: View {
           onEdit: isEditable(event) ? { beginEdit(event) } : nil,
           onDelete: isEditable(event) ? { delete(event) } : nil
         )
+        .septenaNextRow()
       }
+    } header: {
+      Text("Done Today")
+        .font(.septenaSectionTitle)
+        .foregroundStyle(Theme.inkPrimary)
+        .textCase(nil)
     }
-    // Sit in the same rounded "pill" card the open Next blocks use so the
-    // Done log reads as one quiet card rather than floating bare on the
-    // grouped background.
-    .nextSectionCard()
     // The same editors the home surfaces use — `adaptiveDetail` is a drop-in
     // `.sheet(item:)` (sheet on iPhone, docked inspector on iPad/Mac). The feed
     // refreshes from the mutator's change notification, so onSave is a no-op.
@@ -1262,30 +1116,18 @@ struct ChoreRow: View {
 // MARK: - Shared chrome
 
 extension View {
-  /// Wraps a stack of Next rows in the same rounded "pill" card (white bubble)
-  /// that the Tasks / Goals drawers use (`DrawerSection`): a secondary-grouped
-  /// fill with 22pt continuous corners. Lets the Next screen read as grouped
-  /// cards on the light page background — matching the Tasks surface beside it
-  /// — and gives `NextMasonry` the card edge it tiles into columns on wide
-  /// panes. The section's tinted header sits *above* this card (not inside),
-  /// mirroring the drawer convention.
-  func nextSectionCard() -> some View {
+  /// Cell treatment for a Next row inside the grouped `List`. The native cell
+  /// already supplies the white grouped "pill" background; we zero its content
+  /// margins so the row's own internal padding governs — `rowHInset` for the
+  /// horizontal inset (matched to the section header) and the row's baked-in
+  /// vertical padding — reproducing the old in-card density exactly. The List
+  /// owns the rounded corners + inter-section spacing the `nextSectionCard`
+  /// bubble used to draw by hand.
+  func septenaNextRow() -> some View {
     self
-      // De-stacking: the card already sits `pageGutter` off the screen edge, so
-      // rows inside read this tighter inset (aligned with the header above)
-      // instead of stacking a second gutter.
       .environment(\.rowHInset, Theme.Spacing.xl)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(Theme.secondaryGroupedBackground)
-      )
-      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+      .listRowInsets(EdgeInsets())
   }
-
-  /// Horizontal inset for a Next section header, matched to the row content in
-  /// the card below it (`rowHInset` = `Spacing.xl`).
-  func nextHeaderInset() -> some View { padding(.horizontal, Theme.Spacing.xl) }
 }
 
 // Reused across HabitRow / SupplementRow / ChoreRow for "Done" / "Skipped"
@@ -1321,17 +1163,16 @@ struct CompletionRateBadge: View {
   }
 }
 
+// Section headers for the Next List. The `List` owns the header's placement +
+// spacing, so these supply only the look: a tinted, title-cased section title
+// (`.textCase(nil)` overrides the grouped list's default upper-casing). The
+// section accent already lives on each row's checkbox, so no leading glyph.
 @ViewBuilder
 private func sectionHeader(_ title: String, tint: Color) -> some View {
-  // Title-only — no leading SF Symbol. The section accent already lives on
-  // each row's checkbox, so an extra glyph in the header was redundant.
   Text(title)
     .font(.septenaSectionTitle)
     .foregroundStyle(tint)
-    // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
-    .nextHeaderInset()
-    .padding(.top, Theme.sectionSpacing)
-    .padding(.bottom, 6)
+    .textCase(nil)
 }
 
 // MARK: - Bucketed section header
@@ -1353,8 +1194,5 @@ private func bucketSectionHeader(_ sectionTitle: String, tint: Color,
     Spacer()
     if showsCountdown { BucketTimeLeft(bucket: bucket) }
   }
-  // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
-  .nextHeaderInset()
-  .padding(.top, Theme.sectionSpacing)
-  .padding(.bottom, 6)
+  .textCase(nil)
 }

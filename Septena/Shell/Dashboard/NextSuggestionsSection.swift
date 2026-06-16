@@ -611,26 +611,22 @@ struct NextSuggestionsSection: View {
   var body: some View {
     let items = visible
     if !items.isEmpty {
-      VStack(alignment: .leading, spacing: 0) {
+      Section {
+        ForEach(items) { suggestion in
+          NextSuggestionRow(
+            suggestion: suggestion,
+            model: model,
+            nav: nav,
+            tint: suggestion.kindColor.flatMap(AdaptiveColor.adaptive)
+              ?? theme.color(for: suggestion.kind.sectionKey)
+          )
+          .septenaNextRow()
+        }
+      } header: {
         Text("Suggested")
           .font(.septenaSectionTitle)
           .foregroundStyle(Theme.inkSecondary)
-          // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
-          .nextHeaderInset()
-          .padding(.top, Theme.sectionSpacing)
-          .padding(.bottom, 6)
-        VStack(spacing: 0) {
-          ForEach(items) { suggestion in
-            NextSuggestionRow(
-              suggestion: suggestion,
-              model: model,
-              nav: nav,
-              tint: suggestion.kindColor.flatMap(AdaptiveColor.adaptive)
-                ?? theme.color(for: suggestion.kind.sectionKey)
-            )
-          }
-        }
-        .nextSectionCard()
+          .textCase(nil)
       }
     }
   }

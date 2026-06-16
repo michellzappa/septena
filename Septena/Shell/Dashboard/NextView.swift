@@ -45,58 +45,45 @@ struct NextView: View {
   }
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        // Title removed — the tab bar already labels this view.
+    // A native grouped List, the same container the Coach landing uses, so the
+    // two home tabs read as one family: each block is a `Section` with a tinted
+    // header over native grouped cells (was a ScrollView of hand-rolled "pill"
+    // cards). Single-column by design — the old wide-screen masonry is gone.
+    List {
+      // Title removed — the tab bar already labels this view.
 
-        if model.hasLoaded && !model.hasAnyOpen && !hasAnyDone
-            && tasksModel.openTasks.isEmpty
-            && suggestionsModel.suggestions.isEmpty {
-          // Match the other drawers' empty state: the message lives in a
-          // rounded "pill" card (see `nextSectionCard`) rather than floating
-          // bare on the grouped background.
+      if model.hasLoaded && !model.hasAnyOpen && !hasAnyDone
+          && tasksModel.openTasks.isEmpty
+          && suggestionsModel.suggestions.isEmpty {
+        Section {
           Text("Nothing here yet")
             .font(.callout)
             .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.lg)
-            .padding(.vertical, Theme.Spacing.md)
-            .nextSectionCard()
-            .padding(.top, Theme.sectionSpacing)
         }
-
-        NextSuggestionsSection(model: suggestionsModel)
-
-        // Tasks / chores / habits / supplements render in the user's saved
-        // section order (one order, shared with the homepage) — see
-        // NextOpenSection.orderedKeys.
-        NextOpenSection(model: model, tasksModel: tasksModel,
-                        onOpenTask: { editingTask = $0 },
-                        selectedTaskId: editingTask?.id)
-
-        // A chronological log of everything finished today — the trio the
-        // user just ticked off (lingers struck-through above, then lands
-        // here newest-first) plus passive logs (caffeine, meals, mood, …).
-        if hasAnyDone {
-          Text("Done Today")
-            .font(.septenaSectionTitle)
-            .foregroundStyle(Theme.inkPrimary)
-            // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
-            .nextHeaderInset()
-            .padding(.top, Theme.sectionSpacing)
-            .padding(.bottom, 6)
-          NextDoneSection(model: model, passive: doneModel.events)
-        }
-
       }
-      // Shared surface geometry (gutter + tab-bar clearance) so the rounded
-      // section "pills" (see `nextSectionCard`) sit the same distance off
-      // the screen edge as every other tab. `top: 0` because each section
-      // pads its own top with `Theme.sectionSpacing` — conditionally hidden
-      // sections must not leave gaps.
-      .septenaSurface(top: 0)
+
+      NextSuggestionsSection(model: suggestionsModel)
+
+      // Tasks / chores / habits / supplements render in the user's saved
+      // section order (one order, shared with the homepage) — see
+      // NextOpenSection.orderedKeys.
+      NextOpenSection(model: model, tasksModel: tasksModel,
+                      areas: areas, projects: projects,
+                      onOpenTask: { editingTask = $0 },
+                      selectedTaskId: editingTask?.id)
+
+      // A chronological log of everything finished today — the trio the
+      // user just ticked off (lingers struck-through above, then lands
+      // here newest-first) plus passive logs (caffeine, meals, mood, …).
+      if hasAnyDone {
+        NextDoneSection(model: model, passive: doneModel.events)
+      }
     }
-    .background(Theme.groupedBackground)
+    #if os(iOS)
+    .listStyle(.insetGrouped)
+    #else
+    .listStyle(.inset)
+    #endif
     .septenaInlineTitle()
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
