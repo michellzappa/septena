@@ -922,7 +922,7 @@ struct SmartListRow: View {
       ColoredGlyph(icon: icon, color: iconColor,
                    size: Theme.sidebarIconSize + 4)
       Text(title)
-        .font(.body)
+        .scaledFont(size: Theme.sidebarAreaTitleSize)
         .foregroundStyle(.primary)
       Spacer()
       if let n = count, n > 0 {

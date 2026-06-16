@@ -217,9 +217,9 @@ enum Theme {
   static let sectionSpacing: CGFloat = 16
   static let sidebarIconSize: CGFloat = 17
   static let sidebarRowSpacing: CGFloat = 10
-  static let sidebarTitleSize: CGFloat = 13
+  static let sidebarTitleSize: CGFloat = 14
   static let sidebarTitleWeight: Font.Weight = .regular
-  static let sidebarAreaTitleSize: CGFloat = 13
+  static let sidebarAreaTitleSize: CGFloat = 14
   static let listLeadingInset: CGFloat = 20
   static let cardVerticalPadding: CGFloat = 6
   static let cardActionIconSize: CGFloat = 14
@@ -252,7 +252,11 @@ enum Theme {
   /// want noticeably more air than the old Reminders-tight rows —
   /// bumped from 3pt so LogRow / TaskRow / ChoreRow all settle into a
   /// taller, easier-to-tap rhythm inside DrawerSection.
+  #if os(macOS)
+  static let rowVPadding: CGFloat = 6
+  #else
   static let rowVPadding: CGFloat = 8
+  #endif
 
   /// Spacing scale shared across drawer chrome (SectionDrawer,
   /// DrawerSection, ChartCard, StatTile, StatStrip). Replaces the
@@ -345,7 +349,11 @@ extension Font {
 
   // MARK: UI body (SF Pro)
   static let septenaSidebarRow   = Font.system(.body)
+  #if os(macOS)
+  static let septenaTaskTitle    = Font.system(size: 15)
+  #else
   static let septenaTaskTitle    = Font.system(size: 16)
+  #endif
   static let septenaNotes        = Font.system(.subheadline)
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
   static let septenaLabel        = Font.system(.footnote, weight: .medium)
