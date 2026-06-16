@@ -46,7 +46,10 @@ enum SettingsMirror {
     return try? JSONDecoder().decode(AppSettings.self, from: entity.payloadData)
   }
 
-  static func loadSections(context: ModelContext) -> [SectionConfig] {
+  // `nonisolated`: a pure context read (mirrors `loadSettings`), so the Next
+  // suggestions scorer can resolve enabled sections on a background context
+  // off-main. No writes, so it's safe to opt out of the enum's `@MainActor`.
+  nonisolated static func loadSections(context: ModelContext) -> [SectionConfig] {
     let descriptor = FetchDescriptor<SectionEntity>()
     let rows = (try? context.fetch(descriptor)) ?? []
     let settings = loadSettings(context: context)

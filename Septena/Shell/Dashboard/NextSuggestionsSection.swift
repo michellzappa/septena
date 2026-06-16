@@ -14,8 +14,8 @@ import SwiftData
 
 // MARK: - Suggestion model
 
-struct NextSuggestion: Identifiable, Hashable {
-  enum Kind: String, Hashable {
+struct NextSuggestion: Identifiable, Hashable, Sendable {
+  enum Kind: String, Hashable, Sendable {
     case training, fastBreak, mood, intake
 
     /// Section accent key for `SectionTheme.color(for:)`.
@@ -286,8 +286,13 @@ final class NextSuggestionsModel {
   }
 
   func load() async {
-    let ctx = LocalStore.shared.container.mainContext
-    suggestions = Self.computeAll(context: ctx, now: Date())
+    // Run the history scan + scorer on the MirrorReader's background actor so
+    // the read (14–30 days of nutrition/training/intake/mood) never hitches the
+    // Next tab. `computeAll` is `nonisolated` so it can execute off the main
+    // actor; `[NextSuggestion]` is `Sendable` so it crosses back cleanly.
+    let now = Date()
+    let computed = await MirrorReader.shared.read { Self.computeAll(context: $0, now: now) }
+    suggestions = computed
     skipped = Self.loadSkips(date: today)
     hasLoaded = true
   }
@@ -295,7 +300,7 @@ final class NextSuggestionsModel {
   /// Gather ~14–30 days of history + today's state from the local mirror and
   /// run the pure scorer. Shared by the Next view and the watch snapshot
   /// publisher so both surface the identical suggestions.
-  static func computeAll(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
+  nonisolated static func computeAll(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
     let today = SeptenaDate.today
     let since14 = daysAgoISO(14)
     let since30 = daysAgoISO(30)
@@ -341,7 +346,7 @@ final class NextSuggestionsModel {
   /// One nudge per active intake tracker whose learned first-use time (or
   /// within-day cadence, once logged) is due. Container kinds carry their
   /// Continue/New/method choices; simple kinds carry their method list.
-  static func intakeSuggestions(context ctx: ModelContext, today: String, now: Date) -> [NextSuggestion] {
+  nonisolated static func intakeSuggestions(context ctx: ModelContext, today: String, now: Date) -> [NextSuggestion] {
     let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
       .filter { $0.archivedAt == nil }
     guard !kinds.isEmpty else { return [] }
@@ -442,14 +447,14 @@ final class NextSuggestionsModel {
 
   // MARK: Date helpers
 
-  private static func daysAgoISO(_ days: Int) -> String {
+  nonisolated private static func daysAgoISO(_ days: Int) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
     return SeptenaDate.format(d) ?? SeptenaDate.today
   }
 
   // MARK: Compute (pure, takes everything it needs)
 
-  static func compute(
+  nonisolated static func compute(
     today: String,
     isToday: Bool,
     nutrition: [NutritionEntry],
