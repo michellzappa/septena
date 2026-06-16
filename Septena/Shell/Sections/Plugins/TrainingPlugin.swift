@@ -167,6 +167,15 @@ enum TrainingPlugin: SectionPlugin {
       training_entries_list({ from: "<monday>", to: "<sunday>" })
       ```
 
+      ### Goals
+      Training exposes three measurable goal metrics (set the target in-app under
+      the section's goals strip; read them via `goals_list`). All use the
+      trailing-7-day week:
+      - `training.hard_sets_week` — effective hard sets (Σ sets × difficulty
+        weight). Natural `range` goal; the productive default band is 12–20.
+      - `training.cardio_minutes_week` — summed cardio minutes (default 150).
+      - `training.session_count` — distinct training days (default 4).
+
       ### Don't
       - Don't pass an exercise id where `exercise` is expected — it's the **canonical name** (e.g. 'Chest press'), not the slug.
       - Don't pass arbitrary strings for `sessionType` — resolve to an existing SessionType id first.
@@ -177,9 +186,24 @@ enum TrainingPlugin: SectionPlugin {
 
   // MARK: - Aim metrics
 
+  // Training's measurable commitments. All three read the trailing-7-day week
+  // via `TrainingMetrics` (single source of truth shared with the strength /
+  // cardio cards and the watch training-ring complication), so the goal bar,
+  // the in-section chart, and the wrist always agree. `hard_sets_week` is the
+  // natural `range` goal (the productive 12–20 band); the other two are `gte`.
   static var aimMetrics: [GoalMetric] {
     [
-      GoalMetric(key: "training.session_count",
+      GoalMetric(key: TrainingMetrics.hardSetsKey,
+                 label: "Hard sets (this week)",
+                 sectionKey: "training",
+                 window: "calendarWeek",
+                 unitLabel: "sets"),
+      GoalMetric(key: TrainingMetrics.cardioMinutesKey,
+                 label: "Cardio minutes (this week)",
+                 sectionKey: "training",
+                 window: "calendarWeek",
+                 unitLabel: "min"),
+      GoalMetric(key: TrainingMetrics.sessionCountKey,
                  label: "Training sessions (this week)",
                  sectionKey: "training",
                  window: "calendarWeek",
@@ -188,25 +212,43 @@ enum TrainingPlugin: SectionPlugin {
   }
 
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+    let entries = TrainingMetrics.entriesThisWeek(context: context)
     switch metric.key {
-    case "training.session_count":
-      // A "session" collapses to a distinct training day — multiple
-      // session types in one day still count as one training day from
-      // the user's perspective.
-      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window) else { return 0 }
-      let descriptor = FetchDescriptor<ExerciseEntryEntity>(
-        predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
-      )
-      let entries = (try? context.fetch(descriptor)) ?? []
-      return Double(Set(entries.map { $0.date }).count)
-    default:
-      return nil
+    case TrainingMetrics.hardSetsKey:      return TrainingMetrics.hardSets(entries)
+    case TrainingMetrics.cardioMinutesKey: return TrainingMetrics.cardioMinutes(entries)
+    case TrainingMetrics.sessionCountKey:  return TrainingMetrics.sessionCount(entries)
+    default:                               return nil
     }
+  }
+
+  // Starter targets — the built-in defaults from `TrainingMetrics`, offered in
+  // first-run onboarding and seeded for existing users by `TrainingTargetMigration`
+  // (single source of the numbers). "Sessions/week" is the one universal enough
+  // to pre-check; volume + cardio are opt-in.
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    let band = TrainingMetrics.hardSetsBand(context: context)
+    let cardio = TrainingMetrics.defaultCardioWeeklyMin
+    let sessions = TrainingMetrics.defaultSessionTarget
+    return [
+      SuggestedGoal(metricKey: TrainingMetrics.sessionCountKey, sectionKey: "training",
+                    text: "\(Int(sessions)) training sessions/week",
+                    comparator: "gte", target: sessions, upper: nil,
+                    window: "calendarWeek", unitLabel: "sessions", recommended: true),
+      SuggestedGoal(metricKey: TrainingMetrics.hardSetsKey, sectionKey: "training",
+                    text: "Hard sets \(Int(band.target))–\(Int(band.ceiling))/week",
+                    comparator: "range", target: band.target, upper: band.ceiling,
+                    window: "calendarWeek", unitLabel: "sets", recommended: false),
+      SuggestedGoal(metricKey: TrainingMetrics.cardioMinutesKey, sectionKey: "training",
+                    text: "Cardio \(Int(cardio)) min/week",
+                    comparator: "gte", target: cardio, upper: nil,
+                    window: "calendarWeek", unitLabel: "min", recommended: false),
+    ]
   }
 }
 
 private struct TrainingDetailContent: View {
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+  @AppStorage(TrainingDraftStore.restSecondsKey) private var restSeconds = TrainingDraftStore.defaultRestSeconds
 
   var body: some View {
     Section("Training") {
@@ -222,12 +264,33 @@ private struct TrainingDetailContent: View {
         Text("Difficulty").tag(EffortScale.difficulty.rawValue)
         Text("RIR").tag(EffortScale.rir.rawValue)
       }
-      Text("How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard); RIR is reps in reserve (3 → 1, closer to failure). Same data either way.")
+      Text("How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard · Max); RIR is reps in reserve (3+ · 2 · 1 · 0, where 0 is to failure). Same data either way.")
         .font(.caption)
         .foregroundStyle(.secondary)
     } header: {
       Text("Effort scale")
     }
+    Section {
+      Stepper(value: $restSeconds, in: 0...300, step: 15) {
+        HStack {
+          Text("Rest timer")
+          Spacer()
+          Text(restSeconds == 0 ? "Off" : restLabel(restSeconds))
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+      }
+      Text("After each strength set, a countdown runs in the Dynamic Island so the phone can go back in your bag — with an alert when it's time to lift again.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    } header: {
+      Text("Rest timer")
+    }
+  }
+
+  /// "90s" under a minute, "2:00" / "2:30" above.
+  private func restLabel(_ s: Int) -> String {
+    s < 60 ? "\(s)s" : "\(s / 60):\(String(format: "%02d", s % 60))"
   }
 }
 

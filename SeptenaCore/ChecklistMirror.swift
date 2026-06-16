@@ -1016,8 +1016,12 @@ enum ChecklistMirror {
 
   static func loadTrainingCardioHistory(context: ModelContext, days: Int) -> CardioHistoryResponse {
     let today = SeptenaDate.today
+    // `targetWeeklyMin` is the ~150 min/week default placeholder (this runs on
+    // MirrorReader's background context); the view overlays the goal-aware
+    // target via `TrainingMetrics.cardioMinutesTarget` at render.
+    let weeklyTarget = 150
     guard let todayDate = SeptenaDate.parse(today) else {
-      return CardioHistoryResponse(daily: [], targetWeeklyMin: 150)
+      return CardioHistoryResponse(daily: [], targetWeeklyMin: weeklyTarget)
     }
     // Pull a window with 6 extra days so the rolling-7d at the left edge has
     // full lookback. Cardio entries are those whose exercise is in a cardio
@@ -1062,7 +1066,7 @@ enum ChecklistMirror {
         daily.append(CardioDay(date: day.date, minutes: day.minutes, rolling7d: Double(sum)))
       }
     }
-    return CardioHistoryResponse(daily: daily, targetWeeklyMin: 150)
+    return CardioHistoryResponse(daily: daily, targetWeeklyMin: weeklyTarget)
   }
 
   static func loadTrainingSummary(context: ModelContext, since: String? = nil) -> [ExerciseSummary] {

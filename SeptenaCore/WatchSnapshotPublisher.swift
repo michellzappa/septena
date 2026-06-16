@@ -248,10 +248,23 @@ enum WatchSnapshotPublisher {
       return range.map { $0.max }
     }
 
+    // Each macro's authored color, resolved exactly as the Nutrition section
+    // does (`NutritionDestinationView.color(for:)`): the user's per-tile override
+    // else the `MacroCatalog` default — so the wrist ring matches the tile color
+    // on the phone. The catalog id == our ring key for these five.
+    let tiles = MacroCatalog.reconcile(
+      SettingsMirror.loadSettings(context: context)?.nutrition?.macroTiles
+        ?? MacroCatalog.defaultTilePrefs())
+    func colorFor(_ key: String) -> String? {
+      tiles.first(where: { $0.id == key })?.colorHex
+        ?? MacroCatalog.byID[key]?.defaultColorHex
+    }
+
     let rings = macroOrder.map { macro in
       RingMetricWire(key: macro.key,
                      value: totals[macro.key] ?? 0,
-                     goal: goalFor(macro.key, metricKey: macro.metricKey))
+                     goal: goalFor(macro.key, metricKey: macro.metricKey),
+                     colorHex: colorFor(macro.key))
     }
     // Nothing logged and no target anywhere → don't bother the wire.
     guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
@@ -260,59 +273,31 @@ enum WatchSnapshotPublisher {
 
   // MARK: - Training rings (wrist training complication)
 
-  /// Built-in weekly targets — the rings fill toward these when the user hasn't
-  /// set a real goal. Strength mirrors the section's hypertrophy default (12
-  /// effective hard sets/week); cardio is the ~150 min/week activity guideline;
-  /// sessions a sensible 4/week, overridden by a `training.session_count` goal.
-  private static let strengthSetsTarget: Double = 12
-  private static let cardioMinutesTarget: Double = 150
-  private static let sessionsTarget: Double = 4
-
   /// This week's (trailing-7-day) strength / cardio / session totals vs targets.
-  /// Classification mirrors `TrainingDestinationView`: an entry is cardio when it
-  /// has distance or timed-without-weight, strength when it carries a weight.
+  /// Values + targets come from `TrainingMetrics`; targets prefer a real goal and
+  /// fall back to the built-in defaults (12 hard sets, 150 cardio min, 4 sessions).
   /// Strength volume is `sets × difficulty weight` (hard/max = 1, moderate =
   /// 0.5); cardio is summed `durationMin`; a session is a distinct training day.
   /// Returns nil when nothing was logged this week.
   @MainActor
   private static func buildTrainingRings(context: ModelContext) -> TrainingRingsWire? {
-    let cutoff = SeptenaDate.format(
-      Calendar.current.date(byAdding: .day, value: -6, to: Date())) ?? ""  // today + prev 6
-    let entries = ChecklistMirror.loadTrainingEntries(context: context, since: cutoff)
-      .filter { $0.date >= cutoff }
-
-    func isCardio(_ e: ExerciseEntry) -> Bool {
-      (e.distanceM ?? 0) > 0 || ((e.durationMin ?? 0) > 0 && e.weight == nil)
-    }
-    func isStrength(_ e: ExerciseEntry) -> Bool { e.weight != nil && !isCardio(e) }
-
-    var hardSets: Double = 0
-    for e in entries where isStrength(e) {
-      guard let s = e.sets.flatMap(Int.init), s > 0 else { continue }
-      let weight: Double
-      switch (e.difficulty ?? "").lowercased() {
-      case "hard", "max": weight = 1.0
-      case "moderate":    weight = 0.5
-      default:            weight = 0
-      }
-      hardSets += Double(s) * weight
-    }
-    let cardioMin = entries.filter(isCardio).reduce(0.0) { $0 + ($1.durationMin ?? 0) }
-    let sessions = Double(Set(entries.map { $0.date }).count)
-
-    // Sessions target prefers a real `training.session_count` goal.
-    let sessionGoal: Double = {
-      let g = LocalCache.goals(in: context).first {
-        $0.metricKey == "training.session_count"
-      }
-      if let target = g?.metricTargetUpper ?? g?.metricTarget, target > 0 { return target }
-      return sessionsTarget
-    }()
+    // Values + targets both come from `TrainingMetrics` so the wrist matches the
+    // in-app strength/cardio cards and the Goals bars exactly. Each target
+    // prefers a real goal (hard_sets_week / cardio_minutes_week / session_count)
+    // and falls back to the built-in default when the user set none.
+    let entries = TrainingMetrics.entriesThisWeek(context: context)
+    let band    = TrainingMetrics.hardSetsBand(context: context)
 
     let rings = [
-      RingMetricWire(key: "strength", value: hardSets,  goal: strengthSetsTarget),
-      RingMetricWire(key: "cardio",   value: cardioMin, goal: cardioMinutesTarget),
-      RingMetricWire(key: "sessions", value: sessions,  goal: sessionGoal),
+      RingMetricWire(key: "strength",
+                     value: TrainingMetrics.hardSets(entries),
+                     goal: band.target),
+      RingMetricWire(key: "cardio",
+                     value: TrainingMetrics.cardioMinutes(entries),
+                     goal: TrainingMetrics.cardioMinutesTarget(context: context)),
+      RingMetricWire(key: "sessions",
+                     value: TrainingMetrics.sessionCount(entries),
+                     goal: TrainingMetrics.sessionTarget(context: context)),
     ]
     guard rings.contains(where: { $0.value > 0 }) else { return nil }
     return TrainingRingsWire(rings: rings)

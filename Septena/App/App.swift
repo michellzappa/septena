@@ -269,6 +269,10 @@ struct SeptenaApp: App {
             // range goals. After CK fetch above so it won't duplicate bands a
             // sibling device already migrated.
             MacroTargetMigration.runIfNeeded(context: localStore.container.mainContext)
+            // One-shot: materialize training's built-in weekly targets (12–20
+            // hard sets, 150 cardio min, 4 sessions) as editable goals, for
+            // users who train. After CK fetch so it won't duplicate a seed.
+            TrainingTargetMigration.runIfNeeded(context: localStore.container.mainContext)
             // Milestone reconcile. The first pass per scope is the grandfather
             // pass: every already-qualified rung is granted silently, so launch
             // day never celebrates history. Runs after the CK fetch above so a
