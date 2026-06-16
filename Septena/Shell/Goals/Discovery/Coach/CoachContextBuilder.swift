@@ -282,7 +282,13 @@ enum CoachContextBuilder {
     return keys.compactMap { key in
       let n = count(for: key, r, context)
       guard n > 0 else { return nil }
-      return CoachDataPill(id: key, label: sectionLabel(key), systemImage: icon(for: key), count: n)
+      // Label + icon come from the canonical manifest, not a local switch —
+      // one source of truth for section identity (and complete for every key).
+      let m = SectionManifest.byKey[key]
+      return CoachDataPill(id: key,
+                           label: m?.defaultLabel ?? key.capitalized,
+                           systemImage: m?.iconSymbol ?? "circle.fill",
+                           count: n)
     }
   }
 
@@ -481,29 +487,6 @@ enum CoachContextBuilder {
     }
   }
 
-  private static func sectionLabel(_ key: String) -> String {
-    switch key {
-    case "training": return "Training"; case "nutrition": return "Nutrition"
-    case "hydration": return "Hydration"; case "supplements": return "Supplements"
-    case "sleep": return "Sleep"; case "mood": return "Mood"; case "body": return "Body"
-    case "habits": return "Habits"; case "gut": return "Gut"
-    case "tasks": return "Tasks"; case "chores": return "Chores"
-    case "intake": return "Intake"
-    default: return key.capitalized
-    }
-  }
-
-  private static func icon(for key: String) -> String {
-    switch key {
-    case "training": return "figure.run"; case "nutrition": return "fork.knife"
-    case "hydration": return "drop.fill"; case "supplements": return "pills.fill"
-    case "sleep": return "bed.double"; case "mood": return "face.smiling"; case "body": return "scalemass"
-    case "habits": return "repeat"; case "gut": return "stethoscope"
-    case "tasks": return "checklist"; case "chores": return "house.fill"
-    case "intake": return "takeoutbag.and.cup.and.straw"
-    default: return "circle.fill"
-    }
-  }
 
   // MARK: - Fetch helpers
 
