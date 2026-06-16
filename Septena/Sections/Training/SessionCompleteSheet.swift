@@ -114,6 +114,14 @@ struct SessionCompleteSheet: View {
   /// per presentation; no looping.
   @State private var celebrate = 0
   @State private var note = ""
+  @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+
+  /// The logged rung rendered under the user's chosen scale, e.g. "Hard" or
+  /// "RIR 1"; falls back to the raw string for anything unrecognized.
+  private func effortText(_ raw: String) -> String {
+    let scale = EffortScale(rawValue: effortScaleRaw) ?? .difficulty
+    return TrainingEffort.displayLabel(forKey: raw, scale: scale) ?? raw
+  }
 
   var body: some View {
     ScrollView {
@@ -341,7 +349,7 @@ struct SessionCompleteSheet: View {
 
   private func rowSummary(_ e: DraftEntry) -> String {
     if e.isMobility {
-      return e.difficulty.isEmpty ? "done" : e.difficulty
+      return e.difficulty.isEmpty ? "done" : effortText(e.difficulty)
     }
     var parts: [String] = []
     if e.isCardio {
@@ -356,7 +364,7 @@ struct SessionCompleteSheet: View {
         parts.append("@ \(w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : w.decimalString()) kg")
       }
     }
-    if !e.difficulty.isEmpty { parts.append(e.difficulty) }
+    if !e.difficulty.isEmpty { parts.append(effortText(e.difficulty)) }
     return parts.isEmpty ? "done" : parts.joined(separator: " · ")
   }
 

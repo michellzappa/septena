@@ -206,6 +206,8 @@ enum TrainingPlugin: SectionPlugin {
 }
 
 private struct TrainingDetailContent: View {
+  @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+
   var body: some View {
     Section("Training") {
       NavigationLink {
@@ -214,6 +216,17 @@ private struct TrainingDetailContent: View {
       NavigationLink {
         RoutineCatalogView()
       } label: { Label("Routines", systemImage: "list.bullet.rectangle") }
+    }
+    Section {
+      Picker("Effort scale", selection: $effortScaleRaw) {
+        Text("Difficulty").tag(EffortScale.difficulty.rawValue)
+        Text("RIR").tag(EffortScale.rir.rawValue)
+      }
+      Text("How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard); RIR is reps in reserve (3 → 1, closer to failure). Same data either way.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    } header: {
+      Text("Effort scale")
     }
   }
 }

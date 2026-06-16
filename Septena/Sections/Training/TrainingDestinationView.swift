@@ -505,10 +505,10 @@ struct TrainingDestinationView: View {
     for e in entries where isStrengthEntry(e) && e.date >= cutoff {
       guard let s = e.sets.flatMap(Int.init), s > 0 else { continue }
       let weight: Double
-      switch (e.difficulty ?? "").lowercased() {
-      case "hard", "max":   weight = 1.0
-      case "moderate":      weight = 0.5
-      default:              weight = 0
+      switch TrainingEffort.canonicalKey(e.difficulty) {
+      case "hard":     weight = 1.0
+      case "moderate": weight = 0.5
+      default:         weight = 0   // easy / unrated → no stimulus credit
       }
       total += Double(s) * weight
     }
@@ -773,10 +773,10 @@ struct TrainingDestinationView: View {
       guard let wkStart = cal.date(from: dComps) else { continue }
       if let s = e.sets.flatMap(Int.init), s > 0 {
         let weight: Double
-        switch (e.difficulty ?? "").lowercased() {
-        case "hard", "max": weight = 1.0
-        case "moderate":    weight = 0.5
-        default:            weight = 0
+        switch TrainingEffort.canonicalKey(e.difficulty) {
+        case "hard":     weight = 1.0
+        case "moderate": weight = 0.5
+        default:         weight = 0
         }
         setsByWeek[wkStart, default: 0] += Double(s) * weight
       }
@@ -2318,6 +2318,7 @@ struct TrainingExerciseCard: View {
   let index: Int
   let entry: DraftEntry
   let accent: Color
+  @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
   /// Which exercise's card is open, lifted to the parent so only one
   /// drawer is expanded at a time — opening one closes the others.
   @Binding var openExercise: String?
@@ -2818,20 +2819,18 @@ struct TrainingExerciseCard: View {
     // unselected is clear with a 1.5pt accent stroke. Sized for a
     // glance + thumb tap at the gym, and high-contrast against the
     // expanded card's accent-tinted background.
-    let levels: [(id: String, label: String)] = [
-      ("easy", "Easy"), ("medium", "Med"), ("hard", "Hard"),
-    ]
+    let scale = EffortScale(rawValue: effortScaleRaw) ?? .difficulty
     return HStack(spacing: 8) {
-      ForEach(Array(levels.enumerated()), id: \.element.id) { idx, rung in
-        let isSelected = entry.difficulty == rung.id
+      ForEach(TrainingEffort.levels) { rung in
+        let isSelected = TrainingEffort.canonicalKey(entry.difficulty) == rung.key
         Button {
-          store.update { $0.entries[index].difficulty = rung.id }
+          store.update { $0.entries[index].difficulty = rung.key }
         } label: {
           VStack(spacing: 2) {
-            Text("\(idx + 1)")
+            Text("\(TrainingEffort.number(for: rung, scale: scale))")
               .font(.system(.title2, design: .rounded).weight(.bold))
               .monospacedDigit()
-            Text(rung.label.uppercased())
+            Text(scale == .rir ? "RIR" : rung.short.uppercased())
               .font(.caption2.weight(.semibold))
               .tracking(0.5)
           }

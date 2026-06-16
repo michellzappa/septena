@@ -26,18 +26,13 @@ struct EditExerciseEntrySheet: View {
 
   @State private var note: String = ""
 
+  @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+  private var effortScale: EffortScale { EffortScale(rawValue: effortScaleRaw) ?? .difficulty }
+
   /// Cardio if the loaded entry already carries any cardio-shaped field.
   private var isCardio: Bool {
     original.durationMin != nil || original.distanceM != nil || original.level != nil
   }
-
-  private static let difficulties: [(String, String)] = [
-    ("", "—"),
-    ("easy", "Easy"),
-    ("moderate", "Moderate"),
-    ("hard", "Hard"),
-    ("max", "Max"),
-  ]
 
   var body: some View {
     AdaptiveEditScaffold(title: "Edit entry", canSave: original.file != nil, onSave: save) {
@@ -62,9 +57,10 @@ struct EditExerciseEntrySheet: View {
             numberRow("Weight (kg)", text: $weight)
             numberRow("Sets", text: $sets)
             numberRow("Reps", text: $reps)
-            Picker("Difficulty", selection: $difficulty) {
-              ForEach(Self.difficulties, id: \.0) { d in
-                Text(d.1).tag(d.0)
+            Picker(effortScale.label, selection: $difficulty) {
+              Text("—").tag("")
+              ForEach(TrainingEffort.levels) { lvl in
+                Text(effortScale == .rir ? "RIR \(lvl.rir)" : lvl.label).tag(lvl.key)
               }
             }
             .pickerStyle(.segmented)
@@ -94,7 +90,9 @@ struct EditExerciseEntrySheet: View {
     weight = original.weight.map(numString) ?? ""
     sets = original.sets ?? ""
     reps = original.reps ?? ""
-    difficulty = original.difficulty ?? ""
+    // Fold any legacy spelling ("medium"/"max") to a canonical key so the
+    // segmented picker selects a real tag; saving then rewrites it canonical.
+    difficulty = TrainingEffort.canonicalKey(original.difficulty) ?? ""
     durationMin = original.durationMin.map(numString) ?? ""
     distanceM = original.distanceM.map(numString) ?? ""
     level = original.level.map(numString) ?? ""

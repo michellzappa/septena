@@ -2534,6 +2534,9 @@
     "Diagnostics" : {
 
     },
+    "Difficulty" : {
+
+    },
     "Digestion log" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2803,6 +2806,9 @@
           }
         }
       }
+    },
+    "Effort scale" : {
+
     },
     "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
       "localizations" : {
@@ -3579,6 +3585,9 @@
       }
     },
     "How to read this" : {
+
+    },
+    "How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard); RIR is reps in reserve (3 → 1, closer to failure). Same data either way." : {
 
     },
     "Hydration" : {
@@ -5656,6 +5665,9 @@
       }
     },
     "Right" : {
+
+    },
+    "RIR" : {
 
     },
     "Rose" : {

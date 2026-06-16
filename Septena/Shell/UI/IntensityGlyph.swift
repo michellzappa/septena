@@ -19,11 +19,13 @@ struct DifficultyGlyph: View {
   }
 
   private var spec: Spec? {
-    switch (difficulty ?? "").lowercased() {
-    case "easy":   return Spec(filled: 1, opacity: 0.30, label: "Easy")
-    case "medium": return Spec(filled: 2, opacity: 0.65, label: "Medium")
-    case "hard":   return Spec(filled: 3, opacity: 1.00, label: "Hard")
-    default:       return nil
+    // Canonicalize first so both legacy ("medium"/"max") and current
+    // ("moderate") spellings render the same 3-dot ramp.
+    switch TrainingEffort.canonicalKey(difficulty) {
+    case "easy":     return Spec(filled: 1, opacity: 0.30, label: "Easy")
+    case "moderate": return Spec(filled: 2, opacity: 0.65, label: "Moderate")
+    case "hard":     return Spec(filled: 3, opacity: 1.00, label: "Hard")
+    default:         return nil
     }
   }
 
