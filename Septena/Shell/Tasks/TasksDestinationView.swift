@@ -78,20 +78,8 @@ struct TasksDestinationView: View {
     .taskComposerDrawer(isPresented: composerBinding) { composerCard }
   }
 
-  /// Top-of-Log day readout — what's on the plate today.
-  @ViewBuilder
-  private var tasksSummary: some View {
-    if !openTasks.isEmpty || !triageTasks.isEmpty {
-      DrawerSummary(stats: [
-        Stat(value: "\(openTasks.count)", label: "today", tint: accent),
-        Stat(value: "\(triageTasks.count)", label: "inbox", tint: accent),
-      ])
-    }
-  }
-
   @ViewBuilder
   private var logContent: some View {
-      tasksSummary
       // The Inbox (unratified layer) sits on top of Today as a normal section —
       // same row style as Today below (see docs/TRIAGE_BAND_SPEC.md).
       if !triageTasks.isEmpty {

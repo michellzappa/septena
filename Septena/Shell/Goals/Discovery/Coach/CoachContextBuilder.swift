@@ -19,6 +19,9 @@ enum CoachWindow: Int, CaseIterable, Identifiable {
     }
   }
   var shortLabel: String { self == .thirteenWeeks ? "90d" : "\(weeks)w" }
+
+  /// The window coaches open on and read their availability badges from.
+  static let `default`: CoachWindow = .thirteenWeeks
 }
 
 /// One section's presence in the chat context — what the pills render.

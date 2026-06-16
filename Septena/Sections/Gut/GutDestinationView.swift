@@ -40,7 +40,6 @@ struct GutDestinationView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   log: {
-      gutSummary
       DrawerSection("Today", padding: .none) {
         if let today, !today.entries.isEmpty {
           ForEach(Array(today.entries.reversed())) { entry in
@@ -78,18 +77,6 @@ struct GutDestinationView: View {
         original: entry,
         onSave: { _ in Task { await reload() } }
       )
-    }
-  }
-
-  /// Top-of-Log day readout — count + average Bristol type for the viewed day.
-  @ViewBuilder
-  private var gutSummary: some View {
-    if let entries = today?.entries, !entries.isEmpty {
-      let avg = Double(entries.map(\.bristol).reduce(0, +)) / Double(entries.count)
-      DrawerSummary(stats: [
-        Stat(value: "\(entries.count)", label: "movements", tint: accent),
-        Stat(value: avg.decimalString(1), label: "avg type", tint: accent),
-      ])
     }
   }
 

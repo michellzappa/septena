@@ -624,9 +624,6 @@ struct NextSuggestionsSection: View {
         }
       } header: {
         Text("Suggested")
-          .font(.septenaSectionTitle)
-          .foregroundStyle(Theme.inkSecondary)
-          .textCase(nil)
       }
     }
   }

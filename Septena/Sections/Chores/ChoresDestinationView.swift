@@ -49,7 +49,6 @@ struct ChoresDestinationView: View {
                   quickAdd: DrawerQuickAdd("New chore") { creating = true },
                   mode: $mode,
                   log: {
-      choresSummary
       if !today.isEmpty {
         DrawerSection("Today", padding: .none) { ForEach(today) { row(for: $0) } }
       }
@@ -94,19 +93,6 @@ struct ChoresDestinationView: View {
         original: nil,
         onDone: { _ in Task { await model.load() } }
       )
-    }
-  }
-
-  /// Top-of-Log day readout — what's pressing right now.
-  @ViewBuilder
-  private var choresSummary: some View {
-    if !model.chores.isEmpty {
-      let overdue = model.chores.filter { $0.daysOverdue > 0 && !model.completedChores.contains($0.id) }.count
-      let dueToday = model.chores.filter { $0.daysOverdue == 0 && !model.completedChores.contains($0.id) }.count
-      DrawerSummary(stats: [
-        Stat(value: "\(overdue)", label: "overdue", tint: accent),
-        Stat(value: "\(dueToday)", label: "due today", tint: accent),
-      ])
     }
   }
 

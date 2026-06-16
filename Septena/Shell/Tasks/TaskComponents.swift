@@ -302,6 +302,9 @@ enum TaskCelebration {
                         accent: Color,
                         logCommit: LogCommitCenter?) {
     if clearedToday {
+      // A canvas moment by the containment policy (see CommitFeedback.commit):
+      // clearing the last open Today task fires at most once a day, so it earns
+      // the `.arc` flourish + its matched sweep haptic.
       Haptics.play(CommitMotion.arc.hapticSpec(intensity: 1))
       logCommit?.fire(.flourish(motion: .arc, accent: accent, intensity: 1))
     } else if isToday {
@@ -985,7 +988,11 @@ struct MovePickerSheet: View {
   var currentProjectId: String? = nil
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
   @State private var query = ""
+  // Real done/(done+open) ratio per project id, so the pie glyph matches the
+  // sidebar instead of a placeholder. Loaded once on appear.
+  @State private var progressByProject: [String: Double] = [:]
 
   var body: some View {
     NavigationStack {
@@ -1001,7 +1008,7 @@ struct MovePickerSheet: View {
 
           // Top-level projects (no area)
           ForEach(filteredTopProjects) { p in
-            row(.project, title: p.title,
+            row(.project, title: p.title, projectId: p.id,
                 selected: p.id == currentProjectId) {
               onPick(nil, p.id); dismiss()
             }
@@ -1015,7 +1022,7 @@ struct MovePickerSheet: View {
               onPick(area.id, nil); dismiss()
             }
             ForEach(projectsIn(area.id)) { p in
-              row(.project, title: p.title,
+              row(.project, title: p.title, projectId: p.id,
                   selected: p.id == currentProjectId, indent: true) {
                 onPick(area.id, p.id); dismiss()
               }
@@ -1025,6 +1032,7 @@ struct MovePickerSheet: View {
         .padding(.vertical, 8)
       }
       .background(Theme.paperBackground)
+      .task { loadProgress() }
       .septenaAlwaysVisibleSearch(text: $query)
       .navigationTitle("Move")
       .septenaInlineTitle()
@@ -1059,16 +1067,37 @@ struct MovePickerSheet: View {
     projects.filter { $0.area == areaId && $0.status == .active && matches($0.title) }
   }
 
+  // MARK: - Progress
+
+  // done / (done + open) per project, mirroring the sidebar's aggregate so the
+  // pie glyph reads identically here. Cancelled tasks count toward neither side.
+  private func loadProgress() {
+    var done: [String: Int] = [:]
+    var total: [String: Int] = [:]
+    for t in LocalCache.allTasks(in: modelContext) {
+      guard let pid = t.project else { continue }
+      switch t.status {
+      case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
+      case .open: total[pid, default: 0] += 1
+      case .cancelled: break
+      }
+    }
+    progressByProject = total.reduce(into: [:]) { acc, kv in
+      acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
+    }
+  }
+
   // MARK: - Row primitive
 
   private enum RowKind { case inbox, area, project }
 
   @ViewBuilder
-  private func row(_ kind: RowKind, title: String, emoji: String? = nil, selected: Bool,
+  private func row(_ kind: RowKind, title: String, projectId: String? = nil,
+                   emoji: String? = nil, selected: Bool,
                    indent: Bool = false, action: @escaping () -> Void) -> some View {
     Button(action: { Haptics.pick(); action() }) {
       HStack(spacing: 12) {
-        icon(for: kind, emoji: emoji)
+        icon(for: kind, projectId: projectId, emoji: emoji)
           .frame(width: 24, alignment: .center)
         Text(title)
           .scaledFont(size: 16, weight: kind == .area ? .semibold : .regular)
@@ -1090,7 +1119,7 @@ struct MovePickerSheet: View {
   }
 
   @ViewBuilder
-  private func icon(for kind: RowKind, emoji: String? = nil) -> some View {
+  private func icon(for kind: RowKind, projectId: String? = nil, emoji: String? = nil) -> some View {
     switch kind {
     case .inbox:
       Image(systemName: "tray.fill")
@@ -1099,8 +1128,10 @@ struct MovePickerSheet: View {
     case .area:
       AreaIcon(diameter: 14, lineWidth: 1.5, emoji: emoji)
     case .project:
-      // Pie glyph — same component as sidebar / detail page.
-      ProjectProgressIcon(progress: 0.25, tint: Theme.iconMuted, diameter: 14)
+      // Pie glyph — same component as sidebar / detail page, driven by the
+      // project's real done/open ratio.
+      ProjectProgressIcon(progress: projectId.flatMap { progressByProject[$0] } ?? 0,
+                          tint: Theme.iconMuted, diameter: 14)
     }
   }
 }

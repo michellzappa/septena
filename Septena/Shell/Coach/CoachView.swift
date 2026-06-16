@@ -6,7 +6,7 @@ import SwiftData
 //
 //   • Coaches   — one NavigationLink row per CoachDomain; tapping pushes its hub
 //                 (CoachDetailView: conversation + that coach's context + scoped
-//                 goals). A trailing badge counts this week's logged entries.
+//                 goals). A trailing badge counts logged entries in the coach window.
 //   • Exercises — the guided reflections (Purpose, Values, Examined Week); each
 //                 row launches its mini-app, which can drop in goals on finish.
 //   • Goals     — every goal as a row, tapping into the same EditGoalSheet the
@@ -47,7 +47,9 @@ struct CoachView: View {
       #else
       .listStyle(.inset)
       #endif
-      .navigationTitle("Coach")
+      // No title — the tab bar already labels this view, matching the Next
+      // landing (both home tabs rely on the tab label, not a nav-bar title).
+      .navigationTitle("")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -98,7 +100,7 @@ struct CoachView: View {
         NavigationLink(value: domain) {
           CoachLandingRow(domain: domain, pills: pills)
         }
-        // 0 hides the badge, so this doubles as "entries this week".
+        // 0 hides the badge, so this doubles as "entries in the window".
         .badge(pills.reduce(0) { $0 + $1.count })
       }
     } header: {
@@ -183,7 +185,7 @@ struct CoachView: View {
       .filter { $0.key != "goals" }
     var next: [CoachDomain: [CoachAreaPill]] = [:]
     for domain in CoachDomain.allCases {
-      let pills = CoachContextBuilder.availability(for: domain, window: .week, context: context)
+      let pills = CoachContextBuilder.availability(for: domain, window: .default, context: context)
       guard !pills.isEmpty else { continue }
       next[domain] = pills.map {
         CoachAreaPill(id: $0.id, label: $0.label, systemImage: $0.systemImage,
@@ -209,8 +211,10 @@ struct CoachView: View {
 
 // MARK: - Rows
 
-/// The accent-washed icon chip shared by every coach-landing row — the small
-/// counterpart to the old CoachTile's 38pt chip, sized for a list row.
+/// The accent-washed icon chip every row on this page uses — coaches,
+/// exercises, and goals — so background size and glyph size stay identical
+/// across the three. The small counterpart to the old CoachTile's 38pt chip,
+/// sized for a list row.
 private struct CoachIconChip: View {
   let systemImage: String
   let accent: Color
@@ -327,10 +331,7 @@ private struct GoalListRow: View {
         }
       }
     } icon: {
-      Image(systemName: icon)
-        .font(.callout)
-        .foregroundStyle(accent)
-        .frame(width: 29)
+      CoachIconChip(systemImage: icon, accent: accent)
     }
   }
 }

@@ -45,7 +45,6 @@ struct SupplementsDestinationView: View {
                   mode: $mode,
                   log: {
       if isViewingToday {
-        if !model.supplements.isEmpty { supplementsSummary }
         todaySections
       } else {
         pastDaySection
@@ -96,17 +95,6 @@ struct SupplementsDestinationView: View {
         onDone: { _ in Task { await model.load() } }
       )
     }
-  }
-
-  /// Top-of-Log day readout — today's adherence at a glance.
-  private var supplementsSummary: some View {
-    let taken = model.supplements.filter(\.done).count
-    let total = model.supplements.count
-    let pct = total > 0 ? Int((Double(taken) * 100 / Double(total)).rounded()) : 0
-    return DrawerSummary(stats: [
-      Stat(value: "\(taken)/\(total)", label: "taken today", tint: accent),
-      Stat(value: "\(pct)%", label: "complete", tint: accent),
-    ])
   }
 
   // MARK: - Patterns breakdown

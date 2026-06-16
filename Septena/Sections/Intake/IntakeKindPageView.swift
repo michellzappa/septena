@@ -68,9 +68,6 @@ struct IntakeKindPageView: View {
                   modeStorageKey: "intake.\(kindID)",
                   showsSettingsLink: false,
                   log: {
-      if let kind {
-        DrawerSummary(stats: statTiles(kind))
-      }
       DrawerSection("Log", padding: .none) {
         if !entries.isEmpty {
           ForEach(entries.reversed()) { entry in
@@ -202,38 +199,6 @@ struct IntakeKindPageView: View {
   }
 
   // MARK: Rows
-
-  private func statTiles(_ kind: IntakeKindDTO) -> [Stat] {
-    var tiles: [Stat] = [
-      Stat(value: "\(entries.count)",
-           label: (kind.countNoun.map { $0.lowercased() + "s" }) ?? "today",
-           tint: accent)
-    ]
-    if kind.showsAmount {
-      let total = entries.compactMap(\.amount).reduce(0, +)
-      if total > 0 {
-        tiles.append(Stat(value: total.decimalString(1), label: "total",
-                          tint: accent, unit: kind.unit))
-      }
-    }
-    // Reduction signal: a days-since-last streak, only for reduce/quit kinds
-    // (the objective decides). "clean" for quit, "since last" for reduce. Hidden
-    // at 0 (today's count already says you had some).
-    if IntakeObjective.emphasizesStreak(kind.objective), let days = daysSinceLast, days >= 1 {
-      tiles.append(Stat(value: "\(days)d",
-                        label: IntakeObjective.streakLabel(kind.objective),
-                        tint: accent))
-    }
-    return tiles
-  }
-
-  private var daysSinceLast: Int? {
-    guard let last = lastEventAt else { return nil }
-    let cal = Calendar.current
-    return cal.dateComponents([.day],
-                              from: cal.startOfDay(for: last),
-                              to: cal.startOfDay(for: Date())).day
-  }
 
   // MARK: Rhythm wheel
   //

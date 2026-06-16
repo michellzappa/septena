@@ -188,17 +188,18 @@ enum DrawerMode: String, Hashable {
   }
 }
 
-/// The top-left glass control that flips a drawer between Log and Patterns —
-/// the neutral-glass twin of the trailing "+": same round glass capsule, but a
-/// tinted glyph on a neutral fill rather than the prominent accent fill. Rendered
-/// by `SectionDrawer` only when a `mode` binding is present; the calendar (when
-/// the section has time travel) sits beside it as its own separate button.
+/// The top-left control that flips a drawer between Log and Patterns — the
+/// leading-edge twin of the trailing "+": the same prominent accent-filled round
+/// glass button, so the drawer is bookended by two big round buttons (switch on
+/// the left, add on the right). Rendered by `SectionDrawer` whenever a `mode`
+/// binding is present, and now the *only* leading control — time travel moved to
+/// a footer "previous days" link.
 struct DrawerModeToggle: View {
   @Binding var mode: DrawerMode
   /// Key the toggled choice is remembered under. Usually the section key, but
   /// can be a finer key (e.g. per Intake kind) so sibling pages remember apart.
   let storageKey: String
-  /// Accent for the glyph — the only color on an otherwise neutral glass capsule.
+  /// Accent the prominent glass circle is washed with — matches the trailing "+".
   let accent: Color
 
   var body: some View {
@@ -210,9 +211,9 @@ struct DrawerModeToggle: View {
       // this so they never overwrite the remembered choice.
       next.remember(for: storageKey)
     } label: {
-      // Self-contained round glass (not `.buttonStyle(.glass)`, which the
-      // toolbar folds into a shared leading group → bubble-in-a-bubble): a
-      // neutral glass circle with an accent glyph, the twin of the trailing "+".
+      // The glyph shows what tapping switches TO: a chart while in Log, a list
+      // while in Patterns. Accent-colored glyph on neutral glass — the round
+      // shape/size of the trailing "+" without its filled prominence.
       Image(systemName: mode == .log ? "chart.xyaxis.line" : "list.bullet")
         .font(.body.weight(.semibold))
         .foregroundStyle(accent)
@@ -417,9 +418,38 @@ struct SectionDrawer<Content: View>: View {
     let today = Calendar.current.startOfDay(for: Date())
     let clamped = min(Calendar.current.startOfDay(for: moved), today)
     if let str = SeptenaDate.format(clamped), str != currentDate.wrappedValue {
-      currentDate.wrappedValue = str
+      withAnimation(.snappy) { currentDate.wrappedValue = str }
     }
   }
+
+  /// Snap the viewed day back to today from a past day — the footer "Back to
+  /// today" affordance while time-traveling. Like `stepDay`, it's a Log action,
+  /// so it also pulls a dual section out of Patterns first.
+  private func backToToday() {
+    if let mode, mode.wrappedValue == .patterns { mode.wrappedValue = .log }
+    guard let currentDate, currentDate.wrappedValue != SeptenaDate.today else { return }
+    withAnimation(.snappy) { currentDate.wrappedValue = SeptenaDate.today }
+  }
+
+  #if os(iOS)
+  /// Touch twin of the ←/→ keys: a horizontal swipe steps the viewed day on a
+  /// day-scoped Log drawer. Swipe right (content slides right) → previous day;
+  /// swipe left → forward, clamped at today by `stepDay`. Gated on the same
+  /// `showsDayControls` rule as the rest of time travel, so it's inert in
+  /// Patterns. A `.simultaneousGesture` with a horizontal-dominance check so it
+  /// rides alongside — never steals — the vertical scroll, and its 24pt minimum
+  /// keeps taps on rows/buttons untouched.
+  private var daySwipe: some Gesture {
+    DragGesture(minimumDistance: 24)
+      .onEnded { value in
+        guard currentDate != nil, showsDayControls else { return }
+        let dx = value.translation.width
+        let dy = value.translation.height
+        guard abs(dx) > 64, abs(dx) > abs(dy) * 1.5 else { return }
+        stepDay(dx > 0 ? -1 : 1)
+      }
+  }
+  #endif
 
   var body: some View {
     ScrollView {
@@ -454,15 +484,32 @@ struct SectionDrawer<Content: View>: View {
             content()
               .frame(maxWidth: .infinity, alignment: .leading)
           }
-          if showsSettingsLink, !isTimeTraveling,
-             !resolvedTitle.isEmpty, SectionManifest.byKey[sectionKey] != nil {
-            SectionSettingsLink(sectionTitle: resolvedTitle) {
-              #if os(macOS)
-              nav.settingsDestination = .section(sectionKey)
-              nav.showSettings = true
-              #else
-              showingSettings = true
-              #endif
+          // Quiet footer links, grouped tight at the very bottom: a day-travel
+          // affordance (day-scoped drawers only — this is where the former
+          // top-left calendar button moved to) sitting just above the
+          // "Customize <Section>" settings link. On today it opens the picker
+          // ("View previous days"); while time-traveling it flips to a "Back to
+          // today" shortcut. The settings link stays hidden while traveling.
+          let showsHistory = currentDate != nil && showsDayControls
+          let showsSettings = showsSettingsLink && !isTimeTraveling
+            && !resolvedTitle.isEmpty && SectionManifest.byKey[sectionKey] != nil
+          if showsHistory || showsSettings {
+            VStack(spacing: Theme.Spacing.md) {
+              if showsHistory {
+                DrawerHistoryLink(isTimeTraveling: isTimeTraveling,
+                                  onPrevious: { showingTimeTravel = true },
+                                  onToday: { backToToday() })
+              }
+              if showsSettings {
+                SectionSettingsLink(sectionTitle: resolvedTitle) {
+                  #if os(macOS)
+                  nav.settingsDestination = .section(sectionKey)
+                  nav.showSettings = true
+                  #else
+                  showingSettings = true
+                  #endif
+                }
+              }
             }
           }
         }
@@ -513,6 +560,11 @@ struct SectionDrawer<Content: View>: View {
       guard dayKeyNavEnabled else { return .ignored }
       stepDay(1); return .handled
     }
+    // Swipe horizontally to step the viewed day (touch twin of ←/→). iOS only —
+    // Mac/iPad keep the keys; a click-drag on the desktop would fight selection.
+    #if os(iOS)
+    .simultaneousGesture(daySwipe)
+    #endif
     // Time-travel picker. Attached to the body (not the toolbar item) so
     // presentation is stable on iOS; gated on `currentDate` so non
     // day-scoped drawers never build it.
@@ -559,47 +611,20 @@ struct SectionDrawer<Content: View>: View {
             .controlSize(.small)
         }
       }
-      // Mode toggle — leading edge, leftmost, present only for dual-mode
+      // Mode toggle — the sole leading control, present only for dual-mode
       // (Log + Patterns) sections, and only while a single mode is shown. When
       // the drawer is wide enough to show both side-by-side there's nothing to
-      // switch, so the toggle drops out. Sits before the calendar so the two
-      // read left-to-right as "which view · which day".
+      // switch, so the toggle drops out. Time travel is no longer a sibling
+      // button here — it lives as the footer "previous days" link.
       if let mode, !modeShowsBoth {
         ToolbarItem(placement: leadingPlacement) {
           DrawerModeToggle(mode: mode, storageKey: modeStorageKey ?? sectionKey,
                            accent: resolvedAccent)
         }
       }
-      // Calendar / time-travel button — leading edge, present only when the
-      // destination is day-scoped AND not viewing Patterns (Patterns is
-      // cross-day, so a day picker is meaningless there). Tints accent and gains
-      // a clock badge while viewing a past day. `.glass` (the non-prominent
-      // GlassButtonStyle) pins it to a clear Liquid Glass capsule at all times
-      // instead of relying on the system's automatic toolbar-glass, which it can
-      // drop at rest; prominent stays reserved for the trailing "+".
-      if currentDate != nil, showsDayControls {
-        ToolbarItem(placement: leadingPlacement) {
-          Button {
-            showingTimeTravel = true
-          } label: {
-            // Same self-contained glass circle as the mode toggle, so the two
-            // read as separate floating siblings — not nested in one pill. Glyph
-            // is neutral at rest, accent (with a clock badge) while traveling.
-            Image(systemName: isTimeTraveling ? "calendar.badge.clock" : "calendar")
-              .font(.body.weight(.semibold))
-              .foregroundStyle(isTimeTraveling ? resolvedAccent : Color.primary)
-              .frame(width: 38, height: 38)
-              .contentShape(Circle())
-              .accessibilityLabel("Time Travel")
-          }
-          .buttonStyle(.plain)
-          .glassCircle(tint: isTimeTraveling ? resolvedAccent : nil)
-        }
-      }
       // Quick-add "+" — ONE component (`DrawerActionButton`), one style, one
-      // shape, for every section. Lives alone in the trailing primaryAction slot
-      // now that time travel moved to the leading edge; the system places the
-      // prominent glass "+" as a standalone control there.
+      // shape, for every section. Lives alone in the trailing primaryAction slot;
+      // the system places the prominent glass "+" as a standalone control there.
       if let quickAdd {
         ToolbarItem(placement: .primaryAction) {
           DrawerActionButton(quickAdd: quickAdd, accent: resolvedAccent)
@@ -863,6 +888,32 @@ private struct TimeTravelPill: View {
   }
 }
 
+/// Quiet day-travel link at the bottom of a day-scoped drawer, just above the
+/// "Customize <Section>" link. This is where the former top-left calendar button
+/// moved to, freeing the top-left edge for the Log/Patterns toggle alone. On
+/// today it opens the `TimeTravelSheet` picker ("View previous days"); while
+/// viewing a past day it flips to a "Back to today" shortcut. Tertiary,
+/// footnote-weight, centered, to match the settings link below it.
+private struct DrawerHistoryLink: View {
+  let isTimeTraveling: Bool
+  let onPrevious: () -> Void
+  let onToday: () -> Void
+
+  var body: some View {
+    Button(action: isTimeTraveling ? onToday : onPrevious) {
+      HStack(spacing: 5) {
+        Image(systemName: isTimeTraveling ? "arrow.uturn.backward" : "calendar")
+        Text(isTimeTraveling ? "Back to today" : "View previous days")
+      }
+      .font(.footnote)
+      .foregroundStyle(.tertiary)
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+  }
+}
+
 /// Subtle "Customize <Section>" link at the very bottom of every section
 /// drawer. Tapping deep-links into this section's Settings pane (presented
 /// as a sheet over the drawer, so closing it returns here). Tertiary,
@@ -996,6 +1047,9 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   /// call dismiss/close themselves (that's what produced the double-close
   /// and dismiss-no-op bugs the inspector exposed).
   let onSave: () -> Void
+  /// Optional trailing control in the header (e.g. a ⋯ overflow menu of
+  /// contextual actions). Sits where Save would be when `showsSave` is false.
+  var trailing: AnyView? = nil
   @ViewBuilder var content: () -> FormContent
 
   @Environment(\.dismiss) private var dismiss
@@ -1017,7 +1071,8 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
             canSave: canSave,
             accent: accent,
             onCancel: close,
-            onSave: confirm
+            onSave: confirm,
+            trailing: trailing
           )
         }
     } else {
@@ -1046,6 +1101,9 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
                   .keyboardShortcut(.defaultAction) // Return / ⌘Return
               }
             }
+            if let trailing {
+              ToolbarItem(placement: .primaryAction) { trailing }
+            }
           }
       }
     }
@@ -1064,9 +1122,10 @@ private struct AdaptiveEditHeader: View {
   var accent: Color? = nil
   let onCancel: () -> Void
   let onSave: () -> Void
+  var trailing: AnyView? = nil
 
   var body: some View {
-    HStack {
+    HStack(spacing: 12) {
       Button(cancelTitle, action: onCancel)
         .keyboardShortcut(.cancelAction) // Esc
       Spacer()
@@ -1078,6 +1137,7 @@ private struct AdaptiveEditHeader: View {
           .disabled(!canSave)
           .keyboardShortcut(.defaultAction) // Return / ⌘Return
       }
+      if let trailing { trailing }
     }
     .tint(accent)
     .padding(.horizontal, 16)

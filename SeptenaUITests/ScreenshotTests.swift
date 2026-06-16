@@ -53,8 +53,11 @@ final class ScreenshotTests: XCTestCase {
     tapFirst(app, ["Today"]); dwell(); capture(app, "tasks-today")
     // "Goals" is not a tab — goals live in the Coach tab. Capture the coaches
     // landing as "coach", then scroll to the Goals band for "goals".
+    // Coach landing → coaches band ("coach"), the reflective Exercises band
+    // mid-scroll ("coach-exercises"), then the Goals band at the bottom ("goals").
     tapTab(app, "Coach"); capture(app, "coach")
-    app.swipeUp(); dwell(0.4); app.swipeUp(); dwell(); capture(app, "goals")
+    app.swipeUp(); dwell(0.4); capture(app, "coach-exercises")
+    app.swipeUp(); dwell(); capture(app, "goals")
 
     // Pass 2 — Heatmap layout. Terminate + relaunch reseeds the in-memory store.
     app.terminate()
@@ -67,6 +70,15 @@ final class ScreenshotTests: XCTestCase {
     launch(app, layout: "correlations")
     capture(app, "insights")
     app.swipeUp(); dwell(); capture(app, "insights-scrolled")
+
+    // Pass 3b — the other two Week presentations, so the site can show all four
+    // layouts. `rings` = progress-ring grid; `histogram` aliases to `tiles`.
+    app.terminate()
+    launch(app, layout: "rings")
+    capture(app, "week-rings")
+    app.terminate()
+    launch(app, layout: "histogram")
+    capture(app, "week-histogram")
 
     // Pass 4 — section detail sheets (dense layout so the rows are tappable).
     // A colorful bench the viz can swap into the breadth panel. Names match the
@@ -83,7 +95,7 @@ final class ScreenshotTests: XCTestCase {
     captureSection(app, "Body", "body")
     captureSection(app, "Habits", "habits", short: true)
     captureSection(app, "Hydration", "hydration")
-    captureSection(app, "Caffeine", "caffeine", short: true)
+    captureSection(app, "Intake", "intake", short: true)
     captureSection(app, "Chores", "chores")
     captureSection(app, "Supplements", "supplements", short: true)
     captureSection(app, "Groceries", "groceries")

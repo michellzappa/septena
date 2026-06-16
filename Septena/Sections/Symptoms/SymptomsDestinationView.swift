@@ -41,12 +41,6 @@ struct SymptomsDestinationView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   log: {
-      DrawerSummary(stats: [
-        Stat(value: "\(dayEvents.count)", label: "events", tint: accent),
-        Stat(value: "\(dayEvents.map(\.severity).max() ?? 0)", label: "peak", tint: accent),
-        Stat(value: averageSeverityText, label: "average", tint: accent),
-      ])
-
       DrawerSection("Log", padding: .none) {
         if dayEvents.isEmpty {
           Text("Nothing logged yet.")
@@ -103,12 +97,6 @@ struct SymptomsDestinationView: View {
     .sheet(item: $editingDefinition) { def in
       SymptomDefinitionEditor(definition: def)
     }
-  }
-
-  private var averageSeverityText: String {
-    guard !dayEvents.isEmpty else { return "0" }
-    let avg = Double(dayEvents.reduce(0) { $0 + $1.severity }) / Double(dayEvents.count)
-    return avg.decimalString(1)
   }
 
   private func title(for event: SymptomEventEntity) -> String {

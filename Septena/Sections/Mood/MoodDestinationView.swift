@@ -43,7 +43,6 @@ struct MoodDestinationView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   log: {
-      moodSummary
       todaySection
     }, patterns: {
       breakdownSection
@@ -69,18 +68,6 @@ struct MoodDestinationView: View {
   }
 
   // MARK: - Today list
-
-  /// Top-of-Log day readout — check-in count + the latest emotion logged.
-  @ViewBuilder
-  private var moodSummary: some View {
-    if let entries = today?.entries, !entries.isEmpty {
-      let latest = entries.max(by: { $0.time < $1.time })?.emotion
-      DrawerSummary(stats: [
-        Stat(value: "\(entries.count)", label: "check-ins", tint: accent),
-        Stat(value: latest ?? "—", label: "latest", tint: accent),
-      ])
-    }
-  }
 
   @ViewBuilder
   private var todaySection: some View {

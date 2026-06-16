@@ -201,10 +201,7 @@ struct NutritionDestinationView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   log: {
-      // The meal log, time-travelable. Full macro tiles live in Patterns;
-      // a compact day-total readout leads the Log for consistency with the
-      // other editable sections.
-      nutritionSummary
+      // The meal log, time-travelable. Full macro tiles live in Patterns.
       entriesList
     }, patterns: {
       // Today-anchored macro trend tiles + the trailing-7-day meal rhythm
@@ -661,24 +658,6 @@ struct NutritionDestinationView: View {
   }
 
   // MARK: - Entries list
-
-  /// Compact day-total readout atop the Log — kcal + macros for the viewed day.
-  @ViewBuilder
-  private var nutritionSummary: some View {
-    let day = viewingEntries
-    if !day.isEmpty {
-      let t = day.reduce(into: DayTotals()) { acc, e in
-        acc.protein += e.proteinG; acc.fat += e.fatG; acc.carbs += e.carbsG
-        acc.fiber += e.fiberG ?? 0; acc.kcal += e.kcal
-      }
-      DrawerSummary(stats: [
-        Stat(value: "\(Int(t.kcal.rounded()))", label: "kcal", tint: kcalColor),
-        Stat(value: "\(Int(t.protein.rounded()))", label: "protein", tint: proteinColor, unit: "g"),
-        Stat(value: "\(Int(t.carbs.rounded()))", label: "carbs", tint: carbsColor, unit: "g"),
-        Stat(value: "\(Int(t.fat.rounded()))", label: "fat", tint: fatColor, unit: "g"),
-      ])
-    }
-  }
 
   @ViewBuilder
   private var entriesList: some View {

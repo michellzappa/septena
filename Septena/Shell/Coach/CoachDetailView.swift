@@ -8,7 +8,7 @@ import SwiftData
 //   • Goals — the user's goals scoped to this coach's section(s), tappable
 //     into the same EditGoalSheet the Goals surface uses.
 //   • Exercises — the guided Discovery mini-apps mapped to this coach.
-//   • Context — the sections (and entry counts) the coach can see this week;
+//   • Context — the sections (and entry counts) the coach can see in its window;
 //     for the custom coach these pills also pick its scope.
 //
 // Hosted under the "goals" section key (unchanged) so it inherits the goals
@@ -186,11 +186,11 @@ struct CoachDetailView: View {
   // MARK: - Context
 
   private var contextSection: some View {
-    DrawerSection("What I can see · this week") {
+    DrawerSection("What I can see · last \(CoachWindow.default.label)") {
       if pills.isEmpty {
         captionRow(domain.handPicksContext
-                   ? "Nothing logged in the sections this coach can reach this week."
-                   : "Nothing logged in this coach's areas this week.")
+                   ? "Nothing logged in the sections this coach can reach in the last \(CoachWindow.default.label)."
+                   : "Nothing logged in this coach's areas in the last \(CoachWindow.default.label).")
       } else {
         let columns = [GridItem(.adaptive(minimum: 110), spacing: 8, alignment: .leading)]
         LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
@@ -242,7 +242,7 @@ struct CoachDetailView: View {
   private func refresh() {
     availableSections = SettingsMirror.loadSections(context: context)
       .filter { $0.key != "goals" }
-    pills = CoachContextBuilder.availability(for: domain, window: .week, context: context)
+    pills = CoachContextBuilder.availability(for: domain, window: .default, context: context)
     voice = CoachVoiceStore.load(domain)
   }
 

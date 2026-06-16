@@ -4,7 +4,7 @@ import SwiftUI
 // strip. Same anatomy as the old Discovery card — an accent-washed icon chip
 // over a title — promoted out of DiscoveryShelf so the coach surfaces share
 // one look. Below the title it shows EITHER section "area" pills with their
-// weekly entry counts (coach cards) OR a plain subtitle (exercises).
+// entry counts over the coach window (coach cards) OR a plain subtitle (exercises).
 //
 // A plain view (NOT a button) so the caller wraps it in a NavigationLink
 // (coach grid) or a Button (exercise) without nesting two tap targets.
