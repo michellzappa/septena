@@ -45,6 +45,12 @@ struct CoachDetailView: View {
     return nil   // wholeLife → every goal
   }
 
+  /// Sections whose changes should rebuild this coach: the keys it reads
+  /// (all of `supportedKeys` for the whole-life coach), plus goals.
+  private var refreshScope: Set<String> {
+    Set(domain.sectionKeys ?? CoachContextBuilder.supportedKeys).union(["goals"])
+  }
+
   private var scopedGoals: [Goal] {
     allGoals
       .filter { entity in
@@ -63,7 +69,10 @@ struct CoachDetailView: View {
       contextSection
     }
     .task { refresh() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      // refresh() rebuilds this coach's availability via per-section fetches;
+      // only re-run when one of the sections it reads (or goals) changed.
+      guard note.affectsAnySection(of: refreshScope) else { return }
       refresh()
     }
     .adaptiveDetail(item: $editing) { goal in

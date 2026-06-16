@@ -61,9 +61,18 @@ final class LocalNotificationScheduler {
 
   private static let logger = Log.notifications
 
+  /// Sections that declare notification descriptors — the only ones whose data
+  /// changes can alter the nudge schedule. A scoped change to anything else is
+  /// ignored. Keep in sync with the plugins' `notificationDescriptors`.
+  private static let notificationSections: Set<String> =
+    ["medications", "hydration", "chores", "sleep", "supplements", "habits", "mood"]
+
   private weak var contextRef: ModelContext?
   private var observers: [NSObjectProtocol] = []
   private var started = false
+  /// Debounce guard — coalesces a burst of data changes into one reconcile
+  /// (the full plugin walk) a beat later, instead of one walk per edit.
+  private var reconcileScheduled = false
   /// The fire date the Claude reconnect nudge is currently armed for. Used to
   /// log only on *transitions* — reconcile runs on every data change, so we'd
   /// otherwise spam the console with identical "armed" lines.
@@ -78,18 +87,38 @@ final class LocalNotificationScheduler {
     guard !started else { reconcile(); return }
     started = true
     let center = NotificationCenter.default
+    // Section-scoped data changes: re-arm only when a section that actually
+    // declares nudges changed. Unscoped posts (remote sync) carry no keys and
+    // still pass — correct.
+    observers.append(center.addObserver(forName: .septenaDataChanged, object: nil, queue: .main) { [weak self] note in
+      guard note.affectsAnySection(of: Self.notificationSections) else { return }
+      self?.scheduleReconcile()
+    })
+    // Other wakeups carry no section scope; route through the same debounce.
     let names: [Notification.Name] = [
-      .septenaTasksChanged, .septenaDataChanged, .septenaOuraChanged,
+      .septenaTasksChanged, .septenaOuraChanged,
       .septenaClaudeGatewayChanged,
       UserDefaults.didChangeNotification,
     ]
     for name in names {
       observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-        Task { @MainActor in self?.reconcile() }
+        self?.scheduleReconcile()
       })
     }
     registerCategories()
     reconcile()
+  }
+
+  /// Coalesce a burst of change notifications into a single `reconcile()` a
+  /// beat later — the full plugin walk is too heavy to run once per edit.
+  private func scheduleReconcile() {
+    guard !reconcileScheduled else { return }
+    reconcileScheduled = true
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(500))
+      reconcileScheduled = false
+      reconcile()
+    }
   }
 
   /// Register one `UNNotificationCategory` per descriptor that declares

@@ -27,6 +27,10 @@ struct CoachView: View {
 
   private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
+  /// Sections that can change what `refresh()` computes — the union of every
+  /// coach's readable keys plus goals. Gates the data-changed listener.
+  private static let coachScope = Set(CoachContextBuilder.supportedKeys + ["goals"])
+
   @State private var goals: [Goal] = []
   @State private var availableSections: [SectionConfig] = []
   @State private var coachPills: [CoachDomain: [CoachAreaPill]] = [:]
@@ -111,7 +115,12 @@ struct CoachView: View {
         CoachDetailView(domain: domain)
       }
       .task { refresh() }
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        // refresh() walks every coach domain's availability (unbounded
+        // per-section fetches), so only re-run when a section a coach
+        // actually reads — or a goal — changed. A scoped post for an
+        // unrelated section (e.g. groceries) no longer rebuilds the hub.
+        guard note.affectsAnySection(of: Self.coachScope) else { return }
         refresh()
       }
       .adaptiveDetail(item: $editing) { goal in

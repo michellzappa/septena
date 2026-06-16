@@ -61,10 +61,19 @@ final class SpotlightIndexer {
     }
     NotificationCenter.default.addObserver(
       forName: .septenaDataChanged, object: nil, queue: nil
-    ) { [weak self] _ in
+    ) { [weak self] note in
+      // Catalog reconcile fetches every indexed definition + log entity, so
+      // only schedule it when a section it actually indexes changed. Unscoped
+      // posts (remote sync) carry no keys and still pass — correct.
+      guard note.affectsAnySection(of: Self.catalogSections) else { return }
       Task { @MainActor in self?.schedule(.catalogs) }
     }
   }
+
+  /// Section keys whose data feeds the Spotlight catalogs (definitions + logs).
+  /// A change to anything else can't alter what's indexed, so it's skipped.
+  private static let catalogSections: Set<String> =
+    ["habits", "supplements", "chores", "training", "groceries", "nutrition", "mood"]
 
   /// One-shot backfill, called after the launch CloudKit pull so we index the
   /// synced mirror rather than a pre-sync (possibly empty) one.
