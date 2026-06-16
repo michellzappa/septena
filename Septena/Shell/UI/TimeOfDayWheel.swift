@@ -197,6 +197,46 @@ struct TimeOfDayWheel: View {
                            center: .center, angle: .degrees(-90))
   }
 
+  /// The hero dial's deterministic FAUX-GLASS face — a frosted-glass look
+  /// built from a light-from-above sheen and a rim highlight, with NO live
+  /// material, so it renders identically in app-switcher / widget snapshots
+  /// where `.glassEffect` can't composite. The real `.glassEffect` is layered
+  /// on top in `body` for the live refraction + press-lensing; this is what
+  /// reads through when it can't. Tune the sheen / rim constants here.
+  @ViewBuilder private var heroGlassFace: some View {
+    let annulus = AnnulusShape(holeFraction: Self.heroHoleFraction)
+    let dark = colorScheme == .dark
+    // `cardSurface` is ~white in light mode, so a white sheen would be
+    // invisible — glass reads on a light surface through DARKER cues: a depth
+    // shadow lifting it off the page, a dark refraction rim, and a specular
+    // SWEEP whose dark bottom-right edge (not the white highlight) carries the
+    // contrast. Opaque in the widget (no live glass over it); translucent
+    // in-app so the ambient-glow parallax still floats through the live glass.
+    let face = flatGlass ? 1.0 : 0.55
+    ZStack {
+      // Body + depth shadow — the donut sits ABOVE the page, like real glass.
+      annulus
+        .fill(Theme.cardSurface.opacity(face))
+        .shadow(color: .black.opacity(dark ? 0.0 : 0.12), radius: 7, y: 3)
+      // Catch-light: a soft highlight confined to the TOP, fading to clear by
+      // mid-height. Top-only (no diagonal sweep, no dark return) so it never
+      // streaks a bright band across the dark night wedge — that seam was the
+      // artificial tell. Depth shadow + rim carry the "it's a glass disc" read;
+      // this is just the light grazing the top edge.
+      annulus.fill(
+        LinearGradient(
+          stops: [
+            .init(color: .white.opacity(dark ? 0.26 : 0.90), location: 0.0),
+            .init(color: .clear, location: 0.5),
+          ],
+          startPoint: .top, endPoint: .bottom))
+      // Refraction rim: a darker outer/contact edge under a bright inner
+      // specular edge — the strongest glass tell on a light background.
+      annulus.stroke(.black.opacity(dark ? 0.0 : 0.10), lineWidth: 1.5)
+      annulus.stroke(.white.opacity(dark ? 0.28 : 0.75), lineWidth: 0.75)
+    }
+  }
+
   /// Radius of the ring the dots and bands sit on, for a full (non-compact)
   /// dial of `diameter`. The Canvas derives the same value from its live
   /// size; this exists so `DayDialHero` can publish the circle the `.arc`
@@ -342,13 +382,20 @@ struct TimeOfDayWheel: View {
       // so the dark band tracks the (rotated) night hours; the glass refracts
       // whatever sits behind it, so night still reads as dark *glass*. The
       // dusk/dawn terminators feather over ~1h.
-      // Widget snapshot: a flat solid disc stands in for the glass donut
-      // (drawn first, so the night wedge below paints on top of it). The live
-      // glass below is skipped when `flatGlass` is set.
-      if !compact, heroDate != nil, flatGlass {
-        AnnulusShape(holeFraction: Self.heroHoleFraction)
-          .fill(Theme.cardSurface)
-          .padding(20)
+      // Always-present base face for the hero, drawn FIRST (the night wedge and
+      // marks paint on top of it). `.glassEffect` is a live backdrop material
+      // and fails silently in any non-live composite — the app-switcher
+      // snapshot, widget snapshots, screen recording, or mid-rotation — where
+      // it no-ops back to `Color.clear` and leaves a transparent hole. A flat
+      // fill plugs the hole but reads as dead gray. Instead this is a
+      // deterministic FAUX-GLASS face — a light-from-above sheen plus a rim
+      // highlight — so the donut reads as frosted glass on its own in every
+      // snapshot, with the live `.glassEffect` layered on top for the real
+      // refraction + press-lensing when foregrounded. Kept translucent in-app
+      // so the ambient-glow parallax still floats through the live glass; the
+      // widget (`flatGlass`) makes it opaque and skips the live layer below.
+      if !compact, heroDate != nil {
+        heroGlassFace.padding(20)
       }
       if !compact, heroDate != nil, let nightArc {
         AnnulusShape(holeFraction: Self.heroHoleFraction)
