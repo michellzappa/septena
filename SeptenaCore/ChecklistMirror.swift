@@ -385,6 +385,7 @@ enum ChecklistMirror {
         "emoji": def.emoji as Any,
         "bucket": def.bucket as Any,
         "done": state?.done ?? false,
+        "skipped": state?.skipped ?? false,
         "note": state?.note as Any,
         "time": state.map { EventTimestamp.hhmm(from: $0.occurredAt) } as Any,
       ]
@@ -417,14 +418,16 @@ enum ChecklistMirror {
       def.updatedAt = .now
       if def.modelContext == nil { context.insert(def) }
 
-      if item.done || item.note != nil || item.time != nil {
+      if item.done || item.skipped || item.note != nil || item.time != nil {
         let state = statesByID[item.id] ?? SupplementDayStateEntity(
           id: "supplement:\(response.date):\(item.id)",
           date: response.date,
           supplementID: item.id,
-          done: item.done
+          done: item.done,
+          skipped: item.skipped
         )
         state.done = item.done
+        state.skipped = item.skipped
         state.note = item.note
         state.occurredAt = EventTimestamp.from(date: response.date, time: item.time)
         state.updatedAt = .now
@@ -475,15 +478,17 @@ enum ChecklistMirror {
         if def.modelContext == nil { context.insert(def) }
 
         let stateID = "supplement:\(day.date):\(item.id)"
-        if item.done || item.note != nil || item.time != nil {
+        if item.done || item.skipped || item.note != nil || item.time != nil {
           seenStateIDs.insert(stateID)
           let state = existingStatesByID[stateID] ?? SupplementDayStateEntity(
             id: stateID,
             date: day.date,
             supplementID: item.id,
-            done: item.done
+            done: item.done,
+            skipped: item.skipped
           )
           state.done = item.done
+          state.skipped = item.skipped
           state.note = item.note
           state.occurredAt = EventTimestamp.from(date: day.date, time: item.time)
           state.updatedAt = .now
@@ -1588,12 +1593,12 @@ enum ChecklistMirror {
       }
     }
 
-    // Supplements: open (not done). Server returns a flat list — keep
-    // declaration order. Each is tagged with its optional bucket in
+    // Supplements: open (not done, not skipped). Server returns a flat list —
+    // keep declaration order. Each is tagged with its optional bucket in
     // `subtitle` (nil = "anytime") so a downstream consumer can narrow to the
     // current time-of-day window — same scheme as habits (see `itemsForBucket`).
     if let supps = loadSupplementsDay(context: context, date: date) {
-      for s in supps.items where !s.done {
+      for s in supps.items where !s.done && !s.skipped {
         items.append(NextItem(
           id: s.id,
           kind: "supplement",

@@ -2901,6 +2901,7 @@ struct WeekDashboardView: View {
         motion: .fill,
         intensity: 1.4,
         announce: "Hydration goal reached — \(todayMl + ml) of \(hydrationTargetMl) ml.",
+        canvas: true,
         logCommit: logCommit,
         write: write
       )

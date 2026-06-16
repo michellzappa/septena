@@ -507,6 +507,7 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
   /// `nil` = "anytime" (shows all day). Unlike habits, bucketing is optional.
   var bucket: String?
   var done: Bool
+  var skipped: Bool
   var note: String?
   var time: String?
 
@@ -517,17 +518,19 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     bucket = try c.decodeIfPresent(String.self, forKey: .bucket)
     done = (try? c.decode(Bool.self, forKey: .done)) ?? false
+    skipped = (try? c.decode(Bool.self, forKey: .skipped)) ?? false
     note = try c.decodeIfPresent(String.self, forKey: .note)
     time = try c.decodeIfPresent(String.self, forKey: .time)
   }
 
-  enum CodingKeys: String, CodingKey { case id, name, emoji, bucket, done, note, time }
+  enum CodingKeys: String, CodingKey { case id, name, emoji, bucket, done, skipped, note, time }
 
   init(id: String,
        name: String,
        emoji: String?,
        bucket: String? = nil,
        done: Bool,
+       skipped: Bool = false,
        note: String?,
        time: String?) {
     self.id = id
@@ -535,6 +538,7 @@ struct SupplementDayItem: Codable, Identifiable, Hashable {
     self.emoji = emoji
     self.bucket = bucket
     self.done = done
+    self.skipped = skipped
     self.note = note
     self.time = time
   }

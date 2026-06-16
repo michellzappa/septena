@@ -313,6 +313,7 @@ One row per message; a coach's transcript = all rows with that `coachKey`. **NEW
 | `date` | String | `String` | No | |
 | `supplementID` | String | `String` | No | |
 | `done` | Int(64) | `Bool` | No | |
+| `skipped` | Int(64) | `Bool` | No | **⚠ PENDING PROD DEPLOY** · default `false` · skipped = not-needed today (mirrors `HabitEvent.skipped`) |
 | `note` | String | `String?` | Yes | |
 | `time` | String | `String?` | Yes | |
 | `occurredAt` | Timestamp | `Date` | No | **⚠ PENDING PROD DEPLOY** · default `.distantPast` |

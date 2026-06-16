@@ -209,13 +209,13 @@ final class NextItemsModel {
 
   var openSupplements: [SupplementDayItem] {
     supplements.filter { s in
-      actedSupplements.contains(s.id) || !s.done
+      actedSupplements.contains(s.id) || (!s.done && !s.skipped)
     }
   }
 
   var doneSupplements: [SupplementDayItem] {
     supplements.filter { s in
-      !actedSupplements.contains(s.id) && s.done
+      !actedSupplements.contains(s.id) && (s.done || s.skipped)
     }
   }
 
@@ -361,11 +361,27 @@ final class NextItemsModel {
     if !next { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
+      if next { supplements[i].skipped = false }
       supplements[i].time = next ? SeptenaDate.nowHHMM : nil
     }
     actedSupplements.insert(supp.id)
     mutator.toggleSupplement(id: supp.id, date: today, done: next)
     settleActed(supp.id, in: \.actedSupplements, done: next, motion: motion)
+  }
+
+  func skipSupplement(_ supp: SupplementDayItem, skipped: Bool, mutator: ChecklistMutator, motion: A11yMotion) {
+    Haptics.tick()
+    if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
+      supplements[i].skipped = skipped
+      if skipped {
+        supplements[i].done = false
+        supplements[i].time = nil
+      }
+    }
+    actedSupplements.insert(supp.id)
+    mutator.skipSupplement(id: supp.id, date: today, skipped: skipped)
+    // A skip drifts into Done the same way a completion does; un-skip keeps it.
+    settleActed(supp.id, in: \.actedSupplements, done: skipped, motion: motion)
   }
 
   func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion) {
@@ -432,6 +448,29 @@ final class NextItemsModel {
       chores[i].lastCompletedTime = nil
     }
     mutator.uncompleteChore(id: chore.id, date: today)
+  }
+
+  // MARK: - Daily clear-out (canvas celebration)
+  //
+  // Completing the last open item in a daily checklist clears the whole day's
+  // stack — the same at-most-once-a-day "you finished" moment as clearing your
+  // last Today task. The rows read these after their optimistic flip and, when
+  // true, fire the canvas burst. "Open" excludes the deliberately set-aside
+  // (skipped habits, deferred chores); an empty list is never a clear-out.
+
+  /// No habit is still open (every one done or skipped) and there was at least one.
+  var habitsAllCleared: Bool {
+    !habits.isEmpty && !habits.contains { !$0.done && !$0.skipped }
+  }
+  /// No supplement still open (every one taken or skipped) and there was one.
+  var supplementsAllCleared: Bool {
+    !supplements.isEmpty && !supplements.contains { !$0.done && !$0.skipped }
+  }
+  /// No chore still open (every one completed or deferred away) and there was one.
+  var choresAllCleared: Bool {
+    !chores.isEmpty && !chores.contains {
+      !completedChores.contains($0.id) && deferredChores[$0.id] == nil
+    }
   }
 }
 
@@ -533,7 +572,7 @@ struct NextOpenSection: View {
             .septenaNextRow()
         }
       } header: {
-        sectionHeader("Tasks", tint: theme.color(for: "tasks"))
+        sectionHeader("Tasks")
       }
 
     case "chores":
@@ -544,7 +583,7 @@ struct NextOpenSection: View {
             .septenaNextRow()
         }
       } header: {
-        sectionHeader("Chores", tint: theme.color(for: "chores"))
+        sectionHeader("Chores")
       }
 
     case "habits":
@@ -555,8 +594,7 @@ struct NextOpenSection: View {
             .septenaNextRow()
         }
       } header: {
-        bucketSectionHeader("Habits", tint: theme.color(for: "habits"),
-                            showsCountdown: !lingerHabits)
+        bucketSectionHeader("Habits", showsCountdown: !lingerHabits)
       }
 
     case "supplements":
@@ -567,8 +605,7 @@ struct NextOpenSection: View {
             .septenaNextRow()
         }
       } header: {
-        bucketSectionHeader("Supplements", tint: theme.color(for: "supplements"),
-                            showsCountdown: !lingerSupplements)
+        bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements)
       }
 
     default:
@@ -806,9 +843,6 @@ struct NextDoneSection: View {
       }
     } header: {
       Text("Done Today")
-        .font(.septenaSectionTitle)
-        .foregroundStyle(Theme.inkPrimary)
-        .textCase(nil)
     }
     // The same editors the home surfaces use — `adaptiveDetail` is a drop-in
     // `.sheet(item:)` (sheet on iPhone, docked inspector on iPad/Mac). The feed
@@ -937,6 +971,10 @@ struct HabitRow: View {
           // includes the just-completed habit (model flipped it above).
           let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
           Haptics.play(CheckFeel.echo.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
+          // Cleared the whole day's habits — the canvas earns a burst.
+          if model.habitsAllCleared {
+            logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
+          }
         }
       }
     )
@@ -971,6 +1009,9 @@ struct SupplementRow: View {
   /// feed, where the time stays.
   var completionRate: Int? = nil
   @Environment(\.a11yMotion) private var motion
+  // Optional — SupplementRow renders in multiple hosts; not all inherit the
+  // root env. nil → the clear-out burst no-ops, toggle still runs.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   /// Toggle + (on taken) the `.drop` celebration at the checkbox: the fill
   /// falls in and lands with a soft splash. The haptic is its matched
@@ -982,18 +1023,26 @@ struct SupplementRow: View {
     guard taken else { return }
     let count = model.supplements.filter { $0.done }.count
     Haptics.play(CheckFeel.drop.hapticSpec(intensity: 0.8 + Double(count) * 0.08))
+    // Took the last one — the whole day's supplements are done; the canvas
+    // earns a burst.
+    if model.supplementsAllCleared {
+      logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
+    }
   }
 
   var body: some View {
+    let inactive = supplement.done || supplement.skipped
     CheckableRow(
-      tint: tint,
-      isDone: supplement.done,
+      tint: supplement.skipped && !supplement.done ? Theme.inkSecondary : tint,
+      isDone: inactive,
       feel: .drop,
-      isInactive: supplement.done,
+      isInactive: inactive,
       leadingEmoji: supplement.emoji ?? "•",
       title: supplement.name,
       trailing: {
-        if let rate = completionRate {
+        if supplement.skipped {
+          StatusBadge(text: "Skipped")
+        } else if let rate = completionRate {
           CompletionRateBadge(percent: rate, tint: tint)
         } else if let t = supplement.time {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
@@ -1002,14 +1051,22 @@ struct SupplementRow: View {
       onToggle: { commitToggle() }
     )
     // Consistent with the other Next rows: long-press always offers a menu.
-    // Mark taken/not-taken mirrors the checkbox for discoverability; Delete
-    // shows only where a host owns the record (the Supplements mini-app).
+    // Mark taken/not-taken mirrors the checkbox for discoverability; Skip
+    // marks the supplement not-needed today (mirrors habits); Delete shows
+    // only where a host owns the record (the Supplements mini-app).
     .contextMenu {
       Button {
         commitToggle()
       } label: {
         Label(supplement.done ? "Mark not taken" : "Mark taken",
               systemImage: supplement.done ? "arrow.uturn.left" : "checkmark")
+      }
+      Button {
+        model.skipSupplement(supplement, skipped: !supplement.skipped,
+                             mutator: checklistMutator, motion: motion)
+      } label: {
+        Label(supplement.skipped ? "Unskip" : "Skip today",
+              systemImage: supplement.skipped ? "arrow.uturn.left" : "forward.end")
       }
       if let onDelete {
         Divider()
@@ -1031,6 +1088,9 @@ struct ChoreRow: View {
   let tint: Color
   var onDelete: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
+  // Optional — ChoreRow renders in multiple hosts; not all inherit the root
+  // env. nil → the clear-out burst no-ops, completion still runs.
+  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
@@ -1069,6 +1129,11 @@ struct ChoreRow: View {
           // down); this is its matched haptic: a muted thud, then the
           // drawer's softer close. Done is binary, so no intensity.
           Haptics.play(CheckFeel.tuck.hapticSpec())
+          // Filed the last one — the whole day's chores are clear; the canvas
+          // earns a burst.
+          if model.choresAllCleared {
+            logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
+          }
         }
       }
     )
@@ -1163,16 +1228,13 @@ struct CompletionRateBadge: View {
   }
 }
 
-// Section headers for the Next List. The `List` owns the header's placement +
-// spacing, so these supply only the look: a tinted, title-cased section title
-// (`.textCase(nil)` overrides the grouped list's default upper-casing). The
-// section accent already lives on each row's checkbox, so no leading glyph.
+// Section headers for the Next List. Plain `Text` so the grouped `List` styles
+// them with its default header treatment (small, upper-cased, secondary) — the
+// same headers the Coach landing uses, so the two home tabs read identically.
+// The section accent still lives on each row's checkbox, so no leading glyph.
 @ViewBuilder
-private func sectionHeader(_ title: String, tint: Color) -> some View {
+private func sectionHeader(_ title: String) -> some View {
   Text(title)
-    .font(.septenaSectionTitle)
-    .foregroundStyle(tint)
-    .textCase(nil)
 }
 
 // MARK: - Bucketed section header
@@ -1185,14 +1247,14 @@ private func sectionHeader(_ title: String, tint: Color) -> some View {
 // window's close is meaningful only when the item actually drops off at the
 // cutoff; a lingering section carries the item over, so no deadline to show.
 @ViewBuilder
-private func bucketSectionHeader(_ sectionTitle: String, tint: Color,
+private func bucketSectionHeader(_ sectionTitle: String,
                                  showsCountdown: Bool) -> some View {
   let bucket = DayBucket.current.rawValue
   HStack(spacing: 8) {
     Text("\(DayBucket.label(forKey: bucket)) \(sectionTitle)")
-      .font(.septenaSectionTitle).foregroundStyle(tint)
     Spacer()
-    if showsCountdown { BucketTimeLeft(bucket: bucket) }
+    // Match the grouped List's default section-header size so the countdown
+    // reads as part of the header, not louder than it.
+    if showsCountdown { BucketTimeLeft(bucket: bucket, font: .footnote.weight(.semibold)) }
   }
-  .textCase(nil)
 }

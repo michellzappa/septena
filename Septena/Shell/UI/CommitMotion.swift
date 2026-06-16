@@ -625,26 +625,33 @@ enum CommitFeedback {
   static let blockingDismissDelay: Duration = .milliseconds(1150)
 
   /// The shared non-blocking commit path. Runs `write` (persist + any
-  /// caller-side refresh), the success haptic, an optional VoiceOver
-  /// announcement, then fires the app-root flourish. Call from any
-  /// foreground log site that dismisses immediately.
+  /// caller-side refresh), the success haptic, and an optional VoiceOver
+  /// announcement. Call from any foreground log site that dismisses
+  /// immediately.
   ///
-  /// `logCommit` is optional: some hosts (Home-Screen quick actions) don't
-  /// inherit the root environment. When it's nil the write + haptic +
-  /// announcement still confirm the log — only the visual is skipped, which
-  /// is also exactly what Reduce Motion does.
+  /// CONTAINMENT POLICY: the full-screen `LogCommitOverlay` is reserved for
+  /// milestone moments (`MilestonePresenter`) and the at-most-once-a-day
+  /// completion flourishes that opt in with `canvas: true` (hydration target,
+  /// fast-breaking meal, finishing the shop). An everyday log — the default —
+  /// confirms with the motion-matched haptic + VoiceOver announcement only,
+  /// the same contract Reduce Motion has always used: no canvas wash.
   static func commit(motion: CommitMotion,
                      accent: Color,
                      intensity: Double = 1,
                      announce: String? = nil,
+                     canvas: Bool = false,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
     write()
-    // Motion-matched haptic: same character as the visual, even under
-    // Reduce Motion (where the visual is skipped but the haptic still fires).
+    // Motion-matched haptic: same character as the visual, even under Reduce
+    // Motion (where the visual is skipped but the haptic still fires).
     Haptics.play(motion.hapticSpec(intensity: intensity))
     if let announce { A11y.announce(announce) }
-    logCommit?.fire(.flourish(motion: motion, accent: accent, intensity: intensity))
+    // Only budgeted once-a-day moments reach the canvas; everyday logs stay
+    // off it (see policy above).
+    if canvas {
+      logCommit?.fire(.flourish(motion: motion, accent: accent, intensity: intensity))
+    }
   }
 }
 
@@ -673,18 +680,24 @@ enum SectionLog {
   /// the app root. Motion resolves from the section plugin's `logFlourish`
   /// unless overridden. `accent` is the section's theme color (resolved by
   /// the caller); `logCommit` is nil-safe (skips only the visual).
+  /// `canvas: true` opts this log into the full-screen flourish — reserved
+  /// for at-most-once-a-day completion moments (hydration target, fast-breaking
+  /// meal, finishing the shop). Everyday logs leave it false and confirm with
+  /// haptic + announcement only. See `CommitFeedback.commit`.
   static func newLog(section sectionKey: String,
                      accent: Color,
                      motion: CommitMotion? = nil,
                      intensity: Double = 1,
                      announce: String? = nil,
+                     canvas: Bool = false,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
     let resolved = motion
       ?? SectionRegistry.plugin(forKey: sectionKey)?.logFlourish?.motion
       ?? .burst
     CommitFeedback.commit(motion: resolved, accent: accent, intensity: intensity,
-                          announce: announce, logCommit: logCommit, write: write)
+                          announce: announce, canvas: canvas,
+                          logCommit: logCommit, write: write)
   }
 
   /// Commit an EDIT: a correction, not a fresh log — quiet haptic, no

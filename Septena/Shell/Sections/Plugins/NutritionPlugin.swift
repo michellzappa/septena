@@ -37,7 +37,8 @@ enum NutritionPlugin: SectionPlugin {
                          write: () -> Void) {
     if breaksFast(at: loggedAt) {
       SectionLog.newLog(section: "nutrition", accent: accent,
-                        announce: announce, logCommit: logCommit, write: write)
+                        announce: announce, canvas: true,
+                        logCommit: logCommit, write: write)
     } else {
       SectionLog.quietLog(announce: announce, write: write)
     }

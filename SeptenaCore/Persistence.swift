@@ -460,6 +460,10 @@ final class SupplementDayStateEntity {
   var date: String
   var supplementID: String
   var done: Bool
+  /// User explicitly marked the supplement not-needed today (mirrors habits).
+  /// Default keeps SwiftData lightweight migration safe — existing rows read
+  /// back as `false`. A skipped row is `done == false && skipped == true`.
+  var skipped: Bool = false
   var note: String?
   var updatedAt: Date
   /// CKRecord system-fields blob. Same contract as tasks/projects/areas.
@@ -469,6 +473,7 @@ final class SupplementDayStateEntity {
        date: String,
        supplementID: String,
        done: Bool,
+       skipped: Bool = false,
        note: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -476,6 +481,7 @@ final class SupplementDayStateEntity {
     self.date = date
     self.supplementID = supplementID
     self.done = done
+    self.skipped = skipped
     self.note = note
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -560,6 +566,7 @@ final class GoalMilestoneEntity {
   var rungKey: String                  // "kg:78" | "pr:100" | "xp:25000" | "streak:30" | "halfway" | "target" | "held30"
   var label: String                    // user-facing, resolved at detection time
   var value: Double                    // the crossed value (smoothed kg, PR kg, streak days…)
+  var unit: String = ""                // unit discriminator for `value`: "kg" | "%" | "tonnes" | "days" | "" — drives display-time unit rendering (kg→lb) so labels aren't frozen. Stored in CloudKit reservedString1. MUST have a default so lightweight migration can backfill existing on-disk rows (else 134110 store-migration crash).
   var occurredAt: Date                 // when the crossing was detected
   var celebrated: Bool                 // false = granted silently, never animates
   var presentedAt: Date?               // when the celebration was shown (queued path); syncs so one device's showing silences the rest
@@ -573,6 +580,7 @@ final class GoalMilestoneEntity {
        rungKey: String,
        label: String,
        value: Double,
+       unit: String = "",
        occurredAt: Date,
        celebrated: Bool,
        presentedAt: Date? = nil,
@@ -585,6 +593,7 @@ final class GoalMilestoneEntity {
     self.rungKey = rungKey
     self.label = label
     self.value = value
+    self.unit = unit
     self.occurredAt = occurredAt
     self.celebrated = celebrated
     self.presentedAt = presentedAt
@@ -1773,6 +1782,7 @@ enum SupplementEventCloudKitSchema {
     static let date = "date"
     static let supplementID = "supplementID"
     static let done = "done"
+    static let skipped = "skipped"
     static let note = "note"
     static let time = "time"
     static let occurredAt = "occurredAt"
@@ -2376,6 +2386,7 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     record[SupplementEventCloudKitSchema.Field.date] = date
     record[SupplementEventCloudKitSchema.Field.supplementID] = supplementID
     record[SupplementEventCloudKitSchema.Field.done] = done ? 1 : 0
+    record[SupplementEventCloudKitSchema.Field.skipped] = skipped ? 1 : 0
     record[SupplementEventCloudKitSchema.Field.note] = note
     record[SupplementEventCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
@@ -2385,6 +2396,7 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
     if let value = record[SupplementEventCloudKitSchema.Field.date] as? String { date = value }
     if let value = record[SupplementEventCloudKitSchema.Field.supplementID] as? String { supplementID = value }
     if let value = record[SupplementEventCloudKitSchema.Field.done] as? Int { done = value != 0 }
+    if let value = record[SupplementEventCloudKitSchema.Field.skipped] as? Int { skipped = value != 0 }
     note = optionalChecklistString(record[SupplementEventCloudKitSchema.Field.note])
     if let v = record[SupplementEventCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now

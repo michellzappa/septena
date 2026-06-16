@@ -1368,11 +1368,25 @@ final class ChecklistMutator {
   }
 
   func toggleSupplement(id: String, date: String, done: Bool) {
+    setSupplementState(id: id, date: date, done: done, skipped: false,
+                       time: done ? SeptenaDate.nowHHMM : nil)
+  }
+
+  func skipSupplement(id: String, date: String, skipped: Bool) {
+    setSupplementState(id: id, date: date, done: false, skipped: skipped, time: nil)
+  }
+
+  /// Shared write boundary for a supplement day-state — mirrors `setHabitState`.
+  /// A row exists only when there's something to record (taken or skipped);
+  /// clearing both deletes it so an untouched supplement leaves no trace.
+  private func setSupplementState(id: String, date: String, done: Bool, skipped: Bool, time: String?) {
     let stateID = "supplement:\(date):\(id)"
-    if !done {
+    let normalizedTime = normalized(time)
+    let needsRow = done || skipped
+    if !needsRow {
       if let state = fetchSupplementState(id: stateID) {
         context.delete(state)
-        saveContext("CK supplements toggle delete")
+        saveContext("CK supplements state delete")
         ckEngine?.noteSupplementEventDeletion(id: state.id)
         postChecklistChanged("supplements")
       }
@@ -1382,19 +1396,21 @@ final class ChecklistMutator {
       id: stateID,
       date: date,
       supplementID: id,
-      done: true
+      done: done,
+      skipped: skipped
     )
     state.date = date
     state.supplementID = id
-    state.done = true
+    state.done = done
+    state.skipped = skipped
     // Empty string rather than nil so the `note` field registers with
-    // CloudKit on first toggle. Display code already treats "" the same
+    // CloudKit on first write. Display code already treats "" the same
     // as nil (both render as "no note").
     state.note = ""
-    state.occurredAt = EventTimestamp.from(date: date, time: SeptenaDate.nowHHMM)
+    state.occurredAt = EventTimestamp.from(date: date, time: normalizedTime)
     state.updatedAt = .now
     if state.modelContext == nil { context.insert(state) }
-    commitSupplementEvent(state, op: "toggle")
+    commitSupplementEvent(state, op: "state")
   }
 
   @discardableResult
