@@ -158,6 +158,10 @@ targets:
       Release: Config/Base.xcconfig
     settings:
       base:
+        # Target is named SeptenaMac (to disambiguate from the iOS target), but
+        # the shipped app is just "Septena" — without this the built bundle is
+        # SeptenaMac.app, which is what kept "renaming" the app.
+        PRODUCT_NAME: Septena
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
