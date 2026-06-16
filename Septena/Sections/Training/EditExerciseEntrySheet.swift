@@ -57,10 +57,13 @@ struct EditExerciseEntrySheet: View {
             numberRow("Weight (kg)", text: $weight)
             numberRow("Sets", text: $sets)
             numberRow("Reps", text: $reps)
+            // Leading label already says "RIR"/"Difficulty", so the RIR
+            // segments stay bare numbers ("3+","2","1","0") to fit five
+            // segments on a phone.
             Picker(effortScale.label, selection: $difficulty) {
               Text("—").tag("")
               ForEach(TrainingEffort.levels) { lvl in
-                Text(effortScale == .rir ? "RIR \(lvl.rir)" : lvl.label).tag(lvl.key)
+                Text(effortScale == .rir ? lvl.rirLabel : lvl.label).tag(lvl.key)
               }
             }
             .pickerStyle(.segmented)

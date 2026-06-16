@@ -19,12 +19,14 @@ struct DifficultyGlyph: View {
   }
 
   private var spec: Spec? {
-    // Canonicalize first so both legacy ("medium"/"max") and current
-    // ("moderate") spellings render the same 3-dot ramp.
+    // Canonicalize first so legacy ("medium") and current ("moderate")
+    // spellings share one ramp. Only three dots, so the two hardest rungs
+    // (hard / max) both fill all three — max is the to-failure extreme.
     switch TrainingEffort.canonicalKey(difficulty) {
     case "easy":     return Spec(filled: 1, opacity: 0.30, label: "Easy")
     case "moderate": return Spec(filled: 2, opacity: 0.65, label: "Moderate")
     case "hard":     return Spec(filled: 3, opacity: 1.00, label: "Hard")
+    case "max":      return Spec(filled: 3, opacity: 1.00, label: "Max")
     default:         return nil
     }
   }
