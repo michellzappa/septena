@@ -161,7 +161,7 @@ enum TasksPlugin: SectionPlugin {
 
       **"Show me everything I haven't scheduled"**
       ```
-      tasks_list(view: "inbox")
+      tasks_list(view: "anytime")
       ```
 
       ### Verification habit
@@ -170,7 +170,7 @@ enum TasksPlugin: SectionPlugin {
       ### Don't
       - Don't try to `tasks_complete` a recurring task. Tell the user to do it in the app.
       - Don't reference area/project by name. Always resolve to id first via `tasks_list_areas` / `tasks_list_projects`.
-      - Don't assume `anytime` shows all tasks. It excludes inbox-only items.
+      - Don't assume `anytime` shows all tasks. It's only open, dateless, unfiled tasks.
       - Don't claim a task is "added" without mentioning which view/list it landed in.
       """
     )

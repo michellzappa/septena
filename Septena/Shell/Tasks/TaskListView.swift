@@ -557,10 +557,7 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var remindersRow: some View {
-    if filter == .inbox {
-      RemindersInboxSection(onImported: { Task { await load() } })
-        .plainListChrome()
-    } else if filter == .today {
+    if filter == .today {
       // Pending Apple Reminders are unratified captures too — surface them in
       // the triage zone on Today, but only when something's actually pending
       // (no setup CTAs here, so an unconfigured user sees nothing).
@@ -963,8 +960,8 @@ struct TaskListView: View {
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
     guard case let .single(task) = target, task.status == .open else { return nil }
-    // Inbox keeps its richer pre-ranked list (computed in `load()`).
-    if filter == .inbox, let top = suggestionEngine.topSuggestion(for: task.id) {
+    // Today's triage band keeps its richer pre-ranked list (computed in `load()`).
+    if filter == .today, let top = suggestionEngine.topSuggestion(for: task.id) {
       return suggestionEngine.suggestions[task.id] ?? [top]
     }
     // Any other view: classify the title on demand against the trained model,
@@ -1162,7 +1159,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook —
     // whose whole job is showing completed tasks — keeps them.
-    case .project, .area, .unscheduled, .upcoming, .inbox, .triage: return true
+    case .project, .area, .unscheduled, .upcoming, .triage: return true
     case .today:
       return !todayShowCompleted
     case .logbook: return false
@@ -1482,16 +1479,11 @@ struct TaskListView: View {
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
-    // Inbox gets the richer per-task ranked suggestions; every other view
-    // (except the all-done Logbook) still trains the model so a row's context
-    // menu can suggest a destination on demand via `suggest(forText:)`.
-    if filter == .inbox {
-      let allTasks = LocalCache.allTasks(in: modelContext)
-      suggestionEngine.refresh(inbox: local,
-                               allTasks: allTasks,
-                               projects: projects,
-                               areas: areas)
-    } else if filter == .today {
+    // Today's triage band gets the richer per-task ranked suggestions; every
+    // other view (except the all-done Logbook) still trains the model so a
+    // row's context menu can suggest a destination on demand via
+    // `suggest(forText:)`.
+    if filter == .today {
       // The Inbox lives on the Today view now (the triage rows), so classify
       // *those* — that's what powers the one-tap "file here" suggestion chip and
       // the implicit "not this" learning. refresh also primes the model for the
@@ -1510,8 +1502,7 @@ struct TaskListView: View {
     // (and re-renders) with each load. Reading the @Observable engine live
     // inside the row's body proved unreliable for this list; the composer's
     // own suggestion chip works precisely because it caches into @State too.
-    let suggestSource: [SeptenaTask] = filter == .today ? triageItems
-                                     : filter == .inbox ? local : []
+    let suggestSource: [SeptenaTask] = filter == .today ? triageItems : []
     var freshSuggestions: [String: SuggestionEngine.Suggestion] = [:]
     for t in suggestSource where t.project == nil && t.area == nil {
       // Use the SAME call the composer's working chip uses, so the row and the
@@ -1584,7 +1575,6 @@ struct TaskListView: View {
   private var titleIcon: String {
     switch filter {
     case .today: return "sun.max.fill"
-    case .inbox: return "tray"
     case .triage: return "tray.full"
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"

@@ -80,7 +80,9 @@ enum TaskReads {
                                review: nil, done: nil)
 
     case "inbox":
-      let items = LocalCache.tasks(in: context, filter: .inbox)
+      // The standalone Inbox page was retired; "inbox" now aliases the
+      // triage band (loose captures live there). See docs/TRIAGE_BAND_SPEC.md.
+      let items = LocalCache.tasks(in: context, filter: .triage)
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: nil, done: nil)
 
@@ -117,8 +119,8 @@ enum TaskReads {
                                review: nil, done: nil)
 
     default:
-      // Unknown view — fall back to inbox so we don't blow up.
-      let items = LocalCache.tasks(in: context, filter: .inbox)
+      // Unknown view — fall back to the triage band so we don't blow up.
+      let items = LocalCache.tasks(in: context, filter: .triage)
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: nil, done: nil)
     }

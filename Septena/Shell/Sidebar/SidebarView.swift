@@ -1450,14 +1450,12 @@ private struct SidebarTaskDrop: ViewModifier {
     case area(String)
     case project(String)
     case today
-    case inbox
 
     /// Maps a smart-list route to a drop action, or nil for routes with no
     /// single unambiguous "move here" meaning (Upcoming, Anytime, Logbook).
     init?(route: Route) {
       switch route {
       case .filter(.today):   self = .today
-      case .filter(.inbox):   self = .inbox
       default:                return nil
       }
     }
@@ -1491,23 +1489,12 @@ private struct SidebarTaskDrop: ViewModifier {
       mutator.moveToProject(id: id, project: projectId)
     case .today:
       mutator.moveToToday(id: id, today: true)
-    case .inbox:
-      // Inbox = no routing at all: clear schedule, deadline, area, project, and
-      // the Today pin. A leftover deadline would keep the task out of Inbox
-      // (the filter requires deadline == nil) and stuck in Today, so we clear it too.
-      // Drop the pin LAST: `setDeadline(nil)` re-pins a still-Today row, so ending on
-      // `moveToToday(false)` guarantees the task actually lands in Inbox.
-      mutator.schedule(id: id, date: nil)
-      mutator.setDeadline(id: id, date: nil)
-      mutator.moveToArea(id: id, area: nil)
-      mutator.moveToProject(id: id, project: nil)
-      mutator.moveToToday(id: id, today: false)
     }
   }
 }
 
 /// Installs `SidebarTaskDrop` on a smart-list row only when the route has a
-/// meaningful drop action (Today / Inbox); other routes pass
+/// meaningful drop action (Today); other routes pass
 /// through so they don't show a misleading drop highlight.
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route

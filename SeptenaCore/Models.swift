@@ -406,9 +406,9 @@ enum TaskFilter: Equatable, Hashable {
   case today
   /// Unratified layer rendered above Today — agent proposals + loose human
   /// captures (see `SeptenaTask.isInTriageBand`, `docs/TRIAGE_BAND_SPEC.md`).
-  /// Superset of `.inbox` (which is only the loose-human arm).
+  /// This is the only home for loose captures; the standalone Inbox page was
+  /// retired when the triage band absorbed it.
   case triage
-  case inbox
   case upcoming
   case unscheduled
   case logbook
@@ -419,7 +419,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return "today"
     case .triage: return "triage"
-    case .inbox: return "inbox"
     case .upcoming: return "upcoming"
     case .unscheduled: return "unscheduled"
     case .logbook: return "logbook"
@@ -434,7 +433,6 @@ enum TaskFilter: Equatable, Hashable {
     switch self {
     case .today: return String(localized: "Today", comment: "Task filter")
     case .triage: return String(localized: "Inbox", comment: "Task filter")
-    case .inbox: return String(localized: "Inbox", comment: "Task filter")
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")

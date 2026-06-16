@@ -3422,11 +3422,6 @@ enum LocalCache {
     case .triage:
       // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
       return e.isInTriageBand ? SeptenaTask(e) : nil
-    case .inbox:
-      guard e.status == .open,
-            e.project == nil, e.area == nil,
-            e.scheduled == nil, e.deadline == nil, !e.today else { return nil }
-      return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }
       if let s = e.scheduled, s > today { return SeptenaTask(e) }

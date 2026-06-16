@@ -385,7 +385,7 @@ struct WeekDashboardView: View {
     // regardless of which tiles are enabled or materialized in the lazy grid.
     .taskComposerDrawer(isPresented: $creatingTask) {
       TaskComposerCard(
-        mode: .create(.inbox),
+        mode: .create(.triage),
         areas: LocalCache.areas(in: modelContext),
         projects: LocalCache.projects(in: modelContext),
         accent: theme.color(for: "tasks"),

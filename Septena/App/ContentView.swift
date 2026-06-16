@@ -19,7 +19,7 @@ struct ContentView: View {
         .publisher(for: .septenaOpenQuickAdd)) { _ in
         // macOS menu bar "New To-Do" routes through here — same effect as
         // iOS Home Screen Quick Action's `.newTodo` case.
-        nav.path = [.filter(.inbox)]
+        nav.path = [.filter(.today)]
         nav.shouldStartCreating = true
       }
       // Quick Action routing is hoisted to RootTabView — ContentView is

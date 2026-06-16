@@ -254,7 +254,9 @@ enum MCPDispatch {
     let filter: TaskFilter
     switch view {
     case "triage": filter = .triage
-    case "inbox": filter = .inbox
+    // The standalone Inbox page was retired; accept "inbox" as an alias for
+    // the triage band so existing agent calls keep working.
+    case "inbox": filter = .triage
     case "upcoming": filter = .upcoming
     // "someday" is the retired bucket — accept it as an alias for "anytime"
     // so existing agent calls keep working.

@@ -79,7 +79,7 @@ struct TaskChoiceQuery: EntityQuery {
     let context = LocalStore.shared.container.mainContext
     var seen = Set<String>()
     var out: [TaskChoice] = []
-    for filter in [TaskFilter.today, .upcoming, .unscheduled, .inbox] {
+    for filter in [TaskFilter.today, .upcoming, .unscheduled, .triage] {
       for task in LocalCache.tasks(in: context, filter: filter) where !seen.contains(task.id) {
         seen.insert(task.id)
         out.append(TaskChoice(id: task.id, title: task.title))

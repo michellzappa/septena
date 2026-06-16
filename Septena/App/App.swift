@@ -340,16 +340,12 @@ struct SeptenaApp: App {
 
         Divider()
 
-        Button("Inbox")       { navigation.pendingTab = .tasks; navigation.path = [.filter(.inbox)] }
+        Button("Today")    { navigation.pendingTab = .tasks; navigation.path = [.filter(.today)] }
           .keyboardShortcut("1", modifiers: [.command, .option])
-        Button("Today")       { navigation.pendingTab = .tasks; navigation.path = [.filter(.today)] }
+        Button("Upcoming") { navigation.pendingTab = .tasks; navigation.path = [.filter(.upcoming)] }
           .keyboardShortcut("2", modifiers: [.command, .option])
-        Button("Next List")   { navigation.pendingTab = .tasks; navigation.path = [.next] }
+        Button("Anytime")  { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
           .keyboardShortcut("3", modifiers: [.command, .option])
-        Button("Upcoming")    { navigation.pendingTab = .tasks; navigation.path = [.filter(.upcoming)] }
-          .keyboardShortcut("4", modifiers: [.command, .option])
-        Button("Unscheduled") { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
-          .keyboardShortcut("5", modifiers: [.command, .option])
       }
       // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`.
       // Items disable themselves when no task list is focused, which also

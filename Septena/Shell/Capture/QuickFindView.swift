@@ -182,7 +182,8 @@ struct QuickFindView: View {
     if t.isOnToday { return .filter(.today) }
     if t.scheduled != nil || t.deadline != nil { return .filter(.upcoming) }
     if t.status == .done { return .filter(.logbook) }
-    return .filter(.inbox)
+    // Loose, unratified captures live in the triage band on Today.
+    return .filter(.today)
   }
 
   private func taskSubtitle(_ t: TaskEntity) -> String? {
