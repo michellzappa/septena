@@ -52,6 +52,9 @@ struct RhythmHomepageView<MenuContent: View>: View {
   /// Today's calendar events as time-block pills — shown only in the
   /// today-focused view (tap the dial), where a day's schedule is legible.
   @State private var calendarBands: [TimeOfDayWheel.Band] = []
+  /// Debounce token for `.septenaDataChanged`-driven reloads — coalesces the
+  /// optimistic post with CloudKit's echo. Cancelled and replaced per post.
+  @State private var reloadTask: Task<Void, Never>?
 
   private let windowDays = 7
 
@@ -112,8 +115,32 @@ struct RhythmHomepageView<MenuContent: View>: View {
     // Reload on appear, waking-day rollover (todayStart flips at wake/cutoff,
     // not just midnight — clock.now ticks it within 60s), and any logged write.
     .task(id: todayStart) { await reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      Task { await reload() }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      // Reload only when a section the dial actually plots changed (or the post
+      // is unscoped — a CloudKit batch). A scoped change to a dial-less section
+      // (goals, coach, groceries…) no longer triggers a full cross-section sweep.
+      guard note.affectsAnySection(of: dialSections) else { return }
+      scheduleReload()
+    }
+  }
+
+  /// Sections the dial can render — gates the data-changed listener so only
+  /// relevant edits reload it. The visible set already covers the timed
+  /// sections; the extras are the non-`LoggedEvent` streams `RhythmData` reads.
+  private var dialSections: Set<String> {
+    Set(items.map { $0.domain.rawValue })
+      .union(["tasks", "intake", "training", "sleep", "calendar"])
+  }
+
+  /// Coalesce the optimistic scoped post and CloudKit's unscoped echo (which
+  /// arrive a fraction of a second apart for the same local edit) into one
+  /// reload, so a single toggle pays for one cross-section fetch, not two.
+  private func scheduleReload() {
+    reloadTask?.cancel()
+    reloadTask = Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(250))
+      guard !Task.isCancelled else { return }
+      await reload()
     }
   }
 
@@ -235,7 +262,7 @@ enum RhythmData {
     // Tasks aren't `LoggedEvent`s — add completed tasks as dots so the wheel
     // matches the timeline (which plots done tasks at their completedAt time).
     if visible.contains("tasks") {
-      let te = taskEvents(todayStart: todayStart, windowDays: windowDays,
+      let te = taskEvents(todayStart: todayStart, weekStart: weekStart, windowDays: windowDays,
                           color: colors["tasks"], wakingDay: wakingDay, context: context)
       if !te.isEmpty { snap.eventsBySection["tasks", default: []].append(contentsOf: te) }
     }
@@ -267,10 +294,16 @@ enum RhythmData {
   /// Completed tasks as dots, placed at their local `completedAt` time —
   /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
   /// the window.
-  private static func taskEvents(todayStart: Date, windowDays: Int,
+  private static func taskEvents(todayStart: Date, weekStart: Date, windowDays: Int,
                                  color: Color?, wakingDay: WakingDay,
                                  context: ModelContext) -> [TimeOfDayWheel.Event] {
-    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
+    // Bound to the window. `completedAt` is an ISO-local string ("yyyy-MM-dd'T'…")
+    // that sorts lexicographically, so a string `>=` is a valid date bound. This
+    // stops the dial from fetching (and re-parsing) every completed task in
+    // history on every reload — the unbounded fetch was the per-toggle hitch.
+    let cutoff = RhythmFmt.isoLocal.string(from: weekStart)
+    let desc = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.statusRaw == "done" && ($0.completedAt ?? "") >= cutoff })
     let rows = (try? context.fetch(desc)) ?? []
     return rows.compactMap { t in
       guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }

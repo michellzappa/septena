@@ -76,6 +76,9 @@ struct DayDialHero: View {
   /// day-swipe so the dial can reorient without trying to spin everything in
   /// unison; revealed again at the new day.
   @State private var marksVisible = true
+  /// Debounce token for `.septenaDataChanged`-driven reloads — coalesces the
+  /// optimistic post with CloudKit's echo. Cancelled and replaced per post.
+  @State private var reloadTask: Task<Void, Never>?
   #if os(iOS)
   @State private var tilt = TiltSource()
   #endif
@@ -304,8 +307,12 @@ struct DayDialHero: View {
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
     .task(id: displayedStart) { reload() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
-      reload()
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      // Reload only when a section the dial plots changed (or the post is
+      // unscoped — a CloudKit batch). Skips dial-less edits, and the debounce
+      // coalesces the optimistic post with CloudKit's echo into one reload.
+      guard note.affectsAnySection(of: dialSections) else { return }
+      scheduleReload()
     }
     #if os(iOS)
     // Motion runs only while the hero is actually on screen (TabView fires
@@ -316,6 +323,25 @@ struct DayDialHero: View {
       reduced ? tilt.stop() : tilt.start()
     }
     #endif
+  }
+
+  /// Sections the dial can render — gates the data-changed listener so only
+  /// relevant edits reload it. Visible sections cover the timed streams; the
+  /// extras are the non-`LoggedEvent` streams `RhythmData` reads.
+  private var dialSections: Set<String> {
+    visibleSections.union(["tasks", "intake", "training", "sleep", "calendar"])
+  }
+
+  /// Coalesce the optimistic scoped post and CloudKit's unscoped echo (same
+  /// local edit, a fraction of a second apart) into one reload — one
+  /// cross-section fetch per toggle instead of two.
+  private func scheduleReload() {
+    reloadTask?.cancel()
+    reloadTask = Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(250))
+      guard !Task.isCancelled else { return }
+      reload()
+    }
   }
 
   private func reload() {
