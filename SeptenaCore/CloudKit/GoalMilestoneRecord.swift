@@ -34,6 +34,7 @@ enum GoalMilestoneCloudKitSchema {
     static let presentedAt = "presentedAt"
 
     // Reserved for foreseeable additions without bumping the record type.
+    static let unit = "reservedString1"        // value's unit discriminator ("kg"/"%"/"tonnes"/"days")
     static let reservedString1 = "reservedString1"
     static let reservedDate1 = "reservedDate1"
     static let reservedInt1 = "reservedInt1"
@@ -69,6 +70,7 @@ extension GoalMilestoneEntity {
     record[GoalMilestoneCloudKitSchema.Field.rungKey] = rungKey
     record[GoalMilestoneCloudKitSchema.Field.label] = label
     record[GoalMilestoneCloudKitSchema.Field.value] = value
+    record[GoalMilestoneCloudKitSchema.Field.unit] = unit.isEmpty ? nil : unit
     record[GoalMilestoneCloudKitSchema.Field.occurredAt] = occurredAt
     record[GoalMilestoneCloudKitSchema.Field.celebrated] = celebrated ? 1 : 0
     record[GoalMilestoneCloudKitSchema.Field.presentedAt] = presentedAt
@@ -86,6 +88,7 @@ extension GoalMilestoneEntity {
     if let v = optionalMilestoneString(record[GoalMilestoneCloudKitSchema.Field.rungKey]) { rungKey = v }
     if let v = record[GoalMilestoneCloudKitSchema.Field.label] as? String { label = v }
     if let v = record[GoalMilestoneCloudKitSchema.Field.value] as? Double { value = v }
+    unit = optionalMilestoneString(record[GoalMilestoneCloudKitSchema.Field.unit]) ?? ""
     if let v = record[GoalMilestoneCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     if let v = record[GoalMilestoneCloudKitSchema.Field.celebrated] as? Int { celebrated = v != 0 }
     presentedAt = record[GoalMilestoneCloudKitSchema.Field.presentedAt] as? Date

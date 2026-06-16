@@ -88,7 +88,12 @@ final class MilestoneMutator {
       // the comparator (lte = pushing down, gte = pushing up).
       let downward = goal.metricBaseline.map { $0 > target } ?? (comparator == "lte")
 
-      var rungs: [(key: String, kind: String, label: String, value: Double)] = []
+      // Discriminator stored alongside `value` so display surfaces can render
+      // the unit themselves (kg → the user's lb preference) instead of reading
+      // the frozen "kg" baked into the label string.
+      let unitTag = key.hasSuffix("pct") ? "%" : "kg"
+
+      var rungs: [(key: String, kind: String, label: String, value: Double, unit: String)] = []
 
       // Per-unit grid rungs + halfway need a baseline to anchor the ladder.
       if let baseline = goal.metricBaseline {
@@ -97,13 +102,13 @@ final class MilestoneMutator {
           guard qualified else { continue }
           rungs.append((key: "lvl:\(trim(grid))", kind: "rung",
                         label: "Trailing average crossed \(trim(grid)) \(unit)",
-                        value: grid))
+                        value: grid, unit: unitTag))
         }
         let halfway = (baseline + target) / 2
         if downward ? smoothed <= halfway : smoothed >= halfway {
           rungs.append((key: "halfway", kind: "rung",
                         label: "Halfway to \(trim(target)) \(unit)",
-                        value: halfway))
+                        value: halfway, unit: unitTag))
         }
       }
 
@@ -114,12 +119,12 @@ final class MilestoneMutator {
       if onTarget {
         rungs.append((key: "target", kind: "rung",
                       label: "Target reached: \(trim(target)) \(unit)",
-                      value: target))
+                      value: target, unit: unitTag))
         if heldTargetForThirtyDays(goal: goal, metricKey: key, today: today,
                                    step: step, downward: downward) {
           rungs.append((key: "held30", kind: "rung",
                         label: "Held \(trim(target)) \(unit) for 30 days",
-                        value: target))
+                        value: target, unit: unitTag))
         }
       }
 
@@ -154,7 +159,7 @@ final class MilestoneMutator {
     }
     let xpRungs = Self.xpLadderKg.filter { totalKg >= $0 }.map { kg in
       (key: "xp:\(trim(kg / 1000))t", kind: "xp",
-       label: "Lifetime volume: \(trim(kg / 1000)) tonnes", value: kg)
+       label: "Lifetime volume: \(trim(kg / 1000)) tonnes", value: kg, unit: "tonnes")
     }
     celebrated += grantPass(scope: "training.volume", goalID: nil,
                             qualified: xpRungs, celebrateTop: celebrate, now: now)
@@ -174,7 +179,7 @@ final class MilestoneMutator {
       // but never celebrated.
       let enoughHistory = group.count >= 4
       let rung = [(key: "pr:\(trim(maxWeight))", kind: "pr",
-                   label: "\(name) PR: \(trim(maxWeight)) kg", value: maxWeight)]
+                   label: "\(name) PR: \(trim(maxWeight)) kg", value: maxWeight, unit: "kg")]
       celebrated += grantPass(scope: "exercise:\(slug(name))", goalID: nil,
                               qualified: rung, celebrateTop: enoughHistory && celebrate, now: now)
     }
@@ -200,7 +205,7 @@ final class MilestoneMutator {
     // crossing and today's log is what crossed it.
     let rungs = Self.streakLadder.filter { stats.bestStreak >= $0 }.map { days in
       (key: "streak:\(days)", kind: "streak",
-       label: "\(def.title): \(days)-day streak", value: Double(days))
+       label: "\(def.title): \(days)-day streak", value: Double(days), unit: "days")
     }
     let topQualified = Self.streakLadder.filter { stats.bestStreak >= $0 }.max() ?? 0
     let liveCrossing = dates.contains(today) && stats.currentStreak >= topQualified
@@ -261,7 +266,7 @@ final class MilestoneMutator {
   /// celebrate only the most advanced one (everything below it was skipped
   /// through, not crossed live).
   private func grantPass(scope: String, goalID: String?,
-                         qualified: [(key: String, kind: String, label: String, value: Double)],
+                         qualified: [(key: String, kind: String, label: String, value: Double, unit: String)],
                          celebrateTop: Bool, now: Date) -> [MilestoneGrant] {
     let existing = Set((((try? context.fetch(FetchDescriptor<GoalMilestoneEntity>(
       predicate: #Predicate { $0.scope == scope }
@@ -281,6 +286,7 @@ final class MilestoneMutator {
       let entity = GoalMilestoneEntity(id: id, goalID: goalID, scope: scope,
                                        kind: rung.kind, rungKey: rung.key,
                                        label: rung.label, value: rung.value,
+                                       unit: rung.unit,
                                        occurredAt: now, celebrated: celebrate,
                                        presentedAt: celebrate ? nil : now)
       context.insert(entity)

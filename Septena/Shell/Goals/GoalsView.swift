@@ -331,6 +331,20 @@ struct EditGoalSheet: View {
   /// baseline; the bar falls back to the simple current/target math.
   @State private var metricBaselineText: String
 
+  /// Weight-unit preference. Body's weight/mass metrics store kilograms; the
+  /// editor shows + accepts the user's unit and converts on the way in (init)
+  /// and out (save). Reactive so the suffix updates if the user flips the
+  /// setting elsewhere while the sheet is open.
+  @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
+  private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
+  /// Unit suffix to show beside the target fields for a given metric — the
+  /// weight preference for kg-stored body metrics, the catalog label otherwise.
+  private func unitLabel(for key: String) -> String? {
+    guard let metric = GoalMetricCatalog.metric(for: key) else { return nil }
+    return metric.isWeight ? weightUnit.suffix : metric.unitLabel
+  }
+
   init(goal: Goal,
        availableSections: [SectionConfig],
        theme: SectionTheme,
@@ -350,17 +364,23 @@ struct EditGoalSheet: View {
     // Default to the first metric in the catalog (currently training
     // sessions) if the goal has no measurement yet. If the catalog is
     // somehow empty, fall back to an empty key — picker will hide.
-    _metricKey = State(initialValue: goal.metricKey
-                       ?? GoalMetricCatalog.all.first?.key
-                       ?? "")
+    let key = goal.metricKey
+              ?? GoalMetricCatalog.all.first?.key
+              ?? ""
+    _metricKey = State(initialValue: key)
     _metricComparator = State(initialValue: goal.metricComparator ?? "gte")
-    _metricTargetText = State(initialValue: goal.metricTarget.map { Self.formatTarget($0) } ?? "3")
-    _metricUpperText = State(initialValue: goal.metricTargetUpper.map { Self.formatTarget($0) } ?? "")
-    _metricBaselineText = State(initialValue: goal.metricBaseline.map { Self.formatTarget($0) } ?? "")
+    // Body weight/mass targets are stored in kg; show them in the user's unit
+    // for editing (and convert back on save). Non-weight metrics pass through.
+    let isWeight = GoalMetricCatalog.metric(for: key)?.isWeight ?? false
+    let unit = WeightUnit.current
+    let toDisplay: (Double) -> Double = { isWeight ? unit.display($0) : $0 }
+    _metricTargetText = State(initialValue: goal.metricTarget.map { Self.formatTarget(toDisplay($0)) } ?? "3")
+    _metricUpperText = State(initialValue: goal.metricTargetUpper.map { Self.formatTarget(toDisplay($0)) } ?? "")
+    _metricBaselineText = State(initialValue: goal.metricBaseline.map { Self.formatTarget(toDisplay($0)) } ?? "")
   }
 
   private static func formatTarget(_ value: Double) -> String {
-    value == value.rounded() ? String(Int(value)) : String(value)
+    value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
   }
 
   /// A "between" band needs a parseable upper strictly above the lower bound —
@@ -448,7 +468,7 @@ struct EditGoalSheet: View {
                   #endif
                   .multilineTextAlignment(.trailing)
                   .frame(maxWidth: 80)
-                if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                if let unit = unitLabel(for: metricKey) {
                   Text(unit)
                     .foregroundStyle(.secondary)
                 }
@@ -463,7 +483,7 @@ struct EditGoalSheet: View {
                     #endif
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 80)
-                  if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                  if let unit = unitLabel(for: metricKey) {
                     Text(unit)
                       .foregroundStyle(.secondary)
                   }
@@ -483,7 +503,7 @@ struct EditGoalSheet: View {
                   #endif
                   .multilineTextAlignment(.trailing)
                   .frame(maxWidth: 80)
-                if let unit = GoalMetricCatalog.metric(for: metricKey)?.unitLabel {
+                if let unit = unitLabel(for: metricKey) {
                   Text(unit)
                     .foregroundStyle(.secondary)
                 }
@@ -522,7 +542,7 @@ struct EditGoalSheet: View {
                 Image(systemName: "flag.checkered")
                   .foregroundStyle(m.celebrated ? .primary : .secondary)
                 VStack(alignment: .leading, spacing: 2) {
-                  Text(m.label)
+                  Text(MilestoneUnits.label(m))
                   Text(m.occurredAt, style: .date)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -586,14 +606,22 @@ struct EditGoalSheet: View {
     let parsedBaseline = Double(metricBaselineText.replacingOccurrences(of: ",", with: "."))
     let parsedUpper = Double(metricUpperText.replacingOccurrences(of: ",", with: "."))
     let upperToStore = metricComparator == "range" ? parsedUpper : nil
-    if willTrack, let target = parsedTarget {
+    // Weight metrics are entered in the user's unit; store kg. Non-weight
+    // metrics (and all the gate/validation above, which is unit-agnostic since
+    // the comparisons are within one unit) pass through unchanged.
+    let isWeightMetric = GoalMetricCatalog.metric(for: metricKey)?.isWeight ?? false
+    let toKg: (Double?) -> Double? = { v in
+      guard let v else { return nil }
+      return isWeightMetric ? weightUnit.toKilograms(v) : v
+    }
+    if willTrack, let target = toKg(parsedTarget) {
       mutator.updateGoalMetric(id: goal.id,
                                metricKey: metricKey,
                                window: metricWindow,
                                comparator: metricComparator,
                                target: target,
-                               baseline: parsedBaseline,
-                               upper: upperToStore)
+                               baseline: toKg(parsedBaseline),
+                               upper: toKg(upperToStore))
     } else {
       mutator.updateGoalMetric(id: goal.id,
                                metricKey: nil,
@@ -607,13 +635,13 @@ struct EditGoalSheet: View {
     var updated = goal
     updated.text = clean
     updated.sections = sections
-    if willTrack, let target = parsedTarget {
+    if willTrack, let target = toKg(parsedTarget) {
       updated.metricKey = metricKey
       updated.metricWindow = metricWindow
       updated.metricComparator = metricComparator
       updated.metricTarget = target
-      updated.metricBaseline = parsedBaseline
-      updated.metricTargetUpper = upperToStore
+      updated.metricBaseline = toKg(parsedBaseline)
+      updated.metricTargetUpper = toKg(upperToStore)
     } else {
       updated.metricKey = nil
       updated.metricWindow = nil

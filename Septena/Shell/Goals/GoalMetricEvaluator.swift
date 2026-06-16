@@ -17,6 +17,13 @@ struct GoalMetric: Hashable, Identifiable {
   let unitLabel: String   // "sessions", "cups", "g", ...
 
   var id: String { key }
+
+  /// True when this metric's target / evaluated values are stored in
+  /// kilograms and should be *presented and entered* in the user's chosen
+  /// weight unit (`WeightUnit`). Only Body's weight/mass aims qualify
+  /// (`unitLabel == "kg"`); nutrition uses "g", training uses counts. The
+  /// stored value stays kg regardless — this only governs the UI boundary.
+  var isWeight: Bool { unitLabel == "kg" }
 }
 
 // MARK: - Catalog (registry-driven)
@@ -61,6 +68,11 @@ struct GoalMetricProgress {
   let target: Double
   let comparator: String  // "gte" | "lte" | "eq" | "range"
   let unitLabel: String
+  /// Whether `current` / `target` / `targetUpper` / `baseline` are kilogram
+  /// values that the UI should convert into the user's weight unit for
+  /// display (Body's weight/mass aims). The bar *fractions* are unit-free
+  /// ratios, so only the caption numbers + suffix change. Default `false`.
+  var isWeight: Bool = false
   /// Upper bound for a `range` goal (`target` is the lower bound). Nil for
   /// one-sided comparators. When present, the goal is a maintenance band and
   /// the UI renders a band-with-marker rather than a fill bar.
@@ -174,6 +186,7 @@ enum GoalMetricEvaluator {
                               target: target,
                               comparator: comparator,
                               unitLabel: metric.unitLabel,
+                              isWeight: metric.isWeight,
                               targetUpper: goal.metricTargetUpper,
                               baseline: goal.metricBaseline)
   }

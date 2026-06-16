@@ -8,6 +8,11 @@ struct GoalMetricProgressView: View {
   let progress: GoalMetricProgress
   let accent: Color
 
+  /// Reactive read of the weight-unit preference so the caption re-renders the
+  /// instant the user flips kg↔lb. Only consulted for weight metrics.
+  @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
+  private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 6) {
@@ -62,9 +67,15 @@ struct GoalMetricProgressView: View {
     .frame(height: 10)
   }
 
+  /// Unit suffix shown to the user — the weight preference for kg-stored body
+  /// metrics, the metric's own label otherwise.
+  private var unitLabel: String {
+    progress.isWeight ? weightUnit.suffix : progress.unitLabel
+  }
+
   private var caption: String {
     if progress.isRange, let upper = progress.targetUpper {
-      return "\(formatted(progress.current)) · \(formatted(progress.target))–\(formatted(upper)) \(progress.unitLabel)"
+      return "\(formatted(progress.current)) · \(formatted(progress.target))–\(formatted(upper)) \(unitLabel)"
     }
     let comparator: String
     switch progress.comparator {
@@ -72,7 +83,7 @@ struct GoalMetricProgressView: View {
     case "eq":  comparator = "="
     default:    comparator = "≥"
     }
-    let base = "\(formatted(progress.current)) / \(comparator) \(formatted(progress.target)) \(progress.unitLabel)"
+    let base = "\(formatted(progress.current)) / \(comparator) \(formatted(progress.target)) \(unitLabel)"
     // Surface the baseline so users see what reference point the bar
     // is measuring from. Only shown for baseline-aware progress to
     // avoid noise on count/sum goals.
@@ -83,7 +94,11 @@ struct GoalMetricProgressView: View {
     return base
   }
 
+  /// Format a stored value for display, converting kg → the user's weight unit
+  /// first when this is a weight metric. Whole numbers print without decimals;
+  /// converted (fractional) values round to one decimal.
   private func formatted(_ v: Double) -> String {
-    v == v.rounded() ? String(Int(v)) : String(format: "%.1f", v)
+    let shown = progress.isWeight ? weightUnit.display(v) : v
+    return shown == shown.rounded() ? String(Int(shown)) : String(format: "%.1f", shown)
   }
 }

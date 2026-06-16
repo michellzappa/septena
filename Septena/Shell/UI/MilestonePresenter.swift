@@ -26,7 +26,7 @@ enum MilestonePresenter {
     let top = pending.max { tier($0) < tier($1) } ?? pending[0]
     logCommit.fire(style(for: top, theme: theme))
     Haptics.success()
-    A11y.announce(top.label)
+    A11y.announce(MilestoneUnits.label(top))
     milestones.markPresented(ids: pending.map(\.id), at: now)
   }
 
@@ -38,9 +38,11 @@ enum MilestonePresenter {
     case "streak":
       return .ignition(accent: accent, streak: Int(m.value))
     case "pr":
-      return .milestone(accent: accent, headline: trim(m.value), caption: caption(for: m))
+      return .milestone(accent: accent, headline: MilestoneUnits.headline(m),
+                        caption: caption(for: m))
     case "rung" where m.rungKey == "target" || m.rungKey == "held30":
-      return .milestone(accent: accent, headline: trim(m.value), caption: caption(for: m))
+      return .milestone(accent: accent, headline: MilestoneUnits.headline(m),
+                        caption: caption(for: m))
     default:
       // Intermediate rungs / XP — acknowledged, not interrupted.
       return .flourish(motion: .burst, accent: accent, intensity: 1.2)
