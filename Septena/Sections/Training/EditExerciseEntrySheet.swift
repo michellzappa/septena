@@ -52,7 +52,7 @@ struct EditExerciseEntrySheet: View {
         if isCardio {
           Section("Cardio") {
             numberRow("Duration (min)", text: $durationMin)
-            numberRow("Distance (m)", text: $distanceM)
+            numberRow("Distance (\(DistanceUnit.current.inputSuffix))", text: $distanceM)
             numberRow("Level", text: $level)
           }
         } else {
@@ -101,7 +101,8 @@ struct EditExerciseEntrySheet: View {
     // segmented picker selects a real tag; saving then rewrites it canonical.
     difficulty = TrainingEffort.canonicalKey(original.difficulty) ?? ""
     durationMin = original.durationMin.map(numString) ?? ""
-    distanceM = original.distanceM.map(numString) ?? ""
+    // Stored in meters; show in the user's distance input unit (m or mi).
+    distanceM = original.distanceM.map { numString(DistanceUnit.current.inputFromMeters($0)) } ?? ""
     level = original.level.map(numString) ?? ""
   }
 
@@ -126,6 +127,11 @@ struct EditExerciseEntrySheet: View {
     return t.isEmpty ? nil : Int(t)
   }
 
+  /// The typed distance parsed back into meters (the field shows m or mi).
+  private func parseDistanceMeters() -> Double? {
+    parseDouble(distanceM).map { DistanceUnit.current.metersFromInput($0) }
+  }
+
   private func save() {
     guard let id = original.file else { return }
     let noteTrim = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -140,7 +146,7 @@ struct EditExerciseEntrySheet: View {
         reps: .some(nil),
         difficulty: .some(nil),
         durationMin: .some(parseDouble(durationMin)),
-        distanceM: .some(parseInt(distanceM).map(Double.init)),
+        distanceM: .some(parseDistanceMeters()),
         level: .some(parseInt(level).map(Double.init)),
         note: .some(noteTrim.isEmpty ? nil : noteTrim)
       )
@@ -171,7 +177,7 @@ struct EditExerciseEntrySheet: View {
       reps: isCardio ? nil : (repsStr.isEmpty ? nil : repsStr),
       difficulty: isCardio ? nil : (difficulty.isEmpty ? nil : difficulty),
       durationMin: isCardio ? parseDouble(durationMin) : nil,
-      distanceM: isCardio ? parseInt(distanceM).map(Double.init) : nil,
+      distanceM: isCardio ? parseDistanceMeters() : nil,
       level: isCardio ? parseInt(level).map(Double.init) : nil,
       file: id,
       concludedAt: original.concludedAt,

@@ -163,7 +163,6 @@ struct TrainingDestinationView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   log: {
-      trainingSummary
       if isViewingToday {
         // Active draft + the rolling session list. Older sessions live
         // behind the time-travel control, not dumped inline; the trend
@@ -405,19 +404,6 @@ struct TrainingDestinationView: View {
     ResponseCache.save(r.cardio, forKey: CacheKey.cardio)
     loading = false
     applyEmptyStateNudgeIfNeeded()
-  }
-
-  /// Top-of-Log day readout — exercises + total sets for the viewed day.
-  @ViewBuilder
-  private var trainingSummary: some View {
-    let blocks = viewingSessions
-    if !blocks.isEmpty {
-      let sets = blocks.reduce(0) { $0 + $1.entries.count }
-      DrawerSummary(stats: [
-        Stat(value: "\(blocks.count)", label: "exercises", tint: accent),
-        Stat(value: "\(sets)", label: "sets", tint: accent),
-      ])
-    }
   }
 
   /// Training's "empty" is "no session logged today" — for a chart-forward
@@ -1419,9 +1405,7 @@ struct TrainingDestinationView: View {
   }
 
   private func formatDistance(_ m: Double) -> String {
-    m >= 1000
-      ? "\((m / 1000).decimalString(1)) km"
-      : "\(Int(m)) m"
+    DistanceUnit.current.format(meters: m)
   }
 
   private func timeOnly(_ ts: String) -> String {
@@ -2427,10 +2411,9 @@ struct EditingExercise: Identifiable, Equatable {
 /// One exercise as a tappable pill in the active session list. Shows the
 /// status, name, a PR flag, and the planned (or logged) numbers so the whole
 /// session is scannable without drilling in. Tapping opens the focused editor
-/// drawer; the ⋯ menu still handles switch / skip / move / remove in place so
-/// the "machine's taken" cases don't require opening the editor first.
+/// drawer, which owns the per-exercise actions (switch / skip / move / remove /
+/// note) in its ⋯ menu.
 struct TrainingExerciseRow: View {
-  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.modelContext) private var modelContext
 
@@ -2440,11 +2423,10 @@ struct TrainingExerciseRow: View {
   /// Drill into this exercise's editor drawer.
   var onTap: () -> Void
 
-  /// Presents the catalog picker to swap this slot's exercise.
-  @State private var showSwitch = false
-  /// Confirms removing an already-logged entry — deleting it discards the
-  /// saved record, so we ask first. Pending/skipped rows skip the prompt.
-  @State private var showRemoveConfirm = false
+  /// The same trailing-90-day progress series the editor drawer charts, shown
+  /// here as a tiny trailing sparkline so the trend reads without drilling in.
+  /// Loaded lazily on appear (one query per row) and only drawn at 2+ points.
+  @State private var spark: TrainingProgressSeries? = nil
 
   var body: some View {
     header
@@ -2457,50 +2439,7 @@ struct TrainingExerciseRow: View {
       .opacity(opacityFor(entry.status))
       .contentShape(Rectangle())
       .onTapGesture { onTap() }
-      .sheet(isPresented: $showSwitch) {
-        ExercisePickerSheet(
-          selectionMode: .single,
-          disabledNames: otherSessionNames,
-          alternativesTo: entry.exercise,
-          onPick: { def in
-            store.switchExercise(at: index, to: def.name, context: modelContext)
-            Haptics.tick()
-          }
-        )
-      }
-      .confirmationDialog(
-        "Remove \(displayName(entry.exercise))?",
-        isPresented: $showRemoveConfirm,
-        titleVisibility: .visible
-      ) {
-        Button("Remove and delete log", role: .destructive) { removeThisEntry() }
-        Button("Cancel", role: .cancel) {}
-      } message: {
-        Text("This exercise is already logged. Removing it deletes the saved entry.")
-      }
-  }
-
-  /// Drop this card from the session (and delete its saved record if it was
-  /// logged).
-  private func removeThisEntry() {
-    store.removeEntry(at: index, mutator: trainingMutator)
-    Haptics.tick()
-  }
-
-  /// True when this slot is already the last entry in the session — no point
-  /// offering "Move to end".
-  private var isLastEntry: Bool {
-    guard let entries = store.draft?.entries else { return true }
-    return index == entries.count - 1
-  }
-
-  /// Exercise names in the session other than this slot's — disabled in the
-  /// switch picker so a swap can't create a duplicate entry.
-  private var otherSessionNames: Set<String> {
-    guard let entries = store.draft?.entries else { return [] }
-    return Set(entries.enumerated()
-      .filter { $0.offset != index }
-      .map { $0.element.exercise })
+      .task(id: entry.exercise) { loadSpark() }
   }
 
   // MARK: Header
@@ -2526,66 +2465,37 @@ struct TrainingExerciseRow: View {
             .foregroundStyle(Theme.inkSecondary)
         }
       }
-      Spacer()
-      // ⋯ menu — switch this slot for a different exercise, skip/move it, or
-      // drop it. Lives on the row so it's reachable without drilling in (the
-      // "machine's taken" case). The Menu consumes its own taps, so it doesn't
-      // fire the row's drill-in gesture.
-      Menu {
-        Button {
-          showSwitch = true
-        } label: {
-          Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
-        }
-        if entry.status == .skipped {
-          Button {
-            store.unskip(index: index)
-            Haptics.tick()
-          } label: {
-            Label("Unskip", systemImage: "arrow.uturn.left")
-          }
-        } else if entry.status != .done && entry.status != .saving {
-          Button {
-            store.markSkipped(index: index)
-            Haptics.tick()
-          } label: {
-            Label("Skip", systemImage: "forward.end")
-          }
-        }
-        if entry.status != .done && entry.status != .saving && !isLastEntry {
-          Button {
-            store.moveToEnd(at: index)
-            Haptics.tick()
-          } label: {
-            Label("Move to end", systemImage: "arrow.down.to.line")
-          }
-        }
-        if entry.status != .saving {
-          Divider()
-          Button(role: .destructive) {
-            if entry.status == .done {
-              showRemoveConfirm = true
-            } else {
-              removeThisEntry()
-            }
-          } label: {
-            Label("Remove", systemImage: "trash")
-          }
-        }
-      } label: {
-        Image(systemName: "ellipsis")
-          .scaledFont(size: 15, weight: .semibold)
-          .foregroundStyle(Theme.inkSecondary)
-          .frame(width: 30, height: 30)
-          .contentShape(Rectangle())
+      Spacer(minLength: 8)
+      // A glance at this exercise's recent trajectory — the same 90-day series
+      // the editor drawer charts, stripped to a bare trend line.
+      if let s = spark, s.points.count >= 2 {
+        // Same footprint and treatment as the dashboard tile sparkline (84×28).
+        TrainingProgressChart(series: s, accent: accent, height: 28,
+                              weightFactor: WeightUnit.current.displayFactor,
+                              sparkline: true)
+          .frame(width: 84)
+          .opacity(entry.status == .skipped ? 0.4 : 0.9)
+          .accessibilityHidden(true)
       }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Exercise options")
-      // Drill-in affordance.
+      // Drill-in affordance — per-exercise actions (switch / skip / note / …)
+      // now live in the drawer's ⋯ menu once you open it.
       Image(systemName: "chevron.right")
         .scaledFont(size: 12, weight: .semibold)
         .foregroundStyle(Theme.inkSecondary)
     }
+  }
+
+  /// Which progression number to sparkline, from the entry's shape — matches
+  /// the editor drawer's `progressMetric` so the row and drawer agree.
+  private var progressMetric: TrainingProgressMetric {
+    if entry.isMobility { return .duration }
+    if entry.isCardio   { return .pace }
+    return .oneRepMax
+  }
+
+  private func loadSpark() {
+    spark = TrainingMetrics.progressSeries(
+      for: entry.exercise, metric: progressMetric, in: modelContext)
   }
 
   @ViewBuilder
@@ -2644,7 +2554,7 @@ struct TrainingExerciseRow: View {
     } else if entry.isCardio {
       if let d = entry.durationMin, d > 0 { parts.append("\(Int(d)) min") }
       if let m = entry.distanceM, m > 0 {
-        parts.append(m >= 1000 ? "\((m / 1000).decimalString(1)) km" : "\(Int(m)) m")
+        parts.append(DistanceUnit.current.format(meters: m))
       }
       if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
     } else {
@@ -2674,10 +2584,22 @@ struct TrainingExerciseRow: View {
 /// draft edits without logging.
 struct TrainingExerciseEditor: View {
   @Environment(TrainingDraftStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
 
   let exercise: String
   let accent: Color
   @Binding var selection: EditingExercise?
+
+  private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+
+  /// Catalog picker to swap this slot's exercise.
+  @State private var showSwitch = false
+  /// Confirm before removing an already-logged entry (deletes the saved record).
+  @State private var showRemoveConfirm = false
+  /// Note editor sheet + its working text (note lives behind the ⋯ menu, not
+  /// always-on, since most sets don't carry one).
+  @State private var showNote = false
+  @State private var noteDraft = ""
 
   private var index: Int? { store.draft?.entries.firstIndex { $0.exercise == exercise } }
   private var entry: DraftEntry? { index.flatMap { store.draft?.entries[$0] } }
@@ -2688,7 +2610,8 @@ struct TrainingExerciseEditor: View {
       cancelTitle: "Close",
       showsSave: false,
       accent: accent,
-      onSave: {}
+      onSave: {},
+      trailing: AnyView(contextMenu)
     ) {
       Group {
         if let index, let entry {
@@ -2711,6 +2634,140 @@ struct TrainingExerciseEditor: View {
     // Grabber on the iPhone sheet so it reads as swipe-to-dismiss; ignored by
     // the iPad/Mac docked inspector.
     .presentationDragIndicator(.visible)
+    .sheet(isPresented: $showSwitch) {
+      ExercisePickerSheet(
+        selectionMode: .single,
+        disabledNames: otherSessionNames,
+        alternativesTo: exercise,
+        onPick: { def in
+          guard let index else { return }
+          store.switchExercise(at: index, to: def.name, context: modelContext)
+          // Re-point the drawer at the swapped-in exercise (selection keys by name).
+          selection = EditingExercise(exercise: def.name)
+          Haptics.tick()
+        }
+      )
+    }
+    .sheet(isPresented: $showNote) { noteEditor }
+    .confirmationDialog(
+      "Remove \(displayName(exercise))?",
+      isPresented: $showRemoveConfirm,
+      titleVisibility: .visible
+    ) {
+      Button("Remove and delete log", role: .destructive) { removeThisEntry() }
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("This exercise is already logged. Removing it deletes the saved entry.")
+    }
+  }
+
+  // MARK: Contextual ⋯ menu
+
+  /// Per-exercise actions, top-right of the drawer: add/edit note, switch the
+  /// exercise, skip / move / remove. (Mirrors what used to live on the row,
+  /// now that the row is a plain drill-in summary.)
+  @ViewBuilder
+  private var contextMenu: some View {
+    Menu {
+      Button {
+        noteDraft = entry?.note ?? ""
+        showNote = true
+      } label: {
+        Label((entry?.note.isEmpty == false) ? "Edit note" : "Add note",
+              systemImage: "note.text")
+      }
+      Button { showSwitch = true } label: {
+        Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
+      }
+      if let st = entry?.status {
+        if st == .skipped {
+          Button { if let index { store.unskip(index: index); Haptics.tick() } } label: {
+            Label("Unskip", systemImage: "arrow.uturn.left")
+          }
+        } else if st != .done && st != .saving {
+          Button {
+            if let index { store.markSkipped(index: index) }
+            selection = nil
+            Haptics.tick()
+          } label: {
+            Label("Skip", systemImage: "forward.end")
+          }
+        }
+        if st != .done && st != .saving && !isLastEntry {
+          Button {
+            if let index { store.moveToEnd(at: index) }
+            selection = nil
+            Haptics.tick()
+          } label: {
+            Label("Move to end", systemImage: "arrow.down.to.line")
+          }
+        }
+        if st != .saving {
+          Divider()
+          Button(role: .destructive) {
+            if st == .done { showRemoveConfirm = true } else { removeThisEntry() }
+          } label: {
+            Label("Remove", systemImage: "trash")
+          }
+        }
+      }
+    } label: {
+      Image(systemName: "ellipsis")
+        .accessibilityLabel("Exercise options")
+    }
+    .tint(accent)
+  }
+
+  // MARK: Note editor
+
+  private var noteEditor: some View {
+    NavigationStack {
+      Form {
+        TextField("Note", text: $noteDraft, axis: .vertical)
+          .lineLimit(3...8)
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Note")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { showNote = false }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") {
+            if let index { store.update { $0.entries[index].note = noteDraft } }
+            showNote = false
+          }
+          .tint(accent)
+        }
+      }
+    }
+    #if os(iOS)
+    .presentationDetents([.medium])
+    .presentationDragIndicator(.visible)
+    #else
+    .frame(width: 440, height: 300)
+    #endif
+  }
+
+  private func removeThisEntry() {
+    if let index { store.removeEntry(at: index, mutator: trainingMutator) }
+    selection = nil
+    Haptics.tick()
+  }
+
+  private var isLastEntry: Bool {
+    guard let entries = store.draft?.entries, let index else { return true }
+    return index == entries.count - 1
+  }
+
+  private var otherSessionNames: Set<String> {
+    guard let entries = store.draft?.entries else { return [] }
+    return Set(entries.enumerated()
+      .filter { $0.offset != index }
+      .map { $0.element.exercise })
   }
 
   /// After logging: a fresh completion advances to the next still-pending
@@ -2795,41 +2852,42 @@ struct TrainingExerciseEditorBody: View {
               strengthInputs
               difficultyPicker
             }
-            noteField
           }
         }
-        // Primary action, full-width accent-outlined footer. Logs this set;
-        // Skip lives in the row's ⋯ menu, so the footer is just "save this".
-        Button {
-          let wasDone = (entry.status == .done)
-          store.markDone(index: index, mutator: trainingMutator)
-          // Confirm only on first completion, not re-saves of an already-done
-          // entry. Success haptic — a set is a step, not a moment; the
-          // session-complete sheet owns the celebration.
-          if !wasDone {
-            Haptics.success()
+        // Primary action — solid accent, centered, ~two-thirds width. Logs this
+        // set; contextual actions live in the drawer's ⋯ menu. Spacers center
+        // the 66%-wide button within the full content width.
+        HStack(spacing: 0) {
+          Spacer(minLength: 0)
+          Button {
+            let wasDone = (entry.status == .done)
+            store.markDone(index: index, mutator: trainingMutator)
+            // Confirm only on first completion, not re-saves of an already-done
+            // entry. Success haptic — a set is a step, not a moment; the
+            // session-complete sheet owns the celebration.
+            if !wasDone {
+              Haptics.success()
+            }
+            // A first completion advances to the next pending exercise; a
+            // re-save closes. Retrying a failed save leaves the editor open.
+            if entry.status != .failed {
+              onLogged(wasDone)
+            }
+          } label: {
+            Text(entry.status == .failed ? "Retry"
+                 : entry.status == .done ? "Update" : "Save")
+              .font(.headline)
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 14)
+              .contentShape(Rectangle())
           }
-          // A first completion advances to the next pending exercise; a
-          // re-save closes. Retrying a failed save leaves the editor open.
-          if entry.status != .failed {
-            onLogged(wasDone)
-          }
-        } label: {
-          Text(entry.status == .failed ? "Retry"
-               : entry.status == .done ? "Update" : "Save")
-            .font(.headline)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .contentShape(Rectangle())
+          .buttonStyle(.borderedProminent)
+          .tint(accent)
+          .disabled(entry.status == .saving)
+          .containerRelativeFrame(.horizontal) { length, _ in length * 0.66 }
+          Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(accent)
-        .background(
-          RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-            .stroke(accent, lineWidth: 1.5)
-        )
-        .opacity(entry.status == .saving ? 0.5 : 1)
-        .disabled(entry.status == .saving)
+        .frame(maxWidth: .infinity)
         .padding(.top, 4)
       }
       .padding(20)
@@ -2893,30 +2951,6 @@ struct TrainingExerciseEditorBody: View {
     }
   }
 
-  /// Optional free-text note for this set — rides the existing `DraftEntry.note`
-  /// straight through `markDone` to the saved record.
-  private var noteField: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("NOTE")
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-      TextField("Optional", text: Binding(
-        get: { entry.note },
-        set: { setNote($0) }
-      ), axis: .vertical)
-        .textFieldStyle(.plain)
-        .font(.callout)
-        .lineLimit(1...4)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(Theme.cardSurface,
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-        )
-    }
-  }
 
   // MARK: - Progression hints
 
@@ -3029,7 +3063,7 @@ struct TrainingExerciseEditorBody: View {
       parts.append("\(Int(d))m")
     }
     if let m = r.distanceM, m > 0 {
-      parts.append(m >= 1000 ? "\((m/1000).decimalString(1))km" : "\(Int(m))m")
+      parts.append(DistanceUnit.current.format(meters: m))
     }
     if let l = r.level, l > 0 {
       parts.append("L\(fmt(l))")
@@ -3062,9 +3096,10 @@ struct TrainingExerciseEditorBody: View {
   private var strengthInputs: some View {
     VStack(spacing: 18) {
       // Field shows / steps in the user's unit; `setWeight` converts back to
-      // the kg the model stores. Step by a natural increment per unit.
+      // the kg the model stores. Step by the equipment's natural cadence
+      // (barbell 2.5/5, machine 5/10, …), inferred from the exercise name.
       steppedField(label: "Weight (\(WeightUnit.current.suffix))",
-                   step: WeightUnit.current == .kg ? 2.5 : 5,
+                   step: WeightCadence.resolve(forExercise: entry.exercise).step(WeightUnit.current),
                    value: Binding(
                      get: { entry.weight.map { fmt(WeightUnit.current.display($0)) } ?? "" },
                      set: { setWeight($0) }
@@ -3110,17 +3145,13 @@ struct TrainingExerciseEditorBody: View {
           }
           .frame(maxWidth: .infinity)
           .padding(.vertical, 10)
+          // Same treatment as the +/- steppers: accent-tinted fill, no stroke;
+          // the selected rung fills solid accent with white text.
           .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              // White (elevated) against the gray panel when unselected.
-              .fill(isSelected ? accent : Theme.cardSurface)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+              .fill(isSelected ? accent : accent.opacity(0.14))
           )
-          .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .stroke(isSelected ? Color.clear : accent.opacity(0.55),
-                      lineWidth: 1.5)
-          )
-          .foregroundStyle(isSelected ? Color.white : Theme.inkPrimary)
+          .foregroundStyle(isSelected ? Color.white : accent)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(rung.label)
@@ -3157,9 +3188,10 @@ struct TrainingExerciseEditorBody: View {
                      }
                    ))
       HStack(spacing: 8) {
-        steppedField(label: "Meters", step: 50, buttonWidth: 40,
+        steppedField(label: DistanceUnit.current == .mi ? "Miles" : "Meters",
+                     step: DistanceUnit.current == .mi ? 0.1 : 50, buttonWidth: 40,
                      value: Binding(
-                       get: { entry.distanceM.map { fmt($0) } ?? "" },
+                       get: { entry.distanceM.map { fmt(DistanceUnit.current.inputFromMeters($0)) } ?? "" },
                        set: { setDistance($0) }
                      ))
         steppedField(label: "Level", step: 1, buttonWidth: 40,
@@ -3272,13 +3304,12 @@ struct TrainingExerciseEditorBody: View {
     store.update { $0.entries[index].durationMin = Double(s.replacingOccurrences(of: ",", with: ".")) }
   }
   private func setDistance(_ s: String) {
-    store.update { $0.entries[index].distanceM = Double(s.replacingOccurrences(of: ",", with: ".")) }
+    // Field is in m or mi; store meters.
+    let v = Double(s.replacingOccurrences(of: ",", with: "."))
+    store.update { $0.entries[index].distanceM = v.map { DistanceUnit.current.metersFromInput($0) } }
   }
   private func setLevel(_ s: String) {
     store.update { $0.entries[index].level = Double(s.replacingOccurrences(of: ",", with: ".")) }
-  }
-  private func setNote(_ s: String) {
-    store.update { $0.entries[index].note = s }
   }
 
   #if os(iOS)
@@ -3308,42 +3339,61 @@ struct TrainingProgressChart: View {
   /// line plots in the user's chosen weight unit. 1 = kg; pass
   /// `WeightUnit.current.displayFactor`. Non-weight metrics ignore it.
   var weightFactor: Double = 1
+  /// Strip the chart down to a bare trend line — no axes, dots, or rules — for
+  /// the in-session exercise rows, where it sits as a tiny trailing glance.
+  var sparkline: Bool = false
 
   private var scale: Double {
     switch series.metric {
-    case .pace:      return 0.06        // m/min → km/h
+    case .pace:      return DistanceUnit.current.speed(1)   // m/min → km/h or mi/h
     case .oneRepMax: return weightFactor
     case .duration:  return 1.0
     }
   }
 
-  /// Dates whose value beat every earlier day in the window — the days a
-  /// new high-water mark (PR) was set. The first point is never a PR (no
-  /// prior to beat). All three metrics are higher-is-better, so a single
-  /// running-max rule covers strength, cardio speed, and mobility length.
-  private var prDates: Set<Date> {
-    var best = -Double.greatestFiniteMagnitude
-    var out: Set<Date> = []
-    for (i, p) in series.points.enumerated() {
-      if i > 0, p.value > best { out.insert(p.date) }
-      best = max(best, p.value)
+  /// Y range padded a little beyond the data's own min/max — so the line uses
+  /// the full height and the trend reads, instead of being squashed against a
+  /// zero baseline. Falls back to a small band when the values are flat.
+  private var yDomain: ClosedRange<Double> {
+    let vals = series.points.map { $0.value * scale }
+    guard let lo = vals.min(), let hi = vals.max() else { return 0...1 }
+    if lo == hi {
+      let pad = max(abs(lo) * 0.1, 1)
+      return (lo - pad)...(hi + pad)
     }
-    return out
+    let pad = (hi - lo) * 0.15
+    return (lo - pad)...(hi + pad)
   }
 
   var body: some View {
     Chart {
+      // Shaded area under the line — matches the dashboard tile sparkline
+      // (`DomainSparkline`, accent at 22%). Floors at the visible band's bottom
+      // so the autoscaled trend fills the plot rather than hugging zero.
+      if sparkline {
+        ForEach(series.points, id: \.date) { p in
+          AreaMark(x: .value("Date", p.date),
+                   yStart: .value("Floor", yDomain.lowerBound),
+                   yEnd: .value("Value", p.value * scale))
+            .interpolationMethod(.monotone)
+            .foregroundStyle(accent.opacity(0.22))
+        }
+      }
       ForEach(series.points, id: \.date) { p in
         LineMark(x: .value("Date", p.date), y: .value("Value", p.value * scale))
           .interpolationMethod(.monotone)
+          .lineStyle(StrokeStyle(lineWidth: sparkline ? 1.5 : 2,
+                                 lineCap: .round, lineJoin: .round))
           .foregroundStyle(accent)
       }
-      ForEach(series.points, id: \.date) { p in
-        PointMark(x: .value("Date", p.date), y: .value("Value", p.value * scale))
-          .foregroundStyle(accent)
-          .symbolSize(prDates.contains(p.date) ? 70 : 14)
+      if !sparkline {
+        ForEach(series.points, id: \.date) { p in
+          PointMark(x: .value("Date", p.date), y: .value("Value", p.value * scale))
+            .foregroundStyle(accent)
+            .symbolSize(14)
+        }
       }
-      if series.metric == .pace, let avg = series.average {
+      if series.metric == .pace, let avg = series.average, !sparkline {
         RuleMark(y: .value("Average", avg * scale))
           .foregroundStyle(accent.opacity(0.5))
           .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -3353,28 +3403,37 @@ struct TrainingProgressChart: View {
           }
       }
     }
+    .chartYScale(domain: yDomain)
+    .chartPlotStyle { plot in
+      // A sparkline is just the line — no plot border, axes, or grid chrome.
+      sparkline ? AnyView(plot.padding(.vertical, 2)) : AnyView(plot)
+    }
     .chartYAxis {
-      AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
-        AxisValueLabel {
-          if let d = v.as(Double.self) {
-            Text(d.truncatingRemainder(dividingBy: 1) == 0
-                 ? String(Int(d)) : d.decimalString()).font(.caption2)
+      if !sparkline {
+        AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
+          AxisValueLabel {
+            if let d = v.as(Double.self) {
+              Text(d.truncatingRemainder(dividingBy: 1) == 0
+                   ? String(Int(d)) : d.decimalString()).font(.caption2)
+            }
           }
+          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
         }
-        AxisGridLine().foregroundStyle(Color.secondary.opacity(0.1))
       }
     }
     .chartXAxis {
-      // Weekly vertical gridlines (no labels) for cadence.
-      if weeklyGrid {
-        AxisMarks(values: .stride(by: .day, count: 7)) { _ in
-          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
+      if !sparkline {
+        // Weekly vertical gridlines (no labels) for cadence.
+        if weeklyGrid {
+          AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+            AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
+          }
         }
-      }
-      AxisMarks(values: .automatic(desiredCount: 3)) { v in
-        AxisValueLabel {
-          if let d = v.as(Date.self) {
-            Text(d, format: .dateTime.month(.abbreviated).day()).font(.caption2)
+        AxisMarks(values: .automatic(desiredCount: 3)) { v in
+          AxisValueLabel {
+            if let d = v.as(Date.self) {
+              Text(d, format: .dateTime.month(.abbreviated).day()).font(.caption2)
+            }
           }
         }
       }
@@ -3395,9 +3454,10 @@ enum TrainingProgressFormat {
     }
   }
 
-  /// m/min → "12.4 km/h" (matches what cardio machines show).
+  /// m/min → "12.4 km/h" / "7.7 mi/h" (matches what cardio machines show).
   static func pace(_ mPerMin: Double) -> String {
-    "\((mPerMin * 0.06).decimalString(1)) km/h"
+    let u = DistanceUnit.current
+    return "\(u.speed(mPerMin).decimalString(1)) \(u.speedSuffix)"
   }
 
   /// Trend over the window: first point → last point. `steady` when the
@@ -3416,7 +3476,9 @@ enum TrainingProgressFormat {
       let u = WeightUnit.current
       let d = abs(delta) * u.displayFactor
       mag = "\(d.decimalString(d < 10 ? 1 : 0)) \(u.suffix)"
-    case .pace:      mag = "\((abs(delta) * 0.06).decimalString(1)) km/h"
+    case .pace:
+      let u = DistanceUnit.current
+      mag = "\(u.speed(abs(delta)).decimalString(1)) \(u.speedSuffix)"
     case .duration:  mag = "\(Int(abs(delta).rounded())) min"
     }
     // "+0 kg" reads as noise; collapse a rounding-zero delta to "steady".
