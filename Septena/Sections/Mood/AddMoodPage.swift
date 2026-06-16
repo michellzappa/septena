@@ -188,7 +188,12 @@ struct AddMoodPage: View {
                    Haptics.tick()
                    // The header updates to "I'm feeling X" visually; mirror
                    // that for VoiceOver, which can't perceive the pop-in.
-                   A11y.announce("\(picked.displayWord). Log to save.")
+                   A11y.announce("\(picked.displayWord). Tap again to log.")
+                 },
+                 onCommitEmotion: { picked in
+                   // Second tap on the already-selected chip → log it.
+                   emotion = picked
+                   save()
                  })
         .frame(width: geo.size.width, height: geo.size.height)
     }
@@ -300,6 +305,9 @@ private struct MoodCanvas: View {
   let selectedEmotion: MoodEmotion?
   let onPickQuadrant: (MoodQuadrant) -> Void
   let onPickEmotion: (MoodEmotion) -> Void
+  /// Fired when the user taps an emotion that's already selected — the
+  /// second tap commits the check-in without a trip to the Log button.
+  let onCommitEmotion: (MoodEmotion) -> Void
 
   private static let quadrants: [MoodQuadrant] = [.han, .hap, .lan, .lap]
 
@@ -369,9 +377,12 @@ private struct MoodCanvas: View {
     if let q = quadrant {
       VStack(alignment: .leading, spacing: 0) {
         ForEach(MoodCatalog.grid(for: q)) { emotion in
-          Button { onPickEmotion(emotion) } label: { Text(emotion.displayWord) }
+          Button {
+            if emotion == selectedEmotion { onCommitEmotion(emotion) }
+            else { onPickEmotion(emotion) }
+          } label: { Text(emotion.displayWord) }
             .accessibilityLabel(emotion.displayWord)
-            .accessibilityHint("Feeling in \(q.title). Then Log to save.")
+            .accessibilityHint("Feeling in \(q.title). Tap again to log.")
             .accessibilityAddTraits(emotion == selectedEmotion ? .isSelected : [])
         }
       }
@@ -439,8 +450,13 @@ private struct MoodCanvas: View {
         hoveredEmotion = nil
 
         if let h = releasedHover {
-          // Held + dragged onto an emotion → commit that emotion.
-          onPickEmotion(h)
+          // Tapping the already-selected chip a second time logs it;
+          // otherwise this tap (or a drag-release) just selects it.
+          if h == selectedEmotion {
+            onCommitEmotion(h)
+          } else {
+            onPickEmotion(h)
+          }
         } else if quadrant == nil,
                   let q = releasedQuadrant,
                   elapsed < Self.holdThreshold {
