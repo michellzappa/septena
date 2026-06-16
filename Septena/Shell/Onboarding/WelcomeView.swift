@@ -98,6 +98,10 @@ struct WelcomeView: View {
   @State private var chainTotal = 0
   /// The onboarding step currently on screen (drives the chained sheet).
   @State private var currentStep: OnboardingStep?
+  /// The final "Set your starting targets" step, presented once the per-section
+  /// chain drains (only when the picked sections suggest any goals).
+  @State private var showTargets = false
+  @State private var targetSuggestions: [SuggestedGoal] = []
 
   /// `.sheet(item:)` needs an Identifiable; a bare key string isn't.
   private struct OnboardingStep: Identifiable { let id: String }
@@ -159,6 +163,14 @@ struct WelcomeView: View {
           // calls `complete()` → `advance()`. Block swipe-to-dismiss so a
           // stray drag can't strand the chain (cover up, nothing presented).
           .interactiveDismissDisabled()
+      }
+      .sheet(isPresented: $showTargets) {
+        OnboardingTargetsView(suggestions: targetSuggestions) {
+          showTargets = false
+          finish()
+        }
+        .macSheetFrame()
+        .interactiveDismissDisabled()
       }
     }
   }
@@ -303,7 +315,7 @@ struct WelcomeView: View {
     if let first = onboardingQueue.first {
       currentStep = OnboardingStep(id: first)
     } else {
-      finish()
+      proceedToTargetsOrFinish()
     }
   }
 
@@ -315,8 +327,17 @@ struct WelcomeView: View {
       currentStep = OnboardingStep(id: next)
     } else {
       currentStep = nil
-      finish()
+      proceedToTargetsOrFinish()
     }
+  }
+
+  /// Once the per-section chain drains, offer the consolidated targets step if
+  /// the picked sections suggest any goals; otherwise complete straight away.
+  private func proceedToTargetsOrFinish() {
+    let suggestions = SuggestedGoal.all(forSections: selected, context: modelContext)
+    guard !suggestions.isEmpty else { finish(); return }
+    targetSuggestions = suggestions
+    showTargets = true
   }
 
   /// "Skip all" from a chained sheet: abandon the remaining intros and finish.

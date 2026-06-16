@@ -89,6 +89,14 @@ protocol SectionPlugin {
   /// the metric's key string.
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double?
 
+  /// Recommended starter goals this section offers a brand-new user — shown in
+  /// the first-run "Set your starting targets" step and seeded for existing
+  /// users by the section's target migration. Each is a metric-bound `Goal`
+  /// proposal; the `recommended` ones start pre-checked. Default `[]` (no
+  /// suggestions). Keep the numbers genuinely sensible defaults — they become
+  /// real, editable goals.
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal]
+
   /// How a *new* log in this section celebrates — the affect axis,
   /// declared here so the commit feel is manifest-driven (one place per
   /// section). `SectionLog.newLog` reads this. `nil` = no flourish
@@ -355,6 +363,9 @@ extension SectionPlugin {
   /// Default: no evaluator. Pairs with the empty default `aimMetrics`.
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? { nil }
 
+  /// Default: no suggested starter goals. Sections opt in by returning a few.
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] { [] }
+
   /// Default: no commit flourish. Sections opt in by declaring a
   /// `LogFlourish` and routing their writes through `SectionLog`.
   static var logFlourish: LogFlourish? { nil }
@@ -433,6 +444,15 @@ enum SectionRegistry {
     let manifestMissingPlugin = manifestKeys.subtracting(pluginKeys)
     assert(manifestMissingPlugin.isEmpty,
            "SectionManifest rows with no SectionRegistry plugin (will never render behavior): \(manifestMissingPlugin.sorted())")
+
+    // `HomepageDomain` (the dashboard-tile enum) and `supportsDashboard` are
+    // two hand-maintained key lists that must agree exactly — a tile-bearing
+    // section absent from the enum gets no dashboard tile (the classic silent
+    // bug), and an enum case with no manifest row force-unwraps to a crash.
+    let dashboardKeys = Set(SectionManifest.all.filter(\.supportsDashboard).map(\.key))
+    let domainKeys = Set(HomepageDomain.allCases.map(\.rawValue))
+    assert(dashboardKeys == domainKeys,
+           "HomepageDomain ↔ supportsDashboard drift: \(dashboardKeys.symmetricDifference(domainKeys).sorted())")
   }
   #endif
 }

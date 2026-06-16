@@ -231,6 +231,23 @@ enum NutritionPlugin: SectionPlugin {
       return nil
     }
   }
+
+  // Starter targets. Water is the one universal enough to pre-check; protein is
+  // a common opt-in (the rest of the macros are too personal to default-suggest
+  // — the user sets those from the section's goals strip). Editable in the
+  // onboarding step before they're seeded.
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "nutrition.water_sum", sectionKey: "nutrition",
+                    text: "Drink 2000 ml water/day",
+                    comparator: "gte", target: 2000, upper: nil,
+                    window: "today", unitLabel: "ml", recommended: true),
+      SuggestedGoal(metricKey: "nutrition.protein_sum", sectionKey: "nutrition",
+                    text: "Eat 100 g protein/day",
+                    comparator: "gte", target: 100, upper: nil,
+                    window: "today", unitLabel: "g", recommended: false),
+    ]
+  }
 }
 
 private struct NutritionDetailContent: View {
