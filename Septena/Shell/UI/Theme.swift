@@ -147,8 +147,10 @@ enum Theme {
   /// Horizontal inset from the screen edge to the floating "pill" cards in
   /// every scrolling page (section drawers, the Next feed, the home tile
   /// grid). The single knob for how far the cards sit off the edge — set to
-  /// the iOS system default layout margin so cards breathe off the edge.
-  static let pageGutter: CGFloat = 16
+  /// match the Tasks list's row content inset (`hPadding`, 20pt on iOS) so
+  /// the four top-level surfaces line up at the same edge instead of the
+  /// dashboards drifting 4pt tighter than Tasks.
+  static let pageGutter: CGFloat = 20
 
   /// Vertical inset from the nav-bar edge to the first content block on the
   /// four top-level surfaces (Week, Tasks sidebar, Coach). The Next feed is
