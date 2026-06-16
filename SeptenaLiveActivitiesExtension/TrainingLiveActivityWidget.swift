@@ -28,16 +28,18 @@ struct TrainingLiveActivityWidget: Widget {
           }
         }
         DynamicIslandExpandedRegion(.trailing) {
-          Text(timerInterval: context.attributes.startedAt...Date.distantFuture,
-               countsDown: false)
-            .font(.caption.monospacedDigit())
-            .lineLimit(1)
+          sessionTimer(context.state, startedAt: context.attributes.startedAt,
+                       font: .caption)
         }
         DynamicIslandExpandedRegion(.bottom) {
           VStack(alignment: .leading, spacing: 6) {
             ProgressView(value: Double(context.state.doneCount),
                          total: Double(max(context.state.totalCount, 1)))
-            if let next = context.state.nextExercise {
+            if isResting(context.state) {
+              Text("Resting")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+            } else if let next = context.state.nextExercise {
               Text("Next: \(next)")
                 .font(.caption)
                 .lineLimit(1)
@@ -46,13 +48,14 @@ struct TrainingLiveActivityWidget: Widget {
         }
       } compactLeading: {
         Image(systemName: context.attributes.sessionIcon)
+          .foregroundStyle(isResting(context.state) ? .orange : .primary)
       } compactTrailing: {
-        Text(timerInterval: context.attributes.startedAt...Date.distantFuture,
-             countsDown: false)
-          .font(.caption2.monospacedDigit())
+        sessionTimer(context.state, startedAt: context.attributes.startedAt,
+                     font: .caption2)
           .frame(maxWidth: 44)
       } minimal: {
         Image(systemName: context.attributes.sessionIcon)
+          .foregroundStyle(isResting(context.state) ? .orange : .primary)
       }
       .widgetURL(URL(string: "septena://training/active"))
     }
@@ -80,10 +83,8 @@ private struct TrainingLockScreenView: View {
           }
         }
         Spacer(minLength: 8)
-        Text(timerInterval: context.attributes.startedAt...Date.distantFuture,
-             countsDown: false)
-          .font(.headline.monospacedDigit())
-          .lineLimit(1)
+        sessionTimer(context.state, startedAt: context.attributes.startedAt,
+                     font: .headline)
       }
 
       ProgressView(value: Double(context.state.doneCount),
@@ -111,4 +112,26 @@ private struct TrainingLockScreenView: View {
 
 private func progressText(_ state: TrainingActivityAttributes.ContentState) -> String {
   "\(state.doneCount)/\(max(state.totalCount, 1))"
+}
+
+private func isResting(_ state: TrainingActivityAttributes.ContentState) -> Bool {
+  (state.restEndsAt ?? .distantPast) > Date()
+}
+
+/// While resting, an orange countdown to the rest deadline; otherwise the
+/// session-elapsed clock. Both use `Text(timerInterval:)` so the system ticks
+/// them without app updates.
+@ViewBuilder
+private func sessionTimer(_ state: TrainingActivityAttributes.ContentState,
+                          startedAt: Date, font: Font) -> some View {
+  if let rest = state.restEndsAt, rest > Date() {
+    Text(timerInterval: Date.now...rest, countsDown: true)
+      .font(font.monospacedDigit())
+      .foregroundStyle(.orange)
+      .lineLimit(1)
+  } else {
+    Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
+      .font(font.monospacedDigit())
+      .lineLimit(1)
+  }
 }

@@ -9,6 +9,9 @@ struct TrainingActivityAttributes: ActivityAttributes {
     var nextExercise: String?
     var cardioMinutes: Int
     var liftedKg: Int
+    /// Rest-timer deadline. When in the future the widget shows a countdown
+    /// (instead of session-elapsed); nil / past means not resting.
+    var restEndsAt: Date?
   }
 
   var sessionID: String

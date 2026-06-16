@@ -1292,6 +1292,9 @@
         }
       }
     },
+    "After each strength set, a countdown runs in the Dynamic Island so the phone can go back in your bag — with an alert when it's time to lift again." : {
+
+    },
     "Afternoon" : {
       "localizations" : {
         "pt-BR" : {
@@ -1394,6 +1397,9 @@
           }
         }
       }
+    },
+    "and" : {
+
     },
     "Angry" : {
       "localizations" : {
@@ -1579,6 +1585,9 @@
           }
         }
       }
+    },
+    "avg %@" : {
+
     },
     "avg %@/4" : {
       "localizations" : {
@@ -2075,6 +2084,9 @@
           }
         }
       }
+    },
+    "Coaches" : {
+
     },
     "Coffee, beans, brewing methods" : {
       "extractionState" : "stale",
@@ -3156,6 +3168,9 @@
         }
       }
     },
+    "Free-text intentions; tag them so a coach picks them up." : {
+
+    },
     "Free-text intentions. Tag with sections so agents have context for what you're working toward." : {
       "localizations" : {
         "pt-BR" : {
@@ -3167,6 +3182,7 @@
       }
     },
     "Free-text intentions. Tag with sections so your coaches have context for what you're working toward." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3262,6 +3278,9 @@
           }
         }
       }
+    },
+    "Goals turn what you track into progress. We've pre-picked a couple of common ones — adjust, add, or skip. You can change any of these anytime." : {
+
     },
     "Good afternoon" : {
       "localizations" : {
@@ -3384,6 +3403,9 @@
           }
         }
       }
+    },
+    "Guided reflections that turn into goals." : {
+
     },
     "Gut" : {
       "localizations" : {
@@ -3587,7 +3609,7 @@
     "How to read this" : {
 
     },
-    "How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard); RIR is reps in reserve (3 → 1, closer to failure). Same data either way." : {
+    "How you rate each set. Difficulty uses plain words (Easy · Moderate · Hard · Max); RIR is reps in reserve (3+ · 2 · 1 · 0, where 0 is to failure). Same data either way." : {
 
     },
     "Hydration" : {
@@ -4706,6 +4728,9 @@
         }
       }
     },
+    "No goals yet. Tag a goal with sections so your coaches have context for what you're working toward." : {
+
+    },
     "No habits defined." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5035,6 +5060,9 @@
       "shouldTranslate" : false
     },
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
+
+    },
+    "On-device coaches that reflect your logged data back to you." : {
 
     },
     "On-device intelligence" : {
@@ -5644,6 +5672,9 @@
         }
       }
     },
+    "Rest timer" : {
+
+    },
     "Restless" : {
       "localizations" : {
         "pt-BR" : {
@@ -6009,6 +6040,9 @@
           }
         }
       }
+    },
+    "Set a few starting targets" : {
+
     },
     "Set when each part of your day begins. These boundaries drive the Morning / Afternoon / Evening groups in Habits and Supplements, the “Now” marker, what the Next list surfaces, and the welcome greeting." : {
       "localizations" : {

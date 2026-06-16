@@ -1911,6 +1911,12 @@ struct DraftSession: Codable, Hashable {
   /// captured at start() and frozen for the workout. Drives the compact
   /// "last 3" table inside each card's expanded editor.
   var recentByExercise: [String: [RecentExerciseEntry]] = [:]
+  /// When the current between-sets rest ends, or nil when not resting.
+  /// Set on logging a strength set, cleared on expiry / next set / finish.
+  /// Transient: persisted with the draft (local UserDefaults only) so a
+  /// relaunch mid-rest restores the countdown; a stale past value reads as
+  /// "not resting" everywhere it's consumed.
+  var restEndsAt: Date? = nil
 
   /// Index of the next pending entry, or nil if everything's done/skipped.
   var nextPendingIndex: Int? {

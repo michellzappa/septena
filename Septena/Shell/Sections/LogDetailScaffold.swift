@@ -64,11 +64,21 @@ struct LogHeatmap {
   var detail: String? = "last weeks"
 }
 
+/// An optional custom chart card (title + arbitrary chart content). Sections
+/// with a richer-than-heatmap visualization (training's 90-day progress line)
+/// supply one; it renders in a `ChartCard` above the heatmap.
+struct LogChartContent {
+  let title: String
+  var detail: String? = nil
+  let view: AnyView
+}
+
 /// Everything `LogDetailBody` needs to render. Sections build one of these.
 struct LogDetail {
   var emoji: String? = nil
   var subtitle: String = ""
   var tiles: [LogStat] = []
+  var chart: LogChartContent? = nil
   var heatmap: LogHeatmap? = nil
   /// Title for the heatmap card. "Consistency" reads right for done/skipped
   /// logs (habits, supplements); graded logs (symptoms) override it.
@@ -89,6 +99,9 @@ struct LogDetailBody: View {
       VStack(spacing: Theme.Spacing.xxl) {
         masthead
         if !detail.tiles.isEmpty { tiles }
+        if let chart = detail.chart {
+          ChartCard(title: chart.title, detail: chart.detail) { chart.view }
+        }
         if let hm = detail.heatmap { heatmap(hm, title: detail.heatmapTitle) }
         ForEach(detail.cards) { card in cardView(card) }
         if !detail.recent.isEmpty { recent }

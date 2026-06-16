@@ -28,6 +28,10 @@ struct TrainingTabAccessory: View {
         nav.showTrainingSession = true
       } label: {
         content(for: draft)
+          // Make the WHOLE pill tappable, not just the glyph/text/chevron —
+          // without this the `Spacer` gap in the expanded layout swallows
+          // taps, so only the corners feel "live".
+          .contentShape(.rect)
       }
       .buttonStyle(.plain)
     }

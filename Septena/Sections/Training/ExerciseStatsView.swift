@@ -41,12 +41,14 @@ struct ExerciseStatsView: View {
   }
 
   private func reload() {
-    detail = Self.build(entity: entity, context: modelContext)
+    detail = Self.build(entity: entity, context: modelContext, accent: accent)
   }
 
   // MARK: - Build
 
-  static func build(entity: ExerciseDefinitionEntity, context: ModelContext) -> LogDetail {
+  static func build(entity: ExerciseDefinitionEntity,
+                    context: ModelContext,
+                    accent: Color) -> LogDetail {
     let key = exerciseKey(entity.name)
     let all = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       sortBy: [SortDescriptor(\.date, order: .reverse),
@@ -70,6 +72,25 @@ struct ExerciseStatsView: View {
               tone: last30 > 0 ? .accent : .normal),
       LogStat(value: headlinePR(baseline), caption: prCaption(baseline)),
     ]
+
+    // 90-day progress line — the same `TrainingProgressChart` the in-session
+    // card draws, keyed to this exercise's modality. Only shown once there
+    // are ≥2 points to plot (a one-point line says nothing).
+    let metric: TrainingProgressMetric = {
+      switch entity.type {
+      case "cardio":   return .pace
+      case "mobility": return .duration
+      default:         return .oneRepMax
+      }
+    }()
+    let series = TrainingMetrics.progressSeries(for: entity.name, metric: metric, in: context)
+    if series.points.count >= 2 {
+      d.chart = LogChartContent(
+        title: TrainingProgressFormat.title(metric),
+        detail: TrainingProgressFormat.trend(series)?.text,
+        view: AnyView(TrainingProgressChart(series: series, accent: accent, height: 150))
+      )
+    }
 
     // PR card — only the records that exist for this exercise's modality.
     var pr = LogCard(title: "Records")
