@@ -925,12 +925,15 @@ struct TrainingDestinationView: View {
   private var progressionSection: some View {
     let pills = pillOptions
     let line = lineData
+    // Strength weight/volume are stored in kg; scale the whole chart (domain,
+    // marks, axis labels, average) into the user's unit in one place.
+    let scale = metricScale
     let yMax: Double = {
       let vals = line.compactMap(\.value)
       guard let m = vals.max(), m > 0 else { return 1 }
-      return m * 1.15
+      return m * scale * 1.15
     }()
-    let vals = line.compactMap(\.value)
+    let vals = line.compactMap(\.value).map { $0 * scale }
     let avg = vals.isEmpty ? 0 : vals.reduce(0, +) / Double(vals.count)
     let avgText = avg > 0
       ? "Window average \(yLabel(avg))."
@@ -963,7 +966,7 @@ struct TrainingDestinationView: View {
                 if let s = p.series {
                   LineMark(
                     x: .value("Date", p.day),
-                    y: .value("Metric", v),
+                    y: .value("Metric", v * scale),
                     series: .value("Group", s)
                   )
                   .interpolationMethod(.linear)
@@ -971,28 +974,28 @@ struct TrainingDestinationView: View {
                   .accessibilityHidden(true)
                   PointMark(
                     x: .value("Date", p.day),
-                    y: .value("Metric", v)
+                    y: .value("Metric", v * scale)
                   )
                   .symbolSize(28)
                   .foregroundStyle(by: .value("Group", s))
                   .accessibilityLabel(weekdayFull(p.id))
-                  .accessibilityValue("\(s), \(yLabel(v))")
+                  .accessibilityValue("\(s), \(yLabel(v * scale))")
                 } else {
                   LineMark(
                     x: .value("Date", p.day),
-                    y: .value("Metric", v)
+                    y: .value("Metric", v * scale)
                   )
                   .interpolationMethod(.linear)
                   .foregroundStyle(accent)
                   .accessibilityHidden(true)
                   PointMark(
                     x: .value("Date", p.day),
-                    y: .value("Metric", v)
+                    y: .value("Metric", v * scale)
                   )
                   .symbolSize(28)
                   .foregroundStyle(accent)
                   .accessibilityLabel(weekdayFull(p.id))
-                  .accessibilityValue(yLabel(v))
+                  .accessibilityValue(yLabel(v * scale))
                 }
               }
             }
@@ -1296,21 +1299,33 @@ struct TrainingDestinationView: View {
   }
 
   private var chartSubtitle: String {
+    let u = WeightUnit.current.suffix
     switch metricKind(for: selectedExercise) {
-    case .volume: return "Total volume per session (kg)"
+    case .volume: return "Total volume per session (\(u))"
     case .cardioTotal: return "Total cardio minutes per session"
     case .pace: return "Pace (m/min) per session"
     case .duration: return "Duration (min) per session"
-    case .weight: return "Weight (kg) over time"
+    case .weight: return "Weight (\(u)) over time"
     }
   }
 
+  /// Multiplier turning the chart's stored-kg strength values (weight, volume)
+  /// into the user's display unit. Non-weight metrics stay 1.
+  private var metricScale: Double {
+    switch metricKind(for: selectedExercise) {
+    case .weight, .volume: return WeightUnit.current.displayFactor
+    default: return 1
+    }
+  }
+
+  /// Format an axis value. The chart pre-scales weight/volume into the display
+  /// unit, so this only appends the suffix — it must not convert again.
   private func yLabel(_ v: Double) -> String {
     switch metricKind(for: selectedExercise) {
     case .volume, .cardioTotal: return "\(Int(v))"
     case .pace: return v.decimalString(0)
     case .duration: return "\(Int(v))m"
-    case .weight: return "\(Int(v))kg"
+    case .weight: return "\(Int(v))\(WeightUnit.current.suffix)"
     }
   }
 
@@ -1395,10 +1410,12 @@ struct TrainingDestinationView: View {
     )
   }
 
-  private func formatWeight(_ w: Double) -> String {
-    w.truncatingRemainder(dividingBy: 1) == 0
-      ? "\(Int(w))kg"
-      : "\(w.decimalString(1))kg"
+  private func formatWeight(_ kg: Double) -> String {
+    let u = WeightUnit.current
+    let w = u.display(kg)
+    return w.truncatingRemainder(dividingBy: 1) == 0
+      ? "\(Int(w))\(u.suffix)"
+      : "\(w.decimalString(1))\(u.suffix)"
   }
 
   private func formatDistance(_ m: Double) -> String {
@@ -2265,7 +2282,8 @@ struct TrainingSessionView: View {
         Spacer()
         stat(value: "\(Int(cardio))", label: "cardio", unit: "m")
         Spacer()
-        stat(value: "\(Int(lifted))", label: "lifted", unit: "kg")
+        stat(value: "\(Int(WeightUnit.current.display(lifted)))", label: "lifted",
+             unit: WeightUnit.current.suffix)
       }
       Divider()
       VStack(alignment: .leading, spacing: 6) {
@@ -2630,7 +2648,7 @@ struct TrainingExerciseRow: View {
       }
       if let l = entry.level, l > 0 { parts.append("L\(fmt(l))") }
     } else {
-      if let w = entry.weight, w > 0 { parts.append("\(fmt(w)) kg") }
+      if let w = entry.weight, w > 0 { parts.append("\(fmt(WeightUnit.current.display(w))) \(WeightUnit.current.suffix)") }
       if let s = entry.sets, let r = entry.reps { parts.append("\(s)×\(r)") }
       else if let s = entry.sets { parts.append("\(s) sets") }
     }
@@ -2690,6 +2708,9 @@ struct TrainingExerciseEditor: View {
         }
       }
     }
+    // Grabber on the iPhone sheet so it reads as swipe-to-dismiss; ignored by
+    // the iPad/Mac docked inspector.
+    .presentationDragIndicator(.visible)
   }
 
   /// After logging: a fresh completion advances to the next still-pending
@@ -2738,6 +2759,9 @@ struct TrainingExerciseEditorBody: View {
   /// Trailing-90-day progress series for this exercise — drives the small
   /// history chart. Loaded once on appear.
   @State private var progress: TrainingProgressSeries? = nil
+  /// Primary (first) + secondary muscles this exercise works, resolved from its
+  /// catalog definition. Loaded on appear; empty for cardio / untagged slugs.
+  @State private var muscles: [Muscle] = []
 
   // Hoisted formatter — was re-allocated per recents-row render.
   private static let monthDayPosixFormatter: DateFormatter = {
@@ -2749,47 +2773,66 @@ struct TrainingExerciseEditorBody: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
-        progressHistory
-        if entry.isMobility {
-          // Yoga / mobility: TIME + difficulty. No weight/reps, no distance or
-          // level — those don't apply to a flow-style session.
-          mobilityInputs
-          difficultyPicker
-        } else if entry.isCardio {
-          cardioInputs
-        } else {
-          strengthInputs
-          difficultyPicker
+      // Each block sits in its own bordered panel so the drawer reads as
+      // structured sections rather than free-floating controls on a flat
+      // background — and the panels are spaced apart, not stacked tight.
+      VStack(alignment: .leading, spacing: 18) {
+        // Which muscles this exercise hits — orientation tags above the graph.
+        musclePills
+        if hasHistory {
+          panel { progressHistory }
         }
-        // Primary action, trailing-aligned. Logs this set; Skip lives in the
-        // row's ⋯ menu, so the footer is just "log this".
-        HStack {
-          Spacer()
-          Button(entry.status == .failed ? "Retry"
-                 : entry.status == .done ? "Update" : "Done") {
-            let wasDone = (entry.status == .done)
-            store.markDone(index: index, mutator: trainingMutator)
-            // Confirm only on first completion, not re-saves of an already-done
-            // entry. Success haptic — a set is a step, not a moment; the
-            // session-complete sheet owns the celebration.
-            if !wasDone {
-              Haptics.success()
+        panel {
+          VStack(alignment: .leading, spacing: 20) {
+            if entry.isMobility {
+              // Yoga / mobility: TIME + difficulty. No weight/reps, no distance
+              // or level — those don't apply to a flow-style session.
+              mobilityInputs
+              difficultyPicker
+            } else if entry.isCardio {
+              cardioInputs
+            } else {
+              strengthInputs
+              difficultyPicker
             }
-            // A first completion advances to the next pending exercise; a
-            // re-save closes. Retrying a failed save leaves the editor open.
-            if entry.status != .failed {
-              onLogged(wasDone)
-            }
+            noteField
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.large)
-          .tint(accent)
-          .disabled(entry.status == .saving)
         }
-        .padding(.top, 12)
+        // Primary action, full-width accent-outlined footer. Logs this set;
+        // Skip lives in the row's ⋯ menu, so the footer is just "save this".
+        Button {
+          let wasDone = (entry.status == .done)
+          store.markDone(index: index, mutator: trainingMutator)
+          // Confirm only on first completion, not re-saves of an already-done
+          // entry. Success haptic — a set is a step, not a moment; the
+          // session-complete sheet owns the celebration.
+          if !wasDone {
+            Haptics.success()
+          }
+          // A first completion advances to the next pending exercise; a
+          // re-save closes. Retrying a failed save leaves the editor open.
+          if entry.status != .failed {
+            onLogged(wasDone)
+          }
+        } label: {
+          Text(entry.status == .failed ? "Retry"
+               : entry.status == .done ? "Update" : "Save")
+            .font(.headline)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(accent)
+        .background(
+          RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+            .stroke(accent, lineWidth: 1.5)
+        )
+        .opacity(entry.status == .saving ? 0.5 : 1)
+        .disabled(entry.status == .saving)
+        .padding(.top, 4)
       }
-      .padding(16)
+      .padding(20)
     }
     #if os(iOS)
     .toolbar {
@@ -2805,6 +2848,73 @@ struct TrainingExerciseEditorBody: View {
         avgPace = store.cardioAvgPace(for: entry.exercise, context: modelContext)
       }
       loadProgress()
+      loadMuscles()
+    }
+  }
+
+  // MARK: - Muscles
+
+  private func loadMuscles() {
+    let key = exerciseKey(entry.exercise)
+    let defs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    guard let def = defs.first(where: {
+      exerciseKey($0.id) == key || exerciseKey($0.name) == key
+    }) else { muscles = []; return }
+    var out: [Muscle] = []
+    if let p = Muscle.resolve(def.primaryMuscle) { out.append(p) }
+    for s in def.secondaryMuscles {
+      if let m = Muscle.resolve(s), !out.contains(m) { out.append(m) }
+    }
+    muscles = out
+  }
+
+  /// Muscle tags — the first (primary) gets an accent fill; the rest are white
+  /// pills with a hairline, so the primary reads as the headline target. Wraps
+  /// onto extra rows for exercises that hit several groups.
+  @ViewBuilder
+  private var musclePills: some View {
+    if !muscles.isEmpty {
+      FlowLayout(spacing: 8) {
+        ForEach(Array(muscles.enumerated()), id: \.offset) { i, m in
+          Text(m.label)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+              Capsule().fill(i == 0 ? accent.opacity(0.18) : Theme.cardSurface)
+            )
+            .overlay(
+              Capsule().stroke(i == 0 ? Color.clear : Color.primary.opacity(0.12),
+                               lineWidth: 1)
+            )
+            .foregroundStyle(i == 0 ? accent : Theme.inkSecondary)
+        }
+      }
+    }
+  }
+
+  /// Optional free-text note for this set — rides the existing `DraftEntry.note`
+  /// straight through `markDone` to the saved record.
+  private var noteField: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("NOTE")
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+      TextField("Optional", text: Binding(
+        get: { entry.note },
+        set: { setNote($0) }
+      ), axis: .vertical)
+        .textFieldStyle(.plain)
+        .font(.callout)
+        .lineLimit(1...4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(Theme.cardSurface,
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+        )
     }
   }
 
@@ -2827,6 +2937,30 @@ struct TrainingExerciseEditorBody: View {
       for: entry.exercise, metric: progressMetric, in: modelContext)
   }
 
+  /// True when there's anything to draw in the history panel — a 2+ point
+  /// chart or at least one recent session. Gates the panel so we never render
+  /// an empty bordered card.
+  private var hasHistory: Bool {
+    (progress?.points.count ?? 0) >= 2 || !recents.isEmpty
+  }
+
+  /// A bordered section card. Gives the drawer's blocks structure on the flat
+  /// drawer background — a faint fill plus a hairline border, padded inside.
+  @ViewBuilder
+  private func panel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    content()
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(14)
+      .background(
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+          .fill(Color.primary.opacity(0.04))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+          .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+      )
+  }
+
   /// 90-day progress chart for this exercise — the shared
   /// `TrainingProgressChart`, drawing the daily best value, PR rings, and a
   /// cardio average-speed rule. Falls back to the compact RECENT table when
@@ -2847,9 +2981,9 @@ struct TrainingExerciseEditorBody: View {
                                         : (t.up ? accent : Theme.inkSecondary))
           }
         }
-        TrainingProgressChart(series: s, accent: accent, height: 72)
+        TrainingProgressChart(series: s, accent: accent, height: 108, weeklyGrid: true,
+                              weightFactor: WeightUnit.current.displayFactor)
       }
-      .padding(.bottom, 10)
     } else {
       recentSessionsTable
     }
@@ -2874,7 +3008,6 @@ struct TrainingExerciseEditorBody: View {
         }
         .font(.system(.footnote, design: .rounded).monospacedDigit())
       }
-      .padding(.bottom, 10)
     }
   }
 
@@ -2882,8 +3015,10 @@ struct TrainingExerciseEditorBody: View {
   private func adaptiveColumns(_ r: RecentExerciseEntry) -> [String] {
     var parts: [String] = []
     if let w = r.weight, w > 0 {
-      parts.append(w.truncatingRemainder(dividingBy: 1) == 0
-                   ? "\(Int(w))kg" : "\(w.decimalString(1))kg")
+      let u = WeightUnit.current
+      let dw = u.display(w)
+      parts.append(dw.truncatingRemainder(dividingBy: 1) == 0
+                   ? "\(Int(dw))\(u.suffix)" : "\(dw.decimalString(1))\(u.suffix)")
     }
     if let s = r.sets, let reps = r.reps {
       parts.append("\(s)×\(reps)")
@@ -2925,10 +3060,13 @@ struct TrainingExerciseEditorBody: View {
   // MARK: - Strength fields
 
   private var strengthInputs: some View {
-    VStack(spacing: 10) {
-      steppedField(label: "Weight (kg)", step: 2.5,
+    VStack(spacing: 18) {
+      // Field shows / steps in the user's unit; `setWeight` converts back to
+      // the kg the model stores. Step by a natural increment per unit.
+      steppedField(label: "Weight (\(WeightUnit.current.suffix))",
+                   step: WeightUnit.current == .kg ? 2.5 : 5,
                    value: Binding(
-                     get: { entry.weight.map { fmt($0) } ?? "" },
+                     get: { entry.weight.map { fmt(WeightUnit.current.display($0)) } ?? "" },
                      set: { setWeight($0) }
                    ))
       HStack(spacing: 8) {
@@ -2948,7 +3086,13 @@ struct TrainingExerciseEditorBody: View {
 
   private var difficultyPicker: some View {
     let scale = EffortScale(rawValue: effortScaleRaw) ?? .difficulty
-    return HStack(spacing: 8) {
+    // Title reflects the chosen effort scale (Settings ▸ RIR vs Difficulty);
+    // in RIR mode it also replaces the per-pill "RIR" repetition.
+    return VStack(alignment: .leading, spacing: 6) {
+      Text((scale == .rir ? "RIR" : "Difficulty").uppercased())
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+      HStack(spacing: 8) {
       ForEach(TrainingEffort.levels) { rung in
         let isSelected = TrainingEffort.canonicalKey(entry.difficulty) == rung.key
         Button {
@@ -2958,15 +3102,18 @@ struct TrainingExerciseEditorBody: View {
             Text(TrainingEffort.pillNumber(for: rung, scale: scale))
               .font(.system(.title2, design: .rounded).weight(.bold))
               .monospacedDigit()
-            Text(scale == .rir ? "RIR" : rung.short.uppercased())
-              .font(.caption2.weight(.semibold))
-              .tracking(0.5)
+            if scale != .rir {
+              Text(rung.short.uppercased())
+                .font(.caption2.weight(.semibold))
+                .tracking(0.5)
+            }
           }
           .frame(maxWidth: .infinity)
           .padding(.vertical, 10)
           .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .fill(isSelected ? accent : Color.clear)
+              // White (elevated) against the gray panel when unselected.
+              .fill(isSelected ? accent : Theme.cardSurface)
           )
           .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -2979,8 +3126,8 @@ struct TrainingExerciseEditorBody: View {
         .accessibilityLabel(rung.label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
+      }
     }
-    .padding(.top, 8)
   }
 
   private func displayName(_ slug: String) -> String {
@@ -3000,7 +3147,7 @@ struct TrainingExerciseEditorBody: View {
   // MARK: - Cardio fields
 
   private var cardioInputs: some View {
-    VStack(spacing: 10) {
+    VStack(spacing: 18) {
       steppedField(label: "Minutes", step: 5,
                    value: Binding(
                      get: { entry.durationMin.map { fmt($0) } ?? "" },
@@ -3044,7 +3191,7 @@ struct TrainingExerciseEditorBody: View {
                             step: Double,
                             buttonWidth: CGFloat = 60,
                             value: Binding<String>) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: 6) {
       Text(label.uppercased())
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -3064,7 +3211,8 @@ struct TrainingExerciseEditorBody: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        .background(Color.primary.opacity(0.05),
+        // White (elevated) field against the gray panel it sits in.
+        .background(Theme.cardSurface,
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
           RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -3110,7 +3258,9 @@ struct TrainingExerciseEditorBody: View {
   }
 
   private func setWeight(_ s: String) {
-    store.update { $0.entries[index].weight = Double(s.replacingOccurrences(of: ",", with: ".")) }
+    // Field is in the user's unit; store kg.
+    let parsed = Double(s.replacingOccurrences(of: ",", with: "."))
+    store.update { $0.entries[index].weight = parsed.map { WeightUnit.current.toKilograms($0) } }
   }
   private func setSets(_ v: Int?) {
     store.update { $0.entries[index].sets = v }
@@ -3126,6 +3276,9 @@ struct TrainingExerciseEditorBody: View {
   }
   private func setLevel(_ s: String) {
     store.update { $0.entries[index].level = Double(s.replacingOccurrences(of: ",", with: ".")) }
+  }
+  private func setNote(_ s: String) {
+    store.update { $0.entries[index].note = s }
   }
 
   #if os(iOS)
@@ -3148,8 +3301,21 @@ struct TrainingProgressChart: View {
   let series: TrainingProgressSeries
   let accent: Color
   var height: CGFloat = 72
+  /// Draw a faint vertical gridline every 7 days (used by the in-session
+  /// editor's taller mini-graph so the trend reads against weekly cadence).
+  var weeklyGrid: Bool = false
+  /// Multiplier applied to strength (oneRepMax, stored in kg) values so the
+  /// line plots in the user's chosen weight unit. 1 = kg; pass
+  /// `WeightUnit.current.displayFactor`. Non-weight metrics ignore it.
+  var weightFactor: Double = 1
 
-  private var scale: Double { series.metric == .pace ? 0.06 : 1.0 }
+  private var scale: Double {
+    switch series.metric {
+    case .pace:      return 0.06        // m/min → km/h
+    case .oneRepMax: return weightFactor
+    case .duration:  return 1.0
+    }
+  }
 
   /// Dates whose value beat every earlier day in the window — the days a
   /// new high-water mark (PR) was set. The first point is never a PR (no
@@ -3199,6 +3365,12 @@ struct TrainingProgressChart: View {
       }
     }
     .chartXAxis {
+      // Weekly vertical gridlines (no labels) for cadence.
+      if weeklyGrid {
+        AxisMarks(values: .stride(by: .day, count: 7)) { _ in
+          AxisGridLine().foregroundStyle(Color.secondary.opacity(0.12))
+        }
+      }
       AxisMarks(values: .automatic(desiredCount: 3)) { v in
         AxisValueLabel {
           if let d = v.as(Date.self) {
@@ -3240,7 +3412,10 @@ enum TrainingProgressFormat {
     let up = delta >= 0
     let mag: String
     switch s.metric {
-    case .oneRepMax: mag = "\(abs(delta).decimalString(abs(delta) < 10 ? 1 : 0)) kg"
+    case .oneRepMax:
+      let u = WeightUnit.current
+      let d = abs(delta) * u.displayFactor
+      mag = "\(d.decimalString(d < 10 ? 1 : 0)) \(u.suffix)"
     case .pace:      mag = "\((abs(delta) * 0.06).decimalString(1)) km/h"
     case .duration:  mag = "\(Int(abs(delta).rounded())) min"
     }
