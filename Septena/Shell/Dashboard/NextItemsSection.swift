@@ -1200,26 +1200,53 @@ struct ChoreRow: View {
 
 // MARK: - Shared chrome
 
-extension View {
-  /// Wraps a stack of Next rows in the same rounded "pill" card that the
-  /// Tasks / Goals drawers use (`DrawerSection`): a secondary-grouped fill
-  /// with 22pt continuous corners. Lets the Next screen read as grouped
-  /// cards on the light page background instead of a full-bleed list, so it
-  /// matches Week / Tasks / Goals. The section's tinted header sits *above*
-  /// this card (not inside), mirroring the drawer convention.
-  func nextSectionCard() -> some View {
-    self
-      // Same de-stacking as DrawerSection: the card already sits 20pt off the
-      // screen edge, so rows inside it read this tighter inset (aligned with the
-      // section header above) instead of stacking a second 20pt margin.
-      .environment(\.rowHInset, Theme.Spacing.xl)
+/// Section chrome for the Next feed.
+///
+/// On **regular** width (iPad / macOS) each section is a rounded "pill" card —
+/// the same `secondaryGroupedBackground` fill + 22pt corners the Tasks / Goals
+/// drawers use — which is also what lets `NextMasonry` tile sections into
+/// columns (the card edge delineates one column from the next).
+///
+/// On **compact** width (iPhone) the feed goes **borderless** so it reads like
+/// the Tasks list it sits beside: no fill, and `rowHInset` collapses to 0 so
+/// row content lands at the surface's `pageGutter` (20pt) — exactly where a
+/// Tasks row's content sits. The tinted header above each section tracks the
+/// same inset via `.nextHeaderInset()`.
+private struct NextSectionCard: ViewModifier {
+  @Environment(\.horizontalSizeClass) private var hSizeClass
+
+  func body(content: Content) -> some View {
+    let borderless = hSizeClass == .compact
+    content
+      // Carded: rows sit 16pt in from the card edge (which is 20pt off the
+      // screen), aligned with the header. Borderless: 0, so rows align with
+      // the surface gutter like a Tasks row.
+      .environment(\.rowHInset, borderless ? 0 : Theme.Spacing.xl)
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(Theme.secondaryGroupedBackground)
+          .fill(borderless ? Color.clear : Theme.secondaryGroupedBackground)
       )
-      .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+      .clipShape(RoundedRectangle(cornerRadius: borderless ? 0 : Theme.cornerRadius,
+                                  style: .continuous))
   }
+}
+
+/// Horizontal inset for a Next section's header, matched to the row content
+/// below it: 0 when the feed is borderless (compact), `Spacing.xl` when it's
+/// carded (regular) — the mirror of `NextSectionCard`'s `rowHInset`.
+private struct NextHeaderInset: ViewModifier {
+  @Environment(\.horizontalSizeClass) private var hSizeClass
+  func body(content: Content) -> some View {
+    content.padding(.horizontal, hSizeClass == .compact ? 0 : Theme.Spacing.xl)
+  }
+}
+
+extension View {
+  func nextSectionCard() -> some View { modifier(NextSectionCard()) }
+  /// Apply to a Next section header so it stays aligned with the row content
+  /// in both the carded (regular) and borderless (compact) layouts.
+  func nextHeaderInset() -> some View { modifier(NextHeaderInset()) }
 }
 
 // Reused across HabitRow / SupplementRow / ChoreRow for "Done" / "Skipped"
@@ -1262,9 +1289,8 @@ private func sectionHeader(_ title: String, tint: Color) -> some View {
   Text(title)
     .font(.septenaSectionTitle)
     .foregroundStyle(tint)
-    // Aligns with the row content inside the card below (which reads
-    // `rowHInset` = Spacing.xl), not the wider Theme.hPadding.
-    .padding(.horizontal, Theme.Spacing.xl)
+    // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
+    .nextHeaderInset()
     .padding(.top, Theme.sectionSpacing)
     .padding(.bottom, 6)
 }
@@ -1288,8 +1314,8 @@ private func bucketSectionHeader(_ sectionTitle: String, tint: Color,
     Spacer()
     if showsCountdown { BucketTimeLeft(bucket: bucket) }
   }
-  // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
-  .padding(.horizontal, Theme.Spacing.xl)
+  // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
+  .nextHeaderInset()
   .padding(.top, Theme.sectionSpacing)
   .padding(.bottom, 6)
 }

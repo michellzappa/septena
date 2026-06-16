@@ -615,8 +615,8 @@ struct NextSuggestionsSection: View {
         Text("Suggested")
           .font(.septenaSectionTitle)
           .foregroundStyle(Theme.inkSecondary)
-          // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
-          .padding(.horizontal, Theme.Spacing.xl)
+          // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
+          .nextHeaderInset()
           .padding(.top, Theme.sectionSpacing)
           .padding(.bottom, 6)
         VStack(spacing: 0) {

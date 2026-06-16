@@ -81,8 +81,8 @@ struct NextView: View {
           Text("Done Today")
             .font(.septenaSectionTitle)
             .foregroundStyle(Theme.inkPrimary)
-            // Aligns with the row content inside the card below (rowHInset = Spacing.xl).
-            .padding(.horizontal, Theme.Spacing.xl)
+            // Tracks the row content below it (carded: Spacing.xl, borderless: 0).
+            .nextHeaderInset()
             .padding(.top, Theme.sectionSpacing)
             .padding(.bottom, 6)
           NextDoneSection(model: model, passive: doneModel.events)
