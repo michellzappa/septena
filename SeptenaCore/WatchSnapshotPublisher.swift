@@ -93,12 +93,17 @@ enum WatchSnapshotPublisher {
     // (foods + macros) with one tap — frequency-then-recency ranked, capped to
     // a wrist-sized list.
     let topMeals = buildTopMeals(context: context)
+    // Today's macro totals-so-far vs targets, for the watch macro-ring
+    // complication. Nil when nutrition is untracked / no goals, so the wire
+    // stays additive.
+    let nutritionRings = buildNutritionRings(context: context, date: date)
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
                                      intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds,
-                                     topMeals: topMeals.isEmpty ? nil : topMeals)
+                                     topMeals: topMeals.isEmpty ? nil : topMeals,
+                                     nutritionRings: nutritionRings)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
@@ -182,6 +187,71 @@ enum WatchSnapshotPublisher {
     }
 
     return ranked.prefix(topMealsCap).map(\.0)
+  }
+
+  // MARK: - Macro rings (wrist nutrition complication)
+
+  /// Macro key → its goal metric key, mirroring the app's `NutritionTargets`
+  /// (which lives in the app target, out of SeptenaCore's reach). Kept in the
+  /// canonical ring order: kcal, protein, carbs, fat, fiber.
+  private static let macroOrder: [(key: String, metricKey: String)] = [
+    ("kcal",    "nutrition.kcal_sum"),
+    ("protein", "nutrition.protein_sum"),
+    ("carbs",   "nutrition.carbs_sum"),
+    ("fat",     "nutrition.fat_sum"),
+    ("fiber",   "nutrition.fiber_sum"),
+  ]
+
+  /// Today's macro totals-so-far vs targets for the watch's macro-ring
+  /// complication. Sums today's `NutritionEntry` rows directly (robust whether
+  /// or not the daily-summary entity has recomputed yet), and reads each macro's
+  /// target from its range goal, falling back to the legacy `MacrosConfig`.
+  /// Returns nil when no macro has either data or a target, so an untracked user
+  /// carries nothing on the wire.
+  @MainActor
+  private static func buildNutritionRings(context: ModelContext, date: String)
+    -> NutritionRingsWire? {
+    let entries = ChecklistMirror.loadNutritionEntries(context: context, since: date)
+      .filter { $0.date == date }
+
+    // Per-macro running totals so far today.
+    let totals: [String: Double] = [
+      "kcal":    entries.reduce(0) { $0 + $1.kcal },
+      "protein": entries.reduce(0) { $0 + $1.proteinG },
+      "carbs":   entries.reduce(0) { $0 + $1.carbsG },
+      "fat":     entries.reduce(0) { $0 + $1.fatG },
+      "fiber":   entries.reduce(0) { $0 + ($1.fiberG ?? 0) },
+    ]
+
+    // Targets: range goals first (the modern source), legacy MacrosConfig as a
+    // fallback so users who never moved off the old config still get rings.
+    let goals = LocalCache.goals(in: context)
+    let legacy = NutritionPrefs.loadMacrosConfig()
+    func goalFor(_ key: String, metricKey: String) -> Double? {
+      if let g = goals.first(where: { $0.metricKey == metricKey }),
+         let target = g.metricTargetUpper ?? g.metricTarget, target > 0 {
+        return target
+      }
+      let range: MacroRange?
+      switch key {
+      case "kcal":    range = legacy?.kcal
+      case "protein": range = legacy?.protein
+      case "carbs":   range = legacy?.carbs
+      case "fat":     range = legacy?.fat
+      case "fiber":   range = legacy?.fiber
+      default:        range = nil
+      }
+      return range.map { $0.max }
+    }
+
+    let rings = macroOrder.map { macro in
+      MacroRingWire(key: macro.key,
+                    value: totals[macro.key] ?? 0,
+                    goal: goalFor(macro.key, metricKey: macro.metricKey))
+    }
+    // Nothing logged and no target anywhere → don't bother the wire.
+    guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
+    return NutritionRingsWire(rings: rings)
   }
 
   private static func save(payload: Data, rhythmPayload: Data? = nil, date: String) async {

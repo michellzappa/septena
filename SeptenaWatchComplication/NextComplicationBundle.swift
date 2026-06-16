@@ -5,5 +5,6 @@ import SwiftUI
 struct NextComplicationBundle: WidgetBundle {
   var body: some Widget {
     NextComplication()
+    MacroComplication()
   }
 }

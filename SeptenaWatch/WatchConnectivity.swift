@@ -135,6 +135,7 @@ final class WatchConnectivity {
       self.topMeals      = response.topMeals ?? []
       self.bucket        = bkt
       updateComplication()
+      updateMacroComplication(response.nutritionRings)
       scheduleNextRefresh()
     } catch let ckError as CKError where ckError.code == .unknownItem {
       errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
@@ -553,5 +554,17 @@ final class WatchConnectivity {
       updatedAt: Date()
     ).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaNext")
+  }
+
+  /// Mirror the phone-computed macro totals into the app group and refresh the
+  /// macro-ring complication. The snapshot is the only source — these rings are
+  /// phone-computed (goals + daily totals live there), so unlike the Next count
+  /// there's nothing to update on a local wrist log.
+  private func updateMacroComplication(_ wire: NutritionRingsWire?) {
+    let rings = (wire?.rings ?? []).map {
+      MacroComplicationData.Ring(key: $0.key, value: $0.value, goal: $0.goal)
+    }
+    MacroComplicationData(rings: rings, updatedAt: Date()).save()
+    WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaMacroRings")
   }
 }

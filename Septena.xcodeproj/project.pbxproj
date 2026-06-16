@@ -210,6 +210,7 @@
 		4576C2F0D4BCB0983D18B3DE /* SuggestionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57B46F99E041E6147DBFCE6 /* SuggestionBlocks.swift */; };
 		45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
 		46105F4548BD31EC85EC61CF /* IkigaiViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277E998B7BA4B19B1AEFB2C6 /* IkigaiViewModel.swift */; };
+		476CE65A1F2519FB454A1723 /* MacroComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BEA6580C3579079E772EDF /* MacroComplication.swift */; };
 		4864ED3E9586783879087215 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */; };
 		48B94D7C0B89E8D398A8226A /* NextComplicationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16A2330C66B761049C702ED /* NextComplicationViews.swift */; };
 		490A398C3B11F900B233B2F3 /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
@@ -289,6 +290,7 @@
 		620AD94FDB3EE952CF308E24 /* IkigaiQuadrantStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8568DA09F8C5545EBB0A2596 /* IkigaiQuadrantStep.swift */; };
 		6231241386B2C8D72BF97568 /* GoalMetricProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8FE1B8B5D5A1B17969276 /* GoalMetricProgressView.swift */; };
 		62C5EE0FBB7F2050E09F8663 /* GroceriesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */; };
+		63117FDEF0816875654E67D0 /* MacroComplicationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4E8B3CEF27206319F32F38 /* MacroComplicationViews.swift */; };
 		632655A0488ADF895CE234F8 /* NextWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26E0516067040713136547D /* NextWire.swift */; };
 		6333196E0D4D21B3870B208F /* WatchSnapshotPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */; };
 		637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FACD3A9FAD9509B187D281 /* SleepPlugin.swift */; };
@@ -940,6 +942,7 @@
 		5C480659283E01C4B16C910C /* DiscoveryMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryMiniApp.swift; sourceTree = "<group>"; };
 		5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAction.swift; sourceTree = "<group>"; };
 		5D227602C1039FA2206A539A /* SeptenaServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaServices.swift; sourceTree = "<group>"; };
+		5D4E8B3CEF27206319F32F38 /* MacroComplicationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroComplicationViews.swift; sourceTree = "<group>"; };
 		5DB73B809A74BC9ACB0122A5 /* SectionOnboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionOnboarding.swift; sourceTree = "<group>"; };
 		5DDBCEACF8957679BD5E02F2 /* LogRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogRow.swift; sourceTree = "<group>"; };
 		5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPicker.swift; sourceTree = "<group>"; };
@@ -1008,6 +1011,7 @@
 		851BE2CCE51793135E27E354 /* NextWatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWatchView.swift; sourceTree = "<group>"; };
 		8568DA09F8C5545EBB0A2596 /* IkigaiQuadrantStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IkigaiQuadrantStep.swift; sourceTree = "<group>"; };
 		85942F0F6AEDE3D4607485D4 /* DayBucket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayBucket.swift; sourceTree = "<group>"; };
+		85BEA6580C3579079E772EDF /* MacroComplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroComplication.swift; sourceTree = "<group>"; };
 		8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSection.swift; sourceTree = "<group>"; };
 		87FAF7FBE617575AF2437A61 /* GroceryIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryIntents.swift; sourceTree = "<group>"; };
 		880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayTimelineView.swift; sourceTree = "<group>"; };
@@ -1223,6 +1227,8 @@
 			children = (
 				75A7338B84E54DF44893A020 /* Assets.xcassets */,
 				4D23858A1A44DB2F156B311E /* Info.plist */,
+				85BEA6580C3579079E772EDF /* MacroComplication.swift */,
+				5D4E8B3CEF27206319F32F38 /* MacroComplicationViews.swift */,
 				C27BE273FD1D064942278AD1 /* NextComplication.swift */,
 				5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */,
 				A16A2330C66B761049C702ED /* NextComplicationViews.swift */,
@@ -2756,6 +2762,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				7D34AF91EF9504274547D1AF /* DayBucket.swift in Sources */,
+				476CE65A1F2519FB454A1723 /* MacroComplication.swift in Sources */,
+				63117FDEF0816875654E67D0 /* MacroComplicationViews.swift in Sources */,
 				68FEC658F37E69C0360A47D5 /* NextComplication.swift in Sources */,
 				CAC1308955C25982A48369D8 /* NextComplicationBundle.swift in Sources */,
 				48B94D7C0B89E8D398A8226A /* NextComplicationViews.swift in Sources */,

@@ -52,6 +52,36 @@ struct NextItemsResponse: Codable {
   /// a wrist-sized list, so the watch + menu can re-log a real meal (macros and
   /// all) with one tap. Optional so older payloads decode.
   var topMeals: [MealWire]? = nil
+  /// Today's macro totals-so-far against their targets, so the watch's macro-ring
+  /// complication can render Apple-Activity-style rings without replaying the
+  /// nutrition zone. Phone-computed (it owns the goals + the daily summary).
+  /// Optional so older payloads decode unchanged.
+  var nutritionRings: NutritionRingsWire? = nil
+}
+
+/// Today's nutrition macros as concentric "ring" progress — the wire feeding the
+/// watch macro complication. Each ring is one macro's running total against the
+/// target the user set (a range goal's upper bound, else the legacy
+/// `MacrosConfig`). Computed phone-side so the wrist only renders. Kept tiny —
+/// it rides the snapshot on every checklist mutation — so the view derives the
+/// per-macro label / unit / color from `key` rather than carrying them.
+struct NutritionRingsWire: Codable, Hashable {
+  /// Ordered outermost→innermost: kcal, protein, carbs, fat, fiber. The macro
+  /// complication draws them in this order and slices the first 3 for the small
+  /// circular family.
+  var rings: [MacroRingWire]
+}
+
+/// One macro ring: its key, today's total so far, and the value that fills the
+/// ring (nil when the user has set no target for that macro — the view draws a
+/// faint empty track instead of a fill).
+struct MacroRingWire: Codable, Hashable {
+  /// "kcal" | "protein" | "carbs" | "fat" | "fiber".
+  var key: String
+  /// Today's running total in the macro's unit (grams, or kcal).
+  var value: Double
+  /// The target the ring fills toward — a full ring means it's been reached.
+  var goal: Double?
 }
 
 /// One re-loggable meal on the wire: enough for a remote surface (watch) to
