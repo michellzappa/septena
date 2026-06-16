@@ -119,6 +119,18 @@ enum Theme {
   }()
   static let divider = border
 
+  /// Neutral list-selection tint. The app reserves accent colors to carry
+  /// section meaning, so the macOS row-selection capsule must NOT use the
+  /// system blue accent. This matches the sidebar's unemphasized-gray
+  /// selection so a highlighted task reads as "selected", not "tinted".
+  static let selectionNeutral: Color = {
+    #if os(macOS)
+    return Color(nsColor: .secondaryLabelColor)
+    #else
+    return Color.secondary
+    #endif
+  }()
+
   // MARK: - Semantic
 
   /// Destructive / overdue. System red — matches Apple Reminders' overdue

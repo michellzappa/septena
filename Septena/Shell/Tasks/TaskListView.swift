@@ -278,11 +278,27 @@ struct TaskListView: View {
     // is edit-mode circles, not a row highlight).
     #if os(macOS)
     .listStyle(.inset)
+    // Keep the selection capsule neutral-gray, not the system blue accent —
+    // accent colors are reserved to carry section meaning in this app, so a
+    // blue highlight would read as a (meaningless) tint. `.tint` here only
+    // recolors the selection; row icons set their own explicit colors.
+    .tint(Theme.selectionNeutral)
     #else
     .listStyle(.plain)
     #endif
     .scrollContentBackground(.hidden)
+    #if os(macOS)
+    // Clicking blank space (the paper behind the rows) clears the selection.
+    // Rows sit above this background, so row clicks never reach it — only
+    // empty gutters and the area below the last row deselect.
+    .background(
+      Theme.paperBackground
+        .contentShape(Rectangle())
+        .onTapGesture { clearSelection() }
+    )
+    #else
     .background(Theme.paperBackground)
+    #endif
     .scrollDismissesKeyboard(.interactively)
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
