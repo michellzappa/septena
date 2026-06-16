@@ -18,7 +18,7 @@ struct CoachChatView: View {
 
   @Environment(\.modelContext) private var context
   @State private var session: CoachSession?
-  @State private var window: CoachWindow = .week
+  @State private var window: CoachWindow = .thirteenWeeks
   /// Section keys the user tapped to mute — excluded from the coach's
   /// context. Persists across window changes within this chat.
   @State private var mutedKeys: Set<String> = []

@@ -5,14 +5,20 @@ import SwiftData
 /// "1 week" == today + the previous 6 days (the app's standard trailing-7
 /// convention), so `daysBack` is `days - 1`.
 enum CoachWindow: Int, CaseIterable, Identifiable {
-  case week = 1, twoWeeks = 2, fourWeeks = 4, eightWeeks = 8
+  case week = 1, twoWeeks = 2, fourWeeks = 4, eightWeeks = 8, thirteenWeeks = 13
 
   var id: Int { rawValue }
   var weeks: Int { rawValue }
   var days: Int { rawValue * 7 }
   var daysBack: Int { days - 1 }
-  var label: String { weeks == 1 ? "1 week" : "\(weeks) weeks" }
-  var shortLabel: String { "\(weeks)w" }
+  var label: String {
+    switch self {
+    case .week:          return "1 week"
+    case .thirteenWeeks: return "90 days"
+    default:             return "\(weeks) weeks"
+    }
+  }
+  var shortLabel: String { self == .thirteenWeeks ? "90d" : "\(weeks)w" }
 }
 
 /// One section's presence in the chat context — what the pills render.
