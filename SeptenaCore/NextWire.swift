@@ -57,6 +57,10 @@ struct NextItemsResponse: Codable {
   /// nutrition zone. Phone-computed (it owns the goals + the daily summary).
   /// Optional so older payloads decode unchanged.
   var nutritionRings: NutritionRingsWire? = nil
+  /// This week's (trailing-7-day) strength / cardio / session totals vs targets,
+  /// for the watch's training-ring complication. Phone-computed. Optional so
+  /// older payloads decode unchanged.
+  var trainingRings: TrainingRingsWire? = nil
 }
 
 /// Today's nutrition macros as concentric "ring" progress — the wire feeding the
@@ -69,16 +73,24 @@ struct NutritionRingsWire: Codable, Hashable {
   /// Ordered outermost→innermost: kcal, protein, carbs, fat, fiber. The macro
   /// complication draws them in this order and slices the first 3 for the small
   /// circular family.
-  var rings: [MacroRingWire]
+  var rings: [RingMetricWire]
 }
 
-/// One macro ring: its key, today's total so far, and the value that fills the
-/// ring (nil when the user has set no target for that macro — the view draws a
-/// faint empty track instead of a fill).
-struct MacroRingWire: Codable, Hashable {
-  /// "kcal" | "protein" | "carbs" | "fat" | "fiber".
+/// This week's training as concentric rings — strength, cardio, sessions. Same
+/// shape as the macro wire; the complication derives label / unit / color from
+/// each ring's `key`.
+struct TrainingRingsWire: Codable, Hashable {
+  /// Ordered outer→inner: "strength" (weekly hard sets), "cardio" (weekly
+  /// minutes), "sessions" (distinct training days this week).
+  var rings: [RingMetricWire]
+}
+
+/// One ring on the wire: its key, the running total, and the value that fills
+/// the ring (nil when there's no target — the view draws a faint empty track
+/// instead of a fill). Shared by every rings-style complication.
+struct RingMetricWire: Codable, Hashable {
   var key: String
-  /// Today's running total in the macro's unit (grams, or kcal).
+  /// The running total in the metric's unit (grams / kcal / minutes / count).
   var value: Double
   /// The target the ring fills toward — a full ring means it's been reached.
   var goal: Double?

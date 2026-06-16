@@ -19,12 +19,24 @@ struct MacroProvider: TimelineProvider {
       updatedAt: Date()))
   }
 
+  /// Real published data, or — in DEBUG only — the sample day when nothing has
+  /// been published yet, so a placed complication on a fresh simulator shows
+  /// filled rings without needing an iCloud-signed-in sim pair. Release builds
+  /// always show real data (empty tracks until the first sync).
+  private func currentData() -> MacroComplicationData {
+    let loaded = MacroComplicationData.load()
+    #if DEBUG
+    if loaded.rings.isEmpty { return .sample }
+    #endif
+    return loaded
+  }
+
   func getSnapshot(in context: Context, completion: @escaping (MacroEntry) -> Void) {
-    completion(MacroEntry(date: Date(), data: MacroComplicationData.load()))
+    completion(MacroEntry(date: Date(), data: currentData()))
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<MacroEntry>) -> Void) {
-    let entry = MacroEntry(date: Date(), data: MacroComplicationData.load())
+    let entry = MacroEntry(date: Date(), data: currentData())
     // Reload budget is tight on watchOS — the watch app calls
     // WidgetCenter.shared.reloadTimelines(ofKind:) after every snapshot fetch,
     // so a static, never-expiring timeline is enough.

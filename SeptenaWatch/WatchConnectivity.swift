@@ -136,6 +136,7 @@ final class WatchConnectivity {
       self.bucket        = bkt
       updateComplication()
       updateMacroComplication(response.nutritionRings)
+      updateTrainingComplication(response.trainingRings)
       scheduleNextRefresh()
     } catch let ckError as CKError where ckError.code == .unknownItem {
       errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
@@ -562,9 +563,20 @@ final class WatchConnectivity {
   /// there's nothing to update on a local wrist log.
   private func updateMacroComplication(_ wire: NutritionRingsWire?) {
     let rings = (wire?.rings ?? []).map {
-      MacroComplicationData.Ring(key: $0.key, value: $0.value, goal: $0.goal)
+      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal)
     }
     MacroComplicationData(rings: rings, updatedAt: Date()).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaMacroRings")
+  }
+
+  /// Mirror this week's phone-computed training totals into the app group and
+  /// refresh the training-ring complication. Phone-computed like the macro
+  /// rings — nothing to update on a local wrist log.
+  private func updateTrainingComplication(_ wire: TrainingRingsWire?) {
+    let rings = (wire?.rings ?? []).map {
+      ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal)
+    }
+    TrainingComplicationData(rings: rings, updatedAt: Date()).save()
+    WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaTraining")
   }
 }

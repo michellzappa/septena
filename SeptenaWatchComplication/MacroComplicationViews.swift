@@ -22,70 +22,14 @@ enum MacroStyle {
     }
   }
 
-  /// Short legend label.
-  static func label(_ key: String) -> String {
-    switch key {
-    case "kcal":    return "Cal"
-    case "protein": return "Protein"
-    case "carbs":   return "Carbs"
-    case "fat":     return "Fat"
-    case "fiber":   return "Fiber"
-    default:        return key.capitalized
-    }
-  }
-
   /// One-letter chip label for the cramped rectangular legend.
   static func chip(_ key: String) -> String {
     switch key {
-    case "kcal":    return ""      // shown as the headline number, not a chip
     case "protein": return "P"
     case "carbs":   return "C"
     case "fat":     return "F"
     case "fiber":   return "Fi"
     default:        return key.prefix(1).uppercased()
-    }
-  }
-}
-
-// MARK: - Concentric rings
-
-/// Apple-Activity-style concentric rings — one per macro, each filling toward its
-/// target. A nil goal (no target set) draws just the faint track. Sized to the
-/// smaller side of its frame so it stays circular in any family.
-struct MacroRingsView: View {
-  let rings: [MacroComplicationData.Ring]
-  var lineWidth: CGFloat
-  var spacing: CGFloat
-
-  var body: some View {
-    GeometryReader { geo in
-      let side = min(geo.size.width, geo.size.height)
-      ZStack {
-        ForEach(Array(rings.enumerated()), id: \.element.key) { idx, ring in
-          let inset = CGFloat(idx) * (lineWidth + spacing)
-          ringArc(ring)
-            .frame(width: side - inset * 2, height: side - inset * 2)
-        }
-      }
-      .frame(width: side, height: side)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-  }
-
-  @ViewBuilder
-  private func ringArc(_ ring: MacroComplicationData.Ring) -> some View {
-    let color = MacroStyle.color(ring.key)
-    let fraction: Double = {
-      guard let goal = ring.goal, goal > 0 else { return 0 }
-      return min(ring.value / goal, 1)
-    }()
-    ZStack {
-      Circle()
-        .stroke(color.opacity(0.22), lineWidth: lineWidth)
-      Circle()
-        .trim(from: 0, to: fraction)
-        .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-        .rotationEffect(.degrees(-90))
     }
   }
 }
@@ -100,11 +44,11 @@ struct MacroComplicationView: View {
   /// Always render the five canonical rings (falling back to empty tracks when
   /// the phone hasn't published yet) so the complication reads as "macros" even
   /// before the first sync.
-  private var rings: [MacroComplicationData.Ring] {
+  private var rings: [ComplicationRing] {
     let byKey = Dictionary(entry.data.rings.map { ($0.key, $0) },
                            uniquingKeysWith: { a, _ in a })
     return MacroStyle.order.map { key in
-      byKey[key] ?? MacroComplicationData.Ring(key: key, value: 0, goal: nil)
+      byKey[key] ?? ComplicationRing(key: key, value: 0, goal: nil)
     }
   }
 
@@ -128,12 +72,13 @@ struct MacroComplicationView: View {
 // MARK: - Circular: three rings (kcal · protein · carbs)
 
 private struct CircularMacroView: View {
-  let rings: [MacroComplicationData.Ring]
+  let rings: [ComplicationRing]
 
   var body: some View {
     // Five rings don't read at ~50pt — show the three headline macros, the rest
     // live on the rectangular family.
-    MacroRingsView(rings: Array(rings.prefix(3)), lineWidth: 5, spacing: 1.5)
+    RingsView(rings: Array(rings.prefix(3)), color: MacroStyle.color,
+              lineWidth: 5, spacing: 1.5)
       .padding(2)
       .widgetAccentable(false)
   }
@@ -142,51 +87,85 @@ private struct CircularMacroView: View {
 // MARK: - Rectangular: five rings + compact legend
 
 private struct RectangularMacroView: View {
-  let rings: [MacroComplicationData.Ring]
+  let rings: [ComplicationRing]
 
-  private var kcal: MacroComplicationData.Ring? {
-    rings.first { $0.key == "kcal" }
-  }
+  private var kcal: ComplicationRing? { rings.first { $0.key == "kcal" } }
+
+  /// protein / carbs / fat / fiber in ring order.
+  private var macros: [ComplicationRing] { rings.filter { $0.key != "kcal" } }
 
   var body: some View {
-    HStack(spacing: 8) {
-      MacroRingsView(rings: rings, lineWidth: 3.5, spacing: 1.5)
+    HStack(spacing: 9) {
+      RingsView(rings: rings, color: MacroStyle.color, lineWidth: 3.5, spacing: 1.5)
         .widgetAccentable(false)
 
-      VStack(alignment: .leading, spacing: 2) {
-        // Calories headline.
+      VStack(alignment: .leading, spacing: 4) {
+        // Calories headline, with its target.
         if let kcal {
-          HStack(alignment: .firstTextBaseline, spacing: 2) {
+          HStack(alignment: .firstTextBaseline, spacing: 1) {
             Text("\(Int(kcal.value.rounded()))")
-              .font(.headline.weight(.semibold))
+              .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(MacroStyle.color("kcal"))
             if let goal = kcal.goal {
               Text("/\(Int(goal.rounded()))")
-                .font(.caption2)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
             }
             Text("cal")
-              .font(.caption2)
+              .font(.system(size: 10))
               .foregroundStyle(.secondary)
           }
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
         }
-        // Protein / carbs / fat / fiber as tinted chips on (up to) two rows.
-        let macros = rings.filter { $0.key != "kcal" }
-        HStack(spacing: 6) {
-          ForEach(macros, id: \.key) { ring in
-            HStack(spacing: 1) {
-              Text("\(Int(ring.value.rounded()))")
-                .font(.caption2.weight(.medium))
-              Text(MacroStyle.chip(ring.key))
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(.secondary)
-            }
-            .foregroundStyle(MacroStyle.color(ring.key))
+        // The four macros as value/target cells in a 2-column grid, so the
+        // legend fills the width instead of leaving the right half empty.
+        Grid(horizontalSpacing: 10, verticalSpacing: 3) {
+          GridRow {
+            ForEach(macros.prefix(2), id: \.key) { macroCell($0) }
+          }
+          GridRow {
+            ForEach(macros.dropFirst(2), id: \.key) { macroCell($0) }
           }
         }
       }
-      Spacer(minLength: 0)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(.vertical, 1)
   }
+
+  /// "90/150 P" — current value, its target, and the macro's one-letter tag,
+  /// tinted to the ring color.
+  private func macroCell(_ ring: ComplicationRing) -> some View {
+    HStack(spacing: 1) {
+      Text("\(Int(ring.value.rounded()))")
+        .font(.system(size: 12, weight: .medium))
+      if let goal = ring.goal {
+        Text("/\(Int(goal.rounded()))")
+          .font(.system(size: 9))
+          .foregroundStyle(.secondary)
+      }
+      Text(MacroStyle.chip(ring.key))
+        .font(.system(size: 8, weight: .semibold))
+        .foregroundStyle(.secondary)
+    }
+    .foregroundStyle(MacroStyle.color(ring.key))
+    .lineLimit(1)
+    .minimumScaleFactor(0.6)
+    .gridColumnAlignment(.leading)
+  }
+}
+
+// MARK: - Previews (Xcode canvas — no simulator / CloudKit needed)
+
+#Preview("Rectangular · 5 rings", as: .accessoryRectangular) {
+  MacroComplication()
+} timeline: {
+  MacroEntry(date: .now, data: .sample)
+}
+
+#Preview("Circular · 3 rings", as: .accessoryCircular) {
+  MacroComplication()
+} timeline: {
+  MacroEntry(date: .now, data: .sample)
 }

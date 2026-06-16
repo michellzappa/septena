@@ -83,6 +83,7 @@
 		1A579BBFDFC67BB3FA2F7E6A /* InsightsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */; };
 		1A6A9B5FB89C891F4D104C82 /* NextWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26E0516067040713136547D /* NextWire.swift */; };
 		1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
+		1B7FA31CC9D25BA707B6EB31 /* ComplicationRingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */; };
 		1BBBC5F2298045DC6FD22C2F /* TrainingTabAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
@@ -141,6 +142,7 @@
 		2DCD1163302ADF72541A9664 /* EditChoreSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DD66C82573E23BF3CCA2F8 /* EditChoreSheet.swift */; };
 		2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
+		2EE26BE41A95A216674211D2 /* TrainingComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008C9FF807F34F3024F9B348 /* TrainingComplication.swift */; };
 		2F539741AC909D1E65D00CE5 /* WakingDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B436039E56AE29B498D15D /* WakingDay.swift */; };
 		2F5A937885F690EC85B4A322 /* GitHubDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4752E39BC337503CC5BAD76 /* GitHubDestinationView.swift */; };
 		2FD061F015DCEC73E647FAC4 /* SelectablePillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFFFB78909D8812C2A1C7D0 /* SelectablePillsView.swift */; };
@@ -283,6 +285,7 @@
 		5CB0D3A2E6ED546D4D3C6C6D /* OnDeviceReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A544624EC97D36270ACB0B /* OnDeviceReasoningProvider.swift */; };
 		5D923CE897D70AC9B5856743 /* CoachReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169846E5AAB2A89A91CD4290 /* CoachReply.swift */; };
 		5DA39382E21BCFF219BD239D /* AddMoodPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A1880819394CCA40FDB923 /* AddMoodPage.swift */; };
+		5E1ED756713680B72FBC64AE /* TrainingComplicationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE84A8D1F950FB1868B57F17 /* TrainingComplicationViews.swift */; };
 		5E69437B30686ABFF72010D1 /* SectionLogIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3030188F50F856913FBC4E /* SectionLogIntent.swift */; };
 		5F3A721CFBCA71FA8B02EF35 /* VirtueFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */; };
 		5FC8B85066ABC219A5C9EC86 /* NextWatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851BE2CCE51793135E27E354 /* NextWatchView.swift */; };
@@ -814,6 +817,7 @@
 
 /* Begin PBXFileReference section */
 		005258280CCE97383284B57E /* VirtuePromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtuePromptService.swift; sourceTree = "<group>"; };
+		008C9FF807F34F3024F9B348 /* TrainingComplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingComplication.swift; sourceTree = "<group>"; };
 		019FD83A1963232155425024 /* PhotosBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosBridge.swift; sourceTree = "<group>"; };
 		03669C5350B224AF8B8C7845 /* CoachBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachBackend.swift; sourceTree = "<group>"; };
 		0406A27ED1059173E5A4EBBD /* RhythmWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmWidget.swift; sourceTree = "<group>"; };
@@ -961,6 +965,7 @@
 		675F31A4511CBADB2FB97B81 /* MoodIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodIntents.swift; sourceTree = "<group>"; };
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
 		691B6450608A9F9E24709985 /* RhythmSnapshotBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmSnapshotBuilder.swift; sourceTree = "<group>"; };
+		6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationRingsView.swift; sourceTree = "<group>"; };
 		6B51BC53BD88D706639E85DB /* ChoreDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreDetailView.swift; sourceTree = "<group>"; };
 		6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCommit.swift; sourceTree = "<group>"; };
 		6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionRecord.swift; sourceTree = "<group>"; };
@@ -1103,6 +1108,7 @@
 		CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationFeatures.swift; sourceTree = "<group>"; };
 		CD891B290B495297685543B8 /* ReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportModels.swift; sourceTree = "<group>"; };
 		CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntensityGlyph.swift; sourceTree = "<group>"; };
+		CE84A8D1F950FB1868B57F17 /* TrainingComplicationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingComplicationViews.swift; sourceTree = "<group>"; };
 		CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionQuickAddMenu.swift; sourceTree = "<group>"; };
 		CF2235080B8CCDA9426DAFD9 /* PurposePromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurposePromptService.swift; sourceTree = "<group>"; };
 		D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
@@ -1229,6 +1235,7 @@
 			isa = PBXGroup;
 			children = (
 				75A7338B84E54DF44893A020 /* Assets.xcassets */,
+				6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */,
 				4D23858A1A44DB2F156B311E /* Info.plist */,
 				85BEA6580C3579079E772EDF /* MacroComplication.swift */,
 				5D4E8B3CEF27206319F32F38 /* MacroComplicationViews.swift */,
@@ -1236,6 +1243,8 @@
 				5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */,
 				A16A2330C66B761049C702ED /* NextComplicationViews.swift */,
 				F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */,
+				008C9FF807F34F3024F9B348 /* TrainingComplication.swift */,
+				CE84A8D1F950FB1868B57F17 /* TrainingComplicationViews.swift */,
 			);
 			path = SeptenaWatchComplication;
 			sourceTree = "<group>";
@@ -2766,6 +2775,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1B7FA31CC9D25BA707B6EB31 /* ComplicationRingsView.swift in Sources */,
 				7D34AF91EF9504274547D1AF /* DayBucket.swift in Sources */,
 				476CE65A1F2519FB454A1723 /* MacroComplication.swift in Sources */,
 				63117FDEF0816875654E67D0 /* MacroComplicationViews.swift in Sources */,
@@ -2773,6 +2783,8 @@
 				CAC1308955C25982A48369D8 /* NextComplicationBundle.swift in Sources */,
 				48B94D7C0B89E8D398A8226A /* NextComplicationViews.swift in Sources */,
 				7EACBD21879EB225D558CF78 /* SharedComplicationData.swift in Sources */,
+				2EE26BE41A95A216674211D2 /* TrainingComplication.swift in Sources */,
+				5E1ED756713680B72FBC64AE /* TrainingComplicationViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
