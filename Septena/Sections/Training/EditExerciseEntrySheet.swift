@@ -29,6 +29,9 @@ struct EditExerciseEntrySheet: View {
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
   private var effortScale: EffortScale { EffortScale(rawValue: effortScaleRaw) ?? .difficulty }
 
+  @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
+  private var weightUnit: WeightUnit { WeightUnit.resolve(weightUnitRaw) }
+
   /// Cardio if the loaded entry already carries any cardio-shaped field.
   private var isCardio: Bool {
     original.durationMin != nil || original.distanceM != nil || original.level != nil
@@ -54,7 +57,7 @@ struct EditExerciseEntrySheet: View {
           }
         } else {
           Section("Strength") {
-            numberRow("Weight (kg)", text: $weight)
+            numberRow("Weight (\(weightUnit.suffix))", text: $weight)
             numberRow("Sets", text: $sets)
             numberRow("Reps", text: $reps)
             // Leading label already says "RIR"/"Difficulty", so the RIR
@@ -90,7 +93,8 @@ struct EditExerciseEntrySheet: View {
   }
 
   private func seed() {
-    weight = original.weight.map(numString) ?? ""
+    // Stored in kg; show in the user's chosen unit, parse back to kg on save.
+    weight = original.weight.map { numString(weightUnit.display($0)) } ?? ""
     sets = original.sets ?? ""
     reps = original.reps ?? ""
     // Fold any legacy spelling ("medium"/"max") to a canonical key so the
@@ -103,6 +107,12 @@ struct EditExerciseEntrySheet: View {
 
   private func numString(_ d: Double) -> String {
     d == d.rounded() ? String(Int(d)) : d.decimalString()
+  }
+
+  /// The typed weight parsed back into kilograms for storage (the field shows
+  /// the user's unit; the model is always kg).
+  private func parseWeightKg() -> Double? {
+    parseWeightKg().map { weightUnit.toKilograms($0) }
   }
 
   private func parseDouble(_ s: String) -> Double? {
@@ -137,7 +147,7 @@ struct EditExerciseEntrySheet: View {
     } else {
       trainingMutator.updateEntry(
         id: id,
-        weight: .some(parseDouble(weight)),
+        weight: .some(parseWeightKg()),
         sets: .some(setsStr.isEmpty ? nil : setsStr),
         reps: .some(repsStr.isEmpty ? nil : repsStr),
         difficulty: .some(difficulty.isEmpty ? nil : difficulty),
@@ -156,7 +166,7 @@ struct EditExerciseEntrySheet: View {
       date: original.date,
       session: original.session,
       exercise: original.exercise,
-      weight: isCardio ? nil : parseDouble(weight),
+      weight: isCardio ? nil : parseWeightKg(),
       sets: isCardio ? nil : (setsStr.isEmpty ? nil : setsStr),
       reps: isCardio ? nil : (repsStr.isEmpty ? nil : repsStr),
       difficulty: isCardio ? nil : (difficulty.isEmpty ? nil : difficulty),

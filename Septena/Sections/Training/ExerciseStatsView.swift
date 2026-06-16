@@ -88,21 +88,23 @@ struct ExerciseStatsView: View {
       d.chart = LogChartContent(
         title: TrainingProgressFormat.title(metric),
         detail: TrainingProgressFormat.trend(series)?.text,
-        view: AnyView(TrainingProgressChart(series: series, accent: accent, height: 150))
+        view: AnyView(TrainingProgressChart(series: series, accent: accent, height: 150,
+                                            weightFactor: WeightUnit.current.displayFactor))
       )
     }
 
     // PR card — only the records that exist for this exercise's modality.
     var pr = LogCard(title: "Records")
     if let e = baseline.e1RM {
-      var v = "\(Int(e.rounded())) kg"
+      let u = WeightUnit.current
+      var v = "\(Int(u.display(e).rounded())) \(u.suffix)"
       if let w = baseline.bestWeight, let r = baseline.bestReps {
-        v += "  ·  \(trimKg(w)) × \(r)"
+        v += "  ·  \(trimWeight(w)) × \(r)"
       }
       pr.rows.append(LogKeyValue(label: "Est. 1RM", value: v))
     } else if let w = baseline.bestWeight {
       let r = baseline.bestReps.map { " × \($0)" } ?? ""
-      pr.rows.append(LogKeyValue(label: "Best set", value: "\(trimKg(w))\(r)"))
+      pr.rows.append(LogKeyValue(label: "Best set", value: "\(trimWeight(w))\(r)"))
     }
     if let dist = baseline.bestDistanceM {
       pr.rows.append(LogKeyValue(label: "Best distance", value: formatDistance(dist)))
@@ -160,8 +162,11 @@ struct ExerciseStatsView: View {
   }
 
   private static func headlinePR(_ b: PRBaseline) -> String {
-    if let e = b.e1RM { return "\(Int(e.rounded()))kg" }
-    if let w = b.bestWeight { return "\(trimKg(w))kg" }
+    if let e = b.e1RM {
+      let u = WeightUnit.current
+      return "\(Int(u.display(e).rounded()))\(u.suffix)"
+    }
+    if let w = b.bestWeight { return trimWeight(w) }
     if let dist = b.bestDistanceM { return formatDistance(dist) }
     if let dur = b.bestDurationMin { return "\(Int(dur.rounded()))m" }
     return "—"
@@ -175,8 +180,14 @@ struct ExerciseStatsView: View {
     return "record"
   }
 
-  private static func trimKg(_ w: Double) -> String {
-    w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))kg" : "\(w.decimalString(1))kg"
+  /// Format a stored-kg weight in the user's chosen unit, dropping a trailing
+  /// ".0". (The detail builder runs off a view, so it reads the non-reactive
+  /// `WeightUnit.current` snapshot — the detail rebuilds on the next visit.)
+  private static func trimWeight(_ kg: Double) -> String {
+    let u = WeightUnit.current
+    let w = u.display(kg)
+    let num = w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : w.decimalString(1)
+    return "\(num)\(u.suffix)"
   }
 
   private static func formatDistance(_ m: Double) -> String {
@@ -200,7 +211,7 @@ struct ExerciseStatsView: View {
 
   private static func detailLine(_ e: ExerciseEntryEntity) -> String? {
     var parts: [String] = []
-    if let w = e.weight, w > 0 { parts.append(trimKg(w)) }
+    if let w = e.weight, w > 0 { parts.append(trimWeight(w)) }
     if let s = e.sets, let r = e.reps { parts.append("\(s)×\(r)") }
     else if let r = e.reps { parts.append(r) }
     if let d = e.durationMin, d > 0 { parts.append("\(Int(d)) min") }

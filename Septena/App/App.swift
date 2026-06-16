@@ -242,6 +242,11 @@ struct SeptenaApp: App {
             // from another device, or push a pre-existing local override up.
             settingsStore.reconcileDayBucketCutoffs(
               context: localStore.container.mainContext, engine: ckEngine)
+            // Same bridge for the weight-unit preference: adopt an inbound
+            // value from another device, or push the locale-seeded local
+            // default up so it syncs.
+            settingsStore.reconcileUnits(
+              context: localStore.container.mainContext, engine: ckEngine)
             // Grandfather established accounts past the first-run welcome:
             // `onboardedAt` is a new field, so every pre-existing user starts
             // nil — stamp it when the account already has data so the welcome

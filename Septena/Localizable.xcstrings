@@ -3674,6 +3674,9 @@
     "Immediately" : {
 
     },
+    "Imperial (lb)" : {
+
+    },
     "Import" : {
       "localizations" : {
         "pt-BR" : {
@@ -4428,6 +4431,9 @@
           }
         }
       }
+    },
+    "Metric (kg)" : {
+
     },
     "Minimal" : {
       "localizations" : {
@@ -7466,6 +7472,9 @@
           }
         }
       }
+    },
+    "Whether weights show in kilograms or pounds across Training and Body. Your data is always stored the same way — this only changes how it’s displayed and entered." : {
+
     },
     "Whose turn?" : {
 

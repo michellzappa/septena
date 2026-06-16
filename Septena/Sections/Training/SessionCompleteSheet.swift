@@ -115,6 +115,8 @@ struct SessionCompleteSheet: View {
   @State private var celebrate = 0
   @State private var note = ""
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+  @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
+  private var weightUnit: WeightUnit { WeightUnit.resolve(weightUnitRaw) }
 
   /// The logged rung rendered under the user's chosen scale, e.g. "Hard" or
   /// "RIR 1"; falls back to the raw string for anything unrecognized.
@@ -265,7 +267,7 @@ struct SessionCompleteSheet: View {
         statTile(
           label: "Volume",
           value: stats.totalVolumeKg > 0
-            ? "\(Int(stats.totalVolumeKg.rounded())) kg" : "—",
+            ? "\(Int(weightUnit.display(stats.totalVolumeKg).rounded())) \(weightUnit.suffix)" : "—",
           sub: "weight × sets × reps"
         )
         statTile(
@@ -326,7 +328,7 @@ struct SessionCompleteSheet: View {
       Text(CanonicalExerciseName.display(e.exercise))
         .font(.subheadline)
       if let pr = stats.prFlags[e.id] {
-        if pr.weight   { prPill("PR kg") }
+        if pr.weight   { prPill("PR \(weightUnit.suffix)") }
         if pr.distance { prPill("PR m") }
         if pr.duration { prPill("PR min") }
       }
@@ -361,7 +363,8 @@ struct SessionCompleteSheet: View {
     } else {
       if let s = e.sets, let r = e.reps { parts.append("\(s)×\(r)") }
       if let w = e.weight, w > 0 {
-        parts.append("@ \(w.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(w))" : w.decimalString()) kg")
+        let dw = weightUnit.display(w)
+        parts.append("@ \(dw.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(dw))" : dw.decimalString()) \(weightUnit.suffix)")
       }
     }
     if !e.difficulty.isEmpty { parts.append(effortText(e.difficulty)) }

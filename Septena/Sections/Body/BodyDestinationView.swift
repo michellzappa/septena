@@ -16,8 +16,20 @@ struct BodyDestinationView: View {
   // Body is a read-only dual section (Withings-synced, no manual entry): Log =
   // stat readouts + weigh-ins list; Patterns = the trend charts. Default Log.
   @State private var mode: DrawerMode = .remembered(for: "body", default: .log)
+  @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
+  private var weightUnit: WeightUnit { WeightUnit.resolve(weightUnitRaw) }
 
   private var accent: Color { theme.color(for: "body") }
+
+  /// Body weights are stored in kg; render them in the user's chosen unit.
+  private func weightString(_ kg: Double, _ digits: Int = 1) -> String {
+    weightUnit.display(kg).decimalString(digits)
+  }
+
+  /// "min–max u" target range, converting the stored-kg bounds.
+  private func weightRange(_ minKg: Double, _ maxKg: Double) -> String {
+    "\(Int(weightUnit.display(minKg).rounded()))–\(Int(weightUnit.display(maxKg).rounded())) \(weightUnit.suffix)"
+  }
 
   // Hoisted formatters — these run in render paths; re-allocating a
   // DateFormatter per render is expensive, so share one configured
@@ -55,7 +67,7 @@ struct BodyDestinationView: View {
           LogRow(
             title: friendlyDate(row.date),
             detail: detailLine(row),
-            trailing: row.weightKg.map { "\($0.decimalString()) kg" }
+            trailing: row.weightKg.map { "\(weightString($0)) \(weightUnit.suffix)" }
           )
         }
       }
@@ -81,11 +93,11 @@ struct BodyDestinationView: View {
   private var statsSection: some View {
     StatGrid(columns: 3) {
         statTile(label: "Weight",
-                 value: latest(\.weightKg).map { $0.decimalString() },
-                 unit: "kg",
+                 value: latest(\.weightKg).map { weightString($0) },
+                 unit: weightUnit.suffix,
                  target: targets.flatMap { t in
                    if let mn = t.weightMinKg, let mx = t.weightMaxKg {
-                     return "\(Int(mn))–\(Int(mx)) kg"
+                     return weightRange(mn, mx)
                    }
                    return nil
                  },
@@ -103,22 +115,22 @@ struct BodyDestinationView: View {
         weeklyDeltaTile
         if latest(\.muscleMassKg) != nil {
           statTile(label: "Muscle",
-                   value: latest(\.muscleMassKg).map { $0.decimalString() },
-                   unit: "kg",
+                   value: latest(\.muscleMassKg).map { weightString($0) },
+                   unit: weightUnit.suffix,
                    target: nil,
                    color: accent.opacity(0.85))
         }
         if latest(\.hydrationKg) != nil {
           statTile(label: "Hydration",
-                   value: latest(\.hydrationKg).map { $0.decimalString() },
-                   unit: "kg",
+                   value: latest(\.hydrationKg).map { weightString($0) },
+                   unit: weightUnit.suffix,
                    target: nil,
                    color: accent.opacity(0.6))
         }
         if latest(\.boneMassKg) != nil {
           statTile(label: "Bone Mass",
-                   value: latest(\.boneMassKg).map { $0.decimalString() },
-                   unit: "kg",
+                   value: latest(\.boneMassKg).map { weightString($0) },
+                   unit: weightUnit.suffix,
                    target: nil,
                    color: accent.opacity(0.5))
         }
@@ -148,7 +160,7 @@ struct BodyDestinationView: View {
   }
 
   private var weeklyDeltaTile: some View {
-    let delta = weeklyWeightDelta()
+    let delta = weeklyWeightDelta().map { weightUnit.display($0) }
     let formatted: String? = delta.map { (d: Double) -> String in
       let sign = d > 0 ? "+" : ""
       return "\(sign)\(d.decimalString())"
@@ -160,7 +172,7 @@ struct BodyDestinationView: View {
           Text(formatted ?? "—")
             .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
             .foregroundStyle(color)
-          Text("kg")
+          Text(weightUnit.suffix)
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
@@ -195,24 +207,28 @@ struct BodyDestinationView: View {
         trendChart(title: "Weight",
                    caption: targets.flatMap { t in
                      if let mn = t.weightMinKg, let mx = t.weightMaxKg {
-                       return "\(Int(mn))–\(Int(mx)) kg"
+                       return weightRange(mn, mx)
                      }
                      return nil
                    },
                    keyPath: \.weightKg,
-                   unit: "kg",
+                   unit: weightUnit.suffix,
+                   scale: weightUnit.displayFactor,
                    showTrend: true)
         trendChart(title: "Body Fat", caption: "↓ 10–15%",
                    keyPath: \.fatPct, unit: "%",
                    showTrend: true)
-        trendChart(title: "Muscle", caption: "kg",
-                   keyPath: \.muscleMassKg, unit: "kg",
+        trendChart(title: "Muscle", caption: weightUnit.suffix,
+                   keyPath: \.muscleMassKg, unit: weightUnit.suffix,
+                   scale: weightUnit.displayFactor,
                    showTrend: true)
-        trendChart(title: "Hydration", caption: "kg",
-                   keyPath: \.hydrationKg, unit: "kg",
+        trendChart(title: "Hydration", caption: weightUnit.suffix,
+                   keyPath: \.hydrationKg, unit: weightUnit.suffix,
+                   scale: weightUnit.displayFactor,
                    showTrend: false)
-        trendChart(title: "Bone Mass", caption: "kg",
-                   keyPath: \.boneMassKg, unit: "kg",
+        trendChart(title: "Bone Mass", caption: weightUnit.suffix,
+                   keyPath: \.boneMassKg, unit: weightUnit.suffix,
+                   scale: weightUnit.displayFactor,
                    showTrend: false)
       }
     }
@@ -221,10 +237,12 @@ struct BodyDestinationView: View {
   @ViewBuilder
   private func trendChart(title: String, caption: String?,
                           keyPath: KeyPath<WithingsRow, Double?>,
-                          unit: String, showTrend: Bool) -> some View {
+                          unit: String, scale: Double = 1, showTrend: Bool) -> some View {
     let points = chronological.compactMap { row -> (date: String, value: Double)? in
       guard let v = row[keyPath: keyPath] else { return nil }
-      return (row.date, v)
+      // Pre-scale into the display unit so the domain, projection, axis, and
+      // accessibility values all stay consistent without further conversion.
+      return (row.date, v * scale)
     }
     if !points.isEmpty {
       let trend = showTrend ? linearTrend(points.map { $0.value }) : nil
@@ -350,7 +368,7 @@ struct BodyDestinationView: View {
   private func detailLine(_ r: WithingsRow) -> String? {
     var parts: [String] = []
     if let f = r.fatPct { parts.append("\(f.decimalString())% fat") }
-    if let m = r.muscleMassKg { parts.append("\(m.decimalString()) kg muscle") }
+    if let m = r.muscleMassKg { parts.append("\(weightString(m)) \(weightUnit.suffix) muscle") }
     return parts.isEmpty ? nil : parts.joined(separator: " · ")
   }
 

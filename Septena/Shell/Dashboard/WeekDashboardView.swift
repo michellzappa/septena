@@ -1729,15 +1729,15 @@ struct WeekDashboardView: View {
       accent: theme.color(for: "body"),
       headline: {
         let parts = [
-          weight.map { String(format: "%.1f kg", $0) },
+          weight.map { String(format: "%.1f \(WeightUnit.current.suffix)", WeightUnit.current.display($0)) },
           fat.map { String(format: "%.1f%%", $0) },
         ].compactMap { $0 }
         return parts.isEmpty ? "—" : parts.joined(separator: " · ")
       }(),
       headlineStats: [
         .init(label: "Weight",
-              value: weight.map { String(format: "%.1f", $0) } ?? "—",
-              unit: "kg"),
+              value: weight.map { String(format: "%.1f", WeightUnit.current.display($0)) } ?? "—",
+              unit: WeightUnit.current.suffix),
         .init(label: "Fat",
               value: fat.map { String(format: "%.1f", $0) } ?? "—",
               unit: "%"),
@@ -2493,7 +2493,7 @@ struct WeekDashboardView: View {
         title: String(localized: "Body", comment: "Section name"),
         accent: accent,
         stats: [
-          .init(label: "Weight", value: weight.map { String(format: "%.1f", $0) } ?? "—", unit: "kg"),
+          .init(label: "Weight", value: weight.map { String(format: "%.1f", WeightUnit.current.display($0)) } ?? "—", unit: WeightUnit.current.suffix),
           .init(label: "Fat",    value: fat.map { String(format: "%.1f", $0) } ?? "—", unit: "%")
         ],
         progress: .init(label: "Body fat target",

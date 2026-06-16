@@ -75,6 +75,13 @@ enum SettingsKey {
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
+  /// Device-local mirror of `AppSettings.units.weight` ("kg"/"lb") that the
+  /// Training and Body display surfaces read via `@AppStorage` for instant,
+  /// offline-safe formatting. The literal lives on `WeightUnit` so the helper
+  /// and this constant can't drift (same arrangement as `localMcpEnabled` →
+  /// `MCPDefaultsKey.enabled`). Written by `SettingsStore.setWeightUnit` /
+  /// `reconcileUnits`; seeded from the device locale on first launch.
+  static let weightUnit = WeightUnit.defaultsKey
   /// Voice of the generated welcome greeting. Raw value of `WelcomeTone`.
   static let welcomeTone = "septena.homepage.welcomeTone"
   /// Today's on-device generated welcome lines, JSON-encoded and keyed by
@@ -327,6 +334,10 @@ final class SettingsStore {
     // local→cloud migration leg is deferred to the launch reconcile.
     reconcileWelcomeName(context: context, engine: nil)
     reconcileDayBucketCutoffs(context: context, engine: nil)
+    // Seed the weight-unit mirror from the locale (or adopt a synced value) so
+    // the first frame's Training / Body weights format correctly. Inbound-only
+    // here (no engine); the launch task pushes a fresh seed up.
+    reconcileUnits(context: context, engine: nil)
     // Inbound-only at init (no engine): if a synced `onboardedAt` is already
     // in the local mirror, adopt it into the device-local flag now so the
     // welcome gate decides synchronously on the first frame and never waits
@@ -401,6 +412,53 @@ final class SettingsStore {
     s.welcomeName = name
     serverSettings = s
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Set the user's weight/distance unit preference. Writes the device-local
+  /// `@AppStorage` mirror that display surfaces read (so the UI re-formats
+  /// instantly) and the CloudKit-synced `AppUnits` payload (so the choice
+  /// follows them across devices). Distance rides along with the same
+  /// metric/imperial decision so the two `AppUnits` fields stay coherent.
+  /// Mirrors the `setWelcomeName` write pattern.
+  func setWeightUnit(_ unit: WeightUnit, context: ModelContext, engine: CKEngine?) {
+    UserDefaults.standard.set(unit.rawValue, forKey: SettingsKey.weightUnit)
+    let distance = unit == .kg ? "km" : "mi"
+    guard serverSettings?.units?.weight != unit.rawValue
+            || serverSettings?.units?.distance != distance else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.units = AppUnits(weight: unit.rawValue, distance: distance)
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the synced weight unit with the device-local `@AppStorage`
+  /// mirror that the Training / Body surfaces read. Same inbound/outbound shape
+  /// as `reconcileWelcomeName`:
+  /// - A synced value wins: copy it into the local mirror so a choice made on
+  ///   another device shows up here.
+  /// - No synced value yet: seed the mirror from the device locale (US → lb,
+  ///   else kg) so weights read correctly on the very first frame, and — only
+  ///   on the launch path (engine in hand) — push that seed up so it syncs.
+  func reconcileUnits(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.weightUnit
+    if let synced = serverSettings?.units?.weight, !synced.isEmpty {
+      if UserDefaults.standard.string(forKey: key) != synced {
+        UserDefaults.standard.set(synced, forKey: key)
+      }
+      return
+    }
+    // No synced preference. Adopt the locale default into the local mirror the
+    // first time we see this install so display is right immediately.
+    if UserDefaults.standard.string(forKey: key) == nil {
+      UserDefaults.standard.set(WeightUnit.localeDefault.rawValue, forKey: key)
+    }
+    // Persist the local choice up to the synced payload on the launch path.
+    if engine != nil {
+      setWeightUnit(WeightUnit.resolve(UserDefaults.standard.string(forKey: key)),
+                    context: context, engine: engine)
+    }
   }
 
   /// Persist the saved practitioner-report definitions into the synced
@@ -1114,11 +1172,39 @@ struct HomeSettingsPane: View {
 /// Home Screen quick actions, and the logging-animation switch. Notifications
 /// graduated to its own root row; homepage settings moved to Home.
 struct GeneralSettingsPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
   @AppStorage(SettingsKey.loggingAnimationsEnabled)
   private var loggingAnimationsEnabled: Bool = true
+  // Drives the units picker's selection reactively; the actual write goes
+  // through `store.setWeightUnit` (mirror + synced payload), which rewrites
+  // this same key so the control reflects the change immediately.
+  @AppStorage(SettingsKey.weightUnit)
+  private var weightUnitRaw = WeightUnit.kg.rawValue
+
+  private var unitsBinding: Binding<WeightUnit> {
+    Binding {
+      WeightUnit.resolve(weightUnitRaw)
+    } set: { newValue in
+      store.setWeightUnit(newValue, context: modelContext, engine: ckEngine)
+    }
+  }
 
   var body: some View {
     Form {
+      Section {
+        Picker(selection: unitsBinding) {
+          Text("Metric (kg)").tag(WeightUnit.kg)
+          Text("Imperial (lb)").tag(WeightUnit.lb)
+        } label: {
+          Label("Units", systemImage: "scalemass")
+        }
+      } footer: {
+        Text("Whether weights show in kilograms or pounds across Training and Body. Your data is always stored the same way — this only changes how it’s displayed and entered.")
+      }
+
       Section {
         NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
           Label("Time of Day", systemImage: "clock")
