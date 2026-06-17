@@ -62,7 +62,10 @@ struct IntakeKindPageView: View {
                   currentDate: $viewingDate,
                   mode: $mode,
                   modeStorageKey: "intake.\(kindID)",
-                  showsSettingsLink: false,
+                  // The footer "Customize <Kind>" link opens this kind's own
+                  // Manage sheet — for a per-kind page that IS the settings,
+                  // not the section-wide pane the default link deep-links to.
+                  settingsAction: { managing = true },
                   log: {
       DrawerSection("Log", padding: .none) {
         if !entries.isEmpty {

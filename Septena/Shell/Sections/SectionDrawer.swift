@@ -342,6 +342,12 @@ struct SectionDrawer<Content: View>: View {
   /// also self-hides for utility drawers (empty `title` or a `sectionKey`
   /// with no `SectionManifest`) and while time-traveling.
   var showsSettingsLink: Bool = true
+  /// Optional override for the footer link's tap. When set, the "Customize
+  /// <Section>" link runs this instead of deep-linking into the section's
+  /// Settings pane — for drawers whose real settings live elsewhere (e.g.
+  /// Intake's per-kind pages, where each kind's settings is its own Manage
+  /// sheet rather than the section-wide pane).
+  var settingsAction: (() -> Void)? = nil
   /// Whether to flow `content()` through `DrawerColumns` (the 1-vs-2 column
   /// masonry). Default on. Set `false` for destinations that are a *single*
   /// monolithic view doing their own internal width-responsive layout (e.g.
@@ -522,12 +528,16 @@ struct SectionDrawer<Content: View>: View {
               }
               if showsSettings {
                 SectionSettingsLink(sectionTitle: resolvedTitle) {
-                  #if os(macOS)
-                  nav.settingsDestination = .section(sectionKey)
-                  nav.showSettings = true
-                  #else
-                  showingSettings = true
-                  #endif
+                  if let settingsAction {
+                    settingsAction()
+                  } else {
+                    #if os(macOS)
+                    nav.settingsDestination = .section(sectionKey)
+                    nav.showSettings = true
+                    #else
+                    showingSettings = true
+                    #endif
+                  }
                 }
               }
             }
@@ -1466,6 +1476,7 @@ extension SectionDrawer {
     mode: Binding<DrawerMode>,
     modeStorageKey: String? = nil,
     showsSettingsLink: Bool = true,
+    settingsAction: (() -> Void)? = nil,
     @ViewBuilder log: @escaping () -> Log,
     @ViewBuilder patterns: @escaping () -> Patterns
   ) where Content == DrawerModeColumns<Log, Patterns> {
@@ -1480,6 +1491,7 @@ extension SectionDrawer {
       mode: mode,
       modeStorageKey: modeStorageKey,
       showsSettingsLink: showsSettingsLink,
+      settingsAction: settingsAction,
       // The dual body runs its own column layout (single mode → masonry; both
       // → two halves), so the drawer hands it the full content width rather
       // than wrapping it in the standard `DrawerColumns` masonry.
