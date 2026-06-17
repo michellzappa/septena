@@ -111,6 +111,151 @@ final class ScreenshotTests: XCTestCase {
     // Settings editors — best-effort navigation; skip cleanly if labels differ.
     captureSettingsSections(app, "sections")   // proves "turn on only what matters"
     captureSettingsRow(app, ["AI", "Intelligence", "MCP"], "ai")  // proves "bring your own AI"
+
+    // Pass 5 — cornerstone deep screens. The marketing site wants 3–4 shots for
+    // each of the three cornerstone sections (Tasks, Training, Nutrition), so
+    // these go past the single section-detail capture into the views that show
+    // the section's depth: a project board, a task composer, the Patterns charts
+    // (progression / strength / macros), and a meal editor. All best-effort —
+    // every navigation guards on existence/hittability and RETURNS silently on a
+    // miss, so a relabelled control degrades to a skipped shot, never a failed run.
+    // (Demo-seeded labels: project "Q3 launch" + task "Draft the Q3 plan" from
+    // DemoSeed.swift; the Log⇄Patterns toggle is a single button whose a11y label
+    // is "Show patterns" while in Log mode — see SectionDrawer.DrawerModeToggle.)
+    // Relaunch first: Pass 4 ends inside Settings, whose modal can cover the tab
+    // bar and make every tab-based navigation below silently miss. A fresh launch
+    // returns us to the dashboard/tabs.
+    app.terminate()
+    launch(app, layout: "dense")
+    captureTasksProject(app)   // "tasks-project"
+    // captureTasksEditor skipped: opening the composer hangs the app's main
+    // thread (~30s) under UI test, which fails the whole run. The project board
+    // + Today view already cover Tasks; revisit if the composer hang is fixed.
+    captureTrainingPatterns(app)   // "training-progression" + "training-strength"
+    captureNutritionPatterns(app)  // "nutrition-macros"
+    captureNutritionMeal(app)      // "nutrition-meal"
+  }
+
+  /// Tasks cornerstone, shot 1: a project board. From the Tasks-tab sidebar,
+  /// open the seeded "Q3 launch" project (DemoSeed `proj-q3`) and snapshot it,
+  /// then return to the tab root. Best-effort: returns silently if the row or
+  /// project view can't be reached.
+  @MainActor private func captureTasksProject(_ app: XCUIApplication) {
+    tapTab(app, "Tasks"); dwell(0.6)
+    // Specific-type query (like captureSection) — never descendants(.any), which
+    // walks the whole tree and times out.
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Q3 launch")).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 6 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()
+    capture(app, "tasks-project")
+    // Back out: a Back button on compact (push) or just re-select the tab.
+    let back = app.navigationBars.buttons.element(boundBy: 0)
+    if back.exists, back.isHittable { back.tap() } else { tapTab(app, "Tasks") }
+    dwell(0.5)
+  }
+
+  /// Tasks cornerstone, shot 2: the task composer. From the Tasks Today view,
+  /// tap the seeded "Draft the Q3 plan" row to open the editor sheet, snapshot
+  /// it, then dismiss. Best-effort throughout.
+  @MainActor private func captureTasksEditor(_ app: XCUIApplication) {
+    tapTab(app, "Tasks"); dwell(0.5)
+    tapFirst(app, ["Today"]); dwell(0.6)
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Draft the Q3 plan")).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 6 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()
+    capture(app, "tasks-editor")
+    // Dismiss the composer sheet: an explicit Cancel/Done if present, else swipe down.
+    for label in ["Cancel", "Done"] {
+      let b = app.buttons[label]
+      if b.exists, b.isHittable { b.tap(); dwell(0.5); return }
+    }
+    app.swipeDown(); dwell(0.5)
+  }
+
+  /// Flip a Log/Patterns drawer into Patterns. The toggle is a single button
+  /// (SectionDrawer.DrawerModeToggle) whose a11y label reads "Show patterns"
+  /// while the drawer is in Log mode and "Show log" once in Patterns — so we tap
+  /// "Show patterns" only. Best-effort: returns silently if absent (single-mode
+  /// drawers have no toggle, or it's already in Patterns).
+  @MainActor private func togglePatterns(_ app: XCUIApplication) {
+    let toggle = app.buttons["Show patterns"]
+    if toggle.waitForExistence(timeout: 3), toggle.isHittable { toggle.tap(); dwell() }
+  }
+
+  /// Training cornerstone, shots 2+3: the Patterns charts. Open the Training
+  /// drawer from the Week dashboard, flip to Patterns, snapshot the per-exercise
+  /// progression chart ("training-progression"), swipe up once to the strength-
+  /// volume / hard-sets chart ("training-strength"), then dismiss. Best-effort.
+  @MainActor private func captureTrainingPatterns(_ app: XCUIApplication) {
+    tapTab(app, "Week"); dwell(0.6)                    // drawers open from the Week dashboard
+    for _ in 0..<6 { app.swipeDown() }                 // reset to the top
+    dwell(0.5)
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Training")).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 8 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()
+    togglePatterns(app)
+    capture(app, "training-progression")
+    app.swipeUp(); dwell()
+    capture(app, "training-strength")
+    dismissDrawer(app, short: false)
+  }
+
+  /// Nutrition cornerstone, shot 2: the macro tiles. Open the Nutrition drawer,
+  /// flip to Patterns, snapshot the macro tiles ("nutrition-macros"), dismiss.
+  /// Best-effort.
+  @MainActor private func captureNutritionPatterns(_ app: XCUIApplication) {
+    tapTab(app, "Week"); dwell(0.6)
+    for _ in 0..<6 { app.swipeDown() }
+    dwell(0.5)
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Nutrition")).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 8 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()
+    togglePatterns(app)
+    capture(app, "nutrition-macros")
+    dismissDrawer(app, short: true)
+  }
+
+  /// Nutrition cornerstone, shot 3: a meal editor. Open the Nutrition drawer in
+  /// its default Log mode and tap a seeded meal row to open the edit sheet. The
+  /// demo seeds three meals/day with RANDOMIZED food strings (DemoSeed
+  /// `seedNutrition`), so we target the fixed candidate strings first, then fall
+  /// back to the meal emoji, then the first cell — whichever lands. Snapshot
+  /// ("nutrition-meal"), dismiss. Best-effort.
+  @MainActor private func captureNutritionMeal(_ app: XCUIApplication) {
+    tapTab(app, "Week"); dwell(0.6)
+    for _ in 0..<6 { app.swipeDown() }
+    dwell(0.5)
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Nutrition")).firstMatch
+    var tries = 0
+    while !(row.exists && row.isHittable) && tries < 8 { app.swipeUp(); dwell(0.4); tries += 1 }
+    guard row.exists, row.isHittable else { return }
+    row.tap(); dwell()                                 // Nutrition opens in Log mode
+    // The seeded meal food strings are randomized, so target the meal rows by
+    // position (cells) rather than a slow whole-tree label query. Tap the first
+    // hittable cell that opens an edit sheet.
+    var opened = false
+    for i in 0..<5 {
+      let cell = app.cells.element(boundBy: i)
+      if cell.exists, cell.isHittable { cell.tap(); opened = true; break }
+    }
+    guard opened else { dismissDrawer(app, short: true); return }
+    dwell()
+    capture(app, "nutrition-meal")
+    // Dismiss the edit sheet, then the drawer.
+    for label in ["Cancel", "Done"] {
+      let b = app.buttons[label]
+      if b.exists, b.isHittable { b.tap(); dwell(0.5); break }
+    }
+    app.swipeDown(); dwell(0.4)
+    dismissDrawer(app, short: true)
   }
 
   @MainActor private func captureSettingsSections(_ app: XCUIApplication, _ shot: String) {
