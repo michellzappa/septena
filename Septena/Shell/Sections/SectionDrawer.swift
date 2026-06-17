@@ -217,17 +217,18 @@ struct DrawerModeToggle: View {
       next.remember(for: storageKey)
     } label: {
       // The glyph shows what tapping switches TO: a chart while in Log, a list
-      // while in Patterns. Accent-colored glyph on neutral glass — the round
-      // shape/size of the trailing "+" without its filled prominence.
+      // while in Patterns.
       Image(systemName: mode == .log ? "chart.xyaxis.line" : "list.bullet")
-        .font(.body.weight(.semibold))
-        .foregroundStyle(accent)
-        .frame(width: 38, height: 38)
-        .contentShape(Circle())
         .accessibilityLabel(mode == .log ? "Show patterns" : "Show log")
     }
-    .buttonStyle(.plain)
-    .glassCircle()
+    // The system `.glass` style — the neutral twin of the trailing "+"'s
+    // `.glassProminent`: the toolbar floats it as a standalone glass circle the
+    // same size, rather than the bordered-in-a-toolbar look a manual glass
+    // capsule gave. Now safe to use since the toggle is the *sole* leading
+    // control (no sibling button to fold it into a shared group). Accent only
+    // on the glyph; the glass stays neutral.
+    .buttonStyle(.glass)
+    .foregroundStyle(accent)
   }
 }
 
