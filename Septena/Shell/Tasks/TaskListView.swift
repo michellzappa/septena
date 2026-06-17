@@ -252,7 +252,7 @@ struct TaskListView: View {
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
   var body: some View {
-    taskList
+    let base = taskList
       .modifier(TaskListModalPresenter(
         whenSheet: $whenSheet,
         showingMoveSheet: $showingMoveSheet,
@@ -269,6 +269,28 @@ struct TaskListView: View {
         applyMove: applyMove,
         applyRecurrence: applyRecurrence
       ))
+    // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
+    // The "Task" CommandMenu in App.swift reads these and owns the keyboard
+    // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
+    // SCENE value from inside a NavigationSplitView detail re-enters the focus
+    // arbiter and writes `\.taskActions` multiple times per frame, spinning the
+    // main thread until the watchdog kills the app ("FocusedValue update tried
+    // to update multiple times per frame", then a silent SIGKILL — no Swift
+    // trace). The iPad keyboard-HUD menu entries aren't worth a launch crash;
+    // gestures and the `+` button are unaffected. macOS keeps the full menu.
+    #if os(macOS)
+    return base.focusedSceneValue(\.taskActions, TaskActions(
+      newTask: { nav.shouldStartCreating = true },
+      toggleToday: toggleTodayForSelected,
+      openWhen: openWhenForSelected,
+      openDeadline: openDeadlineForSelected,
+      toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      delete: selection.isEmpty ? nil : deleteSelected,
+      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected
+    ))
+    #else
+    return base
+    #endif
   }
 
   private var taskList: some View {
@@ -326,13 +348,7 @@ struct TaskListView: View {
       editorOpen: composerIsOpen,
       onReturn: openSelectedForEdit,
       onEscape: { clearSelection() },
-      onSpace: toggleSelected,
-      onNewTask: { nav.shouldStartCreating = true },
-      onToggleToday: toggleTodayForSelected,
-      onOpenWhen: openWhenForSelected,
-      onOpenDeadline: openDeadlineForSelected,
-      onDelete: deleteSelected,
-      onClearSchedule: clearScheduleForSelected
+      onSpace: toggleSelected
     ))
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
@@ -1881,12 +1897,6 @@ private struct KeyboardNavigationModifier: ViewModifier {
   let onReturn: () -> Void
   let onEscape: () -> Void
   let onSpace: () -> Void
-  let onNewTask: () -> Void
-  let onToggleToday: () -> Void
-  let onOpenWhen: () -> Void
-  let onOpenDeadline: () -> Void
-  let onDelete: () -> Void
-  let onClearSchedule: () -> Void
 
   /// Auto-focus the list on appear so the arrow keys / space / enter work
   /// immediately, without the user having to click into the content first.
@@ -1894,19 +1904,6 @@ private struct KeyboardNavigationModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      // Publish row actions to the menu bar via FocusedValues. The
-      // "Task" CommandMenu in App.swift owns the keyboard shortcuts
-      // (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.) and shows them under a real menu,
-      // which also surfaces them in the iPad keyboard HUD.
-      .focusedSceneValue(\.taskActions, TaskActions(
-        newTask: onNewTask,
-        toggleToday: onToggleToday,
-        openWhen: onOpenWhen,
-        openDeadline: onOpenDeadline,
-        toggleComplete: hasSelection ? onSpace : nil,
-        delete: hasSelection ? onDelete : nil,
-        clearSchedule: hasSelection ? onClearSchedule : nil
-      ))
       .focusable()
       .focused($listFocused)
       // Suppress the macOS blue focus ring around the whole list — the
