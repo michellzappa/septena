@@ -292,9 +292,15 @@ struct SkyTopWash: View {
     //   2. A plain vertical fade as a SAFETY FLOOR — guarantees the wash is
     //      fully clear by the band's foot across the WHOLE width, so it can
     //      never end in a hard edge regardless of window proportions.
-    // Opaque from the top edge (behind the status / nav bar), held full
-    // through the dial (real colour for the glass donut to refract), gone
-    // by the foot. `archDepth` controls how curvy.
+    // Eased in from the top edge, held full through the dial (real colour for
+    // the glass donut to refract), gone by the foot. `archDepth` controls how
+    // curvy. The top fade is deliberate: on iPhone the wash bleeds to the very
+    // top edge, but on iPad the system reserves an unpaintable band at the top
+    // of the window (above every tab's content area — not the status bar, which
+    // can be hidden and the band remains). The wash can't reach into it, so a
+    // hard top edge would read as a crisp line where the band meets the sky.
+    // Ramping the wash up from clear over its top ~8% turns that seam into a
+    // soft fade instead of a line.
     .mask(
       EllipticalGradient(
         stops: [
@@ -309,7 +315,9 @@ struct SkyTopWash: View {
     )
     .mask(
       LinearGradient(stops: [
-        .init(color: .white, location: 0),
+        .init(color: .clear, location: 0),
+        .init(color: .white.opacity(0.55), location: 0.035),
+        .init(color: .white, location: 0.08),
         .init(color: .white, location: 0.80),
         .init(color: .white.opacity(0.5), location: 0.92),
         .init(color: .clear, location: 1),

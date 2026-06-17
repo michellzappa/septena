@@ -3183,17 +3183,14 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
         }
         .ignoresSafeArea()
       }
-      // Tab bar already labels this view, so the nav bar carries no title —
-      // it exists only to host the "…" menu and Claude cue. On iPhone its
-      // scroll-edge background is transparent, so the sky shows through to the
-      // top. On iPad (regular width) the default scroll-edge background is a
-      // frosted material that paints an opaque strip over the status-bar
-      // region — the "white/gray band". Hide it so the bled sky behind it
-      // shows through; the toolbar items keep their own glass.
+      // Tab bar already labels this view. Keep the nav bar present so
+      // iOS's default scroll-edge effect kicks in (content fades to bg
+      // material as it scrolls under the top — same shape as the
+      // bottom tab bar). No .toolbarBackground override — the default
+      // transparent-until-scrolled state is exactly what we want.
       .navigationTitle("")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
-      .toolbarBackground(.hidden, for: .navigationBar)
       #endif
       // Shared home-landing chrome across Week / Next / Coach: the top-left
       // "…" menu, with Week's dashboard-layout switcher + Insights injected
