@@ -587,7 +587,10 @@ struct NutritionDestinationView: View {
     }
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+    // Shared drawer card surface (opaque on a solid host, rimmed Liquid Glass on
+    // the translucent iPhone sheet) so the tiles lift off the drawer instead of
+    // reading white-on-white. Keep the compact 14pt tile radius.
+    .drawerCardSurface(cornerRadius: 14)
     .a11yCombineKeepingChildren(summary)
   }
 
@@ -778,9 +781,14 @@ struct NutritionDestinationView: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 8)
-    // Selected (edit modal open) → accent wash; otherwise the neutral surface.
-    .background(editing?.id == e.id ? accent.opacity(0.18) : Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 10))
+    // Selected (edit modal open) → accent wash painted over the shared card
+    // surface; otherwise the bare drawer card. The accent rect rides closest to
+    // the content so the translucent wash tints the glass card beneath it.
+    .background {
+      RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .fill(accent.opacity(editing?.id == e.id ? 0.18 : 0))
+    }
+    .drawerCardSurface(cornerRadius: 10)
     // Not inside a SwiftUI `List` — so `.swipeActions` doesn't apply.
     // The native equivalents on free-form rows are: tap → present sheet,
     // long-press / right-click → `.contextMenu`. Both are documented
@@ -823,7 +831,7 @@ struct NutritionDestinationView: View {
         }
       }
       .padding(.horizontal, 10).padding(.vertical, 8)
-      .background(Theme.secondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 10))
+      .drawerCardSurface(cornerRadius: 10)
     }
   }
 

@@ -2892,6 +2892,10 @@ struct TrainingExerciseEditorBody: View {
       }
       .padding(20)
     }
+    // Grouped-grey canvas so the panels above read as raised cards (the editor
+    // is hosted on a plain sheet / inspector whose default surface is white).
+    .scrollContentBackground(.hidden)
+    .background(Theme.groupedBackground)
     #if os(iOS)
     .toolbar {
       // Decimal pad has no return key — give it a Done to dismiss.
@@ -2985,9 +2989,12 @@ struct TrainingExerciseEditorBody: View {
     content()
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(14)
+      // Raised card surface on the editor's grouped-grey canvas — the same
+      // contrast the active-session logger and every section drawer use, instead
+      // of a near-invisible 4%-over-white fill that read white-on-white.
       .background(
         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-          .fill(Color.primary.opacity(0.04))
+          .fill(Theme.cardSurface)
       )
       .overlay(
         RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)

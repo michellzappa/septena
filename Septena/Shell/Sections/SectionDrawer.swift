@@ -54,16 +54,21 @@ extension View {
   /// use (see `ModuleTile`) — so cards lift off the translucent iPhone sheet
   /// while staying translucent. Clip follows the glass, matching `ModuleTile`,
   /// so any full-bleed row highlight stays inside the rounded corners.
-  func drawerCardSurface() -> some View {
-    modifier(DrawerCardSurface())
+  /// `cornerRadius` defaults to the full-width card radius (`Theme.cornerRadius`)
+  /// used by `DrawerSection` / `StatTile`; pass a smaller value for compact
+  /// surfaces (grid tiles, inline rows) so they keep their own radius while
+  /// still picking solid-vs-glass from the injected style.
+  func drawerCardSurface(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
+    modifier(DrawerCardSurface(cornerRadius: cornerRadius))
   }
 }
 
 private struct DrawerCardSurface: ViewModifier {
+  var cornerRadius: CGFloat = Theme.cornerRadius
   @Environment(\.drawerSurfaceStyle) private var surfaceStyle
 
   func body(content: Content) -> some View {
-    let shape = RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     switch surfaceStyle {
     case .solid:
       content
