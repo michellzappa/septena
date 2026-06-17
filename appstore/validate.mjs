@@ -81,6 +81,19 @@ const deviceReport = Object.entries(devices).map(([key, d]) => {
         .map((f) => ({ file: f, path: `${d.rawDir}/${ap}/${f}` }))
       : [];
   }
+  // Parity guard: a panel that declares a `shot` must have its raw capture, or
+  // render.mjs silently substitutes a branded placeholder that still passes the
+  // dimension checks above. Statement panels (no `shot`, e.g. privacy/close) are
+  // intentionally shot-less and exempt. This is what stops a placeholder from
+  // shipping with copy that promises a screenshot.
+  if (d.active) {
+    const have = new Set((raw.light ?? []).map((r) => r.file));
+    for (const p of panelsFor(key)) {
+      if (p.shot?.src && !have.has(`${p.shot.src}.png`)) {
+        err(`${key}/${p.id}: panel copy promises a screenshot but raw "${p.shot.src}.png" is missing → a placeholder would ship. Run appstore/capture.sh ${key}.`);
+      }
+    }
+  }
   return {
     key, label: d.label, active: d.active, width: d.width, height: d.height,
     platform: d.platform, captureNote: d.captureNote,

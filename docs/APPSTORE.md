@@ -39,32 +39,32 @@ Septena
 
 ### subtitle
 
-All your life, one private app
+One private app for everything
 
 ### promotional_text
 
-The calmest way to keep your whole life in one place — tasks, sleep, training, mood, and more. Private by design, synced only through your iCloud. No accounts, no ads.
+Keep your whole life in one private place: tasks, sleep, training, mood, and more. Your data stays in your own iCloud. No accounts, no ads, and it's free.
 
 ### description
 
-Your life doesn't fit in one app — so you've ended up with a dozen. A tracker here, a journal there, a habit app you keep forgetting to open. Septena brings all of it home: one private app for everything you track.
+Your life ends up scattered across separate apps that never talk to each other. A tracker here, a journal there, a habit app you keep forgetting to open. Septena brings it all home: one private app for everything you track.
 
-ONE APP, NOT TWELVE
-Not "all your apps in one folder" — one surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you can turn on or quietly hide. Twelve siloed apps each tell you a fact; only one place can tell you two facts are connected. Turn on what matters, leave the rest behind — and your data never disappears when you do.
+ONE APP FOR EVERYTHING
+One surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you turn on or quietly hide. A fact on its own is just a fact. Only when everything lives in one place can you see that two facts are connected. Turn on what matters, hide the rest, and your data stays exactly where it was.
 
 BUILT AROUND THE WEEK
-A day is too noisy and a month is too late; a week is where sleep, training, food, and habits start to relate. Open Septena and see your last seven days at a glance — heatmaps and gentle sparklines across every section, in one calm view. A Correlations view does the math you'd never do by eye, like late afternoon coffee turning up in last night's sleep, with honest statistics, not vibes. Streaks count only what you actually did.
+A day is too noisy and a month is too late. A week is where sleep, training, food, and habits start to relate. Open Septena and your last seven days are there at a glance, in heatmaps and quiet sparklines across every section. The Correlations view does the math you would never do by eye, like late afternoon coffee turning up in last night's sleep. It tells you plainly when the data is still too thin to trust, and streaks count only what you actually did.
 
 PRIVATE BY ARCHITECTURE
-There's no account to create and no server to trust. No ads, no analytics, no one looking over your shoulder. Your data lives on your device and syncs only through your own iCloud — end to end, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
+There is no account to create and no server to trust. No ads, no analytics, no one looking over your shoulder. Your data lives on your device and syncs only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
 
 BRING YOUR OWN AI
-Septena ships no AI of its own. Instead it opens an optional door, so you can point your own AI at your data — with a visible record of everything it touches. Your call, your tools, your audit trail.
+Septena ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
 
 WHEREVER YOU ALREADY ARE
-A Home and Lock Screen widget for the day ahead. An Apple Watch app and complications for the few things that matter right now. Log anything hands-free with Siri and Shortcuts. And step back to any past day to see how it really went.
+A Home and Lock Screen widget for the day ahead. An Apple Watch app and complications for the few things that matter right now. Log hands-free with Siri and Shortcuts. Step back to any past day to see how it really went.
 
-Built by one person, for daily use first — opinionated, fast, and quiet. Not another feed begging for your attention. A calm place to run your life.
+Septena is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
 
 Try it with a tap of demo data before you commit a single detail of your own.
 
@@ -74,7 +74,7 @@ habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,offline
 
 ### release_notes
 
-Septena's first public release. The Week dashboard, sixteen optional sections, cross-section correlations, an Apple Watch app, Home and Lock Screen widgets, and a demo mode so you can look around before committing any of your own data. Thank you for trying it.
+Septena's first public release. The Week dashboard, a full set of optional sections, cross-section correlations, an Apple Watch app, Home and Lock Screen widgets, and a demo mode so you can look around before committing any of your own data. Thank you for trying it.
 
 ### support_url
 
@@ -115,32 +115,32 @@ Septena
 
 ### subtitle
 
-All your life, one private app
+One private app for everything
 
 ### promotional_text
 
-Your whole life in one calm Mac window — tasks, sleep, training, mood, and more. Private by design, synced only through your iCloud. No accounts, no ads.
+Your whole life in one calm Mac window: tasks, sleep, training, mood, and more. Your data stays in your own iCloud. No accounts, no ads, and it's free.
 
 ### description
 
-Your life doesn't fit in one app — so you've ended up with a dozen. Septena brings all of it home, now in a calm window on your Mac: one private app for everything you track.
+Your life ends up scattered across separate apps that never talk to each other. Septena brings it all home, now in a calm window on your Mac: one private app for everything you track.
 
-ONE APP, NOT TWELVE
-Not "all your apps in one folder" — one surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you can turn on or quietly hide. Twelve siloed apps each tell you a fact; only one place can tell you two facts are connected. Turn on what matters; your data never disappears when you hide the rest.
+ONE APP FOR EVERYTHING
+One surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you turn on or quietly hide. A fact on its own is just a fact. Only when everything lives in one place can you see that two facts are connected. Turn on what matters, hide the rest, and your data stays exactly where it was.
 
 BUILT AROUND THE WEEK
-A day is too noisy and a month is too late; a week is where sleep, training, food, and habits start to relate. See your last seven days at a glance — heatmaps and gentle sparklines across every section, in one calm window. A Correlations view does the math you'd never do by eye, like late afternoon coffee turning up in last night's sleep, with honest statistics, not vibes.
+A day is too noisy and a month is too late. A week is where sleep, training, food, and habits start to relate. See your last seven days at a glance, in heatmaps and quiet sparklines across every section. The Correlations view does the math you would never do by eye, like late afternoon coffee turning up in last night's sleep, and it tells you plainly when the data is still too thin to trust.
 
 PRIVATE BY ARCHITECTURE
-There's no account to create and no server to trust. No ads, no analytics. Your data lives on your devices and syncs only through your own iCloud — end to end, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
+There is no account to create and no server to trust. No ads, no analytics. Your data lives on your devices and syncs only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
 
 BRING YOUR OWN AI
-Septena ships no AI of its own. Instead it opens an optional door, so you can point your own AI at your data — with a visible record of everything it touches. Your call, your tools, your audit trail.
+Septena ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
 
 ONE LIFE, EVERY SCREEN
 Septena syncs the same private dashboard across Mac, iPhone, iPad, and Apple Watch through your iCloud. Start on one, pick up on another.
 
-Built by one person, for daily use first — opinionated, fast, and quiet. Not another feed to check. A calm place to run your life.
+Septena is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
 
 ### keywords
 
@@ -148,7 +148,7 @@ habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,goals,w
 
 ### release_notes
 
-Septena's first release on the Mac. The full Week dashboard, sixteen optional sections, cross-section correlations, and private iCloud sync with your iPhone, iPad, and Apple Watch.
+Septena's first release on the Mac. The full Week dashboard, a full set of optional sections, cross-section correlations, and private iCloud sync with your iPhone, iPad, and Apple Watch.
 
 ### support_url
 

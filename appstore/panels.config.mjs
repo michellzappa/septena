@@ -34,7 +34,7 @@ const iphone = [
       background: { tint: theme.accent, dots: true },
       badge: "ALL IN ONE",
       headline: "Your whole life, *one calm screen*",
-      sub: "Tasks, sleep, training, mood — every part of your day, together.",
+      sub: "Tasks, sleep, training, mood. Every part of your day, in one place.",
       shot: { src: "overview", width: 0.76, rotate: -2.5, offsetY: 0.17 },
     },
     {
@@ -43,7 +43,7 @@ const iphone = [
       background: { tint: theme.accent },
       badge: "THE WEEK",
       headline: "Your last *seven days*, at a glance",
-      sub: "Heatmaps and streaks across every section you care about — no tab-digging.",
+      sub: "Heatmaps and streaks across every section you care about, in one view.",
       shot: { src: "week-heatmap", width: 0.74, rotate: 2, offsetY: 0.15 },
       overlays: [
         { icon: "spark", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.55, rotate: -2 },
@@ -55,7 +55,7 @@ const iphone = [
       background: { tint: S.sleep },
       badge: "PATTERNS",
       headline: "See what *actually moves* your sleep",
-      sub: "Septena connects the dots — like late coffee turning up in last night's rest.",
+      sub: "Septena connects the dots, like late coffee turning up in last night's rest.",
       shot: { src: "insights", width: 0.74, rotate: 2, offsetY: 0.15 },
     },
     {
@@ -63,20 +63,22 @@ const iphone = [
       id: "sections",
       background: { tint: S.goals },        // dots reserved for bookends (hook + close)
       align: "center",
-      badge: "SIXTEEN SECTIONS",
+      badge: "YOUR SECTIONS",
       headline: "Turn on *only what matters*",
       sub: "Hide a section and it's gone from view. Your data stays exactly where it was.",
-      chips: { x: 0.5, y: 0.43, w: 1140 },
-      shot: { src: "sections", width: 0.66, rotate: 0, offsetY: 0.44 },
+      // Chips ARE the visual here (the section spectrum); no app screenshot to
+      // promise, so this panel never renders a placeholder.
+      chips: { x: 0.5, y: 0.52, w: 1140 },
     },
     {
-      // 5 · BRING YOUR OWN AI — distinctive top pillar (docs/MESSAGING.md §3).
+      // 5 · AI — the Coach screen is the AI story we can actually show; the
+      //     bring-your-own-AI pillar rides in the sub. Shot: real coach capture.
       id: "ai",
       background: { tint: S.activity },
-      badge: "BRING YOUR OWN AI",
-      headline: "Point *your own AI* at your life",
-      sub: "Septena ships no AI of its own — it opens a door, and shows you every thing it touches.",
-      shot: { src: "ai", width: 0.74, rotate: -2, offsetY: 0.15 },
+      badge: "YOUR DATA, YOUR AI",
+      headline: "Coaches that *read your own life*",
+      sub: "On-device coaches, plus an open door for your own AI. Everything they touch is logged.",
+      shot: { src: "coach", width: 0.74, rotate: -2, offsetY: 0.15 },
     },
     {
       // 6 · PRIVACY — the trust wedge for a general, privacy-aware audience.
@@ -97,9 +99,9 @@ const iphone = [
       align: "center",
       badge: "MADE FOR DAILY USE",
       headline: "A calm place to *run your life*",
-      sub: "Not another feed to check. Try it with demo data before committing your own.",
+      sub: "Try it with demo data before committing a detail of your own.",
       founder: {
-        quote: "I built Septena for my own daily use. Your data is yours — full stop.",
+        quote: "I built Septena for my own daily use. Your data is yours, full stop.",
         name: "MZ",
         role: "maker of Septena",
       },
@@ -123,7 +125,7 @@ const mac = [
     background: { tint: theme.accent, dots: true },
     badge: "ALL IN ONE",
     headline: "Your whole life, *one calm screen*",
-    sub: "Every part of your day, together — now on the Mac.",
+    sub: "Every part of your day, together, now on the Mac.",
     shot: { src: "overview", rotate: 0 },
   },
   {
@@ -145,10 +147,10 @@ const mac = [
   {
     id: "ai",
     background: { tint: S.activity },
-    badge: "BRING YOUR OWN AI",
-    headline: "Point *your own AI* at your life",
-    sub: "Septena ships no AI of its own — it opens a door, and logs every thing it touches.",
-    shot: { src: "ai", rotate: 0 },
+    badge: "YOUR DATA, YOUR AI",
+    headline: "Coaches that *read your own life*",
+    sub: "On-device coaches, plus an open door for your own AI. Everything they touch is logged.",
+    shot: { src: "coach", rotate: 0 },
   },
 ];
 

@@ -28,7 +28,7 @@ export const devices = {
   },
 
   ipad13: {
-    active: true,
+    active: false,             // no real iPad capture yet (capture.sh ipad13 currently failing); flip on once captured, to avoid shipping placeholders
     label: 'iPad 13"',
     width: 2064,
     height: 2752,
@@ -42,7 +42,7 @@ export const devices = {
   },
 
   mac: {
-    active: true,
+    active: false,             // no real Mac capture yet (capture.sh mac currently failing); flip on once captured, to avoid shipping placeholders
     label: "Mac",
     width: 2880,
     height: 1800,
