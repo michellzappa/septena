@@ -27,52 +27,32 @@ const S = theme.sections;
 // = one benefit the shot proves. Angle: all-in-one life dashboard, for
 // privacy-conscious general users. Must-prove: Week, Correlations, Privacy.
 // Shot `src` names map to SeptenaUITests/ScreenshotTests.swift.
+// Each panel = a DISTINCT screen whose shot matches its headline (no repeated
+// screenshots). Privacy is Septena's #1 differentiator but a screenshot can't
+// depict "no servers," so it rides the hook headline ("one private app") + the
+// store description rather than a mismatched shot. Shots used once each:
+// overview · week-heatmap · insights · coach · nutrition · next.
 const iphone = [
     {
-      // 1 · HOOK — the all-in-one promise, on the hero Week screen.
+      // 1 · HOOK — all-in-one + privacy, on the hero dashboard.
       id: "hook",
       background: { tint: theme.accent, dots: true },
       badge: "ALL IN ONE",
-      headline: "Your whole life, *one calm screen*",
-      sub: "Tasks, sleep, training, mood. Every part of your day, in one place.",
+      headline: "Everything you track, *one private app*",
+      sub: "Tasks, sleep, training, mood, and more. Every part of your day, in one place.",
       shot: { src: "overview", width: 0.76, rotate: -2.5, offsetY: 0.17 },
     },
     {
-      // 2 · THE WEEK — glanceable seven days; proves breadth + streaks.
+      // 2 · THE WEEK — the heatmap layout (visually distinct from the dial).
       id: "week",
-      background: { tint: theme.accent },
+      background: { tint: S.habits },
       badge: "THE WEEK",
       headline: "Your last *seven days*, at a glance",
-      sub: "Heatmaps and streaks across every section you care about, in one view.",
-      shot: { src: "week-heatmap", width: 0.74, rotate: 2, offsetY: 0.15 },
-      overlays: [
-        { icon: "spark", title: "Streaks & heatmaps", sub: "per section, per day", tint: S.habits, x: 0.04, y: 0.55, rotate: -2 },
-      ],
+      sub: "Heatmaps and honest streaks across every section, in one view.",
+      shot: { src: "week-heatmap-scrolled", width: 0.74, rotate: 2, offsetY: 0.15 },
     },
     {
-      // 3 · CORRELATIONS — a sleep-insight story, so it wears sleep indigo.
-      id: "correlations",
-      background: { tint: S.sleep },
-      badge: "PATTERNS",
-      headline: "See what *actually moves* your sleep",
-      sub: "Septena connects the dots, like late coffee turning up in last night's rest.",
-      shot: { src: "insights", width: 0.74, rotate: 2, offsetY: 0.15 },
-    },
-    {
-      // 4 · SECTIONS — breadth + control; chips name the domains.
-      id: "sections",
-      background: { tint: S.goals },        // dots reserved for bookends (hook + close)
-      align: "center",
-      badge: "YOUR SECTIONS",
-      headline: "Turn on *only what matters*",
-      sub: "Hide a section and it's gone from view. Your data stays exactly where it was.",
-      // Chips ARE the visual here (the section spectrum); no app screenshot to
-      // promise, so this panel never renders a placeholder.
-      chips: { x: 0.5, y: 0.52, w: 1140 },
-    },
-    {
-      // 5 · AI — the Coach screen is the AI story we can actually show; the
-      //     bring-your-own-AI pillar rides in the sub. Shot: real coach capture.
+      // 3 · AI — the Coach screen; bring-your-own-AI rides in the sub.
       id: "ai",
       background: { tint: S.activity },
       badge: "YOUR DATA, YOUR AI",
@@ -81,31 +61,23 @@ const iphone = [
       shot: { src: "coach", width: 0.74, rotate: -2, offsetY: 0.15 },
     },
     {
-      // 6 · PRIVACY — the trust wedge for a general, privacy-aware audience.
-      id: "privacy",
-      background: { tint: theme.accent, style: "split" },
-      align: "center",
-      badge: "PRIVATE BY DESIGN",
-      headline: "No servers. No accounts. *No ads.*",
-      sub: "Your data lives on your device, synced only through your own iCloud.",
-      overlays: [
-        { icon: "lock", title: "End-to-end, even from us", sub: "export it all, any time", tint: theme.accent, x: 0.17, y: 0.46, w: 860, rotate: 0 },
-      ],
+      // 5 · NUTRITION — quick logging (the food log + macro bars).
+      id: "nutrition",
+      background: { tint: S.nutrition },
+      badge: "LOG IN SECONDS",
+      headline: "A meal in *a few taps*",
+      sub: "Macros and a photo, by hand or by voice. Enough to see the shape of your week.",
+      shot: { src: "nutrition", width: 0.74, rotate: 2, offsetY: 0.15 },
     },
     {
-      // 7 · CLOSE — quiet, human sign-off.
-      id: "close",
-      background: { tint: S.body, style: "split", dots: true },
-      align: "center",
-      badge: "MADE FOR DAILY USE",
-      headline: "A calm place to *run your life*",
-      sub: "Try it with demo data before committing a detail of your own.",
-      founder: {
-        quote: "I built Septena for my own daily use. Your data is yours, full stop.",
-        name: "MZ",
-        role: "maker of Septena",
-      },
-      footnote: "iPhone · Apple Watch · iPad · Mac",
+      // 6 · NEXT — the merged daily checklist; the calm sign-off.
+      id: "next",
+      background: { tint: S.tasks, style: "split", dots: true },
+      badge: "EVERY DAY",
+      headline: "One list for *what's left today*",
+      sub: "Today's tasks, chores, habits, and supplements, together, mirrored to your wrist.",
+      shot: { src: "next", width: 0.74, rotate: -2, offsetY: 0.15 },
+      footnote: "iPhone · Apple Watch · iPad · Mac · free, and open source",
     },
 ];
 

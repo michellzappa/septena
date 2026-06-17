@@ -28,7 +28,7 @@ export const devices = {
   },
 
   ipad13: {
-    active: false,             // no real iPad capture yet (capture.sh ipad13 currently failing); flip on once captured, to avoid shipping placeholders
+    active: true,              // iPad captured 2026-06-17 (overview/week-heatmap/insights/coach present; sections=chips, ai=coach)
     label: 'iPad 13"',
     width: 2064,
     height: 2752,
