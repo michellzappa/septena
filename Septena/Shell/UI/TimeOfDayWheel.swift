@@ -118,11 +118,12 @@ struct TimeOfDayWheel: View {
   /// dial reorients, then back to 1 to reveal the new day. Avoids trying to
   /// spin every layer in unison (only the night wedge turns, visibly).
   var marksOpacity: Double = 1
-  /// Renders the hero face *flat* — a solid disc instead of the live Liquid
-  /// Glass donut. For the widget snapshot, where `.glassEffect` can't render
-  /// (a static archived view); the night wedge still paints on top so the
-  /// solar hours read. No-op unless `heroDate` is set. App surfaces leave this
-  /// `false` and keep the real glass.
+  /// Renders the hero face *flat* — an opaque faux-glass disc instead of the
+  /// live Liquid Glass donut, for any non-live composite where `.glassEffect`
+  /// can't render: the app-switcher snapshot, a widget, screen recording. Also
+  /// drops the dark night wedge, which only reads as glass when the live layer
+  /// frosts it (raw otherwise). No-op unless `heroDate` is set. Foreground app
+  /// surfaces leave this `false` and keep the real glass + night wedge.
   var flatGlass: Bool = false
 
   /// Target degrees to spin the dial content so `northFraction` lands at the
@@ -397,7 +398,12 @@ struct TimeOfDayWheel: View {
       if !compact, heroDate != nil {
         heroGlassFace.padding(20)
       }
-      if !compact, heroDate != nil, let nightArc {
+      // The night wedge only reads as *dark glass* because the live
+      // `.glassEffect` annulus below frosts and refracts it. Without that live
+      // layer — the app-switcher snapshot, a widget, screen recording — it's
+      // just a raw hard slate-indigo gradient hanging on the face. So it's
+      // gated on `!flatGlass`: drawn only when there's live glass to frost it.
+      if !compact, heroDate != nil, !flatGlass, let nightArc {
         AnnulusShape(holeFraction: Self.heroHoleFraction)
           .fill(nightShading(nightArc))
           .padding(20)

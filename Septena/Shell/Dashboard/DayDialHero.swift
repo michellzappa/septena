@@ -63,6 +63,8 @@ struct DayDialHero: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// Switches tabs from inside the dashboard — tapping the dial opens Next.
   @Environment(TabSelection.self) private var tabSelection
+  /// Goes non-`.active` exactly when iOS grabs the app-switcher thumbnail.
+  @Environment(\.scenePhase) private var scenePhase
 
   @State private var snapshot = RhythmData.Snapshot()
   /// Days back from today the dial is scrubbed to (0 = today, negative = past).
@@ -96,7 +98,7 @@ struct DayDialHero: View {
   }
 
   private let windowDays = 7
-  private let dialDiameter: CGFloat = 270
+  private let dialDiameter: CGFloat = 297
 
   /// Roll the dial over at wake (sleep → 4am cutoff → midnight) rather than
   /// calendar midnight, so a night that runs past midnight stays on one dial.
@@ -120,6 +122,15 @@ struct DayDialHero: View {
     Calendar.current.date(byAdding: .day, value: dayOffset, to: todayStart) ?? todayStart
   }
   private var isToday: Bool { dayOffset == 0 }
+
+  /// True while the app is leaving (or has left) the foreground — the window
+  /// iOS uses to snapshot for the app switcher. The live `.glassEffect` can't
+  /// render in that snapshot, so the dark night wedge it normally *frosts into
+  /// glass* is left showing as a raw, hard slate-indigo gradient. In this state
+  /// we hand the wheel `flatGlass`, which draws the opaque faux-glass face and
+  /// (gated in the wheel) drops the unfrostable night wedge — a clean static
+  /// dial in the thumbnail instead of a floating shadow.
+  private var snapshotting: Bool { scenePhase != .active }
 
   /// Step the scrubbed day, clamped to [today − maxDaysBack, today].
   private func stepDay(_ delta: Int) {
@@ -245,7 +256,11 @@ struct DayDialHero: View {
       moonOpacity: moonOpacity,
       sunOpacity: 1,
       // Hidden while a day-swipe reorients the dial, then revealed.
-      marksOpacity: marksVisible ? 1 : 0
+      marksOpacity: marksVisible ? 1 : 0,
+      // In the app-switcher snapshot the live glass can't render — fall back to
+      // the opaque faux-glass face so the donut reads as solid frosted glass
+      // instead of a transparent hole.
+      flatGlass: snapshotting
     )
     // A wide soft backwash for depth, drifting a few points against device
     // tilt (iOS) while the glass stays put — the parallax that makes the
