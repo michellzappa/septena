@@ -260,9 +260,9 @@ struct WeekDashboardView: View {
     #if os(iOS)
     if splitHomeLayout {
       // Beside the dial rail the tiles only get ~half the window — adaptive
-      // packing would squeeze 3 heatmaps into that space and crowd them, so
-      // pin the right column to a fixed 2-up grid.
-      return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: 2)
+      // packing crowds the heatmaps, so keep the right column a single
+      // stacked column of full-width tiles.
+      return [GridItem(.flexible(), spacing: Theme.tileGap)]
     }
     if hSize == .regular {
       return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
@@ -3183,14 +3183,17 @@ private struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Conte
         }
         .ignoresSafeArea()
       }
-      // Tab bar already labels this view. Keep the nav bar present so
-      // iOS's default scroll-edge effect kicks in (content fades to bg
-      // material as it scrolls under the top — same shape as the
-      // bottom tab bar). No .toolbarBackground override — the default
-      // transparent-until-scrolled state is exactly what we want.
+      // Tab bar already labels this view, so the nav bar carries no title —
+      // it exists only to host the "…" menu and Claude cue. On iPhone its
+      // scroll-edge background is transparent, so the sky shows through to the
+      // top. On iPad (regular width) the default scroll-edge background is a
+      // frosted material that paints an opaque strip over the status-bar
+      // region — the "white/gray band". Hide it so the bled sky behind it
+      // shows through; the toolbar items keep their own glass.
       .navigationTitle("")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
+      .toolbarBackground(.hidden, for: .navigationBar)
       #endif
       // Shared home-landing chrome across Week / Next / Coach: the top-left
       // "…" menu, with Week's dashboard-layout switcher + Insights injected
