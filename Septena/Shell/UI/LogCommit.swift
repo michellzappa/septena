@@ -25,7 +25,7 @@ enum LogCommitStyle: Equatable {
   /// (see `CommitMotion`); `accent` makes it read as native to the surface;
   /// `intensity` scales loudness by the log's magnitude. This is the
   /// generalized form of the Mood-meter idea.
-  case flourish(motion: CommitMotion, accent: Color, intensity: Double)
+  case flourish(motion: CommitMotion, accent: Color, intensity: Double, caption: String? = nil)
   /// Habit-streak milestone — radiating rings with the streak number
   /// popping in. Fired when a streak crosses a milestone rung.
   case ignition(accent: Color, streak: Int)
@@ -109,10 +109,11 @@ struct LogCommitStyleView: View {
 
   var body: some View {
     switch style {
-    case .flourish(let motion, let accent, let intensity):
+    case .flourish(let motion, let accent, let intensity, let caption):
       CommitFlourish(motion: motion, accent: accent,
                      intensity: intensity, trigger: trigger,
-                     dialAnchor: motion == .arc ? dialAnchor : nil)
+                     dialAnchor: motion == .arc ? dialAnchor : nil,
+                     caption: caption)
     case .ignition(let accent, let streak):
       IgnitionView(accent: accent, streak: streak, trigger: trigger)
     case .milestone(let accent, let headline, let caption):

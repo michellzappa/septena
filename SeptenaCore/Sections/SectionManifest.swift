@@ -163,6 +163,35 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     SectionManifest.iconByKey[key] ?? "circle.fill"
   }
 
+  /// First-person identity the section's logs are evidence for — the
+  /// manifesto's "a log is a vote, not a row" reframe made literal. Surfaced
+  /// at the first-run picker and as the canvas commit-flourish caption ("Vote
+  /// cast · …"). Kept in a by-key map so the manifest init blocks stay terse
+  /// (same pattern as `iconByKey`). Only sections the user actively *logs*
+  /// into carry one: a vote is something you cast, so read-only mirrors
+  /// (sleep/body/activity/github), list utilities (groceries), and the
+  /// app-functions (goals/coach) fall through to nil and show no line.
+  private static let identityByKey: [String: String] = [
+    "tasks":       String(localized: "Someone who follows through", comment: "Section identity statement"),
+    "training":    String(localized: "Someone who trains", comment: "Section identity statement"),
+    "nutrition":   String(localized: "Someone who eats with intention", comment: "Section identity statement"),
+    "habits":      String(localized: "Someone who shows up", comment: "Section identity statement"),
+    "chores":      String(localized: "Someone who keeps a home", comment: "Section identity statement"),
+    "supplements": String(localized: "Someone who tends to their health", comment: "Section identity statement"),
+    "intake":      String(localized: "Someone mindful of what they take in", comment: "Section identity statement"),
+    "gut":         String(localized: "Someone who listens to their gut", comment: "Section identity statement"),
+    "mood":        String(localized: "Someone who checks in with themselves", comment: "Section identity statement"),
+    "symptoms":    String(localized: "Someone who notices what their body says", comment: "Section identity statement"),
+    "medications": String(localized: "Someone who stays consistent with care", comment: "Section identity statement"),
+    "hydration":   String(localized: "Someone who stays hydrated", comment: "Section identity statement"),
+  ]
+
+  /// The first-person "who this log is a vote for", or nil for sections that
+  /// don't take an active log (see `identityByKey`).
+  public var identityStatement: String? {
+    SectionManifest.identityByKey[key]
+  }
+
   /// Default `isEnabled` for a freshly-seeded `SectionEntity`. `.always`
   /// is always on. `.core`-onboarding sections start on; `.optional`
   /// and `.hidden` start off. `.integration` sections wait for the

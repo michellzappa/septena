@@ -186,7 +186,7 @@ struct WelcomeView: View {
         .font(.septenaWordmark)
         .multilineTextAlignment(.center)
 
-      Text("One private place for every part of your life. Choose what you'd like to track — you can add, rename, or hide sections anytime in Settings.")
+      Text("Every entry is a quiet vote for who you're becoming — private, and yours alone. Choose what you'd like to track; add, rename, or hide sections anytime.")
         .font(.callout)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)

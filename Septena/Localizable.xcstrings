@@ -2953,6 +2953,9 @@
         }
       }
     },
+    "Every entry is a quiet vote for who you're becoming — private, and yours alone. Choose what you'd like to track; add, rename, or hide sections anytime." : {
+
+    },
     "Evidence" : {
 
     },
@@ -5135,9 +5138,6 @@
           }
         }
       }
-    },
-    "One private place for every part of your life. Choose what you'd like to track — you can add, rename, or hide sections anytime in Settings." : {
-
     },
     "Only a Claude Code running on this Mac can connect." : {
       "localizations" : {
@@ -7344,6 +7344,9 @@
           }
         }
       }
+    },
+    "Vote cast" : {
+
     },
     "WAKE" : {
       "localizations" : {

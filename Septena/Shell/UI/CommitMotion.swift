@@ -137,6 +137,11 @@ struct CommitFlourish: View {
   /// solely by the root `LogCommitOverlay`; every other call site leaves it
   /// nil and keeps the screen-relative arc.
   var dialAnchor: DayDialAnchor? = nil
+  /// The section's identity statement, when this commit earns words — the
+  /// manifesto's "a log is a vote" made visible under a "VOTE CAST" eyebrow.
+  /// Only the budgeted canvas moments pass it (see the containment policy in
+  /// `CommitFeedback.commit`); everyday logs leave it nil and stay wordless.
+  var caption: String? = nil
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// User opt-out for logging animations (Settings ▸ Customize). Absent → on.
@@ -157,9 +162,54 @@ struct CommitFlourish: View {
                                    dialAnchor: dialAnchor)
         case .fill:    FillFlourish(color: accent, intensity: intensity, trigger: trigger)
         }
+        if let caption {
+          VoteCastLabel(text: caption, accent: accent, trigger: trigger)
+        }
       }
     }
     .allowsHitTesting(false)
+  }
+}
+
+// MARK: - Vote-cast caption
+//
+// The manifesto's central reframe ("a log is a vote, not a row") made
+// visible. On a budgeted canvas moment the section's identity statement
+// rises with the flourish under a "VOTE CAST" eyebrow, then fades — words
+// reserved for the once-a-day moments that already earn the canvas, never
+// the everyday tap.
+
+private struct VoteCastLabel: View {
+  let text: String
+  let accent: Color
+  let trigger: Int
+
+  @State private var opacity: Double = 0
+  @State private var offset: CGFloat = 14
+
+  var body: some View {
+    VStack(spacing: 4) {
+      Text("Vote cast")
+        .font(.septenaBadge)
+        .textCase(.uppercase)
+        .foregroundStyle(accent)
+      Text(text)
+        .scaledFont(size: 22, weight: .semibold, design: .rounded, relativeTo: .title3)
+        .foregroundStyle(.primary)
+        .multilineTextAlignment(.center)
+    }
+    .padding(.horizontal, 32)
+    .opacity(opacity)
+    .offset(y: offset)
+    // Gated by the host (root overlay honors Reduce Motion / the pref); a
+    // bare `withAnimation` is safe because this view never mounts otherwise.
+    .task(id: trigger) {
+      guard trigger > 0 else { return }
+      opacity = 0; offset = 14
+      withAnimation(.easeOut(duration: 0.4)) { opacity = 1; offset = 0 }
+      try? await Task.sleep(for: .milliseconds(1100))
+      withAnimation(.easeOut(duration: 0.4)) { opacity = 0; offset = -8 }
+    }
   }
 }
 
@@ -640,6 +690,7 @@ enum CommitFeedback {
                      intensity: Double = 1,
                      announce: String? = nil,
                      canvas: Bool = false,
+                     caption: String? = nil,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
     write()
@@ -648,9 +699,11 @@ enum CommitFeedback {
     Haptics.play(motion.hapticSpec(intensity: intensity))
     if let announce { A11y.announce(announce) }
     // Only budgeted once-a-day moments reach the canvas; everyday logs stay
-    // off it (see policy above).
+    // off it (see policy above). The `caption` (the section's identity
+    // statement) rides along only here, so words never reach the everyday tap.
     if canvas {
-      logCommit?.fire(.flourish(motion: motion, accent: accent, intensity: intensity))
+      logCommit?.fire(.flourish(motion: motion, accent: accent,
+                                intensity: intensity, caption: caption))
     }
   }
 }
@@ -695,8 +748,11 @@ enum SectionLog {
     let resolved = motion
       ?? SectionRegistry.plugin(forKey: sectionKey)?.logFlourish?.motion
       ?? .burst
+    // The "vote cast" identity line only rides the budgeted canvas moments,
+    // resolved once here from the manifest so every section reads the same.
+    let caption = canvas ? SectionManifest.byKey[sectionKey]?.identityStatement : nil
     CommitFeedback.commit(motion: resolved, accent: accent, intensity: intensity,
-                          announce: announce, canvas: canvas,
+                          announce: announce, canvas: canvas, caption: caption,
                           logCommit: logCommit, write: write)
   }
 
