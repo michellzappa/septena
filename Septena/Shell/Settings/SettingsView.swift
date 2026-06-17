@@ -2248,7 +2248,7 @@ struct AccountSettingsPane: View {
   }
 }
 
-private struct AppIconPreview: View {
+struct AppIconPreview: View {
   @Environment(\.colorScheme) private var colorScheme
   let option: AppIconOption
   let size: CGFloat

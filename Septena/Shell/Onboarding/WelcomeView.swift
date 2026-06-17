@@ -179,21 +179,11 @@ struct WelcomeView: View {
 
   private var hero: some View {
     VStack(spacing: 12) {
-      ZStack {
-        Circle()
-          .fill(Color.accentColor.opacity(0.15))
-          .frame(width: 76, height: 76)
-        Image("Discs")
-          .resizable()
-          .renderingMode(.template)
-          .scaledToFit()
-          .frame(width: 40, height: 40)
-          .foregroundStyle(Color.accentColor)
-      }
-      .accessibilityHidden(true)
+      AppIconPreview(option: .default, size: 72)
+        .accessibilityHidden(true)
 
       Text("Welcome to Septena")
-        .font(.title2.weight(.semibold))
+        .font(.septenaWordmark)
         .multilineTextAlignment(.center)
 
       Text("One private place for every part of your life. Choose what you'd like to track — you can add, rename, or hide sections anytime in Settings.")
