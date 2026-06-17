@@ -1253,7 +1253,10 @@ struct ProjectProgressIcon: View {
   private var resolvedLineWidth: CGFloat { lineWidth ?? 2.5 }
 
   var body: some View {
-    let clamped = max(0, min(1, progress))
+    // Guard non-finite input explicitly: a NaN/Inf fed into `.trim` /
+    // `StrokeStyle` is an uncatchable SwiftUI geometry trap. `max/min` alone
+    // don't reliably scrub NaN, so test `isFinite` first.
+    let clamped = progress.isFinite ? max(0, min(1, progress)) : 0
     ZStack {
       Circle()
         .stroke(tint.opacity(0.22), lineWidth: resolvedLineWidth)
