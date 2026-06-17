@@ -1215,6 +1215,11 @@ final class SeptenaServices {
         PerfTrace.spanSync("start.ckEngineStart") {
           ckEngine.start()
         }
+        // Readwise highlights are device-local now (see QuoteStore). Clear any
+        // backlog a pre-change build queued — thousands of `quote:readwise:*`
+        // uploads that re-locked the UI on every launch until drained. One-shot
+        // and idempotent: a no-op once the queue is clean.
+        ckEngine.dropPendingReadwiseQuoteChanges()
       }
     }
     startTask = task

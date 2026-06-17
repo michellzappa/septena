@@ -324,6 +324,30 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
     engine?.state.pendingRecordZoneChanges.count ?? 0
   }
 
+  /// Drop any queued uploads/deletes for Readwise-imported quotes. Those rows are
+  /// now device-local (re-imported per device from the user's own token), so they
+  /// never belong in CloudKit — and this clears a backlog a pre-change build may
+  /// have left, where thousands of `quote:readwise:*` saves flooded the engine and
+  /// locked the UI on every launch. Quote records are named `quote:<origin>:<id>`,
+  /// so a `quote:readwise:` prefix match isolates exactly the imported highlights
+  /// (user-authored `quote:user:*` lines are untouched and keep syncing). Returns
+  /// how many were cleared. Idempotent: once the backlog is gone it's a no-op.
+  @discardableResult
+  func dropPendingReadwiseQuoteChanges() -> Int {
+    guard let engine else { return 0 }
+    let prefix = QuoteCloudKitSchema.recordName(for: "readwise:") // "quote:readwise:"
+    let stale = engine.state.pendingRecordZoneChanges.filter { change in
+      switch change {
+      case .saveRecord(let id), .deleteRecord(let id): return id.recordName.hasPrefix(prefix)
+      @unknown default: return false
+      }
+    }
+    guard !stale.isEmpty else { return 0 }
+    engine.state.remove(pendingRecordZoneChanges: stale)
+    SeptenaLog.info("[CKEngine] cleared \(stale.count) stuck Readwise quote uploads")
+    return stale.count
+  }
+
   /// Count of pending database-level operations (zone saves / deletes).
   /// Usually 0 in steady state.
   var pendingDatabaseChangesCount: Int {

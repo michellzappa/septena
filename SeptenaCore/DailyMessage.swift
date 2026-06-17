@@ -6,11 +6,12 @@ import SwiftData
 //
 //   • DailyMessage      — the value type the footer renders (text + source).
 //   • QuotePack         — the bundled, offline preset collections.
-//   • QuoteEntity/Store — CloudKit-mirrored storage for the user's OWN quotes
-//                         and their imported Readwise highlights, so the lines
-//                         they curate follow them across devices. (The Readwise
-//                         token itself is per-device Keychain; re-syncing on a
-//                         new device just re-materializes the same rows.)
+//   • QuoteEntity/Store — storage for the user's OWN quotes (CloudKit-mirrored,
+//                         so curated lines follow them across devices) and their
+//                         imported Readwise highlights (DEVICE-LOCAL — see
+//                         ReadwiseProvider; a large library as individual
+//                         CKRecords flooded sync, so each device re-imports from
+//                         its own token instead).
 //   • DailyMessageSelector — the deterministic, time-sliced picker.
 //
 // The on/off switch and the active-pack set are device-local @AppStorage
@@ -123,9 +124,10 @@ public enum QuotePack: String, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Stored entity
 
-/// One user-curated or Readwise-imported quote. CloudKit-mirrored so the
-/// lines a user adds (and the highlights they sync) follow them across their
-/// own devices, exactly like every other section's data.
+/// One user-curated or Readwise-imported quote. User-added lines are
+/// CloudKit-mirrored so they follow the user across devices; Readwise highlights
+/// (`origin == "readwise"`) stay device-local and re-import per device — see
+/// ReadwiseProvider / QuoteStore.save for why the sync split exists.
 @Model
 public final class QuoteEntity {
   /// `"user:<uuid>"` for hand-added lines, `"readwise:<highlightId>"` for
@@ -246,7 +248,8 @@ public final class QuoteStore {
     guard let entity = try? context.fetch(descriptor).first else { return }
     context.delete(entity)
     do { try context.save() } catch { SeptenaLog.error("QuoteStore: delete save failed", error) }
-    ckEngine?.noteQuoteDeletion(id: id)
+    // Readwise rows are device-local; only user-authored lines sync. See `save`.
+    if !id.hasPrefix("readwise:") { ckEngine?.noteQuoteDeletion(id: id) }
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
   }
 
@@ -257,11 +260,11 @@ public final class QuoteStore {
   public func deleteAllReadwise() {
     let rows = all(origin: "readwise")
     guard !rows.isEmpty else { return }
-    let ids = rows.map(\.id)
     for entity in rows { context.delete(entity) }
     do { try context.save() }
     catch { SeptenaLog.error("QuoteStore: deleteAll save failed", error); return }
-    ckEngine?.noteQuoteDeletions(ids: ids)
+    // Readwise rows are device-local — no CloudKit deletions to enqueue (that's
+    // what kept a disconnect from hanging on a large library).
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
   }
 
@@ -294,9 +297,12 @@ public final class QuoteStore {
   private func save(touching ids: [String]) {
     do { try context.save() }
     catch { SeptenaLog.error("QuoteStore: save failed", error); return }
-    // ONE batched enqueue — a per-id loop here issued a separate CKSyncEngine
-    // `state.add` (each persists engine state to disk) per record.
-    ckEngine?.noteQuoteChanges(ids: ids)
+    // Only user-authored quotes sync to CloudKit. Readwise highlights are
+    // device-local (re-imported per device from the user's own token), so a
+    // multi-thousand-highlight library never floods the sync engine — the cause
+    // of the launch lock-up. ONE batched enqueue for the user lines that remain.
+    let synced = ids.filter { !$0.hasPrefix("readwise:") }
+    ckEngine?.noteQuoteChanges(ids: synced)
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
   }
 }

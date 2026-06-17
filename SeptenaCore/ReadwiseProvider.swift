@@ -8,9 +8,11 @@ import Security
 //
 // Per-device by construction: each install authenticates with its own access
 // token (Keychain, never synced, never sent to any Septena server). The
-// imported QuoteEntity rows DO sync via CloudKit like all other data, so a
-// second device shows the same lines even before its own token is entered —
-// and re-syncing there is idempotent (deterministic `readwise:<id>` ids).
+// imported QuoteEntity rows are DEVICE-LOCAL — deliberately NOT mirrored through
+// CloudKit: a library can be many thousands of highlights, and pushing each as
+// its own CKRecord to power a single daily-quote line flooded the sync engine
+// and locked the app. Each device re-imports from its own token instead;
+// re-syncing is idempotent (deterministic `readwise:<id>` ids).
 //
 // Readwise uses a simple `Authorization: Token <key>` header — no OAuth.
 //   • GET /api/v2/auth/    → 204 when the token is valid (cheap validation).
