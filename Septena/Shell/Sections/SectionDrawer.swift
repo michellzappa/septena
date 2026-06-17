@@ -81,7 +81,7 @@ private struct DrawerCardSurface: ViewModifier {
       // accent stays off the chrome (it lives on the controls + tint). Clip
       // before the rim so the stroke isn't half-cut by the clip.
       content
-        .glassCard()
+        .glassCard(cornerRadius: cornerRadius)
         .clipShape(shape)
         .overlay(shape.strokeBorder(Theme.border, lineWidth: 0.5))
     }
@@ -221,13 +221,15 @@ struct DrawerModeToggle: View {
       Image(systemName: mode == .log ? "chart.xyaxis.line" : "list.bullet")
         .accessibilityLabel(mode == .log ? "Show patterns" : "Show log")
     }
-    // The system `.glass` style — the neutral twin of the trailing "+"'s
-    // `.glassProminent`: the toolbar floats it as a standalone glass circle the
-    // same size, rather than the bordered-in-a-toolbar look a manual glass
-    // capsule gave. Now safe to use since the toggle is the *sole* leading
-    // control (no sibling button to fold it into a shared group). Accent only
-    // on the glyph; the glass stays neutral.
-    .buttonStyle(.glass)
+    // EXACT same mechanism as the trailing "+" (`DrawerActionButton`):
+    // `.buttonStyle(.glassProminent)` is what makes the system float a single
+    // bare circle. `.buttonStyle(.glass)` instead draws the toolbar item's
+    // rounded-rect container *behind* the glyph — the "button inside a toolbar"
+    // look. So we mirror the "+" and only differ in the wash: the "+" tints the
+    // glass with the bright accent (a filled accent circle); the toggle tints it
+    // neutral so it reads as a glass circle, with the accent carried by the glyph.
+    .buttonStyle(.glassProminent)
+    .tint(Color(.tertiarySystemFill))
     .foregroundStyle(accent)
   }
 }
