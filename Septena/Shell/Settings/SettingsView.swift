@@ -72,6 +72,15 @@ enum SettingsKey {
   /// trailing 7-day overlay. Same literal as `TimeOfDayWheel.windowDefaultsKey`
   /// — tapping a wheel writes this same key, so the setting stays in sync.
   static let wheelTodayOnly = "timeOfDayWheel.todayOnly"
+  /// Master switch for the optional daily-message line at the foot of the home
+  /// dashboard. Off by default — a homepage display preference, device-local
+  /// like the Day-dial toggles (the quote *content* syncs via `QuoteEntity`,
+  /// the on/off does not).
+  static let dailyMessageEnabled = "septena.dailyMessage.enabled"
+  /// Which preset `QuotePack`s feed the rotation, comma-separated rawValues.
+  /// Defaults to all three on; stored user + Readwise lines are always in the
+  /// pool when the feature is on, independent of this.
+  static let dailyMessagePacks = "septena.dailyMessage.packs"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"
@@ -1142,6 +1151,26 @@ struct HomeSettingsPane: View {
   private var wakingDay: Bool = true
   @AppStorage(SettingsKey.wheelTodayOnly)
   private var wheelTodayOnly: Bool = true
+  @AppStorage(SettingsKey.dailyMessageEnabled)
+  private var dailyMessageEnabled: Bool = false
+  @AppStorage(SettingsKey.dailyMessagePacks)
+  private var dailyMessagePacksRaw: String = "practice,stoic,zen"
+
+  private var activePacks: Set<QuotePack> {
+    Set(dailyMessagePacksRaw.split(separator: ",").compactMap { QuotePack(rawValue: String($0)) })
+  }
+
+  private func packBinding(_ pack: QuotePack) -> Binding<Bool> {
+    Binding(
+      get: { activePacks.contains(pack) },
+      set: { on in
+        var set = activePacks
+        if on { set.insert(pack) } else { set.remove(pack) }
+        dailyMessagePacksRaw = QuotePack.allCases
+          .filter { set.contains($0) }.map(\.rawValue).joined(separator: ",")
+      }
+    )
+  }
 
   var body: some View {
     Form {
@@ -1187,6 +1216,38 @@ struct HomeSettingsPane: View {
         Text("Day dial")
       } footer: {
         Text("Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day. Open on the full week starts on the last 7 days instead of today — tap any wheel to switch.")
+      }
+
+      Section {
+        Toggle(isOn: $dailyMessageEnabled) {
+          Label("Daily message", systemImage: "text.quote")
+        }
+        if dailyMessageEnabled {
+          ForEach(QuotePack.allCases) { pack in
+            Toggle(isOn: packBinding(pack)) {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(pack.title)
+                Text(pack.subtitle)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+          NavigationLink {
+            DailyMessageQuotesEditor()
+          } label: {
+            Label("Your quotes", systemImage: "quote.opening")
+          }
+          NavigationLink {
+            ReadwiseConnectView()
+          } label: {
+            Label("Readwise", systemImage: "highlighter")
+          }
+        }
+      } header: {
+        Text("Daily message")
+      } footer: {
+        Text("A quiet line at the very bottom of the home dashboard — a quote that changes through the day. Off by default. Draws from the packs you pick, your own quotes, and your Readwise highlights.")
       }
     }
     .formStyle(.grouped)

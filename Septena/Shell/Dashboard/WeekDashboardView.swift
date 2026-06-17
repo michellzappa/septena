@@ -322,6 +322,9 @@ struct WeekDashboardView: View {
           // renders nothing once everything's discovered or it's dismissed.
           DashboardDiscoveryCard(onOpen: open)
           layoutBody
+          // Optional, off-by-default closing line — a quote that rotates
+          // through the day. Always last; renders nothing when disabled.
+          DailyMessageFooter()
         }
         .septenaSurface()
         #if DEBUG

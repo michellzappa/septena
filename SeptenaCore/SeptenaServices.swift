@@ -337,6 +337,15 @@ final class SeptenaServices {
           }
           return nil
         }
+        if recordName.hasPrefix("quote:") {
+          let id = QuoteCloudKitSchema.entityID(from: recordName)
+          if let entity = one(FetchDescriptor<QuoteEntity>(
+            predicate: #Predicate { $0.id == id }
+          )) {
+            return entity.toCloudKitRecord()
+          }
+          return nil
+        }
         if recordName.hasPrefix("withings-row:") {
           let id = WithingsRowCloudKitSchema.entityID(from: recordName)
           if let entity = one(FetchDescriptor<WithingsRowEntity>(
@@ -722,6 +731,17 @@ final class SeptenaServices {
             context.insert(OuraNightEntity(cloudKit: record))
           }
           NotificationCenter.default.post(name: .septenaOuraChanged, object: nil)
+        case QuoteCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = QuoteCloudKitSchema.entityID(from: record.recordID.recordName)
+          if let entity = one(FetchDescriptor<QuoteEntity>(
+            predicate: #Predicate { $0.id == id }
+          )) {
+            entity.apply(record)
+          } else {
+            context.insert(QuoteEntity(cloudKit: record))
+          }
+          NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
         case WithingsRowCloudKitSchema.recordType:
           batchTouchedData = true
           let id = WithingsRowCloudKitSchema.entityID(from: record.recordID.recordName)
@@ -1026,6 +1046,14 @@ final class SeptenaServices {
           )).first {
             context.delete(entity)
           }
+        case QuoteCloudKitSchema.recordType:
+          batchTouchedData = true
+          let id = QuoteCloudKitSchema.entityID(from: recordID.recordName)
+          if let entity = try? context.fetch(FetchDescriptor<QuoteEntity>(
+            predicate: #Predicate { $0.id == id }
+          )).first {
+            context.delete(entity)
+          }
         case WithingsRowCloudKitSchema.recordType:
           batchTouchedData = true
           let id = WithingsRowCloudKitSchema.entityID(from: recordID.recordName)
@@ -1174,6 +1202,7 @@ final class SeptenaServices {
       projectsMutator.taskMutator = taskMutator
       OuraStore.shared.bind(ckEngine: ckEngine)
       WithingsStore.shared.bind(ckEngine: ckEngine)
+      QuoteStore.shared.bind(ckEngine: ckEngine)
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
         // Start the engine (it kicks off its own background fetch) but do

@@ -7,6 +7,9 @@
     "—" : {
 
     },
+    "— %@" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -867,6 +870,9 @@
         }
       }
     },
+    "A quiet line at the very bottom of the home dashboard — a quote that changes through the day. Off by default. Draws from the packs you pick, your own quotes, and your Readwise highlights." : {
+
+    },
     "A roster of focused, on-device coaches." : {
 
     },
@@ -1244,6 +1250,9 @@
           }
         }
       }
+    },
+    "Add your own" : {
+
     },
     "Added by Claude, not yet seen" : {
       "localizations" : {
@@ -2171,6 +2180,9 @@
         }
       }
     },
+    "Connect Readwise" : {
+
+    },
     "Connect Withings in Settings › Integrations." : {
       "localizations" : {
         "pt-BR" : {
@@ -2180,6 +2192,9 @@
           }
         }
       }
+    },
+    "Connected" : {
+
     },
     "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app." : {
       "extractionState" : "stale",
@@ -2432,6 +2447,9 @@
           }
         }
       }
+    },
+    "Daily message" : {
+
     },
     "Daily routines and streaks" : {
       "extractionState" : "stale",
@@ -4790,6 +4808,9 @@
         }
       }
     },
+    "No quotes yet." : {
+
+    },
     "No recent meals" : {
       "localizations" : {
         "pt-BR" : {
@@ -5397,6 +5418,9 @@
         }
       }
     },
+    "Pulls your highlights into the daily-message rotation. The token stays on this device and is never sent to any Septena server." : {
+
+    },
     "Purple" : {
       "localizations" : {
         "pt-BR" : {
@@ -5636,6 +5660,9 @@
           }
         }
       }
+    },
+    "Removes the token and the imported highlights from the rotation. Your own quotes are untouched." : {
+
     },
     "Renaming a supplement doesn't affect its history — events are linked by ID." : {
       "localizations" : {
@@ -6525,6 +6552,12 @@
       }
     },
     "Symptoms" : {
+
+    },
+    "Synced highlights follow you across your devices. Re-syncing only adds what's new." : {
+
+    },
+    "Syncing…" : {
 
     },
     "Synthesize your map" : {
@@ -7634,6 +7667,9 @@
         }
       }
     },
+    "Your lines join the rotation alongside the packs you've enabled." : {
+
+    },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
@@ -7643,6 +7679,9 @@
           }
         }
       }
+    },
+    "Your quotes" : {
+
     },
     "Your Septena+ perks" : {
       "localizations" : {

@@ -60,6 +60,7 @@ promoted to Prod unless the Console already shows them):
 | 8 | ~~**New field** `rhythmPayload` (day-dial widget blob) on `WatchSnapshot`~~ — **DEFERRED**: the day-dial widget is disabled (glass can't render in a widget snapshot), so the field is no longer written. Don't deploy it until the widget ships. | `WatchSnapshot` | `rhythmPayload` | Bytes(Data) |
 | 9 | **New field** `showInSpotlight` (per-section Spotlight/Siri opt-out; absent ⇒ true ⇒ discoverable) | `Section` | `showInSpotlight` | Int(64) (`Bool`) |
 | 10 | **New field** `reservedString1` (carries an area's optional user emoji — first actual write of this reserved slot) | `Area` | `reservedString1` | String |
+| 11 | **New record type** `Quote` (whole type, 4 fields — user-added + Readwise-imported daily-message lines for the optional dashboard footer) | `Quote` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -493,6 +494,18 @@ devices. No separate `date` field is stored.
 | `muscleMassKg` | Double | `Double?` | Yes |
 | `hydrationKg` | Double | `Double?` | Yes |
 | `boneMassKg` | Double | `Double?` | Yes |
+
+#### Quote  — `quote:{id}`  · **⚠ ENTIRE TYPE PENDING PROD DEPLOY**
+One record per stored daily-message line (the optional dashboard footer). The
+inner `{id}` is itself prefixed — `user:{uuid}` for hand-added lines,
+`readwise:{highlightId}` for imported Readwise highlights — so the full
+recordName is e.g. `quote:readwise:456`.
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `text` | String | `String` | No | the quote, verbatim |
+| `attribution` | String | `String` | No | author/source; may be empty |
+| `origin` | String | `String` | No | `user` \| `readwise` |
+| `addedAt` | Timestamp(Date) | `Date` | No | |
 
 ### Training — zone `septena-v1`
 

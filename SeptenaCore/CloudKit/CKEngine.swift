@@ -237,6 +237,12 @@ func noteMedicationDoseEventChange(id: String) { noteChange(recordName: Medicati
 func noteMedicationDoseEventDeletion(id: String) { noteDeletion(recordName: MedicationDoseEventCloudKitSchema.recordName(for: id), kind: "medicationDoseEvent") }
 func noteOuraNightChange(id: String) { noteChange(recordName: OuraNightCloudKitSchema.recordName(for: id), kind: "ouraNight") }
 func noteOuraNightDeletion(id: String) { noteDeletion(recordName: OuraNightCloudKitSchema.recordName(for: id), kind: "ouraNight") }
+func noteQuoteChange(id: String) { noteChange(recordName: QuoteCloudKitSchema.recordName(for: id), kind: "quote") }
+func noteQuoteDeletion(id: String) { noteDeletion(recordName: QuoteCloudKitSchema.recordName(for: id), kind: "quote") }
+/// Batched quote enqueue — ONE `state.add` for the whole set, for bulk imports
+/// (a Readwise sync can be thousands of rows). See `noteChanges`/`noteDeletions`.
+func noteQuoteChanges(ids: [String]) { noteChanges(recordNames: ids.map { QuoteCloudKitSchema.recordName(for: $0) }) }
+func noteQuoteDeletions(ids: [String]) { noteDeletions(recordNames: ids.map { QuoteCloudKitSchema.recordName(for: $0) }) }
 func noteWithingsRowChange(id: String) { noteChange(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
 func noteWithingsRowDeletion(id: String) { noteDeletion(recordName: WithingsRowCloudKitSchema.recordName(for: id), kind: "withingsRow") }
 func noteIntakeKindChange(id: String) { noteChange(recordName: IntakeKindCloudKitSchema.recordName(for: id), kind: "intakeKind") }
@@ -286,6 +292,29 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
     }
     let recordID = CKRecord.ID(recordName: recordName, zoneID: SeptenaCloudKit.zoneID)
     engine.state.add(pendingRecordZoneChanges: [.deleteRecord(recordID)])
+  }
+
+  /// Batched enqueue — ONE `state.add` for many records instead of N separate
+  /// calls. CKSyncEngine persists its state on every `add`, so a per-record loop
+  /// over thousands of rows (a Readwise import / disconnect) blocks the main
+  /// thread on repeated disk writes; folding them into a single array is the fix.
+  /// Empty input and a not-yet-started engine are both no-ops.
+  private func noteChanges(recordNames: [String]) {
+    guard let engine, !recordNames.isEmpty else { return }
+    let changes = recordNames.map {
+      CKSyncEngine.PendingRecordZoneChange.saveRecord(
+        CKRecord.ID(recordName: $0, zoneID: SeptenaCloudKit.zoneID))
+    }
+    engine.state.add(pendingRecordZoneChanges: changes)
+  }
+
+  private func noteDeletions(recordNames: [String]) {
+    guard let engine, !recordNames.isEmpty else { return }
+    let changes = recordNames.map {
+      CKSyncEngine.PendingRecordZoneChange.deleteRecord(
+        CKRecord.ID(recordName: $0, zoneID: SeptenaCloudKit.zoneID))
+    }
+    engine.state.add(pendingRecordZoneChanges: changes)
   }
 
   /// Count of writes the engine has accepted but not yet sent to CloudKit.

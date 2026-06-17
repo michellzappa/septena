@@ -1996,6 +1996,26 @@ enum OuraNightCloudKitSchema {
   }
 }
 
+enum QuoteCloudKitSchema {
+  /// One CKRecord per stored daily-message quote — a user-added line or a
+  /// Readwise-imported highlight. recordName is `quote:<id>`, where the id is
+  /// itself prefixed (`user:<uuid>` / `readwise:<highlightId>`), so upserts
+  /// are idempotent across devices. Feeds the optional dashboard footer line.
+  static let recordType = "Quote"
+
+  enum Field {
+    static let text        = "text"
+    static let attribution = "attribution"
+    static let origin       = "origin"
+    static let addedAt      = "addedAt"
+  }
+
+  static func recordName(for id: String) -> String { "quote:\(id)" }
+  static func entityID(from recordName: String) -> String {
+    String(recordName.dropFirst("quote:".count))
+  }
+}
+
 enum WithingsRowCloudKitSchema {
   /// One CKRecord per day. recordName is `withings-row:<yyyy-MM-dd>`;
   /// date doubles as the unique entity ID so upserts are idempotent
@@ -2792,6 +2812,35 @@ extension OuraNightEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
+extension QuoteEntity: ChecklistCloudKitBackedEntity {
+  func toCloudKitRecord() -> CKRecord {
+    let record = decodedCloudKitRecord() ?? CKRecord(
+      recordType: QuoteCloudKitSchema.recordType,
+      recordID: CKRecord.ID(recordName: QuoteCloudKitSchema.recordName(for: id),
+                            zoneID: SeptenaCloudKit.zoneID)
+    )
+    record[QuoteCloudKitSchema.Field.text]        = text
+    record[QuoteCloudKitSchema.Field.attribution] = attribution
+    record[QuoteCloudKitSchema.Field.origin]      = origin
+    record[QuoteCloudKitSchema.Field.addedAt]     = addedAt as NSDate
+    return record
+  }
+
+  func apply(_ record: CKRecord) {
+    if let v = record[QuoteCloudKitSchema.Field.text]        as? String { text = v }
+    if let v = record[QuoteCloudKitSchema.Field.attribution] as? String { attribution = v }
+    if let v = record[QuoteCloudKitSchema.Field.origin]      as? String { origin = v }
+    if let v = record[QuoteCloudKitSchema.Field.addedAt]     as? Date   { addedAt = v }
+    updatedAt = .now
+    captureCloudKitSystemFields(from: record)
+  }
+
+  convenience init(cloudKit record: CKRecord) {
+    self.init(id: QuoteCloudKitSchema.entityID(from: record.recordID.recordName))
+    apply(record)
+  }
+}
+
 extension WithingsRowEntity: ChecklistCloudKitBackedEntity {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
@@ -3307,7 +3356,8 @@ final class LocalStore {
                          NutritionEntryEntity.self, NutritionDailySummaryEntity.self,
                          ActivityDayEntity.self,
                          OuraNightEntity.self,
-                         WithingsRowEntity.self])
+                         WithingsRowEntity.self,
+                         QuoteEntity.self])
     // Explicitly opt OUT of NSPersistentCloudKitContainer mirroring. Having
     // CloudKit in the target entitlements would otherwise switch SwiftData
     // into auto-mirror mode, which requires all-optional attributes and
