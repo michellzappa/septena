@@ -176,6 +176,13 @@ struct WeekDashboardView: View {
   @State private var presentingMoodCheckin = false
   /// Drives the Tasks-tile "Create in Inbox…" composer, popped in place.
   @State private var creatingTask = false
+  /// Bumped after a Symptoms/Medications tile quick-add. Those two tiles read
+  /// their SwiftData mirror synchronously each body eval and route around
+  /// `AddInfoSection`/`DashSection` (the scoped tile-refresh path), so a write
+  /// alone won't repaint them — toggling this @State re-evaluates the body,
+  /// which re-fetches the fresh count/severity. Mirrors how Mood/Hydration
+  /// self-refresh after their own quick-adds.
+  @State private var quickLogStamp = 0
   /// Hydration tile state. Today's total ml + a 90-day daily series
   /// (oldest→newest). Derived from Nutrition's water entries — Hydration
   /// owns no entity (see HydrationPlugin / ChecklistMirror.loadHydrationDailyMl).
@@ -1176,7 +1183,9 @@ struct WeekDashboardView: View {
     case .groceries:   groceriesQuickAddMenu
     case .gut:         gutQuickAddMenu
     case .mood:        moodQuickAddMenu
-    case .sleep, .body, .activity, .github, .intake, .symptoms, .medications:
+    case .symptoms:    symptomsQuickAddMenu
+    case .medications: medicationsQuickAddMenu
+    case .sleep, .body, .activity, .github, .intake:
       EmptyView()
     }
   }
@@ -1832,6 +1841,7 @@ struct WeekDashboardView: View {
   }
 
   private var symptomsTile: some View {
+    let _ = quickLogStamp  // re-fetch after a tile quick-add (see quickLogStamp)
     let data = symptomsDomainData()
     return Button { open(.symptoms) } label: {
       ModuleTile(
@@ -1842,6 +1852,61 @@ struct WeekDashboardView: View {
       )
     }
     .buttonStyle(.plain)
+    .contextMenu { symptomsQuickAddMenu }
+  }
+
+  @ViewBuilder private var symptomsQuickAddMenu: some View {
+    SymptomsQuickAddMenu(
+      symptoms: symptomQuickItems(),
+      onLog: { id, severity in commitSymptom(symptomID: id, severity: severity) },
+      onOpen: { open(.symptoms) }
+    )
+  }
+
+  /// Recent-first symptoms for the quick-add menu: distinct symptoms logged in
+  /// the trailing 30 days (most-recent first), then any remaining active
+  /// definitions, capped so the menu stays scannable. Uncurated catalogs can be
+  /// long, so recency is the better surface than raw sort order.
+  private func symptomQuickItems() -> [SymptomQuickItem] {
+    let defs = (try? modelContext.fetch(
+      FetchDescriptor<SymptomDefinitionEntity>(
+        sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
+    let active = defs.filter { !$0.archived }
+    guard !active.isEmpty else { return [] }
+    let byID = Dictionary(uniqueKeysWithValues: active.map { ($0.id, $0) })
+
+    let recent = fetchSymptoms(from: lastNDays(30).first ?? SeptenaDate.today,
+                               to: SeptenaDate.today)
+      .sorted { $0.occurredAt > $1.occurredAt }
+    var seen = Set<String>()
+    var ordered: [SymptomDefinitionEntity] = []
+    for event in recent where seen.insert(event.symptomID).inserted {
+      if let def = byID[event.symptomID] { ordered.append(def) }
+    }
+    for def in active where !seen.contains(def.id) {
+      ordered.append(def)
+      seen.insert(def.id)
+    }
+    return ordered.prefix(8).map {
+      SymptomQuickItem(id: $0.id, title: symptomTitle($0))
+    }
+  }
+
+  private func symptomTitle(_ def: SymptomDefinitionEntity) -> String {
+    if let emoji = def.emoji, !emoji.isEmpty { return "\(emoji) \(def.title)" }
+    return def.title
+  }
+
+  private func commitSymptom(symptomID: String, severity: Int) {
+    SectionLog.newLog(section: "symptoms", accent: theme.color(for: "symptoms"),
+                      announce: "Logged symptom.", logCommit: logCommit) {
+      SeptenaServices.shared.symptomsMutator.addEvent(
+        symptomID: symptomID,
+        date: SeptenaDate.today,
+        time: SeptenaDate.nowHHMM,
+        severity: severity)
+    }
+    quickLogStamp += 1
   }
 
   private func symptomsDomainData() -> HomepageDomainData {
@@ -1908,6 +1973,7 @@ struct WeekDashboardView: View {
   }
 
   private var medicationsTile: some View {
+    let _ = quickLogStamp  // re-fetch after a tile quick-add (see quickLogStamp)
     let data = medicationsDomainData()
     return Button { open(.medications) } label: {
       ModuleTile(
@@ -1921,6 +1987,63 @@ struct WeekDashboardView: View {
       )
     }
     .buttonStyle(.plain)
+    .contextMenu { medicationsQuickAddMenu }
+  }
+
+  @ViewBuilder private var medicationsQuickAddMenu: some View {
+    let active = fetchMedicationDefinitions().contains { !$0.archived }
+    MedicationsQuickAddMenu(
+      medications: medicationQuickItems(),
+      emptyLabel: active ? "Nothing due right now" : "No medications yet",
+      onTake: { item in commitMedicationTaken(item) }
+    )
+  }
+
+  /// Active meds still loggable right now. Daily meds drop once today's taken
+  /// count reaches their target and are bucket-gated (anytime all day; a
+  /// bucketed med shows once its window arrives). As-needed meds are always
+  /// available. Mirrors the Supplements quick-add's "due now" semantics.
+  private func medicationQuickItems() -> [MedicationQuickItem] {
+    let today = SeptenaDate.today
+    let active = fetchMedicationDefinitions().filter { !$0.archived }
+    guard !active.isEmpty else { return [] }
+    let todayDoses = fetchMedicationDoses(from: today, to: today)
+    var takenByMed: [String: Int] = [:]
+    for dose in todayDoses where dose.status == "taken" {
+      takenByMed[dose.medicationID, default: 0] += 1
+    }
+    let nowOrder = DayBucket.current.order
+    return active.compactMap { def -> MedicationQuickItem? in
+      if (def.scheduleKind ?? "daily") == "daily" {
+        let target = max(def.targetDosesPerDay ?? 1, 1)
+        if (takenByMed[def.id] ?? 0) >= target { return nil }
+        if let raw = def.bucket, let bucket = DayBucket(rawValue: raw),
+           bucket.order > nowOrder { return nil }
+      }
+      return MedicationQuickItem(id: def.id, title: def.title,
+                                 detail: medicationDoseSummary(def))
+    }
+  }
+
+  private func medicationDoseSummary(_ def: MedicationDefinitionEntity) -> String? {
+    guard let value = def.defaultDoseValue else { return nil }
+    let unit = def.defaultDoseUnit.map { " \($0)" } ?? ""
+    return "\(value.decimalString(2))\(unit)"
+  }
+
+  private func commitMedicationTaken(_ item: MedicationQuickItem) {
+    let def = fetchMedicationDefinitions().first { $0.id == item.id }
+    SectionLog.newLog(section: "medications", accent: theme.color(for: "medications"),
+                      announce: "Logged medication dose.", logCommit: logCommit) {
+      SeptenaServices.shared.medicationsMutator.addDose(
+        medicationID: item.id,
+        date: SeptenaDate.today,
+        time: SeptenaDate.nowHHMM,
+        status: "taken",
+        doseValue: def?.defaultDoseValue,
+        doseUnit: def?.defaultDoseUnit)
+    }
+    quickLogStamp += 1
   }
 
   private func medicationsDomainData() -> HomepageDomainData {
