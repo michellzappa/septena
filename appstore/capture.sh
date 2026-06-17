@@ -33,6 +33,14 @@ else
   [ -z "$SIM_ID" ] && { echo "No '$SIM' simulator found"; exit 1; }
   xcrun simctl boot "$SIM_ID" 2>/dev/null || true
   xcrun simctl ui "$SIM_ID" appearance "$APPEARANCE" 2>/dev/null || true
+  # Apple's canonical marketing status bar: 9:41, full Wi-Fi, 100% charged,
+  # no carrier text. Persists on the booted sim through the UI-test run, so
+  # every captured shot shows the same clean bar instead of wall-clock time.
+  xcrun simctl status_bar "$SIM_ID" override \
+    --time "9:41" \
+    --dataNetwork wifi --wifiMode active --wifiBars 3 \
+    --cellularMode notSupported \
+    --batteryState charged --batteryLevel 100 2>/dev/null || true
   xcodebuild test -scheme "$SCHEME" -destination "platform=iOS Simulator,id=$SIM_ID" \
     -resultBundlePath "$RESULT" -only-testing:"$ONLY" -configuration Debug
 fi
