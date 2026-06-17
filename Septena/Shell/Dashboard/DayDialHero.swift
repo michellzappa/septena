@@ -155,7 +155,7 @@ struct DayDialHero: View {
 
   /// Sleep is recovery info — most useful the moment you wake, and less so as
   /// the day fills with its own dots. On *today* the sleep arc fades out over
-  /// the ~5 hours after wake (full at wake → gone by late morning), so the
+  /// the ~8 hours after wake (full at wake → gone by midday), so the
   /// dial turns from looking back to living forward. Scrubbed past days keep
   /// the full arc — you're reviewing them, not living them. Smoothstepped so
   /// the thinning reads as a fade, not a wipe.
@@ -163,7 +163,7 @@ struct DayDialHero: View {
     guard isToday, let wake = sleepMarks?.wake else { return 1 }
     var delta = nowFraction - wake
     if delta < 0 { delta += 1 }            // before wake on the dial: treat as 0
-    let t = max(0, min(1, (delta * 24) / 5))   // 0 at wake → 1 five hours on
+    let t = max(0, min(1, (delta * 24) / 8))   // 0 at wake → 1 eight hours on
     return 1 - (t * t * (3 - 2 * t))
   }
 
