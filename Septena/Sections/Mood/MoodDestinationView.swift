@@ -16,6 +16,8 @@ struct MoodDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
+  /// Dismisses the drawer itself (pops the pushed pane / closes the sheet).
+  @Environment(\.dismiss) private var dismiss
 
   private var accent: Color { theme.color(for: "mood") }
 
@@ -24,6 +26,9 @@ struct MoodDestinationView: View {
   /// Trailing-7-day check-in instants (with quadrant) for the rhythm wheel.
   @State private var weekPoints: [WheelPoint] = []
   @State private var addingNew = false
+  /// Set when the just-opened check-in actually logged (vs. cancelled), so the
+  /// drawer closes behind the sheet on dismiss — but only after a real log.
+  @State private var loggedFromDrawer = false
   @State private var editing: MoodEntry? = nil
   @State private var loading = true
   /// Day the drawer's date strip is pointing at. In Log mode the list
@@ -57,8 +62,15 @@ struct MoodDestinationView: View {
     })
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["mood"]) { await reload() }
-    .adaptiveDetail(isPresented: $addingNew) {
-      AddMoodPage(onLogged: { Task { await reload() } })
+    .adaptiveDetail(isPresented: $addingNew, onDismiss: {
+      // A mood was just logged from this drawer — close the drawer too so the
+      // user lands back where they opened it instead of on a now-stale pane.
+      // onDismiss fires after AddMoodPage's commit flourish has played in the
+      // sheet, so the animation is preserved; a cancel leaves the flag false
+      // and the drawer stays put.
+      if loggedFromDrawer { loggedFromDrawer = false; dismiss() }
+    }) {
+      AddMoodPage(onLogged: { loggedFromDrawer = true; Task { await reload() } })
     }
     .adaptiveDetail(item: $editing) { entry in
       EditMoodEntrySheet(date: viewingDate,

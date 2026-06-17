@@ -2899,7 +2899,20 @@ struct WeekDashboardView: View {
   }
 
   @ViewBuilder private var moodQuickAddMenu: some View {
-    MoodQuickAddMenu(onCheckIn: { presentingMoodCheckin = true })
+    MoodQuickAddMenu(onLog: { commitMood($0) },
+                     onCheckIn: { presentingMoodCheckin = true })
+  }
+
+  private func commitMood(_ emotion: MoodEmotion) {
+    SeptenaServices.shared.moodMutator.logEntry(
+      date: clock.today,
+      time: EventTimestamp.hhmm(from: clock.now),
+      quadrant: emotion.quadrant.rawValue,
+      arousal: emotion.arousal,
+      valence: emotion.valence,
+      emotion: emotion.word)
+    Haptics.success()
+    Task { await refreshMood() }
   }
 
   private func moodDomainData() -> HomepageDomainData {
