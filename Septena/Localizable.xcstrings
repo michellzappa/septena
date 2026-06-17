@@ -1387,6 +1387,9 @@
         }
       }
     },
+    "An earlier version uploaded highlights to iCloud. This deletes those copies so your other devices don't download them — your highlights stay on this device." : {
+
+    },
     "An exercise with this ID already exists." : {
       "localizations" : {
         "pt-BR" : {
@@ -3556,6 +3559,9 @@
         }
       }
     },
+    "Highlights are stored on this device and re-imported per device from your own token. Re-syncing only adds what's new." : {
+
+    },
     "Histogram" : {
       "localizations" : {
         "pt-BR" : {
@@ -5664,6 +5670,9 @@
     "Removes the token and the imported highlights from the rotation. Your own quotes are untouched." : {
 
     },
+    "Removing…" : {
+
+    },
     "Renaming a supplement doesn't affect its history — events are linked by ID." : {
       "localizations" : {
         "pt-BR" : {
@@ -6552,9 +6561,6 @@
       }
     },
     "Symptoms" : {
-
-    },
-    "Synced highlights follow you across your devices. Re-syncing only adds what's new." : {
 
     },
     "Syncing…" : {

@@ -268,6 +268,22 @@ public final class QuoteStore {
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
   }
 
+  /// Delete the CloudKit copies of imported Readwise highlights WITHOUT removing
+  /// the local rows — cleans up `quote:readwise:*` records a pre-change build
+  /// pushed to iCloud so other devices never fetch (and choke on) them. The
+  /// highlights stay on this device. Deletions are cheap on the sync engine (no
+  /// per-record body to build), so this is safe even for thousands. Awaits the
+  /// push so the caller can report a result. Returns the number enqueued.
+  @discardableResult
+  public func purgeReadwiseFromCloud() async -> Int {
+    guard let ckEngine else { return 0 }
+    let ids = all(origin: "readwise").map(\.id)
+    guard !ids.isEmpty else { return 0 }
+    ckEngine.noteQuoteDeletions(ids: ids)
+    try? await ckEngine.sendChanges()
+    return ids.count
+  }
+
   /// Idempotently upsert a batch of imported highlights. Unchanged rows earn
   /// no save and no CloudKit push. One fetch of the existing rows up front — a
   /// per-quote `fetch(predicate: id == …)` was O(n) queries on the main thread

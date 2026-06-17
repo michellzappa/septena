@@ -85,6 +85,8 @@ struct ReadwiseConnectView: View {
   @State private var tokenInput = ""
   @State private var statusMessage: String?
   @State private var isError = false
+  @State private var isPurging = false
+  @State private var purgeStatus: String?
 
   var body: some View {
     Form {
@@ -150,12 +152,24 @@ struct ReadwiseConnectView: View {
           .foregroundStyle(isError ? Color.red : .secondary)
       }
     } footer: {
-      Text("Synced highlights follow you across your devices. Re-syncing only adds what's new.")
+      Text("Highlights are stored on this device and re-imported per device from your own token. Re-syncing only adds what's new.")
+    }
+
+    Section {
+      Button("Remove highlights from iCloud") { purgeCloud() }
+        .disabled(provider.isSyncing || isPurging)
+      if isPurging {
+        Text("Removing…").font(.caption).foregroundStyle(.secondary)
+      } else if let purgeStatus {
+        Text(purgeStatus).font(.caption).foregroundStyle(.secondary)
+      }
+    } footer: {
+      Text("An earlier version uploaded highlights to iCloud. This deletes those copies so your other devices don't download them — your highlights stay on this device.")
     }
 
     Section {
       Button("Disconnect", role: .destructive) { disconnect() }
-        .disabled(provider.isSyncing)
+        .disabled(provider.isSyncing || isPurging)
     } footer: {
       Text("Removes the token and the imported highlights from the rotation. Your own quotes are untouched.")
     }
@@ -194,6 +208,16 @@ struct ReadwiseConnectView: View {
     } catch {
       statusMessage = "Sync failed. \(provider.lastSyncError ?? "")"
       isError = true
+    }
+  }
+
+  private func purgeCloud() {
+    purgeStatus = nil
+    isPurging = true
+    Task {
+      let n = await QuoteStore.shared.purgeReadwiseFromCloud()
+      isPurging = false
+      purgeStatus = n == 0 ? "Nothing to remove." : "Removed \(n) from iCloud."
     }
   }
 

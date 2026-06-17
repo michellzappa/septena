@@ -338,8 +338,10 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
     let prefix = QuoteCloudKitSchema.recordName(for: "readwise:") // "quote:readwise:"
     let stale = engine.state.pendingRecordZoneChanges.filter { change in
       switch change {
-      case .saveRecord(let id), .deleteRecord(let id): return id.recordName.hasPrefix(prefix)
-      @unknown default: return false
+      // Only drop SAVES — those are the flood. DELETIONS are intentional cleanup
+      // (`purgeReadwiseFromCloud`) and must survive a relaunch to finish.
+      case .saveRecord(let id): return id.recordName.hasPrefix(prefix)
+      default: return false
       }
     }
     guard !stale.isEmpty else { return 0 }
