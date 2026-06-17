@@ -65,11 +65,15 @@ final class ScreenshotTests: XCTestCase {
     capture(app, "week-heatmap")
     app.swipeUp(); dwell(); capture(app, "week-heatmap-scrolled")
 
-    // Pass 3 — Correlations ("insights") layout (caffeine→sleep surfaces at 90 days).
+    // Pass 3 — Correlations: the homepage in correlations layout, then the REAL
+    // Insights explorer (correlation cards) opened via the "More" (⋯) menu.
+    // Demo data surfaces caffeine→sleep at 90 days.
     app.terminate()
     launch(app, layout: "correlations")
     capture(app, "insights")
     app.swipeUp(); dwell(); capture(app, "insights-scrolled")
+    app.swipeDown(); dwell()
+    captureInsights(app)
 
     // Pass 3b — the other two Week presentations, so the site can show all four
     // layouts. `rings` = progress-ring grid; `histogram` aliases to `tiles`.
@@ -101,6 +105,8 @@ final class ScreenshotTests: XCTestCase {
     captureSection(app, "Groceries", "groceries")
     captureSection(app, "Gut", "gut", short: true)
     captureSection(app, "Activity", "activity")
+    captureSection(app, "Symptoms", "symptoms", short: true)
+    captureSection(app, "Medications", "medications", short: true)
 
     // Settings editors — best-effort navigation; skip cleanly if labels differ.
     captureSettingsSections(app, "sections")   // proves "turn on only what matters"
@@ -126,6 +132,22 @@ final class ScreenshotTests: XCTestCase {
       while !(row.exists && row.isHittable) && tries < 4 { app.swipeUp(); dwell(0.4); tries += 1 }
       if row.exists, row.isHittable { row.tap(); dwell(); capture(app, shot); return }
     }
+  }
+
+  /// Open the Insights explorer (the real correlation cards) from the Week
+  /// dashboard's "More" (⋯) menu → Insights, snapshot it as "correlations",
+  /// then dismiss. Best-effort: returns silently if the menu can't be reached.
+  @MainActor private func captureInsights(_ app: XCUIApplication) {
+    for _ in 0..<6 { app.swipeDown() }           // reset to the top of the dashboard
+    dwell(0.4)
+    let more = app.buttons["More"]
+    guard more.waitForExistence(timeout: 4), more.isHittable else { return }
+    more.tap(); dwell(0.6)
+    let insights = app.buttons["Insights"]
+    guard insights.waitForExistence(timeout: 3), insights.isHittable else { return }
+    insights.tap(); dwell()                      // the explorer opens (sheet / push)
+    capture(app, "correlations")
+    dismissDrawer(app, short: false)
   }
 
   // MARK: - helpers

@@ -57,6 +57,8 @@ public enum DemoSeed {
     seedMood(ctx, &rng, scores: sleep)
     seedBody(ctx, &rng)
     seedGut(ctx, &rng)
+    seedSymptoms(ctx, &rng)
+    seedMedications(ctx, &rng)
     seedGoals(ctx)
     seedGroceries(ctx)
     seedSections(ctx)
@@ -399,6 +401,79 @@ public enum DemoSeed {
     }
   }
 
+  /// Symptoms — a couple of recurring complaints (definitions) plus ~6 events
+  /// scattered over the past week so the Log tab has today's entries, the
+  /// 30-day severity trend has shape, and the per-symptom heatmap fills.
+  /// Severity is the canonical 0–10 scale (Mild 3 / Moderate 5 / Severe 8).
+  private static func seedSymptoms(_ ctx: ModelContext, _ rng: inout SeededRNG) {
+    // (id, title, emoji, bodySystem, defaultBodyRegion)
+    let defs: [(String, String, String, String, String)] = [
+      ("demo-symptom-headache", "Headache", "🤕", "Neurological", "Head"),
+      ("demo-symptom-congestion", "Congestion", "🤧", "Respiratory", "Sinuses"),
+    ]
+    for (i, d) in defs.enumerated() {
+      ctx.insert(SymptomDefinitionEntity(id: d.0, title: d.1, emoji: d.2,
+                                         bodySystem: d.3, defaultBodyRegion: d.4, sortIndex: i))
+    }
+    // (dayOffset, symptomID, severity 0–10, hour) — today + scattered week.
+    let events: [(Int, String, Int, Int)] = [
+      (0, "demo-symptom-headache", 4, 9),
+      (0, "demo-symptom-congestion", 3, 14),
+      (-1, "demo-symptom-headache", 6, 16),
+      (-3, "demo-symptom-congestion", 5, 8),
+      (-4, "demo-symptom-headache", 3, 11),
+      (-6, "demo-symptom-headache", 8, 20),
+    ]
+    for (n, e) in events.enumerated() {
+      let region = defs.first { $0.0 == e.1 }?.4
+      let ev = SymptomEventEntity(id: "demo-symptom-\(n)", date: day(e.0), symptomID: e.1,
+                                  severity: e.2, bodyRegion: region)
+      ev.occurredAt = at(e.0, e.3, rng.int(0, 50)); ctx.insert(ev)
+    }
+  }
+
+  /// Medications — daily morning + evening scheduled meds plus an as-needed
+  /// painkiller, with several days of taken/missed dose history so the Log tab
+  /// (today's doses) is populated and the adherence heatmap reads near-100%.
+  /// `status` is "taken" / "missed"; daily meds carry a `targetDosesPerDay`.
+  private static func seedMedications(_ ctx: ModelContext, _ rng: inout SeededRNG) {
+    // (id, title, form, strength, dose, doseUnit, bucket, scheduleKind, target)
+    ctx.insert(MedicationDefinitionEntity(
+      id: "demo-med-0", title: "Levothyroxine", form: "tablet", route: "oral",
+      strengthValue: 75, strengthUnit: "mcg", defaultDoseValue: 1, defaultDoseUnit: "tablet",
+      bucket: "morning", scheduleKind: "daily", targetDosesPerDay: 1, sortIndex: 0))
+    ctx.insert(MedicationDefinitionEntity(
+      id: "demo-med-1", title: "Atorvastatin", form: "tablet", route: "oral",
+      strengthValue: 20, strengthUnit: "mg", defaultDoseValue: 1, defaultDoseUnit: "tablet",
+      bucket: "evening", scheduleKind: "daily", targetDosesPerDay: 1, sortIndex: 1))
+    ctx.insert(MedicationDefinitionEntity(
+      id: "demo-med-2", title: "Ibuprofen", form: "tablet", route: "oral",
+      strengthValue: 200, strengthUnit: "mg", defaultDoseValue: 2, defaultDoseUnit: "tablet",
+      bucket: nil, scheduleKind: "asNeeded", targetDosesPerDay: nil, sortIndex: 2))
+
+    var n = 0
+    func dose(_ off: Int, _ medID: String, _ hour: Int, status: String,
+              value: Double, unit: String) {
+      let e = MedicationDoseEventEntity(id: "demo-med-dose-\(n)", date: day(off),
+                                        medicationID: medID, status: status,
+                                        doseValue: value, doseUnit: unit)
+      e.occurredAt = at(off, hour, rng.int(0, 50)); ctx.insert(e); n += 1
+    }
+    // 14 days of the two daily meds — high adherence, the odd missed evening dose.
+    for d in 0..<14 {
+      dose(-d, "demo-med-0", 7, status: rng.chance(0.95) ? "taken" : "missed",
+           value: 1, unit: "tablet")
+      // Today's evening dose is left unlogged so the Log tab shows a pending item.
+      if d > 0 {
+        dose(-d, "demo-med-1", 21, status: rng.chance(0.9) ? "taken" : "missed",
+             value: 1, unit: "tablet")
+      }
+    }
+    // A couple of as-needed ibuprofen doses for a headache.
+    dose(-1, "demo-med-2", 16, status: "taken", value: 2, unit: "tablet")
+    dose(-6, "demo-med-2", 20, status: "taken", value: 2, unit: "tablet")
+  }
+
   /// Apple Health activity — steps, active kcal, exercise minutes per day, so
   /// the Activity tile has a sparkline and a real headline instead of an empty
   /// HealthKit-unavailable placeholder. Active days (training) skew higher.
@@ -456,13 +531,15 @@ public enum DemoSeed {
       "supplements": "#3b82f6", "sleep": "#6366f1", "nutrition": "#f59e0b", "groceries": "#84cc16",
       "intake": "#92400e", "body": "#ec4899", "gut": "#b45309",
       "activity": "#06b6d4", "goals": "#8b5cf6", "hydration": "#0ea5e9", "mood": "#f43f5e",
+      "symptoms": "#e11d48", "medications": "#4f46e5",
     ]
     // Tile order: sparkline-rich sections lead; list-only sections with no
     // history strip (groceries) sink to the bottom so the dashboard reads dense
     // from the top down. `show` is the enabled set; `order` drives sortIndex.
     let order = [
       "tasks", "training", "nutrition", "sleep", "activity", "body", "habits",
-      "supplements", "mood", "hydration", "intake", "gut", "chores", "groceries",
+      "supplements", "mood", "symptoms", "medications", "hydration", "intake", "gut",
+      "chores", "groceries",
     ]
     let show = Set(order)
     for r in (try? ctx.fetch(FetchDescriptor<SectionEntity>())) ?? [] {
