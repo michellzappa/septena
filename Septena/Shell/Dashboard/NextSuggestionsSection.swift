@@ -736,9 +736,10 @@ private struct NextSuggestionRow: View {
 }
 
 /// Inline commit for an intake nudge — mirrors `IntakeKindPageView`'s fast
-/// path so the wrist/menu/nudge all write identically (and fire the tracker's
-/// own flourish). Resolves the live kind by id, parses the choice token, and
-/// logs through the mutator inside a `SectionLog` so haptic + motion fire once.
+/// path so the wrist/menu/nudge all write identically. Resolves the live kind
+/// by id, parses the choice token, and logs through the mutator inside a
+/// quiet `SectionLog` — a light tick + announce, no fullscreen flourish
+/// (intake is a high-frequency log, kept off the canvas like the page itself).
 @MainActor
 private enum IntakeNudgeLog {
   static func commit(kindID: String, value: String, logCommit: LogCommitCenter?) {
@@ -749,10 +750,7 @@ private enum IntakeNudgeLog {
     let method = kind.methods.first { $0.token == token }
     let showsAmount = kind.doseStyle == "amount" || kind.doseStyle == "both"
     let amount = showsAmount ? method?.defaultAmount : nil
-    let accent = AdaptiveColor.adaptive(kind.color) ?? .secondary
-    SectionLog.newLog(section: "intake", accent: accent,
-                      motion: IntakeKindPageView.motion(for: kind.flourish),
-                      announce: "Logged \(kind.name).", logCommit: logCommit) {
+    SectionLog.quietLog(announce: "Logged \(kind.name).") {
       _ = SeptenaServices.shared.intakeMutator.addEntry(
         kindID: kindID, date: SeptenaDate.today,
         time: SeptenaDate.nowHHMM, method: token, amount: amount, count: count)

@@ -10,7 +10,6 @@ import SwiftData
 struct IntakeKindPageView: View {
   let kindID: String
 
-  @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(DayClock.self) private var clock
 
   @State private var kind: IntakeKindDTO? = nil
@@ -35,9 +34,6 @@ struct IntakeKindPageView: View {
   /// any follow-on sheet (method detail / Manage) presents cleanly after the
   /// chooser has dismissed rather than racing it.
   @State private var pendingChoice: String? = nil
-  /// Replay counter for the in-page snap flourish (see `handleLogAction` —
-  /// on iPhone this page is a sheet, above the app-root overlay).
-  @State private var flourishTrigger = 0
   // Intake is an editable dual section: Log = stat strip + the day's entries
   // (time-travelable); Patterns = the rhythm wheel. Remembered PER KIND — every
   // tracker page shares sectionKey "intake" but keeps its own mode. Default Log.
@@ -96,11 +92,6 @@ struct IntakeKindPageView: View {
       rhythmSection
     })
     .tint(accent)
-    // In-page flourish host — see handleLogAction: on iPhone this page is a
-    // sheet, which covers the app-root overlay, so the snap plays here.
-    .overlay {
-      CommitFlourish(motion: .snap, accent: accent, trigger: flourishTrigger)
-    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["intake"]) { await reload() }
     .sheet(isPresented: $managing) {
@@ -165,33 +156,19 @@ struct IntakeKindPageView: View {
     let needsInput = kind.showsAmount || kind.showsCount || kind.hasCatalog
     if count != nil || !needsInput {
       let amount = kind.showsAmount ? method?.defaultAmount : nil
-      // Intake confirms with the crisp `.snap`. IMPORTANT: on iPhone this
-      // page presents as a SHEET, and the app-root LogCommitOverlay renders
-      // *beneath* sheets — so the visual must play in-page. We pass
-      // `logCommit: nil` (haptic + announce still fire via SectionLog) and
-      // bump the local `flourishTrigger` driving the overlay below.
-      SectionLog.newLog(section: "intake", accent: accent,
-                        motion: Self.motion(for: kind.flourish),
-                        announce: "Logged \(kind.name).", logCommit: nil) {
+      // Intake is a quiet, high-frequency log: it confirms with a light tick +
+      // VoiceOver only, no fullscreen flourish (those are reserved for
+      // once-a-day "moment" celebrations).
+      SectionLog.quietLog(announce: "Logged \(kind.name).") {
         mutator.addEntry(kindID: kindID,
                          date: viewingDate,
                          time: EventTimestamp.hhmm(from: nowInstant),
                          method: token, amount: amount, count: count)
       }
-      flourishTrigger += 1
       Task { await reload() }
     } else {
       creatingMethod = .init(method: token)
     }
-  }
-
-  /// Intake's commit motion: always the crisp `.snap` — one sharp beat for
-  /// a quick tracker log. The per-kind stored `flourish` token is kept on
-  /// the entity (dormant) in case per-kind motions earn their way back, but
-  /// it no longer drives anything.
-  static func motion(for flourish: String) -> CommitMotion {
-    _ = flourish
-    return .snap
   }
 
   private var nowInstant: Date {

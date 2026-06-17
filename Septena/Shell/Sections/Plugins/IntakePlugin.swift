@@ -20,10 +20,10 @@ enum IntakePlugin: SectionPlugin {
   // (no redundant kind-switcher list) — management lives in detailPaneContent().
   static func destinationView() -> AnyView? { nil }
 
-  // Crisp snap for every tracker log (see IntakeKindPageView.motion(for:),
-  // which renders it in-page — on iPhone the kind page is a sheet, above
-  // the root overlay). Per-kind stored flourish tokens are dormant.
-  static var logFlourish: LogFlourish? { LogFlourish(motion: .snap) }
+  // No log flourish: intake is a high-frequency tracker, so each log confirms
+  // with a light tick + announce only (SectionLog.quietLog in IntakeKindPageView
+  // and the Next nudge), like Hydration. Fullscreen flourishes are reserved for
+  // once-a-day "moment" celebrations. Per-kind stored flourish tokens are dormant.
 
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     // Only seed-bearing templates are multi-selectable; the blank "Custom"
