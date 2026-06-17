@@ -105,10 +105,14 @@ private struct UsesPushNavigationKey: EnvironmentKey {
 
 extension EnvironmentValues {
   /// True when section / coach destinations should open as a pushed full pane
-  /// (with room to dock an inspector) rather than a modal bottom sheet. This
-  /// is the single source of truth for that rule — the Week dashboard, the
-  /// Coach tab, and the section-drawer inspector decision all read it instead
-  /// of recomputing from the size class, so the three can never drift.
+  /// (with room to dock an inspector, and room for a side-by-side dual-mode
+  /// drawer) rather than a modal bottom sheet. This is the single source of
+  /// truth for that rule — the Week dashboard, the Coach tab, the section-drawer
+  /// inspector decision, and the drawer column layout all read it instead of
+  /// recomputing from the size class, so they can never drift. True only on a
+  /// dual-regular canvas (regular width AND height): iPad full-screen, an
+  /// unfolded foldable, macOS. A landscape iPhone is regular-width but
+  /// compact-height, so it reads false here and gets the bottom-sheet drawer.
   /// Published once at the app root by `.resolvesAdaptiveNavigation()`.
   var usesPushNavigation: Bool {
     get { self[UsesPushNavigationKey.self] }
@@ -117,11 +121,12 @@ extension EnvironmentValues {
 }
 
 extension View {
-  /// Resolves the adaptive-navigation rule from the current horizontal size
-  /// class and publishes it into the environment as `\.usesPushNavigation`.
-  /// macOS always pushes; iOS pushes only at regular width (iPad full-screen
-  /// / large multitasking), so a compact iPad window correctly falls back to
-  /// bottom sheets. Apply once near the app root.
+  /// Resolves the adaptive-navigation rule from the current size classes and
+  /// publishes it into the environment as `\.usesPushNavigation`. macOS always
+  /// pushes; iOS pushes only when BOTH size classes are regular (iPad
+  /// full-screen / large multitasking / unfolded foldable), so a compact iPad
+  /// window AND a landscape iPhone (regular width, compact height) both fall
+  /// back to bottom sheets. Apply once near the app root.
   func resolvesAdaptiveNavigation() -> some View {
     modifier(ResolveAdaptiveNavigation())
   }
@@ -130,13 +135,22 @@ extension View {
 private struct ResolveAdaptiveNavigation: ViewModifier {
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.verticalSizeClass) private var vSize
   #endif
 
   private var usesPush: Bool {
     #if os(macOS)
     return true
     #else
-    return hSize == .regular
+    // A pushed pane / side-by-side drawer wants a genuinely large canvas —
+    // regular in BOTH dimensions (iPad full-screen, an unfolded foldable, a
+    // wide Mac window). A landscape iPhone reports a regular *width* but a
+    // compact *height*: it's short and notch-asymmetric, so the iPad pushed-
+    // pane treatment looks broken there. Gating on height too sends it down
+    // the bottom-sheet path (the polished portrait drawer) instead, while
+    // staying size-class-driven — never an idiom check — so a foldable still
+    // gets the full treatment when unfolded.
+    return hSize == .regular && vSize == .regular
     #endif
   }
 
@@ -221,16 +235,14 @@ struct DrawerModeToggle: View {
       Image(systemName: mode == .log ? "chart.xyaxis.line" : "list.bullet")
         .accessibilityLabel(mode == .log ? "Show patterns" : "Show log")
     }
-    // EXACT same mechanism as the trailing "+" (`DrawerActionButton`):
-    // `.buttonStyle(.glassProminent)` is what makes the system float a single
-    // bare circle. `.buttonStyle(.glass)` instead draws the toolbar item's
-    // rounded-rect container *behind* the glyph — the "button inside a toolbar"
-    // look. So we mirror the "+" and only differ in the wash: the "+" tints the
-    // glass with the bright accent (a filled accent circle); the toggle tints it
-    // neutral so it reads as a glass circle, with the accent carried by the glyph.
+    // Identical to the trailing "+" (`DrawerActionButton`): the toolbar floats a
+    // bare `.glassProminent` circle, the full accent `.tint` fills it, and the
+    // style auto-contrasts the glyph to white. The drawer is bookended by two
+    // matching accent circles — switch on the left, add on the right. (A neutral
+    // circle with a colored glyph isn't reachable through the toolbar's glass
+    // styles, so we mirror the "+" rather than fight it.)
     .buttonStyle(.glassProminent)
-    .tint(Color(.tertiarySystemFill))
-    .foregroundStyle(accent)
+    .tint(accent)
   }
 }
 
@@ -1398,6 +1410,10 @@ struct DrawerModeColumns<Log: View, Patterns: View>: View {
 
   var body: some View {
     layout
+      // Measured from the ACTUAL available width, not the presentation mode —
+      // so a wide bottom sheet on a landscape iPhone splits Log + Patterns
+      // side-by-side just like the iPad pushed pane, while a narrow portrait
+      // sheet stays single-mode with the toggle.
       .onGeometryChange(for: CGFloat.self) { proxy in
         proxy.size.width
       } action: { width in
@@ -1495,14 +1511,16 @@ struct DrawerColumns<Content: View>: View {
   #endif
 
   var body: some View {
+    // Width-driven (via MasonryLayout), gated only by horizontal size class so
+    // a portrait iPhone stays a single lazy column. A landscape iPhone reports
+    // regular width, so its (now bottom-sheet) drawer still gets the masonry
+    // board — the same 1-vs-2 column decision the iPad pane makes from width.
     #if os(macOS)
-    // macOS has no compact width; always offer the width-driven board.
     masonry
     #else
     if hSize == .regular {
       masonry
     } else {
-      // iPhone path — untouched: lazy single column.
       LazyVStack(spacing: spacing) { content() }
     }
     #endif

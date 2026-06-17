@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import EventKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // Week module — the synthesizing dashboard. Each module gets a tile that
 // (a) renders live stats / histogram for that module and (b) pushes into
@@ -255,6 +258,12 @@ struct WeekDashboardView: View {
   /// regular-width windows and under-filled wide ones.)
   private var columns: [GridItem] {
     #if os(iOS)
+    if splitHomeLayout {
+      // Beside the dial rail the tiles only get ~half the window — adaptive
+      // packing would squeeze 3 heatmaps into that space and crowd them, so
+      // pin the right column to a fixed 2-up grid.
+      return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: 2)
+    }
     if hSize == .regular {
       return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     }
@@ -262,6 +271,56 @@ struct WeekDashboardView: View {
     #else
     return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     #endif
+  }
+
+  /// On a wide-enough iPhone — landscape on a Plus/Max, or an unfolded
+  /// foldable, both of which report `.regular` width — float the day dial
+  /// into a left rail with the tiles stacked beside it on the right, instead
+  /// of the donut sitting alone above a full-width grid. iPhone-only on
+  /// purpose: iPad and Mac keep their single-column-with-adaptive-grid home,
+  /// so this is the one place we read the idiom rather than width alone.
+  /// Only the circular `.dial` day view splits; the linear timeline and the
+  /// hidden style stay in the single column (a narrow rail would squish the
+  /// timeline).
+  private var splitHomeLayout: Bool {
+    #if os(iOS)
+    guard UIDevice.current.userInterfaceIdiom == .phone, hSize == .regular
+    else { return false }
+    return (DayViewStyle(rawValue: dayViewRaw) ?? .dial) == .dial
+    #else
+    return false
+    #endif
+  }
+
+  /// Width of the left rail in the split iPhone layout — sized to seat the
+  /// dial (diameter + its breathing room) without starving the tile column.
+  private let heroRailWidth: CGFloat = 340
+
+  /// The day view — circular dial, linear timeline, or hidden. Extracted so
+  /// it can sit either atop the column or in the split layout's left rail.
+  @ViewBuilder private var dayView: some View {
+    switch DayViewStyle(rawValue: dayViewRaw) ?? .dial {
+    case .dial:
+      DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
+                  sleepNights: ouraNights)
+    case .linear:
+      todayTimeline
+    case .hidden:
+      EmptyView()
+    }
+  }
+
+  /// Everything below (or, in the split layout, beside) the day view: the
+  /// discovery card, the tile grid, and the optional closing line.
+  @ViewBuilder private var rightColumnBody: some View {
+    // Introduces the capabilities the welcome leaves out (Coach, Insights,
+    // Apple Health) once the user is in the app. Self-gating: renders nothing
+    // once everything's discovered or it's dismissed.
+    DashboardDiscoveryCard(onOpen: open)
+    layoutBody
+    // Optional, off-by-default closing line — a quote that rotates through
+    // the day. Always last; renders nothing when disabled.
+    DailyMessageFooter()
   }
 
   var body: some View {
@@ -307,24 +366,21 @@ struct WeekDashboardView: View {
           #if os(macOS)
           ClaudeReconnectCue(.card)
           #endif
-          // The day view — today at a glance, circular or linear.
-          switch DayViewStyle(rawValue: dayViewRaw) ?? .dial {
-          case .dial:
-            DayDialHero(visibleSections: Set(visibleDomains.map(\.rawValue)),
-                        sleepNights: ouraNights)
-          case .linear:
-            todayTimeline
-          case .hidden:
-            EmptyView()
+          if splitHomeLayout {
+            // Wide iPhone (landscape / unfolded): dial in a left rail, the
+            // discovery card + tiles + footer stacked in the right column.
+            HStack(alignment: .top, spacing: Theme.sectionSpacing) {
+              dayView
+                .frame(width: heroRailWidth)
+              VStack(spacing: Theme.sectionSpacing) {
+                rightColumnBody
+              }
+            }
+          } else {
+            // The day view — today at a glance, circular or linear.
+            dayView
+            rightColumnBody
           }
-          // Introduces the capabilities the welcome leaves out (Coach,
-          // Insights, Apple Health) once the user is in the app. Self-gating:
-          // renders nothing once everything's discovered or it's dismissed.
-          DashboardDiscoveryCard(onOpen: open)
-          layoutBody
-          // Optional, off-by-default closing line — a quote that rotates
-          // through the day. Always last; renders nothing when disabled.
-          DailyMessageFooter()
         }
         .septenaSurface()
         #if DEBUG
