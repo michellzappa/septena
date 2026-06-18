@@ -4574,9 +4574,6 @@
         }
       }
     },
-    "Mock supporter state for testing — no purchase is made. Turning it off changes nothing about the app; it only removes the badge." : {
-
-    },
     "Mock unlock. No purchase happens yet." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5008,7 +5005,7 @@
     "Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here." : {
 
     },
-    "Not now? Genuinely fine — the app stays exactly the same. No purchase is made yet; this is a preview of the support screen." : {
+    "Not now? Genuinely fine — the app stays exactly the same. You can support any time from Settings." : {
 
     },
     "Not supported on this device." : {
@@ -5438,6 +5435,9 @@
       "shouldTranslate" : false
     },
     "Pressure" : {
+
+    },
+    "Prices couldn't load right now — check your connection and reopen this screen." : {
 
     },
     "PROGRESS" : {
@@ -7828,6 +7828,9 @@
           }
         }
       }
+    },
+    "Your support is tied to your Apple ID. Restore re-syncs it on a new device; managing lets you change or cancel an ongoing subscription." : {
+
     },
     "Your testimonial" : {
 
