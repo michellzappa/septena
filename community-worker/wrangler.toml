@@ -1,0 +1,40 @@
+name = "septena-community"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+
+# Open-source template. Replace placeholders before deploying your own worker.
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "septena-community"
+database_id = "YOUR_COMMUNITY_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "ATTEST"
+id = "YOUR_ATTEST_KV_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "CHALLENGES"
+id = "YOUR_CHALLENGES_KV_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "RL"
+id = "YOUR_RATE_LIMIT_KV_NAMESPACE_ID"
+
+# Optional, for avatars and support attachments. Wire this after the identity
+# foundation is deployed and tested.
+# [[r2_buckets]]
+# binding = "ASSETS"
+# bucket_name = "septena-community-assets"
+
+[vars]
+# "off" | "audit" (verify + log, never reject) | "enforce".
+ATTEST_MODE = "enforce"
+APP_ATTEST_APP_ID = "YOURTEAMID.com.example.septena,YOURTEAMID.com.example.septena.mac"
+APP_ATTEST_ENV = "production"
+
+# Set as a secret in production:
+#   npx wrangler secret put USER_HASH_SALT

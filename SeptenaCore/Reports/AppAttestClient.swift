@@ -22,8 +22,8 @@ import DeviceCheck
 //
 // `assertion(forBody:baseURL:)` returns nil when App Attest is unavailable
 // (Simulator, enclave-less Mac) or any step fails — callers then send the write
-// unattested, which the worker accepts in "audit" mode and rejects in "enforce"
-// mode. So enabling enforcement is a server-side flip, not an app change.
+// unattested. A staging worker may accept that in "audit" mode; production
+// should reject it in "enforce" mode.
 
 public struct AppAttestation: Sendable {
   public let keyId: String
@@ -36,11 +36,11 @@ public struct AppAttestation: Sendable {
 public actor AppAttestClient {
   public static let shared = AppAttestClient()
 
-  private let keyIdDefaultsKey = "septena.attest.keyId"
+  private let legacyKeyIdDefaultsKey = "septena.attest.keyId"
 
   public init() {}
 
-  public var isSupported: Bool {
+  public nonisolated var isSupported: Bool {
     #if canImport(DeviceCheck)
     return DCAppAttestService.shared.isSupported
     #else
@@ -80,7 +80,8 @@ public actor AppAttestClient {
   private func registeredKeyID(service: DCAppAttestService,
                                baseURL: URL,
                                session: URLSession) async throws -> String {
-    if let existing = UserDefaults.standard.string(forKey: keyIdDefaultsKey) {
+    let defaultsKey = keyIdDefaultsKey(for: baseURL)
+    if let existing = UserDefaults.standard.string(forKey: defaultsKey) {
       return existing
     }
     let keyId = try await service.generateKey()
@@ -88,8 +89,13 @@ public actor AppAttestClient {
     let attestation = try await service.attestKey(keyId, clientDataHash: Data(SHA256.hash(data: Data(challenge.utf8))))
     try await register(keyId: keyId, attestation: attestation, challenge: challenge,
                        baseURL: baseURL, session: session)
-    UserDefaults.standard.set(keyId, forKey: keyIdDefaultsKey)
+    UserDefaults.standard.set(keyId, forKey: defaultsKey)
     return keyId
+  }
+
+  private func keyIdDefaultsKey(for baseURL: URL) -> String {
+    let host = baseURL.host(percentEncoded: false) ?? baseURL.absoluteString
+    return "\(legacyKeyIdDefaultsKey).\(host)"
   }
 
   private func register(keyId: String, attestation: Data, challenge: String,
