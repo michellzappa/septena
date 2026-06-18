@@ -9,9 +9,10 @@
  *   GET  /r/:token                            → render the report HTML
  *
  * Write hardening = App Attest (see src/attest.ts, the SHARED verifier the
- * Feedback worker reuses) + per-key/IP rate limiting. Gate runs in ATTEST_MODE
- * "audit" by default (verify + log, never reject) until validated on a real
- * device; flip to "enforce" then. Expiry/revoke already enforced.
+ * Feedback worker reuses) + per-key/IP rate limiting. Gate defaults to
+ * ATTEST_MODE="enforce"; use "audit" only on a private staging worker while
+ * validating App Attest with non-sensitive payloads. Expiry/revoke already
+ * enforced.
  *
  * Storage: a single KV namespace `REPORTS`, key = view token, value = the
  * ReportPayload JSON the app computed. The app re-PUTs on foreground
@@ -29,19 +30,18 @@ import {
 
 export interface Env extends AttestEnv {
   REPORTS: KVNamespace;
-  /** "off" | "audit" (verify+log, never reject) | "enforce". Default "audit". */
+  /** "off" | "audit" (verify+log, never reject) | "enforce". Default "enforce". */
   ATTEST_MODE?: string;
 }
 
 /**
- * Gate a write. In "audit" it verifies + logs but always allows (so the live
- * feature can't break before App Attest is validated on a real device); in
- * "enforce" it rejects missing/invalid assertions. Rate limit always applies.
+ * Gate a write. In "audit" it verifies + logs but always allows; in "enforce"
+ * it rejects missing/invalid assertions. Rate limit always applies.
  */
 async function attestGate(
   env: Env, headers: Headers, bodyBytes: Uint8Array
 ): Promise<{ allow: boolean; status: string }> {
-  const mode = env.ATTEST_MODE ?? "audit";
+  const mode = env.ATTEST_MODE ?? "enforce";
   const keyId = headers.get("X-Attest-Key-Id") ?? "";
   const assertion = headers.get("X-Attest-Assertion") ?? "";
   const challenge = headers.get("X-Attest-Challenge") ?? "";

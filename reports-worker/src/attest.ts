@@ -8,11 +8,12 @@
  *
  * ⚠️ SECURITY STATUS: implemented per Apple's "Validating Apps That Connect to
  * Your Server" spec, but NOT yet validated against a real device's attestation.
- * Ship behind ATTEST_MODE="audit" (verify + log, never reject) until a real
- * iPhone/iPad/Mac round-trips and the logs show clean passes; only then flip to
- * "enforce". The signature encoding details (DER↔P1363) and the dev/prod aaguid
- * are the most likely things to tweak on first device — audit mode surfaces
- * them without breaking writes.
+ * Validate behind ATTEST_MODE="audit" (verify + log, never reject) on a private
+ * staging worker until a real iPhone/iPad/Mac round-trips and the logs show
+ * clean passes; production should run with ATTEST_MODE="enforce". The signature
+ * encoding details (DER↔P1363) and the dev/prod aaguid are the most likely
+ * things to tweak on first device — audit mode surfaces them without breaking
+ * writes.
  *
  * Bindings expected on Env: KV `ATTEST` (keyId → {publicKeyRawB64, counter}),
  * KV `CHALLENGES` (challenge → "1", short TTL), KV `RL` (rate-limit buckets).
