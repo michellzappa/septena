@@ -1,13 +1,30 @@
 import { issueChallenge, rateLimited, verifyAttestation } from "./attest";
 import { requireUser } from "./auth";
 import type { Env } from "./env";
-import { json, notFound, readJson } from "./http";
+import { json, notFound, publicJson, readJson } from "./http";
 import { profileResponse, updateProfile } from "./profile";
 import { createSupportTicket, getSupportTicket, listSupportTickets, postSupportMessage, setTicketStatus } from "./support";
-import { addComment, createFeature, getFeature, listFeatures, setVote, updateFeature } from "./features";
+import { addComment, createFeature, getFeature, listFeatures, listPublicFeatures, moderateComment, setVote, updateFeature } from "./features";
+import { deleteMyTestimonial, getMyTestimonial, listPublicTestimonials, listTestimonials, moderateTestimonial, putMyTestimonial } from "./testimonials";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    try {
+      return await route(req, env);
+    } catch (error) {
+      const message = String((error as Error)?.message ?? error);
+      // A DB CHECK/constraint rejection is a bad request, not a server fault —
+      // surface it as 400 instead of a 500 the client can't act on.
+      if (/constraint|SQLITE_CONSTRAINT/i.test(message)) {
+        return json({ error: "constraint_failed" }, 400);
+      }
+      console.log(`unhandled error: ${message}`);
+      return json({ error: "internal_error" }, 500);
+    }
+  },
+};
+
+async function route(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
 
@@ -97,6 +114,15 @@ export default {
       return result.ok ? json(result.body, 201) : json({ error: result.error }, result.status);
     }
 
+    // Public, read-only roadmap for the website — no auth, edge-cached. Mirrors
+    // the moderated feature board (votes + counts, no per-user state, no comments).
+    if (req.method === "OPTIONS" && path === "/api/public/features") {
+      return publicJson({ ok: true });
+    }
+    if (req.method === "GET" && path === "/api/public/features") {
+      return publicJson(await listPublicFeatures(env));
+    }
+
     if (req.method === "GET" && path === "/api/features") {
       const auth = await requireUser(env, req, new Uint8Array());
       if (auth.error) return auth.error;
@@ -130,6 +156,17 @@ export default {
       return result.ok ? json(result.body, 201) : json({ error: result.error }, result.status);
     }
 
+    // Maintainer-only: hide / unhide / delete / pin a comment.
+    const commentModMatch = path.match(/^\/api\/features\/([^/]+)\/comments\/([^/]+)$/);
+    if (req.method === "PATCH" && commentModMatch) {
+      const body = await readJson<unknown>(req);
+      if (body.error) return body.error;
+      const auth = await requireUser(env, req, body.bytes);
+      if (auth.error) return auth.error;
+      const result = await moderateComment(env, auth.user!, commentModMatch[1], commentModMatch[2], body.data);
+      return result.ok ? json(result.body) : json({ error: result.error }, result.status);
+    }
+
     const featureMatch = path.match(/^\/api\/features\/([^/]+)$/);
     if (req.method === "GET" && featureMatch) {
       const auth = await requireUser(env, req, new Uint8Array());
@@ -147,10 +184,54 @@ export default {
       return result.ok ? json(result.body) : json({ error: result.error }, result.status);
     }
 
+    // Testimonials — one per user, maintainer-approved before public.
+    if (req.method === "OPTIONS" && path === "/api/public/testimonials") {
+      return publicJson({ ok: true });
+    }
+    if (req.method === "GET" && path === "/api/public/testimonials") {
+      return publicJson(await listPublicTestimonials(env));
+    }
+
+    if (req.method === "GET" && path === "/api/me/testimonial") {
+      const auth = await requireUser(env, req, new Uint8Array());
+      if (auth.error) return auth.error;
+      return json(await getMyTestimonial(env, auth.user!));
+    }
+
+    if (req.method === "PUT" && path === "/api/me/testimonial") {
+      const body = await readJson<unknown>(req);
+      if (body.error) return body.error;
+      const auth = await requireUser(env, req, body.bytes);
+      if (auth.error) return auth.error;
+      const result = await putMyTestimonial(env, auth.user!, body.data);
+      return result.ok ? json(result.body) : json({ error: result.error }, result.status);
+    }
+
+    if (req.method === "DELETE" && path === "/api/me/testimonial") {
+      const auth = await requireUser(env, req, new Uint8Array());
+      if (auth.error) return auth.error;
+      return json(await deleteMyTestimonial(env, auth.user!));
+    }
+
+    if (req.method === "GET" && path === "/api/testimonials") {
+      const auth = await requireUser(env, req, new Uint8Array());
+      if (auth.error) return auth.error;
+      return json(await listTestimonials(env, auth.user!));
+    }
+
+    const testimonialModMatch = path.match(/^\/api\/testimonials\/([^/]+)$/);
+    if (req.method === "PATCH" && testimonialModMatch) {
+      const body = await readJson<unknown>(req);
+      if (body.error) return body.error;
+      const auth = await requireUser(env, req, body.bytes);
+      if (auth.error) return auth.error;
+      const result = await moderateTestimonial(env, auth.user!, testimonialModMatch[1], body.data);
+      return result.ok ? json(result.body) : json({ error: result.error }, result.status);
+    }
+
     if (req.method === "GET" && path === "/health") {
       return json({ ok: true, service: "septena-community" });
     }
 
     return notFound();
-  },
-};
+}

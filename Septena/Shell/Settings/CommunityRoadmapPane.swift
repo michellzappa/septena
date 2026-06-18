@@ -19,6 +19,14 @@ struct CommunityRoadmapPane: View {
       if !canUse {
         fallbackSection
       } else {
+        if isMaintainer {
+          Section {
+            Label("You're a maintainer — swipe a comment to moderate, set status in each request.",
+                  systemImage: "checkmark.seal.fill")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+
         Section {
           Button {
             showingComposer = true
@@ -59,6 +67,14 @@ struct CommunityRoadmapPane: View {
               }
             }
           }
+        }
+
+        Section {
+          Link(destination: URL(string: "https://septena.app/roadmap")!) {
+            Label("View the roadmap on the web", systemImage: "safari")
+          }
+        } footer: {
+          Text("A public, read-only version of this board — handy for sharing.")
         }
       }
     }
@@ -143,6 +159,9 @@ private struct FeatureRow: View {
         Text(feature.title).font(.body).lineLimit(2)
         HStack(spacing: 8) {
           FeatureStatusBadge(status: feature.status)
+          if let by = feature.author?.label {
+            Text(by).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+          }
           if feature.commentCount > 0 {
             Label("\(feature.commentCount)", systemImage: "bubble.left")
               .font(.caption).foregroundStyle(.secondary)
@@ -164,9 +183,26 @@ private struct FeatureDetailView: View {
 
   @State private var detail: CommunityFeatureDetail?
   @State private var comment = ""
+  @State private var replyingTo: CommunityFeatureComment?
   @State private var loading = false
   @State private var busy = false
   @State private var errorMessage: String?
+
+  /// Flat comment list flattened into one-level threads: each top-level comment
+  /// followed by its replies (chronological). Mirrors the worker's one-deep model.
+  private var threadedComments: [(comment: CommunityFeatureComment, isReply: Bool)] {
+    let all = detail?.comments ?? []
+    let tops = all.filter { ($0.parentId ?? "").isEmpty }
+    let repliesByParent = Dictionary(grouping: all.filter { !($0.parentId ?? "").isEmpty }) { $0.parentId ?? "" }
+    var out: [(CommunityFeatureComment, Bool)] = []
+    for top in tops {
+      out.append((top, false))
+      for reply in (repliesByParent[top.id] ?? []).sorted(by: { $0.createdAt < $1.createdAt }) {
+        out.append((reply, true))
+      }
+    }
+    return out
+  }
 
   var body: some View {
     List {
@@ -180,6 +216,10 @@ private struct FeatureDetailView: View {
             }
             if let d = f.detail, !d.isEmpty {
               Text(d).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            if let by = f.author?.label {
+              Label("Suggested by \(by)", systemImage: "person.crop.circle")
+                .font(.caption).foregroundStyle(.secondary)
             }
             Button {
               Task { await vote(!f.hasVoted) }
@@ -212,24 +252,62 @@ private struct FeatureDetailView: View {
       Section("Comments") {
         if loading && detail == nil {
           HStack { ProgressView(); Text("Loading…").foregroundStyle(.secondary) }
-        } else if (detail?.comments ?? []).isEmpty {
+        } else if threadedComments.isEmpty {
           Text("No comments yet.").font(.callout).foregroundStyle(.secondary)
         } else {
-          ForEach(detail?.comments ?? []) { c in
-            FeatureCommentRow(comment: c)
+          ForEach(threadedComments, id: \.comment.id) { item in
+            FeatureCommentRow(comment: item.comment, isReply: item.isReply)
+              .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if canReply {
+                  Button {
+                    replyingTo = item.comment
+                  } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
+                  .tint(.accentColor)
+                }
+                if isMaintainer {
+                  Button(role: .destructive) {
+                    Task { await moderate(item.comment, status: "deleted") }
+                  } label: { Label("Delete", systemImage: "trash") }
+                  Button {
+                    Task { await moderate(item.comment, status: item.comment.status == "hidden" ? "visible" : "hidden") }
+                  } label: {
+                    Label(item.comment.status == "hidden" ? "Unhide" : "Hide",
+                          systemImage: item.comment.status == "hidden" ? "eye" : "eye.slash")
+                  }
+                  .tint(.orange)
+                  Button {
+                    Task { await moderate(item.comment, isPinned: !item.comment.isPinned) }
+                  } label: {
+                    Label(item.comment.isPinned ? "Unpin" : "Pin", systemImage: "pin")
+                  }
+                  .tint(.yellow)
+                }
+              }
           }
         }
       }
 
       if isMaintainer || !(detail?.feature.isLocked ?? false) {
-        Section("Add comment") {
+        Section {
+          if let replyingTo {
+            HStack {
+              Label("Replying to \(replyTargetLabel(replyingTo))", systemImage: "arrowshape.turn.up.left")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+              Spacer()
+              Button("Cancel") { self.replyingTo = nil }
+                .font(.caption)
+            }
+          }
           TextEditor(text: $comment).frame(minHeight: 80)
           Button {
             Task { await postComment() }
           } label: {
-            if busy { ProgressView() } else { Label("Post", systemImage: "paperplane") }
+            if busy { ProgressView() }
+            else { Label(replyingTo == nil ? "Post" : "Post reply", systemImage: "paperplane") }
           }
           .disabled(comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || busy)
+        } header: {
+          Text(replyingTo == nil ? "Add comment" : "Reply")
         }
       } else {
         Section {
@@ -281,12 +359,28 @@ private struct FeatureDetailView: View {
     await run { try await CommunityClient.shared.voteFeature(id: id, voted: voted) }
   }
 
+  private var canReply: Bool {
+    isMaintainer || !(detail?.feature.isLocked ?? false)
+  }
+
+  private func replyTargetLabel(_ c: CommunityFeatureComment) -> String {
+    if c.authorRole == "maintainer" { return "Septena" }
+    if c.authorRole == "moderator" { return "Moderator" }
+    return c.author?.label ?? "a comment"
+  }
+
   @MainActor private func postComment() async {
     let body = comment.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !body.isEmpty else { return }
+    let parent = replyingTo?.id
     busy = true; defer { busy = false }
-    await run { try await CommunityClient.shared.commentFeature(id: id, body: body) }
-    if errorMessage == nil { comment = "" }
+    await run { try await CommunityClient.shared.commentFeature(id: id, body: body, parentId: parent) }
+    if errorMessage == nil { comment = ""; replyingTo = nil }
+  }
+
+  @MainActor private func moderate(_ c: CommunityFeatureComment, status: String? = nil, isPinned: Bool? = nil) async {
+    busy = true; defer { busy = false }
+    await run { try await CommunityClient.shared.moderateComment(featureID: id, commentID: c.id, status: status, isPinned: isPinned) }
   }
 
   @MainActor private func setStatus(_ status: String) async {
@@ -313,21 +407,37 @@ private struct FeatureDetailView: View {
 
 private struct FeatureCommentRow: View {
   let comment: CommunityFeatureComment
+  var isReply: Bool = false
+
+  private var isHidden: Bool { comment.status == "hidden" }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Label(commentAuthorLabel(comment.authorRole), systemImage: commentAuthorIcon(comment.authorRole))
+        if isReply {
+          Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary)
+        }
+        Label(commentAuthorLabel(role: comment.authorRole, author: comment.author),
+              systemImage: commentAuthorIcon(comment.authorRole))
           .font(.caption.weight(.semibold))
         if comment.isPinned {
           Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.orange)
+        }
+        if isHidden {
+          Text("Hidden")
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.orange.opacity(0.16), in: Capsule())
+            .foregroundStyle(.orange)
         }
         Spacer()
         Text(comment.createdAt).font(.caption2).foregroundStyle(.tertiary)
       }
       Text(comment.body).font(.callout).textSelection(.enabled)
+        .foregroundStyle(isHidden ? .secondary : .primary)
     }
     .padding(.vertical, 4)
+    .padding(.leading, isReply ? 20 : 0)
   }
 }
 
@@ -424,11 +534,11 @@ private func featureStatusTint(_ s: String) -> Color {
   }
 }
 
-private func commentAuthorLabel(_ role: String) -> String {
+private func commentAuthorLabel(role: String, author: CommunityAuthor?) -> String {
   switch role {
   case "maintainer": return "Septena"
   case "moderator": return "Moderator"
-  default: return "Member"
+  default: return author?.label ?? "Member"
   }
 }
 

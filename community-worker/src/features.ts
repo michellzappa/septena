@@ -20,14 +20,27 @@ interface FeatureRow {
   vote_count: number;
   comment_count: number;
   has_voted: number;
+  author_username: string | null;
+  author_display_name: string | null;
 }
 
 interface CommentRow {
   id: string;
+  parent_id: string | null;
   author_role: CurrentUser["role"];
   body: string;
   created_at: string;
   is_pinned: number;
+  status: string;
+  author_username: string | null;
+  author_display_name: string | null;
+}
+
+// Author identity is exposed ONLY for users who opted their profile public
+// (the join below is gated on is_public = 1, so non-public authors yield nulls).
+function authorJSON(username: string | null, displayName: string | null): Record<string, unknown> | null {
+  if (!username && !displayName) return null;
+  return { username, displayName };
 }
 
 function canModerate(user: CurrentUser): boolean {
@@ -42,14 +55,40 @@ export async function listFeatures(env: Env, user: CurrentUser): Promise<Record<
   const rows = await env.DB.prepare(`
     select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
            f.maintainer_note, f.is_locked,
+           ap.username as author_username, ap.display_name as author_display_name,
            (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
            (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
            (select count(*) from feature_vote v where v.request_id = f.id and v.user_hash = ?) as has_voted
     from feature_request f
+    left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
     ${statusFilter}
     order by vote_count desc, f.created_at desc
     limit 200
   `).bind(user.userHash).all<FeatureRow>();
+  return { features: (rows.results ?? []).map(featureJSON) };
+}
+
+// Public, unauthenticated board for the website. No iCloud/App Attest identity,
+// so there's no per-user `hasVoted` and no comments — read-only counts only.
+// Only the moderated states are exposed (raw 'pending' submissions stay private,
+// matching what regular users see in-app). Authorship still rides the is_public
+// gate, so non-public authors yield nulls exactly as the authed board does.
+const PUBLIC_STATES = "('approved','planned','in_progress','shipped')";
+
+export async function listPublicFeatures(env: Env): Promise<Record<string, unknown>> {
+  const rows = await env.DB.prepare(`
+    select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
+           f.maintainer_note, f.is_locked,
+           ap.username as author_username, ap.display_name as author_display_name,
+           (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
+           (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
+           0 as has_voted
+    from feature_request f
+    left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
+    where f.status in ${PUBLIC_STATES}
+    order by vote_count desc, f.created_at desc
+    limit 200
+  `).all<FeatureRow>();
   return { features: (rows.results ?? []).map(featureJSON) };
 }
 
@@ -60,11 +99,15 @@ export async function getFeature(
 ): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; status: number; error: string }> {
   const feature = await findFeature(env, user, id);
   if (!feature) return { ok: false, status: 404, error: "feature_not_found" };
+  // Maintainers also see hidden comments (to moderate); deleted are gone for all.
+  const commentStates = canModerate(user) ? "('visible','hidden')" : "('visible')";
   const comments = await env.DB.prepare(`
-    select id, author_role, body, created_at, is_pinned
-    from feature_comment
-    where request_id = ? and status = 'visible'
-    order by is_pinned desc, created_at asc
+    select c.id, c.parent_id, c.author_role, c.body, c.created_at, c.is_pinned, c.status,
+           ap.username as author_username, ap.display_name as author_display_name
+    from feature_comment c
+    left join user_profile ap on ap.user_hash = c.author_hash and ap.is_public = 1
+    where c.request_id = ? and c.status in ${commentStates}
+    order by c.is_pinned desc, c.created_at asc
     limit 500
   `).bind(id).all<CommentRow>();
   return {
@@ -140,15 +183,64 @@ export async function addComment(
   const body = cleanString(input.body);
   if (!body || body.length > 2000) return { ok: false, status: 400, error: "bad_body" };
 
+  // Optional reply target. Threads are kept one level deep: replying to a reply
+  // attaches to its top-level parent so the UI never has to recurse.
+  let parentId: string | null = null;
+  const requestedParent = typeof input.parentId === "string" ? input.parentId : null;
+  if (requestedParent) {
+    const parent = await env.DB.prepare(`
+      select id, parent_id from feature_comment
+      where id = ? and request_id = ? and status = 'visible'
+    `).bind(requestedParent, id).first<{ id: string; parent_id: string | null }>();
+    if (!parent) return { ok: false, status: 400, error: "bad_parent" };
+    parentId = parent.parent_id ?? parent.id;
+  }
+
   await env.DB.prepare(`
-    insert into feature_comment (id, request_id, author_hash, author_role, body)
-    values (?, ?, ?, ?, ?)
-  `).bind(crypto.randomUUID(), id, user.userHash, user.role, body).run();
+    insert into feature_comment (id, request_id, parent_id, author_hash, author_role, body)
+    values (?, ?, ?, ?, ?, ?)
+  `).bind(crypto.randomUUID(), id, parentId, user.userHash, user.role, body).run();
   await env.DB.prepare(`
     update feature_request set updated_at = datetime('now') where id = ?
   `).bind(id).run();
 
   return await getFeature(env, user, id);
+}
+
+export async function moderateComment(
+  env: Env,
+  user: CurrentUser,
+  featureId: string,
+  commentId: string,
+  input: unknown,
+): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  if (!canModerate(user)) return { ok: false, status: 403, error: "forbidden" };
+  if (!isObject(input)) return { ok: false, status: 400, error: "bad_request" };
+  const exists = await env.DB.prepare(`
+    select id from feature_comment where id = ? and request_id = ?
+  `).bind(commentId, featureId).first<{ id: string }>();
+  if (!exists) return { ok: false, status: 404, error: "comment_not_found" };
+
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  if (input.status !== undefined) {
+    const status = input.status;
+    if (status !== "visible" && status !== "hidden" && status !== "deleted") {
+      return { ok: false, status: 400, error: "bad_status" };
+    }
+    sets.push("status = ?"); binds.push(status);
+  }
+  if (input.isPinned !== undefined) {
+    sets.push("is_pinned = ?"); binds.push(input.isPinned === true ? 1 : 0);
+  }
+  if (!sets.length) return { ok: false, status: 400, error: "no_fields" };
+
+  binds.push(commentId);
+  await env.DB.prepare(`
+    update feature_comment set ${sets.join(", ")} where id = ?
+  `).bind(...binds).run();
+
+  return await getFeature(env, user, featureId);
 }
 
 export async function updateFeature(
@@ -192,10 +284,12 @@ async function findFeature(env: Env, user: CurrentUser, id: string): Promise<Fea
   return await env.DB.prepare(`
     select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
            f.maintainer_note, f.is_locked,
+           ap.username as author_username, ap.display_name as author_display_name,
            (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
            (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
            (select count(*) from feature_vote v where v.request_id = f.id and v.user_hash = ?) as has_voted
     from feature_request f
+    left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
     where f.id = ? ${statusFilter}
     limit 1
   `).bind(user.userHash, id).first<FeatureRow>();
@@ -212,6 +306,7 @@ function featureJSON(row: FeatureRow): Record<string, unknown> {
     voteCount: row.vote_count,
     commentCount: row.comment_count,
     hasVoted: row.has_voted > 0,
+    author: authorJSON(row.author_username, row.author_display_name),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -220,9 +315,12 @@ function featureJSON(row: FeatureRow): Record<string, unknown> {
 function commentJSON(row: CommentRow): Record<string, unknown> {
   return {
     id: row.id,
+    parentId: row.parent_id,
     authorRole: row.author_role,
+    author: authorJSON(row.author_username, row.author_display_name),
     body: row.body,
     isPinned: row.is_pinned === 1,
+    status: row.status,
     createdAt: row.created_at,
   };
 }

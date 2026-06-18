@@ -15,6 +15,7 @@ export async function profileResponse(env: Env, user: CurrentUser): Promise<Reco
     user: {
       role: user.role,
       isBanned: user.isBanned,
+      userHash: user.userHash,
     },
     profile: publicProfile(profile),
   };

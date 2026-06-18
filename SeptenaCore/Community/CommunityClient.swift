@@ -24,6 +24,7 @@ public struct CommunityMe: Decodable, Sendable {
   public struct User: Decodable, Sendable {
     public let role: String
     public let isBanned: Bool
+    public let userHash: String?
   }
 
   public let user: User
@@ -123,6 +124,19 @@ public struct CommunitySupportMetadata: Codable, Sendable, Equatable {
 
 // MARK: - Feature requests (roadmap)
 
+/// Author identity, present only for contributors who made their profile public.
+public struct CommunityAuthor: Decodable, Sendable, Equatable {
+  public let username: String?
+  public let displayName: String?
+
+  /// Best display string: name, else @handle.
+  public var label: String? {
+    if let n = displayName, !n.isEmpty { return n }
+    if let u = username, !u.isEmpty { return "@\(u)" }
+    return nil
+  }
+}
+
 public struct CommunityFeature: Decodable, Sendable, Identifiable, Equatable {
   public let id: String
   public let title: String
@@ -133,21 +147,38 @@ public struct CommunityFeature: Decodable, Sendable, Identifiable, Equatable {
   public let voteCount: Int
   public let commentCount: Int
   public let hasVoted: Bool
+  public let author: CommunityAuthor?
   public let createdAt: String
   public let updatedAt: String
 }
 
 public struct CommunityFeatureComment: Decodable, Sendable, Identifiable, Equatable {
   public let id: String
+  public let parentId: String?
   public let authorRole: String
+  public let author: CommunityAuthor?
   public let body: String
   public let isPinned: Bool
+  public let status: String?
   public let createdAt: String
 }
 
 public struct CommunityFeatureDetail: Decodable, Sendable, Equatable {
   public let feature: CommunityFeature
   public let comments: [CommunityFeatureComment]
+}
+
+// MARK: - Testimonials
+
+public struct CommunityTestimonial: Decodable, Sendable, Identifiable, Equatable {
+  public let id: String
+  public let body: String
+  public let rating: Int?
+  public let status: String
+  public let isFeatured: Bool
+  public let author: CommunityAuthor?
+  public let createdAt: String
+  public let updatedAt: String
 }
 
 // MARK: - CommunityClient
@@ -289,11 +320,27 @@ public actor CommunityClient {
 
   public func commentFeature(id: String,
                              body: String,
+                             parentId: String? = nil,
                              baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
     var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(id)/comments"))
     req.httpMethod = "POST"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    let data = try JSONEncoder().encode(PostSupportMessageBody(body: body, isInternal: false))
+    let data = try JSONEncoder().encode(FeatureCommentBody(body: body, parentId: parentId))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  /// Maintainer-only: hide / unhide / delete / pin a comment.
+  public func moderateComment(featureID: String,
+                              commentID: String,
+                              status: String? = nil,
+                              isPinned: Bool? = nil,
+                              baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(featureID)/comments/\(commentID)"))
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(ModerateCommentBody(status: status, isPinned: isPinned))
     req.httpBody = data
     try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
     return try await send(req, as: CommunityFeatureDetail.self)
@@ -312,6 +359,55 @@ public actor CommunityClient {
     req.httpBody = data
     try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
     return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  // MARK: Testimonials
+
+  public func myTestimonial(baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityTestimonial? {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/me/testimonial"))
+    req.httpMethod = "GET"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    return try await send(req, as: TestimonialEnvelope.self).testimonial
+  }
+
+  public func putTestimonial(body: String,
+                             rating: Int?,
+                             baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityTestimonial? {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/me/testimonial"))
+    req.httpMethod = "PUT"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(PutTestimonialBody(body: body, rating: rating))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: TestimonialEnvelope.self).testimonial
+  }
+
+  public func deleteTestimonial(baseURL: URL = CommunityEndpoint.baseURL) async throws {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/me/testimonial"))
+    req.httpMethod = "DELETE"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    _ = try await send(req, as: TestimonialEnvelope.self)
+  }
+
+  public func testimonials(baseURL: URL = CommunityEndpoint.baseURL) async throws -> [CommunityTestimonial] {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/testimonials"))
+    req.httpMethod = "GET"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    return try await send(req, as: TestimonialList.self).testimonials
+  }
+
+  /// Maintainer-only: approve / hide / feature a testimonial.
+  public func moderateTestimonial(id: String,
+                                  status: String? = nil,
+                                  isFeatured: Bool? = nil,
+                                  baseURL: URL = CommunityEndpoint.baseURL) async throws -> [CommunityTestimonial] {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/testimonials/\(id)"))
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(ModerateTestimonialBody(status: status, isFeatured: isFeatured))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: TestimonialList.self).testimonials
   }
 
   private func attachCommunityAuth(_ req: inout URLRequest, body: Data, baseURL: URL) async throws {
@@ -387,5 +483,33 @@ public actor CommunityClient {
     let status: String?
     let maintainerNote: String?
     let isLocked: Bool?
+  }
+
+  private struct FeatureCommentBody: Encodable {
+    let body: String
+    let parentId: String?
+  }
+
+  private struct ModerateCommentBody: Encodable {
+    let status: String?
+    let isPinned: Bool?
+  }
+
+  private struct TestimonialEnvelope: Decodable {
+    let testimonial: CommunityTestimonial?
+  }
+
+  private struct TestimonialList: Decodable {
+    let testimonials: [CommunityTestimonial]
+  }
+
+  private struct PutTestimonialBody: Encodable {
+    let body: String
+    let rating: Int?
+  }
+
+  private struct ModerateTestimonialBody: Encodable {
+    let status: String?
+    let isFeatured: Bool?
   }
 }

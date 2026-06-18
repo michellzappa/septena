@@ -20,6 +20,13 @@ struct SupportSettingsPane: View {
       if !canUseInAppSupport {
         fallbackSection
       } else {
+        if isMaintainer {
+          Section {
+            Label("You're a maintainer — you're seeing every ticket.", systemImage: "checkmark.seal.fill")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+
         Section {
           Button {
             showingComposer = true

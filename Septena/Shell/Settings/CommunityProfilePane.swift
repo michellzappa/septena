@@ -16,6 +16,7 @@ struct CommunityProfilePane: View {
   @State private var saved: CommunityProfile?
   @State private var role = "user"
   @State private var isBanned = false
+  @State private var userHash: String?
 
   @State private var loading = false
   @State private var saving = false
@@ -139,6 +140,19 @@ struct CommunityProfilePane: View {
           }
         }
 
+        if let userHash {
+          Section {
+            Text(userHash)
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+          } header: {
+            Text("Account ID")
+          } footer: {
+            Text("Your anonymous community identity. Useful when granting maintainer access from the server.")
+          }
+        }
+
         if let errorMessage {
           Section {
             Text(errorMessage)
@@ -245,6 +259,7 @@ struct CommunityProfilePane: View {
   private func apply(_ me: CommunityMe) {
     role = me.user.role
     isBanned = me.user.isBanned
+    userHash = me.user.userHash
     let p = me.profile
     username = p.username ?? ""
     displayName = p.displayName ?? ""
