@@ -40,24 +40,13 @@ There is no `.env` for the app. User-facing provider credentials (e.g. the Oura 
 
 ### Building under your own Apple account
 
-The repo carries Septena's own identifiers. To build a signed copy on your own
-account, swap these for yours:
+The repo carries Septena's product identifiers as defaults. To build a signed
+copy on your own account, copy `Config/Secrets.example.xcconfig` to
+`Config/Secrets.xcconfig`, set `SEPTENA_DEVELOPMENT_TEAM`, replace bundle /
+CloudKit / App Group identifiers with your own, then re-run `xcodegen generate`.
 
-- **Team ID** — `DEVELOPMENT_TEAM` in `project.yml`. To keep it out of source
-  entirely, move it to `Config/Secrets.xcconfig` (gitignored) with an empty
-  default in `Config/Base.xcconfig` — the same xcconfig pattern used for the
-  Withings secret — then attach `configFiles: Config/Base.xcconfig` to every
-  target so each one inherits it.
-- **Bundle IDs** — find/replace `com.septena.cloud` in `project.yml` and the
-  `*.entitlements` files with your own reverse-DNS prefix.
-- **CloudKit container** — `iCloud.com.septena.cloud` in the `*.entitlements`
-  files; use your own.
-- **App Group** — `group.com.septena.cloud` in the `*.entitlements` files.
-
-The `*.entitlements` files are hand-maintained (XcodeGen references them via
-`CODE_SIGN_ENTITLEMENTS` but does not generate them), so the container / group /
-bundle strings live there and must be edited by hand. Re-run `xcodegen generate`
-after changing `project.yml`.
+See [`docs/BUILDING_YOUR_OWN.md`](docs/BUILDING_YOUR_OWN.md) for the full
+checklist, including CloudKit and report-worker setup.
 
 ## Repository Layout
 
@@ -212,6 +201,8 @@ From `project.yml` and entitlements:
 ## Useful Docs
 
 - `docs/DesignSpec.md` - the canonical design system (typography, color, iconography, row anatomy, spacing, motion); code should conform.
+- `docs/BUILDING_YOUR_OWN.md` - signing, identifiers, CloudKit, and worker setup for forks.
+- `docs/OPEN_SOURCE_LIMITATIONS.md` - current caveats before treating the repo as turnkey OSS.
 - `docs/BACKLOG.md` - tracked, non-urgent work.
 - `docs/IDENTIFIERS.md` - the stable id/title model and wire contracts across the app, CloudKit, and the MCP gateway.
 - `docs/TRAINING_MIGRATION_HANDOFF.md` / `docs/NUTRITION_MIGRATION_HANDOFF.md` - historical section-migration notes; verify against code before acting.
