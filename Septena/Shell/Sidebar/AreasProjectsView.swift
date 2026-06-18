@@ -76,6 +76,7 @@ struct AreaDetailView: View {
   let area: Area
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
+  @Environment(\.horizontalSizeClass) private var hSize
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(\.modelContext) private var modelContext
 
@@ -147,7 +148,7 @@ struct AreaDetailView: View {
 
         VStack(alignment: .leading, spacing: 0) {
           ForEach(projectsInArea) { project in
-            Button { nav.path = [.project(project)] } label: {
+            Button { openProject(project) } label: {
               projectRow(project)
             }
             .buttonStyle(.plain)
@@ -176,6 +177,23 @@ struct AreaDetailView: View {
 
   private var projectsInArea: [Project] {
     projects.filter { $0.area == area.id && $0.status == .active }
+  }
+
+  /// A project lives *inside* this area, so on the iPhone push stack append it
+  /// (animates in as a pane; Back returns here, not to the sidebar) rather than
+  /// replacing the path — a same-depth swap flash-appears and pops past the
+  /// area. The iPad/Mac split layout renders `path.last` directly, so it keeps
+  /// the flat replace.
+  private func openProject(_ project: Project) {
+    #if os(macOS)
+    nav.path = [.project(project)]
+    #else
+    if hSize == .compact {
+      nav.path.append(.project(project))
+    } else {
+      nav.path = [.project(project)]
+    }
+    #endif
   }
 
   @ViewBuilder

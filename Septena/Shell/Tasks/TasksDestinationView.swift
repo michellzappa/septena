@@ -60,6 +60,17 @@ struct TasksDestinationView: View {
     selectedId = task.id
     editingTask = task
   }
+  /// Row open-tap, matching the deep `TaskListView`:
+  ///   • iOS  — a single tap opens the editor.
+  ///   • macOS — single click stays free (selection / context-menu target);
+  ///     the editor opens on double-click via `.septenaOnDoubleClick` below.
+  private func openTap(_ task: SeptenaTask) -> (() -> Void)? {
+    #if os(macOS)
+    return nil
+    #else
+    return { openEdit(task) }
+    #endif
+  }
 
   var body: some View {
     SectionDrawer(sectionKey: "tasks",
@@ -92,7 +103,8 @@ struct TasksDestinationView: View {
                     showsTodayIndicator: false,
                     isSelected: selectedId == task.id,
                     onToggle: { toggleInbox(task) },
-                    onTap: { openEdit(task) })
+                    onTap: openTap(task))
+              .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .triage, areas: areas,
                               projects: projects, mutator: mutator,
                               onOpenDetail: { openEdit($0) })
@@ -109,7 +121,8 @@ struct TasksDestinationView: View {
                     showsTodayIndicator: false,
                     isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
-                    onTap: { openEdit(task) })
+                    onTap: openTap(task))
+              .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .today, areas: areas,
                               projects: projects, mutator: mutator,
                               onOpenDetail: { openEdit($0) })
@@ -127,7 +140,8 @@ struct TasksDestinationView: View {
                     showsTodayIndicator: false,
                     isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
-                    onTap: { openEdit(task) })
+                    onTap: openTap(task))
+              .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .logbook, areas: areas,
                               projects: projects, mutator: mutator,
                               onOpenDetail: { openEdit($0) })
