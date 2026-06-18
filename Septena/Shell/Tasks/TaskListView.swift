@@ -1232,16 +1232,15 @@ struct TaskListView: View {
     let headerTopPadding: CGFloat = 32
     let headerHorizontalCorrection: CGFloat = 0
     let titleLeadingCorrection: CGFloat = -6
-    let areaIconDiameter: CGFloat = 21
     #else
     let headerTopPadding: CGFloat = 18
-    let headerHorizontalCorrection: CGFloat = -16
-    // Cancel GroupHeaderLabel's internal 6pt leading so the tappable title
-    // starts at the same X as task-row text (macOS already does this).
-    let titleLeadingCorrection: CGFloat = -6
-    // Slightly smaller than macOS so the emoji reads centered over the
-    // (18pt) task-row checkbox rather than overhanging it.
-    let areaIconDiameter: CGFloat = 19
+    // Nudge the whole header (symbol + title) ~2pt left of where it sat so the
+    // area/project symbol lines up over the task-row checkbox.
+    let headerHorizontalCorrection: CGFloat = -18
+    // Cancel GroupHeaderLabel's internal 6pt leading (less the 2pt the group
+    // already shifted) so the tappable title lands at the same X as task-row
+    // text — the same alignment macOS gets from its -6.
+    let titleLeadingCorrection: CGFloat = -4
     #endif
     return VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: Theme.iconTextGap) {
@@ -1249,7 +1248,7 @@ struct TaskListView: View {
           // Area dot is intentionally bumped past task-row icon size — it's a
           // section header, not an inline glyph, and the larger circle reads as
           // a chapter marker. A user emoji takes the dot's place.
-          AreaIcon(tint: Theme.inkSecondary, diameter: areaIconDiameter, lineWidth: 1.5, emoji: areaEmoji)
+          AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5, emoji: areaEmoji)
             .frame(width: Theme.checkboxTap, alignment: .center)
         } else if icon != nil {
           Image(systemName: icon!)
