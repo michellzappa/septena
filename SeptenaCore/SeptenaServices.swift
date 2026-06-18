@@ -142,6 +142,12 @@ final class SeptenaServices {
       let context = LocalStore.shared.container.mainContext
       let settingsSingletonID = SettingsCloudKitSchema.singletonID
 
+      // Single choke point for keeping the watch / widget Next snapshot fresh:
+      // republish on any `.septenaDataChanged` / `.septenaTasksChanged` that
+      // touches Next, so every data source (tasks, checklist, training,
+      // nutrition, mood, intake) stays in sync without each mutator opting in.
+      WatchSnapshotPublisher.install(context: context)
+
       // Backfill: ensure every SectionManifest entry has a local
       // SectionEntity row so the central store is the source of truth
       // for which sections exist and whether they're enabled. Each
@@ -1724,12 +1730,11 @@ final class ChecklistMutator {
   /// (sidebar, Tasks tile, menu bar) never cared about checklist toggles,
   /// so no `.septenaTasksChanged` here.
   private func postChecklistChanged(_ section: String) {
+    // Posting the scoped change is enough: `WatchSnapshotPublisher.install`
+    // observes `.septenaDataChanged` and republishes the watch/widget snapshot
+    // (debounced) for any Next-relevant section, so the rebuild no longer has to
+    // be wired per-mutator — that omission is what left training/mood stale.
     DataChange.post(section)
-    // Keep the watch's one-shot snapshot in sync with every checklist edit.
-    // Debounced: ticking several items in a row coalesces to one rebuild +
-    // CloudKit write instead of one per toggle.
-    let ctx = context
-    Task { @MainActor in WatchSnapshotPublisher.schedule(context: ctx) }
   }
 }
 

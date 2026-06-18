@@ -20,6 +20,30 @@ enum WatchSnapshotPublisher {
   /// each `schedule` call so a burst collapses to one build + write.
   @MainActor private static var pending: Task<Void, Never>?
 
+  /// `.septenaDataChanged` / `.septenaTasksChanged` observers, retained for the
+  /// process lifetime. Non-nil once `install` has run, which also makes the
+  /// install idempotent.
+  @MainActor private static var observers: [NSObjectProtocol]?
+
+  /// The sections whose data actually composes the Next snapshot, so a change to
+  /// an unrelated section (goals, gut, symptoms, medications, groceries, …)
+  /// doesn't pay for a full rebuild. This is every input `publish` reads:
+  /// the completable Next members (chores/habits/supplements — tasks ride the
+  /// separate `.septenaTasksChanged`) plus the four suggestion sources
+  /// (`NextSuggestionsModel.Kind`: training, fastBreak→nutrition, mood, intake)
+  /// and the meal/ring data. Keep in sync when adding a Next member or a
+  /// suggestion source — an omission here is exactly what left training/mood
+  /// stale on the watch before. Unscoped posts (CloudKit batch arrival, section
+  /// colour / settings edits) bypass this filter and always republish.
+  ///
+  /// medications / symptoms / groceries are here not as Next members but because
+  /// their *catalogs* ride the snapshot for the watch's + capture menu — so a
+  /// med/symptom edit, or a grocery flipping in/out of stock, must republish to
+  /// keep the wrist menu current.
+  private static let snapshotSections: Set<String> =
+    ["chores", "habits", "supplements", "training", "nutrition", "mood", "intake",
+     "medications", "symptoms", "groceries"]
+
   /// Coalesce a burst of mutations (ticking five habits in a row) into a single
   /// snapshot build + CloudKit write. The full payload is a snapshot, so only
   /// the last build in a burst matters — the intermediates would each rebuild
@@ -36,6 +60,34 @@ enum WatchSnapshotPublisher {
       pending = nil
       publish(context: context, date: date)
     }
+  }
+
+  /// The single choke point that keeps the watch / widget snapshot in sync.
+  ///
+  /// Every mutator already posts `.septenaDataChanged` (scoped) or
+  /// `.septenaTasksChanged`, and CloudKit batch arrival posts them unscoped, so
+  /// observing those two notifications here republishes on *any* change that can
+  /// affect Next — without each mutator having to remember to call `schedule`.
+  /// That omission is what used to leave the watch nagging "do cardio" / "log
+  /// your mood" after the user already had: training, nutrition, mood and intake
+  /// only refresh the snapshot through this observer. Idempotent.
+  @MainActor
+  static func install(context: ModelContext) {
+    guard observers == nil else { return }
+    let center = NotificationCenter.default
+    let data = center.addObserver(
+      forName: .septenaDataChanged, object: nil, queue: .main
+    ) { note in
+      // Only sections that feed the snapshot; unscoped posts (nil) always pass.
+      guard note.affectsAnySection(of: snapshotSections) else { return }
+      MainActor.assumeIsolated { schedule(context: context) }
+    }
+    let tasks = center.addObserver(
+      forName: .septenaTasksChanged, object: nil, queue: .main
+    ) { _ in
+      MainActor.assumeIsolated { schedule(context: context) }
+    }
+    observers = [data, tasks]
   }
 
   /// Compute on the main actor (SwiftData read), then save off-main. Best-effort:
@@ -100,6 +152,16 @@ enum WatchSnapshotPublisher {
     // This week's training (trailing 7 days) vs targets, for the watch's
     // training-ring complication. Nil when nothing's been logged this week.
     let trainingRings = buildTrainingRings(context: context)
+    // The medications / symptoms / groceries capture catalogs, each gated on the
+    // section being enabled so the wrist + menu is dynamic — disabling a section
+    // on the phone drops its rows from the watch on the next publish.
+    let enabledKeys = Set(sections.filter { $0.isEnabled }.map { $0.key })
+    let medications = enabledKeys.contains("medications")
+      ? buildMedications(context: context) : []
+    let symptoms = enabledKeys.contains("symptoms")
+      ? buildSymptoms(context: context) : []
+    let groceries = enabledKeys.contains("groceries")
+      ? buildGroceries(context: context) : []
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
@@ -107,7 +169,10 @@ enum WatchSnapshotPublisher {
                                      intakeKinds: intakeKinds.isEmpty ? nil : intakeKinds,
                                      topMeals: topMeals.isEmpty ? nil : topMeals,
                                      nutritionRings: nutritionRings,
-                                     trainingRings: trainingRings)
+                                     trainingRings: trainingRings,
+                                     medications: medications.isEmpty ? nil : medications,
+                                     symptoms: symptoms.isEmpty ? nil : symptoms,
+                                     groceries: groceries.isEmpty ? nil : groceries)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
@@ -301,6 +366,56 @@ enum WatchSnapshotPublisher {
     ]
     guard rings.contains(where: { $0.value > 0 }) else { return nil }
     return TrainingRingsWire(rings: rings)
+  }
+
+  // MARK: - Capture catalogs (wrist quick-inputs)
+
+  /// In-stock grocery list cap, so a large pantry can't bloat the snapshot the
+  /// watch reads on every fetch.
+  private static let groceriesCap = 100
+
+  /// The user's active medications for the wrist "mark taken" menu, in their
+  /// saved order. `detail` is the strength ("500 mg") else the form, so the row
+  /// can disambiguate two meds with the same name.
+  @MainActor
+  private static func buildMedications(context: ModelContext) -> [MedicationWire] {
+    let rows = (try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
+      predicate: #Predicate { !$0.archived },
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
+    return rows.map { m in
+      var detail: String? = nil
+      if let v = m.strengthValue {
+        // Trim a trailing ".0" so "500.0 mg" reads "500 mg".
+        let num = v == v.rounded() ? String(Int(v)) : String(v)
+        detail = m.strengthUnit.map { "\(num) \($0)" } ?? num
+      } else if let form = m.form, !form.isEmpty {
+        detail = form
+      }
+      return MedicationWire(id: m.id, name: m.title, detail: detail)
+    }
+  }
+
+  /// The user's active symptom catalog for the wrist severity menu, in saved order.
+  @MainActor
+  private static func buildSymptoms(context: ModelContext) -> [SymptomWire] {
+    let rows = (try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
+      predicate: #Predicate { !$0.archived },
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
+    return rows.map { SymptomWire(id: $0.id, name: $0.title, emoji: $0.emoji) }
+  }
+
+  /// The user's in-stock grocery items for the wrist "mark low" menu, in saved
+  /// order. Only items currently `low == false` — marking low is the wrist
+  /// action, so an already-low item has nothing to do here.
+  @MainActor
+  private static func buildGroceries(context: ModelContext) -> [GroceryWire] {
+    let rows = (try? context.fetch(FetchDescriptor<GroceryItemEntity>(
+      predicate: #Predicate { !$0.low },
+      sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
+    return rows.prefix(groceriesCap).map {
+      GroceryWire(id: $0.id, name: $0.name,
+                  emoji: $0.emoji.isEmpty ? nil : $0.emoji, category: $0.category)
+    }
   }
 
   private static func save(payload: Data, rhythmPayload: Data? = nil, date: String) async {

@@ -40,6 +40,14 @@ struct NextWatchView: View {
     .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
       conn.fetchNext()
     }
+    // Foreground poll: with no push entitlement on the watch, a wrist left open
+    // can't otherwise hear about a change made on the phone. One O(1) snapshot
+    // read a minute while actively on screen keeps an open watch from nagging to
+    // do something already logged elsewhere. Gated to `.active` so it never runs
+    // backgrounded (where the 15-min background refresh takes over).
+    .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+      if scenePhase == .active { conn.fetchNext() }
+    }
   }
 
   @ViewBuilder
@@ -522,6 +530,151 @@ private struct MealPickerView: View {
   }
 }
 
+/// Pick a medication to mark taken — one tap logs a "taken" dose and dismisses,
+/// mirroring the meal picker. `detail` (strength / form) disambiguates the row.
+private struct MedicationPickerView: View {
+  let meds: [MedicationWire]
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    List(meds) { med in
+      Button {
+        conn.logMedication(med)
+        onDone()
+      } label: {
+        HStack(spacing: 9) {
+          Image(systemName: "cross.case")
+            .font(.body)
+            .frame(width: 22)
+            .foregroundStyle(WatchSectionTint.color(forSectionKey: "medications",
+                                                    colors: conn.sectionColors))
+          VStack(alignment: .leading, spacing: 1) {
+            Text(med.name).font(.body).lineLimit(1)
+            if let detail = med.detail, !detail.isEmpty {
+              Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    }
+    .listStyle(.plain)
+    .navigationTitle("Medication")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+/// Pick a symptom, then a severity — two taps for a faithful log. The severity
+/// levels (Mild / Moderate / Severe → 3 / 5 / 8 on the phone's 0–10 scale)
+/// mirror `SymptomsQuickAddMenu` so a wrist log matches the phone's quick-add.
+private struct SymptomPickerView: View {
+  let symptoms: [SymptomWire]
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    List(symptoms) { symptom in
+      NavigationLink {
+        SymptomSeverityList(symptom: symptom, conn: conn, onDone: onDone)
+      } label: {
+        HStack(spacing: 9) {
+          Text(symptom.emoji?.isEmpty == false ? symptom.emoji! : "🩺")
+            .font(.body)
+            .frame(width: 22)
+          Text(symptom.name).font(.body).lineLimit(1)
+          Spacer(minLength: 0)
+        }
+      }
+      .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    }
+    .listStyle(.plain)
+    .navigationTitle("Symptom")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+/// Step 2 of the symptom log — pick a calibrated severity. Logs and dismisses.
+private struct SymptomSeverityList: View {
+  let symptom: SymptomWire
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  // Named severities map onto the phone editor's 0–10 scale, matching
+  // `SymptomsQuickAddMenu.levels` exactly so the two surfaces never diverge.
+  private static let levels: [(label: String, severity: Int)] = [
+    ("Mild", 3), ("Moderate", 5), ("Severe", 8),
+  ]
+
+  var body: some View {
+    List(Self.levels, id: \.severity) { level in
+      Button {
+        conn.logSymptom(symptom, severity: level.severity)
+        onDone()
+      } label: {
+        HStack {
+          Text(level.label).font(.body)
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    }
+    .listStyle(.plain)
+    .navigationTitle(symptom.name)
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+/// Mark in-stock grocery items low. Tapping a row flags it (and drops it from
+/// the list via the connectivity layer) so several can be marked in one pass;
+/// the list empties as you go, and a Done button closes the capture.
+private struct GroceryLowPickerView: View {
+  let conn: WatchConnectivity
+  let onDone: () -> Void
+
+  var body: some View {
+    List {
+      ForEach(conn.groceries) { item in
+        Button {
+          conn.markGroceryLow(item)
+        } label: {
+          HStack(spacing: 9) {
+            Text(item.emoji?.isEmpty == false ? item.emoji! : "🛒")
+              .font(.body)
+              .frame(width: 22)
+            Text(item.name).font(.body).lineLimit(1)
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.down.circle")
+              .foregroundStyle(WatchSectionTint.color(forSectionKey: "groceries",
+                                                      colors: conn.sectionColors))
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+      }
+      if conn.groceries.isEmpty {
+        Text("All marked low")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Button("Done", action: onDone)
+        .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    }
+    .listStyle(.plain)
+    .navigationTitle("Groceries")
+    .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
 // MARK: - Capture sheet (on-demand log)
 
 /// The toolbar **+** target: pick a capturable, then collect its minimal input.
@@ -600,8 +753,61 @@ private struct CaptureSheet: View {
           }
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
+
+        // Medications — mark a dose taken. Present only when the section is
+        // enabled and the user has medications (the snapshot gates both).
+        if !conn.medications.isEmpty {
+          NavigationLink {
+            MedicationPickerView(meds: conn.medications, conn: conn, onDone: onDone)
+          } label: {
+            Label {
+              Text("Take medication")
+            } icon: {
+              Image(systemName: "cross.case")
+                .foregroundStyle(WatchSectionTint.color(forSectionKey: "medications",
+                                                        colors: conn.sectionColors))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
+
+        // Symptoms — log one at a calibrated severity (two taps).
+        if !conn.symptoms.isEmpty {
+          NavigationLink {
+            SymptomPickerView(symptoms: conn.symptoms, conn: conn, onDone: onDone)
+          } label: {
+            Label {
+              Text("Log symptom")
+            } icon: {
+              Image(systemName: "waveform.path.ecg")
+                .foregroundStyle(WatchSectionTint.color(forSectionKey: "symptoms",
+                                                        colors: conn.sectionColors))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
+
+        // Groceries — mark an in-stock item low ("we ran out"). The picker stays
+        // open so several can be flagged in one go.
+        if !conn.groceries.isEmpty {
+          NavigationLink {
+            GroceryLowPickerView(conn: conn, onDone: onDone)
+          } label: {
+            Label {
+              Text("Mark grocery low")
+            } icon: {
+              Image(systemName: "cart")
+                .foregroundStyle(WatchSectionTint.color(forSectionKey: "groceries",
+                                                        colors: conn.sectionColors))
+            }
+          }
+          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
       }
       .listStyle(.plain)
+      // The default Label glyph scale reads chunky in this menu — drop one
+      // notch so the icons sit lighter beside their titles.
+      .imageScale(.small)
       .navigationTitle("Capture")
       .navigationBarTitleDisplayMode(.inline)
     }
@@ -659,8 +865,13 @@ private struct AddInboxTaskView: View {
     }
     .navigationTitle("New To-Do")
     .navigationBarTitleDisplayMode(.inline)
-    // Open straight into text entry — no tap on the field first.
-    .onAppear { focused = true }
+    // Open straight into text entry — no tap on the field first. Defer the
+    // focus to the next runloop: setting @FocusState inside onAppear fires
+    // before the field is in the hierarchy on watchOS, so the input modal
+    // never pops. A hop lets the keyboard/dictation come up on its own.
+    .onAppear {
+      DispatchQueue.main.async { focused = true }
+    }
   }
 
   private func commit() {

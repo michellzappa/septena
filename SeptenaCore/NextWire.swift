@@ -61,6 +61,53 @@ struct NextItemsResponse: Codable {
   /// for the watch's training-ring complication. Phone-computed. Optional so
   /// older payloads decode unchanged.
   var trainingRings: TrainingRingsWire? = nil
+  /// The user's active medications, carried so the watch's + menu can mark a
+  /// dose taken with one tap. Present only when the Medications section is
+  /// enabled (the publisher omits it otherwise), so the wrist menu is dynamic.
+  /// Optional so older payloads decode unchanged.
+  var medications: [MedicationWire]? = nil
+  /// The user's active symptom catalog, carried so the watch's + menu can log a
+  /// symptom at a calibrated severity. Present only when the Symptoms section is
+  /// enabled. Optional so older payloads decode unchanged.
+  var symptoms: [SymptomWire]? = nil
+  /// The user's in-stock grocery items, carried so the watch's + menu can mark
+  /// one low ("we ran out") with one tap. Present only when the Groceries
+  /// section is enabled. Optional so older payloads decode unchanged.
+  var groceries: [GroceryWire]? = nil
+}
+
+/// One active medication on the wire: enough for the wrist to render a row and
+/// write a "taken" `MedicationDoseEvent`. Built phone-side from the user's
+/// non-archived medications; everything optional-with-defaults so the wire
+/// stays additive.
+struct MedicationWire: Codable, Hashable, Identifiable {
+  var id: String
+  /// The medication's display name (its `title`).
+  var name: String
+  /// A short dose/strength detail for the subtitle (e.g. "500 mg"), derived
+  /// phone-side. Optional — absent when the med carries no strength/form.
+  var detail: String? = nil
+}
+
+/// One trackable symptom on the wire: enough for the wrist to render a row and
+/// write a `SymptomEvent` at a chosen severity. Built phone-side from the
+/// non-archived symptom catalog.
+struct SymptomWire: Codable, Hashable, Identifiable {
+  var id: String
+  /// The symptom's display name (its `title`).
+  var name: String
+  /// The symptom's emoji glyph, if the user set one.
+  var emoji: String? = nil
+}
+
+/// One in-stock grocery item on the wire: enough for the wrist to render a row
+/// and mark it low (mutating the `GroceryItem` record in place). Built
+/// phone-side from items whose `low` flag is currently false.
+struct GroceryWire: Codable, Hashable, Identifiable {
+  var id: String
+  var name: String
+  var emoji: String? = nil
+  var category: String? = nil
 }
 
 /// Today's nutrition macros as concentric "ring" progress — the wire feeding the

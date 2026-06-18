@@ -31,6 +31,12 @@ final class WatchConnectivity {
   /// The user's most-eaten meals from the snapshot — the + menu offers them as
   /// one-tap re-log quick-selects (emoji + macro summary).
   var topMeals: [MealWire] = []
+  /// Capture catalogs from the snapshot, each present only when its section is
+  /// enabled on the phone — the + menu offers a quick-input row per non-empty
+  /// catalog (mark a med taken / log a symptom / mark a grocery low).
+  var medications: [MedicationWire] = []
+  var symptoms: [SymptomWire] = []
+  var groceries: [GroceryWire] = []
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -89,6 +95,31 @@ final class WatchConnectivity {
     await _fetch()
   }
 
+  /// A pending post-write reconcile, coalesced so a burst of wrist taps pulls
+  /// once. See `scheduleReconcile`.
+  private var reconcileTask: Task<Void, Never>?
+
+  /// After a wrist log, the phone absorbs the event and republishes the snapshot
+  /// (debounced), which can change *other* rows the log caused — e.g. logging a
+  /// meal hides the "break your fast" suggestion, logging cardio hides the
+  /// training one. The watch only optimistically hides the single tapped row, so
+  /// without this it keeps showing the now-stale siblings until the next
+  /// foreground. Pull the fresh snapshot a few seconds later to reconcile them.
+  ///
+  /// Coalesced (one fetch per burst) and delayed to give the phone time to
+  /// absorb + republish. Safe: items logged on the wrist stay hidden via
+  /// `localDoneIDs`, so a reconcile never resurrects what was just tapped — and
+  /// if the phone is asleep and hasn't republished yet, the stale snapshot is no
+  /// worse than before, and the next foreground fetch still catches up.
+  private func scheduleReconcile() {
+    reconcileTask?.cancel()
+    reconcileTask = Task { [weak self] in
+      try? await Task.sleep(nanoseconds: 6_000_000_000)   // 6s: phone absorb + republish
+      guard !Task.isCancelled else { return }
+      await self?._fetch()
+    }
+  }
+
   @MainActor
   private func _fetch() async {
     isLoading = true
@@ -133,6 +164,9 @@ final class WatchConnectivity {
       self.sectionColors = response.sectionColors ?? [:]
       self.intakeKinds   = response.intakeKinds ?? []
       self.topMeals      = response.topMeals ?? []
+      self.medications   = response.medications ?? []
+      self.symptoms      = response.symptoms ?? []
+      self.groceries     = response.groceries ?? []
       self.bucket        = bkt
       updateComplication()
       updateMacroComplication(response.nutritionRings)
@@ -226,6 +260,7 @@ final class WatchConnectivity {
         // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
       }
     }
+    scheduleReconcile()   // pull the phone's republished snapshot once it lands
   }
 
   // MARK: - Quick-log (actionable suggestions)
@@ -294,6 +329,47 @@ final class WatchConnectivity {
       do { try await saveMealEntry(meal) }
       catch { }   // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
     }
+    scheduleReconcile()   // a new meal can hide the "break your fast" suggestion
+  }
+
+  /// Mark a dose of a medication taken from the wrist — writes a "taken"
+  /// `MedicationDoseEvent`, mirroring `MedicationsMutator.addDose`. A plain
+  /// quick-log (no Next row to hide); the confirming haptic fires here and the
+  /// picker dismisses itself.
+  func logMedication(_ med: MedicationWire) {
+    WKInterfaceDevice.current().play(.success)
+    let date = today
+    Task {
+      do { try await saveMedicationDose(medicationID: med.id, date: date) }
+      catch { }   // Fire-and-forget: the iOS CKSyncEngine reconciles on next open.
+    }
+  }
+
+  /// Log a symptom at a chosen severity from the wrist — writes a `SymptomEvent`,
+  /// mirroring `SymptomsMutator.addEvent`. Severity is the phone's 0–10 scale
+  /// (the picker offers Mild/Moderate/Severe = 3/5/8, matching the phone's
+  /// quick-add menu).
+  func logSymptom(_ symptom: SymptomWire, severity: Int) {
+    WKInterfaceDevice.current().play(.success)
+    let date = today
+    Task {
+      do { try await saveSymptomEvent(symptomID: symptom.id, severity: severity, date: date) }
+      catch { }
+    }
+  }
+
+  /// Mark a grocery item low ("we ran out") from the wrist — mutates the existing
+  /// `GroceryItem` record in place (low → 1), mirroring `GroceryMutator.setLow`.
+  /// Optimistically drops it from the in-stock list so the menu reflects the tap
+  /// at once; the phone republishes the trimmed list on absorb.
+  func markGroceryLow(_ item: GroceryWire) {
+    WKInterfaceDevice.current().play(.success)
+    groceries.removeAll { $0.id == item.id }
+    Task {
+      do { try await saveGroceryLow(itemID: item.id) }
+      catch { }
+    }
+    scheduleReconcile()
   }
 
   /// Shared optimistic hide for a just-logged suggestion: success haptic, mark
@@ -312,6 +388,7 @@ final class WatchConnectivity {
       items.removeAll { $0.id == itemID }
       completedIDs.remove(itemID)
     }
+    scheduleReconcile()   // pull the phone's republished snapshot once it lands
   }
 
   /// Maps a `NextBlocks`-declared event record type to its CloudKit writer.
@@ -486,6 +563,49 @@ final class WatchConnectivity {
     if let v = meal.sodiumMg { record["sodiumMg"] = v }
     if let v = meal.cholesterolMg { record["cholesterolMg"] = v }
     if let v = meal.potassiumMg { record["potassiumMg"] = v }
+    try await db.save(record)
+  }
+
+  /// A medication dose taken. Record name + fields match
+  /// `MedicationDoseEventCloudKitSchema` (record type "MedicationDoseEvent",
+  /// name "medication-dose-event:{uuid}") so the phone mirrors it like its own
+  /// write. Status "taken", source manual; time-of-day rides `occurredAt`.
+  private func saveMedicationDose(medicationID: String, date: String) async throws {
+    let eventID  = UUID().uuidString.lowercased()
+    let recordID = CKRecord.ID(recordName: "medication-dose-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "MedicationDoseEvent", recordID: recordID)
+    record["date"]         = date
+    record["medicationID"] = medicationID
+    record["status"]       = "taken"
+    record["source"]       = "manual"
+    record["occurredAt"]   = Date()
+    try await db.save(record)
+  }
+
+  /// A symptom logged at a severity. Record name + fields match
+  /// `SymptomEventCloudKitSchema` (record type "SymptomEvent", name
+  /// "symptom-event:{uuid}"). Severity is the phone's 0–10 scale; time-of-day
+  /// rides `occurredAt`.
+  private func saveSymptomEvent(symptomID: String, severity: Int, date: String) async throws {
+    let eventID  = UUID().uuidString.lowercased()
+    let recordID = CKRecord.ID(recordName: "symptom-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "SymptomEvent", recordID: recordID)
+    record["date"]       = date
+    record["symptomID"]  = symptomID
+    record["severity"]   = severity
+    record["source"]     = "manual"
+    record["occurredAt"] = Date()
+    try await db.save(record)
+  }
+
+  /// Marks a grocery item low by mutating its `GroceryItem` record in place —
+  /// mirrors `GroceryMutator.setLow(low: true)`: set `low` 1, leave `lastBought`
+  /// (only a "bought" stamps that). Fetches the existing record so system fields
+  /// and the item's other attributes round-trip untouched.
+  private func saveGroceryLow(itemID: String) async throws {
+    let recordID = CKRecord.ID(recordName: "grocery-item:\(itemID)", zoneID: ckZoneID)
+    guard let record = try? await db.record(for: recordID) else { return }
+    record["low"] = 1
     try await db.save(record)
   }
 
