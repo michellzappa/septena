@@ -10,11 +10,17 @@
     "— %@" : {
 
     },
+    "— Anonymous" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
     "· %@" : {
       "shouldTranslate" : false
+    },
+    "“%@”" : {
+
     },
     "“%@” is overdue — mark it if you’ve done it." : {
       "localizations" : {
@@ -876,13 +882,19 @@
         }
       }
     },
+    "A public, read-only version of this board — handy for sharing." : {
+
+    },
     "A quiet line at the very bottom of the home dashboard — a quote that changes through the day. Off by default. Draws from the packs you pick, your own quotes, and your Readwise highlights." : {
 
     },
-    "A roster of focused, on-device coaches." : {
+    "A sentence or two about how Septena helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved." : {
 
     },
     "A short title and, optionally, the problem you're trying to solve." : {
+
+    },
+    "Account ID" : {
 
     },
     "Ache" : {
@@ -2977,6 +2989,9 @@
     "Every entry is a quiet vote for who you're becoming — private, and yours alone. Choose what you'd like to track; add, rename, or hide sections anytime." : {
 
     },
+    "Every section, every feature — yours, with nothing held back and no ads watching you. That's a promise, not a trial. If it's become part of how you run your life, you can chip in to keep it independent. You won't unlock anything — there's nothing to unlock." : {
+
+    },
     "Evidence" : {
 
     },
@@ -3552,6 +3567,9 @@
           }
         }
       }
+    },
+    "Hidden" : {
+
     },
     "Hides this section everywhere. Your data and customizations stay." : {
       "localizations" : {
@@ -4462,6 +4480,7 @@
       }
     },
     "Membership" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4545,6 +4564,7 @@
       "shouldTranslate" : false
     },
     "Mock membership for testing — no purchase is made. Turn this off to re-lock Septena+ features." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4554,7 +4574,11 @@
         }
       }
     },
+    "Mock supporter state for testing — no purchase is made. Turning it off changes nothing about the app; it only removes the badge." : {
+
+    },
     "Mock unlock. No purchase happens yet." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4982,6 +5006,9 @@
       }
     },
     "Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here." : {
+
+    },
+    "Not now? Genuinely fine — the app stays exactly the same. No purchase is made yet; this is a preview of the support screen." : {
 
     },
     "Not supported on this device." : {
@@ -5569,6 +5596,9 @@
         }
       }
     },
+    "Rating optional" : {
+
+    },
     "Re-enable in Settings → Health → Data Access & Devices → Septena." : {
       "localizations" : {
         "pt-BR" : {
@@ -5986,6 +6016,9 @@
         }
       }
     },
+    "Septena is free. All of it. Always." : {
+
+    },
     "Septena is locked" : {
 
     },
@@ -6070,6 +6103,7 @@
       }
     },
     "Septena+ membership" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6617,7 +6651,13 @@
         }
       }
     },
+    "Support" : {
+
+    },
     "Support conversations you start will appear here." : {
+
+    },
+    "Supporter" : {
 
     },
     "Symptoms" : {
@@ -6839,6 +6879,12 @@
         }
       }
     },
+    "Thank you — you're the reason Septena stays free and independent." : {
+
+    },
+    "The app is free. Chip in to keep it independent." : {
+
+    },
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
 
     },
@@ -6862,9 +6908,6 @@
           }
         }
       }
-    },
-    "The free app gives you one on-device coach. Septena+ turns that into a roster — focused coaches for the parts of your life you're working on." : {
-
     },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
       "extractionState" : "stale",
@@ -6978,6 +7021,9 @@
 
     },
     "This keeps the board tied to the genuine app and your Apple ID without shipping a secret." : {
+
+    },
+    "This keeps them tied to the genuine app and your Apple ID without shipping a secret." : {
 
     },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
@@ -7257,6 +7303,7 @@
       }
     },
     "Unlock %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7301,6 +7348,7 @@
       }
     },
     "Upgrade to %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7724,6 +7772,9 @@
         }
       }
     },
+    "You're a supporter" : {
+
+    },
     "You’re at %lld of %lld ml — log a glass?" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7735,7 +7786,7 @@
         }
       }
     },
-    "YOUR COACHES" : {
+    "Your anonymous community identity. Useful when granting maintainer access from the server." : {
 
     },
     "Your data stays in your private iCloud. Connecting an AI just opens a door into it — one you control and can revoke." : {
@@ -7761,13 +7812,14 @@
         }
       }
     },
-    "Your public handle for feature requests, and the roadmap board where you can suggest and upvote features." : {
+    "Your public handle, the roadmap board to suggest and upvote features, and a testimonial you can share about Septena." : {
 
     },
     "Your quotes" : {
 
     },
     "Your Septena+ perks" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7777,7 +7829,7 @@
         }
       }
     },
-    "Your team of coaches" : {
+    "Your testimonial" : {
 
     },
     "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {
