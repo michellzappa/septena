@@ -355,6 +355,14 @@ struct SeptenaApp: App {
           .keyboardShortcut("2", modifiers: [.command, .option])
         Button("Anytime")  { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
           .keyboardShortcut("3", modifiers: [.command, .option])
+
+        Divider()
+
+        // Quick Find — the jump-to-anything palette. Lives in Go (the app's
+        // navigation menu) rather than a bespoke top-level "Find" menu, the
+        // way Xcode's "Open Quickly…" sits under File.
+        Button("Quick Find…") { navigation.showQuickFind = true }
+          .keyboardShortcut("f", modifiers: [.command, .shift])
       }
       // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`.
       // Items disable themselves when no task list is focused, which also
@@ -378,16 +386,12 @@ struct SeptenaApp: App {
           .keyboardShortcut(",", modifiers: .command)
       }
       // ⌘K opens Add Info — the unified quick-add palette (port of the
-      // webapp's ⌘K). Quick Find moves to ⌘⇧F so it stays reachable from
-      // the keyboard but the more frequently used "capture" action gets
-      // the shorter shortcut.
-      CommandMenu("Add") {
+      // webapp's ⌘K). It's a "capture" action, so it sits in File alongside
+      // New To-Do rather than in a bespoke top-level "Add" menu. Quick Find
+      // (⌘⇧F) lives in the Go menu above.
+      CommandGroup(after: .newItem) {
         Button("Add Info…") { navigation.showAddInfo = true }
           .keyboardShortcut("k", modifiers: .command)
-      }
-      CommandMenu("Find") {
-        Button("Quick Find…") { navigation.showQuickFind = true }
-          .keyboardShortcut("f", modifiers: [.command, .shift])
       }
       // Override the default ⌘N "New Window" with "New To-Do". When a task
       // list is focused, `NewTaskCommand` routes to the in-list inline
