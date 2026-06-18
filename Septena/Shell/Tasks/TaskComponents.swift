@@ -607,6 +607,8 @@ struct ScreenTitle: View {
   let title: String
 
   var body: some View {
+    #if os(macOS)
+    // macOS title chrome is tuned separately — leave it untouched.
     HStack(spacing: 12) {
       Image(systemName: icon)
         .font(.title2)
@@ -619,6 +621,24 @@ struct ScreenTitle: View {
     .padding(.horizontal, Theme.hPadding)
     .padding(.top, 12)
     .padding(.bottom, 18)
+    #else
+    // Mirror the task-row leading recipe exactly (icon in a checkbox-width
+    // column + the same icon→text gap) so the title icon sits over the row
+    // checkbox and the title text starts at one X with every task title.
+    HStack(spacing: Theme.iconTextGap) {
+      Image(systemName: icon)
+        .font(.title2)
+        .foregroundStyle(iconTint)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+      Text(title)
+        .font(.septenaScreenTitle)
+        .foregroundStyle(.primary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.top, 12)
+    .padding(.bottom, 18)
+    #endif
   }
 }
 
