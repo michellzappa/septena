@@ -15,6 +15,7 @@ export async function requireUser(
   const keyId = req.headers.get("X-Attest-Key-Id") ?? "";
   const assertion = req.headers.get("X-Attest-Assertion") ?? "";
   const challenge = req.headers.get("X-Attest-Challenge") ?? "";
+  let attested = false;
   if (mode !== "off") {
     if (!keyId || !assertion || !challenge) {
       if (mode === "enforce") return { error: problem("missing_attestation", 403), attestStatus: "missing" };
@@ -24,12 +25,33 @@ export async function requireUser(
         return { error: problem(`attestation_${res.reason ?? "failed"}`, 403), attestStatus: res.reason ?? "failed" };
       }
       if (!res.ok) console.log(`attest.audit failed reason=${res.reason ?? ""}`);
+      else attested = true;
     }
   }
 
   const cloudKitUserID = req.headers.get("X-Septena-CloudKit-User")?.trim() ?? "";
   if (!cloudKitUserID) return { error: problem("missing_cloudkit_user", 400), attestStatus: "ok" };
   const userHash = await hmacUserHash(env, cloudKitUserID);
+
+  // Identity binding (trust-on-first-use). The CloudKit user id is a header the
+  // client asserts; App Attest only proves the app is genuine, not *which*
+  // iCloud user it is. Pin each genuine attest key to the first identity it
+  // presents so one device's key can't later hop between user identities (e.g.
+  // claim a maintainer's hash). A normal single-account user never trips this;
+  // it self-heals on reinstall (a fresh key gets a fresh binding). NOT a full
+  // fix for a first-contact spoof by someone who already knows a target's
+  // opaque CloudKit record id — closing that needs proven CloudKit identity.
+  if (attested && keyId) {
+    const bindKey = `bind:${keyId}`;
+    const bound = await env.ATTEST.get(bindKey);
+    if (!bound) {
+      await env.ATTEST.put(bindKey, userHash);
+    } else if (bound !== userHash) {
+      console.log(`attest.bind mismatch key=${keyId.slice(0, 8)}`);
+      return { error: problem("identity_mismatch", 403), attestStatus: "identity_mismatch" };
+    }
+  }
+
   const row = await upsertIdentity(env, userHash);
   if (row.is_banned === 1) return { error: problem("user_banned", 403), attestStatus: "ok" };
   return {
