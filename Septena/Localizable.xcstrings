@@ -469,6 +469,9 @@
     "%@/10" : {
 
     },
+    "%@/280" : {
+
+    },
     "%@%@" : {
       "localizations" : {
         "en" : {
@@ -807,6 +810,9 @@
         }
       }
     },
+    "2–24 characters: lowercase letters, numbers, or underscores." : {
+
+    },
     "6 months" : {
       "localizations" : {
         "pt-BR" : {
@@ -874,6 +880,9 @@
 
     },
     "A roster of focused, on-device coaches." : {
+
+    },
+    "A short title and, optionally, the problem you're trying to solve." : {
 
     },
     "Ache" : {
@@ -1689,6 +1698,9 @@
         }
       }
     },
+    "Be the first to suggest a feature." : {
+
+    },
     "Bean" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1780,6 +1792,9 @@
           }
         }
       }
+    },
+    "Bio" : {
+
     },
     "Blue" : {
       "localizations" : {
@@ -2097,6 +2112,9 @@
         }
       }
     },
+    "Closing keeps the conversation but stops the user from replying. Internal notes are visible only to maintainers." : {
+
+    },
     "Coaches" : {
 
     },
@@ -2141,6 +2159,9 @@
           }
         }
       }
+    },
+    "Community" : {
+
     },
     "Complete Chore" : {
       "extractionState" : "manual",
@@ -3744,6 +3765,9 @@
         }
       }
     },
+    "In-app support requires App Attest and iCloud so requests can be tied to the genuine app without shipping a secret." : {
+
+    },
     "Inbox" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
       "localizations" : {
@@ -3871,6 +3895,9 @@
       }
     },
     "Intensity scales each motion's loudness — sink ignores it on purpose. Streak drives the Ignition milestone number." : {
+
+    },
+    "Internal" : {
 
     },
     "iOS shows a confirmation prompt each time you switch icons." : {
@@ -4131,6 +4158,9 @@
         }
       }
     },
+    "Loading…" : {
+
+    },
     "Log a few symptoms and your severity trend and timing pattern appear here." : {
 
     },
@@ -4312,6 +4342,9 @@
         }
       }
     },
+    "Maintainer" : {
+
+    },
     "Make Septena yours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4322,6 +4355,9 @@
           }
         }
       }
+    },
+    "Manage" : {
+
     },
     "Map what you love, do well, can offer, and want to serve." : {
       "localizations" : {
@@ -4699,6 +4735,9 @@
           }
         }
       }
+    },
+    "No comments yet." : {
+
     },
     "no data" : {
       "localizations" : {
@@ -5743,6 +5782,9 @@
     "RIR" : {
 
     },
+    "Role" : {
+
+    },
     "Rose" : {
       "localizations" : {
         "pt-BR" : {
@@ -5792,6 +5834,9 @@
           }
         }
       }
+    },
+    "Save" : {
+
     },
     "Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase." : {
       "localizations" : {
@@ -5917,6 +5962,9 @@
           }
         }
       }
+    },
+    "Send" : {
+
     },
     "Septena" : {
       "localizations" : {
@@ -6202,6 +6250,9 @@
     "Show in Spotlight & Siri" : {
 
     },
+    "Shown next to your contributions. Up to 80 characters." : {
+
+    },
     "Shows today at a glance, above the layout. Dial is a 24-hour clock with your logs as dots and sleep as an arc, lit by the real sunrise and sunset for your time zone — no location needed. Timeline shows the same day as a horizontal strip." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6410,6 +6461,9 @@
         }
       }
     },
+    "Status shows on the board. Locking stops non-maintainers from commenting." : {
+
+    },
     "Steady" : {
       "localizations" : {
         "pt-BR" : {
@@ -6470,6 +6524,9 @@
           }
         }
       }
+    },
+    "Submit" : {
+
     },
     "Sugar" : {
       "localizations" : {
@@ -6559,6 +6616,9 @@
           }
         }
       }
+    },
+    "Support conversations you start will appear here." : {
+
     },
     "Symptoms" : {
 
@@ -6913,6 +6973,12 @@
           }
         }
       }
+    },
+    "This keeps profiles tied to the genuine app and your Apple ID without shipping a secret. Sign in to iCloud on a supported device to set one up." : {
+
+    },
+    "This keeps the board tied to the genuine app and your Apple ID without shipping a secret." : {
+
     },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
       "localizations" : {
@@ -7274,6 +7340,9 @@
         }
       }
     },
+    "Username" : {
+
+    },
     "Values" : {
       "localizations" : {
         "pt-BR" : {
@@ -7498,6 +7567,9 @@
     "What should we call you?" : {
 
     },
+    "When on, other members can see your username, display name, and bio. When off, your contributions appear without a public profile." : {
+
+    },
     "When on, pending items in the source list import automatically and are removed from Reminders. Runs on app launch and whenever Reminders changes." : {
       "localizations" : {
         "pt-BR" : {
@@ -7689,6 +7761,9 @@
         }
       }
     },
+    "Your public handle for feature requests, and the roadmap board where you can suggest and upvote features." : {
+
+    },
     "Your quotes" : {
 
     },
@@ -7703,6 +7778,9 @@
       }
     },
     "Your team of coaches" : {
+
+    },
+    "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {
 
     },
     "Zone 2 cardio" : {

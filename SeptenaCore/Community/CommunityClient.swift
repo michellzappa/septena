@@ -121,6 +121,35 @@ public struct CommunitySupportMetadata: Codable, Sendable, Equatable {
   }
 }
 
+// MARK: - Feature requests (roadmap)
+
+public struct CommunityFeature: Decodable, Sendable, Identifiable, Equatable {
+  public let id: String
+  public let title: String
+  public let detail: String?
+  public let status: String
+  public let maintainerNote: String?
+  public let isLocked: Bool
+  public let voteCount: Int
+  public let commentCount: Int
+  public let hasVoted: Bool
+  public let createdAt: String
+  public let updatedAt: String
+}
+
+public struct CommunityFeatureComment: Decodable, Sendable, Identifiable, Equatable {
+  public let id: String
+  public let authorRole: String
+  public let body: String
+  public let isPinned: Bool
+  public let createdAt: String
+}
+
+public struct CommunityFeatureDetail: Decodable, Sendable, Equatable {
+  public let feature: CommunityFeature
+  public let comments: [CommunityFeatureComment]
+}
+
 // MARK: - CommunityClient
 
 public actor CommunityClient {
@@ -140,7 +169,7 @@ public actor CommunityClient {
     self.session = session
   }
 
-  public var appAttestSupported: Bool {
+  public nonisolated var appAttestSupported: Bool {
     AppAttestClient.shared.isSupported
   }
 
@@ -206,6 +235,85 @@ public actor CommunityClient {
     return try await send(req, as: CommunitySupportThread.self)
   }
 
+  /// Maintainer-only: change a ticket's status (e.g. close / reopen). The
+  /// worker rejects this with 403 for non-maintainer callers.
+  public func setSupportTicketStatus(id: String,
+                                     status: String,
+                                     baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunitySupportThread {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/support/tickets/\(id)"))
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(SetTicketStatusBody(status: status))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: CommunitySupportThread.self)
+  }
+
+  // MARK: Feature requests
+
+  public func features(baseURL: URL = CommunityEndpoint.baseURL) async throws -> [CommunityFeature] {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features"))
+    req.httpMethod = "GET"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    return try await send(req, as: FeatureList.self).features
+  }
+
+  public func feature(id: String,
+                      baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(id)"))
+    req.httpMethod = "GET"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  public func createFeature(title: String,
+                            detail: String?,
+                            baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features"))
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(CreateFeatureBody(title: title, detail: detail))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  public func voteFeature(id: String,
+                          voted: Bool,
+                          baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(id)/vote"))
+    req.httpMethod = voted ? "POST" : "DELETE"
+    try await attachCommunityAuth(&req, body: Data(), baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  public func commentFeature(id: String,
+                             body: String,
+                             baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(id)/comments"))
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(PostSupportMessageBody(body: body, isInternal: false))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
+  /// Maintainer-only: change status, set a maintainer note, or lock the thread.
+  public func updateFeature(id: String,
+                            status: String? = nil,
+                            maintainerNote: String? = nil,
+                            isLocked: Bool? = nil,
+                            baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityFeatureDetail {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/features/\(id)"))
+    req.httpMethod = "PATCH"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let data = try JSONEncoder().encode(UpdateFeatureBody(status: status, maintainerNote: maintainerNote, isLocked: isLocked))
+    req.httpBody = data
+    try await attachCommunityAuth(&req, body: data, baseURL: baseURL)
+    return try await send(req, as: CommunityFeatureDetail.self)
+  }
+
   private func attachCommunityAuth(_ req: inout URLRequest, body: Data, baseURL: URL) async throws {
     guard let userRecordName = try await cloudKitUserRecordName() else {
       throw ClientError.cloudKitUserUnavailable
@@ -260,5 +368,24 @@ public actor CommunityClient {
   private struct PostSupportMessageBody: Encodable {
     let body: String
     let isInternal: Bool
+  }
+
+  private struct SetTicketStatusBody: Encodable {
+    let status: String
+  }
+
+  private struct FeatureList: Decodable {
+    let features: [CommunityFeature]
+  }
+
+  private struct CreateFeatureBody: Encodable {
+    let title: String
+    let detail: String?
+  }
+
+  private struct UpdateFeatureBody: Encodable {
+    let status: String?
+    let maintainerNote: String?
+    let isLocked: Bool?
   }
 }

@@ -769,6 +769,9 @@ struct SettingsView: View {
     case layout, correlations, timeOfDay
     case quickActions, appIcon
     case skills, localMcp, motionGallery, dataTools
+    case support
+    case communityProfile   // public username / display name / bio (community Worker)
+    case communityRoadmap   // feature-request board (community Worker)
     case milestonePreview   // DEBUG bench: fire each milestone celebration
     case siriShortcuts
     case section(String)
@@ -921,6 +924,9 @@ struct SettingsView: View {
     case .connections:  return "Connections"
     case .data:         return "Data"
     case .reports:      return "Reports"
+    case .support:      return "Support"
+    case .communityProfile: return "Community Profile"
+    case .communityRoadmap: return "Roadmap"
     case .skills:       return "Skills"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
@@ -955,6 +961,9 @@ struct SettingsView: View {
     case .connections:  return "app.connected.to.app.below.fill"
     case .data:         return "externaldrive"
     case .reports:      return "chart.bar.doc.horizontal"
+    case .support:      return "lifepreserver"
+    case .communityProfile: return "person.text.rectangle"
+    case .communityRoadmap: return "map"
     case .skills:       return "book.closed"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
@@ -1004,6 +1013,9 @@ struct SettingsView: View {
     case .connections:       IntegrationsSettingsPane()
     case .data:              ImportExportSettingsPane(mode: .full)
     case .reports:           ReportsSettingsPane()
+    case .support:           SupportSettingsPane()
+    case .communityProfile:  CommunityProfilePane()
+    case .communityRoadmap:  CommunityRoadmapPane()
     case .dataTools:         ImportExportSettingsPane(mode: .dataTools)
     case .skills:            SkillsSettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
@@ -2172,6 +2184,19 @@ struct AccountSettingsPane: View {
         Text("iCloud")
       } footer: {
         Text("Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID.")
+      }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.communityProfile) {
+          Label("Community Profile", systemImage: "person.text.rectangle")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.communityRoadmap) {
+          Label("Roadmap", systemImage: "map")
+        }
+      } header: {
+        Text("Community")
+      } footer: {
+        Text("Your public handle for feature requests, and the roadmap board where you can suggest and upvote features.")
       }
     }
     .formStyle(.grouped)
@@ -4693,7 +4718,9 @@ struct AboutSettingsPane: View {
       Section("Links") {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
         outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
-        outboundLink("Feedback", destination: "mailto:mz@envisioning.com", icon: "envelope")
+        NavigationLink(value: SettingsView.SettingsDestination.support) {
+          Label("Support", systemImage: "lifepreserver")
+        }
         outboundLink("Source code", destination: "https://github.com/septena/septena", icon: "chevron.left.forwardslash.chevron.right")
         outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text")
       }
