@@ -3,26 +3,32 @@ main = "src/worker.ts"
 compatibility_date = "2024-11-01"
 
 # Open-source template. Replace placeholders before deploying your own worker.
-account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+account_id = "50894cc73fc5188e3efb7eb9819c54e9"
 workers_dev = true
+
+# Custom domain the app's CommunityClient defaults to. Wrangler provisions the
+# DNS record + edge cert on deploy (requires the septena.app zone in this account).
+[[routes]]
+pattern = "community.septena.app"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"
 database_name = "septena-community"
-database_id = "YOUR_COMMUNITY_D1_DATABASE_ID"
+database_id = "0dfcbd99-e8d6-4cca-a76e-09c1caa9482a"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "ATTEST"
-id = "YOUR_ATTEST_KV_NAMESPACE_ID"
+id = "10bb35645a93423591188c0ef8160b95"
 
 [[kv_namespaces]]
 binding = "CHALLENGES"
-id = "YOUR_CHALLENGES_KV_NAMESPACE_ID"
+id = "a473762726b74e34aa07226a82aca718"
 
 [[kv_namespaces]]
 binding = "RL"
-id = "YOUR_RATE_LIMIT_KV_NAMESPACE_ID"
+id = "80b89a7a4b2a4102b6f4393c50496afc"
 
 # Optional, for avatars and support attachments. Wire this after the identity
 # foundation is deployed and tested.
@@ -33,7 +39,7 @@ id = "YOUR_RATE_LIMIT_KV_NAMESPACE_ID"
 [vars]
 # "off" | "audit" (verify + log, never reject) | "enforce".
 ATTEST_MODE = "enforce"
-APP_ATTEST_APP_ID = "YOURTEAMID.com.example.septena,YOURTEAMID.com.example.septena.mac"
+APP_ATTEST_APP_ID = "992N457T8D.com.septena.cloud,992N457T8D.com.septena.cloud.mac"
 APP_ATTEST_ENV = "production"
 
 # Set as a secret in production:
