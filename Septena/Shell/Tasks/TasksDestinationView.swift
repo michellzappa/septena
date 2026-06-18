@@ -93,6 +93,9 @@ struct TasksDestinationView: View {
                     isSelected: selectedId == task.id,
                     onToggle: { toggleInbox(task) },
                     onTap: { openEdit(task) })
+              .taskRowActions(task: task, filter: .triage, areas: areas,
+                              projects: projects, mutator: mutator,
+                              onOpenDetail: { openEdit($0) })
           }
         }
       }
@@ -107,6 +110,9 @@ struct TasksDestinationView: View {
                     isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
                     onTap: { openEdit(task) })
+              .taskRowActions(task: task, filter: .today, areas: areas,
+                              projects: projects, mutator: mutator,
+                              onOpenDetail: { openEdit($0) })
               .transition(.opacity)
           }
         }
@@ -122,6 +128,9 @@ struct TasksDestinationView: View {
                     isSelected: selectedId == task.id,
                     onToggle: { toggle(task) },
                     onTap: { openEdit(task) })
+              .taskRowActions(task: task, filter: .logbook, areas: areas,
+                              projects: projects, mutator: mutator,
+                              onOpenDetail: { openEdit($0) })
           }
         }
       }
