@@ -369,7 +369,7 @@ private struct IntakeCustomStarterRow: View {
 
 /// Section-style tracker manager for the Settings detail pane: each kind reads
 /// like a section row (its own colored glyph), taps into its identity/Manage
-/// sheet, archives by swipe, and unarchives from the Archived group. Kinds are
+/// sheet, archives via its context menu, and unarchives from the Archived group. Kinds are
 /// presented as sections in the UX while staying rows under the host section
 /// (Option C — presentation layer). See docs/CONSUMABLES_PLAN.md.
 private struct IntakeDetailContent: View {
@@ -387,7 +387,7 @@ private struct IntakeDetailContent: View {
         ForEach(active) { kind in
           Button { managingID = kind.id } label: { kindRow(kind) }
             .buttonStyle(.plain)
-            .swipeActions {
+            .contextMenu {
               Button(role: .destructive) {
                 mutator.setKindArchived(id: kind.id, archived: true)
                 Task { await reload() }

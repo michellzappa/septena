@@ -56,14 +56,13 @@ struct CommunityRoadmapPane: View {
               } label: {
                 FeatureRow(feature: feature)
               }
-              .swipeActions(edge: .leading) {
+              .contextMenu {
                 Button {
                   Task { await vote(feature, voted: !feature.hasVoted) }
                 } label: {
                   Label(feature.hasVoted ? "Remove vote" : "Vote",
                         systemImage: feature.hasVoted ? "arrowtriangle.down" : "arrowtriangle.up")
                 }
-                .tint(feature.hasVoted ? .gray : .accentColor)
               }
             }
           }
@@ -257,30 +256,27 @@ private struct FeatureDetailView: View {
         } else {
           ForEach(threadedComments, id: \.comment.id) { item in
             FeatureCommentRow(comment: item.comment, isReply: item.isReply)
-              .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+              .contextMenu {
                 if canReply {
                   Button {
                     replyingTo = item.comment
                   } label: { Label("Reply", systemImage: "arrowshape.turn.up.left") }
-                  .tint(.accentColor)
                 }
                 if isMaintainer {
-                  Button(role: .destructive) {
-                    Task { await moderate(item.comment, status: "deleted") }
-                  } label: { Label("Delete", systemImage: "trash") }
                   Button {
                     Task { await moderate(item.comment, status: item.comment.status == "hidden" ? "visible" : "hidden") }
                   } label: {
                     Label(item.comment.status == "hidden" ? "Unhide" : "Hide",
                           systemImage: item.comment.status == "hidden" ? "eye" : "eye.slash")
                   }
-                  .tint(.orange)
                   Button {
                     Task { await moderate(item.comment, isPinned: !item.comment.isPinned) }
                   } label: {
                     Label(item.comment.isPinned ? "Unpin" : "Pin", systemImage: "pin")
                   }
-                  .tint(.yellow)
+                  Button(role: .destructive) {
+                    Task { await moderate(item.comment, status: "deleted") }
+                  } label: { Label("Delete", systemImage: "trash") }
                 }
               }
           }

@@ -53,21 +53,19 @@ struct CommunityTestimonialPane: View {
           } else {
             ForEach(others) { t in
               TestimonialRow(testimonial: t, showStatus: isMaintainer)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                .contextMenu {
                   if isMaintainer {
-                    Button(role: .destructive) {
-                      Task { await moderate(t, status: "hidden") }
-                    } label: { Label("Hide", systemImage: "eye.slash") }
                     if t.status != "approved" {
                       Button {
                         Task { await moderate(t, status: "approved") }
                       } label: { Label("Approve", systemImage: "checkmark.circle") }
-                      .tint(.green)
                     }
                     Button {
                       Task { await moderate(t, isFeatured: !t.isFeatured) }
                     } label: { Label(t.isFeatured ? "Unfeature" : "Feature", systemImage: "star") }
-                    .tint(.yellow)
+                    Button(role: .destructive) {
+                      Task { await moderate(t, status: "hidden") }
+                    } label: { Label("Hide", systemImage: "eye.slash") }
                   }
                 }
             }

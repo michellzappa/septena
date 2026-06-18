@@ -61,18 +61,20 @@ struct ExerciseCatalogView: View {
           } label: {
             exerciseRow(entity)
           }
-          .swipeActions(edge: .trailing) {
-            if entity.archived {
-              Button("Unarchive") {
-                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: false, context: context)
-              }.tint(.blue)
-            } else {
-              Button("Archive") {
-                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: true, context: context)
-              }.tint(.orange)
-            }
-          }
           .contextMenu {
+            if entity.archived {
+              Button {
+                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: false, context: context)
+              } label: {
+                Label("Unarchive", systemImage: "tray.and.arrow.up")
+              }
+            } else {
+              Button {
+                TrainingConfigStore.setExerciseDefinitionArchived(id: entity.id, archived: true, context: context)
+              } label: {
+                Label("Archive", systemImage: "archivebox")
+              }
+            }
             Button(role: .destructive) {
               TrainingConfigStore.deleteExerciseDefinition(id: entity.id, context: context)
             } label: {
