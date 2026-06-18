@@ -312,8 +312,8 @@ enum RhythmData {
     }
   }
 
-  /// Intake events as dots, each tinted by its *kind*'s own color (coffee,
-  /// matcha, cannabis… each define one) rather than the flat section accent.
+  /// Intake events as dots, each tinted by its *kind*'s own color (each kind
+  /// defines one) rather than the flat section accent.
   /// Falls back to the section color for a kind with no color set.
   private static func intakeEvents(todayStart: Date, windowDays: Int, weekStart: Date,
                                    sectionColor: Color?, wakingDay: WakingDay,

@@ -1,7 +1,8 @@
 # CloudKit Schema Manifest
 
 > **Source of truth:** the Swift `*CloudKitSchema` enums + their `makeRecord`/`apply`
-> functions. This doc is **derived from code** (commit `671d48b`, 2026-06-06) and is
+> functions. This doc is **derived from code** (baseline commit `671d48b`, 2026-06-06;
+> Intake section reconciled to the generalized-consumables model 2026-06-18) and is
 > meant to be regenerated when the schema changes — it is *documentation of* the code,
 > not a checked-in `.ckdb`. CloudKit's Development schema is auto-created from whatever
 > the app first writes, so **this manifest === the Development schema**.
@@ -50,7 +51,7 @@ promoted to Prod unless the Console already shows them):
 
 | # | Change | Record type(s) | Field(s) | Type |
 |---|---|---|---|---|
-| 1 | **New field** `occurredAt` | `HabitEvent`, `SupplementEvent`, `ChoreEvent`, `GutEvent`, `CaffeineEvent`, `CannabisEvent`, `ExerciseEntry` (7 existing event types) | `occurredAt` | Timestamp(Date) |
+| 1 | **New field** `occurredAt` | `HabitEvent`, `SupplementEvent`, `ChoreEvent`, `GutEvent`, `ExerciseEntry` (5 surviving event types — the retired `CaffeineEvent`/`CannabisEvent` also carry it but are no longer written; `IntakeEvent` ships its own, see #12) | `occurredAt` | Timestamp(Date) |
 | 2 | **New record type** `MoodEvent` (whole type, 9 fields incl. its own `occurredAt`) | `MoodEvent` | all | — |
 | 3 | **New field** `bucket` (optional supplement time-bucket) | `SupplementDefinition` | `bucket` | String |
 | 4 | **New record type** `GoalMilestone` (whole type, 9 fields — latched achievement events) | `GoalMilestone` | all | — |
@@ -61,6 +62,7 @@ promoted to Prod unless the Console already shows them):
 | 9 | **New field** `showInSpotlight` (per-section Spotlight/Siri opt-out; absent ⇒ true ⇒ discoverable) | `Section` | `showInSpotlight` | Int(64) (`Bool`) |
 | 10 | **New field** `reservedString1` (carries an area's optional user emoji — first actual write of this reserved slot) | `Area` | `reservedString1` | String |
 | 11 | **New record type** `Quote` (whole type, 4 fields — user-added + Readwise-imported daily-message lines for the optional dashboard footer) | `Quote` | all | — |
+| 12 | **New record types** for the generalized **Intake** section (replaces retired caffeine/cannabis types — consumables purge 2026-06-12) | `IntakeKind`, `IntakeItem`, `IntakeEvent` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -88,6 +90,7 @@ view regardless.
 - [ ] `MoodEvent` record type exists with all 9 fields
 - [ ] `SymptomDefinition` and `SymptomEvent` record types exist with all fields
 - [ ] `MedicationDefinition` and `MedicationDoseEvent` record types exist with all fields
+- [ ] `IntakeKind`, `IntakeItem`, `IntakeEvent` record types exist with all fields (Intake section)
 - [ ] `SupplementDefinition.bucket : String` present
 - [ ] No type was promoted with a **different** field type than this manifest (additive
       mistakes can't be undone — if types diverge, the field is permanently wrong in Prod)
@@ -128,6 +131,7 @@ hitting any of these in Prod gets a silent write failure.
 | Item | Status | Recommendation |
 |---|---|---|
 | `AirReading` (whole type) | Feature removed; gone from code | Delete from Dev before deploy, or it's permanent cruft in Prod |
+| `CaffeineEvent`, `CaffeineBean`, `CannabisEvent`, `CannabisStrain` (whole types) | Retired in the consumables purge (2026-06-12) — replaced by the generalized Intake types (`IntakeKind`/`IntakeItem`/`IntakeEvent`); gateway dropped its caffeine/cannabis tools too. Dev records sit dormant (personal migration done). | Delete from Dev before deploy, or they're permanent cruft in Prod |
 | `Area.slug`, `Area.previousSlugs` | Orphaned — local SwiftData props remain, but **no `*Record.swift` encodes them** and the gateway neither reads nor writes them | Decide: revive the slug feature (then fix iOS to encode) **or** delete |
 | `Project.slug`, `Project.previousSlugs` | Same as Area | Same decision |
 
@@ -138,13 +142,10 @@ Cleanup is optional, but now is the only cheap moment.
 
 | Item | Why it's real |
 |---|---|
-| `CannabisStrain` (whole type) | **Gateway-managed catalog** (`listCannabisStrains`/`createCannabisStrain` in `septena-mcp-gateway`), the cannabis analog of `CaffeineBean`. iOS doesn't touch it yet. |
 | `Users` | CloudKit **system record type** (default `roles` field). Built-in; cannot/should not be deleted. |
 
-> Everything else in the export matches the manifest exactly (27 types reconciled).
 > Note this manifest's tables are **iOS-write-derived**; the gateway is a second writer,
-> so `CannabisStrain` and the orphaned `slug` fields don't appear in them — see this
-> section for the full truth.
+> so the orphaned `slug` fields don't appear in them — see § A for the full truth.
 
 ---
 
@@ -342,34 +343,54 @@ One row per message; a coach's transcript = all rows with that `coachKey`. **NEW
 
 ### Intake — zone `septena-v1`
 
-#### CaffeineEvent  — `caffeine-event:{id}`
-| Field | CK type | Swift | Nullable | Notes |
-|---|---|---|---|---|
-| `date` | String | `String` | No | |
-| `time` | String | `String` | No | |
-| `method` | String | `String` | No | v60/matcha/other |
-| `beans` | String | `String?` | Yes | |
-| `grams` | Double | `Double?` | Yes | |
-| `note` | String | `String?` | Yes | |
-| `occurredAt` | Timestamp | `Date` | No | **⚠ PENDING PROD DEPLOY** · default `.distantPast` |
+> **Generalized-consumables model (replaced the old caffeine/cannabis types).** The
+> per-substance `CaffeineEvent` / `CaffeineBean` / `CannabisEvent` types were retired in
+> the consumables purge (2026-06-12) and replaced by a single user-configurable model:
+> one `IntakeKind` per substance (caffeine, cannabis, anything the user adds), optional
+> `IntakeItem` catalog rows per kind (beans / strains), and `IntakeEvent` logs. All three
+> are **new record types from Production's point of view** (see changelog #12). The old
+> caffeine/cannabis CKRecords sit dormant in the dev zone (one-time personal migration
+> already done) and are gateway-cleanup candidates, not written by current code.
 
-#### CaffeineBean  — `caffeine-bean:{id}`
+#### IntakeKind  — `intake-kind:{id}`
 | Field | CK type | Swift | Nullable | Notes |
 |---|---|---|---|---|
 | `name` | String | `String` | No | |
+| `symbol` | String | `String` | No | SF Symbol token |
+| `color` | String | `String` | No | per-kind hex/hsl token (not `SectionTheme`) |
 | `sortIndex` | Int(64) | `Int` | No | |
+| `unit` | String | `String?` | Yes | `g` / `mg` / `ml` / nil |
+| `doseStyle` | String | `String` | No | `amount` / `count` / `both` / `none` |
+| `countNoun` | String | `String?` | Yes | `hit` / `cup` / `puff` |
+| `containerNoun` | String | `String?` | Yes | `capsule` / `pack` / nil |
+| `containerCap` | Int(64) | `Int?` | Yes | nil = no container model |
+| `catalogNoun` | String | `String?` | Yes | `Beans` / `Strains` / nil |
+| `flourish` | String | `String` | No | motion token (`bloom` / `ripple` / …) |
+| `metricMode` | String | `String` | No | `countEvents` / `sumAmount` |
+| `objective` | String | `String` | No | `log` / `limit` / `reduce` / `quit` · property-level default `log` (lightweight-migration backfill) |
+| `methods` | String | `String` (`methodsJSON`) | No | encoded `[IntakeMethodRow]` JSON |
+| `templateID` | String | `String?` | Yes | seed-template provenance |
+| `archivedAt` | Timestamp | `Date?` | Yes | hide-don't-delete, mirrors sections |
 
-#### CannabisEvent  — `cannabis-event:{id}`
+#### IntakeItem  — `intake-item:{id}`
 | Field | CK type | Swift | Nullable | Notes |
 |---|---|---|---|---|
+| `kindID` | String | `String` | No | → `IntakeKind` |
+| `name` | String | `String` | No | |
+| `sortIndex` | Int(64) | `Int` | No | |
+| `archivedAt` | Timestamp | `Date?` | Yes | hide-don't-delete |
+
+#### IntakeEvent  — `intake-event:{id}`
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `kindID` | String | `String` | No | → `IntakeKind` |
 | `date` | String | `String` | No | |
-| `time` | String | `String` | No | |
-| `method` | String | `String` | No | vape/edible |
-| `strain` | String | `String?` | Yes | |
-| `hit` | Int(64) | `Int?` | Yes | |
-| `grams` | Double | `Double?` | Yes | |
+| `method` | String | `String` | No | stable token from the kind's method rows |
+| `itemID` | String | `String?` | Yes | → `IntakeItem` |
+| `amount` | Double | `Double?` | Yes | in `kind.unit` |
+| `count` | Int(64) | `Int?` | Yes | hits/uses; container math reads this |
 | `note` | String | `String?` | Yes | |
-| `occurredAt` | Timestamp | `Date` | No | **⚠ PENDING PROD DEPLOY** · default `.distantPast` |
+| `occurredAt` | Timestamp | `Date` | No | default `.distantPast`; derived from `date`/method on write |
 
 ### Body — zone `septena-v1`
 
