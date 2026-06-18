@@ -156,6 +156,33 @@ export async function postSupportMessage(
   return await getSupportTicket(env, user, ticketID);
 }
 
+export async function setTicketStatus(
+  env: Env,
+  user: CurrentUser,
+  ticketID: string,
+  input: unknown,
+): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; status: number; error: string }> {
+  if (!canModerate(user)) return { ok: false, status: 403, error: "forbidden" };
+  const ticket = await findTicket(env, user, ticketID);
+  if (!ticket) return { ok: false, status: 404, error: "ticket_not_found" };
+  if (!isObject(input)) return { ok: false, status: 400, error: "bad_request" };
+  const status = parseStatus(input.status);
+  if (!status) return { ok: false, status: 400, error: "bad_status" };
+
+  await env.DB.prepare(`
+    update support_ticket set status = ?, updated_at = datetime('now') where id = ?
+  `).bind(status, ticketID).run();
+
+  return await getSupportTicket(env, user, ticketID);
+}
+
+function parseStatus(value: unknown): TicketStatus | null {
+  if (value === "open" || value === "waiting_on_user" || value === "waiting_on_maintainer" || value === "closed") {
+    return value;
+  }
+  return null;
+}
+
 async function findTicket(env: Env, user: CurrentUser, ticketID: string): Promise<TicketRow | null> {
   const ownerClause = canModerate(user) ? "" : "and user_hash = ?";
   const stmt = env.DB.prepare(`
