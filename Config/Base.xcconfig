@@ -2,16 +2,17 @@
 //
 // Committed base configuration for the Septena and SeptenaMac app targets,
 // wired in via `configFiles` in project.yml. It declares empty defaults for
-// the optional build-time secrets (the Withings dev-app OAuth credentials and
-// the CloudKit Web Services API token used by the Claude gateway integration),
-// then optionally layers in the real values from the gitignored
-// Secrets.xcconfig (present only on a configured build machine / CI).
+// optional local build settings (the Apple development team, Withings dev-app
+// OAuth credentials, and the CloudKit Web Services API token used by the Claude
+// gateway integration), then optionally layers in the real values from the
+// gitignored Secrets.xcconfig (present only on a configured build machine / CI).
 //
-// These build settings reach the app at runtime through Info.plist keys (see
-// project.yml): WithingsClientID / WithingsClientSecret (read by
-// WithingsAppCredentials in SeptenaCore/WithingsProvider.swift) and
+// These build settings reach the app through project.yml and Info.plist keys:
+// DEVELOPMENT_TEAM for signing; WithingsClientID / WithingsClientSecret (read
+// by WithingsAppCredentials in SeptenaCore/WithingsProvider.swift); and
 // CloudKitWebAPIToken (read by ClaudeGatewayProvider in SeptenaCore).
 
+SEPTENA_DEVELOPMENT_TEAM =
 WITHINGS_CLIENT_ID =
 WITHINGS_CLIENT_SECRET =
 CLOUDKIT_WEB_API_TOKEN =

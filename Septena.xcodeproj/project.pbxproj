@@ -16,6 +16,7 @@
 		019D58E673D55023001D1BCC /* ConsumableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */; };
 		01E672AE9CC6DC0BCC948870 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42EB061D69FA656547DC171F /* NutritionDestinationView.swift */; };
 		020427845BE68FA93286A4B3 /* SeptenaWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		0261456561011DEE3B73EF79 /* CommunityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE874D502585AA472CA027E /* CommunityClient.swift */; };
 		027376E6E47C54E7A535D80C /* RoutineCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B54F8682AE8C22E352630E /* RoutineCatalogView.swift */; };
 		02C0FDC8E22EF595A294A4ED /* SeptenaSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6962898B56CBFB87E5417A5 /* SeptenaSceneDelegate.swift */; };
 		036EA94AAE4126D6277D46B8 /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905952CC4800DE8D2B5A5659 /* StatGrid.swift */; };
@@ -356,6 +357,7 @@
 		741C8DEC093734FCECDE01C3 /* MealLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */; };
 		7435B6913FC111EAE946DBBB /* ValuesMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBBBE8B556E5C9946CFB630 /* ValuesMiniApp.swift */; };
 		74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
+		750FF5E1329426132EE6F7B3 /* CommunityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE874D502585AA472CA027E /* CommunityClient.swift */; };
 		752EC30B8D5BBB93EBA9FBBE /* CoachVoiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */; };
 		75F953C419493CAE4EC29A6E /* GoalsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207D112EFCEB89F2F0D1DBE5 /* GoalsPlugin.swift */; };
 		7695140F0CB50E018E0E18BE /* TrainingEffort.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3885ECABB96F4419BAE7E6E /* TrainingEffort.swift */; };
@@ -857,6 +859,7 @@
 		089893F59A6C1D2025AD8A2C /* MoodQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodQuickAddMenu.swift; sourceTree = "<group>"; };
 		096FF0E177B6CFC4B5A6D912 /* EditMoodEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditMoodEntrySheet.swift; sourceTree = "<group>"; };
 		09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestClient.swift; sourceTree = "<group>"; };
+		0AE874D502585AA472CA027E /* CommunityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityClient.swift; sourceTree = "<group>"; };
 		0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersInboxSection.swift; sourceTree = "<group>"; };
 		0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditGutEntrySheet.swift; sourceTree = "<group>"; };
 		0C35D898846EB8A48B77811E /* AddInfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoSheet.swift; sourceTree = "<group>"; };
@@ -1642,6 +1645,14 @@
 			path = Pages;
 			sourceTree = "<group>";
 		};
+		7B1367CAFB6371C5CDA8BA0A /* Community */ = {
+			isa = PBXGroup;
+			children = (
+				0AE874D502585AA472CA027E /* CommunityClient.swift */,
+			);
+			path = Community;
+			sourceTree = "<group>";
+		};
 		7B495183D216750F1BD82CBA /* Groceries */ = {
 			isa = PBXGroup;
 			children = (
@@ -2056,6 +2067,7 @@
 				3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */,
 				FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */,
 				9C1C012D9D64C42D35820701 /* CloudKit */,
+				7B1367CAFB6371C5CDA8BA0A /* Community */,
 				99EAA76DEFE9EF8D901F97AE /* MCP */,
 				FBD3FE9D91D0A6D83EA2E57B /* Reports */,
 				858259E63BAAEEF2BE43D00B /* Sections */,
@@ -2311,41 +2323,41 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					1B1FB88A3182F26908EEC837 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					2A4D1301995EEBAA1BE5D242 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 						TestTargetID = 1B1FB88A3182F26908EEC837;
 					};
 					82DED0A5735C22C10D7212B5 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 						TestTargetID = FD752EC978FED2E2D676DE2D;
 					};
 					904F2F0D56A19DA95C229D97 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					C4055CC2A1451D2304DA1AD5 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					C99314A0CFDF9A8B0AEB409A = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					FA39C23110542023235A82C8 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					FC017B26AF169F2C07B0D9B3 = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					FD752EC978FED2E2D676DE2D = {
-						DevelopmentTeam = 992N457T8D;
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -2552,6 +2564,7 @@
 				079DC88BA2CF573D2EB5D9E8 /* CoachVoiceEditor.swift in Sources */,
 				752EC30B8D5BBB93EBA9FBBE /* CoachVoiceRecord.swift in Sources */,
 				1418ABD39D3C3BF52077A9A6 /* CommitMotion.swift in Sources */,
+				750FF5E1329426132EE6F7B3 /* CommunityClient.swift in Sources */,
 				317960F38E6A17F7D026C0E6 /* CompletionPatternsSection.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
 				EFA74ED84CC5C35B6F51D0D3 /* ConsistencyStats.swift in Sources */,
@@ -2942,6 +2955,7 @@
 				86159E5611439B7BDBDE918F /* CoachVoiceEditor.swift in Sources */,
 				AF247DC389C988F3638A8AE9 /* CoachVoiceRecord.swift in Sources */,
 				52883300FBE8C0D226A43368 /* CommitMotion.swift in Sources */,
+				0261456561011DEE3B73EF79 /* CommunityClient.swift in Sources */,
 				094811D884D904AEF10F6FFD /* CompletionPatternsSection.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
 				271ED637C90C08FC42DF6238 /* ConsistencyStats.swift in Sources */,
@@ -3260,6 +3274,7 @@
 /* Begin XCBuildConfiguration section */
 		1E187131DD9F51C922DDC10D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
@@ -3330,7 +3345,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 992N457T8D;
+				DEVELOPMENT_TEAM = "$(SEPTENA_DEVELOPMENT_TEAM)";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -3362,6 +3377,7 @@
 		};
 		552C730E1CFDE7A55ACF2DAC /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatchComplication/SeptenaWatchComplication.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3380,6 +3396,7 @@
 		};
 		6EA0C71930D4C533C1938768 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatch/SeptenaWatch.entitlements;
@@ -3394,6 +3411,7 @@
 		};
 		7195B3F5B5FA629E2F91DA47 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaWidgets/SeptenaWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3431,6 +3449,7 @@
 		};
 		720046C3308720BECE4DA02B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
@@ -3468,6 +3487,7 @@
 		};
 		7AF816471E8BEE559DF22FDA /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaLiveActivitiesExtension/SeptenaLiveActivitiesExtension.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3485,6 +3505,7 @@
 		};
 		800AB61816833BAFC8478F7A /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaWatchComplication/SeptenaWatchComplication.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3503,6 +3524,7 @@
 		};
 		88FD6E4D9DC8921105158F9C /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
@@ -3519,6 +3541,7 @@
 		};
 		8B13CD42BF245605EDCA1074 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaLiveActivitiesExtension/SeptenaLiveActivitiesExtension.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3536,6 +3559,7 @@
 		};
 		8DD082D7FEE1F4622E2E84C8 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
@@ -3553,6 +3577,7 @@
 		};
 		954EAD78034257EA3BB11DBD /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3591,6 +3616,7 @@
 		};
 		A24D5F82127FA487745E7536 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
@@ -3607,6 +3633,7 @@
 		};
 		D23C04669DB4DCCC38457505 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -3624,6 +3651,7 @@
 		};
 		F12AB81864AF526DD07400F4 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SeptenaWidgets/SeptenaWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -3676,7 +3704,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 992N457T8D;
+				DEVELOPMENT_TEAM = "$(SEPTENA_DEVELOPMENT_TEAM)";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;

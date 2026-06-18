@@ -15,7 +15,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: minimal
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    DEVELOPMENT_TEAM: 992N457T8D
+    DEVELOPMENT_TEAM: $(SEPTENA_DEVELOPMENT_TEAM)
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
     INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
@@ -86,8 +86,6 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
         NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
@@ -140,8 +138,6 @@ targets:
           - es
           - pt-BR
         CFBundleIconFile: AppIcon
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
         NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
         NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
@@ -203,8 +199,9 @@ targets:
         CFBundleDisplayName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.cloud
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp
@@ -230,8 +227,9 @@ targets:
       properties:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.watchkitapp.next
@@ -252,6 +250,9 @@ targets:
       properties:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.liveactivities
@@ -289,6 +290,9 @@ targets:
       properties:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.widgets
@@ -316,6 +320,9 @@ targets:
       - path: SeptenaCore/IntakeModel.swift
       - path: SeptenaCore/GutSymptomMigrationMap.swift
       - path: SeptenaCore/WakingDay.swift
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
@@ -330,6 +337,9 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: Septena
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.uitests
@@ -346,6 +356,9 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: SeptenaMac
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.macuitests
