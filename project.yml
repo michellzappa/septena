@@ -374,6 +374,9 @@ schemes:
         Septena: all
     run:
       config: Debug
+      # Local StoreKit testing: the support purchases resolve against this
+      # config file (no App Store Connect needed). See Config/Septena.storekit.
+      storeKitConfiguration: Config/Septena.storekit
     test:
       config: Debug
       targets:
@@ -404,6 +407,7 @@ schemes:
         SeptenaMac: all
     run:
       config: Debug
+      storeKitConfiguration: Config/Septena.storekit
     test:
       config: Debug
       targets:

@@ -16,6 +16,9 @@ struct SeptenaApp: App {
   @State private var theme = SectionTheme()
   @State private var trainingDraft = TrainingDraftStore()
   @State private var settingsStore = SettingsStore()
+  /// StoreKit 2 backing for "Support Septena" (patronage). Drives only the
+  /// cosmetic supporter state — see SupportStore.
+  @State private var supportStore = SupportStore()
   /// App-wide celebration layer. Fired by foreground log actions (habit
   /// streaks today; consumables next), played by a single LogCommitOverlay.
   @State private var logCommit = LogCommitCenter()
@@ -26,6 +29,17 @@ struct SeptenaApp: App {
   /// Whole-app privacy gate (Face ID / Touch ID / passcode). No-op unless the
   /// user turns it on in Settings ▸ Privacy. Driven below from `scenePhase`.
   @State private var appLock = AppLock()
+  /// Whether the user already supports the app (mock today). Only drives the
+  /// cosmetic badge — and suppresses the one-time support moment below.
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked = false
+  /// One-time gate: the gentle "support Septena" moment is shown at most once,
+  /// ever, after a milestone once the user is well-established.
+  @AppStorage(SettingsKey.supportMomentShown) private var supportMomentShown = false
+  /// Armed (in-memory, this session) when an eligible user just earned a
+  /// milestone; presented on the next foreground so it never stacks on the
+  /// celebration itself.
+  @State private var supportMomentPending = false
+  @State private var showSupportMoment = false
   private let localStore = LocalStore.shared
   /// Process-wide accessor for the CloudKit-backed mutation stack.
   /// Owns `ckEngine`, `taskMutator`, `areasMutator`, `projectsMutator`
@@ -75,10 +89,19 @@ struct SeptenaApp: App {
         // SectionTheme / CKEngine / DayClock. Self-gating: a no-op once the
         // account has been onboarded.
         .welcomeGate()
+        // The earned "support Septena" moment — shown at most once, only to a
+        // well-established user, and only on a foreground after a milestone.
+        // It's the support screen (sells nothing functional); marking it shown
+        // on present guarantees once-ever regardless of outcome.
+        .sheet(isPresented: $showSupportMoment) {
+          SeptenaPlusPaywall()
+            .onAppear { supportMomentShown = true }
+        }
         .environment(navigation)
         .environment(theme)
         .environment(trainingDraft)
         .environment(settingsStore)
+        .environment(supportStore)
         .environment(taskMutator)
         .environment(checklistMutator)
         .environment(areasMutator)
@@ -100,6 +123,13 @@ struct SeptenaApp: App {
           // dropped by APNs, so foregrounding must be a reliable
           // refresh path independent of push delivery.
           if phase == .active {
+            // Present the support moment armed in a prior session — before the
+            // fresh milestone check below, so a thank-you ask and a brand-new
+            // celebration never land on top of each other.
+            if supportMomentPending, !supportMomentShown, !showSupportMoment {
+              supportMomentPending = false
+              showSupportMoment = true
+            }
             dayClock.refreshIfNeeded()
             // Re-arm nudges: absorbs a backgrounded-across-midnight rollover
             // and any completions made on another device while we were away.
@@ -113,20 +143,29 @@ struct SeptenaApp: App {
                 WatchSnapshotPublisher.schedule(context: localStore.container.mainContext)
                 // Surface milestones earned while away (background Withings
                 // ingest, logs from intents, another device's data syncing in).
-                MilestonePresenter.presentPending(
+                if MilestonePresenter.presentPending(
                   milestones: services.milestoneMutator, theme: theme,
-                  logCommit: logCommit, now: dayClock.now)
+                  logCommit: logCommit, now: dayClock.now) {
+                  armSupportMoment()
+                }
               }
             }
             // Keep the Claude gateway's CloudKit token fresh. No-op unless
             // the user connected Claude, and skips the network when the
             // last push is still well within token lifetime.
             Task { await ClaudeGatewayProvider.shared.refreshIfNeeded() }
+            // Re-check support entitlement on foreground — a renewal, lapse, or
+            // purchase on another device should reflect here without a relaunch.
+            Task { await supportStore.refreshEntitlement() }
           }
         }
         .onOpenURL { url in
           handleDeepLink(url)
         }
+        // Resolve support products + current entitlement once, off the first
+        // frame (it's a network round-trip). Mirrors the supporter state into
+        // the cosmetic `plusUnlocked` flag the rest of the app reads.
+        .task { await supportStore.start() }
         .task {
           // Cold-launch arm: `onChange(of:)` doesn't fire for the initial
           // scene phase, so kick the first biometric prompt here when the app
@@ -289,8 +328,10 @@ struct SeptenaApp: App {
             milestones.evaluateBodyGoals(now: dayClock.now, today: dayClock.today)
             milestones.evaluateTraining(now: dayClock.now, celebrate: false)
             milestones.evaluateAllHabitStreaks(now: dayClock.now, today: dayClock.today)
-            MilestonePresenter.presentPending(milestones: milestones, theme: theme,
-                                              logCommit: logCommit, now: dayClock.now)
+            if MilestonePresenter.presentPending(milestones: milestones, theme: theme,
+                                                 logCommit: logCommit, now: dayClock.now) {
+              armSupportMoment()
+            }
             #if DEBUG
             // One-shot, DEBUG-only: register optional CloudKit fields that
             // exist in code but were never written in Development, so they
@@ -316,9 +357,11 @@ struct SeptenaApp: App {
           .publisher(for: .septenaDataChanged)
           .filter { $0.affectsSection("milestones") }
           .debounce(for: .seconds(0.6), scheduler: RunLoop.main)) { _ in
-          MilestonePresenter.presentPending(
+          if MilestonePresenter.presentPending(
             milestones: services.milestoneMutator, theme: theme,
-            logCommit: logCommit, now: dayClock.now)
+            logCommit: logCommit, now: dayClock.now) {
+            armSupportMoment()
+          }
         }
         .onAppear {
           #if canImport(UIKit)
@@ -451,6 +494,7 @@ struct SeptenaApp: App {
         .environment(theme)
         .environment(trainingDraft)
         .environment(settingsStore)
+        .environment(supportStore)
         .environment(taskMutator)
         .environment(checklistMutator)
         .environment(areasMutator)
@@ -468,6 +512,20 @@ struct SeptenaApp: App {
     .windowResizability(.contentSize)
     .defaultPosition(.center)
     #endif
+  }
+
+  /// Arm the one-time "support Septena" moment after a milestone just fired —
+  /// but only for a well-established user who isn't already a supporter and
+  /// hasn't seen it. Armed in-memory; the next foreground presents it, so the
+  /// ask never lands on top of the celebration that earned it. The 30-day
+  /// floor (from the synced `onboardedAt`) keeps it from ever feeling early.
+  @MainActor
+  private func armSupportMoment() {
+    guard !supportMomentShown, !plusUnlocked, !supportMomentPending,
+          !showSupportMoment else { return }
+    guard let onboarded = settingsStore.serverSettings?.onboardedAt,
+          dayClock.now.timeIntervalSince(onboarded) >= 30 * 24 * 60 * 60 else { return }
+    supportMomentPending = true
   }
 
   private func handleDeepLink(_ url: URL) {

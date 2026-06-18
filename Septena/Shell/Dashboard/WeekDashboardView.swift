@@ -501,8 +501,8 @@ struct WeekDashboardView: View {
     .pickerStyle(.inline)
     Divider()
     // Insights — folded in from the old top-right toolbar button. Insights has
-    // no per-day series, so the menu is its natural home; the Septena+ gate
-    // still lives inside the destination.
+    // no per-day series, so the menu is its natural home. (Free like the rest
+    // of the app — no gate.)
     Button {
       logInsightsOpen("menu tapped")
       open(.insights)

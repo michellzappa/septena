@@ -17,17 +17,22 @@ import SwiftUI
 @MainActor
 enum MilestonePresenter {
 
+  /// Fires the celebration for whatever's queued. Returns `true` when a real
+  /// milestone was presented this call — the app root uses that as the signal
+  /// to (gently, once, much later) arm the "support Septena" earned moment.
+  @discardableResult
   static func presentPending(milestones: MilestoneMutator,
                              theme: SectionTheme,
                              logCommit: LogCommitCenter,
-                             now: Date) {
+                             now: Date) -> Bool {
     let pending = milestones.pendingPresentation(now: now)
-    guard !pending.isEmpty else { return }
+    guard !pending.isEmpty else { return false }
     let top = pending.max { tier($0) < tier($1) } ?? pending[0]
     logCommit.fire(style(for: top, theme: theme))
     Haptics.success()
     A11y.announce(MilestoneUnits.label(top))
     milestones.markPresented(ids: pending.map(\.id), at: now)
+    return true
   }
 
   /// The real tiering: which celebration a given milestone earns. Pure, so

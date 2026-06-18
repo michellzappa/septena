@@ -3,6 +3,7 @@ import SwiftData
 import EventKit
 import CloudKit
 import CoreLocation
+import StoreKit
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -143,11 +144,17 @@ enum SettingsKey {
   /// app-wide; the commit haptic + VoiceOver confirmation still fire, exactly
   /// like Reduce Motion. Read by `CommitFlourish` and `LogCommitOverlay`.
   static let loggingAnimationsEnabled = "septena.ui.loggingAnimations"
-  /// Mock entitlement flag for the (not-yet-real) Septena+ membership.
-  /// Local-only @AppStorage — there's no StoreKit / IAP yet, so this is
-  /// flipped by the in-app "mock unlock" toggle in the paywall. Gates the
-  /// Correlations homepage layout; turning it off re-locks Plus features.
+  /// Whether the user is a paying *supporter*. The whole app is free — this
+  /// flag unlocks NOTHING functional; it only drives cosmetics (the avatar
+  /// foil ring and the "Supporter" badge). It's a local @AppStorage *mirror*
+  /// of the real StoreKit entitlement: `SupportStore` recomputes ownership
+  /// from `Transaction.currentEntitlements` and writes it here, so every
+  /// cosmetic reader stays truth-backed without knowing about StoreKit. (Key
+  /// string kept for continuity with existing installs.)
   static let plusUnlocked     = "septena.plus.unlocked"
+  /// One-time gate for the "earned moment" support prompt (shown once, ever,
+  /// after a milestone once the user is well-established). Local-only.
+  static let supportMomentShown = "septena.support.momentShown"
   /// macOS-only: run an in-process loopback MCP server so a local Claude Code
   /// instance can read/write Septena without the hosted gateway. Off by
   /// default. The key strings live in SeptenaCore (`MCPDefaultsKey`) so the
@@ -772,6 +779,7 @@ struct SettingsView: View {
     case support
     case communityProfile   // public username / display name / bio (community Worker)
     case communityRoadmap   // feature-request board (community Worker)
+    case communityTestimonial // one-per-user testimonial (community Worker)
     case milestonePreview   // DEBUG bench: fire each milestone celebration
     case siriShortcuts
     case section(String)
@@ -927,6 +935,7 @@ struct SettingsView: View {
     case .support:      return "Support"
     case .communityProfile: return "Community Profile"
     case .communityRoadmap: return "Roadmap"
+    case .communityTestimonial: return "Testimonial"
     case .skills:       return "Skills"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
@@ -964,6 +973,7 @@ struct SettingsView: View {
     case .support:      return "lifepreserver"
     case .communityProfile: return "person.text.rectangle"
     case .communityRoadmap: return "map"
+    case .communityTestimonial: return "quote.bubble"
     case .skills:       return "book.closed"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
@@ -1016,6 +1026,7 @@ struct SettingsView: View {
     case .support:           SupportSettingsPane()
     case .communityProfile:  CommunityProfilePane()
     case .communityRoadmap:  CommunityRoadmapPane()
+    case .communityTestimonial: CommunityTestimonialPane()
     case .dataTools:         ImportExportSettingsPane(mode: .dataTools)
     case .skills:            SkillsSettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
@@ -1745,71 +1756,26 @@ private struct LayoutPreviewExample: View {
   }
 }
 
-/// Static stand-in for the Septena+ multi-coach roster, used as the paywall
-/// hero. Illustrative only — three example coaches as section-tinted cards —
-/// so the value reads at a glance without faking a live screen.
-private struct CoachesPreviewExample: View {
-  private struct Coach: Identifiable {
-    let id: String
-    let name: String
-    let role: String
-    let icon: String
-    let color: Color
-  }
-
-  private let coaches: [Coach] = [
-    .init(id: "strength", name: "Strength Coach",
-          role: "Plans your next session from recent lifts",
-          icon: "figure.strengthtraining.traditional", color: .orange),
-    .init(id: "sleep", name: "Sleep Coach",
-          role: "Nudges your wind-down toward your target",
-          icon: "bed.double", color: .indigo),
-    .init(id: "nutrition", name: "Nutrition Coach",
-          role: "Keeps macros honest against your goals",
-          icon: "fork.knife", color: .yellow),
-  ]
-
-  var body: some View {
-    VStack(spacing: 10) {
-      ForEach(coaches) { coach in
-        HStack(spacing: 12) {
-          RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(coach.color.opacity(0.16))
-            .frame(width: 40, height: 40)
-            .overlay(
-              Image(systemName: coach.icon)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(coach.color)
-            )
-          VStack(alignment: .leading, spacing: 2) {
-            Text(coach.name).font(.subheadline.weight(.semibold))
-            Text(coach.role)
-              .font(.caption).foregroundStyle(.secondary)
-              .lineLimit(1)
-          }
-          Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(
-          RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.cardSurface)
-        )
-      }
-    }
-  }
-}
-
-// MARK: - Septena+ (mock membership)
+// MARK: - Support Septena (patronage, not a paid tier)
 //
-// First pass at a paid tier. There's no StoreKit / receipt validation
-// yet — `SettingsKey.plusUnlocked` is a local @AppStorage flag flipped by
-// the in-app "mock unlock" toggle. When real IAP lands, that key becomes
-// the entitlement check and the paywall's unlock action calls into
-// StoreKit instead of just setting the flag.
+// The whole app is free — every section, every feature, forever, with
+// nothing gated. "Support Septena" is a pure tip jar: an optional way to
+// keep the app independent and ad-free. A supporter unlocks NOTHING another
+// user can't have; the only thing it changes is cosmetic (a "Supporter"
+// badge + the avatar foil ring). That discipline is the whole product, so
+// don't put a real feature behind `plusUnlocked` — ship it free.
+//
+// Purchases run through StoreKit 2 (`SupportStore`). Locally they resolve
+// against Config/Septena.storekit wired into the scheme, so the flow is
+// testable with no App Store Connect account; the matching ASC products are
+// still to be created (their ids are permanent once they are). `SupportStore`
+// mirrors the entitlement into `SettingsKey.plusUnlocked`. (Internal type
+// names keep the `SeptenaPlus` prefix for continuity; everything user-facing
+// reads "Support Septena".)
 
-/// One sellable Septena+ benefit. The paywall renders the list straight
-/// from `SeptenaPlus.features`, so adding a perk is a one-line append
-/// here — no paywall surgery. Keep `id` stable; a future real-IAP build
-/// can map it to an entitlement / destination.
+/// One "why support" reason. The support screen renders the list straight
+/// from `SeptenaPlus.reasons`, so adding one is a one-line append. Keep `id`
+/// stable. Also reused for the cosmetic perks a supporter actually gets.
 struct SeptenaPlusFeature: Identifiable {
   let id: String
   let icon: String      // SF Symbol
@@ -1817,8 +1783,24 @@ struct SeptenaPlusFeature: Identifiable {
   let detail: String
 }
 
+/// One support tier shown on the support screen. Annual is the highlighted
+/// default; lifetime is the one-time "Founding Supporter". `id` maps to a
+/// future StoreKit product identifier.
+struct SupportTier: Identifiable {
+  let id: String
+  let title: String
+  let price: String
+  let cadence: String     // "per year" / "per month" / "one time"
+  let note: String?       // e.g. "Two months free", "Lifetime"
+  let highlighted: Bool
+}
+
 enum SeptenaPlus {
-  static let name = "Septena+"
+  /// User-facing name of the support offering (no "+", which would imply
+  /// gated features — there are none).
+  static let name = "Support Septena"
+  /// The single word worn by a supporter (badge + thank-you copy).
+  static let badgeWord = "Supporter"
 
   // MARK: Premium finish — "Obsidian + disc medallion"
   //
@@ -1863,23 +1845,49 @@ enum SeptenaPlus {
     CGPoint(x: 0.2829, y: 0.3256),
   ]
 
-  /// The membership's perks, in display order. Septena+ is the multi-coach
-  /// tier: the free app gives everyone one on-device coach over their goals
-  /// and data; the membership unlocks a roster of focused coaches. Everything
-  /// else — Insights, correlations, app icons — is free.
-  static let features: [SeptenaPlusFeature] = [
-    .init(id: "coachRoster",
-          icon: "person.2",
-          title: "A roster of coaches",
-          detail: "Go beyond the single built-in coach. Add focused coaches — strength, sleep, nutrition, and more — each with its own voice and intent."),
-    .init(id: "coachFocus",
-          icon: "scope",
-          title: "Each one stays in its lane",
-          detail: "Every coach reasons over only the sections it needs, so its guidance stays sharp and on-topic instead of one generalist spreading thin."),
-    .init(id: "coachPrivate",
-          icon: "lock.shield",
-          title: "Private and on-device",
-          detail: "Coaches run on Apple Intelligence, on your device — the same private foundation as the rest of Septena. Nothing leaves your phone."),
+  /// Why support — what the money actually does. Note none of these is a
+  /// feature you unlock: they're reasons the app can stay the way it is.
+  static let reasons: [SeptenaPlusFeature] = [
+    .init(id: "free",
+          icon: "gift",
+          title: "Keeps every feature free",
+          detail: "Nothing here is held back for a paid tier. Your support is the reason there's no paywall — and the promise there never will be one."),
+    .init(id: "independent",
+          icon: "leaf",
+          title: "Keeps it independent",
+          detail: "No ads, no investors, no data sold. Septena answers to the people who use it, and that only works if some of them chip in."),
+    .init(id: "next",
+          icon: "hammer",
+          title: "Funds the next update",
+          detail: "Every fix and new section is built by one developer. Supporting is the most direct way to say “keep going.”"),
+  ]
+
+  /// The cosmetic perks a supporter actually gets. Deliberately small — the
+  /// point is to support the app, not to buy capability.
+  static let perks: [SeptenaPlusFeature] = [
+    .init(id: "badge",
+          icon: "checkmark.seal",
+          title: "A Supporter badge",
+          detail: "A quiet mark on your profile and a foil ring on your avatar. Just for you — it changes nothing about what the app can do."),
+    .init(id: "thanks",
+          icon: "heart",
+          title: "Our genuine thanks",
+          detail: "You're keeping a private, independent app alive. That's the whole deal, and it matters more than any feature could."),
+  ]
+
+  /// Support tiers, annual first (the highlighted default). A supporter
+  /// picks one; none unlocks more than any other — they're amounts, not
+  /// plans. Lifetime is the one-time "Founding Supporter".
+  static let tiers: [SupportTier] = [
+    .init(id: "annual",   title: "Annual",
+          price: "€77", cadence: "per year",
+          note: "Two months free", highlighted: true),
+    .init(id: "monthly",  title: "Monthly",
+          price: "€7",  cadence: "per month",
+          note: nil, highlighted: false),
+    .init(id: "lifetime", title: "Founding Supporter",
+          price: "€177", cadence: "one time",
+          note: "Lifetime — for being here early", highlighted: false),
   ]
 }
 
@@ -1944,42 +1952,49 @@ struct SeptenaPlusFeatureRow: View {
   }
 }
 
-/// Compact "Septena+" pill used to mark Plus-gated rows in the picker.
-/// Ink capsule with a champagne-foil hairline and a foil "+", so it reads
-/// as a small pressed-metal plate rather than a colorful sticker.
+/// Compact "Supporter" pill worn on the profile. Ink capsule with a
+/// champagne-foil hairline and a small foil heart, so it reads as a small
+/// pressed-metal plate of thanks rather than a colorful sticker. Marks who
+/// chose to support — it never gates anything.
 struct SeptenaPlusBadge: View {
   var body: some View {
-    (Text("Septena").foregroundStyle(.white)
-      + Text("+").foregroundStyle(SeptenaPlus.foil))
-      .font(.caption2.weight(.bold))
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
-      .background(SeptenaPlus.ink, in: Capsule())
-      .overlay(Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75))
+    HStack(spacing: 3) {
+      Image(systemName: "heart.fill")
+        .font(.system(size: 8, weight: .bold))
+        .foregroundStyle(SeptenaPlus.foil)
+      Text(SeptenaPlus.badgeWord)
+        .foregroundStyle(.white)
+    }
+    .font(.caption2.weight(.bold))
+    .padding(.horizontal, 8)
+    .padding(.vertical, 3)
+    .background(SeptenaPlus.ink, in: Capsule())
+    .overlay(Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75))
   }
 }
 
-/// Mock paywall for the Septena+ upgrade. Shows the multi-coach roster
-/// preview as the hero, the value bullets, and a clearly labelled mock
-/// unlock toggle (no purchase is made). `onUnlock` flips the entitlement.
+/// The support screen. NOT a paywall — it sells nothing functional. A
+/// free-forever promise up top, the reasons supporting matters, the three
+/// amounts (annual highlighted as the default), and an honest line that you
+/// unlock nothing. Tiers show the real localized `Product.displayPrice` and a
+/// tap runs a StoreKit purchase via `SupportStore`; a completed purchase (or a
+/// restore) flips the entitlement and the screen dismisses itself.
 struct SeptenaPlusPaywall: View {
   @Environment(\.dismiss) private var dismiss
-  let onUnlock: () -> Void
-
-  @State private var mockOn = false
+  @Environment(SupportStore.self) private var store
 
   var body: some View {
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 24) {
           header
-          previewHero
           VStack(alignment: .leading, spacing: 18) {
-            ForEach(SeptenaPlus.features) { feature in
-              SeptenaPlusFeatureRow(feature: feature)
+            ForEach(SeptenaPlus.reasons) { reason in
+              SeptenaPlusFeatureRow(feature: reason)
             }
           }
-          unlockCard
+          tiers
+          honesty
         }
         .padding(20)
       }
@@ -1990,12 +2005,17 @@ struct SeptenaPlusPaywall: View {
       #endif
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Not now") { dismiss() }
+          Button("Maybe later") { dismiss() }
         }
+      }
+      // A completed purchase (or a restore) flips the entitlement — close the
+      // screen so the user lands back on their now-thanked profile.
+      .onChange(of: store.isSupporter) { _, nowSupporter in
+        if nowSupporter { dismiss() }
       }
     }
     #if os(macOS)
-    .frame(width: 500, height: 640)
+    .frame(width: 500, height: 680)
     #endif
   }
 
@@ -2003,61 +2023,108 @@ struct SeptenaPlusPaywall: View {
     VStack(alignment: .leading, spacing: 14) {
       SeptenaDiscMark(size: 56)
       VStack(alignment: .leading, spacing: 6) {
-        SeptenaPlusBadge()
-        Text("Your team of coaches")
+        Text("Septena is free. All of it. Always.")
           .font(.title2.weight(.semibold))
-        Text("The free app gives you one on-device coach. Septena+ turns that into a roster — focused coaches for the parts of your life you're working on.")
+        Text("Every section, every feature — yours, with nothing held back and no ads watching you. That's a promise, not a trial. If it's become part of how you run your life, you can chip in to keep it independent. You won't unlock anything — there's nothing to unlock.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
     }
   }
 
-  private var previewHero: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text("YOUR COACHES")
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-      CoachesPreviewExample()
-        .padding(.horizontal, 14)
-        .padding(.bottom, 14)
-        .allowsHitTesting(false)
+  private var tiers: some View {
+    VStack(spacing: 12) {
+      ForEach(SeptenaPlus.tiers) { tier in
+        let product = store.product(forTier: tier.id)
+        SupportTierCard(tier: tier,
+                        product: product,
+                        inFlight: store.purchaseInFlight == product?.id) {
+          guard let product else { return }
+          Task { await store.purchase(product) }
+        }
+      }
+      if store.loadFailed {
+        Text("Prices couldn't load right now — check your connection and reopen this screen.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, 2)
+      }
+      Button("Restore purchases") {
+        Task { await store.restore() }
+      }
+      .font(.subheadline)
+      .frame(maxWidth: .infinity)
+      .padding(.top, 4)
     }
-    .background(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(Theme.groupedBackground)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-    )
   }
 
-  private var unlockCard: some View {
-    Toggle(isOn: $mockOn) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Unlock \(SeptenaPlus.name)")
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.white)
-        Text("Mock unlock. No purchase happens yet.")
-          .font(.caption).foregroundStyle(.white.opacity(0.6))
+  private var honesty: some View {
+    Text("Not now? Genuinely fine — the app stays exactly the same. You can support any time from Settings.")
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+}
+
+/// A single tappable support tier. The highlighted (annual) tier wears the
+/// ink/foil treatment so it reads as the default; the rest are quiet
+/// outlined cards. Tapping becomes a supporter at that amount.
+struct SupportTierCard: View {
+  let tier: SupportTier
+  /// The resolved StoreKit product, if loaded — its `displayPrice` is the
+  /// real, localized price. Falls back to the tier's static price otherwise.
+  var product: Product?
+  /// True while this tier's purchase is in flight (show a spinner, block taps).
+  var inFlight: Bool = false
+  let onTap: () -> Void
+
+  private var priceText: String { product?.displayPrice ?? tier.price }
+
+  var body: some View {
+    Button(action: onTap) {
+      HStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: 3) {
+          Text(tier.title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(tier.highlighted ? .white : .primary)
+          if let note = tier.note {
+            Text(note)
+              .font(.caption)
+              .foregroundStyle(tier.highlighted ? .white.opacity(0.7) : .secondary)
+          }
+        }
+        Spacer(minLength: 8)
+        if inFlight {
+          ProgressView()
+            .tint(tier.highlighted ? .white : .primary)
+        } else {
+          VStack(alignment: .trailing, spacing: 1) {
+            Text(priceText)
+              .font(.title3.weight(.bold))
+              .foregroundStyle(tier.highlighted ? AnyShapeStyle(SeptenaPlus.foilGradient) : AnyShapeStyle(.primary))
+            Text(tier.cadence)
+              .font(.caption2)
+              .foregroundStyle(tier.highlighted ? .white.opacity(0.7) : .secondary)
+          }
+        }
       }
+      .padding(16)
+      .background(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .fill(tier.highlighted ? AnyShapeStyle(SeptenaPlus.ink) : AnyShapeStyle(Theme.cardSurface))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .strokeBorder(tier.highlighted ? SeptenaPlus.foil.opacity(0.4)
+                                          : Color.primary.opacity(0.08),
+                        lineWidth: tier.highlighted ? 0.75 : 0.5)
+      )
+      .contentShape(Rectangle())
     }
-    .tint(SeptenaPlus.foil)
-    .onChange(of: mockOn) { _, on in
-      if on { onUnlock() }
-    }
-    .padding(16)
-    .background(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .fill(SeptenaPlus.ink)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .strokeBorder(SeptenaPlus.foil.opacity(0.3), lineWidth: 0.75)
-    )
+    .buttonStyle(.plain)
+    .disabled(product == nil || inFlight)
+    .opacity(product == nil ? 0.5 : 1)
   }
 }
 
@@ -2067,13 +2134,13 @@ struct SeptenaPlusPaywall: View {
 // can't read the real iCloud avatar or name (no public API for either),
 // so we render the standard substitute: a monogram avatar built from the
 // user's given name (`welcomeName`, already CloudKit-synced) with the
-// Septena+ status attached to that identity — a rainbow ring on the
+// supporter status attached to that identity — a foil ring on the
 // avatar plus a badge. The card pushes to `AccountSettingsPane`, the home
-// for name, membership, and iCloud sync state.
+// for name, support, and iCloud sync state.
 
-/// Circular monogram avatar. Initials over a neutral fill; a Septena+
-/// member gets the seven-color rainbow ring so the plan reads as part of
-/// who they are, not a buried setting.
+/// Circular monogram avatar. Initials over a neutral fill; a supporter
+/// gets the champagne-foil ring so the thanks reads as part of who they
+/// are, not a buried setting.
 struct ProfileAvatar: View {
   let name: String
   let isPlus: Bool
@@ -2143,9 +2210,11 @@ struct AccountSettingsPane: View {
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @State private var showPaywall = false
+  @State private var showManageSubscriptions = false
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
+  @Environment(SupportStore.self) private var supportStore
 
   var body: some View {
     Form {
@@ -2193,42 +2262,47 @@ struct AccountSettingsPane: View {
         NavigationLink(value: SettingsView.SettingsDestination.communityRoadmap) {
           Label("Roadmap", systemImage: "map")
         }
+        NavigationLink(value: SettingsView.SettingsDestination.communityTestimonial) {
+          Label("Testimonial", systemImage: "quote.bubble")
+        }
       } header: {
         Text("Community")
       } footer: {
-        Text("Your public handle for feature requests, and the roadmap board where you can suggest and upvote features.")
+        Text("Your public handle, the roadmap board to suggest and upvote features, and a testimonial you can share about Septena.")
       }
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showPaywall) {
-      SeptenaPlusPaywall {
-        plusUnlocked = true
-        showPaywall = false
-      }
+      SeptenaPlusPaywall()
     }
+    #if os(iOS)
+    .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+    #endif
   }
 
   @ViewBuilder
   private var membershipSection: some View {
     if plusUnlocked {
       Section {
-        ForEach(SeptenaPlus.features) { feature in
-          SeptenaPlusFeatureRow(feature: feature)
+        ForEach(SeptenaPlus.perks) { perk in
+          SeptenaPlusFeatureRow(feature: perk)
         }
       } header: {
-        Text("Your Septena+ perks")
+        Text("You're a supporter")
+      } footer: {
+        Text("Thank you — you're the reason Septena stays free and independent.")
       }
       Section {
-        Toggle(isOn: $plusUnlocked) {
-          Label {
-            Text("Septena+ membership")
-          } icon: {
-            Image(systemName: "checkmark.seal.fill")
-              .foregroundStyle(SeptenaPlus.foilGradient)
-          }
+        Button("Restore purchases") {
+          Task { await supportStore.restore() }
         }
+        #if os(iOS)
+        Button("Manage subscription") {
+          showManageSubscriptions = true
+        }
+        #endif
       } footer: {
-        Text("Mock membership for testing — no purchase is made. Turn this off to re-lock Septena+ features.")
+        Text("Your support is tied to your Apple ID. Restore re-syncs it on a new device; managing lets you change or cancel an ongoing subscription.")
       }
     } else {
       Section {
@@ -2238,10 +2312,10 @@ struct AccountSettingsPane: View {
           HStack(spacing: 14) {
             SeptenaDiscMark(size: 30)
             VStack(alignment: .leading, spacing: 2) {
-              Text("Upgrade to \(SeptenaPlus.name)")
+              Text(SeptenaPlus.name)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
-              Text("A roster of focused, on-device coaches.")
+              Text("The app is free. Chip in to keep it independent.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -2254,7 +2328,7 @@ struct AccountSettingsPane: View {
         }
         .buttonStyle(.plain)
       } header: {
-        Text("Membership")
+        Text("Support")
       }
     }
   }
