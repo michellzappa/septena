@@ -60,6 +60,7 @@ targets:
       path: Septena/Info.plist
       properties:
         CFBundleDisplayName: Septena
+        ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
           - en
           - fr
@@ -131,6 +132,7 @@ targets:
       path: Septena/Info-Mac.plist
       properties:
         CFBundleDisplayName: Septena
+        ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
           - en
           - fr

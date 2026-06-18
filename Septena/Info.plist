@@ -41,6 +41,8 @@
 	<string>1</string>
 	<key>CloudKitWebAPIToken</key>
 	<string>$(CLOUDKIT_WEB_API_TOKEN)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
