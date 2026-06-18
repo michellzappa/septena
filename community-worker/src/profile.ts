@@ -32,7 +32,7 @@ export async function updateProfile(
   const isPublic = typeof input.isPublic === "boolean" ? input.isPublic : false;
 
   const normalizedUsername = username === null ? null : normalizeUsername(username);
-  if (normalizedUsername !== null && !/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+  if (normalizedUsername !== null && !/^[a-z0-9_]{2,24}$/.test(normalizedUsername)) {
     return { ok: false, status: 400, error: "bad_username" };
   }
   if (displayName !== null && displayName.length > 80) return { ok: false, status: 400, error: "display_name_too_long" };
