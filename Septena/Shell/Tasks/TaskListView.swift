@@ -1939,6 +1939,9 @@ private struct KeyboardNavigationModifier: ViewModifier {
       }
       // ↑↓ row traversal is handled natively by `List(selection:)` on macOS —
       // no custom key handling needed.
+      // Deletion is intentionally NOT bound to the bare ⌫ key — a hard delete
+      // is destructive and unrecoverable, so it's gated behind ⌘⌫ (the "Delete"
+      // menu command) to make an accidental delete much harder.
   }
 
 }

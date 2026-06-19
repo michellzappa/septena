@@ -19,6 +19,7 @@ struct SidebarRootView: View {
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
+  @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   /// Push-navigation surface (iPad regular / macOS) vs. compact stack (iPhone /
   /// slide-over) — the single rule, resolved at the app root, that decides
@@ -473,7 +474,18 @@ struct SidebarRootView: View {
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
     if usesPushNavigation {
-      content().tag(Self.token(for: route))
+      content()
+        .tag(Self.token(for: route))
+      #if os(macOS)
+        // Paint the selection ourselves so it stays one consistent accent tint.
+        // The native `.sidebar` highlight is accent-colored only while the List
+        // holds focus, then flips to an inactive gray the instant a click moves
+        // focus to the detail pane — read as a blue→gray "flash". A custom row
+        // background keyed off `isSelected` is focus-independent, so the chosen
+        // row reads the same no matter which pane is first responder.
+        .listRowBackground(SidebarRowSelectionBackground(selected: isSelected(route),
+                                                         accent: theme.accent))
+      #endif
     } else {
       Button { selectRoute(route) } label: { content() }
         .buttonStyle(InertButtonStyle())
@@ -1129,6 +1141,22 @@ struct SectionGlyph: View {
       }
   }
 }
+
+#if os(macOS)
+/// Focus-independent selection fill for the macOS Tasks sidebar. Replaces the
+/// native `.sidebar` highlight (which is accent-colored only while the List is
+/// first responder and grays out the moment focus moves to the detail pane) so
+/// the chosen row keeps one steady accent tint instead of flashing blue→gray.
+private struct SidebarRowSelectionBackground: View {
+  let selected: Bool
+  let accent: Color
+  var body: some View {
+    RoundedRectangle(cornerRadius: 6, style: .continuous)
+      .fill(selected ? accent.opacity(0.18) : Color.clear)
+      .padding(.vertical, 1)
+  }
+}
+#endif
 
 struct SidebarAreaRow: View {
   let name: String
