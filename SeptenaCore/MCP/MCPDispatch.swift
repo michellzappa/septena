@@ -65,10 +65,10 @@ enum MCPDispatch {
   private static var ctx: ModelContext { LocalStore.shared.container.mainContext }
 
   /// Section keys whose tools should be advertised. Mirrors the gateway's
-  /// rule exactly (src/mcp.ts tools/list): a section qualifies only when it's
-  /// `isEnabled` AND — when `section_order` is non-empty — present in that
-  /// order. A section enabled but absent from the order is NOT exposed, so a
-  /// half-configured section can't leak its tools. No sections at all ⇒ empty
+  /// rule exactly (src/mcp.ts tools/list): a section qualifies purely on
+  /// `isEnabled`. `section_order` is ORDERING, never membership — a section
+  /// enabled but absent from a stale order is STILL advertised (the opposite
+  /// rule once hid newly-shipped sections' tools). No sections at all ⇒ empty
   /// (globals only), never "everything".
   ///
   /// Delegates to `SeptenaServices.enabledSectionKeys()` so the MCP tool list

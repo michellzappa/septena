@@ -1369,6 +1369,15 @@ struct NutritionSettings: Codable, Hashable {
 }
 
 struct AppSettings: Codable {
+  /// INVARIANT — `sectionOrder` is ORDERING ONLY, never membership. Whether a
+  /// section is active is `SectionEntity.isEnabled` (see
+  /// `SeptenaServices.enabledSectionKeys()`); this array only ranks the active
+  /// ones for display. A key absent from here is NOT hidden — rank it last and
+  /// move on; an unknown key is ignored. Filtering membership through this
+  /// array (`order.filter { enabled… }`) silently drops sections enabled after
+  /// the order was last saved — the exact bug that hid `symptoms`/`medications`
+  /// from MCP. Resolve order+membership via `SettingsMirror.loadSections`
+  /// (ordered, complete) rather than re-deriving from this field.
   var sectionOrder: [String]?
   var targets: AppTargets?
   var units: AppUnits?

@@ -87,12 +87,13 @@ final class SeptenaServices {
       engine: ckEngine)
   }
 
-  /// The section keys that are active right now — `isEnabled` AND, when
-  /// `section_order` is non-empty, present in that order. The single gate
-  /// shared by the MCP tool list (`MCPDispatch`) and the App Intents surface
-  /// (`SectionLogIntent.requireSection`) so both honor the SAME enabled-section
-  /// rule. Mirrors the gateway's tools/list rule: a half-configured section
-  /// (enabled but absent from the order) is NOT active, and no sections at all
+  /// The section keys that are active right now — gated purely on `isEnabled`.
+  /// `section_order` is ORDERING, never membership: a section enabled but
+  /// absent from a stale order is still active (filtering on the order once hid
+  /// newly-shipped sections' MCP tools + App Intents entirely — see below). The
+  /// single gate shared by the MCP tool list (`MCPDispatch`) and the App Intents
+  /// surface (`SectionLogIntent.requireSection`) so both honor the SAME rule,
+  /// and mirrors the gateway's tools/list rule (src/mcp.ts). No sections at all
   /// ⇒ empty, never "everything".
   func enabledSectionKeys() -> Set<String> {
     let context = LocalStore.shared.container.mainContext

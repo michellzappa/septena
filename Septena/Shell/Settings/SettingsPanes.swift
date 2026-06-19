@@ -1351,14 +1351,17 @@ struct QuickActionsSettingsPane: View {
   }
 
   private var availableEntries: [(manifest: SectionManifest, accent: Color)] {
-    let order = store.serverSettings?.sectionOrder ?? store.sections.map(\.key)
-    let configByKey = Dictionary(uniqueKeysWithValues: store.sections.map { ($0.key, $0) })
-    return order.compactMap { key -> (SectionManifest, Color)? in
-      guard let manifest = SectionManifest.byKey[key],
-            let config = configByKey[key],
-            config.isEnabled,
+    // Iterate `store.sections` — the canonical ordered+complete list from
+    // SettingsMirror.loadSections, which already ranks by `section_order` AND
+    // appends enabled sections that aren't in the order yet. Re-deriving from
+    // raw `serverSettings.sectionOrder` is the trap: it treats order as
+    // membership, so a section enabled but absent from a stale order silently
+    // vanishes here. `section_order` is ORDERING, never membership.
+    store.sections.compactMap { config -> (SectionManifest, Color)? in
+      guard config.isEnabled,
+            let manifest = SectionManifest.byKey[config.key],
             manifest.supportsDashboard,
-            WeekDestination(rawValue: key) != nil else { return nil }
+            WeekDestination(rawValue: config.key) != nil else { return nil }
       return (manifest, parseHexColor(config.color))
     }
   }
