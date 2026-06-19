@@ -42,6 +42,7 @@ interface TaskOut {
   area?: string;
   project?: string;
   completedAt?: string;
+  notes?: string;
   // Provenance + freshness cue — needed to compute the triage band (and to
   // keep "today" excluding unratified rows). See iOS SeptenaTask.isInTriageBand.
   source?: string;
@@ -94,6 +95,7 @@ export async function listTasks(
     area: optionalString(r.fields.area?.value),
     project: optionalString(r.fields.project?.value),
     completedAt: optionalString(r.fields.completedAt?.value),
+    notes: optionalString(r.fields.notesText?.value),
     source: optionalString(r.fields.source?.value),
     acknowledgedAt: optionalNumber(r.fields.acknowledgedAt?.value),
     createdAt: optionalNumber(r.fields.createdAt?.value),

@@ -85,6 +85,7 @@ export const createTaskJsonSchema = {
     deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
+    notes: { type: "string", description: "Free-text note body for the task." },
   },
 } as const;
 
@@ -106,6 +107,7 @@ export const updateTaskJsonSchema = {
     area: { type: ["string", "null"] },
     project: { type: ["string", "null"] },
     status: { type: "string", enum: ["open", "cancelled"] },
+    notes: { type: ["string", "null"], description: 'Free-text note body, or null/"" to clear' },
   },
 } as const;
 
@@ -130,6 +132,7 @@ export interface CreateTaskInput {
   due?: string;
   area?: string;
   project?: string;
+  notes?: string;
 }
 
 export interface UpdateTaskInput {
@@ -143,6 +146,7 @@ export interface UpdateTaskInput {
   area?: string | null;
   project?: string | null;
   status?: "open" | "cancelled";
+  notes?: string | null;
 }
 
 // ---- Implementations ----
@@ -164,6 +168,9 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   if (createDeadline) fields.deadline = { value: createDeadline };
   if (input.area) fields.area = { value: input.area };
   if (input.project) fields.project = { value: input.project };
+  // Plaintext field (Web Services can't see the encrypted `notes`; the app
+  // reads `notesText` first, same pattern as project notes).
+  if (input.notes) fields.notesText = { value: input.notes };
 
   // createWithFieldFallback drops unknown fields and retries, so this is safe
   // to ship before the CloudKit prod schema learns source/sourceClient/createdAt
@@ -239,6 +246,9 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
     updated.push("project");
   }
   if (input.status !== undefined) { fields.status = { value: input.status }; updated.push("status"); }
+  // notes → plaintext `notesText`; null/"" writes an empty string (clear),
+  // matching the in-app server's clear-on-empty semantics.
+  if (input.notes !== undefined) { fields.notesText = { value: input.notes ?? "" }; updated.push("notes"); }
 
   if (updated.length === 0) return { id: input.id, updated: [] };
 
@@ -428,6 +438,7 @@ export async function getTask(client: CloudKitClient, input: { id: string }) {
     project: optionalString(fields.project?.value),
     completedAt: optionalString(fields.completedAt?.value),
     source: optionalString(fields.source?.value),
+    notes: optionalString(fields.notesText?.value),
     convo: {
       confirmedIntent: convo.confirmedIntent,
       acceptance: convo.acceptance,
