@@ -1,41 +1,8 @@
 import WidgetKit
 import SwiftUI
 
-// MARK: - Macro styling (key → label / unit / color)
-
-/// Per-macro presentation, derived from the wire `key` so the snapshot stays
-/// tiny. Order and colors mirror the Apple Activity rings' "one ring per goal"
-/// idea: distinct, high-contrast hues that survive the accessory tint.
-enum MacroStyle {
-  /// Canonical outermost→innermost order. The complication renders rings in this
-  /// order and slices the first three for the small circular family.
-  static let order = ["kcal", "protein", "carbs", "fat", "fiber"]
-
-  static func color(_ key: String) -> Color {
-    // Deliberately off Apple's Activity-ring triad (red / green / cyan): an
-    // orange-anchored, green-free palette so the macro rings never read as the
-    // Move/Exercise/Stand rings on the same face.
-    switch key {
-    case "kcal":    return .indigo
-    case "protein": return .pink
-    case "carbs":   return .blue
-    case "fat":     return .yellow
-    case "fiber":   return .purple
-    default:        return .gray
-    }
-  }
-
-  /// One-letter chip label for the cramped rectangular legend.
-  static func chip(_ key: String) -> String {
-    switch key {
-    case "protein": return "P"
-    case "carbs":   return "C"
-    case "fat":     return "F"
-    case "fiber":   return "Fi"
-    default:        return key.prefix(1).uppercased()
-    }
-  }
-}
+// Macro per-key styling (order / color / chip / label / unit) lives in the
+// shared `RingStyles.swift` so the complication and the in-app detail page agree.
 
 // MARK: - Family router
 
@@ -61,6 +28,9 @@ struct MacroComplicationView: View {
         family == .accessoryCircular ? AnyView(AccessoryWidgetBackground())
                                      : AnyView(Color.clear)
       }
+      // Tap target: open the watch app's macro detail page (handled by
+      // `NextWatchView.onOpenURL`).
+      .widgetURL(URL(string: "septena://nutrition"))
   }
 
   @ViewBuilder

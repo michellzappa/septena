@@ -4,13 +4,22 @@ struct NextWatchView: View {
   @State private var conn = WatchConnectivity.shared
   @State private var quickLogItem: NextItem?
   @State private var capturing = false
+  /// The push stack — set by the foot-of-feed summary links and by the macro /
+  /// training complication deep links (`onOpenURL`).
+  @State private var path: [WatchPage] = []
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
-    NavigationStack {
+    NavigationStack(path: $path) {
       content
         .navigationTitle(conn.bucket.isEmpty ? "Next" : DayBucket.label(forKey: conn.bucket))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: WatchPage.self) { page in
+          switch page {
+          case .nutrition: NutritionDetailView(conn: conn)
+          case .training:  TrainingDetailView(conn: conn)
+          }
+        }
         .toolbar {
           // Capture a loggable (intake / mood) on demand, not just
           // when its suggestion happens to lead the feed.
@@ -26,6 +35,16 @@ struct NextWatchView: View {
     }
     .sheet(isPresented: $capturing) {
       CaptureSheet(conn: conn) { capturing = false }
+    }
+    // Complication tap targets: the macro / training rings carry a `widgetURL`,
+    // which the system delivers here. Route it to the matching summary page.
+    .onOpenURL { url in
+      guard url.scheme == "septena" else { return }
+      switch url.host {
+      case "nutrition": path = [.nutrition]
+      case "training":  path = [.training]
+      default:          break
+      }
     }
     .task { conn.fetchNext() }
     .onChange(of: scenePhase) { _, phase in
@@ -67,12 +86,20 @@ struct NextWatchView: View {
       }
       .padding()
     } else if conn.items.isEmpty {
-      VStack(spacing: 6) {
-        Image(systemName: "checkmark.circle.fill")
-          .font(.title2)
-          .foregroundStyle(.green)
-        Text("All done")
-          .foregroundStyle(.secondary)
+      // Nothing left to do — still surface the summary pages so the macro /
+      // training rings stay reachable in-app when the feed is clear.
+      if hasNutrition || hasTraining {
+        List {
+          allDoneHero
+            .frame(maxWidth: .infinity)
+            .listRowInsets(EdgeInsets(top: 14, leading: 6, bottom: 8, trailing: 6))
+            .listRowBackground(Color.clear)
+          summaryLinkRows
+        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 0)
+      } else {
+        allDoneHero
       }
     } else {
       List {
@@ -90,11 +117,63 @@ struct NextWatchView: View {
                       onQuickLog: { quickLogItem = item })
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
+        summaryLinkRows
       }
       .listStyle(.plain)
       .environment(\.defaultMinListRowHeight, 0)
       .animation(.default, value: conn.items)
     }
+  }
+
+  private var allDoneHero: some View {
+    VStack(spacing: 6) {
+      Image(systemName: "checkmark.circle.fill")
+        .font(.title2)
+        .foregroundStyle(.green)
+      Text("All done")
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private var hasNutrition: Bool { !conn.nutritionRings.isEmpty }
+  private var hasTraining: Bool { !conn.trainingRings.isEmpty }
+
+  /// Foot-of-feed links to the macro / training summary pages — the same pages
+  /// the complications open. Shown only for sections the snapshot has data for,
+  /// under a quiet header so they read as a footer, not another task group.
+  @ViewBuilder
+  private var summaryLinkRows: some View {
+    if hasNutrition || hasTraining {
+      Text("Summaries")
+        .font(.caption2)
+        .fontWeight(.semibold)
+        .foregroundStyle(.secondary)
+        .listRowInsets(EdgeInsets(top: 10, leading: 6, bottom: 2, trailing: 6))
+        .listRowBackground(Color.clear)
+      if hasNutrition {
+        summaryLink(.nutrition, title: "Macros", systemImage: "fork.knife",
+                    color: WatchSectionTint.color(forSectionKey: "nutrition", colors: conn.sectionColors))
+      }
+      if hasTraining {
+        summaryLink(.training, title: "Training", systemImage: "figure.strengthtraining.traditional",
+                    color: WatchSectionTint.color(forSectionKey: "training", colors: conn.sectionColors))
+      }
+    }
+  }
+
+  private func summaryLink(_ page: WatchPage, title: String,
+                           systemImage: String, color: Color) -> some View {
+    NavigationLink(value: page) {
+      HStack(spacing: 9) {
+        Image(systemName: systemImage)
+          .font(.body)
+          .foregroundStyle(color)
+          .frame(width: 18)
+        Text(title).font(.body)
+        Spacer(minLength: 0)
+      }
+    }
+    .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
   }
 
   /// A group header in its own (separator-free) list row: a 2pt rule in the

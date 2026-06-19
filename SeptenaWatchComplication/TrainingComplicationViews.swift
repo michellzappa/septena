@@ -1,43 +1,8 @@
 import WidgetKit
 import SwiftUI
 
-// MARK: - Training styling (key → label / unit / color)
-
-/// Per-metric presentation for the training rings, derived from the wire `key`.
-/// Distinct hues from the macro complication so the two faces read differently.
-enum TrainingStyle {
-  /// Outer→inner order.
-  static let order = ["strength", "cardio", "sessions"]
-
-  static func color(_ key: String) -> Color {
-    switch key {
-    case "strength": return .orange
-    case "cardio":   return .green
-    case "sessions": return .blue
-    default:         return .gray
-    }
-  }
-
-  /// Full legend label.
-  static func label(_ key: String) -> String {
-    switch key {
-    case "strength": return "Strength"
-    case "cardio":   return "Cardio"
-    case "sessions": return "Sessions"
-    default:         return key.capitalized
-    }
-  }
-
-  /// Compact unit suffix for the rectangular legend.
-  static func unit(_ key: String) -> String {
-    switch key {
-    case "strength": return "sets"
-    case "cardio":   return "min"
-    case "sessions": return "sess"
-    default:         return ""
-    }
-  }
-}
+// Training per-key styling (order / color / label / unit) lives in the shared
+// `RingStyles.swift` so the complication and the in-app detail page agree.
 
 // MARK: - Family router
 
@@ -61,6 +26,9 @@ struct TrainingComplicationView: View {
         family == .accessoryCircular ? AnyView(AccessoryWidgetBackground())
                                      : AnyView(Color.clear)
       }
+      // Tap target: open the watch app's training detail page (handled by
+      // `NextWatchView.onOpenURL`).
+      .widgetURL(URL(string: "septena://training"))
   }
 
   @ViewBuilder

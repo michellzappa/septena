@@ -37,6 +37,12 @@ final class WatchConnectivity {
   var medications: [MedicationWire] = []
   var symptoms: [SymptomWire] = []
   var groceries: [GroceryWire] = []
+  /// Today's macro rings and this week's training rings from the snapshot, held
+  /// so the in-app detail pages (the complications' tap targets) render the same
+  /// phone-computed values the complications show. Empty until the first fetch /
+  /// when the section is disabled.
+  var nutritionRings: [ComplicationRing] = []
+  var trainingRings: [ComplicationRing] = []
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -685,6 +691,7 @@ final class WatchConnectivity {
     let rings = (wire?.rings ?? []).map {
       ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
+    nutritionRings = rings   // held for the in-app detail page (complication tap target)
     MacroComplicationData(rings: rings, updatedAt: Date()).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaMacroRings")
   }
@@ -696,6 +703,7 @@ final class WatchConnectivity {
     let rings = (wire?.rings ?? []).map {
       ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
+    trainingRings = rings   // held for the in-app detail page (complication tap target)
     TrainingComplicationData(rings: rings, updatedAt: Date()).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaTraining")
   }
