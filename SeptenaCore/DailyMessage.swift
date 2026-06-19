@@ -39,6 +39,21 @@ public struct DailyMessage: Hashable, Sendable, Identifiable {
     self.attribution = attribution
     self.source = source
   }
+
+  /// The primary credit line — the author, or the sole source when that's all we
+  /// have. Readwise lines pack `"author\ntitle"`; packs and the user's own
+  /// quotes are a single line, so this returns the whole attribution for them.
+  public var attributionLead: String {
+    attribution.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+      .first.map(String.init) ?? attribution
+  }
+
+  /// The secondary credit line — the book / article title — shown beneath the
+  /// author when a source carries both. Empty for single-line attributions.
+  public var attributionDetail: String {
+    let parts = attribution.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+    return parts.count > 1 ? String(parts[1]) : ""
+  }
 }
 
 // MARK: - Preset packs
@@ -181,7 +196,7 @@ public final class QuoteEntity {
 }
 
 /// A highlight pulled from an external source (Readwise), pre-mapped to the
-/// fields `QuoteStore.upsertReadwise` writes.
+/// fields `QuoteStore.reconcileReadwise` writes.
 public struct ImportedQuote: Sendable, Hashable {
   /// Stable source id — becomes `readwise:<sourceID>`.
   public let sourceID: String
@@ -268,36 +283,26 @@ public final class QuoteStore {
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
   }
 
-  /// Delete the CloudKit copies of imported Readwise highlights WITHOUT removing
-  /// the local rows — cleans up `quote:readwise:*` records a pre-change build
-  /// pushed to iCloud so other devices never fetch (and choke on) them. The
-  /// highlights stay on this device. Deletions are cheap on the sync engine (no
-  /// per-record body to build), so this is safe even for thousands. Awaits the
-  /// push so the caller can report a result. Returns the number enqueued.
-  @discardableResult
-  public func purgeReadwiseFromCloud() async -> Int {
-    guard let ckEngine else { return 0 }
-    let ids = all(origin: "readwise").map(\.id)
-    guard !ids.isEmpty else { return 0 }
-    ckEngine.noteQuoteDeletions(ids: ids)
-    try? await ckEngine.sendChanges()
-    return ids.count
-  }
-
-  /// Idempotently upsert a batch of imported highlights. Unchanged rows earn
-  /// no save and no CloudKit push. One fetch of the existing rows up front — a
-  /// per-quote `fetch(predicate: id == …)` was O(n) queries on the main thread
-  /// and the cause of the freeze on a multi-thousand-highlight library.
-  public func upsertReadwise(_ quotes: [ImportedQuote]) {
-    guard !quotes.isEmpty else { return }
+  /// Idempotently make the stored Readwise rows match `quotes` exactly: upsert
+  /// the highlights passed in and PRUNE any imported row not in the set. The
+  /// prune is what lets "Choose books" work — deselecting a book (or deleting a
+  /// highlight in Readwise) drops its lines on the next sync, because the caller
+  /// only ever fetches the selected books so `quotes` is the complete desired
+  /// set. Unchanged rows earn no save. One fetch of the existing rows up front —
+  /// a per-quote `fetch(predicate: id == …)` was O(n) queries on the main thread
+  /// and the cause of the freeze on a multi-thousand-highlight library. Wholly
+  /// device-local: no CloudKit enqueue for the readwise rows (see `save`).
+  public func reconcileReadwise(_ quotes: [ImportedQuote]) {
     // Index existing Readwise rows by id in a single fetch, then diff in memory.
     let existing = Dictionary(all(origin: "readwise").map { ($0.id, $0) },
                               uniquingKeysWith: { first, _ in first })
+    var desired = Set<String>()
     var touched: [String] = []
     for q in quotes {
       let t = q.text.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !t.isEmpty else { continue }
       let id = "readwise:\(q.sourceID)"
+      desired.insert(id)
       if let entity = existing[id] {
         if entity.update(text: t, attribution: q.attribution) { touched.append(id) }
       } else {
@@ -306,7 +311,15 @@ public final class QuoteStore {
         touched.append(id)
       }
     }
-    guard !touched.isEmpty else { return }
+    // Drop imported rows the user no longer wants (deselected book / removed
+    // highlight). Readwise rows are device-local, so deletion is a plain
+    // context.delete — no CloudKit deletion to enqueue.
+    var pruned = false
+    for (id, entity) in existing where !desired.contains(id) {
+      context.delete(entity)
+      pruned = true
+    }
+    guard pruned || !touched.isEmpty else { return }
     save(touching: touched)
   }
 
@@ -338,8 +351,13 @@ extension Notification.Name {
 /// same part of the day shows the same line; it rotates at each day-bucket
 /// boundary and re-seeds each day.
 public enum DailyMessageSelector {
-  /// Assemble the candidate pool from the enabled preset packs plus the
-  /// stored user + Readwise lines.
+  /// Assemble the candidate pool from the enabled preset packs plus the stored
+  /// user + Readwise lines, then de-cluster it by author (see `interleaved`).
+  /// Raw, the pool is grouped source-by-source — every highlight of one book in
+  /// a run, every Marcus Aurelius line in a row — so the day-anchor lands in a
+  /// cluster and tapping for another line walks straight through the rest of it.
+  /// Interleaving spreads authors out so consecutive lines come from different
+  /// sources.
   public static func pool(packs: Set<QuotePack>,
                           stored: [DailyMessage]) -> [DailyMessage] {
     var out: [DailyMessage] = []
@@ -347,18 +365,57 @@ public enum DailyMessageSelector {
       out.append(contentsOf: pack.messages)
     }
     out.append(contentsOf: stored)
-    return out
+    return interleaved(out)
+  }
+
+  /// Round-robin the messages across authors (keyed by `attributionLead`) so
+  /// adjacent entries come from different sources. Deterministic — group order
+  /// is first-appearance, order within a group is preserved — so the (day, slot)
+  /// anchor stays stable across launches. Clustering only returns at the tail,
+  /// once every other author is exhausted and a single dominant source remains.
+  static func interleaved(_ messages: [DailyMessage]) -> [DailyMessage] {
+    guard messages.count > 2 else { return messages }
+    var order: [String] = []
+    var groups: [String: [DailyMessage]] = [:]
+    for m in messages {
+      let key = m.attributionLead
+      if groups[key] == nil { order.append(key) }
+      groups[key, default: []].append(m)
+    }
+    guard order.count > 1 else { return messages }  // single author: nothing to spread
+    var result: [DailyMessage] = []
+    result.reserveCapacity(messages.count)
+    var rank = 0
+    var added = true
+    while added {
+      added = false
+      for key in order {
+        if let group = groups[key], rank < group.count {
+          result.append(group[rank])
+          added = true
+        }
+      }
+      rank += 1
+    }
+    return result
   }
 
   /// Deterministically pick one message. `day` is the `yyyy-MM-dd` string and
-  /// `slot` is the day-bucket order (0…2). Uses a stable FNV-1a hash — Swift's
-  /// `Hasher` is per-process-randomized, so it can't be used for a choice that
-  /// must survive relaunch within a day.
+  /// `slot` is the day-bucket order (0…2).
   public static func pick(from pool: [DailyMessage], day: String, slot: Int) -> DailyMessage? {
-    guard !pool.isEmpty else { return nil }
-    let seed = "\(day)|\(slot)"
-    let index = Int(fnv1a(seed) % UInt64(pool.count))
+    guard let index = index(count: pool.count, day: day, slot: slot) else { return nil }
     return pool[index]
+  }
+
+  /// The deterministic base index into a pool of `count` for a (day, slot)
+  /// seed. Uses a stable FNV-1a hash — Swift's `Hasher` is per-process-
+  /// randomized, so it can't anchor a choice that must survive relaunch within
+  /// a day. Returns nil for an empty pool. Exposed so the footer can walk
+  /// forward from this anchor when the user taps for another line.
+  public static func index(count: Int, day: String, slot: Int) -> Int? {
+    guard count > 0 else { return nil }
+    let seed = "\(day)|\(slot)"
+    return Int(fnv1a(seed) % UInt64(count))
   }
 
   private static func fnv1a(_ string: String) -> UInt64 {

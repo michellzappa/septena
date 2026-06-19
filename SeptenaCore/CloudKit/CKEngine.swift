@@ -339,7 +339,7 @@ func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessag
     let stale = engine.state.pendingRecordZoneChanges.filter { change in
       switch change {
       // Only drop SAVES — those are the flood. DELETIONS are intentional cleanup
-      // (`purgeReadwiseFromCloud`) and must survive a relaunch to finish.
+      // a prior build may have enqueued and must survive a relaunch to finish.
       case .saveRecord(let id): return id.recordName.hasPrefix(prefix)
       default: return false
       }

@@ -85,8 +85,6 @@ struct ReadwiseConnectView: View {
   @State private var tokenInput = ""
   @State private var statusMessage: String?
   @State private var isError = false
-  @State private var isPurging = false
-  @State private var purgeStatus: String?
 
   var body: some View {
     Form {
@@ -156,23 +154,28 @@ struct ReadwiseConnectView: View {
     }
 
     Section {
-      Button("Remove highlights from iCloud") { purgeCloud() }
-        .disabled(provider.isSyncing || isPurging)
-      if isPurging {
-        Text("Removing…").font(.caption).foregroundStyle(.secondary)
-      } else if let purgeStatus {
-        Text(purgeStatus).font(.caption).foregroundStyle(.secondary)
+      NavigationLink {
+        ReadwiseBookPickerView()
+      } label: {
+        LabeledContent("Choose books", value: booksSummary)
       }
+      .disabled(provider.isSyncing)
     } footer: {
-      Text("An earlier version uploaded highlights to iCloud. This deletes those copies so your other devices don't download them — your highlights stay on this device.")
+      Text("Pick which books and articles feed the rotation. With \u{201C}All books\u{201D} on, new ones you add to Readwise are included automatically.")
     }
 
     Section {
       Button("Disconnect", role: .destructive) { disconnect() }
-        .disabled(provider.isSyncing || isPurging)
+        .disabled(provider.isSyncing)
     } footer: {
       Text("Removes the token and the imported highlights from the rotation. Your own quotes are untouched.")
     }
+  }
+
+  private var booksSummary: String {
+    guard let ids = provider.selectedBookIDs else { return "All books" }
+    if ids.isEmpty { return "None" }
+    return ids.count == 1 ? "1 book" : "\(ids.count) books"
   }
 
   private func connect() {
@@ -211,20 +214,128 @@ struct ReadwiseConnectView: View {
     }
   }
 
-  private func purgeCloud() {
-    purgeStatus = nil
-    isPurging = true
-    Task {
-      let n = await QuoteStore.shared.purgeReadwiseFromCloud()
-      isPurging = false
-      purgeStatus = n == 0 ? "Nothing to remove." : "Removed \(n) from iCloud."
-    }
-  }
-
   private func disconnect() {
     provider.clearToken()
     QuoteStore.shared.deleteAllReadwise()
     statusMessage = nil
     isError = false
+  }
+}
+
+// MARK: - Readwise book picker
+
+/// Lets the user narrow which Readwise sources feed the rotation. Edits the
+/// provider's `selectedBookIDs` and re-syncs on dismiss so the highlight set
+/// (and the parent's count) reflects the choice. Selection is device-local —
+/// same as the rest of the Readwise integration.
+struct ReadwiseBookPickerView: View {
+  private var provider: ReadwiseProvider { ReadwiseProvider.shared }
+
+  @State private var books: [ReadwiseBook] = []
+  @State private var isLoading = true
+  @State private var loadError: String?
+  @State private var importAll = true
+  @State private var selected: Set<Int> = []
+  @State private var dirty = false
+
+  var body: some View {
+    Form {
+      if isLoading {
+        Section {
+          HStack(spacing: 8) {
+            ProgressView()
+            Text("Loading your library…").foregroundStyle(.secondary)
+          }
+        }
+      } else if let loadError {
+        Section {
+          Text(loadError).foregroundStyle(.red)
+          Button("Try again") { Task { await load() } }
+        }
+      } else {
+        Section {
+          Toggle("All books", isOn: $importAll)
+            .onChange(of: importAll) { _, on in
+              dirty = true
+              if on { selected = Set(books.map(\.id)) }
+            }
+        } footer: {
+          Text("When on, every book and article is included — and anything new you add to Readwise joins automatically.")
+        }
+
+        if !importAll {
+          Section {
+            ForEach(books) { book in
+              Button { toggle(book.id) } label: {
+                HStack(alignment: .firstTextBaseline) {
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text(book.title).foregroundStyle(.primary)
+                    Text(subtitle(book)).font(.caption).foregroundStyle(.secondary)
+                  }
+                  Spacer(minLength: 12)
+                  if selected.contains(book.id) {
+                    Image(systemName: "checkmark").foregroundStyle(.tint)
+                  }
+                }
+                .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
+            }
+          } header: {
+            HStack {
+              Text("\(selected.count) of \(books.count) selected")
+              Spacer()
+              Button(selected.count == books.count ? "Deselect all" : "Select all") {
+                dirty = true
+                selected = selected.count == books.count ? [] : Set(books.map(\.id))
+              }
+            }
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Choose books")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+    .task { await load() }
+    .onDisappear { persistAndSync() }
+  }
+
+  private func subtitle(_ book: ReadwiseBook) -> String {
+    let count = book.numHighlights == 1 ? "1 highlight" : "\(book.numHighlights) highlights"
+    return book.author.isEmpty ? count : "\(book.author) · \(count)"
+  }
+
+  private func toggle(_ id: Int) {
+    dirty = true
+    if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
+  }
+
+  private func load() async {
+    isLoading = true
+    loadError = nil
+    do {
+      let fetched = try await provider.fetchBooks()
+      books = fetched
+      if let stored = provider.selectedBookIDs {
+        importAll = false
+        // Keep only ids that still exist in the library.
+        selected = stored.intersection(Set(fetched.map(\.id)))
+      } else {
+        importAll = true
+        selected = Set(fetched.map(\.id))
+      }
+    } catch {
+      loadError = "Couldn't load your library. \(provider.lastSyncError ?? "Check your connection and try again.")"
+    }
+    isLoading = false
+  }
+
+  private func persistAndSync() {
+    guard dirty else { return }
+    provider.setSelectedBookIDs(importAll ? nil : selected)
+    Task { try? await provider.sync() }
   }
 }
