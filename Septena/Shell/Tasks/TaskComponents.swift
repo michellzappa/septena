@@ -347,6 +347,22 @@ struct AgentCueMarker: View {
   }
 }
 
+/// Trailing cue for a row that *arrived in Today on its own* — a future-dated
+/// plan whose day came, so it surfaced at the rollover rather than being added
+/// by hand today (see `SeptenaTask.showsArrivedToday`). Same dot family as
+/// `AgentCueMarker`/`ConvoBadgeView` so they read as one system, but drawn
+/// hollow (`circle`) to say "newly here" rather than the agent cue's filled
+/// "unseen by you". Calm and peripheral; it self-clears at the next rollover.
+struct ArrivedTodayMarker: View {
+  var tint: Color
+  var body: some View {
+    Image(systemName: "circle")
+      .font(.caption2)
+      .foregroundStyle(tint)
+      .accessibilityLabel(Text("Arrived in Today"))
+  }
+}
+
 // MARK: - Checkable row primitive
 //
 // The shared skeleton behind every row with a checkbox — tasks, habits,
@@ -538,17 +554,20 @@ struct TaskRow: View {
     trailingDate
   }
 
-  /// The single trailing agent-signal dot. A live conversation's status badge
-  /// wins; absent that, the calm "unseen" cue for a Claude-created row the user
-  /// hasn't engaged yet. Mutually exclusive — the row never shows two dots, and
-  /// the cue now rides the same right edge as every other row glyph (it used to
-  /// sit alone on the leading edge). The `hasStarted && badge != nil` guard
-  /// mirrors `ConvoBadgeView`'s own, so when it wins the badge always renders.
+  /// The single trailing signal dot, in priority order: a live conversation's
+  /// status badge wins; absent that, the calm "unseen" cue for a Claude-created
+  /// row the user hasn't engaged yet; absent that, the "arrived in Today on its
+  /// own" cue for a future-dated plan whose day just came. Mutually exclusive —
+  /// the row never shows two dots, and the cue rides the same right edge as
+  /// every other row glyph. The `hasStarted && badge != nil` guard mirrors
+  /// `ConvoBadgeView`'s own, so when it wins the badge always renders.
   @ViewBuilder private var agentSignal: some View {
     if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil {
       ConvoBadgeView(convo: task.conversation)
     } else if task.showsAgentCue() {
       AgentCueMarker(tint: accent)
+    } else if task.showsArrivedToday() {
+      ArrivedTodayMarker(tint: accent)
     }
   }
 

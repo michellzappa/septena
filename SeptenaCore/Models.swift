@@ -98,6 +98,21 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return now.timeIntervalSince(createdAt) < AgentCue.decayWindow
   }
 
+  /// True while this row arrived in Today *on its own* — its scheduled ("When")
+  /// or deadline date is today and it was created on an earlier day, so it
+  /// surfaced at the day rollover rather than being captured by hand today. A
+  /// quiet "this landed this morning" cue (Things-style), distinct from the
+  /// agent cue. Self-clearing with NO stored state: tomorrow the date no longer
+  /// equals today, so it evaporates on its own — no field, no migration, no
+  /// CloudKit deploy. Agent rows are excluded; they carry their own cue and the
+  /// row never shows two dots.
+  func showsArrivedToday() -> Bool {
+    guard status == .open, source != TaskSource.mcp,
+          let created, created < SeptenaDate.today else { return false }
+    let today = SeptenaDate.today
+    return scheduled == today || deadline == today
+  }
+
   /// Canonical "overdue" test — Things-style: ONLY a hard `deadline` can make
   /// a task overdue. A scheduled ("When") date in the past is just a plan that
   /// rolled into Today; it never turns red. A deadline of *today or earlier*
