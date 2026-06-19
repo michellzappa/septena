@@ -175,10 +175,14 @@ enum DrawerMode: String, Hashable {
   case log, patterns
 
   /// The per-section remembered mode, or `fallback` if the user never toggled.
+  ///
+  /// FORCED to `fallback` for now: every drawer should open in Log regardless of
+  /// any previously-toggled choice (the default is `.log` everywhere). The toggle
+  /// still flips the mode for the current visit and `remember(for:)` still writes
+  /// the stored value, so re-enabling persistence is a one-line revert — just
+  /// restore the UserDefaults read below.
   static func remembered(for sectionKey: String, default fallback: DrawerMode) -> DrawerMode {
-    guard let raw = UserDefaults.standard.string(forKey: storageKey(sectionKey)),
-          let mode = DrawerMode(rawValue: raw) else { return fallback }
-    return mode
+    return fallback
   }
 
   /// Persist this mode as the section's remembered choice.
@@ -195,15 +199,17 @@ enum DrawerMode: String, Hashable {
   /// sticks. Call from a section's reload once data has loaded; `didNudge` guards
   /// it to a single fire per appearance. Centralized here so every section that
   /// wants it shares the exact same rule.
+  ///
+  /// DISABLED for now: drawers should always start in Log — opening into Patterns
+  /// just because today's log is empty proved more confusing than helpful. The
+  /// call sites stay wired (and `didNudge` still consumes) so this is a one-line
+  /// revert if we want the nudge back; the default mode is `.log` everywhere, so
+  /// short-circuiting here means every section reliably lands on the log.
   static func nudgeEmptyDayToPatterns(mode: Binding<DrawerMode>,
                                       didNudge: Binding<Bool>,
                                       isViewingToday: Bool,
                                       isEmpty: Bool) {
-    guard !didNudge.wrappedValue else { return }
     didNudge.wrappedValue = true
-    if mode.wrappedValue == .log, isViewingToday, isEmpty {
-      withAnimation(.snappy) { mode.wrappedValue = .patterns }
-    }
   }
 }
 
