@@ -292,6 +292,7 @@ enum MCPDispatch {
     if let v = e.project { out["project"] = v }
     if let v = e.completedAt { out["completedAt"] = v }
     if let v = e.source { out["source"] = v }
+    if let v = e.notes { out["notes"] = v }
     let c = e.conversation
     var convo: [String: Any] = [
       "turns": c.thread.count,
@@ -320,6 +321,7 @@ enum MCPDispatch {
       scheduled: try args.date("scheduled"),
       deadline: try args.date("deadline") ?? args.date("due"),
       today: args.bool("today") ?? false,
+      notes: args.string("notes"),
       source: TaskSource.mcp)
     return ["id": t.id, "title": t.title]
   }
@@ -368,6 +370,12 @@ enum MCPDispatch {
       m.moveToProject(id: id, project: args.string("project")); updated.append("project")
     }
     if args.string("status") == "cancelled" { m.cancel(id: id); updated.append("status") }
+    // notes: present with a value sets it; present-but-null/empty clears it
+    // (the backend treats "" as clear, nil as unchanged); absent = untouched.
+    if args.present("notes") {
+      m.update(id: id, notes: args.string("notes") ?? "")
+      updated.append("notes")
+    }
     return ["id": id, "updated": updated]
   }
 
@@ -520,6 +528,7 @@ enum MCPDispatch {
     if let a = t.area { out["area"] = a }
     if let p = t.project { out["project"] = p }
     if let c = t.completedAt { out["completedAt"] = c }
+    if let n = t.notes { out["notes"] = n }
     return out
   }
 
