@@ -561,14 +561,20 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
           const order = Array.isArray(settings.section_order)
             ? (settings.section_order as unknown[]).filter((v): v is string => typeof v === "string")
             : [];
-          // Order-aware filter: only keys both ordered and enabled. If no
-          // sections exist yet (brand-new user before iOS seeds), [] →
-          // buildToolList exposes globals only, never every section's tools.
+          // `section_order` defines ORDERING, not membership. A section that
+          // is enabled but absent from a stale order (e.g. a newly shipped
+          // section like `symptoms`/`medications` enabled after the user last
+          // saved an order) must STILL surface its tools — enablement is the
+          // gate. Mirrors the in-app `SeptenaServices.enabledSectionKeys()`,
+          // which made the same fix. So: take enabled keys in saved order,
+          // then append any enabled-but-unordered keys. Brand-new user with no
+          // sections yet → [] so buildToolList exposes globals only.
           filtered = sections.length === 0
             ? []
-            : order.length > 0
-              ? order.filter(k => enabledKeys.has(k))
-              : Array.from(enabledKeys);
+            : [
+                ...order.filter(k => enabledKeys.has(k)),
+                ...Array.from(enabledKeys).filter(k => !order.includes(k)),
+              ];
           // Cache the freshly-computed manifest so a later auth-expired
           // tools/list can serve it instead of hard-401'ing (see catch).
           if (userRecordName) {
