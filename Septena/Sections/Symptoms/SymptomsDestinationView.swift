@@ -162,13 +162,13 @@ struct SymptomsDestinationView: View {
     }
   }
 
-  /// Trailing-7-day timing wheel — when symptoms tend to strike. The shared
+  /// Trailing-30-day timing wheel — when symptoms tend to strike. The shared
   /// `TimeOfDayWheel` filters to its window, so passing every event is fine.
   private var wheelEvents: [TimeOfDayWheel.Event] {
     let todayStart = Calendar.current.startOfDay(for: Date())
     return events.compactMap {
       TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.occurredAt,
-                           todayStart: todayStart, windowDays: 7)
+                           todayStart: todayStart, windowDays: 30)
     }
   }
 
@@ -182,7 +182,8 @@ struct SymptomsDestinationView: View {
     let wheel = wheelEvents
     if wheel.count >= 3 {
       DrawerSection("When symptoms occur", padding: .tight) {
-        TimeOfDayWheel(events: wheel, accent: accent, windowDays: 7, nowFraction: nowFraction)
+        TimeOfDayWheel(events: wheel, accent: accent, windowDays: 30,
+                       nowFraction: nowFraction, aggregate: true)
           .frame(maxWidth: .infinity)
       }
     }

@@ -74,6 +74,13 @@ struct TimeOfDayWheel: View {
   /// isn't an interactive control). Ticks stay as a faint frame so the angles
   /// still read.
   var compact: Bool = false
+  /// Section "Patterns" treatment: the dial always shows the full `windowDays`
+  /// aggregate — no today⇄week tap, since the aggregate IS the point of a
+  /// pattern dial — and the flat face renders as a DONUT (open center) rather
+  /// than a solid disc with a hub, so it reads as one ring of data instead of a
+  /// circle stacked on a circle. The window label sits in the hollow. Non-hero,
+  /// non-compact section dials only (the homepage dial keeps its tap toggle).
+  var aggregate: Bool = false
   /// Hero treatment (`DayDialHero`): set to the day being shown. Replaces
   /// the center scope chip with the date while focused on today (a clock
   /// face shows its day); the week overlay keeps the "7 days" chip so that
@@ -160,6 +167,12 @@ struct TimeOfDayWheel: View {
   /// definition shared by the `AnnulusShape` glass mask and the Canvas (the
   /// now-hand starts at this edge; the date floats in the hollow).
   static let heroHoleFraction: CGFloat = 0.42
+
+  /// The flat section donut's hole (`aggregate` dials), as a fraction of the
+  /// disc radius — a touch smaller than the hero's so the 24-hour ring still
+  /// dominates. Shared by the face mask, the now-hand start, and the centre
+  /// window label.
+  static let sectionHoleFraction: CGFloat = 0.40
 
   /// The dark tone the night arc wears behind the glass — a soft slate-indigo
   /// (lighter than a true night so the frosted glass stays gentle). Tune this
@@ -275,9 +288,13 @@ struct TimeOfDayWheel: View {
   @AppStorage(Self.windowDefaultsKey) private var todayOnly = true
 
   /// The resolved focus: a locked dial (the hero) is always single-day;
-  /// compact tiles always show the full week (the overlay *is* the point of a
-  /// thumbnail); the full dial honors the tap toggle.
-  private var focusToday: Bool { lockToday ? true : (compact ? false : todayOnly) }
+  /// compact tiles and aggregate section dials always show the full window (the
+  /// overlay *is* the point); the plain full dial honors the tap toggle.
+  private var focusToday: Bool {
+    if lockToday { return true }
+    if compact || aggregate { return false }
+    return todayOnly
+  }
   /// Outer margin for the labels/disc — collapses in compact so the dial fills
   /// its tile.
   private var margin: CGFloat { compact ? 5 : Self.fullMargin }
@@ -364,11 +381,23 @@ struct TimeOfDayWheel: View {
       // Both faces land their edge exactly on the tick ring (20pt inset =
       // the Canvas `ringR` margin). Compact draws no face at all.
       if !compact && heroDate == nil {
-        Circle()
-          .fill(Theme.cardSurface)
-          .overlay(Circle().strokeBorder(Theme.inkSecondary.opacity(0.18), lineWidth: 1.5))
-          .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
-          .padding(20)
+        if aggregate {
+          // Aggregate section dial: a flat DONUT (open center) so the 24-hour
+          // ring of dots reads as one band, not a disc stacked on the card's
+          // disc. Same surface/stroke/shadow as the solid dial — just hollow.
+          let donut = AnnulusShape(holeFraction: Self.sectionHoleFraction)
+          donut
+            .fill(Theme.cardSurface)
+            .overlay(donut.stroke(Theme.inkSecondary.opacity(0.18), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
+            .padding(20)
+        } else {
+          Circle()
+            .fill(Theme.cardSurface)
+            .overlay(Circle().strokeBorder(Theme.inkSecondary.opacity(0.18), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.07), radius: 5, y: 2)
+            .padding(20)
+        }
       }
 
       // The hero's face is the REAL Liquid Glass donut, drawn BELOW the
@@ -531,9 +560,16 @@ struct TimeOfDayWheel: View {
       // legible when the tint goes pale at midday. Flat-disc dials keep the
       // plain accent hairline from center, capped by the hub disc.
       if let nowFraction {
-        let handStart = heroDate != nil
-          ? point(nowFraction, ringR * Self.heroHoleFraction)
-          : center
+        // Start at the open center's edge on any donut face (hero glass or flat
+        // aggregate); flat solid dials run the hand from the very center.
+        let handStart: CGPoint
+        if heroDate != nil {
+          handStart = point(nowFraction, ringR * Self.heroHoleFraction)
+        } else if aggregate {
+          handStart = point(nowFraction, ringR * Self.sectionHoleFraction)
+        } else {
+          handStart = center
+        }
         let tip = point(nowFraction, ringR - 2)
         var hand = Path()
         hand.move(to: handStart)
@@ -566,15 +602,23 @@ struct TimeOfDayWheel: View {
       // dial spins (drawing it in the rotating Canvas made it whirl). Compact
       // thumbnails: nothing.
       if !compact && heroDate == nil {
-        let hubR: CGFloat = 30
-        let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
-                         width: hubR * 2, height: hubR * 2)
-        ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
-        ctx.stroke(Path(ellipseIn: hub),
-                   with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
-        let scope = todayOnly ? "Today" : "\(windowDays) days"
-        ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
-                 at: center)
+        if aggregate {
+          // The donut's hole is the hub — no disc, just the window label
+          // floating in the hollow (the dial has no today⇄week toggle).
+          ctx.draw(Text("\(windowDays) days").font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary),
+                   at: center)
+        } else {
+          let hubR: CGFloat = 30
+          let hub = CGRect(x: center.x - hubR, y: center.y - hubR,
+                           width: hubR * 2, height: hubR * 2)
+          ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
+          ctx.stroke(Path(ellipseIn: hub),
+                     with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
+          let scope = todayOnly ? "Today" : "\(windowDays) days"
+          ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
+                   at: center)
+        }
       }
     }
     // The marks (ticks, bands, dots, now-hand) sit at the dial's orientation
@@ -599,14 +643,14 @@ struct TimeOfDayWheel: View {
     .contentShape(Circle())
     // A locked dial (the hero) handles its own tap/swipe in `DayDialHero`;
     // only the toggling dials wire the today⇄week tap here.
-    .modifier(WheelTapToggle(enabled: !compact && !lockToday) { todayOnly.toggle() })
+    .modifier(WheelTapToggle(enabled: !compact && !lockToday && !aggregate) { todayOnly.toggle() })
     .accessibilityElement()
-    .accessibilityAddTraits(compact || lockToday ? [] : .isButton)
+    .accessibilityAddTraits(compact || lockToday || aggregate ? [] : .isButton)
     .accessibilityLabel(Text("Time-of-day wheel"))
     .accessibilityValue(Text(focusToday
       ? "\(shownEvents.count) events"
       : "\(events.count) events over the last \(windowDays) days"))
-    .accessibilityHint(compact || lockToday
+    .accessibilityHint(compact || lockToday || aggregate
       ? Text("")
       : Text("Double tap to switch between today and the last \(windowDays) days"))
     // Seed the applied rotation without animating in from 0 on first appear.

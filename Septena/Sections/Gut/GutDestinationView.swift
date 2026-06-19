@@ -13,7 +13,7 @@ struct GutDestinationView: View {
   @State private var loading = true
   @State private var editing: GutEntry? = nil
   @State private var creating: Bool = false
-  /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
+  /// Trailing-30-day event instants for the rhythm wheel (see `rhythmSection`).
   @State private var weekPoints: [WheelPoint] = []
   /// Movement dates over the trailing ~17 weeks for the frequency heatmap.
   @State private var freqDates: [String] = []
@@ -22,7 +22,7 @@ struct GutDestinationView: View {
   /// strip and `reload()` re-fetches for that day. Defaults to today.
   @State private var viewingDate: String = SeptenaDate.today
   // Gut is an editable dual section: Log = the day's movements; Patterns = the
-  // 7-day rhythm wheel. Default Log; remembered per section.
+  // 30-day rhythm wheel. Default Log; remembered per section.
   @State private var mode: DrawerMode = .remembered(for: "gut", default: .log)
   /// Whether the one-shot empty-state nudge has run for this appearance.
   @State private var didNudge = false
@@ -138,7 +138,7 @@ struct GutDestinationView: View {
 
   // MARK: - Rhythm wheel (Patterns mode)
   //
-  // A 24-hour dial of *when* movements land over the trailing 7 days, faded by
+  // A 24-hour dial of *when* movements land over the trailing 30 days, faded by
   // recency — gut regularity is a time-of-day signal. See `TimeOfDayWheel`.
   // Cross-day by nature, so it's the section's Patterns view; needs enough
   // events to read a pattern, otherwise a gentle keep-logging placeholder.
@@ -156,7 +156,7 @@ struct GutDestinationView: View {
   }
 
   private func reloadWeek() async {
-    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    let weekStart = Calendar.current.date(byAdding: .day, value: -29, to: todayStart) ?? todayStart
     weekPoints = await MirrorReader.shared.read { ctx in
       let desc = FetchDescriptor<GutEventEntity>(
         predicate: #Predicate { $0.occurredAt >= weekStart },
@@ -169,7 +169,7 @@ struct GutDestinationView: View {
   private var wheelEvents: [TimeOfDayWheel.Event] {
     let start = todayStart
     return weekPoints.compactMap {
-      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 7)
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 30)
     }
   }
 
@@ -183,12 +183,13 @@ struct GutDestinationView: View {
     let events = wheelEvents
     if events.count >= 3 {
       DrawerSection("When movements happen", padding: .tight) {
-        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 30,
+                       nowFraction: nowFraction, aggregate: true)
           .frame(maxWidth: .infinity)
       }
     } else if !loading {
       DrawerSection("When movements happen") {
-        Text("Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here.")
+        Text("Not enough logged yet to read a rhythm — keep at it and a 30-day pattern shows here.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }

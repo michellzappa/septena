@@ -119,9 +119,9 @@ struct MoodDestinationView: View {
 
   // MARK: - Rhythm wheel
   //
-  // A 24-hour dial of *when* you check in over the trailing 7 days, each dot
+  // A 24-hour dial of *when* you check in over the trailing 30 days, each dot
   // tinted its mood quadrant and faded by recency — surfaces the diurnal swing.
-  // See `TimeOfDayWheel`. Today only, and only with enough events to read.
+  // See `TimeOfDayWheel`. Shown with enough events to read.
 
   private struct WheelPoint: Identifiable, Sendable {
     let id: String
@@ -135,7 +135,7 @@ struct MoodDestinationView: View {
   }
 
   private func reloadWeek() async {
-    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    let weekStart = Calendar.current.date(byAdding: .day, value: -29, to: todayStart) ?? todayStart
     weekPoints = await MirrorReader.shared.read { ctx in
       let desc = FetchDescriptor<MoodEventEntity>(
         predicate: #Predicate { $0.occurredAt >= weekStart },
@@ -150,7 +150,7 @@ struct MoodDestinationView: View {
   private var wheelEvents: [TimeOfDayWheel.Event] {
     let start = todayStart
     return weekPoints.compactMap { p in
-      TimeOfDayWheel.Event(id: p.id, occurredAt: p.at, todayStart: start, windowDays: 7,
+      TimeOfDayWheel.Event(id: p.id, occurredAt: p.at, todayStart: start, windowDays: 30,
                            color: MoodQuadrant(rawValue: p.quadrant)?.color)
     }
   }
@@ -165,7 +165,8 @@ struct MoodDestinationView: View {
     let events = wheelEvents
     if events.count >= 3 {
       DrawerSection("When you check in", padding: .tight) {
-        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 30,
+                       nowFraction: nowFraction, aggregate: true)
           .frame(maxWidth: .infinity)
       }
     }

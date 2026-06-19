@@ -17,7 +17,7 @@ struct IntakeKindPageView: View {
   @State private var itemNames: [String: String] = [:]
   @State private var lastContainerCount: Int? = nil
   @State private var lastEventAt: Date? = nil
-  /// Trailing-7-day event instants for the rhythm wheel (see `rhythmSection`).
+  /// Trailing-30-day event instants for the rhythm wheel (see `rhythmSection`).
   @State private var weekPoints: [IntakeReader.IntakeInstant] = []
   /// Event dates over the trailing ~17 weeks for the frequency heatmap.
   @State private var freqDates: [String] = []
@@ -182,9 +182,9 @@ struct IntakeKindPageView: View {
 
   // MARK: Rhythm wheel
   //
-  // A 24-hour dial of *when* this tracker lands over the trailing 7 days, faded
+  // A 24-hour dial of *when* this tracker lands over the trailing 30 days, faded
   // by recency (shared `TimeOfDayWheel`, same as the old consumable
-  // drawers). Only on today and only with enough events to read a pattern.
+  // drawers). Shown with enough events to read a pattern.
 
   private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
 
@@ -201,7 +201,7 @@ struct IntakeKindPageView: View {
   private var wheelEvents: [TimeOfDayWheel.Event] {
     let start = todayStart
     return weekPoints.compactMap {
-      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 7)
+      TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.at, todayStart: start, windowDays: 30)
     }
   }
 
@@ -210,12 +210,13 @@ struct IntakeKindPageView: View {
     let events = wheelEvents
     if events.count >= 3, let kind {
       DrawerSection("When you reach for \(kind.name)", padding: .tight) {
-        TimeOfDayWheel(events: events, accent: accent, windowDays: 7, nowFraction: nowFraction)
+        TimeOfDayWheel(events: events, accent: accent, windowDays: 30,
+                       nowFraction: nowFraction, aggregate: true)
           .frame(maxWidth: .infinity)
       }
     } else if !loading {
       DrawerSection("Rhythm") {
-        Text("Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here.")
+        Text("Not enough logged yet to read a rhythm — keep at it and a 30-day pattern shows here.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
       }
@@ -271,9 +272,9 @@ struct IntakeKindPageView: View {
   private func reload() async {
     let id = kindID
     let date = viewingDate
-    // The wheel's window is the trailing 7 days from *today* (not the viewing
+    // The wheel's window is the trailing 30 days from *today* (not the viewing
     // date), so compute it on the main actor from the day clock before the read.
-    let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+    let weekStart = Calendar.current.date(byAdding: .day, value: -29, to: todayStart) ?? todayStart
     // Frequency heatmap window — trailing ~17 weeks. `weekInstants` just filters
     // by `since`, so a 119-day floor reuses it for the full history pull.
     let histStart = Calendar.current.date(byAdding: .day, value: -118, to: todayStart) ?? todayStart

@@ -446,7 +446,7 @@ struct NutritionDestinationView: View {
 
   // MARK: - Meal rhythm wheel
   //
-  // A 24-hour dial of *when* meals land over the trailing 7 days, faded by
+  // A 24-hour dial of *when* meals land over the trailing 30 days, faded by
   // recency. Derived purely from the already-loaded entries' local
   // `date` + `time` — no extra query, no model change. Hidden when there's
   // too little to read (a lone dot tells you nothing about rhythm).
@@ -458,14 +458,15 @@ struct NutritionDestinationView: View {
       DrawerSection("When you eat", padding: .tight) {
         TimeOfDayWheel(events: events,
                        accent: theme.color(for: "nutrition"),
-                       windowDays: 7,
-                       nowFraction: nowFraction)
+                       windowDays: 30,
+                       nowFraction: nowFraction,
+                       aggregate: true)
           .frame(maxWidth: .infinity)
       }
     }
   }
 
-  /// Map the trailing 7 days of meals to wheel points. `date` (yyyy-MM-dd,
+  /// Map the trailing 30 days of meals to wheel points. `date` (yyyy-MM-dd,
   /// local) gives the days-ago ring; `time` (HH:mm, local) gives the angle.
   private var mealWheelEvents: [TimeOfDayWheel.Event] {
     let cal = Calendar.current
@@ -474,7 +475,7 @@ struct NutritionDestinationView: View {
     return entries.compactMap { e in
       guard let day = Self.ymdCurrentTZFormatter.date(from: e.date) else { return nil }
       let daysAgo = cal.dateComponents([.day], from: cal.startOfDay(for: day), to: todayStart).day ?? 0
-      guard daysAgo >= 0, daysAgo < 7 else { return nil }
+      guard daysAgo >= 0, daysAgo < 30 else { return nil }
       let parts = e.time.split(separator: ":")
       let h = Double(parts.first ?? "0") ?? 0
       let m = parts.count > 1 ? (Double(parts[1]) ?? 0) : 0
