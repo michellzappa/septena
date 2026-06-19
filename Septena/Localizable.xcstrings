@@ -1,6 +1,236 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Maybe later" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talvez depois"
+          }
+        }
+      }
+    },
+    "Restore purchases" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar compras"
+          }
+        }
+      }
+    },
+    "Manage subscription" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerenciar assinatura"
+          }
+        }
+      }
+    },
+    "Thank you" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obrigado"
+          }
+        }
+      }
+    },
+    "YOU'RE A SUPPORTER" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VOCÊ É UM APOIADOR"
+          }
+        }
+      }
+    },
+    "Support Septena" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoiar o Septena"
+          }
+        }
+      }
+    },
+    "Keeps every feature free" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantém todos os recursos gratuitos"
+          }
+        }
+      }
+    },
+    "Nothing here is held back for a paid tier. Your support is the reason there's no paywall — and the promise there never will be one." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada aqui fica reservado para um plano pago. Seu apoio é o motivo de não haver paywall — e a promessa de que nunca haverá."
+          }
+        }
+      }
+    },
+    "Keeps it independent" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantém o app independente"
+          }
+        }
+      }
+    },
+    "No ads, no investors, no data sold. Septena answers to the people who use it, and that only works if some of them chip in." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sem anúncios, sem investidores, sem venda de dados. O Septena responde a quem o usa, e isso só funciona se algumas dessas pessoas contribuírem."
+          }
+        }
+      }
+    },
+    "Funds the next update" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Financia a próxima atualização"
+          }
+        }
+      }
+    },
+    "Every fix and new section is built by one developer. Supporting is the most direct way to say “keep going.”" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada correção e cada nova seção é feita por um único desenvolvedor. Apoiar é a forma mais direta de dizer “continue”."
+          }
+        }
+      }
+    },
+    "A Supporter badge" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um selo de Apoiador"
+          }
+        }
+      }
+    },
+    "A quiet mark on your profile and a foil ring on your avatar. Just for you — it changes nothing about what the app can do." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uma marca discreta no seu perfil e um anel dourado no seu avatar. Só para você — não muda nada do que o app faz."
+          }
+        }
+      }
+    },
+    "Our genuine thanks" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nossa gratidão sincera"
+          }
+        }
+      }
+    },
+    "You're keeping a private, independent app alive. That's the whole deal, and it matters more than any feature could." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você está mantendo vivo um app privado e independente. É isso que importa, e vale mais do que qualquer recurso."
+          }
+        }
+      }
+    },
+    "Annual" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anual"
+          }
+        }
+      }
+    },
+    "Founding Supporter" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoiador Fundador"
+          }
+        }
+      }
+    },
+    "Two months free" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dois meses grátis"
+          }
+        }
+      }
+    },
+    "Lifetime — for being here early" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vitalício — por estar aqui desde cedo"
+          }
+        }
+      }
+    },
+    "per year" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "por ano"
+          }
+        }
+      }
+    },
+    "per month" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "por mês"
+          }
+        }
+      }
+    },
+    "one time" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pagamento único"
+          }
+        }
+      }
+    },
     "" : {
 
     },
@@ -309,6 +539,16 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "%@ of %@ selected" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ selected"
           }
         }
       }
@@ -1418,9 +1658,6 @@
         }
       }
     },
-    "An earlier version uploaded highlights to iCloud. This deletes those copies so your other devices don't download them — your highlights stay on this device." : {
-
-    },
     "An exercise with this ID already exists." : {
       "localizations" : {
         "pt-BR" : {
@@ -1564,6 +1801,9 @@
           }
         }
       }
+    },
+    "Arrived in Today" : {
+
     },
     "As needed" : {
 
@@ -3000,7 +3240,14 @@
 
     },
     "Every section, every feature — yours, with nothing held back and no ads watching you. That's a promise, not a trial. If it's become part of how you run your life, you can chip in to keep it independent. You won't unlock anything — there's nothing to unlock." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada seção, cada recurso — seus, sem nada retido e sem anúncios te observando. Isso é uma promessa, não um teste gratuito. Se o app virou parte de como você toca a sua vida, você pode contribuir para mantê-lo independente. Você não vai desbloquear nada — não há nada a desbloquear."
+          }
+        }
+      }
     },
     "Evidence" : {
 
@@ -3223,6 +3470,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Versão do formato %@. O exportador acima produz arquivos que voltam por este importador sem alterações."
+          }
+        }
+      }
+    },
+    "Free" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gratuito"
           }
         }
       }
@@ -4186,6 +4443,9 @@
         }
       }
     },
+    "Loading your library…" : {
+
+    },
     "Loading…" : {
 
     },
@@ -5012,11 +5272,18 @@
         }
       }
     },
-    "Not enough logged yet to read a rhythm — keep at it and a 7-day pattern shows here." : {
+    "Not enough logged yet to read a rhythm — keep at it and a 30-day pattern shows here." : {
 
     },
     "Not now? Genuinely fine — the app stays exactly the same. You can support any time from Settings." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agora não? Tudo bem mesmo — o app continua exatamente igual. Você pode apoiar quando quiser nos Ajustes."
+          }
+        }
+      }
     },
     "Not supported on this device." : {
 
@@ -5387,6 +5654,9 @@
         }
       }
     },
+    "Pick which books and articles feed the rotation. With “All books” on, new ones you add to Readwise are included automatically." : {
+
+    },
     "Pick which calendars contribute events to your day timeline and Next page. Hidden calendars stay untouched in iOS Calendar." : {
       "localizations" : {
         "pt-BR" : {
@@ -5448,7 +5718,14 @@
 
     },
     "Prices couldn't load right now — check your connection and reopen this screen." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível carregar os preços agora — verifique sua conexão e reabra esta tela."
+          }
+        }
+      }
     },
     "PROGRESS" : {
       "localizations" : {
@@ -5749,9 +6026,6 @@
     "Removes the token and the imported highlights from the rotation. Your own quotes are untouched." : {
 
     },
-    "Removing…" : {
-
-    },
     "Renaming a supplement doesn't affect its history — events are linked by ID." : {
       "localizations" : {
         "pt-BR" : {
@@ -6027,7 +6301,14 @@
       }
     },
     "Septena is free. All of it. Always." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena é gratuito. Tudo. Sempre."
+          }
+        }
+      }
     },
     "Septena is locked" : {
 
@@ -6667,8 +6948,25 @@
     "Support conversations you start will appear here." : {
 
     },
+    "Support the app" : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoie o app"
+          }
+        }
+      }
+    },
     "Supporter" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoiador"
+          }
+        }
+      }
     },
     "Symptoms" : {
 
@@ -6890,10 +7188,24 @@
       }
     },
     "Thank you — you're the reason Septena stays free and independent." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obrigado — você é o motivo de o Septena seguir gratuito e independente."
+          }
+        }
+      }
     },
     "The app is free. Chip in to keep it independent." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app é gratuito. Contribua para mantê-lo independente."
+          }
+        }
+      }
     },
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
 
@@ -7625,6 +7937,9 @@
     "What should we call you?" : {
 
     },
+    "When on, every book and article is included — and anything new you add to Readwise joins automatically." : {
+
+    },
     "When on, other members can see your username, display name, and bio. When off, your contributions appear without a public profile." : {
 
     },
@@ -7783,7 +8098,14 @@
       }
     },
     "You're a supporter" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você é um apoiador"
+          }
+        }
+      }
     },
     "You’re at %lld of %lld ml — log a glass?" : {
       "extractionState" : "stale",
@@ -7840,7 +8162,14 @@
       }
     },
     "Your support is tied to your Apple ID. Restore re-syncs it on a new device; managing lets you change or cancel an ongoing subscription." : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu apoio está vinculado ao seu Apple ID. Restaurar sincroniza novamente em um novo dispositivo; gerenciar permite alterar ou cancelar uma assinatura em andamento."
+          }
+        }
+      }
     },
     "Your testimonial" : {
 

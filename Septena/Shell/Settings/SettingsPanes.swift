@@ -850,9 +850,12 @@ struct SeptenaPlusFeatureRow: View {
             .foregroundStyle(SeptenaPlus.foilGradient)
         )
       VStack(alignment: .leading, spacing: 3) {
-        Text(feature.title)
+        // The reason/perk text is stored as English in `SeptenaPlus`; render it
+        // through LocalizedStringKey so the string catalog can translate it
+        // (a plain `Text(String)` would print verbatim, unlocalized).
+        Text(LocalizedStringKey(feature.title))
           .font(.subheadline.weight(.semibold))
-        Text(feature.detail)
+        Text(LocalizedStringKey(feature.detail))
           .font(.caption)
           .foregroundStyle(.secondary)
           .fixedSize(horizontal: false, vertical: true)
@@ -872,7 +875,7 @@ struct SeptenaPlusBadge: View {
       Image(systemName: "heart.fill")
         .font(.system(size: 8, weight: .bold))
         .foregroundStyle(SeptenaPlus.foil)
-      Text(SeptenaPlus.badgeWord)
+      Text(LocalizedStringKey(SeptenaPlus.badgeWord))
         .foregroundStyle(.white)
     }
     .font(.caption2.weight(.bold))
@@ -880,6 +883,22 @@ struct SeptenaPlusBadge: View {
     .padding(.vertical, 3)
     .background(SeptenaPlus.ink, in: Capsule())
     .overlay(Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75))
+  }
+}
+
+/// The quiet counterpart to `SeptenaPlusBadge`, worn by a non-supporter. The
+/// whole app is free, so this is a plain statement of fact, not a nudge — a
+/// muted capsule with no foil, deliberately understated next to the supporter
+/// mark. It only exists so the profile reads the same either way (a labelled
+/// tier) instead of looking empty until you support.
+struct FreeAccountBadge: View {
+  var body: some View {
+    Text("Free")
+      .font(.caption2.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .padding(.horizontal, 8)
+      .padding(.vertical, 3)
+      .background(.quaternary, in: Capsule())
   }
 }
 
@@ -892,6 +911,12 @@ struct SeptenaPlusBadge: View {
 struct SeptenaPlusPaywall: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(SupportStore.self) private var store
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  /// The thank-you celebration, played ON this screen (the topmost layer) so
+  /// it's visible regardless of what presented us — the root `LogCommitOverlay`
+  /// sits below Settings, so firing it there would play out of sight.
+  @State private var celebrationStyle: LogCommitStyle?
+  @State private var celebrateTrigger = 0
 
   var body: some View {
     NavigationStack {
@@ -909,7 +934,7 @@ struct SeptenaPlusPaywall: View {
         .padding(20)
       }
       .background(Theme.groupedBackground.ignoresSafeArea())
-      .navigationTitle(SeptenaPlus.name)
+      .navigationTitle(Text(LocalizedStringKey(SeptenaPlus.name)))
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -918,10 +943,35 @@ struct SeptenaPlusPaywall: View {
           Button("Maybe later") { dismiss() }
         }
       }
-      // A completed purchase (or a restore) flips the entitlement — close the
-      // screen so the user lands back on their now-thanked profile.
+      // A completed purchase (or restore) flips the entitlement. Play the
+      // app's own milestone celebration on this screen, then auto-dismiss —
+      // rendering it here (not on the root overlay) keeps it visible above
+      // Settings. Under Reduce Motion, skip the animation and just close.
       .onChange(of: store.isSupporter) { _, nowSupporter in
-        if nowSupporter { dismiss() }
+        guard nowSupporter else { return }
+        Haptics.success()
+        if reduceMotion {
+          Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            dismiss()
+          }
+        } else {
+          celebrationStyle = .milestone(accent: SeptenaPlus.foil,
+                                        headline: String(localized: "Thank you"),
+                                        caption: String(localized: "YOU'RE A SUPPORTER"))
+          celebrateTrigger += 1
+          Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.9))
+            dismiss()
+          }
+        }
+      }
+    }
+    .overlay {
+      if let style = celebrationStyle {
+        LogCommitStyleView(style: style, trigger: celebrateTrigger)
+          .allowsHitTesting(false)
+          .transition(.opacity)
       }
     }
     #if os(macOS)
@@ -995,11 +1045,15 @@ struct SupportTierCard: View {
     Button(action: onTap) {
       HStack(spacing: 14) {
         VStack(alignment: .leading, spacing: 3) {
-          Text(tier.title)
+          // Title / note / cadence are stored as English in `SeptenaPlus.tiers`;
+          // render through LocalizedStringKey so the catalog can translate them.
+          // (`priceText` stays verbatim — it's StoreKit's localized displayPrice,
+          // or a €-amount fallback, neither of which the catalog should touch.)
+          Text(LocalizedStringKey(tier.title))
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(tier.highlighted ? .white : .primary)
           if let note = tier.note {
-            Text(note)
+            Text(LocalizedStringKey(note))
               .font(.caption)
               .foregroundStyle(tier.highlighted ? .white.opacity(0.7) : .secondary)
           }
@@ -1013,7 +1067,7 @@ struct SupportTierCard: View {
             Text(priceText)
               .font(.title3.weight(.bold))
               .foregroundStyle(tier.highlighted ? AnyShapeStyle(SeptenaPlus.foilGradient) : AnyShapeStyle(.primary))
-            Text(tier.cadence)
+            Text(LocalizedStringKey(tier.cadence))
               .font(.caption2)
               .foregroundStyle(tier.highlighted ? .white.opacity(0.7) : .secondary)
           }
@@ -1105,6 +1159,8 @@ struct IdentityHeaderRow: View {
           .foregroundStyle(.primary)
         if plusUnlocked {
           SeptenaPlusBadge()
+        } else {
+          FreeAccountBadge()
         }
       }
       Spacer(minLength: 0)
@@ -1143,6 +1199,8 @@ struct AccountSettingsPane: View {
               }
             if plusUnlocked {
               SeptenaPlusBadge()
+            } else {
+              FreeAccountBadge()
             }
           }
         }
@@ -1222,7 +1280,7 @@ struct AccountSettingsPane: View {
           HStack(spacing: 14) {
             SeptenaDiscMark(size: 30)
             VStack(alignment: .leading, spacing: 2) {
-              Text(SeptenaPlus.name)
+              Text(LocalizedStringKey(SeptenaPlus.name))
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
               Text("The app is free. Chip in to keep it independent.")
@@ -1238,7 +1296,9 @@ struct AccountSettingsPane: View {
         }
         .buttonStyle(.plain)
       } header: {
-        Text("Support")
+        // Unique string (not the shared "Support" key, which means help/support
+        // elsewhere) so the localization can't collide with that context.
+        Text("Support the app")
       }
     }
   }
