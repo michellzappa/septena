@@ -173,7 +173,8 @@ enum WatchSnapshotPublisher {
                                      trainingRings: trainingRings,
                                      medications: medications.isEmpty ? nil : medications,
                                      symptoms: symptoms.isEmpty ? nil : symptoms,
-                                     groceries: groceries.isEmpty ? nil : groceries)
+                                     groceries: groceries.isEmpty ? nil : groceries,
+                                     enabledSections: enabledKeys.isEmpty ? nil : Array(enabledKeys))
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't

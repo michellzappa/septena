@@ -43,6 +43,11 @@ final class WatchConnectivity {
   /// when the section is disabled.
   var nutritionRings: [ComplicationRing] = []
   var trainingRings: [ComplicationRing] = []
+  /// Section keys enabled on the phone (from the snapshot), so the Next-list
+  /// "Summaries" links show for an enabled section even on a day its ring data
+  /// didn't ride along. Empty for older payloads — callers fall back to ring
+  /// presence then.
+  var enabledSections: Set<String> = []
   var bucket: String = ""
   var isLoading = false
   var errorMessage: String?
@@ -173,6 +178,7 @@ final class WatchConnectivity {
       self.medications   = response.medications ?? []
       self.symptoms      = response.symptoms ?? []
       self.groceries     = response.groceries ?? []
+      self.enabledSections = Set(response.enabledSections ?? [])
       self.bucket        = bkt
       updateComplication()
       updateMacroComplication(response.nutritionRings)

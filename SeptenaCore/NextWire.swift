@@ -74,6 +74,12 @@ struct NextItemsResponse: Codable {
   /// one low ("we ran out") with one tap. Present only when the Groceries
   /// section is enabled. Optional so older payloads decode unchanged.
   var groceries: [GroceryWire]? = nil
+  /// The keys of the sections currently enabled on the phone, so the watch can
+  /// offer section-scoped affordances (e.g. the Next-list "Summaries" links to
+  /// the macro / training pages) based on enablement rather than on whether
+  /// today's data happened to ride along. Optional so older payloads decode
+  /// unchanged — the watch falls back to data-presence when absent.
+  var enabledSections: [String]? = nil
 }
 
 /// One active medication on the wire: enough for the wrist to render a row and

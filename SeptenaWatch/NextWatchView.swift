@@ -118,11 +118,26 @@ struct NextWatchView: View {
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
         summaryLinkRows
+        endFlourish
       }
       .listStyle(.plain)
       .environment(\.defaultMinListRowHeight, 0)
       .animation(.default, value: conn.items)
     }
+  }
+
+  /// A quiet end-of-feed mark: the Septena logo (the seven-disc custom symbol),
+  /// dimmed and centered, so the list closes on the brand instead of a hard cut.
+  /// Non-interactive — purely a flourish.
+  private var endFlourish: some View {
+    SeptenaDiscsMark()
+      .frame(width: 26, height: 26)
+      .frame(maxWidth: .infinity)
+      .padding(.top, 14)
+      .padding(.bottom, 6)
+      .listRowBackground(Color.clear)
+      .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 4, trailing: 6))
+      .accessibilityHidden(true)
   }
 
   private var allDoneHero: some View {
@@ -135,8 +150,19 @@ struct NextWatchView: View {
     }
   }
 
-  private var hasNutrition: Bool { !conn.nutritionRings.isEmpty }
-  private var hasTraining: Bool { !conn.trainingRings.isEmpty }
+  // The Macros / Training summary links are stable navigation affordances — their
+  // pages handle the empty case — so they should only ever hide when the phone
+  // *explicitly* says the section is off. If the snapshot carries the enabled set,
+  // respect it; otherwise (older / stale snapshot with no enabled set) show the
+  // link rather than guessing from whether today's ring data rode along. This is
+  // what keeps Training from silently vanishing against a stale snapshot.
+  private var hasNutrition: Bool { sectionAvailable("nutrition") }
+  private var hasTraining: Bool { sectionAvailable("training") }
+
+  private func sectionAvailable(_ key: String) -> Bool {
+    if !conn.enabledSections.isEmpty { return conn.enabledSections.contains(key) }
+    return true
+  }
 
   /// Foot-of-feed links to the macro / training summary pages — the same pages
   /// the complications open. Shown only for sections the snapshot has data for,
@@ -211,6 +237,37 @@ struct NextWatchView: View {
       i += 1
     }
     return "\(count) \(WatchSectionTint.noun(forKey: key, count: count))"
+  }
+}
+
+// MARK: - Septena mark (inline)
+
+/// Septena's seven-disc brand mark, drawn inline with `Canvas` rather than loaded
+/// from the `DiscsMark` symbol asset. Drawing it in Swift means it renders from
+/// the code build alone — no dependency on the asset catalog recompiling (which
+/// `actool` caches separately, so a freshly-added symbolset can silently fail to
+/// appear on an incremental build). Disc centers + radius match `DiscsMark.svg`
+/// (seven discs in a regular heptagon, 1000×1000 artwork box).
+private struct SeptenaDiscsMark: View {
+  var body: some View {
+    Canvas { ctx, size in
+      let unit = min(size.width, size.height) / 1000
+      let r = 112.5 * unit
+      let centers: [CGPoint] = [
+        .init(x: 500,    y: 177.5),
+        .init(x: 766.25, y: 302.5),
+        .init(x: 832.5,  y: 595),
+        .init(x: 648.75, y: 825),
+        .init(x: 351.25, y: 825),
+        .init(x: 167.5,  y: 595),
+        .init(x: 233.75, y: 302.5),
+      ]
+      for raw in centers {
+        let center = CGPoint(x: raw.x * unit, y: raw.y * unit)
+        let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: rect), with: .color(.secondary))
+      }
+    }
   }
 }
 
