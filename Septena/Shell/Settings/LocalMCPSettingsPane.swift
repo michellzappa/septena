@@ -53,6 +53,23 @@ struct LocalMCPSettingsPane: View {
               Text(s.label).tag(s.rawValue)
             }
           }
+          // When tailnet access is on, surface this Mac's tailnet address as a
+          // first-class, shareable value — AirDrop/Message it to the other
+          // device you want connecting. Choosing "My tailnet" above is the
+          // toggle that exposes it; "This Mac only" keeps it hidden.
+          if scope == .tailnet, let ip = tailnetIP {
+            LabeledContent("Tailnet address") {
+              HStack(spacing: 8) {
+                Text("\(ip):\(port)")
+                  .font(.caption.monospaced())
+                  .textSelection(.enabled)
+                ShareLink(item: "\(ip):\(port)") {
+                  Image(systemName: "square.and.arrow.up")
+                }
+                .labelStyle(.iconOnly)
+              }
+            }
+          }
         } footer: {
           if scope == .tailnet {
             if let ip = tailnetIP {
@@ -75,10 +92,15 @@ struct LocalMCPSettingsPane: View {
               .font(.caption.monospaced())
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
-            Button {
-              copy(connectCommand)
-            } label: {
-              Label("Copy command", systemImage: "doc.on.doc")
+            HStack {
+              Button {
+                copy(connectCommand)
+              } label: {
+                Label("Copy command", systemImage: "doc.on.doc")
+              }
+              ShareLink(item: connectCommand) {
+                Label("Share…", systemImage: "square.and.arrow.up")
+              }
             }
           }
         }
