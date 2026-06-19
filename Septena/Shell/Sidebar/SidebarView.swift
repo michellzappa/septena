@@ -19,7 +19,6 @@ struct SidebarRootView: View {
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
-  @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   /// Push-navigation surface (iPad regular / macOS) vs. compact stack (iPhone /
   /// slide-over) — the single rule, resolved at the app root, that decides
@@ -232,11 +231,11 @@ struct SidebarRootView: View {
   /// hand-built `sectionCard` / `inCardDivider` / bare-VStack scaffolding this
   /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
   private func sidebarListContent() -> some View {
+    #if os(iOS)
     List(selection: sidebarSelection) {
       smartListSection
       areaProjectSections
     }
-    #if os(iOS)
     .listStyle(.insetGrouped)
     // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
     // `sidebarPhone`) shows through, matching the app's surface rhythm.
@@ -246,6 +245,19 @@ struct SidebarRootView: View {
     // Reminders-like rhythm.
     .listSectionSpacing(18)
     #else
+    // macOS draws selection itself (no `selection:` binding). A `.sidebar`
+    // `List(selection:)` colors the selected row with the *active* accent only
+    // while the List holds focus, then grays it the instant a click hands focus
+    // to the detail pane — the blue→gray "flash". A custom `.listRowBackground`
+    // can't suppress that system capsule (it composites *under* it, giving two
+    // overlapping highlights), so instead we forgo the native selection
+    // entirely: rows are plain Buttons and `SidebarRowSelectionBackground`
+    // paints one focus-independent accent pill. Trade-off: no arrow-key row
+    // navigation, which the native binding provided.
+    List {
+      smartListSection
+      areaProjectSections
+    }
     .listStyle(.sidebar)
     #endif
   }
@@ -265,7 +277,8 @@ struct SidebarRootView: View {
           SmartListRow(icon: spec.icon,
                        iconColor: spec.color,
                        title: spec.title,
-                       count: spec.count)
+                       count: spec.count,
+                       selected: isSelected(spec.route))
         }
         .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
@@ -473,23 +486,24 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
+    #if os(macOS)
+    // Self-drawn selection (see `sidebarListContent`): a Button drives nav and
+    // `SidebarRowSelectionBackground` paints the one consistent neutral pill,
+    // keyed off the id-based `isSelected` so it never grays out on focus loss.
+    // `focusEffectDisabled` suppresses the system focus ring (the stray blue
+    // outline) so the pill is the only selection cue, Reminders-style.
+    Button { selectRoute(route) } label: { content() }
+      .buttonStyle(InertButtonStyle())
+      .focusEffectDisabled()
+      .listRowBackground(SidebarRowSelectionBackground(selected: isSelected(route)))
+    #else
     if usesPushNavigation {
-      content()
-        .tag(Self.token(for: route))
-      #if os(macOS)
-        // Paint the selection ourselves so it stays one consistent accent tint.
-        // The native `.sidebar` highlight is accent-colored only while the List
-        // holds focus, then flips to an inactive gray the instant a click moves
-        // focus to the detail pane — read as a blue→gray "flash". A custom row
-        // background keyed off `isSelected` is focus-independent, so the chosen
-        // row reads the same no matter which pane is first responder.
-        .listRowBackground(SidebarRowSelectionBackground(selected: isSelected(route),
-                                                         accent: theme.accent))
-      #endif
+      content().tag(Self.token(for: route))
     } else {
       Button { selectRoute(route) } label: { content() }
         .buttonStyle(InertButtonStyle())
     }
+    #endif
   }
 
   /// Stable, id-based selection token for the sidebar `List`. Mirrors `Route`
@@ -618,7 +632,8 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func areaRow(_ area: Area) -> some View {
     navRow(.area(area)) {
-      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
+                     selected: isSelected(.area(area)))
     }
     #if os(iOS)
     .contextMenu {
@@ -639,7 +654,8 @@ struct SidebarRootView: View {
     navRow(.project(project)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0)
+                        count: projectOpenCount[project.id] ?? 0,
+                        selected: isSelected(.project(project)))
     }
     #if os(iOS)
     .contextMenu {
@@ -928,6 +944,11 @@ struct SmartListRow: View {
   let title: String
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
+  /// macOS: when this smart list is the current selection (sitting on the gray
+  /// pill), the title takes the Tasks accent (same as the `+` button), matching
+  /// the area/project rows. No effect on iOS.
+  var selected: Bool = false
+  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: 10) {
@@ -935,7 +956,7 @@ struct SmartListRow: View {
                    size: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
-        .foregroundStyle(.primary)
+        .foregroundStyle(selectedTitleColor)
       Spacer()
       if let n = count, n > 0 {
         Text("\(n)")
@@ -945,6 +966,14 @@ struct SmartListRow: View {
     }
     .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
+  }
+
+  private var selectedTitleColor: AnyShapeStyle {
+    #if os(macOS)
+    selected ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.primary)
+    #else
+    AnyShapeStyle(.primary)
+    #endif
   }
 }
 
@@ -1143,16 +1172,23 @@ struct SectionGlyph: View {
 }
 
 #if os(macOS)
-/// Focus-independent selection fill for the macOS Tasks sidebar. Replaces the
-/// native `.sidebar` highlight (which is accent-colored only while the List is
-/// first responder and grays out the moment focus moves to the detail pane) so
-/// the chosen row keeps one steady accent tint instead of flashing blue→gray.
+/// Selection fill for the macOS Tasks sidebar. We draw the selection ourselves
+/// (the List has no `selection:` binding) so it stays one consistent appearance
+/// regardless of focus — the native `.sidebar` highlight otherwise flips from the
+/// active accent to an inactive gray the instant focus leaves the list (the
+/// blue→gray "flash"). Mail.app / Reminders look: a neutral gray pill (the system
+/// *unemphasized* selection gray), with the row drawing an accent-/item-colored
+/// title over it. Inset from the edges so it reads as a contained capsule, not an
+/// edge-to-edge band — `.sidebar` hands `.listRowBackground` the full row width,
+/// so without the inset it bleeds.
 private struct SidebarRowSelectionBackground: View {
   let selected: Bool
-  let accent: Color
   var body: some View {
     RoundedRectangle(cornerRadius: 6, style: .continuous)
-      .fill(selected ? accent.opacity(0.18) : Color.clear)
+      // Half-strength so the indicator reads as a light wash, not a solid fill.
+      .fill(selected ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.5)
+                     : Color.clear)
+      .padding(.horizontal, 8)
       .padding(.vertical, 1)
   }
 }
@@ -1164,6 +1200,11 @@ struct SidebarAreaRow: View {
   var emoji: String? = nil
   /// Open task count rolled up across the area (loose + projects in it).
   var count: Int = 0
+  /// macOS: when this row is the current selection (sitting on the gray pill),
+  /// the title takes the section accent — Mail.app colors the selected item's
+  /// name. No effect on iOS.
+  var selected: Bool = false
+  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1171,7 +1212,7 @@ struct SidebarAreaRow: View {
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
-        .foregroundStyle(Theme.inkPrimary)
+        .foregroundStyle(selectedTitleColor)
       Spacer()
       if count > 0 {
         Text("\(count)")
@@ -1182,6 +1223,14 @@ struct SidebarAreaRow: View {
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
+  }
+
+  private var selectedTitleColor: Color {
+    #if os(macOS)
+    selected ? theme.accent : Theme.inkPrimary
+    #else
+    Theme.inkPrimary
+    #endif
   }
 }
 
@@ -1224,6 +1273,11 @@ struct SidebarProjectRow: View {
   var tint: Color = Theme.iconMuted
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
+  /// macOS: when this row is the current selection (sitting on the gray pill),
+  /// the title takes the section accent — Mail.app colors the selected item's
+  /// name. No effect on iOS.
+  var selected: Bool = false
+  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1231,7 +1285,7 @@ struct SidebarProjectRow: View {
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
-        .foregroundStyle(Theme.inkPrimary)
+        .foregroundStyle(selectedTitleColor)
       Spacer()
       if count > 0 {
         Text("\(count)")
@@ -1242,6 +1296,14 @@ struct SidebarProjectRow: View {
     }
     .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
+  }
+
+  private var selectedTitleColor: Color {
+    #if os(macOS)
+    selected ? theme.accent : Theme.inkPrimary
+    #else
+    Theme.inkPrimary
+    #endif
   }
 }
 
