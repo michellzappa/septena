@@ -150,7 +150,8 @@ enum WatchSnapshotPublisher {
     // stays additive.
     let nutritionRings = buildNutritionRings(context: context, date: date)
     // This week's training (trailing 7 days) vs targets, for the watch's
-    // training-ring complication. Nil when nothing's been logged this week.
+    // training-ring complication. Present whenever a target exists (they always
+    // have built-in defaults), so it mirrors the macro rings' availability.
     let trainingRings = buildTrainingRings(context: context)
     // The medications / symptoms / groceries capture catalogs, each gated on the
     // section being enabled so the wrist + menu is dynamic — disabling a section
@@ -343,7 +344,8 @@ enum WatchSnapshotPublisher {
   /// fall back to the built-in defaults (12 hard sets, 150 cardio min, 4 sessions).
   /// Strength volume is `sets × difficulty weight` (hard/max = 1, moderate =
   /// 0.5); cardio is summed `durationMin`; a session is a distinct training day.
-  /// Returns nil when nothing was logged this week.
+  /// Present whenever there's progress or a target (targets always have built-in
+  /// defaults), so it stays available like the macro rings.
   @MainActor
   private static func buildTrainingRings(context: ModelContext) -> TrainingRingsWire? {
     // Values + targets both come from `TrainingMetrics` so the wrist matches the
@@ -364,7 +366,12 @@ enum WatchSnapshotPublisher {
                      value: TrainingMetrics.sessionCount(entries),
                      goal: TrainingMetrics.sessionTarget(context: context)),
     ]
-    guard rings.contains(where: { $0.value > 0 }) else { return nil }
+    // Publish whenever there's progress OR a target — mirroring
+    // `buildNutritionRings`. Training targets always carry a built-in default, so
+    // this keeps the wrist training complication and the Next-list "Training"
+    // summary available even on a week with nothing logged yet (empty rings
+    // toward the goal), matching how macros always show once a target exists.
+    guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
     return TrainingRingsWire(rings: rings)
   }
 

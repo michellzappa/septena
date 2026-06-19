@@ -14,17 +14,21 @@ enum MacroStyle {
   static let order = ["kcal", "protein", "carbs", "fat", "fiber"]
 
   static func color(_ key: String) -> Color {
-    // Deliberately off Apple's Activity-ring triad (red / green / cyan): an
-    // orange-anchored, green-free palette so the macro rings never read as the
-    // Move/Exercise/Stand rings on the same face.
+    // Mirror the phone's `MacroCatalog` default colors, so the fallback — empty
+    // tracks before the first sync, and the widget-gallery placeholder, both of
+    // which carry no authored `colorHex` — matches the app's macro tiles instead
+    // of a different palette. The live wire still overrides per macro with the
+    // user's customized tile color (`RingsView` prefers `ring.colorHex`).
+    let hex: String
     switch key {
-    case "kcal":    return .indigo
-    case "protein": return .pink
-    case "carbs":   return .blue
-    case "fat":     return .yellow
-    case "fiber":   return .purple
+    case "kcal":    hex = "#eab308"
+    case "protein": hex = "#ef4444"
+    case "carbs":   hex = "#3b82f6"
+    case "fat":     hex = "#f59e0b"
+    case "fiber":   hex = "#10b981"
     default:        return .gray
     }
+    return Color(hexToken: hex) ?? .gray
   }
 
   /// One-letter chip label for the cramped rectangular legend.
