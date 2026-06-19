@@ -35,5 +35,16 @@ until mkdir "$LOCKDIR" 2>/dev/null; do
 done
 trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
 
-echo "build.sh: building $SCHEME [$DEST] in $REPO"
-( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration Debug build )
+# Isolate CLI builds from Xcode's DerivedData. xcodebuild's default DerivedData
+# is keyed by the .xcodeproj path, so a build.sh run on the MAIN tree lands in
+# the SAME folder Xcode uses for device Run. These CLI builds come out UNSIGNED
+# (no keychain/profile resolution in an agent shell), so Xcode then treats the
+# unsigned .app as up-to-date, installs it as-is, and the device rejects it with
+# "No code signature found." Give CLI builds their own per-repo DerivedData
+# (keyed by path, like the cron's $CRON_DERIVED) so they can never poison the
+# IDE's products. Worktrees, already on distinct paths, stay isolated too.
+DERIVED="/tmp/septena-agent-derived/$(printf '%s' "$REPO" | shasum | cut -c1-12)"
+
+echo "build.sh: building $SCHEME [$DEST] in $REPO (derived: $DERIVED)"
+( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration Debug \
+    -derivedDataPath "$DERIVED" build )
