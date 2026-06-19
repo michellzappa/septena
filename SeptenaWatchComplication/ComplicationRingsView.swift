@@ -44,22 +44,53 @@ struct RingsView: View {
     }
   }
 
-  @ViewBuilder
   private func ringArc(_ ring: ComplicationRing) -> some View {
     // The metric's authored Settings color when present (matches the section),
     // else the domain's fixed fallback hue.
     let c = Color(hexToken: ring.colorHex) ?? color(ring.key)
-    let fraction: Double = {
+    // Raw progress, unclamped — so we can render the over-100% wrap.
+    let raw: Double = {
       guard let goal = ring.goal, goal > 0 else { return 0 }
-      return min(ring.value / goal, 1)
+      return ring.value / goal
     }()
-    ZStack {
-      Circle()
-        .stroke(c.opacity(0.22), lineWidth: lineWidth)
-      Circle()
-        .trim(from: 0, to: fraction)
-        .stroke(c, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-        .rotationEffect(.degrees(-90))
+    // Past 100% the ring laps over itself (Apple-Activity-style). We draw one
+    // extra lap (exact through 200%, a full overlap beyond). The standard SwiftUI
+    // technique (Sarunw / Frank Jia / Andy Regensky): the first lap dims for
+    // contrast, the full-color overflow laps on top, and a rounded TIP offset to
+    // the rim + rotated to the head casts a shadow onto the ring beneath — that
+    // shadow is what actually makes the overlap read.
+    let lapped = raw > 1
+    let overflow = lapped ? min(raw - 1, 1) : 0
+    return GeometryReader { geo in
+      let side = min(geo.size.width, geo.size.height)
+      let radius = (side - lineWidth) / 2          // stroke centerline radius
+      ZStack {
+        Circle()
+          .stroke(c.opacity(0.22), lineWidth: lineWidth)
+        // First lap — dimmed once lapped so the full-color overflow reads on top
+        // (a same-color overlap on a full-bright ring is invisible — the bug).
+        Circle()
+          .trim(from: 0, to: min(raw, 1))
+          .stroke(c.opacity(lapped ? 0.4 : 1),
+                  style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+        if lapped {
+          Circle()
+            .trim(from: 0, to: overflow)
+            .stroke(c, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+          // Rounded head with a drop shadow onto the ring beneath. `offset` puts
+          // it on the rim; `rotationEffect(360·raw)` walks it to the head for any
+          // progress, including the overflow lap.
+          Circle()
+            .fill(c)
+            .frame(width: lineWidth, height: lineWidth)
+            .offset(y: -radius)
+            .rotationEffect(.degrees(360 * raw))
+            .shadow(color: .black.opacity(0.5), radius: max(lineWidth * 0.4, 1.5))
+        }
+      }
+      .frame(width: side, height: side)
     }
   }
 }
