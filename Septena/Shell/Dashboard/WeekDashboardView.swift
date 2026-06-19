@@ -137,10 +137,6 @@ struct WeekDashboardView: View {
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var moodToday: MoodDayResponse? = nil
   @State private var moodHistory: [MoodHistoryPoint] = []
-  /// True while the dashboard QuickAdd is presenting AddMoodPage as a
-  /// standalone sheet (separate from `sheetDest` because Mood needs both
-  /// the destination route and the standalone check-in flow).
-  @State private var presentingMoodCheckin = false
   /// Drives the Tasks-tile "Create in Inbox…" composer, popped in place.
   @State private var creatingTask = false
   /// Bumped after a Symptoms/Medications tile quick-add. Those two tiles read
@@ -214,7 +210,7 @@ struct WeekDashboardView: View {
       bodyRows: ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) ?? []))
   }
 
-  /// iPhone compact: a single fixed column. iPad regular & macOS: adaptive —
+  /// iPhone compact: two columns. iPad regular & macOS: adaptive —
   /// packs as many ~280pt tiles as fit, so a narrow Stage Manager / split
   /// window stays at 2 columns while a full-screen 13" iPad or a wide Mac
   /// window gets 4–5. LazyVGrid reflows on resize. (Previously iPad was
@@ -231,7 +227,10 @@ struct WeekDashboardView: View {
     if hSize == .regular {
       return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     }
-    return [GridItem(.flexible(), spacing: Theme.tileGap)]
+    // Compact iPhone (portrait): two columns. A whole row per tile wasted
+    // width — the numbers-and-histogram tile reads fine at half width and
+    // matches the density of the other layout modes.
+    return Array(repeating: GridItem(.flexible(), spacing: Theme.tileGap), count: 2)
     #else
     return [GridItem(.adaptive(minimum: 280), spacing: Theme.tileGap)]
     #endif
@@ -473,6 +472,8 @@ struct WeekDashboardView: View {
     } label: {
       Label("Insights", systemImage: "chart.dots.scatter")
     }
+    // Separate the dashboard rows from the shared Settings item below.
+    Divider()
   }
 
   /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only
@@ -1050,10 +1051,24 @@ struct WeekDashboardView: View {
   /// is no longer a layout mode — it's the Insights destination.)
   @ViewBuilder
   private var layoutBody: some View {
+    // Touch `quickLogStamp` so a Symptoms / Medications tile quick-add (which
+    // bumps it) re-evaluates the body and re-fetches those SwiftData-backed
+    // series — they aren't in the `.septenaDataChanged` reload path, and now
+    // that every mode renders from `visibleDomainData` the dependency has to
+    // live here rather than inside a per-section tile.
+    let _ = quickLogStamp
     switch currentLayoutMode {
     case .tiles:
+      // Histogram mode: same `visibleDomainData` + tap + quick-add plumbing
+      // as the other three renderers, so the four modes can't drift.
       LazyVGrid(columns: columns, spacing: Theme.tileGap) {
-        tiles
+        ForEach(visibleDomainData) { item in
+          Button { handleDomainTap(item.tap) } label: {
+            DomainTile(data: item)
+          }
+          .buttonStyle(.plain)
+          .contextMenu { quickAddMenu(for: item) }
+        }
       }
     case .dense:
       DenseHomepageView(
@@ -1222,41 +1237,6 @@ struct WeekDashboardView: View {
   // section mirror hydrates) is the `SectionManifest` catalog order — no
   // separate hardcoded list. See `visibleDomains`.
 
-  @ViewBuilder
-  private var tiles: some View {
-    ForEach(tileItems) { item in
-      tileView(for: item)
-    }
-  }
-
-  /// One grid cell per item. Intake is flattened HERE — each kind becomes its
-  /// own top-level item, so it lands in its own grid cell (a nested ForEach
-  /// returned from `tile(for:)` would collapse into a single cell instead).
-  private var tileItems: [HomeTileItem] {
-    visibleDomains.flatMap { domain -> [HomeTileItem] in
-      guard domain == .intake else { return [.domain(domain)] }
-      return intakeTiles.isEmpty ? [.domain(.intake)] : intakeTiles.map { .intakeKind($0) }
-    }
-  }
-
-  @ViewBuilder
-  private func tileView(for item: HomeTileItem) -> some View {
-    switch item {
-    case .domain(let d):     tile(for: d)
-    case .intakeKind(let t): intakeKindTile(t)
-    }
-  }
-
-  private enum HomeTileItem: Identifiable {
-    case domain(HomepageDomain)
-    case intakeKind(IntakeTileDTO)
-    var id: String {
-      switch self {
-      case .domain(let d):     return d.rawValue
-      case .intakeKind(let t): return "intake:\(t.id)"
-      }
-    }
-  }
 
   /// Domain order + visibility, driven by Settings so reordering in
   /// Settings → Sections applies uniformly to every layout mode. Section
@@ -1282,28 +1262,6 @@ struct WeekDashboardView: View {
       .filter { seen.insert($0).inserted }
   }
 
-  @ViewBuilder
-  private func tile(for domain: HomepageDomain) -> some View {
-    switch domain {
-    case .tasks:       tasksTile
-    case .habits:      habitsTile
-    case .training:    trainingTile
-    case .chores:      choresTile
-    case .supplements: supplementsTile
-    case .sleep:       sleepTile
-    case .nutrition:   nutritionTile
-    case .hydration:   hydrationTile
-    case .groceries:   groceriesTile
-    case .intake:      intakeEmptyTile  // only reached when there are no kinds
-    case .body:        bodyTile
-    case .gut:         gutTile
-    case .mood:        moodTile
-    case .symptoms:    symptomsTile
-    case .medications: medicationsTile
-    case .activity:    activityTile
-    case .github:      githubTile
-    }
-  }
 
   // MARK: - Mode-agnostic domain data
   //
@@ -1665,9 +1623,8 @@ struct WeekDashboardView: View {
     let state = currentFastingState(now: Date())
     let metric = NutritionHeatmapMetric(rawValue: nutritionHeatmapMetricRaw) ?? .protein
 
-    // History series: heatmap metric preference wins for any mode that
-    // reads `history` (Dense, Heatmap). Tiles use `nutritionTile` and
-    // ignore this. Only honor the "fasting" pick when the master
+    // History series: the heatmap metric preference picks which series
+    // every mode renders. Only honor the "fasting" pick when the master
     // toggle is on, otherwise the picker preference is dormant.
     let history: HistorySeries = {
       if nutritionTrackFasting, metric == .fasting {
@@ -1816,30 +1773,6 @@ struct WeekDashboardView: View {
     )
   }
 
-  // GitHub — daily commit counts; 7-day histogram in the tile, full year
-  // in the destination's heatmap.
-  private var githubTile: some View {
-    let counts = derived.githubCounts90
-    let today = counts.last ?? 0
-    let week = counts.suffix(7).reduce(0, +)
-    let streak = derived.githubStreak
-    let bars = Array(counts.suffix(7))
-    return Button { open(.github) } label: {
-      ModuleTile(
-        title: String(localized: "GitHub", comment: "Section name"),
-        accent: theme.color(for: "github"),
-        stats: [
-          .init(label: "Today", value: "\(today)"),
-          .init(label: "Streak", value: "\(streak)", unit: "d"),
-          .init(label: "Week", value: "\(week)")
-        ],
-        history: .init(label: "Commits (7d)", values: bars)
-      )
-    }
-    .buttonStyle(.plain)
-  }
-
-
   private func gutDomainData() -> HomepageDomainData {
     let count = gutToday?.movementCount ?? 0
     let avgBristol = Self.avgBristol(gutToday?.entries ?? [])
@@ -1861,21 +1794,6 @@ struct WeekDashboardView: View {
       history: .bars(bars.isEmpty ? Array(repeating: 0, count: 90) : bars),
       tap: .openSheet(.gut)
     )
-  }
-
-  private var symptomsTile: some View {
-    let _ = quickLogStamp  // re-fetch after a tile quick-add (see quickLogStamp)
-    let data = symptomsDomainData()
-    return Button { open(.symptoms) } label: {
-      ModuleTile(
-        title: data.title,
-        accent: data.accent,
-        stats: data.headlineStats.map { .init(label: $0.label, value: $0.value, unit: $0.unit) },
-        history: .init(label: "Severity (7d)", values: symptomsHistory(days: 7))
-      )
-    }
-    .buttonStyle(.plain)
-    .contextMenu { symptomsQuickAddMenu }
   }
 
   @ViewBuilder private var symptomsQuickAddMenu: some View {
@@ -1993,24 +1911,6 @@ struct WeekDashboardView: View {
       }
     }
     return out
-  }
-
-  private var medicationsTile: some View {
-    let _ = quickLogStamp  // re-fetch after a tile quick-add (see quickLogStamp)
-    let data = medicationsDomainData()
-    return Button { open(.medications) } label: {
-      ModuleTile(
-        title: data.title,
-        accent: data.accent,
-        stats: data.headlineStats.map { .init(label: $0.label, value: $0.value, unit: $0.unit) },
-        progress: data.progress.map {
-          .init(label: $0.label, current: $0.current, target: $0.target, unit: $0.unit ?? "")
-        },
-        history: .init(label: "Taken (7d)", values: medicationsHistory(days: 7))
-      )
-    }
-    .buttonStyle(.plain)
-    .contextMenu { medicationsQuickAddMenu }
   }
 
   @ViewBuilder private var medicationsQuickAddMenu: some View {
@@ -2193,36 +2093,6 @@ struct WeekDashboardView: View {
   @AppStorage(SettingsKey.tasksOpenIn)
   private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
 
-  // Tasks — live counts from /api/tasks/counts and per-day completion
-  // history from /api/tasks/history. Tap behaviour is user-configurable
-  // via Settings > Tasks > Open in: drawer (default, like other sections)
-  // or the Tasks tab.
-  private var tasksTile: some View {
-    let openToday = taskCounts.map { $0.todayCount + $0.reviewCount } ?? 0
-    let toSort = taskCounts?.triageCount ?? 0
-    let upcoming = taskCounts?.upcomingCount ?? 0
-    let doneToday = tasksHistory?.daily.last?.done ?? 0
-    let totalToday = doneToday + openToday
-    // Tile histograms render at 7 days regardless of the underlying
-    // loader window (90d for Heatmap + Dense). At ~150pt tile width,
-    // 90 bars compress into invisibility. Sparkline mode reads from
-    // the full @State arrays via `HomepageDomainData`, so this slice
-    // is tile-mode-only.
-    let bars = Array((tasksHistory?.daily.map(\.done) ?? []).suffix(7))
-    return WeekTasksTile(
-      accent: theme.color(for: "tasks"),
-      openToday: openToday,
-      toSort: toSort,
-      upcoming: upcoming,
-      doneToday: doneToday,
-      totalToday: totalToday,
-      bars: bars
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { openTasksFromTile() }
-    .contextMenu { tasksQuickAddMenu }
-  }
-
   /// Today's open tasks read straight from SwiftData (no network hop) —
   /// LocalCache mirrors the server's view=today filter, so this matches
   /// what the Tasks tab shows when you navigate in.
@@ -2253,22 +2123,6 @@ struct WeekDashboardView: View {
     )
   }
 
-  private var habitsTile: some View {
-    let total = dailies.habits.count
-    let done = dailies.habits.filter { $0.done }.count
-    let skipped = dailies.habits.filter { $0.skipped }.count
-    return WeekHabitsTile(
-      accent: theme.color(for: "habits"),
-      done: done,
-      skipped: skipped,
-      total: total,
-      history: Array(habitHistory.suffix(7))
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.habits) }
-    .contextMenu { habitsQuickAddMenu }
-  }
-
   @ViewBuilder private var habitsQuickAddMenu: some View {
     HabitsQuickAddMenu(
       habits: dailies.habits,
@@ -2282,37 +2136,6 @@ struct WeekDashboardView: View {
     dailies.toggleHabit(item, mutator: checklistMutator, motion: motion)
     AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
-  }
-
-  // Training — sessions count derived from unique dates in the last 7
-  // days of entries; Z2 minutes and target come from the cardio endpoint;
-  // histogram bars stack strength-like effort (full accent) and cardio
-  // effort (lighter shade) per day — both in effort-minutes, with yoga
-  // folded into strength-like rather than cardio. Each series is normalized
-  // to its own 7-day max ×50 so a peak day fills the chart.
-  private var trainingTile: some View {
-    let accent = theme.color(for: "training")
-    // Same fix as `trainingDomainData`: stats are trailing 7 days so
-    // they read sensibly against the weekly Z2 target. Tile bar chart
-    // still renders 7 days regardless via `lastSevenDays`.
-    let sessionCount = weeklySessionCount
-    let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
-    let target = cardio?.targetWeeklyMin ?? 150
-
-    let strengthBars = derived.trainStrengthBars7
-    let cardioBars   = derived.trainCardioBars7
-
-    return WeekTrainingTile(
-      accent: accent,
-      sessionCount: sessionCount,
-      minutes: minutes,
-      target: target,
-      strengthBars: strengthBars,
-      cardioBars: cardioBars
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.training) }
-    .contextMenu { trainingQuickAddMenu }
   }
 
   @ViewBuilder private var trainingQuickAddMenu: some View {
@@ -2340,54 +2163,15 @@ struct WeekDashboardView: View {
     )
   }
 
-  /// Last 7 ISO yyyy-MM-dd dates, oldest → newest. Used to align the
-  /// training tile's two-series histogram so absent days still render
-  /// as zero-height bars instead of being collapsed out of the chart.
-  /// Stays at 7 — the training tile's bar chart was designed for it
-  /// and looked cramped at 30. The longer-window training domain data
-  /// uses `lastNDays(_:)` directly.
-  private var lastSevenDays: [String] { lastNDays(7) }
-
-  /// Last N ISO yyyy-MM-dd dates, oldest → newest. Generalisation of
-  /// `lastSevenDays` for callers that need a longer window — currently
-  /// `trainingDomainData` (90 days for the Heatmap mode).
+  /// Last N ISO yyyy-MM-dd dates, oldest → newest. Used by the symptoms /
+  /// medications / activity history helpers and `trainingDomainData`
+  /// (90 days for the Heatmap mode).
   private func lastNDays(_ n: Int) -> [String] {
     let cal = Calendar.current
     let fmt = Self.ymdFormatter
     return (0..<n).reversed().compactMap { offset in
       cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
-  }
-
-  private var choresTile: some View {
-    // "Done today" needs to count chores already completed earlier in the
-    // day (server has them with `last_completed == today`) plus anything
-    // toggled in this session (`completedChores`). Without the server
-    // half, the count is always 0 on a fresh launch.
-    let todayISO = SeptenaDate.today
-    let serverDoneIDs = Set(dailies.chores
-                              .filter { $0.lastCompleted == todayISO }
-                              .map(\.id))
-    let doneIDs = serverDoneIDs.union(dailies.completedChores)
-    let dueToday = dailies.chores.filter {
-      $0.daysOverdue == 0 && !doneIDs.contains($0.id)
-    }.count
-    let overdue  = dailies.chores.filter {
-      $0.daysOverdue > 0 && !doneIDs.contains($0.id)
-    }.count
-    let done = doneIDs.count
-    let total = dueToday + overdue + done
-    return WeekChoresTile(
-      accent: theme.color(for: "chores"),
-      dueToday: dueToday,
-      overdue: overdue,
-      done: done,
-      total: total,
-      history: Array(choreHistory.suffix(7))
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.chores) }
-    .contextMenu { choresQuickAddMenu }
   }
 
   /// Chores already toggled this session — hidden from both menus so we
@@ -2410,21 +2194,6 @@ struct WeekDashboardView: View {
     Haptics.tick()
   }
 
-  // Supplements — live taken/total today plus 7-day adherence histogram.
-  private var supplementsTile: some View {
-    let total = dailies.supplements.count
-    let done = dailies.supplements.filter { $0.done }.count
-    return WeekSupplementsTile(
-      accent: theme.color(for: "supplements"),
-      done: done,
-      total: total,
-      history: Array(supplementHistory.suffix(7))
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.supplements) }
-    .contextMenu { supplementsQuickAddMenu }
-  }
-
   @ViewBuilder private var supplementsQuickAddMenu: some View {
     SupplementsQuickAddMenu(
       supplements: dailies.supplements,
@@ -2436,43 +2205,6 @@ struct WeekDashboardView: View {
     dailies.toggleSupplement(item, mutator: checklistMutator, motion: motion)
     AddInfoSection.supplements.notifyTilesChanged()
     Haptics.tick()
-  }
-
-  // Sleep — Oura-backed. Last night's total + score; 7-day hours
-  // histogram. Reverse the server order so the bar furthest right is
-  // most-recent.
-  private var sleepTile: some View {
-    let last = ouraNights.first
-    let lastH = last?.totalH ?? 0
-    let score = last?.sleepScore.map { "\($0)" } ?? "—"
-    let bars = Array(ouraNights.reversed().map { $0.sleepScore ?? 0 }.suffix(7))
-    return Button { open(.sleep) } label: {
-      WeekSleepTile(
-        accent: theme.color(for: "sleep"),
-        lastHoursText: formatHoursShort(lastH),
-        lastHours: lastH,
-        score: score,
-        bars: bars
-      )
-    }
-    .buttonStyle(.plain)
-  }
-
-  // Groceries — what's running low, as the headline stat.
-  private var groceriesTile: some View {
-    let lowCount = groceries.filter { $0.low }.count
-    let stocked = groceries.count - lowCount
-    let missingPerDay = groceriesMissingPerDay()
-    return WeekGroceriesTile(
-      accent: theme.color(for: "groceries"),
-      lowCount: lowCount,
-      stocked: stocked,
-      totalItems: groceries.count,
-      missingPerDay: missingPerDay
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.groceries) }
-    .contextMenu { groceriesQuickAddMenu }
   }
 
   @ViewBuilder private var groceriesQuickAddMenu: some View {
@@ -2514,28 +2246,6 @@ struct WeekDashboardView: View {
   // the `tiles` loop. Tapping opens the kind switcher; each kind page owns its
   // container-aware quick-add. Non-Tiles layout modes show one aggregate row
   // via `intakeDomainData()`. See docs/CONSUMABLES_PLAN.md.
-
-  private func intakeKindTile(_ t: IntakeTileDTO) -> some View {
-    let accent = AdaptiveColor.adaptive(t.color) ?? theme.color(for: "intake")
-    var stats: [ModuleTile.Stat] = [.init(label: "Today", value: "\(t.todayCount)")]
-    if t.showsAmount, t.todayAmount > 0 {
-      stats.append(.init(label: "Total",
-                         value: String(format: "%.1f", t.todayAmount),
-                         unit: t.unit))
-    }
-    // Reduce/quit trackers headline their days-since-last streak ("12d clean").
-    if IntakeObjective.emphasizesStreak(t.objective),
-       let days = intakeDaysSince(t.lastEventAt), days >= 1 {
-      stats.append(.init(label: IntakeObjective.streakLabel(t.objective), value: "\(days)d"))
-    }
-    let bars = Array(t.dailyCounts.suffix(7))
-    return ModuleTile(title: t.name, accent: accent, stats: stats,
-                      history: .init(label: "7-day",
-                                     values: bars.isEmpty ? Array(repeating: 0, count: 7) : bars))
-      .contentShape(Rectangle())
-      .onTapGesture { openIntakeKind(t.id) }
-      .contextMenu { intakeQuickAddMenu(for: t) }
-  }
 
   /// Long-press quick-add for a tracker tile — the same container-aware
   /// choices its kind page builds (Continue (Hit N) / New capsule / methods),
@@ -2582,16 +2292,6 @@ struct WeekDashboardView: View {
                               to: cal.startOfDay(for: clock.now)).day
   }
 
-  /// Shown when the section is enabled but has no kinds yet — taps straight into
-  /// the create-a-tracker wizard (there's no host kind-switcher screen anymore).
-  private var intakeEmptyTile: some View {
-    ModuleTile(title: SectionManifest.byKey["intake"]?.defaultLabel ?? "Intake",
-               accent: theme.color(for: "intake"),
-               stats: [.init(label: "Trackers", value: "0")])
-      .contentShape(Rectangle())
-      .onTapGesture { creatingIntakeKind = true }
-  }
-
   /// Aggregate row for the non-Tiles layout modes (Dense / Heatmap / Rings /
   /// Wheel), which consume `visibleDomainData` rather than `tile(for:)`.
   private func intakeDomainData() -> HomepageDomainData {
@@ -2614,68 +2314,6 @@ struct WeekDashboardView: View {
   private func reloadIntake() async {
     let date = clock.today
     intakeTiles = await MirrorReader.shared.read { IntakeReader.loadTiles(context: $0, date: date) }
-  }
-
-  // Body — latest Withings weigh-in + bidirectional weight chart.
-  // Only actual weigh-in days produce bars; gaps stay nil so carry-forward
-  // values don't collapse everything to zero deviation.
-  private var bodyTile: some View {
-    let accent = theme.color(for: "body")
-    let latest = bodyRows.first
-    let weight = latest?.weightKg
-    let fat    = latest?.fatPct
-    // Tile chart is a 7-day window; the full 90-day series lives on
-    // `bodyDomainData` for Sparkline / Heatmap modes.
-    let actualSeriesFull = derived.weightActual30
-    let actualSeries = Array(actualSeriesFull.suffix(7))
-    let present = actualSeries.compactMap { $0 }
-    let avg = present.isEmpty ? 0.0 : present.reduce(0, +) / Double(present.count)
-    let centeredValues: [Double?] = actualSeries.map { $0.map { $0 - avg } }
-    // Body-fat percentage tracked against a soft 18% target (single number,
-    // overrideable later via Settings.targets.fat_min_pct).
-    let fatTarget: Double = 18
-    return Button { open(.body) } label: {
-      ModuleTile(
-        title: String(localized: "Body", comment: "Section name"),
-        accent: accent,
-        stats: [
-          .init(label: "Weight", value: weight.map { String(format: "%.1f", WeightUnit.current.display($0)) } ?? "—", unit: WeightUnit.current.suffix),
-          .init(label: "Fat",    value: fat.map { String(format: "%.1f", $0) } ?? "—", unit: "%")
-        ],
-        progress: .init(label: "Body fat target",
-                        current: fat.map { min($0, fatTarget * 2) } ?? 0,
-                        target: fatTarget,
-                        unit: "%"),
-        centeredHistory: .init(label: "Weight vs avg (7d)", values: centeredValues)
-      )
-    }
-    .buttonStyle(.plain)
-  }
-
-  // Gut — today's movement count + last-7-day movement bars.
-  private var gutTile: some View {
-    let accent = theme.color(for: "gut")
-    let count = gutToday?.movementCount ?? 0
-    let avgBristol = Self.avgBristol(gutToday?.entries ?? [])
-    let bars = Array(gutHistory.map { $0.movements }.suffix(7))
-    let dailyTarget = 2
-    return ModuleTile(
-      title: String(localized: "Gut", comment: "Section name"),
-      accent: accent,
-      stats: [
-        .init(label: "Today",       value: "\(count)"),
-        .init(label: "Avg Bristol", value: avgBristol.map { String(format: "%.1f", $0) } ?? "—")
-      ],
-      progress: .init(label: "Today / typical",
-                      current: Double(min(count, dailyTarget)),
-                      target: Double(dailyTarget)),
-      history: .init(label: "7-day movements",
-                     values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars)
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.gut) }
-    .contextMenu { gutQuickAddMenu }
   }
 
   // Bristol scale is a fixed 7-item enum — the menu IS the complete UX,
@@ -2707,35 +2345,6 @@ struct WeekDashboardView: View {
     }
   }
 
-  // Activity — Apple Health, on-device. Skips entirely when HealthKit
-  // isn't available (Mac). Real per-day step bars from the last 7 days.
-  @ViewBuilder
-  private var activityTile: some View {
-    Group {
-      if let snap = activitySnapshot() {
-        let accent = theme.color(for: "activity")
-        let stepsTarget = 8000
-        Button { open(.activity) } label: {
-          ModuleTile(
-            title: String(localized: "Activity", comment: "Section name"),
-            accent: accent,
-            stats: [
-              .init(label: "Steps",    value: "\(snap.steps)"),
-              .init(label: "Active",   value: "\(Int(snap.kcal))", unit: "kcal"),
-              .init(label: "Exercise", value: "\(snap.exMin)", unit: "m")
-            ],
-            progress: .init(label: "Steps target",
-                            current: Double(min(snap.steps, stepsTarget)),
-                            target: Double(stepsTarget)),
-            history: .init(label: "7-day steps",
-                           values: snap.bars)
-          )
-        }
-        .buttonStyle(.plain)
-      }
-    }
-  }
-
   // Settings is reached from the sidebar (and ⌘, on macOS) — it's an
   // app-level surface, not a Week tile, and not on this toolbar.
 
@@ -2746,63 +2355,6 @@ struct WeekDashboardView: View {
   private func formatHoursShort(_ h: Double) -> String {
     let total = Int((h * 60).rounded())
     return String(format: "%d:%02d", total / 60, total % 60)
-  }
-
-  // Nutrition — today's protein + kcal from today's entries; histogram
-  // is per-day protein from /api/nutrition/stats; progress bar uses the
-  // user's protein target from /api/nutrition/macros-config.
-  //
-  // When fasting tracking is on and the live state machine reports a
-  // fasting window, the tile morphs: headline becomes the live timer,
-  // progress tracks the target fasting band, and the history becomes
-  // 7-day completed-fast hours instead of protein grams.
-  private var nutritionTile: some View {
-    // TimelineView lets the live timer minute-tick while the tile is
-    // visible; the rest of the tile re-renders harmlessly each minute.
-    TimelineView(.periodic(from: .now, by: 60)) { ctx in
-      nutritionTileBody(now: ctx.date)
-    }
-  }
-
-  @ViewBuilder
-  private func nutritionTileBody(now: Date) -> some View {
-    let accent = theme.color(for: "nutrition")
-    let state = currentFastingState(now: now)
-    if nutritionTrackFasting, case .fasting(_, let since, let totalMin) = state {
-      ModuleTile(
-        title: String(localized: "Nutrition", comment: "Section name"),
-        accent: accent,
-        stats: [
-          .init(label: "Fasting", value: fastingDurationText(totalMin: totalMin)),
-          .init(label: "Since", value: since)
-        ],
-        progress: fastingProgressRow(totalMin: totalMin),
-        history: .init(label: "7-day fasts (h)", values: fastingHoursBars())
-      )
-      .contentShape(Rectangle())
-      .onTapGesture { open(.nutrition) }
-      .contextMenu { nutritionQuickAddMenu }
-    } else {
-      let proteinTarget = nutritionTarget?.protein.min ?? 150
-      let bars = Array((nutritionStats?.daily.map { Int($0.proteinG) }
-                ?? Array(repeating: 0, count: 7)).suffix(7))
-      ModuleTile(
-        title: String(localized: "Nutrition", comment: "Section name"),
-        accent: accent,
-        stats: [
-          .init(label: "Protein", value: "\(Int(todayProteinSum))", unit: "g"),
-          .init(label: "Kcal",    value: "\(Int(todayKcalSum))")
-        ],
-        progress: .init(label: "Today's protein",
-                        current: todayProteinSum,
-                        target: max(proteinTarget, 1),
-                        unit: "g"),
-        history: .init(label: "7-day protein", values: bars)
-      )
-      .contentShape(Rectangle())
-      .onTapGesture { open(.nutrition) }
-      .contextMenu { nutritionQuickAddMenu }
-    }
   }
 
   /// Live fasting state derived from `nutritionStats`. Returns `.fed`
@@ -2816,37 +2368,6 @@ struct WeekDashboardView: View {
       yesterdayLastMeal: stats.yesterdayLastMeal
     )
     return computeFastingState(inputs: inputs, now: now)
-  }
-
-  private func fastingDurationText(totalMin: Int) -> String {
-    "\(totalMin / 60)h \(totalMin % 60)m"
-  }
-
-  /// Progress bar fills toward the user's target fasting minimum (the
-  /// short end of the band). Once past it, the bar shows full but the
-  /// timer keeps counting in the headline.
-  private func fastingProgressRow(totalMin: Int) -> ModuleTile.ProgressBar {
-    let targetMin = nutritionTarget?.fasting?.min ?? FastingDefaults.targetMinH
-    let hours = Double(totalMin) / 60
-    return .init(
-      label: "Fast vs target",
-      current: min(hours, targetMin),
-      target: max(targetMin, 1),
-      unit: "h"
-    )
-  }
-
-  /// Last-7 completed-fast hours, oldest→newest. Gaps (sparse-log
-  /// days where the heuristic couldn't anchor a window) collapse to 0
-  /// — the bar just renders short rather than disappearing.
-  private func fastingHoursBars() -> [Int] {
-    let windows = nutritionStats?.fasting ?? []
-    let last7 = windows.suffix(7)
-    let bars = last7.map { Int(($0.hours ?? 0).rounded()) }
-    if bars.count < 7 {
-      return Array(repeating: 0, count: 7 - bars.count) + bars
-    }
-    return bars
   }
 
   @ViewBuilder private var nutritionQuickAddMenu: some View {
@@ -2883,44 +2404,9 @@ struct WeekDashboardView: View {
 
   // MARK: - Mood
 
-  // Mood — today's check-in count + last-7-day log bars. Bars are the
-  // raw log count per day; color stays neutral on the bar itself (the
-  // detail color story lives inside MoodDestinationView).
-  private var moodTile: some View {
-    let accent = theme.color(for: "mood")
-    let today = moodToday?.logCount ?? 0
-    let bars = Array(moodHistory.map { $0.logs }.suffix(7))
-    return ModuleTile(
-      title: String(localized: "Mood", comment: "Section name"),
-      accent: accent,
-      stats: [
-        .init(label: "Today",  value: "\(today)"),
-        .init(label: "Target", value: "3"),
-      ],
-      progress: .init(label: "Today / target",
-                      current: Double(min(today, 3)),
-                      target: 3),
-      history: .init(label: "7-day check-ins",
-                     values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars)
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.mood) }
-    .contextMenu { moodQuickAddMenu }
-    .sheet(isPresented: $presentingMoodCheckin) {
-      AddMoodPage(onLogged: {
-        Task { await refreshMood() }
-      })
-      #if os(iOS)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-      #endif
-    }
-  }
-
   @ViewBuilder private var moodQuickAddMenu: some View {
     MoodQuickAddMenu(onLog: { commitMood($0) },
-                     onCheckIn: { presentingMoodCheckin = true })
+                     onCheckIn: { nav.showMoodCheckin = true })
   }
 
   private func commitMood(_ emotion: MoodEmotion) {
@@ -2964,33 +2450,6 @@ struct WeekDashboardView: View {
   }
 
   // MARK: - Hydration
-
-  // Hydration — today's water total vs the daily target + a 7-day intake
-  // histogram. Backed by Nutrition's water entries (no entity of its own),
-  // so like Mood it routes around `AddInfoSection` and refreshes itself
-  // after a quick-add commit.
-  private var hydrationTile: some View {
-    let accent = theme.color(for: "hydration")
-    let bars = Array(hydrationHistory.suffix(7))
-    return ModuleTile(
-      title: String(localized: "Hydration", comment: "Section name"),
-      accent: accent,
-      stats: [
-        .init(label: "Today",  value: "\(hydrationToday)", unit: "ml"),
-        .init(label: "Target", value: "\(hydrationTargetMl)", unit: "ml"),
-      ],
-      progress: .init(label: "Today / target",
-                      current: Double(min(hydrationToday, hydrationTargetMl)),
-                      target: Double(max(hydrationTargetMl, 1)),
-                      unit: "ml"),
-      history: .init(label: "7-day intake",
-                     values: bars.isEmpty
-                       ? Array(repeating: 0, count: 7) : bars)
-    )
-    .contentShape(Rectangle())
-    .onTapGesture { open(.hydration) }
-    .contextMenu { hydrationQuickAddMenu }
-  }
 
   /// Preset glasses commit a water-only Nutrition entry at the current
   /// time. Custom amounts live in the destination view's sheet — the

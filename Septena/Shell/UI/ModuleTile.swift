@@ -408,15 +408,22 @@ struct Histogram: View {
               let secH = barsH * max(0, min(1, CGFloat(secondaryValues[idx]) / 100))
               VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                Rectangle()
-                  .fill(accent.opacity(0.35))
-                  .frame(height: secH)
-                Rectangle()
-                  .fill(accent)
-                  .frame(height: primaryH)
+                // Round the *visible* stack (cardio on top of strength), not
+                // the full-height column. Clipping the column rounds corners at
+                // the top of the frame — far above a short bar — which left the
+                // bar itself flat-topped, unlike the single-bar branch below.
+                VStack(spacing: 0) {
+                  Rectangle()
+                    .fill(accent.opacity(0.35))
+                    .frame(height: secH)
+                  Rectangle()
+                    .fill(accent)
+                    .frame(height: primaryH)
+                }
+                .frame(height: secH + primaryH)
+                .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
               }
               .frame(width: barW, height: barsH)
-              .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             } else if let ceiling, ceiling > 0 {
               let frac = max(0, min(1, CGFloat(v) / CGFloat(ceiling)))
               let fillH = barsH * frac
@@ -468,6 +475,150 @@ struct Histogram: View {
           .frame(height: labelH)
         }
       }
+    }
+  }
+}
+
+// MARK: - Unified domain tile (Histogram layout mode)
+
+/// The Histogram layout mode's cell, rendered from the shared
+/// `HomepageDomainData` — the same view-model Sparkline / Heatmap / Rings
+/// read, so the four modes can't drift on what "today's number" means.
+///
+/// It speaks the family's visual vocabulary (a `SectionGlyph` identity
+/// square + a flat `Theme.cardSurface` card, matching `DenseDomainCard` /
+/// `HeatmapDomainCard`) while keeping the mode's signature: up to two
+/// headline numbers above a 7-day histogram. No progress bar — that
+/// concept moved to Rings mode.
+struct DomainTile: View {
+  let data: HomepageDomainData
+
+  /// At most two stats. A 2-up grid cell is too narrow on iPhone for three
+  /// big numbers, and the `domainData` builders order `headlineStats` by
+  /// prominence — so the first two are the glance-worthy ones.
+  private var stats: [DomainStat] { Array(data.headlineStats.prefix(2)) }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 8) {
+        SectionGlyph(icon: data.icon, accent: data.accent)
+        Text(data.title)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+        Spacer(minLength: 0)
+      }
+
+      if !stats.isEmpty {
+        HStack(alignment: .top, spacing: 16) {
+          ForEach(Array(stats.enumerated()), id: \.offset) { idx, stat in
+            VStack(alignment: .leading, spacing: 2) {
+              Text(stat.label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .lineLimit(1)
+              HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(stat.value)
+                  .font(.system(.title2, design: .rounded).weight(.semibold))
+                  .foregroundStyle(data.accent)
+                  // Match the old tile's quick-add digit tween.
+                  .contentTransition(.numericText())
+                  .a11yAnimation(Theme.Motion.gauge, value: stat.value)
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.6)
+                if let unit = stat.unit {
+                  Text(unit)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+            }
+            if idx != stats.count - 1 { Spacer(minLength: 0) }
+          }
+        }
+      }
+
+      if let history = data.history {
+        TileHistogram(history: history, accent: data.accent)
+          .frame(height: 58)
+      }
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Theme.cardSurface)
+    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .contentShape(Rectangle())
+  }
+}
+
+/// Maps a `HomepageDomainData.history` series onto the tile's 7-day chart,
+/// reusing the same primitives the tile always used (`Histogram` for
+/// counts / two-series effort, `CenteredBarChart` for body-weight deltas).
+/// 90-day series get sliced to the trailing 7 here — at ~half-screen tile
+/// width, 90 bars compress into nothing; the long window is for the
+/// Sparkline / Heatmap modes that read `history` directly.
+private struct TileHistogram: View {
+  let history: HistorySeries
+  let accent: Color
+
+  var body: some View {
+    switch history {
+    case .bars(let values):
+      let v = Self.last7(values)
+      Histogram(values: v,
+                accent: accent,
+                emphasizedIndex: v.count - 1,
+                dayLabels: Self.weekdayLabels(count: v.count))
+
+    case .stackedBars(let primary, let secondary):
+      // Each series independently normalized to its own 7-day max ×50, so
+      // the two stack into a shared 0…100 ceiling (mirrors the training
+      // tile's old `derived.train*Bars7`). Strength-like sits on the bottom
+      // in full accent, cardio on top in the lighter shade.
+      let p = Self.normalize50(Self.last7(primary))
+      let s = Self.normalize50(Self.last7(secondary))
+      Histogram(values: p,
+                accent: accent,
+                dayLabels: Self.weekdayLabels(count: p.count),
+                secondaryValues: s)
+
+    case .centered(let values, _):
+      let v = Self.last7Optional(values)
+      CenteredBarChart(values: v,
+                       accent: accent,
+                       dayLabels: Self.weekdayLabels(count: v.count))
+    }
+  }
+
+  /// Trailing 7, padded with leading zeros if the series is shorter (so a
+  /// short window reads as empty days, not a compressed chart).
+  private static func last7<T: ExpressibleByIntegerLiteral>(_ v: [T]) -> [T] {
+    v.count >= 7 ? Array(v.suffix(7)) : Array(repeating: 0, count: 7 - v.count) + v
+  }
+
+  /// Same, but pads missing days with `nil` for `.centered` series so a
+  /// gap stays a gap rather than a fake zero deviation.
+  private static func last7Optional(_ v: [Double?]) -> [Double?] {
+    v.count >= 7 ? Array(v.suffix(7)) : Array(repeating: nil, count: 7 - v.count) + v
+  }
+
+  private static func normalize50(_ v: [Double]) -> [Int] {
+    let m = max(1, v.max() ?? 0)
+    return v.map { Int(($0 / m) * 50) }
+  }
+
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"   // single-letter weekday
+    return fmt
+  }()
+
+  /// Last `count` weekday initials ending at today, oldest → newest.
+  private static func weekdayLabels(count: Int) -> [String] {
+    let cal = Calendar.current
+    let fmt = narrowWeekdayFormatter
+    return (0..<count).reversed().compactMap { offset in
+      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
     }
   }
 }

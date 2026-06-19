@@ -632,7 +632,6 @@
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		C9BCD0430EC4B5561CB1F143 /* MilestoneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2ABB5641A551478BB6D1FE7 /* MilestoneEngine.swift */; };
 		C9CE47DECCE06EDE9E42B1D6 /* DiscoveryFlowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8406632D2A873E175B61F4DC /* DiscoveryFlowChrome.swift */; };
-		CA6270A709C27D25DD0559C1 /* WeekDashboardTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46CEB14D4AC9E10041749682 /* WeekDashboardTiles.swift */; };
 		CAC1308955C25982A48369D8 /* NextComplicationBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */; };
 		CAC3D7882FBA4CC14C531FEE /* TasksPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB380FE69F57820927B8BD3D /* TasksPlugin.swift */; };
 		CB31EA476ED138FEC78FCE6B /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1654FD32744DA1974DA1C1CE /* PlatformDelegates.swift */; };
@@ -727,7 +726,6 @@
 		E6C8DBF309966F7E6CF312CB /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F911216C13CBFC7E330714A /* Theme.swift */; };
 		E725A1C52A8034651B53D622 /* ValuesSuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AF7AFAC799CE9882271F8A /* ValuesSuggestions.swift */; };
 		E72B4D7EC438FBA124261947 /* MilestoneUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB0FEA3128C7486D772B3A6 /* MilestoneUnits.swift */; };
-		E74AC414E5DA6C6D7EC01836 /* WeekDashboardTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46CEB14D4AC9E10041749682 /* WeekDashboardTiles.swift */; };
 		E772D842933CA1E01A9D9D3D /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
 		E776274FBDC13B364207E1AD /* CoachMessageRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115B3D035A8FFAB40EB1205D /* CoachMessageRecord.swift */; };
 		E7A21358615235C62A3149B5 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */; };
@@ -990,7 +988,6 @@
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
 		45A392FAFE9C986DE043966D /* OnDeviceAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceAI.swift; sourceTree = "<group>"; };
 		460C571ECD796E1777AD12C1 /* QuickActionsApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionsApplier.swift; sourceTree = "<group>"; };
-		46CEB14D4AC9E10041749682 /* WeekDashboardTiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardTiles.swift; sourceTree = "<group>"; };
 		473849A78E0E577B6653610D /* CoachMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachMiniApp.swift; sourceTree = "<group>"; };
 		47CA5EA5A9284AB449966DCC /* NextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextView.swift; sourceTree = "<group>"; };
 		482D9E9FA333137B98A9DBE1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -2065,7 +2062,6 @@
 				8FBC963243F9C04B7A1E1D3E /* RhythmHomepageView.swift */,
 				F5DE68E3B7FE05E1182EE513 /* RingsHomepageView.swift */,
 				71619B3F8898583F88154FB7 /* WeekDashboardScreen.swift */,
-				46CEB14D4AC9E10041749682 /* WeekDashboardTiles.swift */,
 				BA9B6C995B9C77E9835E54BC /* WeekDashboardTypes.swift */,
 				4847155874CE3B82AD612728 /* WeekDashboardView.swift */,
 				BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */,
@@ -2926,7 +2922,6 @@
 				1FAA44C44828EC36310A45B9 /* WakingDay.swift in Sources */,
 				6333196E0D4D21B3870B208F /* WatchSnapshotPublisher.swift in Sources */,
 				159261A7A8BC89E45D403080 /* WeekDashboardScreen.swift in Sources */,
-				CA6270A709C27D25DD0559C1 /* WeekDashboardTiles.swift in Sources */,
 				2232023982330F2ACCB423A2 /* WeekDashboardTypes.swift in Sources */,
 				AB4D0CE5A8F8961949BC886D /* WeekDashboardView.swift in Sources */,
 				679E3A7A8A85A1E17D323983 /* WeightCadence.swift in Sources */,
@@ -3338,7 +3333,6 @@
 				2F539741AC909D1E65D00CE5 /* WakingDay.swift in Sources */,
 				50ECC944A3D81BCEB7923CED /* WatchSnapshotPublisher.swift in Sources */,
 				9F9B7F470B210E73A084536C /* WeekDashboardScreen.swift in Sources */,
-				E74AC414E5DA6C6D7EC01836 /* WeekDashboardTiles.swift in Sources */,
 				DCA144262796E7B20BD5C426 /* WeekDashboardTypes.swift in Sources */,
 				B4FF26A77957BACDB89050C5 /* WeekDashboardView.swift in Sources */,
 				6541894A81635D38EA7C69AB /* WeightCadence.swift in Sources */,
