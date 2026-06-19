@@ -1,5 +1,8 @@
 import StoreKit
 import SwiftUI
+import OSLog
+
+private let supportLog = Logger(subsystem: "com.septena.cloud", category: "Support")
 
 // SupportStore — the StoreKit 2 backing for "Support Septena" (patronage).
 //
@@ -82,17 +85,27 @@ final class SupportStore {
       switch result {
       case .success(let verification):
         if case .verified(let transaction) = verification {
+          supportLog.log("purchase verified: \(transaction.productID, privacy: .public)")
           await transaction.finish()
+          // Mark ownership straight from the verified transaction. Don't wait
+          // on a `currentEntitlements` re-query — in the StoreKit test
+          // environment a freshly-purchased item isn't always returned by that
+          // query on the very next call, which would leave the UI unchanged.
+          setSupporter(true)
+          // Reconcile anyway (picks up revocation / other devices).
           await refreshEntitlement()
+        } else {
+          supportLog.error("purchase succeeded but failed verification")
         }
-      case .pending, .userCancelled:
-        break
+      case .pending:
+        supportLog.log("purchase pending (deferred / Ask to Buy)")
+      case .userCancelled:
+        supportLog.log("purchase cancelled by user")
       @unknown default:
         break
       }
     } catch {
-      // Surfacing a purchase error inline is a later refinement; for now a
-      // failed/cancelled purchase simply leaves the screen as it was.
+      supportLog.error("purchase threw: \(error.localizedDescription, privacy: .public)")
     }
   }
 
@@ -113,12 +126,24 @@ final class SupportStore {
         owned = true
       }
     }
-    isSupporter = owned
-    // @AppStorage observes UserDefaults, so this updates every cosmetic reader.
-    UserDefaults.standard.set(owned, forKey: SettingsKey.plusUnlocked)
+    supportLog.log("refreshEntitlement → owned=\(owned, privacy: .public)")
+    // Never downgrade a just-completed purchase if the re-query lags behind in
+    // the test environment; only this call can clear it once it actually sees
+    // no entitlement AND we weren't mid-purchase.
+    if owned || purchaseInFlight == nil {
+      setSupporter(owned)
+    }
   }
 
   // MARK: - Helpers
+
+  /// The single place `isSupporter` changes: updates the observable property
+  /// (drives in-session UI: screen dismiss, supporter section) and mirrors into
+  /// the `plusUnlocked` @AppStorage flag (drives the badge + avatar ring).
+  private func setSupporter(_ value: Bool) {
+    isSupporter = value
+    UserDefaults.standard.set(value, forKey: SettingsKey.plusUnlocked)
+  }
 
   private func productID(forTier tierID: String) -> String {
     switch tierID {
