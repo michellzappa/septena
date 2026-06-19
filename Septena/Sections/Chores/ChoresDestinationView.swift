@@ -1,10 +1,11 @@
 import SwiftUI
 
-// Chores mini-app — full chore list split into Today (due or overdue)
-// and Later (future-dated). Reached from the Week dashboard's
-// Chores tile. Reuses NextItemsModel for loading + optimistic mutations
-// and ChoreRow for row UI; tap edits, long-press exposes defer / delete
-// (the app-wide list-row menu pattern — no swipe actions anywhere).
+// Chores mini-app — full chore list split into Today (due or overdue),
+// Later (future-dated), and a backward-looking "Recently done" glance.
+// Reached from the Week dashboard's Chores tile. Reuses NextItemsModel for
+// loading + optimistic mutations and ChoreRow for row UI; tap edits,
+// long-press exposes defer / delete (the app-wide list-row menu pattern —
+// no swipe actions anywhere).
 
 struct ChoresDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
@@ -44,6 +45,27 @@ struct ChoresDestinationView: View {
       }
   }
 
+  /// Backward-looking glance for the Log view: chores completed in the trailing
+  /// week, most-recent first. Completing a chore slides its next occurrence into
+  /// Later, so without this the drawer instantly forgets what you just finished
+  /// (and with nothing due, Log can otherwise be all-Later). Excludes anything
+  /// still lingering struck-through up in Today, and caps at a handful so it
+  /// stays a glance rather than a second copy of the full list.
+  private var recentlyDone: [ChoreItem] {
+    let cutoff = SeptenaDate.parse(SeptenaDate.today)
+      .flatMap { Calendar.current.date(byAdding: .day, value: -6, to: $0) }
+      .flatMap(SeptenaDate.format) ?? SeptenaDate.today  // today + previous 6 = trailing 7
+    let lingering = Set(today.map(\.id))
+    return model.chores
+      .filter { chore in
+        guard let last = chore.lastCompleted else { return false }
+        return last >= cutoff && !lingering.contains(chore.id)
+      }
+      .sorted { ($0.lastCompleted ?? "") > ($1.lastCompleted ?? "") }
+      .prefix(8)
+      .map { $0 }
+  }
+
   var body: some View {
     SectionDrawer(sectionKey: "chores",
                   quickAdd: DrawerQuickAdd("New chore") { creating = true },
@@ -55,6 +77,7 @@ struct ChoresDestinationView: View {
       if !later.isEmpty {
         DrawerSection("Later", padding: .none) { ForEach(later) { row(for: $0) } }
       }
+      recentlyDoneSection
     }, patterns: {
       CompletionPatternsSection(title: "Completion", accent: accent,
                                 days: history, loading: !model.hasLoaded)
@@ -94,6 +117,28 @@ struct ChoresDestinationView: View {
         onDone: { _ in Task { await model.load() } }
       )
     }
+  }
+
+  /// "Recently done" list for the Log view — the chores from `recentlyDone`,
+  /// most-recent first, as read-only rows showing when each was last done
+  /// (relative day + time). Tapping opens the same detail the Log/Patterns rows
+  /// open. Self-hides when empty (SectionBreakdownList renders nothing).
+  private var recentlyDoneSection: some View {
+    let rows = recentlyDone.map { chore -> BreakdownRow in
+      let detail = chore.lastCompleted.map { iso -> String in
+        let day = LogDetailFormat.relativeDay(iso)
+        if let t = chore.lastCompletedTime, !t.isEmpty { return "\(day) · \(t)" }
+        return day
+      }
+      return BreakdownRow(id: chore.id,
+                          title: chore.emoji.map { "\($0) \(chore.name)" } ?? chore.name,
+                          detail: detail)
+    }
+    return SectionBreakdownList(
+      title: "Recently done", rows: rows, accent: accent,
+      selectedID: viewing?.id,
+      onTap: { id in viewing = model.chores.first { $0.id == id } }
+    )
   }
 
   /// Per-chore drill-in for Patterns mode — every chore, tap to open its
