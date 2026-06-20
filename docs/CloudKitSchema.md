@@ -257,7 +257,8 @@ same recordName — a benign same-content conflict, never a duplicate.
 | `occurredAt` | Date/Time | `Date` | No | when the crossing was detected |
 | `celebrated` | Int(64) | `Bool` | No | 0 = granted silently (grandfathered/backfill) |
 | `presentedAt` | Date/Time | `Date?` | Yes | queued-celebration shown; syncs so one device's showing silences the rest |
-| `reservedString1`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `unit` (`reservedString1`) | String | `String?` | Yes | value's unit discriminator ("kg"/"%"/"tonnes"/"days"); written by `GoalMilestoneRecord.swift` |
+| `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### CoachVoice  — recordName `coachVoice:{coachKey}`
 One row per coach (coachKey = CoachDomain rawValue: training/food/accountability/wholeLife/custom). The user's per-coach tone dials. **NEW — pending Prod deploy.**
