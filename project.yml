@@ -196,6 +196,9 @@ targets:
       # extension (the rings on the watch face) so the two can't drift.
       - path: SeptenaWatchComplication/ComplicationRingsView.swift
       - path: SeptenaWatchComplication/RingStyles.swift
+      # Vendored WolfActivityRing (MIT) — the Apple-style activity ring that
+      # renders the over-100% lap via color contrast (works in the complication).
+      - path: SeptenaWatchComplication/WolfActivityRing.swift
     dependencies:
       - target: SeptenaWatchComplication
         embed: true

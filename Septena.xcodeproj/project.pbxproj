@@ -166,6 +166,7 @@
 		317960F38E6A17F7D026C0E6 /* CompletionPatternsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9B58F0219ED9B9CB7BB773E /* CompletionPatternsSection.swift */; };
 		31E3CDE53B537BC61FA86E4B /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905952CC4800DE8D2B5A5659 /* StatGrid.swift */; };
 		3239E48846BD07983E8A8FCF /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
+		327AC106CC368BF24D9FE81E /* WolfActivityRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A39809598381550C2AC11 /* WolfActivityRing.swift */; };
 		3292128871BF0E9AAEE59677 /* ExerciseLibrarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A708921A7D5F315781CFCF71 /* ExerciseLibrarySheet.swift */; };
 		32946FB8F8ED833AE1EEA490 /* TrainingTabAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */; };
 		331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
@@ -479,6 +480,7 @@
 		9A309102A56D669A431C6703 /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
 		9AB964A33AAB489A7C864FBA /* CoachSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3319F7A0826C7F360313B88 /* CoachSession.swift */; };
 		9AC5922C800B87A4C67231C7 /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422B1072AC84061389BB5BA5 /* MirrorReader.swift */; };
+		9B1F584EB23911FBA6180A3C /* WolfActivityRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 296A39809598381550C2AC11 /* WolfActivityRing.swift */; };
 		9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
 		9BE25314B179473CC0A6CE7D /* IntakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D41E004025226ADBE31D93 /* IntakePlugin.swift */; };
 		9D294C6FFD9CFE45F6E11B7D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
@@ -952,6 +954,7 @@
 		27B4DF2D4A21D88AD4B3A964 /* VolumeUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeUnit.swift; sourceTree = "<group>"; };
 		283D02F47FC57BD00F27178E /* VirtueSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueSummarizer.swift; sourceTree = "<group>"; };
 		28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsPlugin.swift; sourceTree = "<group>"; };
+		296A39809598381550C2AC11 /* WolfActivityRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WolfActivityRing.swift; sourceTree = "<group>"; };
 		2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
 		2E4B85E65CB1D53481420C4C /* GutPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutPlugin.swift; sourceTree = "<group>"; };
 		2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuickAddMenu.swift; sourceTree = "<group>"; };
@@ -1346,6 +1349,7 @@
 				035453AA7844A66C20E64324 /* RingStyles.swift */,
 				008C9FF807F34F3024F9B348 /* TrainingComplication.swift */,
 				CE84A8D1F950FB1868B57F17 /* TrainingComplicationViews.swift */,
+				296A39809598381550C2AC11 /* WolfActivityRing.swift */,
 			);
 			path = SeptenaWatchComplication;
 			sourceTree = "<group>";
@@ -2957,6 +2961,7 @@
 				7EACBD21879EB225D558CF78 /* SharedComplicationData.swift in Sources */,
 				2EE26BE41A95A216674211D2 /* TrainingComplication.swift in Sources */,
 				5E1ED756713680B72FBC64AE /* TrainingComplicationViews.swift in Sources */,
+				327AC106CC368BF24D9FE81E /* WolfActivityRing.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2979,6 +2984,7 @@
 				4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */,
 				B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */,
 				F4251470458A2411D47FC255 /* WatchModels.swift in Sources */,
+				9B1F584EB23911FBA6180A3C /* WolfActivityRing.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -20,9 +20,11 @@ extension Color {
 }
 
 /// Apple-Activity-style concentric rings — one per metric, each filling toward
-/// its target. A nil goal (no target set) draws just the faint track. Sized to
-/// the smaller side of its frame so it stays circular in any family. Generic
-/// over any rings-style complication; the caller supplies the per-key color.
+/// its target. Built on the vendored `WolfActivityRing` (`ActivityRing`), which
+/// handles the over-100% lap via a `color → tipColor` angular gradient + a bright
+/// tip cap — pure color contrast, so it survives the restricted watchOS
+/// complication (WidgetKit) rendering mode where `.shadow()` is unreliable.
+/// Generic over any rings-style complication; the caller supplies the per-key color.
 struct RingsView: View {
   let rings: [ComplicationRing]
   var color: (String) -> Color
@@ -32,11 +34,14 @@ struct RingsView: View {
   var body: some View {
     GeometryReader { geo in
       let side = min(geo.size.width, geo.size.height)
+      let outerRadius = (side - lineWidth) / 2
       ZStack {
         ForEach(Array(rings.enumerated()), id: \.element.key) { idx, ring in
-          let inset = CGFloat(idx) * (lineWidth + spacing)
-          ringArc(ring)
-            .frame(width: side - inset * 2, height: side - inset * 2)
+          let radius = outerRadius - CGFloat(idx) * (lineWidth + spacing)
+          if radius >= lineWidth * 0.75 {
+            let p = progress(ring)
+            ActivityRing(progress: p, options: options(ring, radius: radius, progress: p))
+          }
         }
       }
       .frame(width: side, height: side)
@@ -44,53 +49,39 @@ struct RingsView: View {
     }
   }
 
-  private func ringArc(_ ring: ComplicationRing) -> some View {
+  private func progress(_ ring: ComplicationRing) -> Double {
+    guard let goal = ring.goal, goal > 0 else { return 0 }
+    return ring.value / goal
+  }
+
+  private func options(_ ring: ComplicationRing, radius: CGFloat, progress: Double) -> ActivityRingOptions {
     // The metric's authored Settings color when present (matches the section),
     // else the domain's fixed fallback hue.
     let c = Color(hexToken: ring.colorHex) ?? color(ring.key)
-    // Raw progress, unclamped — so we can render the over-100% wrap.
-    let raw: Double = {
-      guard let goal = ring.goal, goal > 0 else { return 0 }
-      return ring.value / goal
-    }()
-    // Past 100% the ring laps over itself (Apple-Activity-style). We draw one
-    // extra lap (exact through 200%, a full overlap beyond). The standard SwiftUI
-    // technique (Sarunw / Frank Jia / Andy Regensky): the first lap dims for
-    // contrast, the full-color overflow laps on top, and a rounded TIP offset to
-    // the rim + rotated to the head casts a shadow onto the ring beneath — that
-    // shadow is what actually makes the overlap read.
-    let lapped = raw > 1
-    let overflow = lapped ? min(raw - 1, 1) : 0
-    return GeometryReader { geo in
-      let side = min(geo.size.width, geo.size.height)
-      let radius = (side - lineWidth) / 2          // stroke centerline radius
-      ZStack {
-        Circle()
-          .stroke(c.opacity(0.22), lineWidth: lineWidth)
-        // First lap — dimmed once lapped so the full-color overflow reads on top
-        // (a same-color overlap on a full-bright ring is invisible — the bug).
-        Circle()
-          .trim(from: 0, to: min(raw, 1))
-          .stroke(c.opacity(lapped ? 0.4 : 1),
-                  style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-          .rotationEffect(.degrees(-90))
-        if lapped {
-          Circle()
-            .trim(from: 0, to: overflow)
-            .stroke(c, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-          // Rounded head with a drop shadow onto the ring beneath. `offset` puts
-          // it on the rim; `rotationEffect(360·raw)` walks it to the head for any
-          // progress, including the overflow lap.
-          Circle()
-            .fill(c)
-            .frame(width: lineWidth, height: lineWidth)
-            .offset(y: -radius)
-            .rotationEffect(.degrees(360 * raw))
-            .shadow(color: .black.opacity(0.5), radius: max(lineWidth * 0.4, 1.5))
-        }
-      }
-      .frame(width: side, height: side)
+    var o = ActivityRingOptions()
+    o.radius = Double(radius)
+    o.thickness = Double(lineWidth)
+    // Under goal: a solid ring (matches the phone's macro tiles, reads as
+    // "complete" at exactly 100%). Over goal: dim the tail and keep the head
+    // full, so the overflow laps over the dimmed first lap and is unmistakable
+    // — WolfActivityRing's own over-100% pattern, minus the shadow.
+    if progress >= 1 {
+      // Reached / passed goal. Keep the ring full-bright (completion should read
+      // prominent, not faded) but brighten the HEAD toward white — the ring glows
+      // to a light tip and the cap marks where the head met the start. Differentiates
+      // a COMPLETED ring from an in-progress one, and the light head laps visibly
+      // over the body when over goal. Color contrast carries it in the complication
+      // (shadows are unreliable there); the shadow adds depth in-app.
+      o.color = c
+      o.tipColor = .white
+      o.tipShadowColor = .black.opacity(0.5)
+    } else {
+      o.color = c
+      o.tipColor = c
+      o.tipShadowColor = .clear
     }
+    o.backgroundColor = c.opacity(0.22)   // faint track
+    o.outlineColor = .clear
+    return o
   }
 }

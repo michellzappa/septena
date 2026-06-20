@@ -18,3 +18,11 @@ trademarks and brand identity described below.
    the MIT grant; they appear only to identify Septena's optional integration
    with Claude. Anthropic retains all rights to its marks. If you fork or
    redistribute Septena under a different name, remove or replace this asset.
+
+Third-party code
+----------------
+
+- WolfActivityRing — SeptenaWatchComplication/WolfActivityRing.swift.
+  Vendored (with minor watchOS-compatibility edits) from
+  https://github.com/wolfmcnally/WolfActivityRing, Copyright © Wolf McNally,
+  MIT License. The full MIT permission notice is retained in the file header.
