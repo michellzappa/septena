@@ -197,6 +197,16 @@ final class WatchConnectivity {
       updateMacroComplication(response.nutritionRings, fasting: response.fasting)
       updateTrainingComplication(response.trainingRings)
       scheduleNextRefresh()
+    } catch is CancellationError {
+      // A newer fetch superseded this one — most often a burst of wrist taps,
+      // each of which schedules a reconcile that cancels the in-flight fetch
+      // (see `scheduleReconcile`). That is not a user-facing failure: leave the
+      // current list untouched and just stop the spinner. Surfacing it (as the
+      // catch-all once did) blanked the whole Next list with a bogus
+      // "Swift.CancellationError error 1" screen on rapid tapping.
+    } catch let ckError as CKError where ckError.code == .operationCancelled {
+      // CloudKit reports task cancellation as `.operationCancelled` — same
+      // benign supersede case as above; don't show it.
     } catch let ckError as CKError where ckError.code == .unknownItem {
       errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
     } catch {

@@ -102,14 +102,21 @@ struct NextWatchView: View {
         allDoneHero
       }
     } else {
+      // Snapshot the enumerated items once per render and read group boundaries
+      // from this local copy — never from live `conn.items` by index. Rapid
+      // wrist taps mutate `conn.items` (optimistic completion removals plus the
+      // post-write reconcile) while the List is mid-animation; a row closure
+      // re-evaluated against the now-shorter live array would index out of
+      // bounds. The captured copy stays consistent for the life of the closure.
+      let rows = Array(conn.items.enumerated())
       List {
-        ForEach(Array(conn.items.enumerated()), id: \.element.id) { index, item in
+        ForEach(rows, id: \.element.id) { index, item in
           // A section header — accent rule plus a count label — at the start of
           // each group: the first row, or wherever the group changes from the
           // row above. The watch echo of iOS's tinted section headers.
           if index == 0 ||
-             WatchSectionTint.key(for: item) != WatchSectionTint.key(for: conn.items[index - 1]) {
-            sectionHeader(for: item, at: index)
+             WatchSectionTint.key(for: item) != WatchSectionTint.key(for: rows[index - 1].element) {
+            sectionHeader(for: item, at: index, in: rows)
           }
           NextItemRow(item: item,
                       done: conn.completedIDs.contains(item.id),
@@ -209,14 +216,15 @@ struct NextWatchView: View {
   /// group's section accent, plus an accent-tinted count caption ("3 tasks").
   /// Renders before every group, so each section is labelled — not just the
   /// boundaries between adjacent groups.
-  private func sectionHeader(for item: NextItem, at index: Int) -> some View {
+  private func sectionHeader(for item: NextItem, at index: Int,
+                             in rows: [(offset: Int, element: NextItem)]) -> some View {
     let accent = WatchSectionTint.color(for: item, colors: conn.sectionColors)
     return VStack(alignment: .leading, spacing: 3) {
       Capsule()
         .fill(accent.opacity(0.7))
         .frame(height: 2)
         .frame(maxWidth: .infinity, alignment: .leading)
-      Text(sectionLabel(startingAt: index))
+      Text(sectionLabel(startingAt: index, in: rows))
         .font(.caption2)
         .fontWeight(.semibold)
         .foregroundStyle(accent)
@@ -231,11 +239,12 @@ struct NextWatchView: View {
   /// "3 tasks" — the count of contiguous rows in the group that begins at
   /// `index`, with the section's own noun. Counting the run (rather than every
   /// matching row) stays correct even if a section key were ever to recur.
-  private func sectionLabel(startingAt index: Int) -> String {
-    let key = WatchSectionTint.key(for: conn.items[index])
+  private func sectionLabel(startingAt index: Int,
+                            in rows: [(offset: Int, element: NextItem)]) -> String {
+    let key = WatchSectionTint.key(for: rows[index].element)
     var count = 0
     var i = index
-    while i < conn.items.count, WatchSectionTint.key(for: conn.items[i]) == key {
+    while i < rows.count, WatchSectionTint.key(for: rows[i].element) == key {
       count += 1
       i += 1
     }
