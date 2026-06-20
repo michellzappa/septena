@@ -37,18 +37,24 @@ struct HabitsQuickAddMenu: View {
   let habits: [HabitDayItem]
   let buckets: [String]
   let onComplete: (HabitDayItem) -> Void
+  /// Opens the Habits section (add / manage / see the full list) — the
+  /// always-present escape so the menu is never a dead end when nothing's due.
+  let onOpen: () -> Void
 
   var body: some View {
     let items = actionable(habits, buckets: buckets)
     if items.isEmpty {
-      Button {} label: { Label("Nothing left right now", systemImage: "checkmark.circle") }
-        .disabled(true)
+      Text("Nothing left right now")
     } else {
       ForEach(items) { item in
         Button { onComplete(item) } label: {
           Label(displayName(item), systemImage: "checkmark.circle")
         }
       }
+    }
+    Divider()
+    Button { onOpen() } label: {
+      Label("Habits…", systemImage: "ellipsis")
     }
   }
 }

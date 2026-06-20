@@ -43,10 +43,7 @@ struct SymptomsDestinationView: View {
                   log: {
       DrawerSection("Log", padding: .none) {
         if dayEvents.isEmpty {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+          DrawerEmptyLogLine(isToday: viewingDate == SeptenaDate.today)
         } else {
           ForEach(dayEvents) { event in
             LogEntryRow(

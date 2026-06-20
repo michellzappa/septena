@@ -60,6 +60,7 @@ struct MoodDestinationView: View {
         }
       }
     })
+    .tint(accent)
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["mood"]) { await reload() }
     .adaptiveDetail(isPresented: $addingNew, onDismiss: {
@@ -99,9 +100,8 @@ struct MoodDestinationView: View {
         }
       }
     } else if !loading {
-      DrawerSection {
-        Text(isViewingToday ? "No check-ins yet today." : "No check-ins on this day.")
-          .foregroundStyle(.secondary)
+      DrawerSection(padding: .none) {
+        DrawerEmptyLogLine(isToday: isViewingToday)
       }
     }
   }

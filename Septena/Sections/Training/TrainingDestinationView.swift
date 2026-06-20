@@ -181,7 +181,7 @@ struct TrainingDestinationView: View {
       } else {
         // Time-travel view: just the picked day's sessions.
         if viewingSessions.isEmpty {
-          Text("No sessions logged on this day")
+          Text("Nothing logged on this day.")
             .font(.caption).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)

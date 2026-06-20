@@ -12,9 +12,10 @@ import SwiftUI
 //                           triage band (the retired Inbox page's contents) now
 //                           sits on top of the day.
 //   • Section "Today"     → up to 3 open today's tasks, tap to mark done.
-//   • Tasks…              → opens the AddInfo sheet (existing palette).
 //
-// The "check off" items use the same TaskMutator path as TaskListView,
+// "Create in Inbox…" is the full-input escape (every section's quick-add ends
+// with a path to the full composer). The "check off" items use the same
+// TaskMutator path as TaskListView,
 // so optimistic state, outbox, and CloudKit push all behave identically.
 
 struct TasksQuickAddMenu: View {

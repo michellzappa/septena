@@ -24,18 +24,24 @@ private func displayName(_ chore: ChoreItem) -> String {
 struct ChoresQuickAddMenu: View {
   let chores: [ChoreItem]
   let onComplete: (ChoreItem) -> Void
+  /// Opens the Chores section (add / manage / see the full list) — the
+  /// always-present escape so the menu is never a dead end when nothing's due.
+  let onOpen: () -> Void
 
   var body: some View {
     let items = actionable(chores)
     if items.isEmpty {
-      Button {} label: { Label("Nothing due today", systemImage: "checkmark.circle") }
-        .disabled(true)
+      Text("Nothing due today")
     } else {
       ForEach(items) { chore in
         Button { onComplete(chore) } label: {
           Label(displayName(chore), systemImage: "checkmark.circle")
         }
       }
+    }
+    Divider()
+    Button { onOpen() } label: {
+      Label("Chores…", systemImage: "ellipsis")
     }
   }
 }

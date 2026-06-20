@@ -16,6 +16,9 @@ import SwiftUI
 struct GroceriesQuickAddMenu: View {
   let items: [GroceryItem]
   let onMarkLow: (GroceryItem) -> Void
+  /// Opens the Groceries section (add items / search / see the full list) — the
+  /// always-present escape so the menu is never a dead end when all is stocked.
+  let onOpen: () -> Void
 
   /// Top 3 stocked items ranked by `lastBought` descending. Items with no
   /// `lastBought` sort last so freshly-added groceries don't crowd out
@@ -36,10 +39,7 @@ struct GroceriesQuickAddMenu: View {
 
   var body: some View {
     if topStocked.isEmpty {
-      Button {} label: {
-        Label("No stocked items", systemImage: "checkmark.circle")
-      }
-      .disabled(true)
+      Text("No stocked items")
     } else {
       ForEach(topStocked) { item in
         Button { onMarkLow(item) } label: {
@@ -47,7 +47,10 @@ struct GroceriesQuickAddMenu: View {
         }
       }
     }
-
+    Divider()
+    Button { onOpen() } label: {
+      Label("Groceries…", systemImage: "ellipsis")
+    }
   }
 
   private func displayName(_ item: GroceryItem) -> String {

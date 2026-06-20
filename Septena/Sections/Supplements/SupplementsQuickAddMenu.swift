@@ -24,6 +24,9 @@ private func displayName(_ item: SupplementDayItem) -> String {
 struct SupplementsQuickAddMenu: View {
   let supplements: [SupplementDayItem]
   let onToggle: (SupplementDayItem) -> Void
+  /// Opens the Supplements section (add / manage / see the full list) — the
+  /// always-present escape so the menu is never a dead end when nothing's due.
+  let onOpen: () -> Void
 
   @AppStorage(NextLinger.supplementsKey) private var linger = NextLinger.supplementsDefault
 
@@ -37,14 +40,17 @@ struct SupplementsQuickAddMenu: View {
     if items.isEmpty {
       // Distinguish "all taken" from "nothing due in this time bucket".
       let label = undone.isEmpty ? "Nothing left today" : "Nothing due right now"
-      Button {} label: { Label(label, systemImage: "checkmark.circle") }
-        .disabled(true)
+      Text(label)
     } else {
       ForEach(items) { item in
         Button { onToggle(item) } label: {
           Label(displayName(item), systemImage: "checkmark.circle")
         }
       }
+    }
+    Divider()
+    Button { onOpen() } label: {
+      Label("Supplements…", systemImage: "ellipsis")
     }
   }
 }

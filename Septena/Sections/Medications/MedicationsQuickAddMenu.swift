@@ -20,11 +20,13 @@ struct MedicationsQuickAddMenu: View {
   /// Shown when nothing is due — distinguishes "no meds yet" from "none due now."
   let emptyLabel: String
   let onTake: (MedicationQuickItem) -> Void
+  /// Opens the Medications section (log a dose / add / manage) — the
+  /// always-present escape so the menu is never a dead end when nothing's due.
+  let onOpen: () -> Void
 
   var body: some View {
     if medications.isEmpty {
-      Button {} label: { Label(emptyLabel, systemImage: "checkmark.circle") }
-        .disabled(true)
+      Text(emptyLabel)
     } else {
       ForEach(medications) { item in
         Button { onTake(item) } label: {
@@ -32,6 +34,10 @@ struct MedicationsQuickAddMenu: View {
                 systemImage: "pills")
         }
       }
+    }
+    Divider()
+    Button { onOpen() } label: {
+      Label("Medications…", systemImage: "ellipsis")
     }
   }
 }

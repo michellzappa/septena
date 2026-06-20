@@ -210,6 +210,7 @@ struct NutritionDestinationView: View {
       macroTilesGrid
       mealRhythmSection
     })
+    .tint(accent)
     // Day rollover: reload so the fasting row, today's totals, and the
     // "earlier days" grouping all reflect the new day's data. The
     // sectionReload wire below drives the reload (initial load, day
@@ -686,7 +687,7 @@ struct NutritionDestinationView: View {
             fastingGapRow(f)
           }
           if todayEntries.isEmpty {
-            Text("No entries logged today")
+            Text("Nothing logged yet.")
               .font(.caption).foregroundStyle(.secondary)
               .frame(maxWidth: .infinity, alignment: .leading)
               .padding(.leading, 8)
@@ -701,7 +702,7 @@ struct NutritionDestinationView: View {
       VStack(alignment: .leading, spacing: 6) {
         dayHeader(date: viewingDate, totals: totalsByDate[viewingDate])
         if viewingEntries.isEmpty {
-          Text("No entries logged on this day")
+          Text("Nothing logged on this day.")
             .font(.caption).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 8)

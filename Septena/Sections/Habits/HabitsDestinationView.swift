@@ -75,16 +75,17 @@ struct HabitsDestinationView: View {
       byHabitSection
     })
     .tint(accent)
+    // One-time paint + today-list load on appear; everything day-scoped and
+    // data-change-driven (past day, completion rates, history heatmap) rides the
+    // shared `.sectionReload` wire so there's no separate `.onReceive` to drift.
     .task {
       model.paintFromCache()
       await model.load()
+    }
+    .sectionReload(on: viewingDate, onDataChange: true, forSections: ["habits"]) {
+      await reloadPastDay()
       await loadRates()
       await loadHistory()
-    }
-    .sectionReload(on: viewingDate, onDataChange: true,
-                   forSections: ["habits"]) { await reloadPastDay() }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("habits") { Task { await loadRates(); await loadHistory() } }
     }
     // Tapping a habit opens its detail "infobox" (streak + history +
     // consistency); the row's checkbox still checks it off. "Edit" in the
@@ -130,9 +131,8 @@ struct HabitsDestinationView: View {
     if let resp = pastDay {
       let allItems = resp.buckets.flatMap { resp.grouped[$0] ?? [] }
       if allItems.isEmpty {
-        DrawerSection {
-          Text("Nothing logged on this day.")
-            .foregroundStyle(.secondary)
+        DrawerSection(padding: .none) {
+          DrawerEmptyLogLine(isToday: false)
         }
       } else {
         ForEach(resp.buckets, id: \.self) { bucket in

@@ -36,8 +36,9 @@ struct GutQuickAddMenu: View {
   /// empty; the common middle is always unioned in regardless.
   let recentBristolTypes: [Int]
   let onCommit: (_ bristol: Int) -> Void
-  let hasLastEntry: Bool
-  let onEditLast: (() -> Void)?
+  /// Opens the Gut section — the full editor (volume, note, back-dated time)
+  /// lives there. The always-present escape every quick-add menu carries.
+  let onOpen: () -> Void
 
   private var visibleEntries: [BristolEntry] {
     let ids = Set(defaultBristolIDs).union(recentBristolTypes)
@@ -50,12 +51,9 @@ struct GutQuickAddMenu: View {
         Label(item.label, systemImage: item.systemImage)
       }
     }
-
-    if let onEditLast, hasLastEntry {
-      Divider()
-      Button { onEditLast() } label: {
-        Label("Edit last entry", systemImage: "pencil")
-      }
+    Divider()
+    Button { onOpen() } label: {
+      Label("Gut…", systemImage: "ellipsis")
     }
   }
 }

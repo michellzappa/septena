@@ -54,10 +54,7 @@ struct GutDestinationView: View {
             )
           }
         } else if !loading {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+          DrawerEmptyLogLine(isToday: isViewingToday)
         }
       }
     }, patterns: {

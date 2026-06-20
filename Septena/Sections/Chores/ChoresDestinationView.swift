@@ -84,14 +84,14 @@ struct ChoresDestinationView: View {
       byChoreSection
     })
     .tint(accent)
+    // One-time paint + today-list load on appear; the history heatmap rides the
+    // shared `.sectionReload` wire (appear + scoped data-change) so there's no
+    // separate `.onReceive` to drift. Chores has no time travel, so no `on:`.
     .task {
       model.paintFromCache()
       await model.load()
-      await loadHistory()
     }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("chores") { Task { await loadHistory() } }
-    }
+    .sectionReload(onDataChange: true, forSections: ["chores"]) { await loadHistory() }
     // Tapping a chore opens its detail "infobox" (history + learned cadence);
     // the row's own checkbox still completes it. From the detail, "Edit" swaps
     // to the editor for the same chore.

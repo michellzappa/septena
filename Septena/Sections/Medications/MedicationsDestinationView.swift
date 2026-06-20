@@ -62,10 +62,7 @@ struct MedicationsDestinationView: View {
                   log: {
       DrawerSection("Doses", padding: .none) {
         if dayDoses.isEmpty {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+          DrawerEmptyLogLine(isToday: viewingDate == SeptenaDate.today)
         } else {
           ForEach(dayDoses) { dose in
             LogEntryRow(

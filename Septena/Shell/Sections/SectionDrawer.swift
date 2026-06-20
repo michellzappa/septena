@@ -1262,6 +1262,24 @@ enum DrawerPadding {
   case standard, tight, none
 }
 
+/// The single placeholder for an empty day-log, so every section's empty state
+/// reads identically: "Nothing logged yet." while viewing today, "Nothing logged
+/// on this day." while reviewing a past day. Carries the row-aligned 14/12 inset
+/// so it drops straight into a `DrawerSection(padding: .none)` exactly where the
+/// log rows would sit — one wording, one style, every section.
+struct DrawerEmptyLogLine: View {
+  /// True when the drawer is showing today (vs. a past day via time travel).
+  let isToday: Bool
+
+  var body: some View {
+    Text(isToday ? "Nothing logged yet." : "Nothing logged on this day.")
+      .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, 14)
+      .padding(.vertical, 12)
+  }
+}
+
 private struct RowHInsetKey: EnvironmentKey {
   static let defaultValue: CGFloat = Theme.hPadding
 }

@@ -122,6 +122,10 @@ struct WeekDashboardView: View {
   @State private var intakeTiles: [IntakeTileDTO] = []
   /// Tracker page presented from a tile tap (push on regular, sheet on compact).
   @State private var intakeKindDest: IntakeKindRef? = nil
+  /// Full intake editor presented from a tracker tile's "New entry…" row — the
+  /// quick-add's full-input escape (mirrors Nutrition's "New meal…"). Holds the
+  /// kind id; nil when closed.
+  @State private var intakeEditorKind: IntakeEditorTarget? = nil
   /// Create-a-tracker wizard, presented from the empty-state tile. Intake has no
   /// monolithic section screen (each kind is its own tile → drawer), so the empty
   /// state goes straight to creation rather than a redundant kind-switcher list.
@@ -441,6 +445,19 @@ struct WeekDashboardView: View {
           #endif
       }
     }
+    // The tracker tile's "New entry…" escape — the full intake editor for a
+    // fresh entry (when / method / amount / variety / note), the same form the
+    // section page uses. `original: nil` opens it blank.
+    .sheet(item: $intakeEditorKind) { target in
+      EditIntakeEntrySheet(kindID: target.kindID, date: clock.today, original: nil,
+                           onSave: { Task { await reloadIntake() } })
+        #if os(iOS)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        #else
+        .frame(width: 560, height: 600)
+        #endif
+    }
   }
 
   /// Week's tab-specific rows for the shared "…" `HomeMenu` (rendered above
@@ -517,6 +534,14 @@ struct WeekDashboardView: View {
   struct IntakeKindRef: Identifiable, Hashable {
     let value: String
     var id: String { value }
+  }
+
+  /// Identifies which tracker kind the full intake editor is open for. Distinct
+  /// from `IntakeKindRef` (page navigation) so presenting the editor never
+  /// collides with a pushed/sheeted kind page.
+  struct IntakeEditorTarget: Identifiable, Hashable {
+    let kindID: String
+    var id: String { kindID }
   }
 
   private var intakeKindPushBinding: Binding<IntakeKindRef?> {
@@ -1918,7 +1943,8 @@ struct WeekDashboardView: View {
     MedicationsQuickAddMenu(
       medications: medicationQuickItems(),
       emptyLabel: active ? "Nothing due right now" : "No medications yet",
-      onTake: { item in commitMedicationTaken(item) }
+      onTake: { item in commitMedicationTaken(item) },
+      onOpen: { open(.medications) }
     )
   }
 
@@ -2127,7 +2153,8 @@ struct WeekDashboardView: View {
     HabitsQuickAddMenu(
       habits: dailies.habits,
       buckets: dailies.habitBuckets,
-      onComplete: { item in commitHabitToggle(item) }
+      onComplete: { item in commitHabitToggle(item) },
+      onOpen: { open(.habits) }
     )
   }
 
@@ -2184,7 +2211,8 @@ struct WeekDashboardView: View {
   @ViewBuilder private var choresQuickAddMenu: some View {
     ChoresQuickAddMenu(
       chores: pendingChores,
-      onComplete: { chore in commitChoreComplete(chore) }
+      onComplete: { chore in commitChoreComplete(chore) },
+      onOpen: { open(.chores) }
     )
   }
 
@@ -2197,7 +2225,8 @@ struct WeekDashboardView: View {
   @ViewBuilder private var supplementsQuickAddMenu: some View {
     SupplementsQuickAddMenu(
       supplements: dailies.supplements,
-      onToggle: { item in commitSupplementToggle(item) }
+      onToggle: { item in commitSupplementToggle(item) },
+      onOpen: { open(.supplements) }
     )
   }
 
@@ -2210,7 +2239,8 @@ struct WeekDashboardView: View {
   @ViewBuilder private var groceriesQuickAddMenu: some View {
     GroceriesQuickAddMenu(
       items: groceries,
-      onMarkLow: { item in commitGroceryMarkLow(item) }
+      onMarkLow: { item in commitGroceryMarkLow(item) },
+      onOpen: { open(.groceries) }
     )
   }
 
@@ -2269,6 +2299,12 @@ struct WeekDashboardView: View {
         Label("Log \(choice.label)", systemImage: choice.symbol ?? "plus.circle")
       }
     }
+    Divider()
+    Button {
+      intakeEditorKind = IntakeEditorTarget(kindID: t.id)
+    } label: {
+      Label("New entry…", systemImage: "square.and.pencil")
+    }
   }
 
   private func commitIntake(_ t: IntakeTileDTO, value: String) {
@@ -2316,16 +2352,14 @@ struct WeekDashboardView: View {
     intakeTiles = await MirrorReader.shared.read { IntakeReader.loadTiles(context: $0, date: date) }
   }
 
-  // Bristol scale is a fixed 7-item enum — the menu IS the complete UX,
-  // no "More…" sheet fallback. Matches AddGutPage's commit semantics;
-  // the full editor lives in GutDestinationView.
+  // Bristol scale is a fixed 7-item enum — one tap logs a complete movement.
+  // The trailing "Gut…" row opens the section, where the full editor (volume,
+  // note, back-dated time) lives. Matches AddGutPage's commit semantics.
   @ViewBuilder private var gutQuickAddMenu: some View {
-    let hasLast = !(gutToday?.entries.isEmpty ?? true)
     GutQuickAddMenu(
       recentBristolTypes: GutBristolRecorder.recentTypes,
       onCommit: { bristol in commitGut(bristol: bristol) },
-      hasLastEntry: hasLast,
-      onEditLast: hasLast ? { open(.gut) } : nil
+      onOpen: { open(.gut) }
     )
   }
 
@@ -2461,6 +2495,11 @@ struct WeekDashboardView: View {
       } label: {
         Label("Add \(ml) ml", systemImage: "drop.fill")
       }
+    }
+    Divider()
+    // Custom amounts + target live in the section's "Quick add" card.
+    Button { open(.hydration) } label: {
+      Label("Hydration…", systemImage: "ellipsis")
     }
   }
 

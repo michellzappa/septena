@@ -3,7 +3,8 @@ import SwiftUI
 // Single canonical menu for the Nutrition tile — same content from the
 // trailing-circle button (Menu) and the tile's `.contextMenu`.
 //
-// Three entry points + a recommendation section:
+// Two entry points + a recommendation section ("New meal…" is the full-input
+// escape every section's quick-add ends with):
 //
 //   1. Search…  → focused search modal across the full meal history.
 //                 The right path when "I know I've eaten this before
@@ -18,8 +19,6 @@ import SwiftUI
 //        - repetition count over the lookback window
 //        - recency bonus
 //      Tap re-logs the meal at the current time with its macros.
-//
-//   4. Nutrition… → opens the AddInfo sheet (the existing palette).
 //
 // The dashboard does the scoring; the menu just renders.
 

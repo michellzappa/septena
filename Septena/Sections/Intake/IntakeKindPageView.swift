@@ -25,6 +25,11 @@ struct IntakeKindPageView: View {
   @State private var viewingDate: String = SeptenaDate.today
   @State private var editing: IntakeEntryDTO? = nil
   @State private var creatingMethod: PresetMethod? = nil
+  /// Blank full editor opened by the quick-log sheet's "New entry…" row — the
+  /// full-input escape (when / method / amount / variety / note), with no preset
+  /// method so the form picks the first. The single in-section "+" change that
+  /// brings intake in line with every other section's quick-add.
+  @State private var creatingBlank = false
   @State private var managing = false
   /// The quick-log chooser sheet (nutrition pattern): the drawer's single big
   /// "+" opens it; the container-aware choices live inside, so the toolbar
@@ -82,10 +87,7 @@ struct IntakeKindPageView: View {
             )
           }
         } else if !loading {
-          Text("Nothing logged yet.")
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+          DrawerEmptyLogLine(isToday: isViewingToday)
         }
       }
     }, patterns: {
@@ -107,6 +109,11 @@ struct IntakeKindPageView: View {
     .sheet(item: $creatingMethod) { preset in
       EditIntakeEntrySheet(kindID: kindID, date: viewingDate, original: nil,
                            presetMethod: preset.method,
+                           onSave: { Task { await reload() } })
+    }
+    // The quick-log sheet's "New entry…" escape — the full editor, blank.
+    .sheet(isPresented: $creatingBlank) {
+      EditIntakeEntrySheet(kindID: kindID, date: viewingDate, original: nil,
                            onSave: { Task { await reload() } })
     }
     // The quick-log chooser. A pick is recorded and the sheet dismissed; the
@@ -141,6 +148,10 @@ struct IntakeKindPageView: View {
     var actions = choices.map {
       LogAction(id: "log:\($0.value)", title: $0.label, systemImage: $0.symbol ?? "plus")
     }
+    // Full-input escape — every section's quick-add ends with a way to the full
+    // editor. Sits below the one-tap logs, above Manage.
+    actions.append(LogAction(id: "new", title: "New entry…",
+                             systemImage: "square.and.pencil"))
     actions.append(LogAction(id: "manage", title: "Manage \(kind.name)",
                              systemImage: "slider.horizontal.3"))
     return actions
@@ -148,6 +159,7 @@ struct IntakeKindPageView: View {
 
   private func handleLogAction(_ id: String) {
     if id == "manage" { managing = true; return }
+    if id == "new" { creatingBlank = true; return }
     guard let kind, id.hasPrefix("log:") else { return }
     let value = String(id.dropFirst("log:".count))
     let (token, count) = ConsumableContainer.parse(value: value)
