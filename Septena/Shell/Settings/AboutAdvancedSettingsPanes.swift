@@ -56,6 +56,9 @@ struct AboutSettingsPane: View {
       }
 
       Section {
+        NavigationLink(value: SettingsView.SettingsDestination.whatsNew) {
+          Label("What's New", systemImage: "megaphone")
+        }
         infoRow("Platform", platformLabel)
       }
 

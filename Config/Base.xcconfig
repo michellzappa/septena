@@ -17,6 +17,14 @@ WITHINGS_CLIENT_ID =
 WITHINGS_CLIENT_SECRET =
 CLOUDKIT_WEB_API_TOKEN =
 
+// Build number (CFBundleVersion). Lives here, not in project.yml, so it can be
+// stamped from the git commit count by scripts/stamp-version.sh at archive
+// time — monotonic and conflict-free across parallel sessions. The committed
+// default (1) is fine for day-to-day Debug builds; only an archive needs the
+// real, ever-increasing value. An xcconfig is the base layer, so project.yml
+// must NOT set CURRENT_PROJECT_VERSION (a project-level value would win).
+CURRENT_PROJECT_VERSION = 1
+
 // Optional include — silently skipped when the file is absent (fresh clone or
 // CI without secrets), so the project still generates and builds. Copy
 // Secrets.example.xcconfig to Secrets.xcconfig to provide real values.

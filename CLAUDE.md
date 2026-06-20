@@ -52,6 +52,33 @@ There's no `.env`. The only build-time credential is the optional Withings dev
 pair: copy `Config/Secrets.example.xcconfig` → `Config/Secrets.xcconfig`
 (gitignored). The app builds and runs fine without it.
 
+## Versioning & changelog
+
+Full guide: `docs/VERSIONING.md`. The rules that bite:
+
+- **Two numbers, two owners.** `MARKETING_VERSION` (SemVer, user-facing) lives
+  in `project.yml` and is **bumped by hand only when cutting a release**. The
+  build number `CURRENT_PROJECT_VERSION` lives in `Config/Base.xcconfig` (NOT
+  project.yml — a project-level value would override the xcconfig) and is
+  **stamped from the git commit count** by `scripts/stamp-version.sh` at archive
+  time. Never hand-bump the build number; never move it back into project.yml.
+- **SemVer, pre-1.0.** Bump MINOR (`0.2.0`) for a batch of user-facing
+  features, PATCH (`0.1.1`) for fixes-only. `1.0.0` = public App Store launch.
+- **Cutting a release is one deliberate act, done in a single session** (so the
+  hotspot `project.yml` + changelog don't conflict across parallel sessions):
+  `scripts/changelog-draft.sh` → curate `Septena/Resources/changelog.json` →
+  bump `MARKETING_VERSION` → `git tag vX.Y.Z` → `scripts/stamp-version.sh` →
+  archive. Do NOT bump the version or touch the changelog during ordinary
+  feature work — the cron commits green units without a version bump.
+- **The changelog is one canonical JSON, two consumers.**
+  `Septena/Resources/changelog.json` is bundled into the app (Settings ▸ About ▸
+  What's New + the auto "What's New" sheet on update, read by `SeptenaCore/
+  Changelog.swift`) AND mirrored to the website at build time
+  (`../septena-site/scripts/sync-changelog.mjs` → `/changelog`). **Author here,
+  never in two places.** It is NOT generated from the runtime DB — that's
+  life-data; release notes come from git. A highlight's optional `section` key
+  drives its accent color on both surfaces.
+
 ## Branch & integration discipline
 
 **A committer-cron handles commits.** A scheduled job commits green work on

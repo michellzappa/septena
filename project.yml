@@ -13,8 +13,13 @@ settings:
   base:
     SWIFT_VERSION: "5.10"
     SWIFT_STRICT_CONCURRENCY: minimal
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    # MARKETING_VERSION is the deliberate, human-chosen release version
+    # (SemVer). Bump it by hand here only when cutting a release — see
+    # docs/VERSIONING.md. CURRENT_PROJECT_VERSION (the build number) is NOT set
+    # here on purpose: it lives in Config/Base.xcconfig so `scripts/stamp-
+    # version.sh` can stamp it from the git commit count at archive time
+    # (monotonic, conflict-free across parallel sessions).
+    MARKETING_VERSION: "0.7.0"
     DEVELOPMENT_TEAM: $(SEPTENA_DEVELOPMENT_TEAM)
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

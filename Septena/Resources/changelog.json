@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "_comment": "Canonical, hand-curated release notes for Septena. Single source of truth: bundled into the app (Settings ▸ About ▸ What's New + the launch sheet) AND mirrored to the website at build time (septena-site/scripts/sync-changelog.mjs → /changelog). Newest release first. `section` on a highlight is an optional SectionManifest key (drives the accent color); omit it (null) for app-wide changes. Draft new entries from `scripts/changelog-draft.sh <last-tag>`, then curate. See docs/VERSIONING.md. NOTE: entries before 0.7.0 are reconstructed from git history (build = commit count at that date) — Septena hadn't shipped publicly yet, so these are a human-readable starting point, not literal past App Store builds. The version in project.yml (MARKETING_VERSION) must always match the newest entry here.",
+  "releases": [
+    {
+      "version": "0.7.0",
+      "build": 1066,
+      "date": "2026-06-20",
+      "name": "AI hub & community",
+      "summary": "A home for everything AI, a real community board, and a calmer everyday surface.",
+      "highlights": [
+        {
+          "title": "Run the MCP server from iPhone",
+          "detail": "Connect Claude to your Septena data from iOS too, with connected apps folded into one AI hub.",
+          "section": null
+        },
+        {
+          "title": "Settings, reorganized into seven hubs",
+          "detail": "Everything is grouped by intent now, with a unified Claude & AI hub.",
+          "section": null
+        },
+        {
+          "title": "A real community board",
+          "detail": "Comment threads, a public feature board you can vote on, testimonials, and moderation.",
+          "section": null
+        },
+        {
+          "title": "Quieter capture",
+          "detail": "Every quick-add menu has a full-editor escape hatch, and section drawers open straight into the log.",
+          "section": null
+        }
+      ]
+    },
+    {
+      "version": "0.6.0",
+      "build": 1013,
+      "date": "2026-06-17",
+      "name": "Identity & depth",
+      "summary": "The app's voice comes through, training gets deeper, and units finally bend to you.",
+      "highlights": [
+        {
+          "title": "A log is a vote",
+          "detail": "The idea that every entry is a small act of self-investment now runs through onboarding and the little celebrations when you log.",
+          "section": null
+        },
+        {
+          "title": "Choose metric or imperial",
+          "detail": "One global switch for weight, distance, and volume. Your data stays metric underneath; only what you see and type changes.",
+          "section": null
+        },
+        {
+          "title": "Effort on every strength set",
+          "detail": "Log difficulty as RIR or a plain scale, whichever you think in.",
+          "section": "training"
+        },
+        {
+          "title": "Skip a supplement for today",
+          "detail": "Mark a supplement skipped without breaking your streak, just like habits.",
+          "section": "supplements"
+        },
+        {
+          "title": "Watch rings match your colors",
+          "detail": "The macro and training rings on the watch pick up each metric's color from Settings.",
+          "section": "training"
+        }
+      ]
+    },
+    {
+      "version": "0.5.0",
+      "build": 854,
+      "date": "2026-06-13",
+      "name": "Front door",
+      "summary": "The home screen becomes a living dial of your day under a real sky.",
+      "highlights": [
+        {
+          "title": "Your day as a dial",
+          "detail": "A day-dial hero spins so 'now' sits at the top, with the date upright and the sun and moon where they belong.",
+          "section": null
+        },
+        {
+          "title": "The real sky, overhead",
+          "detail": "The top of the dashboard washes with the actual color of the sky right now, from the sun's true elevation.",
+          "section": null
+        },
+        {
+          "title": "Rhythm wheel, colored by kind",
+          "detail": "The day wheel plots what you took, each kind in its own color.",
+          "section": "intake"
+        },
+        {
+          "title": "One way to start a section",
+          "detail": "Section onboarding is unified into a single, consistent first-run flow.",
+          "section": null
+        }
+      ]
+    },
+    {
+      "version": "0.4.0",
+      "build": 666,
+      "date": "2026-06-09",
+      "name": "Localized & named",
+      "summary": "Septena speaks Portuguese, settles its names, and sharpens its icons.",
+      "highlights": [
+        {
+          "title": "Brazilian Portuguese",
+          "detail": "The interface, notifications, and Siri phrases are translated to pt-BR.",
+          "section": null
+        },
+        {
+          "title": "Concrete icons everywhere",
+          "detail": "Generic 'sparkle' glyphs are gone — every surface uses a real, specific symbol.",
+          "section": null
+        },
+        {
+          "title": "Move suggestions on demand",
+          "detail": "Ask for tidy-up suggestions outside the inbox, when you want them.",
+          "section": "tasks"
+        },
+        {
+          "title": "Full-color discs on the watch",
+          "detail": "The watch corner complication wears Septena's discs mark.",
+          "section": null
+        }
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "build": 434,
+      "date": "2026-06-04",
+      "name": "Polish",
+      "summary": "Editing gets richer, the watch gets steadier, and the Claude link tells you when it needs you.",
+      "highlights": [
+        {
+          "title": "Full task quick-edit",
+          "detail": "Edit every field of a task — deadline, area, project, notes — from one sheet.",
+          "section": "tasks"
+        },
+        {
+          "title": "A gentle reconnect cue for Claude",
+          "detail": "When the Claude connection goes stale, a quiet, non-modal nudge appears instead of a hard wall.",
+          "section": null
+        },
+        {
+          "title": "Steadier watch refresh",
+          "detail": "The watch reads a single Next snapshot instead of replaying the whole sync zone.",
+          "section": null
+        }
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "build": 333,
+      "date": "2026-05-25",
+      "name": "Life OS",
+      "summary": "Septena grows from a task app into one place for every corner of your life.",
+      "highlights": [
+        {
+          "title": "Sections become the shape of the app",
+          "detail": "Each life domain is a section you can turn on or hide without ever losing data.",
+          "section": null
+        },
+        {
+          "title": "Nutrition with photos and full macros",
+          "detail": "Log meals with photos and complete macro and micronutrient detail.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Water, gut, mood, training, groceries",
+          "detail": "New sections arrive — with hydration layered over nutrition — each with a first-run intro.",
+          "section": "hydration"
+        },
+        {
+          "title": "Insights from your own data",
+          "detail": "An on-device correlation engine surfaces patterns across what you track.",
+          "section": null
+        }
+      ]
+    },
+    {
+      "version": "0.1.0",
+      "build": 53,
+      "date": "2026-04-06",
+      "name": "Foundation",
+      "summary": "The first cut — a fast, focused task manager to build everything else on.",
+      "highlights": [
+        {
+          "title": "A proper task manager",
+          "detail": "Sidebar with Inbox, Today, and Upcoming, organized into areas and projects.",
+          "section": "tasks"
+        },
+        {
+          "title": "Fast capture",
+          "detail": "Inline entry and multi-select for getting things down without friction.",
+          "section": "tasks"
+        }
+      ]
+    }
+  ]
+}

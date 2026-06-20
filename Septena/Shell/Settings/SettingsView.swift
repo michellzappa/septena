@@ -44,14 +44,20 @@ enum SettingsKey {
   /// device. Written by `SettingsStore.markOnboardingComplete` /
   /// `reconcileOnboarding`.
   static let welcomeCompleted = "septena.welcome.completed"
+  /// Device-local marker of the newest release the user has already seen in
+  /// the "What's New" sheet. Empty on a fresh install (the welcome covers
+  /// first run, so we adopt the current version silently instead of showing
+  /// notes). On update, any release newer than this triggers the sheet once;
+  /// dismissing it advances the marker to the latest version.
+  static let lastSeenChangelogVersion = "septena.changelog.lastSeenVersion"
   /// Device-local dev override: forces the welcome to present even on an
   /// established account, surviving relaunch, so the first-run flow can be
   /// re-tested without wiping the app. Set by Settings ▸ About ▸ Advanced
   /// ("Reset first-run welcome"); cleared when the welcome is completed.
   /// Never set in normal use, so the gate behaves exactly as before.
   static let welcomeForce = "septena.welcome.force"
-  /// Consent toggle for anonymous aggregate usage analytics (Plausible).
-  /// Same key string is referenced by `PlausibleClient.consentKey` so the
+  /// Consent toggle for anonymous aggregate usage telemetry.
+  /// Same key string is referenced by `TelemetryClient.consentKey` so the
   /// guard inside the actor and the @AppStorage binding stay in sync.
   static let shareUsageData   = "septena.privacy.shareUsageData"
   /// Which renderer the homepage uses. Raw value of `HomepageLayoutMode`.
@@ -769,6 +775,7 @@ struct SettingsView: View {
     case privacy
     case feedback        // roadmap + community profile + testimonial
     case about
+    case whatsNew        // release notes, reached from About
     case advanced        // dev + diagnostics, reached from About
     // Sub-panes reached from the hubs above.
     case general         // time of day, app icon, quick actions, animations
@@ -947,6 +954,7 @@ struct SettingsView: View {
     case .privacy:      return "Privacy"
     case .feedback:     return "Feedback"
     case .about:        return "About"
+    case .whatsNew:     return "What's New"
     case .advanced:     return "Advanced"
     case .dataTools:    return "Data Tools"
     case .motionGallery: return "Motion Gallery"
@@ -988,6 +996,7 @@ struct SettingsView: View {
     case .privacy:      return "hand.raised"
     case .feedback:     return "bubble.left.and.bubble.right"
     case .about:        return "info.circle"
+    case .whatsNew:     return "megaphone"
     case .advanced:     return "wrench.and.screwdriver"
     case .dataTools:    return "stethoscope"
     case .motionGallery: return "wand.and.rays"
@@ -1045,6 +1054,7 @@ struct SettingsView: View {
     case .privacy:           PrivacySettingsPane()
     case .feedback:          FeedbackSettingsPane()
     case .about:             AboutSettingsPane()
+    case .whatsNew:          ChangelogList()
     case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
     case .milestonePreview:  MilestonePreviewPane()

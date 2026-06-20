@@ -50,6 +50,14 @@ struct RootTabView: View {
   #endif
   @State private var tabSelection = TabSelection()
 
+  // "What's New" gate. We show the sheet once when the app's marketing version
+  // climbs past the last release the user saw — but never on a fresh install
+  // (empty marker → adopt the current version silently; the welcome covers
+  // first run) and never until the welcome is done.
+  @AppStorage(SettingsKey.welcomeCompleted) private var welcomeCompleted = false
+  @AppStorage(SettingsKey.lastSeenChangelogVersion) private var lastSeenChangelog = ""
+  @State private var showWhatsNew = false
+
   // Default to shown when a section row hasn't loaded yet, so a tab never
   // flickers out during launch. Keyed by the manifest `key`, not the tab enum.
   private var tasksEnabled: Bool {
@@ -200,6 +208,24 @@ struct RootTabView: View {
           .presentationDragIndicator(.visible)
           #else
           .frame(width: 480, height: 560)
+          #endif
+      }
+      // "What's New" after an update — see the gate notes on `showWhatsNew`.
+      .task(id: welcomeCompleted) {
+        guard welcomeCompleted, let latest = Changelog.latest?.version else { return }
+        if lastSeenChangelog.isEmpty {
+          lastSeenChangelog = latest            // fresh install: adopt silently
+        } else if !Changelog.unseen(since: lastSeenChangelog).isEmpty {
+          showWhatsNew = true
+        }
+      }
+      .sheet(isPresented: $showWhatsNew, onDismiss: {
+        if let latest = Changelog.latest?.version { lastSeenChangelog = latest }
+      }) {
+        WhatsNewSheet(since: lastSeenChangelog)
+          #if os(iOS)
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
           #endif
       }
   }

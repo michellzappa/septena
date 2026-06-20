@@ -1461,7 +1461,11 @@
         }
       }
     },
+    "Analytics is processed by Septena on Cloudflare infrastructure." : {
+
+    },
     "Analytics is provided by Plausible Analytics (EU-hosted, cookie-free)." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3668,6 +3672,7 @@
       }
     },
     "Helps us understand which features people use, so we improve the right things." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3676,6 +3681,9 @@
           }
         }
       }
+    },
+    "Helps us understand which features people use, so we improve the right things. Turning this off sends one privacy-preference update, then stops usage events." : {
+
     },
     "Hidden" : {
 
@@ -7684,6 +7692,9 @@
           }
         }
       }
+    },
+    "Updates will show up here." : {
+
     },
     "Upgrade to %@" : {
       "extractionState" : "stale",
