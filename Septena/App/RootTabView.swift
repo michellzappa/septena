@@ -10,7 +10,7 @@ import SwiftUI
 enum SeptenaTab: Hashable {
   case week, next, tasks, goals
 
-  /// Stable, low-cardinality screen name for Plausible. Kept here so the
+  /// Stable, low-cardinality screen name for telemetry. Kept here so the
   /// dashboard's labels match the enum even if the tab's display title
   /// changes.
   var analyticsName: String {
@@ -72,12 +72,12 @@ struct RootTabView: View {
       // value instead of each recomputing from the size class.
       .resolvesAdaptiveNavigation()
       .environment(tabSelection)
-      // Anonymous aggregate analytics — one event when the user lands on
+      // Anonymous aggregate telemetry — one event when the user lands on
       // a tab. `.task(id:)` re-runs only when the value changes and is
       // cancelled on disappear, so back-nav within a tab doesn't double
       // count. The actor is fire-and-forget; this never blocks UI.
       .task(id: tabSelection.current) {
-        await PlausibleClient.shared.track(screen: tabSelection.current.analyticsName)
+        await TelemetryClient.shared.track(screen: tabSelection.current.analyticsName)
       }
       // App-global Settings. Lives at the TabView level so the top-left
       // "…" menu on every home view opens it, and so the sidebar row in

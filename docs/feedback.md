@@ -115,7 +115,7 @@ public and bundled. Reuse the KV/cron patterns already in `septena-mcp-gateway`.
 
 Upgrade the `mailto:` row in `AboutSettingsPane`. Follow the `AdaptiveEditScaffold`
 convention (inspector on iPad/Mac, sheet on iPhone) for the form and the
-`PlausibleClient` actor shape for the poster.
+`TelemetryClient` actor shape for the poster.
 
 **Gating:** on appear, if `DCAppAttestService.isSupported == false` → render the
 existing `mailto:mz@envisioning.com` link, not the sheet.
@@ -126,7 +126,7 @@ existing `mailto:mz@envisioning.com` link, not the sheet.
 - Optional email — "Leave your email if you'd like a reply." (No outbound mail;
   this is purely for the maintainer to reach out.)
 - Read-only attached metadata, shown so it's not surprising: app version, build,
-  platform, OS version (same values `PlausibleClient` already computes).
+  platform, OS version (same values `TelemetryClient` already computes).
 
 **`FeedbackClient` (new actor):**
 1. One-time per install: `generateKey()` → store `keyId` in Keychain →

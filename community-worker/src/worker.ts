@@ -1,4 +1,5 @@
 import { issueChallenge, rateLimited, verifyAttestation } from "./attest";
+import { telemetryAdmin } from "./admin";
 import { requireUser } from "./auth";
 import type { Env } from "./env";
 import { json, notFound, publicJson, readJson } from "./http";
@@ -6,6 +7,7 @@ import { profileResponse, updateProfile } from "./profile";
 import { createSupportTicket, getSupportTicket, listSupportTickets, postSupportMessage, setTicketStatus } from "./support";
 import { addComment, createFeature, getFeature, listFeatures, listPublicFeatures, moderateComment, setVote, updateFeature } from "./features";
 import { deleteMyTestimonial, getMyTestimonial, listPublicTestimonials, listTestimonials, moderateTestimonial, putMyTestimonial } from "./testimonials";
+import { ingestTelemetry } from "./telemetry";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -54,6 +56,14 @@ async function route(req: Request, env: Env): Promise<Response> {
       });
       console.log(`attest.register key=${b.keyId.slice(0, 8)} ok=${res.ok} reason=${res.reason ?? ""}`);
       return res.ok ? json({ ok: true }) : json({ error: res.reason ?? "attestation_failed" }, 400);
+    }
+
+    if (req.method === "POST" && path === "/api/telemetry") {
+      return ingestTelemetry(env, req);
+    }
+
+    if (req.method === "GET" && path === "/admin/telemetry") {
+      return telemetryAdmin(req, env);
     }
 
     if (req.method === "GET" && path === "/api/me") {

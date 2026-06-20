@@ -150,7 +150,7 @@ Mutators are the write boundary. Views and intents should not write SwiftData en
 | `CalendarBridge.swift` | EventKit calendar events for dashboards/Next. |
 | `WatchBridge.swift` | iOS to watch checklist sync and watch mutations. |
 | `AddTaskIntent.swift`, `App/Intents/` | App Intents for tasks and section logging. |
-| `Plausible.swift` | Optional anonymous aggregate analytics. |
+| `Telemetry.swift` | Optional anonymous aggregate telemetry via the Cloudflare worker. |
 
 The hosted MCP gateway is `https://mcp.septena.app/mcp`. The app mirrors the section skill briefs in Settings so the LLM-facing tool catalog and the in-app section definitions can stay aligned.
 

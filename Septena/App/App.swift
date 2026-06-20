@@ -135,6 +135,7 @@ struct SeptenaApp: App {
             // and any completions made on another device while we were away.
             LocalNotificationScheduler.shared.reconcile()
             Task {
+              await TelemetryClient.shared.trackAppOpen()
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
               // Republish the watch snapshot after pulling — this is also how

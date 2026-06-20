@@ -626,7 +626,7 @@ struct SectionDrawer<Content: View>: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     .tint(resolvedAccent)
-    // Screen analytics keyed by the section — internalized here so no drawer
+    // Screen telemetry keyed by the section — internalized here so no drawer
     // hand-passes a `.trackScreen("key")` that always equals `sectionKey`.
     .trackScreen(sectionKey)
     .toolbar {

@@ -41,6 +41,9 @@ id = "80b89a7a4b2a4102b6f4393c50496afc"
 ATTEST_MODE = "enforce"
 APP_ATTEST_APP_ID = "992N457T8D.com.septena.cloud,992N457T8D.com.septena.cloud.mac"
 APP_ATTEST_ENV = "production"
+ADMIN_EMAILS = "mz@centaur-labs.io"
 
 # Set as a secret in production:
 #   npx wrangler secret put USER_HASH_SALT
+#   npx wrangler secret put TELEMETRY_HASH_SALT
+#   npx wrangler secret put ADMIN_DASHBOARD_TOKEN

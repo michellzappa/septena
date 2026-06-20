@@ -36,32 +36,37 @@ struct PrivacySettingsPane: View {
       Section {
         Toggle("Share anonymous usage data", isOn: $share)
       } footer: {
-        Text("Helps us understand which features people use, so we improve the right things.")
+        Text("Helps us understand which features people use, so we improve the right things. Turning this off sends one privacy-preference update, then stops usage events.")
       }
 
       Section("What is sent") {
         bullet("Which screens you open (e.g. \"Nutrition\", \"Sleep\")")
         bullet("App version, build, and platform (iOS or macOS)")
+        bullet("An anonymous app-install hash, used only for aggregate opt-in and opt-out counts")
+        bullet("Changes to this analytics preference")
       }
 
       Section("What is never sent") {
         bullet("Anything you log — food, intake, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
-        bullet("Any identifier that links events to you, or links today's session to yesterday's.")
-        bullet("Your IP address. The analytics provider uses it briefly to derive your country, then discards it.")
+        bullet("Your community profile, iCloud identity, or anything that links analytics to your personal data.")
+        bullet("Your IP address. Cloudflare receives it to deliver the request, but Septena does not store it in analytics tables.")
       }
 
       Section {
         EmptyView()
       } footer: {
         VStack(alignment: .leading, spacing: 8) {
-          Text("Analytics is provided by Plausible Analytics (EU-hosted, cookie-free).")
-          Link("plausible.io/privacy",
-               destination: URL(string: "https://plausible.io/privacy")!)
+          Text("Analytics is processed by Septena on Cloudflare infrastructure.")
+          Link("cloudflare.com/privacypolicy",
+               destination: URL(string: "https://www.cloudflare.com/privacypolicy/")!)
             .font(.callout)
         }
       }
     }
     .formStyle(.grouped)
+    .onChange(of: share) { _, enabled in
+      Task { await TelemetryClient.shared.recordConsent(enabled: enabled) }
+    }
   }
 
   private func bullet(_ text: String) -> some View {
