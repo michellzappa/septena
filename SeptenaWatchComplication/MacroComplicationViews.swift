@@ -28,17 +28,108 @@ struct MacroComplicationView: View {
         family == .accessoryCircular ? AnyView(AccessoryWidgetBackground())
                                      : AnyView(Color.clear)
       }
-      // Tap target: open the watch app's macro detail page (handled by
-      // `NextWatchView.onOpenURL`).
+      // Tap target: open the watch app's nutrition detail page (handled by
+      // `NextWatchView.onOpenURL`) — it shows the live fast too while one runs.
       .widgetURL(URL(string: "septena://nutrition"))
   }
 
   @ViewBuilder
   private var content: some View {
-    switch family {
-    case .accessoryRectangular: RectangularMacroView(rings: rings)
-    default:                    CircularMacroView(rings: rings)
+    // A live fast morphs the whole face — a single ring + elapsed timer — exactly
+    // as the phone's Nutrition tile does. Elapsed is derived from the timeline
+    // entry's date so it steps forward over the fast without a provider reload.
+    if let fast = entry.data.fasting {
+      let elapsed = max(0, entry.date.timeIntervalSince(fast.since))
+      switch family {
+      case .accessoryRectangular: RectangularFastingView(fast: fast, elapsed: elapsed)
+      default:                    CircularFastingView(fast: fast, elapsed: elapsed)
+      }
+    } else {
+      switch family {
+      case .accessoryRectangular: RectangularMacroView(rings: rings)
+      default:                    CircularMacroView(rings: rings)
+      }
     }
+  }
+}
+
+// MARK: - Fasting morph (single ring filling toward the fasting target)
+
+/// Split the elapsed interval into whole hours + minutes once, for both faces.
+private func fastingHM(_ elapsed: TimeInterval) -> (h: Int, m: Int) {
+  let totalMin = Int(elapsed) / 60
+  return (totalMin / 60, totalMin % 60)
+}
+
+/// The single fasting ring, filling toward the target (laps past 100% like any
+/// other ring). The wire's authored color wins; `FastingStyle` is the fallback.
+private func fastingRing(_ fast: FastingComplication, elapsed: TimeInterval) -> ComplicationRing {
+  ComplicationRing(key: "fasting", value: elapsed / 3600,
+                   goal: max(fast.targetHours, 0.1), colorHex: fast.colorHex)
+}
+
+// MARK: - Circular: one ring with the elapsed hours centered
+
+private struct CircularFastingView: View {
+  let fast: FastingComplication
+  let elapsed: TimeInterval
+
+  var body: some View {
+    let hm = fastingHM(elapsed)
+    ZStack {
+      RingsView(rings: [fastingRing(fast, elapsed: elapsed)],
+                color: { _ in FastingStyle.color(fast.colorHex) },
+                lineWidth: 5, spacing: 0)
+        .padding(1)
+      VStack(spacing: -2) {
+        Text("\(hm.h)")
+          .font(.system(size: 18, weight: .semibold, design: .rounded))
+        Text("h")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(.secondary)
+      }
+    }
+    .widgetAccentable(false)
+  }
+}
+
+// MARK: - Rectangular: ring + "Fasting" headline, elapsed, and since/target
+
+private struct RectangularFastingView: View {
+  let fast: FastingComplication
+  let elapsed: TimeInterval
+
+  var body: some View {
+    let hm = fastingHM(elapsed)
+    let tint = FastingStyle.color(fast.colorHex)
+    HStack(spacing: 10) {
+      ZStack {
+        RingsView(rings: [fastingRing(fast, elapsed: elapsed)],
+                  color: { _ in tint }, lineWidth: 5, spacing: 0)
+        Image(systemName: "hourglass")
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(tint)
+      }
+      .frame(width: 44, height: 44)
+      .widgetAccentable(false)
+
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Fasting")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(tint)
+        Text("\(hm.h)h \(hm.m)m")
+          .font(.system(size: 18, weight: .semibold, design: .rounded))
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+        Text("since \(fast.sinceLabel) · \(Int(fast.targetHours.rounded()))h goal")
+          .font(.system(size: 9))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(.vertical, 1)
   }
 }
 
@@ -150,4 +241,16 @@ private struct RectangularMacroView: View {
   MacroComplication()
 } timeline: {
   MacroEntry(date: .now, data: .sample)
+}
+
+#Preview("Rectangular · fasting", as: .accessoryRectangular) {
+  MacroComplication()
+} timeline: {
+  MacroEntry(date: .now, data: .fastingSample)
+}
+
+#Preview("Circular · fasting", as: .accessoryCircular) {
+  MacroComplication()
+} timeline: {
+  MacroEntry(date: .now, data: .fastingSample)
 }

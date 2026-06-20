@@ -26,7 +26,9 @@ struct MacroProvider: TimelineProvider {
   private func currentData() -> MacroComplicationData {
     let loaded = MacroComplicationData.load()
     #if DEBUG
-    if loaded.rings.isEmpty { return .sample }
+    // Don't mask a real fast (which legitimately has empty rings overnight) with
+    // the macro sample — only fall back when there's nothing to show at all.
+    if loaded.rings.isEmpty && loaded.fasting == nil { return .sample }
     #endif
     return loaded
   }
@@ -36,11 +38,25 @@ struct MacroProvider: TimelineProvider {
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<MacroEntry>) -> Void) {
-    let entry = MacroEntry(date: Date(), data: currentData())
-    // Reload budget is tight on watchOS — the watch app calls
+    let data = currentData()
+    let now = Date()
+    if data.fasting != nil {
+      // A live fast: step the ring + elapsed readout forward without re-invoking
+      // the provider by emitting future entries (WidgetKit renders each at its
+      // own date, deriving elapsed from it). A 15-minute cadence over the next
+      // ~18h covers any fast; the watch app reloads this timeline on its next
+      // snapshot fetch anyway, so this is just the between-fetch fill.
+      let step: TimeInterval = 15 * 60
+      let entries = (0..<72).map { i in
+        MacroEntry(date: now.addingTimeInterval(Double(i) * step), data: data)
+      }
+      completion(Timeline(entries: entries, policy: .atEnd))
+      return
+    }
+    // Macros: reload budget is tight on watchOS — the watch app calls
     // WidgetCenter.shared.reloadTimelines(ofKind:) after every snapshot fetch,
     // so a static, never-expiring timeline is enough.
-    completion(Timeline(entries: [entry], policy: .never))
+    completion(Timeline(entries: [MacroEntry(date: now, data: data)], policy: .never))
   }
 }
 

@@ -153,6 +153,10 @@ enum WatchSnapshotPublisher {
     // training-ring complication. Present whenever a target exists (they always
     // have built-in defaults), so it mirrors the macro rings' availability.
     let trainingRings = buildTrainingRings(context: context)
+    // The live fast, if the user tracks fasting and one is running — so the watch
+    // macro complication morphs into a fasting face like the phone tile. Nil
+    // otherwise, so the wrist keeps showing macros.
+    let fasting = buildFasting(context: context)
     // The medications / symptoms / groceries capture catalogs, each gated on the
     // section being enabled so the wrist + menu is dynamic — disabling a section
     // on the phone drops its rows from the watch on the next publish.
@@ -171,6 +175,7 @@ enum WatchSnapshotPublisher {
                                      topMeals: topMeals.isEmpty ? nil : topMeals,
                                      nutritionRings: nutritionRings,
                                      trainingRings: trainingRings,
+                                     fasting: fasting,
                                      medications: medications.isEmpty ? nil : medications,
                                      symptoms: symptoms.isEmpty ? nil : symptoms,
                                      groceries: groceries.isEmpty ? nil : groceries,
@@ -374,6 +379,50 @@ enum WatchSnapshotPublisher {
     // toward the goal), matching how macros always show once a target exists.
     guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
     return TrainingRingsWire(rings: rings)
+  }
+
+  // MARK: - Fasting (wrist macro complication morph)
+
+  /// The phone-only "Track fasting" preference key. Mirrors
+  /// `SettingsKey.nutritionTrackFasting`, which lives in the app target out of
+  /// SeptenaCore's reach; both read `UserDefaults.standard`, so the raw key is
+  /// the contract. When off, the wrist always shows macros, never a fast.
+  private static let trackFastingDefaultsKey = "septena.nutrition.trackFasting"
+
+  /// The live fast for the watch macro complication — present only when the user
+  /// tracks fasting *and* a fast is currently running, so the complication morphs
+  /// into a fasting face exactly as the phone's Nutrition tile does
+  /// (`WeekDashboardView.nutritionDomainData`). Same `computeFastingState` inputs
+  /// (from the shared stats builder, scanning just today + yesterday — all the
+  /// live state needs) and the same target source (`MacrosConfig.fasting.min`,
+  /// falling back to the default band).
+  @MainActor
+  private static func buildFasting(context: ModelContext) -> FastingWire? {
+    guard UserDefaults.standard.bool(forKey: trackFastingDefaultsKey) else { return nil }
+    let stats = ChecklistMirror.buildNutritionStatsResponse(context: context, days: 2)
+    let inputs = FastingStateInputs(
+      todayLatestMeal: stats.todayLatestMeal,
+      todayMealCount: stats.todayMealCount ?? 0,
+      yesterdayLastMeal: stats.yesterdayLastMeal)
+    let now = Date()
+    guard case .fasting(_, let since, let totalMin) = computeFastingState(inputs: inputs, now: now)
+    else { return nil }
+
+    let targetH = NutritionPrefs.loadMacrosConfig()?.fasting?.min ?? FastingDefaults.targetMinH
+    // The Fasting metric's authored color, resolved exactly as the phone's
+    // Nutrition surfaces do: the user's per-tile override else the MacroCatalog
+    // default — so the wrist ring matches the phone.
+    let tiles = MacroCatalog.reconcile(
+      SettingsMirror.loadSettings(context: context)?.nutrition?.macroTiles
+        ?? MacroCatalog.defaultTilePrefs())
+    let colorHex = tiles.first(where: { $0.id == "fasting" })?.colorHex
+      ?? MacroCatalog.byID["fasting"]?.defaultColorHex
+
+    return FastingWire(
+      since: now.addingTimeInterval(-Double(totalMin) * 60),
+      sinceLabel: since,
+      targetHours: max(targetH, 1),
+      colorHex: colorHex)
   }
 
   // MARK: - Capture catalogs (wrist quick-inputs)

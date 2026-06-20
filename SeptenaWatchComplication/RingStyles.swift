@@ -60,6 +60,21 @@ enum MacroStyle {
   }
 }
 
+// MARK: - Fasting (single ring — the macro complication's fasting morph)
+
+/// The fasting face the macro complication morphs into during an active fast:
+/// one ring filling toward the user's lower fasting target. The default hue
+/// mirrors the phone's `MacroCatalog` "fasting" color; the live wire overrides
+/// it per-fast with the user's authored color (`RingsView` prefers `colorHex`).
+enum FastingStyle {
+  static let fallbackHex = "#8b5cf6"
+
+  /// The authored color when present, else the fixed fasting hue.
+  static func color(_ colorHex: String? = nil) -> Color {
+    Color(hexToken: colorHex) ?? Color(hexToken: fallbackHex) ?? .purple
+  }
+}
+
 // MARK: - Training (strength · cardio · sessions)
 
 /// Distinct hues from the macro complication so the two faces read differently.

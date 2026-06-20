@@ -61,6 +61,13 @@ struct NextItemsResponse: Codable {
   /// for the watch's training-ring complication. Phone-computed. Optional so
   /// older payloads decode unchanged.
   var trainingRings: TrainingRingsWire? = nil
+  /// The live fast, if one is running and the user tracks fasting — so the watch
+  /// macro complication can morph into a fasting face exactly as the phone's
+  /// Nutrition tile does. Phone-computed (fasting tracking is a phone preference
+  /// and the live state machine needs the phone's meal history). Absent when not
+  /// fasting, so the complication falls back to the macro rings. Optional so
+  /// older payloads decode unchanged.
+  var fasting: FastingWire? = nil
   /// The user's active medications, carried so the watch's + menu can mark a
   /// dose taken with one tap. Present only when the Medications section is
   /// enabled (the publisher omits it otherwise), so the wrist menu is dynamic.
@@ -136,6 +143,23 @@ struct TrainingRingsWire: Codable, Hashable {
   /// Ordered outer→inner: "strength" (weekly hard sets), "cardio" (weekly
   /// minutes), "sessions" (distinct training days this week).
   var rings: [RingMetricWire]
+}
+
+/// The live fasting window for the watch macro complication, so it morphs into a
+/// fasting face exactly as the phone's Nutrition tile does. Phone-computed and
+/// present only while a fast is running; the complication shows macros otherwise.
+struct FastingWire: Codable, Hashable {
+  /// The absolute instant the current fast began (now − elapsed), so the wrist
+  /// can render a live elapsed timer (stepped by the complication timeline)
+  /// instead of a value frozen at publish time.
+  var since: Date
+  /// "HH:mm" of the meal the fast started from — the phone tile's "since" label.
+  var sinceLabel: String
+  /// The user's lower fasting target in hours; the ring fills toward it.
+  var targetHours: Double
+  /// The Fasting metric's authored color token, mirrored from Settings so the
+  /// ring matches the phone. Nil → the complication's fixed fallback hue.
+  var colorHex: String? = nil
 }
 
 /// One ring on the wire: its key, the running total, and the value that fills

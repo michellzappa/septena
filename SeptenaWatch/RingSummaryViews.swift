@@ -27,21 +27,81 @@ struct NutritionDetailView: View {
   }
 
   var body: some View {
-    RingSummaryPage(
-      // Draw kcal/protein/carbs/fat (fiber stays legend-only) — same set the
-      // circular complication draws.
-      drawnRings: Array(rings.prefix(4)),
-      legendRings: rings,
-      color: MacroStyle.color,
-      label: MacroStyle.label,
-      unit: MacroStyle.unit,
-      isEmpty: conn.nutritionRings.isEmpty,
-      emptyHint: "No meals logged today")
-    .navigationTitle("Macros")
+    Group {
+      if let fast = conn.fasting {
+        // A live fast takes over the whole page — the complication's tap target
+        // shows the fast the face is showing, not a list of zero macros (an
+        // overnight fast has no meals logged yet). Mirrors the face's morph.
+        FastingDetailPage(fast: fast)
+      } else {
+        RingSummaryPage(
+          // Draw kcal/protein/carbs/fat (fiber stays legend-only) — same set the
+          // circular complication draws.
+          drawnRings: Array(rings.prefix(4)),
+          legendRings: rings,
+          color: MacroStyle.color,
+          label: MacroStyle.label,
+          unit: MacroStyle.unit,
+          isEmpty: conn.nutritionRings.isEmpty,
+          emptyHint: "No meals logged today")
+      }
+    }
+    .navigationTitle(conn.fasting == nil ? "Macros" : "Fasting")
     .navigationBarTitleDisplayMode(.inline)
     // Direct deep-link launches mount this page under the Next root; the root's
     // `.task` fetches, but pull once more here if we arrived before any data.
-    .task { if conn.nutritionRings.isEmpty { conn.fetchNext() } }
+    .task { if conn.nutritionRings.isEmpty && conn.fasting == nil { conn.fetchNext() } }
+  }
+}
+
+/// A live fast as the whole nutrition summary page — a big ring filling toward
+/// the target with the elapsed hours centered, then the since / goal labels.
+/// Mirrors the macro complication's fasting morph and the phone's Nutrition tile,
+/// so a fast never reads as "0 protein". Ticks every minute via `TimelineView`,
+/// and the ring laps past 100% once the fast exceeds its target.
+private struct FastingDetailPage: View {
+  let fast: FastingComplication
+
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: 60)) { ctx in
+      let elapsed = max(0, ctx.date.timeIntervalSince(fast.since))
+      let totalMin = Int(elapsed) / 60
+      let h = totalMin / 60, m = totalMin % 60
+      let tint = FastingStyle.color(fast.colorHex)
+      let ring = ComplicationRing(key: "fasting",
+                                  value: elapsed / 3600,
+                                  goal: max(fast.targetHours, 0.1),
+                                  colorHex: fast.colorHex)
+      ScrollView {
+        VStack(spacing: 12) {
+          ZStack {
+            RingsView(rings: [ring], color: { _ in tint }, lineWidth: 10, spacing: 0)
+              .frame(width: 112, height: 112)
+            VStack(spacing: -1) {
+              Text("\(h)")
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .foregroundStyle(tint)
+              Text(m > 0 ? "h \(m)m" : "h")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+          }
+          .padding(.top, 6)
+
+          VStack(spacing: 4) {
+            Label("Fasting", systemImage: "hourglass")
+              .font(.caption).fontWeight(.semibold)
+              .foregroundStyle(tint)
+            Text("since \(fast.sinceLabel)")
+              .font(.caption2).foregroundStyle(.secondary)
+            Text("\(Int(fast.targetHours.rounded()))h goal")
+              .font(.caption2).foregroundStyle(.secondary)
+          }
+        }
+        .padding(.horizontal, 6)
+        .padding(.bottom, 8)
+      }
+    }
   }
 }
 
@@ -85,6 +145,7 @@ private struct RingSummaryPage: View {
   var body: some View {
     ScrollView {
       VStack(spacing: 14) {
+
         RingsView(rings: drawnRings, color: color, lineWidth: 7, spacing: 3)
           .frame(width: 108, height: 108)
           .padding(.top, 4)

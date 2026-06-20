@@ -43,6 +43,11 @@ final class WatchConnectivity {
   /// when the section is disabled.
   var nutritionRings: [ComplicationRing] = []
   var trainingRings: [ComplicationRing] = []
+  /// The live fast from the snapshot, when one is running and the user tracks
+  /// fasting — held so the macro complication morphs into a fasting face and the
+  /// in-app Macros summary (its tap target) can show the live fast. Nil when not
+  /// fasting, so both surfaces fall back to macros.
+  var fasting: FastingComplication? = nil
   /// Section keys enabled on the phone (from the snapshot), so the Next-list
   /// "Summaries" links show for an enabled section even on a day its ring data
   /// didn't ride along. Empty for older payloads — callers fall back to ring
@@ -181,7 +186,7 @@ final class WatchConnectivity {
       self.enabledSections = Set(response.enabledSections ?? [])
       self.bucket        = bkt
       updateComplication()
-      updateMacroComplication(response.nutritionRings)
+      updateMacroComplication(response.nutritionRings, fasting: response.fasting)
       updateTrainingComplication(response.trainingRings)
       scheduleNextRefresh()
     } catch let ckError as CKError where ckError.code == .unknownItem {
@@ -689,16 +694,23 @@ final class WatchConnectivity {
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaNext")
   }
 
-  /// Mirror the phone-computed macro totals into the app group and refresh the
-  /// macro-ring complication. The snapshot is the only source — these rings are
-  /// phone-computed (goals + daily totals live there), so unlike the Next count
-  /// there's nothing to update on a local wrist log.
-  private func updateMacroComplication(_ wire: NutritionRingsWire?) {
+  /// Mirror the phone-computed macro totals (and the live fast, if any) into the
+  /// app group and refresh the macro-ring complication. The snapshot is the only
+  /// source — these are phone-computed (goals, daily totals, and the fasting
+  /// state machine all live there), so unlike the Next count there's nothing to
+  /// update on a local wrist log. When a fast rides along, the complication
+  /// morphs into a fasting face instead of drawing the rings.
+  private func updateMacroComplication(_ wire: NutritionRingsWire?, fasting wire2: FastingWire?) {
     let rings = (wire?.rings ?? []).map {
       ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
+    let fast = wire2.map {
+      FastingComplication(since: $0.since, sinceLabel: $0.sinceLabel,
+                          targetHours: $0.targetHours, colorHex: $0.colorHex)
+    }
     nutritionRings = rings   // held for the in-app detail page (complication tap target)
-    MacroComplicationData(rings: rings, updatedAt: Date()).save()
+    fasting = fast           // held for the in-app page + the fasting-face morph
+    MacroComplicationData(rings: rings, updatedAt: Date(), fasting: fast).save()
     WidgetCenter.shared.reloadTimelines(ofKind: "SeptenaMacroRings")
   }
 
