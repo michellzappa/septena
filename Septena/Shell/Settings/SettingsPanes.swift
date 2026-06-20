@@ -84,32 +84,35 @@ struct ConnectionsAISettingsPane: View {
         NavigationLink(value: SettingsView.SettingsDestination.skills) {
           Label("MCP Skills", systemImage: "book.closed")
         }
-        #if os(macOS)
         NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
-          Label("Local MCP Server", systemImage: "server.rack")
+          Label("MCP Server", systemImage: "server.rack")
         }
-        #endif
       } header: {
         Text("AI & MCP")
       } footer: {
-        #if os(macOS)
-        Text("Choose how far AI may reach, connect Claude through MCP, and run the local MCP server for Claude Code on this Mac.")
-        #else
-        Text("Choose how far AI may reach, connect Claude through MCP, and review the MCP skills that teach models how to use your sections.")
-        #endif
+        Text("Choose how far AI may reach, connect Claude through MCP, and review the skills that teach models how to use your sections.")
       }
 
+      ConnectedAppsSettingsSections()
+    }
+    .formStyle(.grouped)
+  }
+}
+
+#if !os(macOS)
+struct MCPServerUnavailablePane: View {
+  var body: some View {
+    Form {
       Section {
-        NavigationLink(value: SettingsView.SettingsDestination.connections) {
-          Label("Connected Apps", systemImage: "app.connected.to.app.below.fill")
-        }
+        Label("MCP Server runs on Mac", systemImage: "server.rack")
       } footer: {
-        Text("Apple permissions, device integrations, and external services such as Oura, Withings, GitHub, and Readwise.")
+        Text("The local MCP server lets Claude Code connect directly to Septena through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server.")
       }
     }
     .formStyle(.grouped)
   }
 }
+#endif
 
 // MARK: - Sharing & Data
 

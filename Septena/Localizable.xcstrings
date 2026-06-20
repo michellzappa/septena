@@ -1560,9 +1560,6 @@
     "Apple Intelligence" : {
 
     },
-    "Apple permissions, device integrations, and external services such as Oura, Withings, GitHub, and Readwise." : {
-
-    },
     "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
 
     },
@@ -2082,10 +2079,7 @@
         }
       }
     },
-    "Choose how far AI may reach, connect Claude through MCP, and review the MCP skills that teach models how to use your sections." : {
-
-    },
-    "Choose how far AI may reach, connect Claude through MCP, and run the local MCP server for Claude Code on this Mac." : {
+    "Choose how far AI may reach, connect Claude through MCP, and review the skills that teach models how to use your sections." : {
 
     },
     "Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals." : {
@@ -2169,13 +2163,10 @@
         }
       }
     },
-    "Claude and MCP live in Connections & AI. Service tokens stay on this device." : {
+    "Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app." : {
 
     },
-    "Claude reads and writes your data through the hosted gateway at mcp.septena.app." : {
-
-    },
-    "Claude reads and writes your data through the hosted gateway at mcp.septena.app. The local MCP server lets Claude Code on this Mac connect directly, with no gateway hop." : {
+    "Claude reads and writes your data through the hosted gateway at mcp.septena.app. The MCP Server lets Claude Code on this Mac connect directly, with no gateway hop." : {
 
     },
     "Claude session expired" : {
@@ -6400,6 +6391,9 @@
         }
       }
     },
+    "Service tokens stay on this device." : {
+
+    },
     "Services" : {
       "localizations" : {
         "pt-BR" : {
@@ -7264,6 +7258,9 @@
           }
         }
       }
+    },
+    "The local MCP server lets Claude Code connect directly to Septena through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server." : {
+
     },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
       "localizations" : {

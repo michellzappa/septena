@@ -9,6 +9,15 @@ import UIKit
 #endif
 
 struct IntegrationsSettingsPane: View {
+  var body: some View {
+    Form {
+      ConnectedAppsSettingsSections()
+    }
+    .formStyle(.grouped)
+  }
+}
+
+struct ConnectedAppsSettingsSections: View {
   @State private var remindersBridge = RemindersBridge.shared
   @State private var calendarBridge = CalendarBridge.shared
   @State private var healthBridge = HealthKitBridge.shared
@@ -17,149 +26,147 @@ struct IntegrationsSettingsPane: View {
   @State private var githubProvider = GitHubProvider.shared
   @State private var readwiseProvider = ReadwiseProvider.shared
   @State private var photosBridge = PhotosBridge.shared
+
   var body: some View {
-    Form {
-      Section {
-        NavigationLink {
-          RemindersInboxDetail()
-            .navigationTitle("Reminders")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Reminders",
-                   systemImage: "checklist",
-                   state: remindersAccessLabel,
-                   isGranted: remindersBridge.access == .granted)
-        }
-
-        NavigationLink {
-          CalendarDetail()
-            .navigationTitle("Calendar")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Calendar",
-                   systemImage: "calendar",
-                   state: calendarAccessLabel,
-                   isGranted: calendarBridge.access == .granted)
-        }
-
-        NavigationLink {
-          AppleHealthDetail()
-            .navigationTitle("Apple Health")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Apple Health",
-                   systemImage: "heart.text.square",
-                   state: healthAccessLabel,
-                   isGranted: healthBridge.access == .granted)
-        }
-
-        // Photos — used to attach thumbnails to nutrition (meal) entries.
-        // Access is requested lazily by the picker too, but surfacing it
-        // here gives denied users a fix path (and a way to grant up front).
-        NavigationLink {
-          PhotosDetail()
-            .navigationTitle("Photos")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Photos",
-                   systemImage: "photo",
-                   state: photosAccessLabel,
-                   isGranted: photosBridge.access == .granted)
-        }
-
-        // Siri & Shortcuts — Apple system integration; grouped here with
-        // the other Apple ones rather than as a top-level Settings row.
-        NavigationLink {
-          SiriShortcutsSettingsPane()
-            .navigationTitle("Siri & Shortcuts")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          Label("Siri & Shortcuts", systemImage: "mic")
-            .foregroundStyle(.primary)
-        }
-
-      } header: {
-        Text("Apple")
-      } footer: {
-        Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
+    Section {
+      NavigationLink {
+        RemindersInboxDetail()
+          .navigationTitle("Reminders")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Reminders",
+                 systemImage: "checklist",
+                 state: remindersAccessLabel,
+                 isGranted: remindersBridge.access == .granted)
       }
 
-      Section {
-        // Oura — direct iOS client (Personal Access Token). Replaces the
-        // old FastAPI proxy at /api/health/oura.
-        NavigationLink {
-          OuraIntegrationDetail()
-            .navigationTitle("Oura")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Oura",
-                   systemImage: "circle.circle",
-                   state: ouraProvider.hasToken ? "Connected" : "Grant",
-                   isGranted: ouraProvider.hasToken)
-        }
-
-        // Withings — direct iOS client (OAuth2). Replaces the old
-        // FastAPI proxy at /api/health/withings.
-        NavigationLink {
-          WithingsIntegrationDetail()
-            .navigationTitle("Withings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Withings",
-                   systemImage: "scalemass",
-                   state: withingsProvider.hasTokens ? "Connected" : "Connect",
-                   isGranted: withingsProvider.hasTokens)
-        }
-
-        // GitHub — read-only contribution calendar via the GraphQL API.
-        // Per-device token (Keychain); nothing syncs to CloudKit.
-        NavigationLink {
-          GitHubIntegrationDetail()
-            .navigationTitle("GitHub")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "GitHub",
-                   systemImage: "chevron.left.forwardslash.chevron.right",
-                   state: githubProvider.hasToken ? "Connected" : "Connect",
-                   isGranted: githubProvider.hasToken)
-        }
-
-        NavigationLink {
-          ReadwiseConnectView()
-            .navigationTitle("Readwise")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-        } label: {
-          stateRow(title: "Readwise",
-                   systemImage: "highlighter",
-                   state: readwiseProvider.hasToken ? "Connected" : "Connect",
-                   isGranted: readwiseProvider.hasToken)
-        }
-
-      } header: {
-        Text("Services")
-      } footer: {
-        Text("Claude and MCP live in Connections & AI. Service tokens stay on this device.")
+      NavigationLink {
+        CalendarDetail()
+          .navigationTitle("Calendar")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Calendar",
+                 systemImage: "calendar",
+                 state: calendarAccessLabel,
+                 isGranted: calendarBridge.access == .granted)
       }
+
+      NavigationLink {
+        AppleHealthDetail()
+          .navigationTitle("Apple Health")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Apple Health",
+                 systemImage: "heart.text.square",
+                 state: healthAccessLabel,
+                 isGranted: healthBridge.access == .granted)
+      }
+
+      // Photos — used to attach thumbnails to nutrition (meal) entries.
+      // Access is requested lazily by the picker too, but surfacing it
+      // here gives denied users a fix path (and a way to grant up front).
+      NavigationLink {
+        PhotosDetail()
+          .navigationTitle("Photos")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Photos",
+                 systemImage: "photo",
+                 state: photosAccessLabel,
+                 isGranted: photosBridge.access == .granted)
+      }
+
+      // Siri & Shortcuts — Apple system integration; grouped here with
+      // the other Apple ones rather than as a top-level Settings row.
+      NavigationLink {
+        SiriShortcutsSettingsPane()
+          .navigationTitle("Siri & Shortcuts")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        Label("Siri & Shortcuts", systemImage: "mic")
+          .foregroundStyle(.primary)
+      }
+
+    } header: {
+      Text("Apple")
+    } footer: {
+      Text("Grant access here, or manage permissions in iOS Settings → Privacy.")
     }
-    .formStyle(.grouped)
+
+    Section {
+      // Oura — direct iOS client (Personal Access Token). Replaces the
+      // old FastAPI proxy at /api/health/oura.
+      NavigationLink {
+        OuraIntegrationDetail()
+          .navigationTitle("Oura")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Oura",
+                 systemImage: "circle.circle",
+                 state: ouraProvider.hasToken ? "Connected" : "Grant",
+                 isGranted: ouraProvider.hasToken)
+      }
+
+      // Withings — direct iOS client (OAuth2). Replaces the old
+      // FastAPI proxy at /api/health/withings.
+      NavigationLink {
+        WithingsIntegrationDetail()
+          .navigationTitle("Withings")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Withings",
+                 systemImage: "scalemass",
+                 state: withingsProvider.hasTokens ? "Connected" : "Connect",
+                 isGranted: withingsProvider.hasTokens)
+      }
+
+      // GitHub — read-only contribution calendar via the GraphQL API.
+      // Per-device token (Keychain); nothing syncs to CloudKit.
+      NavigationLink {
+        GitHubIntegrationDetail()
+          .navigationTitle("GitHub")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "GitHub",
+                 systemImage: "chevron.left.forwardslash.chevron.right",
+                 state: githubProvider.hasToken ? "Connected" : "Connect",
+                 isGranted: githubProvider.hasToken)
+      }
+
+      NavigationLink {
+        ReadwiseConnectView()
+          .navigationTitle("Readwise")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      } label: {
+        stateRow(title: "Readwise",
+                 systemImage: "highlighter",
+                 state: readwiseProvider.hasToken ? "Connected" : "Connect",
+                 isGranted: readwiseProvider.hasToken)
+      }
+
+    } header: {
+      Text("Services")
+    } footer: {
+      Text("Service tokens stay on this device.")
+    }
   }
 
   private func stateRow(title: String,

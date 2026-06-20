@@ -951,7 +951,7 @@ struct SettingsView: View {
     case .dataTools:    return "Data Tools"
     case .motionGallery: return "Motion Gallery"
     case .milestonePreview: return "Milestones (preview)"
-    case .localMcp:     return "Local MCP Server"
+    case .localMcp:     return "MCP Server"
     case .section(let key):
       return SectionManifest.displayLabel(
         key: key,
@@ -1051,7 +1051,7 @@ struct SettingsView: View {
     #if os(macOS)
     case .localMcp:          LocalMCPSettingsPane()
     #else
-    case .localMcp:          EmptyView()   // folded into Connections & AI; macOS-only
+    case .localMcp:          MCPServerUnavailablePane()
     #endif
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }

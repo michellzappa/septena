@@ -99,18 +99,16 @@ struct ClaudeAISettingsPane: View {
         }
       }
 
-      #if os(macOS)
       NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
-        Label("Local MCP Server", systemImage: "server.rack")
+        Label("MCP Server", systemImage: "server.rack")
       }
-      #endif
     } header: {
       Text("Connections")
     } footer: {
       #if os(macOS)
-      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. The local MCP server lets Claude Code on this Mac connect directly, with no gateway hop.")
+      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. The MCP Server lets Claude Code on this Mac connect directly, with no gateway hop.")
       #else
-      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app.")
+      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app.")
       #endif
     }
   }

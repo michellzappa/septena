@@ -38,7 +38,7 @@ struct LocalMCPSettingsPane: View {
     Form {
       Section {
         Toggle(isOn: $enabled) {
-          Label("Local MCP Server", systemImage: "server.rack")
+          Label("MCP Server", systemImage: "server.rack")
         }
       } footer: {
         Text("Lets Claude Code on this Mac read and write your Septena data "
