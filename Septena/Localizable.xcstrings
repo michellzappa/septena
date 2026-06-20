@@ -1375,6 +1375,9 @@
         }
       }
     },
+    "AI & MCP" : {
+
+    },
     "AI provider override" : {
 
     },
@@ -1555,6 +1558,9 @@
       }
     },
     "Apple Intelligence" : {
+
+    },
+    "Apple permissions, device integrations, and external services such as Oura, Withings, GitHub, and Readwise." : {
 
     },
     "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
@@ -1944,6 +1950,9 @@
         }
       }
     },
+    "Build focused reports to share with a doctor, therapist, coach, or other practitioner." : {
+
+    },
     "Build routines and keep your streaks alive" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2073,6 +2082,12 @@
         }
       }
     },
+    "Choose how far AI may reach, connect Claude through MCP, and review the MCP skills that teach models how to use your sections." : {
+
+    },
+    "Choose how far AI may reach, connect Claude through MCP, and run the local MCP server for Claude Code on this Mac." : {
+
+    },
     "Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals." : {
       "localizations" : {
         "pt-BR" : {
@@ -2154,7 +2169,7 @@
         }
       }
     },
-    "Claude moved to its own pane — see Claude & AI for the hosted gateway and local MCP server." : {
+    "Claude and MCP live in Connections & AI. Service tokens stay on this device." : {
 
     },
     "Claude reads and writes your data through the hosted gateway at mcp.septena.app." : {
@@ -2739,6 +2754,9 @@
         }
       }
     },
+    "Display & Behavior" : {
+
+    },
     "Doing the hard thing" : {
       "localizations" : {
         "pt-BR" : {
@@ -3152,6 +3170,9 @@
           }
         }
       }
+    },
+    "Export backups as JSON, import compatible data, or move records between devices and tools." : {
+
     },
     "Exported %@" : {
       "localizations" : {
@@ -6009,6 +6030,9 @@
         }
       }
     },
+    "Repair local data from iCloud and copy schema prompts for model-assisted imports." : {
+
+    },
     "Required" : {
       "localizations" : {
         "pt-BR" : {
@@ -6824,6 +6848,9 @@
           }
         }
       }
+    },
+    "Suggest and vote on what comes next, share a testimonial, and choose the public profile attached to community contributions." : {
+
     },
     "Suggested" : {
       "localizations" : {
@@ -8155,9 +8182,6 @@
           }
         }
       }
-    },
-    "Your public handle, the roadmap board to suggest and upvote features, and a testimonial you can share about Septena." : {
-
     },
     "Your quotes" : {
 

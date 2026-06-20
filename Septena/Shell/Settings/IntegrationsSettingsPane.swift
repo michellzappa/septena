@@ -15,6 +15,7 @@ struct IntegrationsSettingsPane: View {
   @State private var ouraProvider = OuraProvider.shared
   @State private var withingsProvider = WithingsProvider.shared
   @State private var githubProvider = GitHubProvider.shared
+  @State private var readwiseProvider = ReadwiseProvider.shared
   @State private var photosBridge = PhotosBridge.shared
   var body: some View {
     Form {
@@ -139,10 +140,23 @@ struct IntegrationsSettingsPane: View {
                    isGranted: githubProvider.hasToken)
         }
 
+        NavigationLink {
+          ReadwiseConnectView()
+            .navigationTitle("Readwise")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+        } label: {
+          stateRow(title: "Readwise",
+                   systemImage: "highlighter",
+                   state: readwiseProvider.hasToken ? "Connected" : "Connect",
+                   isGranted: readwiseProvider.hasToken)
+        }
+
       } header: {
         Text("Services")
       } footer: {
-        Text("Claude moved to its own pane — see Claude & AI for the hosted gateway and local MCP server.")
+        Text("Claude and MCP live in Connections & AI. Service tokens stay on this device.")
       }
     }
     .formStyle(.grouped)
@@ -1087,4 +1101,3 @@ private struct WithingsIntegrationDetail: View {
 }
 
 // MARK: - About
-

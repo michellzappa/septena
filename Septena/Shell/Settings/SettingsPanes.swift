@@ -72,6 +72,101 @@ struct PrivacySettingsPane: View {
   }
 }
 
+// MARK: - Connections & AI
+
+struct ConnectionsAISettingsPane: View {
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.claudeAI) {
+          Label("AI Mode & Claude", systemImage: "brain.head.profile")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.skills) {
+          Label("MCP Skills", systemImage: "book.closed")
+        }
+        #if os(macOS)
+        NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
+          Label("Local MCP Server", systemImage: "server.rack")
+        }
+        #endif
+      } header: {
+        Text("AI & MCP")
+      } footer: {
+        #if os(macOS)
+        Text("Choose how far AI may reach, connect Claude through MCP, and run the local MCP server for Claude Code on this Mac.")
+        #else
+        Text("Choose how far AI may reach, connect Claude through MCP, and review the MCP skills that teach models how to use your sections.")
+        #endif
+      }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.connections) {
+          Label("Connected Apps", systemImage: "app.connected.to.app.below.fill")
+        }
+      } footer: {
+        Text("Apple permissions, device integrations, and external services such as Oura, Withings, GitHub, and Readwise.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+// MARK: - Sharing & Data
+
+struct SharingDataSettingsPane: View {
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.reports) {
+          Label("Practitioner Reports", systemImage: "chart.bar.doc.horizontal")
+        }
+      } footer: {
+        Text("Build focused reports to share with a doctor, therapist, coach, or other practitioner.")
+      }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.data) {
+          Label("Import & Export", systemImage: "square.and.arrow.up")
+        }
+      } footer: {
+        Text("Export backups as JSON, import compatible data, or move records between devices and tools.")
+      }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.dataTools) {
+          Label("Data Tools", systemImage: "stethoscope")
+        }
+      } footer: {
+        Text("Repair local data from iCloud and copy schema prompts for model-assisted imports.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
+// MARK: - Feedback
+
+struct FeedbackSettingsPane: View {
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.communityRoadmap) {
+          Label("Roadmap", systemImage: "map")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.communityTestimonial) {
+          Label("Testimonial", systemImage: "quote.bubble")
+        }
+        NavigationLink(value: SettingsView.SettingsDestination.communityProfile) {
+          Label("Public Profile", systemImage: "person.text.rectangle")
+        }
+      } footer: {
+        Text("Suggest and vote on what comes next, share a testimonial, and choose the public profile attached to community contributions.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+}
+
 // MARK: - Home (homepage configuration)
 
 /// Everything that shapes the home tab, pulled out of the old "Customize"
@@ -182,6 +277,8 @@ struct HomeSettingsPane: View {
       } footer: {
         Text("A quiet line at the very bottom of the home dashboard — a quote that changes through the day. Off by default. Draws from the packs you pick, your own quotes, and your Readwise highlights.")
       }
+
+      DisplayBehaviorSettingsSections()
     }
     .formStyle(.grouped)
   }
@@ -193,6 +290,15 @@ struct HomeSettingsPane: View {
 /// Home Screen quick actions, and the logging-animation switch. Notifications
 /// graduated to its own root row; homepage settings moved to Home.
 struct GeneralSettingsPane: View {
+  var body: some View {
+    Form {
+      DisplayBehaviorSettingsSections()
+    }
+    .formStyle(.grouped)
+  }
+}
+
+private struct DisplayBehaviorSettingsSections: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SettingsStore.self) private var store
@@ -214,51 +320,50 @@ struct GeneralSettingsPane: View {
   }
 
   var body: some View {
-    Form {
-      Section {
-        Picker(selection: unitsBinding) {
-          Text("Metric (kg, km)").tag(WeightUnit.kg)
-          Text("Imperial (lb, mi)").tag(WeightUnit.lb)
-        } label: {
-          Label("Units", systemImage: "scalemass")
-        }
-      } footer: {
-        Text("Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered.")
+    Section {
+      Picker(selection: unitsBinding) {
+        Text("Metric (kg, km)").tag(WeightUnit.kg)
+        Text("Imperial (lb, mi)").tag(WeightUnit.lb)
+      } label: {
+        Label("Units", systemImage: "scalemass")
       }
+    } header: {
+      Text("Display & Behavior")
+    } footer: {
+      Text("Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered.")
+    }
 
-      Section {
-        NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
-          Label("Time of Day", systemImage: "clock")
-        }
-      } footer: {
-        Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
+    Section {
+      NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
+        Label("Time of Day", systemImage: "clock")
       }
+    } footer: {
+      Text("Set when morning, afternoon, and evening begin — used across Habits, Supplements, the “Now” marker, and the greeting.")
+    }
 
-      #if os(iOS)
-      Section {
-        NavigationLink(value: SettingsView.SettingsDestination.quickActions) {
-          Label("Quick Actions", systemImage: "bolt")
-        }
-      } footer: {
-        Text("Choose up to 4 sections to surface when you long-press the app icon on the Home Screen.")
+    #if os(iOS)
+    Section {
+      NavigationLink(value: SettingsView.SettingsDestination.quickActions) {
+        Label("Quick Actions", systemImage: "bolt")
       }
-      #endif
+    } footer: {
+      Text("Choose up to 4 sections to surface when you long-press the app icon on the Home Screen.")
+    }
+    #endif
 
-      Section {
-        NavigationLink(value: SettingsView.SettingsDestination.appIcon) {
-          Label("App Icon", systemImage: "app.badge")
-        }
-      }
-
-      Section {
-        Toggle(isOn: $loggingAnimationsEnabled) {
-          Label("Logging animations", systemImage: "party.popper")
-        }
-      } footer: {
-        Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+    Section {
+      NavigationLink(value: SettingsView.SettingsDestination.appIcon) {
+        Label("App Icon", systemImage: "app.badge")
       }
     }
-    .formStyle(.grouped)
+
+    Section {
+      Toggle(isOn: $loggingAnimationsEnabled) {
+        Label("Logging animations", systemImage: "party.popper")
+      }
+    } footer: {
+      Text("The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+    }
   }
 }
 
@@ -1250,19 +1355,9 @@ struct AccountSettingsPane: View {
       }
 
       Section {
-        NavigationLink(value: SettingsView.SettingsDestination.communityProfile) {
-          Label("Community Profile", systemImage: "person.text.rectangle")
+        NavigationLink(value: SettingsView.SettingsDestination.about) {
+          Label("About Septena", systemImage: "info.circle")
         }
-        NavigationLink(value: SettingsView.SettingsDestination.communityRoadmap) {
-          Label("Roadmap", systemImage: "map")
-        }
-        NavigationLink(value: SettingsView.SettingsDestination.communityTestimonial) {
-          Label("Testimonial", systemImage: "quote.bubble")
-        }
-      } header: {
-        Text("Community")
-      } footer: {
-        Text("Your public handle, the roadmap board to suggest and upvote features, and a testimonial you can share about Septena.")
       }
     }
     .formStyle(.grouped)
@@ -1762,4 +1857,3 @@ struct MotionGalleryPane: View {
 // a top-level Tasks pane.
 
 // MARK: - Palette
-

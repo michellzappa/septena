@@ -764,15 +764,18 @@ struct SettingsView: View {
     case sections        // collapsed per-section list (absorbs Manage Sections)
     case home            // homepage: layout, timeline, welcome, insights
     case notifications   // promoted to root
-    case general         // time of day, app icon, quick actions, animations
-    case claudeAI        // unified AI reach + Claude gateway + local MCP + skills
-    case connections     // Apple + service integrations (was Integrations)
+    case connectionsAI   // AI reach + Claude/MCP + app/service integrations
+    case sharingData     // practitioner reports + import/export
     case privacy
-    case data            // import / export (was Import & Export)
-    case reports         // practitioner reports — scoped shareable section bundles
+    case feedback        // roadmap + community profile + testimonial
     case about
     case advanced        // dev + diagnostics, reached from About
     // Sub-panes reached from the hubs above.
+    case general         // time of day, app icon, quick actions, animations
+    case claudeAI        // unified AI reach + Claude gateway + local MCP + skills
+    case connections     // Apple + service integrations (was Integrations)
+    case data            // import / export (was Import & Export)
+    case reports         // practitioner reports — scoped shareable section bundles
     case layout, correlations, timeOfDay
     case quickActions, appIcon
     case skills, localMcp, motionGallery, dataTools
@@ -807,7 +810,7 @@ struct SettingsView: View {
       sidebarList(selection: $selection)
         .navigationTitle("Settings")
         // The sidebar is always shown — Settings is a fixed-size window with
-        // only ten root rows, so the collapse affordance just invited an
+        // only seven root rows, so the collapse affordance just invited an
         // awkward detail-only state. Drop the toolbar toggle entirely.
         .toolbar(removing: .sidebarToggle)
         // ...and pin the column so the divider can't be dragged at all: the
@@ -820,7 +823,7 @@ struct SettingsView: View {
         let dest = selection ?? .sections
         pane(for: dest)
           .navigationTitle(title(for: dest))
-          // The hub panes (Home, Sections, Claude & AI, …) push their
+          // The hub panes (Home, Sections, Connections & AI, …) push their
           // sub-panes via `NavigationLink(value:)`; the detail column needs
           // its own resolver for those to open (the sidebar only drives the
           // root `selection`).
@@ -893,10 +896,11 @@ struct SettingsView: View {
   #endif
 
   private var staticDestinations: [SettingsDestination] {
-    // Nine intent groups, Apple-style. Local MCP folds into Claude & AI;
-    // Advanced folds into About — neither is a root row.
-    [.sections, .home, .notifications, .general, .claudeAI,
-     .connections, .privacy, .data, .reports, .about]
+    // Seven intent groups. The profile card above this list is destination 0;
+    // About/Advanced live under Account so utility pages don't consume root
+    // slots, and the former General controls sit inside Home.
+    [.sections, .home, .notifications, .connectionsAI,
+     .sharingData, .privacy, .feedback]
   }
 
   private func staticRow(_ dest: SettingsDestination) -> some View {
@@ -921,24 +925,27 @@ struct SettingsView: View {
     case .account:      return "Account"
     case .sections:     return "Sections"
     case .home:         return "Home"
+    case .connectionsAI: return "Connections & AI"
+    case .sharingData:  return "Sharing & Data"
     case .general:      return "General"
-    case .claudeAI:     return "Claude & AI"
+    case .claudeAI:     return "AI"
     case .quickActions: return "Quick Actions"
     case .appIcon:      return "App Icon"
     case .layout:       return "Layout"
     case .correlations: return "Insights"
     case .timeOfDay:    return "Time of Day"
     case .notifications: return "Notifications"
-    case .connections:  return "Connections"
-    case .data:         return "Data"
-    case .reports:      return "Reports"
+    case .connections:  return "Connected Apps"
+    case .data:         return "Import & Export"
+    case .reports:      return "Practitioner Reports"
     case .support:      return "Support"
-    case .communityProfile: return "Community Profile"
+    case .communityProfile: return "Public Profile"
     case .communityRoadmap: return "Roadmap"
     case .communityTestimonial: return "Testimonial"
-    case .skills:       return "Skills"
+    case .skills:       return "MCP Skills"
     case .siriShortcuts: return "Siri & Shortcuts"
     case .privacy:      return "Privacy"
+    case .feedback:     return "Feedback"
     case .about:        return "About"
     case .advanced:     return "Advanced"
     case .dataTools:    return "Data Tools"
@@ -959,6 +966,8 @@ struct SettingsView: View {
     case .account:      return "person.crop.circle"
     case .sections:     return "square.grid.2x2"
     case .home:         return "house"
+    case .connectionsAI: return "brain.head.profile"
+    case .sharingData:  return "square.and.arrow.up"
     case .general:      return "slider.horizontal.3"
     case .claudeAI:     return "brain.head.profile"
     case .quickActions: return "bolt"
@@ -977,6 +986,7 @@ struct SettingsView: View {
     case .skills:       return "book.closed"
     case .siriShortcuts: return "mic"
     case .privacy:      return "hand.raised"
+    case .feedback:     return "bubble.left.and.bubble.right"
     case .about:        return "info.circle"
     case .advanced:     return "wrench.and.screwdriver"
     case .dataTools:    return "stethoscope"
@@ -1012,6 +1022,8 @@ struct SettingsView: View {
     case .account:           AccountSettingsPane()
     case .sections:          SectionsSettingsPane()
     case .home:              HomeSettingsPane()
+    case .connectionsAI:     ConnectionsAISettingsPane()
+    case .sharingData:       SharingDataSettingsPane()
     case .general:           GeneralSettingsPane()
     case .claudeAI:          ClaudeAISettingsPane()
     case .quickActions:      QuickActionsSettingsPane()
@@ -1031,6 +1043,7 @@ struct SettingsView: View {
     case .skills:            SkillsSettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
+    case .feedback:          FeedbackSettingsPane()
     case .about:             AboutSettingsPane()
     case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
@@ -1038,7 +1051,7 @@ struct SettingsView: View {
     #if os(macOS)
     case .localMcp:          LocalMCPSettingsPane()
     #else
-    case .localMcp:          EmptyView()   // folded into Claude & AI; macOS-only
+    case .localMcp:          EmptyView()   // folded into Connections & AI; macOS-only
     #endif
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
