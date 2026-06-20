@@ -715,35 +715,56 @@ enum SeptenaPlus {
   // MARK: Premium finish — "Obsidian + disc medallion"
   //
   // The rainbow is the *free* app's identity (the seven sections). The
-  // membership is its refined, contained form: a dark graphite surface
-  // carrying a single champagne-foil accent, with the spectrum distilled
-  // into a small precise medallion (`SeptenaDiscMark`) — a jewel you earn,
-  // never a gradient smeared across text. Restraint reads as premium;
-  // maximalism reads as free.
+  // membership is its refined, contained form: a graphite surface carrying a
+  // single champagne-foil accent, with the spectrum distilled into a small
+  // precise medallion (`SeptenaDiscMark`) — a jewel you earn, never a gradient
+  // smeared across text. Restraint reads as premium; maximalism reads as free.
+  //
+  // Every value here is FIXED, never run through the global dark-mode `adaptive`
+  // lift (`parseHexColor`): the lift hoists anything below 50% lightness up to
+  // a flat gray, which would dissolve the obsidian plate into mud — exactly the
+  // bug this finish exists to avoid. The foil and discs are the same in both
+  // appearances (`AdaptiveColor.raw`); only `ink` is hand-tuned per mode.
 
-  /// Deep graphite "ink" surface. Fixed dark in both appearances — like a
-  /// metal membership card, it shouldn't dissolve into a light background.
+  /// Authored-as-stored color, no dark-mode lift — the whole finish is fixed.
+  private static func fixed(_ hex: String) -> Color { AdaptiveColor.raw(hex) ?? .gray }
+
+  /// Graphite "ink" surface — the metal membership card. Deep graphite in
+  /// light mode (pops against the white page); a *raised* graphite in dark
+  /// mode that sits a touch lighter than the near-black sheet (~#1C1C1E) so the
+  /// card reads as a jewel raised off the canvas, not a hole punched into it.
   static let ink = LinearGradient(
-    colors: [parseHexColor("#33353B"), parseHexColor("#17181B")],
+    colors: [AdaptiveColor.dual(light: "#33353B", dark: "#3A3D45"),
+             AdaptiveColor.dual(light: "#17181B", dark: "#23252B")],
     startPoint: .top, endPoint: .bottom
   )
 
   /// Champagne-gold foil — the single Plus accent. Warm, to sit with the
   /// app's New York serif. Used flat for fills/strokes…
-  static let foil = parseHexColor("#C9A86A")
+  static let foil = fixed("#C9A86A")
   /// …and as a metallic sweep for rims and the avatar ring.
   static let foilGradient = LinearGradient(
-    colors: [parseHexColor("#E7D29A"), parseHexColor("#C9A86A"), parseHexColor("#9C7E45")],
+    colors: [fixed("#E7D29A"), fixed("#C9A86A"), fixed("#9C7E45")],
     startPoint: .topLeading, endPoint: .bottomTrailing
   )
 
+  /// A faint top-down white sheen clipped to a rounded rect of `corner`, laid
+  /// over an `ink` surface so it reads as raised metal with a glossed top edge
+  /// rather than a flat slab — the cue that sells the card in dark mode.
+  static func sheen(corner: CGFloat) -> some View {
+    RoundedRectangle(cornerRadius: corner, style: .continuous)
+      .fill(LinearGradient(colors: [.white.opacity(0.10), .clear],
+                           startPoint: .top, endPoint: .center))
+      .allowsHitTesting(false)
+  }
+
   /// Canonical seven-disc palette (red → orange → yellow → green → cyan →
   /// blue → purple) — the only place the spectrum survives, inside the
-  /// medallion.
+  /// medallion. Fixed (no lift) so the jewel stays the app-icon spectrum.
   static let discColors: [Color] = [
-    parseHexColor("#ef4444"), parseHexColor("#f97316"), parseHexColor("#eab308"),
-    parseHexColor("#22c55e"), parseHexColor("#06b6d4"), parseHexColor("#3b82f6"),
-    parseHexColor("#8b5cf6"),
+    fixed("#ef4444"), fixed("#f97316"), fixed("#eab308"),
+    fixed("#22c55e"), fixed("#06b6d4"), fixed("#3b82f6"),
+    fixed("#8b5cf6"),
   ]
 
   /// Heptagonal disc placement (unit square), shared with `AppIconPreview`
@@ -814,6 +835,7 @@ struct SeptenaDiscMark: View {
     ZStack {
       RoundedRectangle(cornerRadius: corner, style: .continuous)
         .fill(SeptenaPlus.ink)
+      SeptenaPlus.sheen(corner: corner)
       ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
         Circle()
           .fill(SeptenaPlus.discColors[index])
@@ -840,9 +862,10 @@ struct SeptenaPlusFeatureRow: View {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
         .fill(SeptenaPlus.ink)
         .frame(width: 38, height: 38)
+        .overlay(SeptenaPlus.sheen(corner: 10))
         .overlay(
           RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .strokeBorder(SeptenaPlus.foil.opacity(0.28), lineWidth: 0.75)
+            .strokeBorder(SeptenaPlus.foil.opacity(0.42), lineWidth: 0.75)
         )
         .overlay(
           Image(systemName: feature.icon)
@@ -1075,12 +1098,15 @@ struct SupportTierCard: View {
       }
       .padding(16)
       .background(
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .fill(tier.highlighted ? AnyShapeStyle(SeptenaPlus.ink) : AnyShapeStyle(Theme.cardSurface))
+        ZStack {
+          RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(tier.highlighted ? AnyShapeStyle(SeptenaPlus.ink) : AnyShapeStyle(Theme.cardSurface))
+          if tier.highlighted { SeptenaPlus.sheen(corner: 16) }
+        }
       )
       .overlay(
         RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .strokeBorder(tier.highlighted ? SeptenaPlus.foil.opacity(0.4)
+          .strokeBorder(tier.highlighted ? SeptenaPlus.foil.opacity(0.5)
                                           : Color.primary.opacity(0.08),
                         lineWidth: tier.highlighted ? 0.75 : 0.5)
       )

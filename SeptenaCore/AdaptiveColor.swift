@@ -55,6 +55,27 @@ enum AdaptiveColor {
     return Color(red: c.r, green: c.g, blue: c.b)
   }
 
+  /// A hand-authored appearance *pair* — the `light` token under a light
+  /// appearance, `dark` under a dark one — with NO automatic lift. For
+  /// finishes tuned per mode by hand (the membership "metal card", whose dark
+  /// plate must sit a touch *lighter* than the near-black canvas to read as
+  /// raised, the opposite of what the derived lift would do). Gray on bad input.
+  static func dual(light: String, dark: String) -> Color {
+    guard let l = components(light), let d = components(dark) else { return .gray }
+    #if os(macOS)
+    return Color(nsColor: NSColor(name: nil) { appearance in
+      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      let c = isDark ? d : l
+      return NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: 1)
+    })
+    #else
+    return Color(uiColor: UIColor { traits in
+      let c = traits.userInterfaceStyle == .dark ? d : l
+      return UIColor(red: c.r, green: c.g, blue: c.b, alpha: 1)
+    })
+    #endif
+  }
+
   // MARK: - Adaptive wrapping
 
   /// Wrap base light-mode components in a Color that swaps to the lifted
