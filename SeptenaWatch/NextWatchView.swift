@@ -125,26 +125,11 @@ struct NextWatchView: View {
           .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
         summaryLinkRows
-        endFlourish
       }
       .listStyle(.plain)
       .environment(\.defaultMinListRowHeight, 0)
       .animation(.default, value: conn.items)
     }
-  }
-
-  /// A quiet end-of-feed mark: the Septena logo (the seven-disc custom symbol),
-  /// dimmed and centered, so the list closes on the brand instead of a hard cut.
-  /// Non-interactive — purely a flourish.
-  private var endFlourish: some View {
-    SeptenaDiscsMark()
-      .frame(width: 26, height: 26)
-      .frame(maxWidth: .infinity)
-      .padding(.top, 14)
-      .padding(.bottom, 6)
-      .listRowBackground(Color.clear)
-      .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 4, trailing: 6))
-      .accessibilityHidden(true)
   }
 
   private var allDoneHero: some View {
@@ -249,41 +234,6 @@ struct NextWatchView: View {
       i += 1
     }
     return "\(count) \(WatchSectionTint.noun(forKey: key, count: count))"
-  }
-}
-
-// MARK: - Septena mark (inline)
-
-/// Septena's seven-disc brand mark, drawn inline from real `Circle` shapes rather
-/// than the `DiscsMark` symbol asset OR a `Canvas`. The asset route failed
-/// silently (actool caches symbolsets separately, so a freshly-added one can not
-/// appear on an incremental build); the `Canvas` route then failed to render
-/// inside a `List` row on watchOS (a `Canvas` has no intrinsic size and the row
-/// can collapse/skip its draw). Real shapes always lay out and draw in a List
-/// row. Disc centers + radius match `DiscsMark.svg` (seven discs in a regular
-/// heptagon, 1000×1000 artwork box).
-private struct SeptenaDiscsMark: View {
-  private static let centers: [CGPoint] = [
-    .init(x: 500,    y: 177.5),
-    .init(x: 766.25, y: 302.5),
-    .init(x: 832.5,  y: 595),
-    .init(x: 648.75, y: 825),
-    .init(x: 351.25, y: 825),
-    .init(x: 167.5,  y: 595),
-    .init(x: 233.75, y: 302.5),
-  ]
-
-  var body: some View {
-    GeometryReader { geo in
-      let unit = min(geo.size.width, geo.size.height) / 1000
-      let d = 225 * unit   // disc diameter (radius 112.5 in the 1000-box)
-      ForEach(Array(Self.centers.enumerated()), id: \.offset) { _, c in
-        Circle()
-          .fill(.secondary)
-          .frame(width: d, height: d)
-          .position(x: c.x * unit, y: c.y * unit)
-      }
-    }
   }
 }
 
