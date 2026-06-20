@@ -51,8 +51,10 @@ struct ClaudeReconnectCue: View {
   // Top-bar control: a plain Button the SYSTEM draws as a regular Liquid Glass
   // circle — matching the "…" menu opposite it, no custom glass. `.tint` only
   // carries the Claude accent into the glyph. The glyph swaps per state:
-  // warning triangle by default, a green check on the post-reconnect flash,
-  // a spinner mid-refresh.
+  // the device's biometry mark by default (a lapsed token is an auth
+  // checkpoint, not a fault — "verify it's you," not a warning), a green check
+  // on the post-reconnect flash, a spinner mid-refresh, and an orange triangle
+  // ONLY when a reconnect genuinely failed.
   private var pillButton: some View {
     Button(action: tap) {
       pillGlyph
@@ -70,8 +72,10 @@ struct ClaudeReconnectCue: View {
     } else if failed {
       Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
     } else {
-      // Tinted Claude by the button's `.tint`.
-      Image(systemName: "exclamationmark.triangle.fill")
+      // Biometry mark (Face/Touch/Optic ID), tinted Claude by the button's
+      // `.tint`: the connection lapsed by design and re-authenticating is the
+      // security boundary, not a problem to alarm about.
+      Image(systemName: AppLock.biometrySymbolName)
     }
   }
 
@@ -112,10 +116,15 @@ struct ClaudeReconnectCue: View {
       Image(systemName: "checkmark.circle.fill")
         .font(.subheadline)
         .foregroundStyle(.green)
+    } else if failed {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .font(.subheadline)
+        .foregroundStyle(.orange)
     } else {
-      Circle()
-        .fill(failed ? Color.orange : Color.claudeAccent)
-        .frame(width: 7, height: 7)
+      // Biometry mark, not an alarm dot: a lapsed token is an auth checkpoint.
+      Image(systemName: AppLock.biometrySymbolName)
+        .font(.subheadline)
+        .foregroundStyle(Color.claudeAccent)
     }
   }
 
@@ -125,11 +134,11 @@ struct ClaudeReconnectCue: View {
       .foregroundStyle(justReconnected ? Color.green : Color.claudeAccent)
   }
 
-  // Muted context line (card only). Default framing is proactive ("keep
-  // connected"), since the cue fires while the session is still live.
+  // Muted context line (card only). Default framing is a security checkpoint,
+  // not a nag: access lapses by design and you re-authenticate to restore it.
   private var subtitle: String? {
     if justReconnected { return nil }
     if failed { return "Couldn’t reconnect — tap to retry" }
-    return "Keep Claude connected"
+    return "Verify it’s you to reconnect"
   }
 }
