@@ -276,7 +276,13 @@ final class CloudKitTasksBackend: TasksBackend {
     guard let entity = fetch(id: id) else { return }
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = ckServerTimestamp()
-    entity.today = false
+    // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
+    // (`isOnToday`, `isInTriageBand`) and every count site already gate on
+    // `status == .open`, so a done task is invisible regardless of the pin.
+    // Clearing it here was pure data loss — reopening (`uncomplete`) had no way
+    // to restore the placement, so a completed-then-reopened task pinned to
+    // Today (or filed only in a project) silently vanished from every surface.
+    // Keeping the flag means uncomplete returns the task exactly where it was.
     entity.pendingSync = true
     commitAndPush(entity, op: "complete")
   }
@@ -293,7 +299,8 @@ final class CloudKitTasksBackend: TasksBackend {
     guard let entity = fetch(id: id) else { return }
     entity.statusRaw = TaskStatus.cancelled.rawValue
     entity.completedAt = ckServerTimestamp()
-    entity.today = false
+    // Same as `complete`: the status guard hides a cancelled task everywhere, so
+    // clearing the pin would only lose placement on a future un-cancel.
     entity.pendingSync = true
     commitAndPush(entity, op: "cancel")
   }
