@@ -493,6 +493,13 @@ struct TaskAttributeBar: View {
   /// The currently expanded inline pill (never `.list`, which presents a sheet).
   @State private var expanded: Attribute?
   @State private var showingList = false
+  /// Whether the Notes panel should grab the keyboard when it appears. True for
+  /// a user tap on the pill; false for the one-shot auto-expand below, where we
+  /// reveal existing notes without popping the keyboard.
+  @State private var notesAutoFocus = true
+  /// One-shot guard so the Notes panel auto-opens exactly once — when editing a
+  /// task that already has notes, show them straight away (no tap needed).
+  @State private var didAutoExpandNotes = false
   @Namespace private var glassNS
 
   var body: some View {
@@ -532,6 +539,16 @@ struct TaskAttributeBar: View {
       guard let attr else { return }
       activate = nil
       select(attr)
+    }
+    // Editing a task that already has notes: reveal them on appear so they're
+    // never hidden behind a tap. `initial: true` plus watching `draft.notes`
+    // covers the order race with the parent's `seed()` — whichever populates the
+    // draft, this fires once notes are present. Doesn't steal keyboard focus.
+    .onChange(of: draft.notes, initial: true) { _, _ in
+      guard !didAutoExpandNotes, !draft.trimmedNotes.isEmpty else { return }
+      didAutoExpandNotes = true
+      notesAutoFocus = false
+      if expanded == nil { expanded = .notes }
     }
   }
 
@@ -578,7 +595,8 @@ struct TaskAttributeBar: View {
       case .when:       InlineWhenPanel(draft: $draft, accent: accent)
       case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent)
-      case .notes:      InlineNotesPanel(notes: $draft.notes, accent: accent)
+      case .notes:      InlineNotesPanel(notes: $draft.notes, accent: accent,
+                                         autoFocus: notesAutoFocus)
       case .list, .none: EmptyView()
       }
     }
@@ -593,6 +611,9 @@ struct TaskAttributeBar: View {
     // Move the keyboard cursor onto the pill (also drops the title field's
     // keyboard before a calendar opens — what `onInteractStart` used to do).
     focus = .pill(attr)
+    // A user-initiated open of Notes should focus the field (unlike the silent
+    // auto-expand of pre-existing notes, which leaves the keyboard alone).
+    if attr == .notes { notesAutoFocus = true }
     withAnimation(.snappy(duration: 0.22)) {
       if attr.presentsSheet {
         expanded = nil
@@ -856,6 +877,9 @@ private struct InlineRepeatPanel: View {
 private struct InlineNotesPanel: View {
   @Binding var notes: String
   let accent: Color
+  /// Grab the keyboard on appear. True for a user tap on the pill; false when
+  /// the panel is auto-expanded to reveal existing notes (no keyboard pop).
+  var autoFocus: Bool = true
   @FocusState private var focused: Bool
 
   var body: some View {
@@ -880,7 +904,7 @@ private struct InlineNotesPanel: View {
     .padding(12)
     .background(Theme.secondaryGroupedBackground,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .onAppear { focused = true }
+    .onAppear { if autoFocus { focused = true } }
   }
 }
 
