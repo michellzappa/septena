@@ -87,6 +87,32 @@ struct NextItemsResponse: Codable {
   /// today's data happened to ride along. Optional so older payloads decode
   /// unchanged — the watch falls back to data-presence when absent.
   var enabledSections: [String]? = nil
+  /// The most-recent logged meals (newest first, capped), so the watch's Macros
+  /// summary page can list them under the rings — a freshness check: the latest
+  /// thing logged on the phone should appear on the wrist. Phone-computed.
+  /// Optional so older payloads decode unchanged.
+  var recentNutrition: [RecentLogWire]? = nil
+  /// The most-recent logged training entries (newest first, capped), listed under
+  /// the rings on the watch's training summary page for the same freshness check.
+  /// Optional so older payloads decode unchanged.
+  var recentTraining: [RecentLogWire]? = nil
+}
+
+/// One recently-logged row on the wire — enough for a remote surface (watch) to
+/// render a compact "last logged" list under a summary page's rings, purely so
+/// the user can eyeball whether the snapshot is current. Read-only (no write-back
+/// like `MealWire`); everything optional-with-defaults so the wire stays additive.
+struct RecentLogWire: Codable, Hashable, Identifiable {
+  var id: String
+  var emoji: String? = nil
+  /// The row's primary line (meal name / exercise name).
+  var title: String
+  /// A short metric summary for the trailing/secondary text — e.g. "410 kcal" for
+  /// a meal, "3×8 · 80kg" or "30 min" for a training entry. Optional.
+  var detail: String? = nil
+  /// When it was logged, already formatted for display — "14:30" for today, else
+  /// a day-prefixed label like "Yesterday 14:30". The wrist only renders it.
+  var when: String
 }
 
 /// One active medication on the wire: enough for the wrist to render a row and

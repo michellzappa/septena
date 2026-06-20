@@ -43,6 +43,12 @@ final class WatchConnectivity {
   /// when the section is disabled.
   var nutritionRings: [ComplicationRing] = []
   var trainingRings: [ComplicationRing] = []
+  /// The most-recent logged meals / training entries from the snapshot, listed
+  /// under the rings on the summary pages as a freshness check (does the latest
+  /// thing logged on the phone show up on the wrist?). Empty until the first
+  /// fetch / when the section carried no data.
+  var recentNutrition: [RecentLogWire] = []
+  var recentTraining: [RecentLogWire] = []
   /// The live fast from the snapshot, when one is running and the user tracks
   /// fasting — held so the macro complication morphs into a fasting face and the
   /// in-app Macros summary (its tap target) can show the live fast. Nil when not
@@ -184,6 +190,8 @@ final class WatchConnectivity {
       self.symptoms      = response.symptoms ?? []
       self.groceries     = response.groceries ?? []
       self.enabledSections = Set(response.enabledSections ?? [])
+      self.recentNutrition = response.recentNutrition ?? []
+      self.recentTraining  = response.recentTraining ?? []
       self.bucket        = bkt
       updateComplication()
       updateMacroComplication(response.nutritionRings, fasting: response.fasting)

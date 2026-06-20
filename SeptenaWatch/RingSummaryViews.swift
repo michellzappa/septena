@@ -43,7 +43,9 @@ struct NutritionDetailView: View {
           label: MacroStyle.label,
           unit: MacroStyle.unit,
           isEmpty: conn.nutritionRings.isEmpty,
-          emptyHint: "No meals logged today")
+          emptyHint: "No meals logged today",
+          recent: conn.recentNutrition,
+          recentTitle: "Recent meals")
       }
     }
     .navigationTitle(conn.fasting == nil ? "Macros" : "Fasting")
@@ -122,7 +124,9 @@ struct TrainingDetailView: View {
       label: TrainingStyle.label,
       unit: TrainingStyle.unit,
       isEmpty: conn.trainingRings.isEmpty,
-      emptyHint: "No training logged this week")
+      emptyHint: "No training logged this week",
+      recent: conn.recentTraining,
+      recentTitle: "Recent sets")
     .navigationTitle("This week")
     .navigationBarTitleDisplayMode(.inline)
     .task { if conn.trainingRings.isEmpty { conn.fetchNext() } }
@@ -141,6 +145,10 @@ private struct RingSummaryPage: View {
   let unit: (String) -> String
   let isEmpty: Bool
   let emptyHint: String
+  /// The most-recent logged rows, listed under the legend so the user can confirm
+  /// the snapshot is current. Empty → the section is omitted.
+  var recent: [RecentLogWire] = []
+  var recentTitle: String = ""
 
   var body: some View {
     ScrollView {
@@ -166,9 +174,54 @@ private struct RingSummaryPage: View {
             .multilineTextAlignment(.center)
             .padding(.top, 2)
         }
+
+        if !recent.isEmpty {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(recentTitle.uppercased())
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+            ForEach(recent) { row in
+              RecentLogRow(row: row)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, 4)
+        }
       }
       .padding(.horizontal, 6)
       .padding(.bottom, 8)
+    }
+  }
+}
+
+/// One recently-logged row: emoji + name on the left, the metric summary and the
+/// "when" stacked on the right — a glanceable "last logged" line so the user can
+/// tell whether the wrist is showing the latest data.
+private struct RecentLogRow: View {
+  let row: RecentLogWire
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      if let emoji = row.emoji, !emoji.isEmpty {
+        Text(emoji).font(.caption)
+      }
+      Text(row.title)
+        .font(.caption)
+        .lineLimit(1)
+      Spacer(minLength: 4)
+      VStack(alignment: .trailing, spacing: 1) {
+        if let detail = row.detail, !detail.isEmpty {
+          Text(detail)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        Text(row.when)
+          .font(.caption2)
+          .foregroundStyle(.tertiary)
+          .lineLimit(1)
+      }
+      .minimumScaleFactor(0.7)
     }
   }
 }

@@ -167,6 +167,11 @@ enum WatchSnapshotPublisher {
       ? buildSymptoms(context: context) : []
     let groceries = enabledKeys.contains("groceries")
       ? buildGroceries(context: context) : []
+    // Recent meal / training rows for the watch summary pages' freshness lists.
+    // Built only when the rings rode along (same data presence), so a page that
+    // shows nothing carries no list either.
+    let recentNutrition = nutritionRings != nil ? buildRecentNutrition(context: context) : []
+    let recentTraining = trainingRings != nil ? buildRecentTraining(context: context) : []
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
@@ -179,7 +184,9 @@ enum WatchSnapshotPublisher {
                                      medications: medications.isEmpty ? nil : medications,
                                      symptoms: symptoms.isEmpty ? nil : symptoms,
                                      groceries: groceries.isEmpty ? nil : groceries,
-                                     enabledSections: enabledKeys.isEmpty ? nil : Array(enabledKeys))
+                                     enabledSections: enabledKeys.isEmpty ? nil : Array(enabledKeys),
+                                     recentNutrition: recentNutrition.isEmpty ? nil : recentNutrition,
+                                     recentTraining: recentTraining.isEmpty ? nil : recentTraining)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
@@ -342,6 +349,86 @@ enum WatchSnapshotPublisher {
     guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
     return NutritionRingsWire(rings: rings)
   }
+
+  // MARK: - Recent logs (wrist summary-page freshness lists)
+
+  /// How many recent rows to carry per summary page, and how far back to look.
+  /// Small — these ride the snapshot on every mutation and only exist so the user
+  /// can eyeball that the latest log reached the wrist.
+  private static let recentLogCap = 4
+  private static let recentLogWindowDays = 3
+
+  /// A short, already-formatted "when" label for a recent row: the wall-clock
+  /// "HH:mm" for today, else the friendly day prefixed ("Yesterday 14:30").
+  private static func recentWhen(date: String, time: String) -> String {
+    let hm = String(time.prefix(5))
+    guard date != SeptenaDate.today else { return hm }
+    let day = SeptenaDate.friendlyLabel(date)
+    return hm.isEmpty ? day : "\(day) \(hm)"
+  }
+
+  /// The newest few logged meals (last `recentLogWindowDays`, newest first), so
+  /// the watch's Macros page can list them under the rings as a freshness check.
+  /// `loadNutritionEntries` already sorts newest-first by `loggedAt`.
+  @MainActor
+  private static func buildRecentNutrition(context: ModelContext) -> [RecentLogWire] {
+    let since = SeptenaDate.format(
+      Calendar.current.date(byAdding: .day, value: -recentLogWindowDays, to: Date()))
+    let entries = ChecklistMirror.loadNutritionEntries(context: context, since: since)
+      .filter { $0.foods != ["Water"] }   // hydration isn't a meal
+      .prefix(recentLogCap)
+    return entries.map { e in
+      RecentLogWire(
+        id: e.file,
+        emoji: e.emoji,
+        title: e.foods.first ?? "Meal",
+        detail: "\(Int(e.kcal.rounded())) kcal",
+        when: recentWhen(date: e.date, time: e.time))
+    }
+  }
+
+  /// The newest few logged training entries (this trailing week, newest first),
+  /// listed under the rings on the watch's training summary page.
+  @MainActor
+  private static func buildRecentTraining(context: ModelContext) -> [RecentLogWire] {
+    let entries = TrainingMetrics.entriesThisWeek(context: context)
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .prefix(recentLogCap)
+    return entries.map { e in
+      RecentLogWire(
+        id: e.id,
+        title: e.exercise,
+        detail: trainingSummary(e),
+        when: recentWhen(date: e.date, time: trainingTime(e)))
+    }
+  }
+
+  /// "3×8 · 80kg" for a strength set, "30 min" / "5.0 km" for cardio — a compact
+  /// one-line readout of what was logged. Metric units (the wrist carries no unit
+  /// preference; the summary pages already render metric values).
+  private static func trainingSummary(_ e: ExerciseEntryEntity) -> String? {
+    var parts: [String] = []
+    if let sets = e.sets, !sets.isEmpty, let reps = e.reps, !reps.isEmpty {
+      parts.append("\(sets)×\(reps)")
+    }
+    if let w = e.weight, w > 0 { parts.append("\(Int(w.rounded()))kg") }
+    if let mins = e.durationMin, mins > 0 { parts.append("\(Int(mins.rounded())) min") }
+    if let m = e.distanceM, m > 0 { parts.append(String(format: "%.1f km", m / 1000)) }
+    return parts.isEmpty ? nil : parts.joined(separator: " · ")
+  }
+
+  /// "HH:mm" for a training entry from its canonical instant (no separate time
+  /// string on the entity), falling back to empty for pre-migration rows.
+  private static func trainingTime(_ e: ExerciseEntryEntity) -> String {
+    guard e.occurredAt != .distantPast else { return "" }
+    return recentTimeFormatter.string(from: e.occurredAt)
+  }
+
+  private static let recentTimeFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "HH:mm"
+    return f
+  }()
 
   // MARK: - Training rings (wrist training complication)
 
