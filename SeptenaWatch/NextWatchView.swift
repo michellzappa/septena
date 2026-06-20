@@ -198,6 +198,9 @@ struct NextWatchView: View {
         Text(title).font(.body)
         Spacer(minLength: 0)
       }
+      // Match the standard task rows above, which carry an inner vertical pad on
+      // top of the row insets — without it these links read a touch shorter.
+      .padding(.vertical, 4)
     }
     .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
   }
@@ -242,30 +245,34 @@ struct NextWatchView: View {
 
 // MARK: - Septena mark (inline)
 
-/// Septena's seven-disc brand mark, drawn inline with `Canvas` rather than loaded
-/// from the `DiscsMark` symbol asset. Drawing it in Swift means it renders from
-/// the code build alone — no dependency on the asset catalog recompiling (which
-/// `actool` caches separately, so a freshly-added symbolset can silently fail to
-/// appear on an incremental build). Disc centers + radius match `DiscsMark.svg`
-/// (seven discs in a regular heptagon, 1000×1000 artwork box).
+/// Septena's seven-disc brand mark, drawn inline from real `Circle` shapes rather
+/// than the `DiscsMark` symbol asset OR a `Canvas`. The asset route failed
+/// silently (actool caches symbolsets separately, so a freshly-added one can not
+/// appear on an incremental build); the `Canvas` route then failed to render
+/// inside a `List` row on watchOS (a `Canvas` has no intrinsic size and the row
+/// can collapse/skip its draw). Real shapes always lay out and draw in a List
+/// row. Disc centers + radius match `DiscsMark.svg` (seven discs in a regular
+/// heptagon, 1000×1000 artwork box).
 private struct SeptenaDiscsMark: View {
+  private static let centers: [CGPoint] = [
+    .init(x: 500,    y: 177.5),
+    .init(x: 766.25, y: 302.5),
+    .init(x: 832.5,  y: 595),
+    .init(x: 648.75, y: 825),
+    .init(x: 351.25, y: 825),
+    .init(x: 167.5,  y: 595),
+    .init(x: 233.75, y: 302.5),
+  ]
+
   var body: some View {
-    Canvas { ctx, size in
-      let unit = min(size.width, size.height) / 1000
-      let r = 112.5 * unit
-      let centers: [CGPoint] = [
-        .init(x: 500,    y: 177.5),
-        .init(x: 766.25, y: 302.5),
-        .init(x: 832.5,  y: 595),
-        .init(x: 648.75, y: 825),
-        .init(x: 351.25, y: 825),
-        .init(x: 167.5,  y: 595),
-        .init(x: 233.75, y: 302.5),
-      ]
-      for raw in centers {
-        let center = CGPoint(x: raw.x * unit, y: raw.y * unit)
-        let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-        ctx.fill(Path(ellipseIn: rect), with: .color(.secondary))
+    GeometryReader { geo in
+      let unit = min(geo.size.width, geo.size.height) / 1000
+      let d = 225 * unit   // disc diameter (radius 112.5 in the 1000-box)
+      ForEach(Array(Self.centers.enumerated()), id: \.offset) { _, c in
+        Circle()
+          .fill(.secondary)
+          .frame(width: d, height: d)
+          .position(x: c.x * unit, y: c.y * unit)
       }
     }
   }
