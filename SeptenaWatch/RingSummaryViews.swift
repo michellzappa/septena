@@ -12,6 +12,7 @@ import SwiftUI
 enum WatchPage: Hashable {
   case nutrition
   case training
+  case intake
 }
 
 // MARK: - Nutrition (today's macros)
@@ -130,6 +131,72 @@ struct TrainingDetailView: View {
     .navigationTitle("This week")
     .navigationBarTitleDisplayMode(.inline)
     .task { if conn.trainingRings.isEmpty { conn.fetchNext() } }
+  }
+}
+
+// MARK: - Intake (today's tally)
+
+/// A dead-simple "what I've had today" page — one row per intake tracker logged
+/// today (its glyph, name, and an ×N tally with an optional noun summary). No
+/// rings or goals; intake is a log, not a target. Reads the phone-computed
+/// `intakeToday` tally off the snapshot, so the watch carries no intake model.
+struct IntakeDetailView: View {
+  let conn: WatchConnectivity
+
+  var body: some View {
+    Group {
+      if conn.intakeToday.isEmpty {
+        ScrollView {
+          Text("Nothing logged today")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 24)
+        }
+      } else {
+        List(conn.intakeToday) { row in
+          IntakeTallyRow(row: row)
+            .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        }
+        .listStyle(.plain)
+      }
+    }
+    .navigationTitle("Today")
+    .navigationBarTitleDisplayMode(.inline)
+    .task { if conn.intakeToday.isEmpty { conn.fetchNext() } }
+  }
+}
+
+/// One intake tracker's tally row: glyph + name on the left, the count summary
+/// (the noun line if the wire carried one, else "×N") on the right.
+private struct IntakeTallyRow: View {
+  let row: IntakeTodayWire
+
+  private var tint: Color {
+    // Resolve like the Capture menu's intake glyphs — handles hex / hsl / rgb
+    // tokens and lifts dark colors for the always-dark watch canvas.
+    WatchSectionTint.color(forSectionKey: row.id,
+                           colors: row.color.map { [row.id: $0] } ?? [:])
+  }
+
+  var body: some View {
+    HStack(spacing: 9) {
+      Image(systemName: row.symbol ?? "circle.fill")
+        .font(.body)
+        .foregroundStyle(tint)
+        .frame(width: 18)
+      Text(row.name)
+        .font(.body)
+        .lineLimit(1)
+      Spacer(minLength: 4)
+      Text(row.detail ?? "×\(row.count)")
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
   }
 }
 

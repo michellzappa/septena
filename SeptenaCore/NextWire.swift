@@ -31,6 +31,16 @@ struct NextItemsResponse: Codable {
   var date: String
   var bucket: String
   var items: [NextItem]
+  /// The phone's time-of-day bucket cutoffs at publish time, carried so the
+  /// watch applies the same morning/afternoon/evening boundaries the phone uses.
+  /// The watch's own app group is a separate container — it never receives
+  /// cutoff writes from the phone — so without this the watch always uses the
+  /// factory defaults (morning < 12, afternoon < 17), which diverges from any
+  /// user-customised setting and makes bucket transitions feel early or late.
+  /// Optional so older payloads decode unchanged; the watch falls back to the
+  /// factory defaults when absent (same behaviour as before).
+  var morningCutoff: Int? = nil
+  var afternoonCutoff: Int? = nil
   /// The phone's per-section "carry over missed items" prefs at publish time,
   /// carried in the payload so the watch and widget filter exactly as the phone
   /// would (App Group defaults are per-device and don't cross to the watch).
@@ -96,6 +106,26 @@ struct NextItemsResponse: Codable {
   /// the rings on the watch's training summary page for the same freshness check.
   /// Optional so older payloads decode unchanged.
   var recentTraining: [RecentLogWire]? = nil
+  /// Today's intake tally — one row per tracker logged today, so the watch's
+  /// Intakes summary page can show "what I've had today" at a glance. Present
+  /// only when the Intake section is enabled and something's been logged today.
+  /// Optional so older payloads decode unchanged.
+  var intakeToday: [IntakeTodayWire]? = nil
+}
+
+/// One intake tracker's tally for today on the wire — enough for the wrist's
+/// Intakes summary page to show "what I've had today" at a glance. One row per
+/// tracker with at least one event today, phone-computed. Read-only.
+struct IntakeTodayWire: Codable, Hashable, Identifiable {
+  var id: String          // kind id
+  var name: String
+  var symbol: String? = nil
+  var color: String? = nil
+  /// How many times the tracker was logged today — the "×N" tally.
+  var count: Int
+  /// A short phone-formatted summary line, e.g. "3 cups" using the tracker's
+  /// count noun. Optional — absent when the kind carries no noun.
+  var detail: String? = nil
 }
 
 /// One recently-logged row on the wire — enough for a remote surface (watch) to

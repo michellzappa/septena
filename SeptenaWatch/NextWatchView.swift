@@ -18,6 +18,7 @@ struct NextWatchView: View {
           switch page {
           case .nutrition: NutritionDetailView(conn: conn)
           case .training:  TrainingDetailView(conn: conn)
+          case .intake:    IntakeDetailView(conn: conn)
           }
         }
         .toolbar {
@@ -88,7 +89,7 @@ struct NextWatchView: View {
     } else if conn.items.isEmpty {
       // Nothing left to do — still surface the summary pages so the macro /
       // training rings stay reachable in-app when the feed is clear.
-      if hasNutrition || hasTraining {
+      if hasSummaries {
         List {
           allDoneHero
             .frame(maxWidth: .infinity)
@@ -150,6 +151,8 @@ struct NextWatchView: View {
   // what keeps Training from silently vanishing against a stale snapshot.
   private var hasNutrition: Bool { sectionAvailable("nutrition") }
   private var hasTraining: Bool { sectionAvailable("training") }
+  private var hasIntake: Bool { sectionAvailable("intake") }
+  private var hasSummaries: Bool { hasNutrition || hasTraining || hasIntake }
 
   private func sectionAvailable(_ key: String) -> Bool {
     if !conn.enabledSections.isEmpty { return conn.enabledSections.contains(key) }
@@ -161,7 +164,7 @@ struct NextWatchView: View {
   /// under a quiet header so they read as a footer, not another task group.
   @ViewBuilder
   private var summaryLinkRows: some View {
-    if hasNutrition || hasTraining {
+    if hasSummaries {
       Text("Summaries")
         .font(.caption2)
         .fontWeight(.semibold)
@@ -175,6 +178,10 @@ struct NextWatchView: View {
       if hasTraining {
         summaryLink(.training, title: "Training", systemImage: "figure.strengthtraining.traditional",
                     color: WatchSectionTint.color(forSectionKey: "training", colors: conn.sectionColors))
+      }
+      if hasIntake {
+        summaryLink(.intake, title: "Intakes", systemImage: "takeoutbag.and.cup.and.straw",
+                    color: WatchSectionTint.color(forSectionKey: "intake", colors: conn.sectionColors))
       }
     }
   }
@@ -245,7 +252,7 @@ struct NextWatchView: View {
 /// and are parsed here. A row whose section has no color — or a section we
 /// can't resolve — gets a neutral rule rather than a guessed tint. All
 /// suggestions share one band, like the phone's single `NextSuggestionsSection`.
-private enum WatchSectionTint {
+enum WatchSectionTint {
   /// Group key — the unit the list draws a rule between. Suggestions collapse
   /// to one group regardless of their `logKind` (intake / mood).
   static func key(for item: NextItem) -> String {

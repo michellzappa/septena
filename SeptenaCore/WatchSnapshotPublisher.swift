@@ -99,6 +99,12 @@ enum WatchSnapshotPublisher {
     // user's saved section order) comes from the one shared builder, so the
     // watch snapshot can never diverge from the app's Next list.
     let items = NextFeed.flat(context: context, date: date)
+    // Carry this phone's current bucket cutoffs in the payload so the watch
+    // applies the same morning/afternoon/evening boundaries. The watch has its
+    // own separate app-group container — the phone's DayBucket.saveCutoffs()
+    // write never reaches it — so without this the watch always uses factory
+    // defaults (morning < 12, afternoon < 17) regardless of user settings.
+    let cutoffs = DayBucket.cutoffs
     // Carry this phone's current linger prefs in the payload so the watch and
     // widget filter to the current bucket exactly as this phone's Next list does
     // (App Group defaults are per-device, so they can't reach the watch otherwise).
@@ -120,9 +126,24 @@ enum WatchSnapshotPublisher {
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
       .filter { $0.archivedAt == nil }
     var intakeKinds: [IntakeKindWire] = []
+    // Today's per-tracker tally for the wrist's Intakes summary page ("what I've
+    // had today"). Built from the same `todaysEvents` fetch as the + menu's
+    // container math, so it costs nothing extra. One row per tracker with at
+    // least one event today, in the user's saved order.
+    var intakeToday: [IntakeTodayWire] = []
     if !kindRows.isEmpty {
       let todaysEvents = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(
         predicate: #Predicate { $0.date == date }))) ?? []
+      intakeToday = kindRows.compactMap { k in
+        let n = todaysEvents.filter { $0.kindID == k.id }.count
+        guard n > 0 else { return nil }
+        var detail: String? = nil
+        if let noun = k.countNoun, !noun.isEmpty {
+          detail = "\(n) \(noun)\(n == 1 ? "" : "s")"
+        }
+        return IntakeTodayWire(id: k.id, name: k.name, symbol: k.symbol,
+                               color: k.color, count: n, detail: detail)
+      }
       intakeKinds = kindRows.map { k in
         var last: Int? = nil
         if let token = k.methods.first(where: { $0.usesContainer })?.token {
@@ -173,6 +194,8 @@ enum WatchSnapshotPublisher {
     let recentNutrition = nutritionRings != nil ? buildRecentNutrition(context: context) : []
     let recentTraining = trainingRings != nil ? buildRecentTraining(context: context) : []
     let response = NextItemsResponse(date: date, bucket: "", items: items,
+                                     morningCutoff: cutoffs.morningEnd,
+                                     afternoonCutoff: cutoffs.afternoonEnd,
                                      lingerHabits: lingerHabits,
                                      lingerSupplements: lingerSupplements,
                                      sectionColors: sectionColors,
@@ -186,7 +209,8 @@ enum WatchSnapshotPublisher {
                                      groceries: groceries.isEmpty ? nil : groceries,
                                      enabledSections: enabledKeys.isEmpty ? nil : Array(enabledKeys),
                                      recentNutrition: recentNutrition.isEmpty ? nil : recentNutrition,
-                                     recentTraining: recentTraining.isEmpty ? nil : recentTraining)
+                                     recentTraining: recentTraining.isEmpty ? nil : recentTraining,
+                                     intakeToday: intakeToday.isEmpty ? nil : intakeToday)
     guard let payload = try? JSONEncoder().encode(response) else { return }
 
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't

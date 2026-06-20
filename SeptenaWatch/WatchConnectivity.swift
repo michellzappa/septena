@@ -49,6 +49,10 @@ final class WatchConnectivity {
   /// fetch / when the section carried no data.
   var recentNutrition: [RecentLogWire] = []
   var recentTraining: [RecentLogWire] = []
+  /// Today's per-tracker intake tally from the snapshot — "what I've had today",
+  /// listed on the in-app Intakes summary page. Empty until the first fetch /
+  /// when nothing's been logged today.
+  var intakeToday: [IntakeTodayWire] = []
   /// The live fast from the snapshot, when one is running and the user tracks
   /// fasting — held so the macro complication morphs into a fasting face and the
   /// in-app Macros summary (its tap target) can show the live fast. Nil when not
@@ -175,6 +179,15 @@ final class WatchConnectivity {
         return
       }
 
+      // Sync the phone's bucket cutoffs into the watch's own app-group store so
+      // DayBucket.current uses the same morning/afternoon/evening boundaries the
+      // phone does. The phone's saveCutoffs() write goes to the phone's app-group
+      // container, which is separate from the watch's — without this the watch
+      // always uses factory defaults (morning < 12, afternoon < 17) regardless of
+      // what the user set in Settings, causing bucket transitions to feel early.
+      if let m = response.morningCutoff, let a = response.afternoonCutoff {
+        DayBucket.saveCutoffs(DayBucketCutoffs(morningEnd: m, afternoonEnd: a))
+      }
       // Narrow to the current time-of-day bucket via the shared helper (keeps
       // the watch and the iOS widget from ever disagreeing), then drop items
       // completed locally this session until the phone republishes.
@@ -192,6 +205,7 @@ final class WatchConnectivity {
       self.enabledSections = Set(response.enabledSections ?? [])
       self.recentNutrition = response.recentNutrition ?? []
       self.recentTraining  = response.recentTraining ?? []
+      self.intakeToday     = response.intakeToday ?? []
       self.bucket        = bkt
       updateComplication()
       updateMacroComplication(response.nutritionRings, fasting: response.fasting)
