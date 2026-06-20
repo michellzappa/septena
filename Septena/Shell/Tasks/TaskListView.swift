@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if canImport(AppKit)
+import AppKit  // NSEvent.modifierFlags for ⌘/⇧-click selection
+#endif
 
 // One screen per filter (Today / Inbox / Upcoming / Anytime / Logbook / Project / Area).
 // Read-through cache: views render from SwiftData immediately, then refresh
@@ -927,11 +930,21 @@ struct TaskListView: View {
       editingDetail = task
     })
     #else
-    // Double-click opens the editor. Routed through an AppKit catcher (not a
-    // SwiftUI `TapGesture`) so single clicks fall through to `List` selection —
-    // a TapGesture here would swallow the selection click. See
-    // `septenaOnDoubleClick`.
-    .septenaOnDoubleClick { editingDetail = task }
+    // Selection + open on macOS. We can't lean on native List click-selection
+    // here: to open on double-click we need a SwiftUI tap gesture, and any tap
+    // gesture on the row captures the click before NSTableView can select (and
+    // the old AppKit double-click overlay never fires inside a List — the
+    // table's `mouseDown` tracking loop eats the second click). The old AppKit
+    // overlay route is therefore a dead end in a List. So we own selection in
+    // the gesture and write the same `selection` set the List binds to — which
+    // still drives the native highlight, plus keyboard ⇧/⌘+arrows. Single click
+    // selects (honoring ⌘/⇧ for multi-select), double click selects + opens.
+    .simultaneousGesture(TapGesture(count: 2).onEnded {
+      clickSelect(task.id); editingDetail = task
+    })
+    .simultaneousGesture(TapGesture(count: 1).onEnded {
+      clickSelect(task.id)
+    })
     #endif
     // Right-click selects this row (unless already part of a selection) so the
     // menu's target is unambiguous.
@@ -1019,6 +1032,25 @@ struct TaskListView: View {
   private func selectOnly(_ id: String) {
     selection = [id]
   }
+
+#if os(macOS)
+  /// macOS click selection, driven from the row's tap gesture (native
+  /// click-selection is unavailable once a tap gesture is attached — see the
+  /// row's `.simultaneousGesture`). Mirrors the system convention: plain click
+  /// selects only this row, ⌘-click toggles it in/out of the set, ⇧-click adds
+  /// it (extends). Writes the same `selection` set the List binds to, so the
+  /// native highlight + keyboard nav stay in sync.
+  private func clickSelect(_ id: String) {
+    let mods = NSEvent.modifierFlags
+    if mods.contains(.command) {
+      if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    } else if mods.contains(.shift) {
+      selection.insert(id)
+    } else {
+      selection = [id]
+    }
+  }
+#endif
 
   /// Deselect everything — the single "clear selection" entry point used by
   /// every deselect path.

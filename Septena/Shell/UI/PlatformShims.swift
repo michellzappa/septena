@@ -72,9 +72,14 @@ extension View {
   /// Run `action` on a primary double-click. macOS only — iOS opens via a
   /// single tap. Like `septenaOnRightClick`, the catcher sits as an overlay
   /// that claims ONLY double-click (`clickCount >= 2`) events; single clicks
-  /// fall through to SwiftUI underneath, so a row inside a `List(selection:)`
-  /// still selects on the first click. A SwiftUI `TapGesture` here would
-  /// instead enter the gesture arena and swallow the List's selection click.
+  /// fall through to SwiftUI underneath. Use this for rows in plain
+  /// VStack/LazyVStack layouts (e.g. the drawer's `DrawerSection`).
+  ///
+  /// NOT for rows inside a native `List(selection:)`: there NSTableView's
+  /// `mouseDown` runs its own event-tracking loop that swallows the second
+  /// click before this overlay can re-hit-test it, so the catcher never fires.
+  /// In a List, reach for `.onTapGesture(count: 2)` — it sees the double-click
+  /// and still lets single clicks drive native selection.
   @ViewBuilder
   func septenaOnDoubleClick(_ action: @escaping () -> Void) -> some View {
     #if os(macOS)
