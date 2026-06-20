@@ -94,16 +94,27 @@ struct TaskDraft {
   @MainActor
   func update(_ original: SeptenaTask, via mutator: TaskMutator) {
     let id = original.id
+    // Compare against the original run through the SAME normalization (a draft
+    // seeded from it), so every field is normalized-vs-normalized. The When /
+    // Today writes used to be unconditional, which — because `storedScheduled`
+    // collapses a "scheduled today" date into the pin — silently rewrote a
+    // planned-today task into a pinned-today one (and churned CloudKit) every
+    // time you merely opened and closed the editor. Now a true no-op peek
+    // writes nothing.
+    let prior = TaskDraft(task: original)
     if trimmedTitle != original.title || notes != (original.notes ?? "") {
       mutator.update(id: id, title: trimmedTitle, notes: notes)
     }
 
-    mutator.schedule(id: id, date: storedScheduled)
-    mutator.moveToToday(id: id, today: pinToday)
-    if deadline != SeptenaDate.parse(original.deadline) {
+    if storedScheduled != prior.storedScheduled {
+      mutator.schedule(id: id, date: storedScheduled)
+    }
+    if pinToday != prior.pinToday {
+      mutator.moveToToday(id: id, today: pinToday)
+    }
+    if deadline != prior.deadline {
       mutator.setDeadline(id: id, date: deadline)
     }
-
     if recurrence != original.recurrence {
       mutator.setRecurrence(id: id, recurrence: recurrence)
     }
@@ -118,11 +129,16 @@ struct TaskDraft {
   /// Inbox). A pure title / notes edit returns false: editing the text of a
   /// loose capture isn't filing it.
   func placementChanged(from original: SeptenaTask) -> Bool {
-    pinToday != original.today
-      || storedScheduled != SeptenaDate.parse(original.scheduled)
-      || deadline != SeptenaDate.parse(original.deadline)
-      || projectId != original.project
-      || areaId != original.area
+    // Normalize the original through the same mapping before comparing —
+    // otherwise the lossy `pinToday` / `storedScheduled` collapse makes a
+    // "scheduled today" task look changed on a bare peek, which would ratify an
+    // agent proposal (acknowledge → leave the Inbox) with no decision made.
+    let prior = TaskDraft(task: original)
+    return pinToday != prior.pinToday
+      || storedScheduled != prior.storedScheduled
+      || deadline != prior.deadline
+      || projectId != prior.projectId
+      || areaId != prior.areaId
   }
 
   // MARK: - Pill value labels
