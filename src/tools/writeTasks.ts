@@ -214,7 +214,9 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
         fields: {
           status: { value: "done" },
           completedAt: { value: completedAt },
-          today: { value: 0 },
+          // Do NOT clear `today`: the status guard hides done tasks from every
+          // view, and clearing it loses the Today placement on un-complete
+          // (matches the app's TasksBackend.complete). Never lose data.
         },
       },
     },
