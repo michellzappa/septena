@@ -2241,6 +2241,9 @@
     "Community" : {
 
     },
+    "Community sign-in" : {
+
+    },
     "Complete Chore" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2879,6 +2882,9 @@
       }
     },
     "Each fires the real MilestonePresenter tiering — streaks and goal target/held get the full card, intermediate rungs and XP get the quiet burst. Under Reduce Motion the visual is suppressed by design." : {
+
+    },
+    "Each note is dotted with the color of the section it belongs to." : {
 
     },
     "Each row fires the same renderer and haptic a real log uses. Under Reduce Motion the visual is suppressed (by design) — you'll still feel the haptic." : {
@@ -3796,6 +3802,9 @@
     "How far AI may reach" : {
 
     },
+    "How it was built" : {
+
+    },
     "How it works" : {
       "localizations" : {
         "pt-BR" : {
@@ -4664,7 +4673,6 @@
       }
     },
     "Membership" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5479,6 +5487,9 @@
       }
     },
     "Optional — used to personalize your daily greeting. Change it anytime in Settings." : {
+
+    },
+    "Optional. This Mac can't use App Attest, so Sign in with Apple is how the community features — Roadmap, Testimonials, and in-app Support — confirm you're a real person. That's the only thing it does: it ties those contributions to your Apple ID and nothing else. It doesn't touch your data, your iCloud sync, or your account, and you can sign out any time." : {
 
     },
     "Orange" : {
@@ -6576,6 +6587,9 @@
     "Show each section's goals and live progress toward target (read-only)." : {
 
     },
+    "Show in daily message" : {
+
+    },
     "Show in Next" : {
       "localizations" : {
         "pt-BR" : {
@@ -6602,6 +6616,15 @@
           }
         }
       }
+    },
+    "Sign in with Apple" : {
+
+    },
+    "Signing in…" : {
+
+    },
+    "Signing out only forgets this device's session — your contributions and all your data stay put." : {
+
     },
     "Since %@ · target %@–%@h" : {
       "localizations" : {
@@ -7214,7 +7237,7 @@
         }
       }
     },
-    "Testimonials are tied to your Apple ID — open Settings and sign in to iCloud, then come back." : {
+    "Testimonials are tied to your Apple ID — sign in to iCloud, then come back." : {
 
     },
     "Thank you" : {
@@ -7247,7 +7270,7 @@
         }
       }
     },
-    "The board ties suggestions to your Apple ID — open Settings and sign in to iCloud, then come back." : {
+    "The board ties suggestions to your Apple ID — sign in to iCloud, then come back." : {
 
     },
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
@@ -7390,6 +7413,9 @@
           }
         }
       }
+    },
+    "This Mac can't use App Attest, so community features verify you with a one-time Sign in with Apple instead. It ties contributions to your Apple ID — nothing in your data changes, and you can sign out any time." : {
+
     },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
       "localizations" : {
@@ -7620,6 +7646,9 @@
           }
         }
       }
+    },
+    "Turn off to drop your Readwise highlights from the rotation without disconnecting — your imported highlights, packs, and own quotes stay." : {
+
     },
     "Turn values into goals" : {
       "localizations" : {
@@ -7996,6 +8025,9 @@
     "What should we call you?" : {
 
     },
+    "What the dots mean" : {
+
+    },
     "When on, every book and article is included — and anything new you add to Readwise joins automatically." : {
 
     },
@@ -8226,7 +8258,7 @@
         }
       }
     },
-    "Your profile is tied to your Apple ID — open Settings and sign in to iCloud, then come back to set one up." : {
+    "Your profile is tied to your Apple ID — sign in to iCloud, then come back to set one up." : {
 
     },
     "Your quotes" : {

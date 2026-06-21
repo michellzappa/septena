@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SupportSettingsPane: View {
   @State private var tickets: [CommunitySupportTicket] = []
-  @State private var loading = false
+  // Starts true so the first render shows a spinner, not the "no tickets" empty
+  // state, while the initial fetch is in flight.
+  @State private var loading = true
   @State private var errorMessage: String?
   @State private var showingComposer = false
   @State private var role = "user"
@@ -80,10 +82,7 @@ struct SupportSettingsPane: View {
     .formStyle(.grouped)
     .task {
       if canUseInAppSupport == nil { await refreshAccess() }
-      if canUseInAppSupport == true {
-        await loadRole()
-        await loadTickets()
-      }
+      if canUseInAppSupport == true { await loadData() }
     }
     .refreshable {
       await reload()
@@ -116,6 +115,7 @@ struct SupportSettingsPane: View {
       Text("Email goes straight to me — I make Septena alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time.")
         .font(.footnote)
         .foregroundStyle(.secondary)
+      OpenAppleAccountButton()
     }
   }
 
@@ -126,13 +126,18 @@ struct SupportSettingsPane: View {
     needsAppleSignIn = (access == .needsAppleSignIn)
   }
 
+  /// Role + tickets concurrently — separate endpoints, no need to serialize.
+  @MainActor
+  private func loadData() async {
+    async let roleLoad: Void = loadRole()
+    async let ticketsLoad: Void = loadTickets()
+    _ = await (roleLoad, ticketsLoad)
+  }
+
   @MainActor
   private func reload() async {
     await refreshAccess()
-    if canUseInAppSupport == true {
-      await loadRole()
-      await loadTickets()
-    }
+    if canUseInAppSupport == true { await loadData() }
   }
 
   @MainActor

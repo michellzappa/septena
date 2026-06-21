@@ -7,7 +7,9 @@ import SwiftUI
 struct CommunityRoadmapPane: View {
   @State private var features: [CommunityFeature] = []
   @State private var role = "user"
-  @State private var loading = false
+  // Starts true so the first render shows a spinner, not the "no requests"
+  // empty state, while the initial fetch is in flight.
+  @State private var loading = true
   @State private var errorMessage: String?
   @State private var showingComposer = false
 
@@ -88,7 +90,7 @@ struct CommunityRoadmapPane: View {
     .formStyle(.grouped)
     .task {
       if canUse == nil { await refreshAccess() }
-      if canUse == true { await loadRole(); await load() }
+      if canUse == true { await loadData() }
     }
     .refreshable {
       await reload()
@@ -112,8 +114,9 @@ struct CommunityRoadmapPane: View {
     Section {
       Label("Sign in to iCloud to use the roadmap.", systemImage: "lightbulb.slash")
         .foregroundStyle(.secondary)
-      Text("The board ties suggestions to your Apple ID — open Settings and sign in to iCloud, then come back.")
+      Text("The board ties suggestions to your Apple ID — sign in to iCloud, then come back.")
         .font(.footnote).foregroundStyle(.secondary)
+      OpenAppleAccountButton()
     }
   }
 
@@ -129,9 +132,17 @@ struct CommunityRoadmapPane: View {
     needsAppleSignIn = (access == .needsAppleSignIn)
   }
 
+  /// Role + data concurrently — they hit separate endpoints, so there's no
+  /// reason to wait for one before the other.
+  @MainActor private func loadData() async {
+    async let roleLoad: Void = loadRole()
+    async let dataLoad: Void = load()
+    _ = await (roleLoad, dataLoad)
+  }
+
   @MainActor private func reload() async {
     await refreshAccess()
-    if canUse == true { await loadRole(); await load() }
+    if canUse == true { await loadData() }
   }
 
   @MainActor private func loadRole() async {

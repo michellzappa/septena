@@ -37,6 +37,12 @@ public struct CommunityProfile: Codable, Sendable, Equatable {
   public var avatarKey: String?
   public var bio: String?
   public var isPublic: Bool
+  /// The member's Septena+ patronage tier ("annual"/"monthly"/"lifetime"), or
+  /// nil for the free tier. Server-owned and read-only here — set via
+  /// `CommunityClient.updateSupporterTier(_:)`, not the profile editor.
+  public var supporterTier: String?
+  /// ISO-8601 timestamp of when a support tier was first set; nil when free.
+  public var supporterSince: String?
   public var updatedAt: String?
 
   public init(username: String? = nil,
@@ -44,12 +50,16 @@ public struct CommunityProfile: Codable, Sendable, Equatable {
               avatarKey: String? = nil,
               bio: String? = nil,
               isPublic: Bool = false,
+              supporterTier: String? = nil,
+              supporterSince: String? = nil,
               updatedAt: String? = nil) {
     self.username = username
     self.displayName = displayName
     self.avatarKey = avatarKey
     self.bio = bio
     self.isPublic = isPublic
+    self.supporterTier = supporterTier
+    self.supporterSince = supporterSince
     self.updatedAt = updatedAt
   }
 }
@@ -195,8 +205,15 @@ public actor CommunityClient {
   private let container: CKContainer
   private let session: URLSession
 
-  public init(container: CKContainer = .default(), session: URLSession = .shared) {
-    self.container = container
+  // Must be the app's real container, NOT `CKContainer.default()`: `.default()`
+  // resolves to `iCloud.<main-bundle-id>`, which on the Mac app
+  // (`com.septena.cloud.mac`) is a container the app isn't entitled to — so
+  // accountStatus never reports `.available` and community surfaces wrongly show
+  // "sign in to iCloud" for a signed-in user. The rest of the app keys on this
+  // explicit identifier (see CKEngine). Resolved in-body because a public init's
+  // default-argument value can't reference the internal `SeptenaCloudKit`.
+  public init(container: CKContainer? = nil, session: URLSession = .shared) {
+    self.container = container ?? CKContainer(identifier: SeptenaCloudKit.containerIdentifier)
     self.session = session
   }
 
@@ -267,6 +284,22 @@ public actor CommunityClient {
     req.httpMethod = "PATCH"
     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
     let body = try JSONEncoder().encode(ProfileUpdate(profile))
+    req.httpBody = body
+    try await attachCommunityAuth(&req, body: body, baseURL: baseURL)
+    return try await send(req, as: CommunityMe.self)
+  }
+
+  /// Report the caller's current Septena+ patronage tier so their community
+  /// profile can show a "Supporter" badge. Pass nil to clear it (free tier).
+  /// Client-asserted: the worker trusts the attested/session channel — the
+  /// badge gates nothing. See `SupportStore.syncSupporterToCommunity`.
+  @discardableResult
+  public func updateSupporterTier(_ tier: String?,
+                                  baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityMe {
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/me/support"))
+    req.httpMethod = "PUT"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let body = try JSONEncoder().encode(SupporterUpdate(tier: tier))
     req.httpBody = body
     try await attachCommunityAuth(&req, body: body, baseURL: baseURL)
     return try await send(req, as: CommunityMe.self)
@@ -514,6 +547,12 @@ public actor CommunityClient {
       self.bio = profile.bio
       self.isPublic = profile.isPublic
     }
+  }
+
+  // nil `tier` is omitted by JSONEncoder, which the worker reads as "clear the
+  // tier" (free) — the same as sending an explicit null.
+  private struct SupporterUpdate: Encodable {
+    let tier: String?
   }
 
   private struct SupportTicketList: Decodable {

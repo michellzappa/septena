@@ -1359,6 +1359,10 @@ struct AccountSettingsPane: View {
         Text("Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID.")
       }
 
+      // macOS only (renders nothing on iOS). Optional Sign in with Apple — the
+      // App-Attest substitute that unlocks community features on this Mac and
+      // does nothing else. Sits under Sync because it's the same Apple-ID story.
+      CommunityAppleAccountSection()
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showPaywall) {

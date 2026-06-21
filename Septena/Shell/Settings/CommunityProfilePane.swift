@@ -17,8 +17,18 @@ struct CommunityProfilePane: View {
   @State private var role = "user"
   @State private var isBanned = false
   @State private var userHash: String?
+  /// The patronage tier the server has on record ("annual"/"monthly"/"lifetime"),
+  /// or nil for free. Drives the membership badge; kept in step with StoreKit by
+  /// pushing the local tier before each load (see `.task`).
+  @State private var supporterTier: String?
 
-  @State private var loading = false
+  /// The live StoreKit entitlement, pushed to the worker so the badge below
+  /// reflects a just-completed purchase without waiting for the next launch.
+  @Environment(SupportStore.self) private var supportStore
+
+  // Starts true so the first render shows a spinner, not blank form fields,
+  // while the profile is being fetched.
+  @State private var loading = true
   @State private var saving = false
   @State private var errorMessage: String?
   @State private var savedConfirmation = false
@@ -82,6 +92,8 @@ struct CommunityProfilePane: View {
         CommunitySignInSection { Task { await reload() } }
       } else if canUseCommunity == false {
         fallbackSection
+      } else if saved == nil && loading {
+        Section { HStack { ProgressView(); Text("Loading…").foregroundStyle(.secondary) } }
       } else {
         if isBanned {
           Section {
@@ -137,6 +149,24 @@ struct CommunityProfilePane: View {
           Text("When on, other members can see your username, display name, and bio. When off, your contributions appear without a public profile.")
         }
 
+        Section {
+          HStack {
+            Text(membershipTitle)
+            Spacer()
+            if supporterTier?.isEmpty == false {
+              SeptenaPlusBadge()
+            } else {
+              FreeAccountBadge()
+            }
+          }
+        } header: {
+          Text("Membership")
+        } footer: {
+          Text(supporterTier?.isEmpty == false
+               ? "Your Septena+ support shows a Supporter badge on your community profile. Thank you."
+               : "Septena is free. Supporters wear a Supporter badge here — manage it in Settings ▸ Support Septena.")
+        }
+
         if role != "user" {
           Section {
             Label(roleTitle, systemImage: roleSymbol)
@@ -175,7 +205,12 @@ struct CommunityProfilePane: View {
     .formStyle(.grouped)
     .task {
       if canUseCommunity == nil { await refreshAccess() }
-      if canUseCommunity == true, saved == nil { await load() }
+      if canUseCommunity == true {
+        // Push the live StoreKit tier first so the loaded profile reflects a
+        // purchase made since launch; both are no-ops when nothing changed.
+        await supportStore.syncSupporterToCommunity(tier: supportStore.supporterTier)
+        if saved == nil { await load() }
+      }
     }
     .refreshable {
       await reload()
@@ -214,9 +249,19 @@ struct CommunityProfilePane: View {
     Section {
       Label("Sign in to iCloud to set up a profile.", systemImage: "person.crop.circle.badge.exclamationmark")
         .foregroundStyle(.secondary)
-      Text("Your profile is tied to your Apple ID — open Settings and sign in to iCloud, then come back to set one up.")
+      Text("Your profile is tied to your Apple ID — sign in to iCloud, then come back to set one up.")
         .font(.footnote)
         .foregroundStyle(.secondary)
+      OpenAppleAccountButton()
+    }
+  }
+
+  private var membershipTitle: String {
+    switch supporterTier {
+    case "annual":   return "Annual supporter"
+    case "monthly":  return "Monthly supporter"
+    case "lifetime": return "Founding supporter"
+    default:         return "Free"
     }
   }
 
@@ -289,6 +334,7 @@ struct CommunityProfilePane: View {
     displayName = p.displayName ?? ""
     bio = p.bio ?? ""
     isPublic = p.isPublic
+    supporterTier = p.supporterTier
     saved = p
   }
 }

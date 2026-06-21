@@ -13,7 +13,9 @@ struct CommunityTestimonialPane: View {
   @State private var draftBody = ""
   @State private var draftRating: Int? = nil
 
-  @State private var loading = false
+  // Starts true so the first render shows a spinner, not the empty state, while
+  // the initial fetch is in flight.
+  @State private var loading = true
   @State private var busy = false
   @State private var errorMessage: String?
 
@@ -37,6 +39,8 @@ struct CommunityTestimonialPane: View {
         CommunitySignInSection { Task { await reload() } }
       } else if canUse == false {
         fallbackSection
+      } else if loading && mine == nil && others.isEmpty {
+        Section { HStack { ProgressView(); Text("Loading…").foregroundStyle(.secondary) } }
       } else {
         if isMaintainer {
           Section {
@@ -84,7 +88,7 @@ struct CommunityTestimonialPane: View {
     .formStyle(.grouped)
     .task {
       if canUse == nil { await refreshAccess() }
-      if canUse == true { await loadRole(); await load() }
+      if canUse == true { await loadData() }
     }
     .refreshable {
       await reload()
@@ -136,8 +140,9 @@ struct CommunityTestimonialPane: View {
     Section {
       Label("Sign in to iCloud to leave a testimonial.", systemImage: "quote.bubble")
         .foregroundStyle(.secondary)
-      Text("Testimonials are tied to your Apple ID — open Settings and sign in to iCloud, then come back.")
+      Text("Testimonials are tied to your Apple ID — sign in to iCloud, then come back.")
         .font(.footnote).foregroundStyle(.secondary)
+      OpenAppleAccountButton()
     }
   }
 
@@ -157,9 +162,16 @@ struct CommunityTestimonialPane: View {
     needsAppleSignIn = (access == .needsAppleSignIn)
   }
 
+  /// Role + data concurrently — separate endpoints, no need to serialize.
+  @MainActor private func loadData() async {
+    async let roleLoad: Void = loadRole()
+    async let dataLoad: Void = load()
+    _ = await (roleLoad, dataLoad)
+  }
+
   @MainActor private func reload() async {
     await refreshAccess()
-    if canUse == true { await loadRole(); await load() }
+    if canUse == true { await loadData() }
   }
 
   @MainActor private func loadRole() async {

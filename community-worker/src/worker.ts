@@ -4,7 +4,7 @@ import { telemetryAdmin } from "./admin";
 import { hmacUserHash, requireUser } from "./auth";
 import type { Env } from "./env";
 import { json, notFound, publicJson, readJson } from "./http";
-import { profileResponse, updateProfile } from "./profile";
+import { profileResponse, setSupporterTier, updateProfile } from "./profile";
 import { createSupportTicket, getSupportTicket, listSupportTickets, postSupportMessage, setTicketStatus } from "./support";
 import { addComment, createFeature, getFeature, listFeatures, listPublicFeatures, moderateComment, setVote, updateFeature } from "./features";
 import { deleteMyTestimonial, getMyTestimonial, listPublicTestimonials, listTestimonials, moderateTestimonial, putMyTestimonial } from "./testimonials";
@@ -108,6 +108,18 @@ async function route(req: Request, env: Env): Promise<Response> {
       const auth = await requireUser(env, req, body.bytes);
       if (auth.error) return auth.error;
       const result = await updateProfile(env, auth.user!, body.data);
+      return result.ok ? json(result.body) : json({ error: result.error }, result.status);
+    }
+
+    // Patronage badge. The app reports its current StoreKit support tier here so
+    // the member's profile can show a "Supporter" badge. Client-asserted over
+    // the attested/session channel (the badge gates nothing).
+    if (req.method === "PUT" && path === "/api/me/support") {
+      const body = await readJson<unknown>(req);
+      if (body.error) return body.error;
+      const auth = await requireUser(env, req, body.bytes);
+      if (auth.error) return auth.error;
+      const result = await setSupporterTier(env, auth.user!, body.data);
       return result.ok ? json(result.body) : json({ error: result.error }, result.status);
     }
 

@@ -37,6 +37,9 @@ final class SupportStore {
   /// True when the user currently owns any support product (the source of
   /// truth for the cosmetic supporter state).
   private(set) var isSupporter = false
+  /// The owned tier id ("annual"/"monthly"/"lifetime"), or nil when free. Drives
+  /// the badge shown on the community profile (pushed via `CommunityClient`).
+  private(set) var supporterTier: String?
   /// The product id of an in-flight purchase, so the screen can show a spinner
   /// on exactly that tier. `nil` when idle.
   private(set) var purchaseInFlight: String?
@@ -91,7 +94,7 @@ final class SupportStore {
           // on a `currentEntitlements` re-query — in the StoreKit test
           // environment a freshly-purchased item isn't always returned by that
           // query on the very next call, which would leave the UI unchanged.
-          setSupporter(true)
+          setSupporter(true, productID: transaction.productID)
           // Reconcile anyway (picks up revocation / other devices).
           await refreshEntitlement()
         } else {
@@ -118,31 +121,62 @@ final class SupportStore {
   /// Recompute `isSupporter` from current entitlements and mirror it into the
   /// cosmetic `plusUnlocked` flag the rest of the app reads.
   func refreshEntitlement() async {
-    var owned = false
+    var ownedProductID: String?
     for await result in Transaction.currentEntitlements {
       guard case .verified(let transaction) = result else { continue }
       if ProductID.all.contains(transaction.productID),
          transaction.revocationDate == nil {
-        owned = true
+        ownedProductID = transaction.productID
       }
     }
+    let owned = ownedProductID != nil
     supportLog.log("refreshEntitlement → owned=\(owned, privacy: .public)")
     // Never downgrade a just-completed purchase if the re-query lags behind in
     // the test environment; only this call can clear it once it actually sees
     // no entitlement AND we weren't mid-purchase.
     if owned || purchaseInFlight == nil {
-      setSupporter(owned)
+      setSupporter(owned, productID: ownedProductID)
     }
   }
 
   // MARK: - Helpers
 
   /// The single place `isSupporter` changes: updates the observable property
-  /// (drives in-session UI: screen dismiss, supporter section) and mirrors into
-  /// the `plusUnlocked` @AppStorage flag (drives the badge + avatar ring).
-  private func setSupporter(_ value: Bool) {
+  /// (drives in-session UI: screen dismiss, supporter section), mirrors into the
+  /// `plusUnlocked` @AppStorage flag (drives the badge + avatar ring), and pushes
+  /// the tier to the community worker so the public profile badge stays in step.
+  private func setSupporter(_ value: Bool, productID ownedProductID: String? = nil) {
     isSupporter = value
+    supporterTier = value ? tierID(forProductID: ownedProductID) : nil
     UserDefaults.standard.set(value, forKey: SettingsKey.plusUnlocked)
+    let tier = supporterTier
+    Task { await syncSupporterToCommunity(tier: tier) }
+  }
+
+  /// Best-effort: report the current tier to the community worker so the
+  /// member's profile badge matches their StoreKit entitlement. Skips the call
+  /// when nothing changed, and never proactively announces "free" for a member
+  /// who has never supported (only sets a real tier, or clears one we set
+  /// before). Community may be unavailable (no iCloud / no App Attest); a thrown
+  /// error leaves the synced marker untouched so the next change retries. Safe
+  /// to await from the profile pane on appear as well as from `setSupporter`.
+  func syncSupporterToCommunity(tier: String?) async {
+    let key = "septena.community.supporterTierSynced"
+    let last = UserDefaults.standard.string(forKey: key)
+    let normalized = tier ?? ""
+    guard last != normalized else { return }
+    if normalized.isEmpty, last == nil {
+      // Baseline a never-supported member so we don't re-check every launch and
+      // don't announce a "free" status nobody needs.
+      UserDefaults.standard.set("", forKey: key)
+      return
+    }
+    do {
+      try await CommunityClient.shared.updateSupporterTier(tier)
+      UserDefaults.standard.set(normalized, forKey: key)
+    } catch {
+      supportLog.log("community supporter sync deferred: \(error.localizedDescription, privacy: .public)")
+    }
   }
 
   private func productID(forTier tierID: String) -> String {
@@ -151,6 +185,15 @@ final class SupportStore {
     case "monthly":  return ProductID.monthly
     case "lifetime": return ProductID.lifetime
     default:         return tierID
+    }
+  }
+
+  private func tierID(forProductID productID: String?) -> String? {
+    switch productID {
+    case ProductID.annual:   return "annual"
+    case ProductID.monthly:  return "monthly"
+    case ProductID.lifetime: return "lifetime"
+    default:                 return nil
     }
   }
 
