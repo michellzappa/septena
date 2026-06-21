@@ -199,13 +199,20 @@ struct NextWatchView: View {
   /// kinds list with their today count, falling back to the today-only tally if
   /// the kind list hasn't synced (older snapshot).
   private var intakeSummaryRows: [IntakeTodayWire] {
-    guard !conn.intakeKinds.isEmpty else { return conn.intakeToday }
     let logged = Dictionary(conn.intakeToday.map { ($0.id, $0) },
                             uniquingKeysWith: { a, _ in a })
-    return conn.intakeKinds.map { k in
-      logged[k.id] ?? IntakeTodayWire(id: k.id, name: k.name, symbol: k.symbol,
-                                      color: k.color, count: 0, detail: nil)
+    // Every enabled tracker, backfilled with today's tally (×0 before anything's
+    // logged)…
+    var seen = Set<String>()
+    var rows = conn.intakeKinds.map { k -> IntakeTodayWire in
+      seen.insert(k.id)
+      return logged[k.id] ?? IntakeTodayWire(id: k.id, name: k.name, symbol: k.symbol,
+                                             color: k.color, count: 0, detail: nil)
     }
+    // …plus any tracker that has a tally today but didn't ride along in the kinds
+    // list, so a logged tracker is never hidden by a partial snapshot.
+    for t in conn.intakeToday where !seen.contains(t.id) { rows.append(t) }
+    return rows
   }
 
   /// A single intake-tracker tile: tinted glyph + name on the left, today's tally
