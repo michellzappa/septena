@@ -303,7 +303,12 @@ struct WeekDashboardView: View {
         Task { await refresh([.tasks]) }
       },
       onDayChange: {
+        // Roll over every tile for the new day. Intake loads on a separate
+        // path (`reloadIntake`) and isn't part of `loadAll`, so reload it
+        // explicitly — otherwise its "N today" count stays stuck on
+        // yesterday's events after midnight while the rest of the dash resets.
         Task { await loadAll() }
+        Task { await reloadIntake() }
       },
       onDataChange: { note in
         if let keys = note.changedSections {

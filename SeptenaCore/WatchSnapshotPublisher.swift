@@ -87,7 +87,18 @@ enum WatchSnapshotPublisher {
     ) { _ in
       MainActor.assumeIsolated { schedule(context: context) }
     }
-    observers = [data, tasks]
+    // Republish on the midnight rollover too. The snapshot carries day-keyed
+    // values (today's intake tally, macro rings, the Next feed's today bucket),
+    // but a bare day change posts no data/task notification — so without this
+    // the widgets and watch complications keep rendering yesterday's counts
+    // until the next mutation or app-foreground. `schedule` re-reads
+    // `SeptenaDate.today`, so the rebuilt snapshot is keyed to the new day.
+    let dayChange = center.addObserver(
+      forName: .NSCalendarDayChanged, object: nil, queue: .main
+    ) { _ in
+      MainActor.assumeIsolated { schedule(context: context) }
+    }
+    observers = [data, tasks, dayChange]
   }
 
   /// Compute on the main actor (SwiftData read), then save off-main. Best-effort:
@@ -500,6 +511,11 @@ enum WatchSnapshotPublisher {
   /// the contract. When off, the wrist always shows macros, never a fast.
   private static let trackFastingDefaultsKey = "septena.nutrition.trackFasting"
 
+  /// The last fast we published this process, kept so a transient empty read
+  /// can't blank the wrist mid-fast (see `buildFasting`). Reset to nil whenever a
+  /// *real* read says the user isn't fasting, so breaking a fast clears it at once.
+  @MainActor private static var lastFasting: FastingWire?
+
   /// The live fast for the watch macro complication — present only when the user
   /// tracks fasting *and* a fast is currently running, so the complication morphs
   /// into a fasting face exactly as the phone's Nutrition tile does
@@ -509,7 +525,10 @@ enum WatchSnapshotPublisher {
   /// falling back to the default band).
   @MainActor
   private static func buildFasting(context: ModelContext) -> FastingWire? {
-    guard UserDefaults.standard.bool(forKey: trackFastingDefaultsKey) else { return nil }
+    guard UserDefaults.standard.bool(forKey: trackFastingDefaultsKey) else {
+      lastFasting = nil
+      return nil
+    }
     let stats = ChecklistMirror.buildNutritionStatsResponse(context: context, days: 2)
     let inputs = FastingStateInputs(
       todayLatestMeal: stats.todayLatestMeal,
@@ -517,7 +536,23 @@ enum WatchSnapshotPublisher {
       yesterdayLastMeal: stats.yesterdayLastMeal)
     let now = Date()
     guard case .fasting(_, let since, let totalMin) = computeFastingState(inputs: inputs, now: now)
-    else { return nil }
+    else {
+      // Not fasting per this read. A read that actually saw meals (`daily`
+      // non-empty) is trustworthy — "fed" means the fast is genuinely over, so
+      // clear and publish macros. But an *empty* read (the SwiftData fetch came
+      // back with nothing — transiently, or before a CloudKit absorb finished)
+      // would also land here and wrongly blank a running fast: the very flap
+      // where the wrist drops to "0 nutrients, no fast" while the phone still
+      // shows it. On an empty read, preserve the last known fast instead of
+      // overwriting the complication with zeroes. The 48h cap stops a stale fast
+      // from lingering if the empty reads never resolve.
+      if stats.daily.isEmpty, let last = lastFasting,
+         now.timeIntervalSince(last.since) < 48 * 3600 {
+        return last
+      }
+      lastFasting = nil
+      return nil
+    }
 
     let targetH = NutritionPrefs.loadMacrosConfig()?.fasting?.min ?? FastingDefaults.targetMinH
     // The Fasting metric's authored color, resolved exactly as the phone's
@@ -529,11 +564,13 @@ enum WatchSnapshotPublisher {
     let colorHex = tiles.first(where: { $0.id == "fasting" })?.colorHex
       ?? MacroCatalog.byID["fasting"]?.defaultColorHex
 
-    return FastingWire(
+    let wire = FastingWire(
       since: now.addingTimeInterval(-Double(totalMin) * 60),
       sinceLabel: since,
       targetHours: max(targetH, 1),
       colorHex: colorHex)
+    lastFasting = wire
+    return wire
   }
 
   // MARK: - Capture catalogs (wrist quick-inputs)
