@@ -143,11 +143,26 @@ struct TrainingDetailView: View {
 struct IntakeDetailView: View {
   let conn: WatchConnectivity
 
+  /// One row per *enabled* tracker (from `intakeKinds`, always on the snapshot),
+  /// each carrying today's tally — `×0` for a tracker not logged yet. So the page
+  /// reads as a full "what I track" list with today's counts, not just the
+  /// subset that happens to have an event today. Falls back to the today-only
+  /// tally if the kind list hasn't synced (older snapshot).
+  private var rows: [IntakeTodayWire] {
+    guard !conn.intakeKinds.isEmpty else { return conn.intakeToday }
+    let logged = Dictionary(conn.intakeToday.map { ($0.id, $0) },
+                            uniquingKeysWith: { a, _ in a })
+    return conn.intakeKinds.map { k in
+      logged[k.id] ?? IntakeTodayWire(id: k.id, name: k.name, symbol: k.symbol,
+                                      color: k.color, count: 0, detail: nil)
+    }
+  }
+
   var body: some View {
     Group {
-      if conn.intakeToday.isEmpty {
+      if rows.isEmpty {
         ScrollView {
-          Text("Nothing logged today")
+          Text("No intake trackers")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -155,7 +170,7 @@ struct IntakeDetailView: View {
             .padding(.top, 24)
         }
       } else {
-        List(conn.intakeToday) { row in
+        List(rows) { row in
           IntakeTallyRow(row: row)
             .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         }
@@ -164,7 +179,7 @@ struct IntakeDetailView: View {
     }
     .navigationTitle("Today")
     .navigationBarTitleDisplayMode(.inline)
-    .task { if conn.intakeToday.isEmpty { conn.fetchNext() } }
+    .task { if conn.intakeKinds.isEmpty && conn.intakeToday.isEmpty { conn.fetchNext() } }
   }
 }
 

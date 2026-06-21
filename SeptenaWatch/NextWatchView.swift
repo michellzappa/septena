@@ -151,7 +151,10 @@ struct NextWatchView: View {
   // what keeps Training from silently vanishing against a stale snapshot.
   private var hasNutrition: Bool { sectionAvailable("nutrition") }
   private var hasTraining: Bool { sectionAvailable("training") }
-  private var hasIntake: Bool { sectionAvailable("intake") }
+  // Also reveal Intakes whenever the snapshot carries trackers — having intake
+  // kinds means the section is on, so a stale/empty `enabledSections` (the only
+  // thing `sectionAvailable` keys off) can't silently hide the link.
+  private var hasIntake: Bool { sectionAvailable("intake") || !conn.intakeKinds.isEmpty }
   private var hasSummaries: Bool { hasNutrition || hasTraining || hasIntake }
 
   private func sectionAvailable(_ key: String) -> Bool {
