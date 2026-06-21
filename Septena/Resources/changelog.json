@@ -3,6 +3,50 @@
   "_comment": "Canonical, hand-curated release notes for Septena. Single source of truth: bundled into the app (Settings ▸ About ▸ What's New + the launch sheet) AND mirrored to the website at build time (septena-site/scripts/sync-changelog.mjs → /changelog). Newest release first. `section` on a highlight is an optional SectionManifest key (drives the accent color); omit it (null) for app-wide changes. Draft new entries from `scripts/changelog-draft.sh <last-tag>`, then curate. See docs/VERSIONING.md. NOTE: entries before 0.7.0 are reconstructed from git history (build = commit count at that date) — Septena hadn't shipped publicly yet, so these are a human-readable starting point, not literal past App Store builds. The version in project.yml (MARKETING_VERSION) must always match the newest entry here.",
   "releases": [
     {
+      "version": "Unreleased",
+      "build": 1081,
+      "date": "2026-06-21",
+      "name": "In development",
+      "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
+      "highlights": [
+        {
+          "title": "What's New, right inside the app",
+          "detail": "See a curated list of recent changes whenever Septena updates.",
+          "section": null
+        },
+        {
+          "title": "Editing a task now shows its notes automatically",
+          "detail": "Existing notes reveal themselves as soon as you start editing, so nothing stays hidden.",
+          "section": "tasks"
+        },
+        {
+          "title": "Tasks stay put when you complete or reopen them",
+          "detail": "Checking off, reopening, or peeking at a task no longer shuffles its place in your list.",
+          "section": "tasks"
+        },
+        {
+          "title": "Smoother task selection on Mac",
+          "detail": "Tapping a task in the list selects it more reliably.",
+          "section": "tasks"
+        },
+        {
+          "title": "All your intake trackers on the watch",
+          "detail": "The watch summary and a new Intakes page show every intake tracker you log, with day cutoffs synced to your wrist.",
+          "section": "intake"
+        },
+        {
+          "title": "Cleaner fasting complication",
+          "detail": "The circular fasting complication now rounds to whole hours for an easier glance.",
+          "section": "nutrition"
+        },
+        {
+          "title": "The watch stays fresh across midnight and mid-fast",
+          "detail": "Snapshots and the dashboard update correctly as the day rolls over and during an active fast.",
+          "section": null
+        }
+      ]
+    },
+    {
       "version": "0.7.0",
       "build": 1066,
       "date": "2026-06-20",
