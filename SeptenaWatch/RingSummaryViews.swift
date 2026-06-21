@@ -19,12 +19,19 @@ enum WatchPage: Hashable {
 
 struct NutritionDetailView: View {
   let conn: WatchConnectivity
+  /// Presents the most-eaten-meals picker — the same one-tap quick-log the
+  /// Capture sheet's "Log a meal" row opens, surfaced contextually here.
+  @State private var loggingMeal = false
 
   /// The canonical five in order, backfilling any the snapshot hasn't sent with
   /// empty tracks — so the page reads as "macros" even before the first sync
   /// (mirrors the complication's `rings`).
   private var rings: [ComplicationRing] {
     RingMetrics.canonical(order: MacroStyle.order, from: conn.nutritionRings)
+  }
+
+  private var accent: Color {
+    WatchSectionTint.color(forSectionKey: "nutrition", colors: conn.sectionColors)
   }
 
   var body: some View {
@@ -49,8 +56,26 @@ struct NutritionDetailView: View {
           recentTitle: "Recent meals")
       }
     }
-    .navigationTitle(conn.fasting == nil ? "Macros" : "Fasting")
+    .navigationTitle(conn.fasting == nil ? "Nutrition" : "Fasting")
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      // Contextual quick-log: re-log one of the user's most-eaten meals straight
+      // from the nutrition page, tinted to the section accent. Gated on the
+      // phone having published meals (same condition as the Capture sheet's row).
+      if !conn.topMeals.isEmpty {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button { loggingMeal = true } label: {
+            Image(systemName: "plus")
+          }
+          .tint(accent)
+        }
+      }
+    }
+    .sheet(isPresented: $loggingMeal) {
+      NavigationStack {
+        MealPickerView(meals: conn.topMeals, conn: conn) { loggingMeal = false }
+      }
+    }
     // Direct deep-link launches mount this page under the Next root; the root's
     // `.task` fetches, but pull once more here if we arrived before any data.
     .task { if conn.nutritionRings.isEmpty && conn.fasting == nil { conn.fetchNext() } }
@@ -236,7 +261,11 @@ private struct RingSummaryPage: View {
     ScrollView {
       VStack(spacing: 14) {
 
-        RingsView(rings: drawnRings, color: color, lineWidth: 7, spacing: 3)
+        // Show only rings with real data — an unlogged metric (e.g. 0/12 sets)
+        // would otherwise draw a full dim "shadow" track; the legend below still
+        // lists every target, so nothing is lost by dropping the empty ring.
+        RingsView(rings: drawnRings, color: color, lineWidth: 7, spacing: 3,
+                  hidesEmptyRings: true)
           .frame(width: 108, height: 108)
           .padding(.top, 4)
 
@@ -290,6 +319,10 @@ private struct RecentLogRow: View {
       Text(row.title)
         .font(.caption)
         .lineLimit(1)
+        // Claim the title's full width first so a long "when" stamp
+        // ("Yesterday 10:50") shrinks/truncates before the title does — the
+        // name is what the row is for; the timestamp is secondary.
+        .layoutPriority(1)
       Spacer(minLength: 4)
       VStack(alignment: .trailing, spacing: 1) {
         if let detail = row.detail, !detail.isEmpty {

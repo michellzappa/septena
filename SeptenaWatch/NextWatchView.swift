@@ -175,18 +175,62 @@ struct NextWatchView: View {
         .listRowInsets(EdgeInsets(top: 10, leading: 6, bottom: 2, trailing: 6))
         .listRowBackground(Color.clear)
       if hasNutrition {
-        summaryLink(.nutrition, title: "Macros", systemImage: "fork.knife",
+        summaryLink(.nutrition, title: "Nutrition", systemImage: "fork.knife",
                     color: WatchSectionTint.color(forSectionKey: "nutrition", colors: conn.sectionColors))
       }
       if hasTraining {
         summaryLink(.training, title: "Training", systemImage: "figure.strengthtraining.traditional",
                     color: WatchSectionTint.color(forSectionKey: "training", colors: conn.sectionColors))
       }
+      // Each intake tracker as its own top-level tile (Caffeine, Cannabis, …),
+      // sitting beside Nutrition / Training — the trackers + today's tally are
+      // visible here directly, no "Intakes" sub-page to drill into.
       if hasIntake {
-        summaryLink(.intake, title: "Intakes", systemImage: "takeoutbag.and.cup.and.straw",
-                    color: WatchSectionTint.color(forSectionKey: "intake", colors: conn.sectionColors))
+        ForEach(intakeSummaryRows) { row in
+          intakeTile(row)
+        }
       }
     }
+  }
+
+  /// One row per enabled intake tracker, each carrying today's tally (×0 before
+  /// anything's logged) — so the Summaries footer shows every tracker, not just
+  /// the ones with an event today. Mirrors `IntakeDetailView.rows`: backfill the
+  /// kinds list with their today count, falling back to the today-only tally if
+  /// the kind list hasn't synced (older snapshot).
+  private var intakeSummaryRows: [IntakeTodayWire] {
+    guard !conn.intakeKinds.isEmpty else { return conn.intakeToday }
+    let logged = Dictionary(conn.intakeToday.map { ($0.id, $0) },
+                            uniquingKeysWith: { a, _ in a })
+    return conn.intakeKinds.map { k in
+      logged[k.id] ?? IntakeTodayWire(id: k.id, name: k.name, symbol: k.symbol,
+                                      color: k.color, count: 0, detail: nil)
+    }
+  }
+
+  /// A single intake-tracker tile: tinted glyph + name on the left, today's tally
+  /// (the wire's noun line, else "×N") on the right. A terminal info tile — unlike
+  /// the Nutrition / Training rows it doesn't drill in (intake is a tally, not a
+  /// ring set), but it matches their glyph alignment and row padding.
+  private func intakeTile(_ row: IntakeTodayWire) -> some View {
+    let tint = WatchSectionTint.color(forSectionKey: row.id,
+                                      colors: row.color.map { [row.id: $0] } ?? [:])
+    return HStack(spacing: 9) {
+      Image(systemName: row.symbol ?? "circle.fill")
+        .font(.body)
+        .foregroundStyle(tint)
+        .frame(width: 18)
+      Text(row.name).font(.body)
+      Spacer(minLength: 4)
+      Text(row.detail ?? "×\(row.count)")
+        .font(.caption)
+        .fontWeight(.semibold)
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+    .padding(.vertical, 4)
+    .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
   }
 
   private func summaryLink(_ page: WatchPage, title: String,
@@ -599,7 +643,9 @@ private struct IntakeCaptureInput: View {
 /// the watch carries no nutrition model — tapping writes a full `NutritionEntry`
 /// for the chosen meal and dismisses. Ranking (frequency then recency) and the
 /// 25-meal cap are applied phone-side, so the list is render-ready.
-private struct MealPickerView: View {
+/// Internal (not file-private) so the Nutrition summary page can present the
+/// same picker from its own toolbar **+**.
+struct MealPickerView: View {
   let meals: [MealWire]
   let conn: WatchConnectivity
   let onDone: () -> Void

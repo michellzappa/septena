@@ -30,13 +30,32 @@ struct RingsView: View {
   var color: (String) -> Color
   var lineWidth: CGFloat
   var spacing: CGFloat
+  /// When true, a ring with no progress (nothing logged toward it yet) is dropped
+  /// entirely — no dim "remaining" track — and the rings that *do* have data pack
+  /// outward to fill the dial. The in-app summary pages use this so the stack
+  /// shows only real data (the legend below still lists every target); the
+  /// complications leave it off, where an empty ring reads as a target to fill.
+  var hidesEmptyRings: Bool = false
+
+  // On a tinted watch face the rings render `.widgetAccentable(false)` → WidgetKit
+  // *vibrant* mode, which maps content to a luminance × alpha mask on the face's
+  // single-color ramp. A saturated-hue track (`c.opacity(0.22)`) collapses to ≈
+  // background there (the hue's own luminance is too low), so we use a dim *neutral*
+  // gray instead — low enough to recede as a faint "remaining" ring (the Apple
+  // Activity empty-track look, so the filled arc pops), high enough to survive the
+  // mask. In `.fullColor` the track is the section hue at low alpha.
+  @Environment(\.widgetRenderingMode) private var renderingMode
 
   var body: some View {
     GeometryReader { geo in
       let side = min(geo.size.width, geo.size.height)
       let outerRadius = (side - lineWidth) / 2
+      // Drop no-data rings up front so the survivors pack outward from the rim
+      // (no black gap where an empty ring used to sit), rather than just blanking
+      // a fixed slot. Off by default → complications keep every ring as a target.
+      let shown = hidesEmptyRings ? rings.filter { progress($0) > 0 } : rings
       ZStack {
-        ForEach(Array(rings.enumerated()), id: \.element.key) { idx, ring in
+        ForEach(Array(shown.enumerated()), id: \.element.key) { idx, ring in
           let radius = outerRadius - CGFloat(idx) * (lineWidth + spacing)
           if radius >= lineWidth * 0.75 {
             let p = progress(ring)
@@ -80,7 +99,18 @@ struct RingsView: View {
       o.tipColor = c
       o.tipShadowColor = .clear
     }
-    o.backgroundColor = c.opacity(0.22)   // faint track
+    // The unfilled track is a dim "remaining" ring (Apple-Activity style), not a
+    // bright loop — the empty part should read as low-alpha so the fill stands
+    // out. Full color: a faint tint of the section hue. Vibrant / accented (tinted
+    // faces): the hue desaturates away, so luminance is the only lever — a dim
+    // neutral gray, kept just bright enough to survive the vibrant mask.
+    o.backgroundColor = renderingMode == .fullColor
+      ? c.opacity(0.22)
+      : Color(white: 0.18)
+    // A small black wedge ahead of the head marks the divider so completion stays
+    // legible even when the track and fill desaturate to the same tint. An angular
+    // (not pixel) gap, so it reads consistently across the concentric rings.
+    o.trackGap = 0.04
     o.outlineColor = .clear
     return o
   }
