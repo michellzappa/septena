@@ -4,44 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1081,
+      "build": 1086,
       "date": "2026-06-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "What's New, right inside the app",
-          "detail": "See a curated list of recent changes whenever Septena updates.",
-          "section": null
-        },
-        {
-          "title": "Editing a task now shows its notes automatically",
-          "detail": "Existing notes reveal themselves as soon as you start editing, so nothing stays hidden.",
-          "section": "tasks"
-        },
-        {
-          "title": "Tasks stay put when you complete or reopen them",
-          "detail": "Checking off, reopening, or peeking at a task no longer shuffles its place in your list.",
+          "title": "Your tasks keep their place when you check them off",
+          "detail": "Completing and reopening a task no longer shuffles where it sits in your list, and editing a task now reveals its existing notes automatically.",
           "section": "tasks"
         },
         {
           "title": "Smoother task selection on Mac",
-          "detail": "Tapping a task in the list selects it more reliably.",
+          "detail": "Tapping a task in the Mac list selects it more reliably.",
           "section": "tasks"
         },
         {
-          "title": "All your intake trackers on the watch",
-          "detail": "The watch summary and a new Intakes page show every intake tracker you log, with day cutoffs synced to your wrist.",
+          "title": "See all your intake trackers on Apple Watch",
+          "detail": "The watch summary now shows every intake tracker you've enabled, with bucket cutoffs synced to the wrist.",
           "section": "intake"
         },
         {
           "title": "Cleaner fasting complication",
-          "detail": "The circular fasting complication now rounds to whole hours for an easier glance.",
+          "detail": "The circular fasting complication now rounds elapsed time to whole hours for an easier glance.",
           "section": "nutrition"
         },
         {
-          "title": "The watch stays fresh across midnight and mid-fast",
-          "detail": "Snapshots and the dashboard update correctly as the day rolls over and during an active fast.",
+          "title": "Watch stays in sync across midnight and during a fast",
+          "detail": "Your watch snapshot and dashboard now refresh correctly as the day rolls over and while a fast is underway.",
+          "section": null
+        },
+        {
+          "title": "What's New, right in the app",
+          "detail": "A new changelog surface lets you catch up on what changed with each update.",
+          "section": null
+        },
+        {
+          "title": "The story behind Septena",
+          "detail": "A new maker identity and About entry share who builds Septena, alongside a seven-disc flourish.",
+          "section": null
+        },
+        {
+          "title": "Sign in with Apple for community on Mac",
+          "detail": "macOS now supports Sign in with Apple so community and support features work natively.",
           "section": null
         }
       ]
