@@ -373,7 +373,7 @@ final class NextSuggestionsModel {
       // Container-aware choices, computed once for whichever nudge fires.
       let methods = kind.methods.map {
         ConsumableContainer.Method(token: $0.token, label: $0.label,
-                                   symbol: $0.symbol, usesContainer: $0.usesContainer)
+                                   emoji: $0.emoji, usesContainer: $0.usesContainer)
       }
       let lastCount: Int? = {
         guard let token = kind.methods.first(where: { $0.usesContainer })?.token else { return nil }
@@ -654,7 +654,11 @@ private struct NextSuggestionRow: View {
             Button {
               commitIntake(choice.value)
             } label: {
-              Label(choice.label, systemImage: choice.symbol ?? "plus")
+              if let e = choice.emoji, !e.isEmpty {
+                Label { Text(choice.label) } icon: { Text(e) }
+              } else {
+                Label(choice.label, systemImage: choice.symbol ?? "plus")
+              }
             }
           }
         } label: { rowLabel }

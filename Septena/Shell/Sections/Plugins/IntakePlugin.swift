@@ -89,13 +89,14 @@ enum IntakePlugin: SectionPlugin {
           .opt("flourish", "string", "motion token"),
           .req("metricMode", "string", "countEvents | sumAmount"),
           .req("objective", "string", "log | limit | reduce | quit"),
-          .opt("methods", "array", "method rows: { token, label, symbol?, defaultAmount?, usesContainer }"),
+          .opt("methods", "array", "method rows: { token, label, emoji?, defaultAmount?, usesContainer }"),
           .opt("templateID", "string"),
           .opt("archivedAt", "timestamp"),
         ]),
         SchemaTable(name: "intakeItem", purpose: "a variety in a tracker's catalog", fields: [
           .req("id", "string"), .req("kindID", "string", "→ intakeKind.id"),
-          .req("name", "string"), .opt("sortIndex", "int"),
+          .req("name", "string"), .opt("emoji", "string", "user glyph"),
+          .opt("sortIndex", "int"),
           .opt("archivedAt", "timestamp"),
         ]),
         SchemaTable(name: "intakeEvent", purpose: "a single logged consumption event", fields: [
@@ -145,7 +146,7 @@ enum IntakePlugin: SectionPlugin {
         SectionSkill.Tool("intake_kind_update", "Edit config, archive/unarchive, or change the objective goal",
               inputs: "required: kind · optional: any config field, archived, target, weekly"),
         SectionSkill.Tool("intake_items_list", "A tracker's variety catalog", inputs: "required: kind"),
-        SectionSkill.Tool("intake_item_create", "Add a variety", inputs: "required: kind, name"),
+        SectionSkill.Tool("intake_item_create", "Add a variety", inputs: "required: kind, name · optional: emoji"),
         SectionSkill.Tool("intake_item_delete", "Remove a variety", inputs: "required: id"),
       ],
       body: """
@@ -309,14 +310,14 @@ enum IntakePlugin: SectionPlugin {
 
 @MainActor func intakeMethodExportDict(_ m: IntakeMethodRow) -> [String: Any] {
   compact([
-    "token": m.token, "label": m.label, "symbol": m.symbol,
+    "token": m.token, "label": m.label, "emoji": m.emoji,
     "defaultAmount": m.defaultAmount, "usesContainer": m.usesContainer,
   ])
 }
 
 @MainActor func intakeItemExportDict(_ i: IntakeItemEntity) -> [String: Any] {
   compact([
-    "id": i.id, "kindID": i.kindID, "name": i.name,
+    "id": i.id, "kindID": i.kindID, "name": i.name, "emoji": i.emoji,
     "sortIndex": i.sortIndex,
     "archivedAt": i.archivedAt.map(isoDate),
     "updatedAt": isoDate(i.updatedAt),

@@ -378,6 +378,7 @@ One row per message; a coach's transcript = all rows with that `coachKey`. **NEW
 |---|---|---|---|---|
 | `kindID` | String | `String` | No | → `IntakeKind` |
 | `name` | String | `String` | No | |
+| `emoji` | String | `String?` | Yes | optional Tier-3 user glyph on the variety (mirrors `Area.emoji`) |
 | `sortIndex` | Int(64) | `Int` | No | |
 | `archivedAt` | Timestamp | `Date?` | Yes | hide-don't-delete |
 

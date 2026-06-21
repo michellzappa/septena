@@ -2287,7 +2287,7 @@ struct WeekDashboardView: View {
   private func intakeQuickAddMenu(for t: IntakeTileDTO) -> some View {
     let methods = t.methods.map {
       ConsumableContainer.Method(token: $0.token, label: $0.label,
-                                 symbol: $0.symbol, usesContainer: $0.usesContainer)
+                                 emoji: $0.emoji, usesContainer: $0.usesContainer)
     }
     let choices = ConsumableContainer.choices(
       lastCount: t.lastContainerCount,
@@ -2299,7 +2299,11 @@ struct WeekDashboardView: View {
       Button {
         commitIntake(t, value: choice.value)
       } label: {
-        Label("Log \(choice.label)", systemImage: choice.symbol ?? "plus.circle")
+        if let e = choice.emoji, !e.isEmpty {
+          Label { Text("Log \(choice.label)") } icon: { Text(e) }
+        } else {
+          Label("Log \(choice.label)", systemImage: choice.symbol ?? "plus.circle")
+        }
       }
     }
     Divider()

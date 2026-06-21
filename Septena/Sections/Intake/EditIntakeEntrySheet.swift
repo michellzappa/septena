@@ -66,7 +66,10 @@ struct EditIntakeEntrySheet: View {
             Section(kind.catalogNoun ?? "Variety") {
               Picker(kind.catalogNoun ?? "Variety", selection: $itemID) {
                 Text("None").tag(String?.none)
-                ForEach(items) { Text($0.name).tag(String?.some($0.id)) }
+                ForEach(items) { item in
+                  Text(item.emoji.map { "\($0)  \(item.name)" } ?? item.name)
+                    .tag(String?.some(item.id))
+                }
               }
             }
           }

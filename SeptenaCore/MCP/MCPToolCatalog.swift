@@ -329,7 +329,8 @@ enum MCPToolCatalog {
                 "target": ["type": "number", "description": "Goal target for limit/reduce/quit."],
                 "weekly": ["type": "boolean", "description": "Window the limit/reduce goal per week instead of per day."],
                 "methods": ["type": "array", "description": "Method rows.", "items": ["type": "object", "properties": [
-                  "token": ["type": "string"], "label": ["type": "string"], "symbol": ["type": "string"],
+                  "token": ["type": "string"], "label": ["type": "string"],
+                  "emoji": ["type": "string", "description": "Optional user glyph for this method."],
                   "defaultAmount": ["type": "number"], "usesContainer": ["type": "boolean"],
                 ]]],
               ]]),
@@ -345,7 +346,8 @@ enum MCPToolCatalog {
                 "target": ["type": "number"], "weekly": ["type": "boolean"],
                 "archived": ["type": "boolean"],
                 "methods": ["type": "array", "items": ["type": "object", "properties": [
-                  "token": ["type": "string"], "label": ["type": "string"], "symbol": ["type": "string"],
+                  "token": ["type": "string"], "label": ["type": "string"],
+                  "emoji": ["type": "string", "description": "Optional user glyph for this method."],
                   "defaultAmount": ["type": "number"], "usesContainer": ["type": "boolean"],
                 ]]],
               ]]),
@@ -358,6 +360,7 @@ enum MCPToolCatalog {
               description: "Add a variety to a tracker's catalog.",
               inputSchema: ["type": "object", "required": ["kind", "name"], "properties": [
                 "kind": ["type": "string"], "name": ["type": "string"],
+                "emoji": ["type": "string", "description": "Optional user glyph for this variety."],
               ]]),
       MCPTool(name: "intake_item_delete",
               description: "Remove a catalog variety (events keep displaying its name).",

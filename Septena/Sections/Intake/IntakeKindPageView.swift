@@ -137,7 +137,7 @@ struct IntakeKindPageView: View {
     guard let kind else { return [] }
     let methods = kind.methods.map {
       ConsumableContainer.Method(token: $0.token, label: $0.label,
-                                 symbol: $0.symbol, usesContainer: $0.usesContainer)
+                                 emoji: $0.emoji, usesContainer: $0.usesContainer)
     }
     let choices = ConsumableContainer.choices(
       lastCount: lastContainerCount,
@@ -146,7 +146,8 @@ struct IntakeKindPageView: View {
       countNoun: kind.countNoun ?? "use",
       methods: methods)
     var actions = choices.map {
-      LogAction(id: "log:\($0.value)", title: $0.label, systemImage: $0.symbol ?? "plus")
+      LogAction(id: "log:\($0.value)", title: $0.label,
+                systemImage: $0.symbol ?? "plus", emoji: $0.emoji)
     }
     // Full-input escape — every section's quick-add ends with a way to the full
     // editor. Sits below the one-tap logs, above Manage.
@@ -355,7 +356,15 @@ private struct IntakeQuickLogSheet: View {
         Section {
           ForEach(logChoices) { choice in
             Button { onPick(choice.id) } label: {
-              Label(choice.title, systemImage: choice.systemImage ?? "plus")
+              Label {
+                Text(choice.title)
+              } icon: {
+                if let e = choice.emoji, !e.isEmpty {
+                  Text(e)
+                } else {
+                  Image(systemName: choice.systemImage ?? "plus")
+                }
+              }
             }
           }
         }

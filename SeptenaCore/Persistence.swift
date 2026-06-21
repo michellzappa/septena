@@ -1069,7 +1069,7 @@ final class MedicationDoseEventEntity {
 final class IntakeKindEntity {
   @Attribute(.unique) var id: String   // opaque "ik-<uuid>", never the name
   var name: String
-  var symbol: String
+  var symbol: String                   // SF Symbol — the kind/type always carries one
   var color: String                    // hex/hsl token (per-kind, not SectionTheme)
   var sortIndex: Int
   var unit: String?                    // "g" | "mg" | "ml" | nil
@@ -1137,6 +1137,9 @@ final class IntakeItemEntity {
   @Attribute(.unique) var id: String
   var kindID: String
   var name: String
+  /// Optional Tier-3 user glyph (DesignSpec §2) — a bean/strain/variety can
+  /// carry its own emoji. Nil ⇒ no glyph (text only). Mirrors `Area.emoji`.
+  var emoji: String?
   var sortIndex: Int
   var archivedAt: Date?
   var updatedAt: Date
@@ -1145,6 +1148,7 @@ final class IntakeItemEntity {
   init(id: String,
        kindID: String,
        name: String,
+       emoji: String? = nil,
        sortIndex: Int = 0,
        archivedAt: Date? = nil,
        updatedAt: Date = .now,
@@ -1152,6 +1156,7 @@ final class IntakeItemEntity {
     self.id = id
     self.kindID = kindID
     self.name = name
+    self.emoji = emoji
     self.sortIndex = sortIndex
     self.archivedAt = archivedAt
     self.updatedAt = updatedAt
@@ -2072,6 +2077,7 @@ enum IntakeItemCloudKitSchema {
   enum Field {
     static let kindID = "kindID"
     static let name = "name"
+    static let emoji = "emoji"
     static let sortIndex = "sortIndex"
     static let archivedAt = "archivedAt"
   }
@@ -2938,6 +2944,7 @@ extension IntakeItemEntity: ChecklistCloudKitBackedEntity {
     )
     record[IntakeItemCloudKitSchema.Field.kindID] = kindID
     record[IntakeItemCloudKitSchema.Field.name] = name
+    record[IntakeItemCloudKitSchema.Field.emoji] = emoji
     record[IntakeItemCloudKitSchema.Field.sortIndex] = sortIndex
     record[IntakeItemCloudKitSchema.Field.archivedAt] = archivedAt as NSDate?
     return record
@@ -2946,6 +2953,7 @@ extension IntakeItemEntity: ChecklistCloudKitBackedEntity {
   func apply(_ record: CKRecord) {
     if let v = record[IntakeItemCloudKitSchema.Field.kindID] as? String { kindID = v }
     if let v = record[IntakeItemCloudKitSchema.Field.name] as? String { name = v }
+    emoji = optionalChecklistString(record[IntakeItemCloudKitSchema.Field.emoji])
     if let v = record[IntakeItemCloudKitSchema.Field.sortIndex] as? Int { sortIndex = v }
     archivedAt = record[IntakeItemCloudKitSchema.Field.archivedAt] as? Date
     updatedAt = .now

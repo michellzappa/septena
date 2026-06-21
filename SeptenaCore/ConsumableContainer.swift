@@ -21,10 +21,10 @@ public enum ConsumableContainer {
   public struct Method: Sendable, Hashable {
     public let token: String     // persisted value (e.g. "vape", "edible")
     public let label: String     // display (e.g. "Edible")
-    public let symbol: String?   // optional SF Symbol for non-container choices
+    public let emoji: String?    // optional Tier-3 user glyph for non-container choices
     public let usesContainer: Bool
-    public init(token: String, label: String, symbol: String? = nil, usesContainer: Bool) {
-      self.token = token; self.label = label; self.symbol = symbol
+    public init(token: String, label: String, emoji: String? = nil, usesContainer: Bool) {
+      self.token = token; self.label = label; self.emoji = emoji
       self.usesContainer = usesContainer
     }
   }
@@ -71,7 +71,7 @@ public enum ConsumableContainer {
     // plain choice. (When there's no cap, `usesContainer` is ignored and all
     // methods list flat — the caffeine shape.)
     for m in methods where !(m.usesContainer && containerCap != nil) {
-      out.append(.init(value: m.token, label: m.label, symbol: m.symbol))
+      out.append(.init(value: m.token, label: m.label, emoji: m.emoji))
     }
     return out
   }

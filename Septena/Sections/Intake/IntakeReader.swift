@@ -46,6 +46,7 @@ struct IntakeEntryDTO: Identifiable, Sendable, Hashable {
 struct IntakeItemDTO: Identifiable, Sendable, Hashable {
   let id: String
   let name: String
+  let emoji: String?
 }
 
 /// One homepage tile's worth of a kind — name, accent, and today's totals.
@@ -131,7 +132,7 @@ enum IntakeReader {
       predicate: #Predicate { $0.kindID == kindID && $0.archivedAt == nil },
       sortBy: [SortDescriptor(\.sortIndex)]
     ))) ?? []
-    return rows.map { IntakeItemDTO(id: $0.id, name: $0.name) }
+    return rows.map { IntakeItemDTO(id: $0.id, name: $0.name, emoji: $0.emoji) }
   }
 
   /// The most recent count today for the container method — feeds

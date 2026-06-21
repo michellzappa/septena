@@ -773,7 +773,7 @@ enum MCPDispatch {
       let token = (m["token"] as? String).flatMap { $0.isEmpty ? nil : $0.lowercased() }
         ?? IntakeTemplates.slug(label)
       return IntakeMethodRow(token: token, label: label,
-                             symbol: m["symbol"] as? String,
+                             emoji: m["emoji"] as? String,
                              defaultAmount: (m["defaultAmount"] as? NSNumber)?.doubleValue,
                              usesContainer: (m["usesContainer"] as? Bool) ?? false)
     }
@@ -801,6 +801,7 @@ enum MCPDispatch {
               "containerCap": k.containerCap ?? 0, "catalogNoun": k.catalogNoun ?? "",
               "objective": k.objective, "archived": k.archivedAt != nil,
               "methods": k.methods.map { ["token": $0.token, "label": $0.label,
+                                          "emoji": $0.emoji ?? "",
                                           "usesContainer": $0.usesContainer,
                                           "defaultAmount": $0.defaultAmount ?? 0] },
               "itemCount": items.filter { $0.kindID == k.id }.count,
@@ -863,14 +864,14 @@ enum MCPDispatch {
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? [])
       .filter { $0.kindID == kind.id && $0.archivedAt == nil }
     return ["kind": kind.name, "items": rows.map { (i: IntakeItemEntity) -> [String: Any] in
-      ["id": i.id, "name": i.name]
+      ["id": i.id, "name": i.name, "emoji": i.emoji ?? ""]
     }]
   }
 
   private static func intakeItemCreate(_ args: MCPArgs) throws -> Any {
     let kind = try resolveIntakeKind(args)
     let item = SeptenaServices.shared.intakeMutator.addItem(
-      kindID: kind.id, name: try args.requireString("name"))
+      kindID: kind.id, name: try args.requireString("name"), emoji: args.string("emoji"))
     return ["id": item.id, "name": item.name]
   }
 

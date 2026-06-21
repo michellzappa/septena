@@ -59,8 +59,17 @@ struct IntakeManageSheet: View {
 
   private var identitySection: some View {
     Section("Identity") {
-      TextField("Name", text: $name)
-        .onSubmit { mutator.updateKind(id: kindID, name: name) }
+      HStack(spacing: 10) {
+        TextField("Name", text: $name)
+          .onSubmit { mutator.updateKind(id: kindID, name: name) }
+        // The app-standard swatch button — same compact picker the section
+        // identity editor uses — rather than a full inline grid of colors.
+        PaletteSwatchButton(selectedHex: color) { hex in
+          color = hex
+          mutator.updateKind(id: kindID, color: hex)
+        }
+      }
+      // The kind/type always carries an SF Symbol (DesignSpec Tier-1/2).
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 14) {
           ForEach(IntakeKindWizard.symbols, id: \.self) { s in
@@ -77,12 +86,6 @@ struct IntakeManageSheet: View {
           }
         }
         .padding(.vertical, 2)
-      }
-      // The app-standard accent palette (same grid the section identity
-      // editor uses), not a bespoke subset.
-      PaletteSwatchGrid(selectedHex: color) { hex in
-        color = hex
-        mutator.updateKind(id: kindID, color: hex)
       }
     }
   }
@@ -139,6 +142,14 @@ struct IntakeManageSheet: View {
     Section {
       ForEach(kind?.methods ?? [], id: \.token) { m in
         HStack {
+          // A method can carry its own Tier-3 emoji (shown in the quick-add).
+          EmojiSlotPicker(emoji: Binding(get: { m.emoji ?? "" }, set: { _ in })) { picked in
+            guard var methods = kind?.methods,
+                  let idx = methods.firstIndex(where: { $0.token == m.token }) else { return }
+            methods[idx].emoji = picked.isEmpty ? nil : picked
+            mutator.updateKind(id: kindID, methods: methods)
+            Task { await reload() }
+          }
           Text(m.label)
           Spacer()
           if containerOn {
@@ -176,7 +187,17 @@ struct IntakeManageSheet: View {
 
   private func varietiesSection(_ kind: IntakeKindDTO) -> some View {
     Section(kind.catalogNoun ?? "Varieties") {
-      ForEach(items) { item in Text(item.name) }
+      ForEach(items) { item in
+        HStack(spacing: 10) {
+          // A variety (bean/strain) can carry its own Tier-3 emoji. Picking one
+          // commits live; reload refreshes the displayed glyph.
+          EmojiSlotPicker(emoji: Binding(get: { item.emoji ?? "" }, set: { _ in })) { picked in
+            mutator.updateItem(id: item.id, emoji: .some(picked.isEmpty ? nil : picked))
+            Task { await reload() }
+          }
+          Text(item.name)
+        }
+      }
         .onDelete { offsets in
           for i in offsets { mutator.deleteItem(id: items[i].id) }
           Task { await reload() }

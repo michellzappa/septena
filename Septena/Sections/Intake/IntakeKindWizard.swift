@@ -36,6 +36,8 @@ struct IntakeKindWizard: View {
   private var mutator: IntakeMutator { SeptenaServices.shared.intakeMutator }
   private var canCreate: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
+  // The kind/type always carries an SF Symbol (DesignSpec Tier-1/2). Emoji is
+  // for the long-tail instances (methods, varieties), not the type itself.
   static let symbols = ["cup.and.saucer", "leaf", "mug", "wineglass", "pills",
                         "drop", "flame", "carrot", "bolt", "heart", "pencil", "circle"]
 
@@ -69,9 +71,13 @@ struct IntakeKindWizard: View {
 
   private var identitySection: some View {
     Section("Identity") {
-      TextField("Name (e.g. Caffeine, Tea)", text: $name)
+      HStack(spacing: 10) {
+        TextField("Name (e.g. Caffeine, Tea)", text: $name)
+        // Shared compact swatch button — same picker the section detail and
+        // the Manage sheet use — not a full inline grid of colors.
+        PaletteSwatchButton(selectedHex: color) { color = $0 }
+      }
       symbolPicker
-      colorPicker
     }
   }
 
@@ -90,12 +96,6 @@ struct IntakeKindWizard: View {
       }
       .padding(.vertical, 2)
     }
-  }
-
-  // Shared 22-color grid — same picker the section detail and the Manage sheet
-  // use, so creating a tracker offers the full palette, not a reduced subset.
-  private var colorPicker: some View {
-    PaletteSwatchGrid(selectedHex: color) { color = $0 }
   }
 
   private var objectiveSection: some View {
@@ -151,20 +151,22 @@ struct IntakeKindWizard: View {
 
   private var methodsSection: some View {
     Section("Methods") {
-      ForEach(methods, id: \.token) { m in
+      ForEach(methods.indices, id: \.self) { idx in
         HStack {
-          Text(m.label)
+          // A method can carry its own Tier-3 emoji (shown in the quick-add).
+          EmojiSlotPicker(emoji: Binding(
+            get: { methods[idx].emoji ?? "" },
+            set: { methods[idx].emoji = $0.isEmpty ? nil : $0 }))
+          Text(methods[idx].label)
           Spacer()
           if usesContainers {
             // Explicit per-method container flag (tap to mark the method that
             // consumes the container) — no add-order inference.
             Button {
-              if let idx = methods.firstIndex(where: { $0.token == m.token }) {
-                methods[idx].usesContainer.toggle()
-              }
+              methods[idx].usesContainer.toggle()
             } label: {
-              Image(systemName: m.usesContainer ? "shippingbox.fill" : "shippingbox")
-                .foregroundStyle(m.usesContainer ? (AdaptiveColor.adaptive(color) ?? .accentColor) : .secondary)
+              Image(systemName: methods[idx].usesContainer ? "shippingbox.fill" : "shippingbox")
+                .foregroundStyle(methods[idx].usesContainer ? (AdaptiveColor.adaptive(color) ?? .accentColor) : .secondary)
             }
             .buttonStyle(.plain)
           }

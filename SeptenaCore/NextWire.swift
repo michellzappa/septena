@@ -294,7 +294,7 @@ struct IntakeKindWire: Codable, Hashable {
   struct Method: Codable, Hashable {
     var token: String
     var label: String
-    var symbol: String? = nil
+    var emoji: String? = nil
     var defaultAmount: Double? = nil
     var usesContainer: Bool = false
   }

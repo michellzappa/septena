@@ -168,7 +168,7 @@ enum WatchSnapshotPublisher {
           containerCap: k.containerCap, lastContainerCount: last,
           showsAmount: k.doseStyle == "amount" || k.doseStyle == "both",
           methods: k.methods.map {
-            .init(token: $0.token, label: $0.label, symbol: $0.symbol,
+            .init(token: $0.token, label: $0.label, emoji: $0.emoji,
                   defaultAmount: $0.defaultAmount, usesContainer: $0.usesContainer)
           })
       }

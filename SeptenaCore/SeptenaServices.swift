@@ -2738,19 +2738,21 @@ final class IntakeMutator {
   // MARK: - Items (catalog)
 
   @discardableResult
-  func addItem(kindID: String, name: String) -> IntakeItemEntity {
+  func addItem(kindID: String, name: String, emoji: String? = nil) -> IntakeItemEntity {
     let entity = IntakeItemEntity(id: uniqueItemID(),
                                   kindID: kindID,
                                   name: name,
+                                  emoji: emoji,
                                   sortIndex: nextItemSortIndex(kindID: kindID))
     context.insert(entity)
     commitItem(entity, op: "create")
     return entity
   }
 
-  func updateItem(id: String, name: String) {
+  func updateItem(id: String, name: String? = nil, emoji: String?? = nil) {
     guard let entity = fetchItem(id: id) else { return }
-    entity.name = name
+    if let name { entity.name = name }
+    if let emoji { entity.emoji = emoji }
     entity.updatedAt = .now
     commitItem(entity, op: "update")
   }

@@ -12,13 +12,27 @@ import Foundation
 public struct IntakeMethodRow: Codable, Sendable, Hashable {
   public var token: String           // stable lowercase value stored on events
   public var label: String           // display
-  public var symbol: String?         // SF Symbol
+  public var emoji: String?          // optional Tier-3 user glyph (DesignSpec §2)
   public var defaultAmount: Double?   // prefilled dose, if any
   public var usesContainer: Bool      // routes through the container quick-add
-  public init(token: String, label: String, symbol: String? = nil,
+  public init(token: String, label: String, emoji: String? = nil,
               defaultAmount: Double? = nil, usesContainer: Bool = false) {
-    self.token = token; self.label = label; self.symbol = symbol
+    self.token = token; self.label = label; self.emoji = emoji
     self.defaultAmount = defaultAmount; self.usesContainer = usesContainer
+  }
+
+  // Tolerate the legacy `symbol` key on decode so old methodsJSON (SF-symbol
+  // era) still loads — its value is dropped (methods are emoji-only now).
+  private enum CodingKeys: String, CodingKey {
+    case token, label, emoji, defaultAmount, usesContainer
+  }
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    token = try c.decode(String.self, forKey: .token)
+    label = try c.decode(String.self, forKey: .label)
+    emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
+    defaultAmount = try c.decodeIfPresent(Double.self, forKey: .defaultAmount)
+    usesContainer = try c.decodeIfPresent(Bool.self, forKey: .usesContainer) ?? false
   }
 }
 
@@ -211,9 +225,9 @@ public enum IntakeTemplates {
       containerCap: nil, catalogNoun: "Beans", flourish: "bloom",
       metricMode: "countEvents", objective: "limit",
       methods: [
-        .init(token: "v60",    label: "V60",    symbol: "cup.and.saucer"),
-        .init(token: "matcha", label: "Matcha", symbol: "leaf"),
-        .init(token: "other",  label: "Other",  symbol: "mug"),
+        .init(token: "v60",    label: "V60",    emoji: "☕"),
+        .init(token: "matcha", label: "Matcha", emoji: "🍵"),
+        .init(token: "other",  label: "Other"),
       ],
       templateID: "caffeine")
   }

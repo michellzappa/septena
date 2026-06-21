@@ -150,11 +150,15 @@ struct LogAction: Identifiable, Hashable {
   let id: String
   let title: String
   let systemImage: String?
+  /// Optional Tier-3 user glyph (e.g. an intake method's emoji). When set, the
+  /// row renders it in place of `systemImage`.
+  let emoji: String?
 
-  init(id: String, title: String, systemImage: String? = nil) {
+  init(id: String, title: String, systemImage: String? = nil, emoji: String? = nil) {
     self.id = id
     self.title = title
     self.systemImage = systemImage
+    self.emoji = emoji
   }
 }
 

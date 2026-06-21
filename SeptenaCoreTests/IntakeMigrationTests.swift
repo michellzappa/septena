@@ -44,11 +44,19 @@ import Foundation
 
   @Test func methodRowsJSONRoundTrip() throws {
     let rows = [
-      IntakeMethodRow(token: "vape", label: "Vape", symbol: "wind", usesContainer: true),
-      IntakeMethodRow(token: "edible", label: "Edible", symbol: "circle.fill", defaultAmount: 0.1),
+      IntakeMethodRow(token: "vape", label: "Vape", emoji: "💨", usesContainer: true),
+      IntakeMethodRow(token: "edible", label: "Edible", emoji: "🍬", defaultAmount: 0.1),
     ]
     let data = try JSONEncoder().encode(rows)
     let back = try JSONDecoder().decode([IntakeMethodRow].self, from: data)
     #expect(back == rows)
+  }
+
+  // Legacy methodsJSON from the SF-symbol era still decodes — the old `symbol`
+  // key is tolerated and dropped (methods are emoji-only now).
+  @Test func methodRowsDecodeLegacySymbolKey() throws {
+    let legacy = #"[{"token":"v60","label":"V60","symbol":"cup.and.saucer"}]"#
+    let back = try JSONDecoder().decode([IntakeMethodRow].self, from: Data(legacy.utf8))
+    #expect(back == [IntakeMethodRow(token: "v60", label: "V60")])
   }
 }

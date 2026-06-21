@@ -14,8 +14,8 @@ import Foundation
   // the migrator synthesizes for the legacy cannabis kind. Symbols/nouns live
   // in config now rather than being hardcoded in a per-substance helper.
   private static let cannabisMethods: [ConsumableContainer.Method] = [
-    .init(token: "vape",   label: "Vape",   symbol: "wind",        usesContainer: true),
-    .init(token: "edible", label: "Edible", symbol: "circle.fill", usesContainer: false),
+    .init(token: "vape",   label: "Vape",   emoji: "💨", usesContainer: true),
+    .init(token: "edible", label: "Edible", emoji: "🍬", usesContainer: false),
   ]
 
   private func cannabisChoices(lastCount: Int?, cap: Int) -> [SuggestionBlocks.Choice] {
@@ -34,7 +34,7 @@ import Foundation
   @Test func capsuleChoicesAcrossStates() {
     let newAndEdible: [SuggestionBlocks.Choice] = [
       .init(value: "vape:1", label: "New capsule", symbol: "plus.circle"),
-      .init(value: "edible", label: "Edible",      symbol: "circle.fill"),
+      .init(value: "edible", label: "Edible",      emoji: "🍬"),
     ]
     func continueRow(_ hit: Int) -> SuggestionBlocks.Choice {
       .init(value: "vape:\(hit)", label: "Continue (Hit \(hit))", symbol: "arrow.clockwise")
@@ -54,7 +54,7 @@ import Foundation
     #expect(out == [
       .init(value: "vape:2", label: "Continue (Hit 2)", symbol: "arrow.clockwise"),
       .init(value: "vape:1", label: "New capsule",      symbol: "plus.circle"),
-      .init(value: "edible", label: "Edible",           symbol: "circle.fill"),
+      .init(value: "edible", label: "Edible",           emoji: "🍬"),
     ])
   }
 
@@ -62,7 +62,7 @@ import Foundation
     let out = cannabisChoices(lastCount: 3, cap: 3) // hit 3 filled the cap
     #expect(out == [
       .init(value: "vape:1", label: "New capsule", symbol: "plus.circle"),
-      .init(value: "edible", label: "Edible",      symbol: "circle.fill"),
+      .init(value: "edible", label: "Edible",      emoji: "🍬"),
     ])
   }
 
@@ -70,7 +70,7 @@ import Foundation
     let out = cannabisChoices(lastCount: nil, cap: 3)
     #expect(out == [
       .init(value: "vape:1", label: "New capsule", symbol: "plus.circle"),
-      .init(value: "edible", label: "Edible",      symbol: "circle.fill"),
+      .init(value: "edible", label: "Edible",      emoji: "🍬"),
     ])
   }
 
@@ -107,17 +107,17 @@ import Foundation
   // `usesContainer` ignored — the same set the static SuggestionBlocks row holds.
   @Test func noContainerListsMethodsFlat() {
     let caffeine: [ConsumableContainer.Method] = [
-      .init(token: "v60",    label: "V60",    symbol: "cup.and.saucer", usesContainer: false),
-      .init(token: "matcha", label: "Matcha", symbol: "leaf",           usesContainer: false),
-      .init(token: "other",  label: "Other",  symbol: "mug",            usesContainer: false),
+      .init(token: "v60",    label: "V60",    emoji: "☕", usesContainer: false),
+      .init(token: "matcha", label: "Matcha", emoji: "🍵", usesContainer: false),
+      .init(token: "other",  label: "Other",  emoji: "🥤", usesContainer: false),
     ]
     let out = ConsumableContainer.choices(
       lastCount: nil, containerCap: nil, containerNoun: "", countNoun: "", methods: caffeine
     )
     #expect(out == [
-      .init(value: "v60",    label: "V60",    symbol: "cup.and.saucer"),
-      .init(value: "matcha", label: "Matcha", symbol: "leaf"),
-      .init(value: "other",  label: "Other",  symbol: "mug"),
+      .init(value: "v60",    label: "V60",    emoji: "☕"),
+      .init(value: "matcha", label: "Matcha", emoji: "🍵"),
+      .init(value: "other",  label: "Other",  emoji: "🥤"),
     ])
   }
 }

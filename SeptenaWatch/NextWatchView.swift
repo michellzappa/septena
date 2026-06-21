@@ -618,7 +618,7 @@ private struct IntakeCaptureInput: View {
   var body: some View {
     let methods = kind.methods.map {
       ConsumableContainer.Method(token: $0.token, label: $0.label,
-                                 symbol: $0.symbol, usesContainer: $0.usesContainer)
+                                 emoji: $0.emoji, usesContainer: $0.usesContainer)
     }
     let choices = ConsumableContainer.choices(
       lastCount: kind.lastContainerCount,
@@ -1057,7 +1057,9 @@ private struct QuickLogChoiceList: View {
     List(choices, id: \.value) { choice in
       Button { onPick(choice.value) } label: {
         HStack(spacing: 10) {
-          if let symbol = choice.symbol {
+          if let emoji = choice.emoji, !emoji.isEmpty {
+            Text(emoji).font(.body).frame(width: 22)
+          } else if let symbol = choice.symbol {
             Image(systemName: symbol)
               .font(.body)
               .frame(width: 22)

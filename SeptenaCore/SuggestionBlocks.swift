@@ -49,9 +49,10 @@ public enum SuggestionBlocks {
   public struct Choice: Sendable, Hashable {
     public let value: String    // persisted (e.g. "v60")
     public let label: String    // display (e.g. "V60")
-    public let symbol: String?  // optional SF Symbol
-    public init(value: String, label: String, symbol: String? = nil) {
-      self.value = value; self.label = label; self.symbol = symbol
+    public let symbol: String?  // optional SF Symbol (app-defined choices)
+    public let emoji: String?   // optional Tier-3 user glyph (intake methods); wins over symbol
+    public init(value: String, label: String, symbol: String? = nil, emoji: String? = nil) {
+      self.value = value; self.label = label; self.symbol = symbol; self.emoji = emoji
     }
   }
 
