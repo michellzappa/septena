@@ -621,6 +621,7 @@ struct NextSuggestionsSection: View {
               ?? theme.color(for: suggestion.kind.sectionKey)
           )
           .septenaNextRow()
+          .tag(NextRowTag.suggestion(suggestion.id))
         }
       } header: {
         Text("Suggested")

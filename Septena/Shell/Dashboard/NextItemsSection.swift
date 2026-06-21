@@ -7,6 +7,29 @@ import EventKit
 // beat, then fades out in place (there's no "done" strip to slide into).
 // Shared state lives in NextItemsModel.
 
+// MARK: - List selection tags
+//
+// The Next page is one `List` of heterogeneous rows (tasks / chores / habits /
+// supplements / suggestions / done-log). To get native `List(selection:)`
+// keyboard nav across all of them — the same arrow-key cursor + highlight the
+// Tasks tab has — every row is `.tag`'d with a kind-prefixed string id so the
+// page-level selection (`Set<String>`) can map a cursor back to its action.
+enum NextRowTag {
+  static func task(_ id: String) -> String       { "task:\(id)" }
+  static func chore(_ id: String) -> String      { "chore:\(id)" }
+  static func habit(_ id: String) -> String      { "habit:\(id)" }
+  static func supplement(_ id: String) -> String { "supp:\(id)" }
+  static func suggestion(_ id: String) -> String { "sugg:\(id)" }
+  static func done(_ id: String) -> String       { "done:\(id)" }
+
+  /// Split a tag back into its `(kind, id)` halves. The id may itself contain
+  /// ":" (CloudKit record names don't, but be safe), so split on the first.
+  static func split(_ tag: String) -> (kind: String, id: String) {
+    guard let i = tag.firstIndex(of: ":") else { return ("", tag) }
+    return (String(tag[..<i]), String(tag[tag.index(after: i)...]))
+  }
+}
+
 // MARK: - Today tasks (inline on Next)
 //
 // Mirrors NextItemsModel for the Tasks slice — Next renders today's open
@@ -570,6 +593,7 @@ struct NextOpenSection: View {
             .taskRowActions(task: task, areas: areas, projects: projects,
                             mutator: taskMutator, onOpenDetail: onOpenTask)
             .septenaNextRow()
+            .tag(NextRowTag.task(task.id))
         }
       } header: {
         sectionHeader("Tasks")
@@ -581,6 +605,7 @@ struct NextOpenSection: View {
           ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"))
             .septenaNextRow()
+            .tag(NextRowTag.chore(chore.id))
         }
       } header: {
         sectionHeader("Chores")
@@ -592,6 +617,7 @@ struct NextOpenSection: View {
           HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "habits"))
             .septenaNextRow()
+            .tag(NextRowTag.habit(habit.id))
         }
       } header: {
         bucketSectionHeader("Habits", showsCountdown: !lingerHabits)
@@ -603,6 +629,7 @@ struct NextOpenSection: View {
           SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"))
             .septenaNextRow()
+            .tag(NextRowTag.supplement(supp.id))
         }
       } header: {
         bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements)
@@ -840,6 +867,7 @@ struct NextDoneSection: View {
           onDelete: isEditable(event) ? { delete(event) } : nil
         )
         .septenaNextRow()
+        .tag(NextRowTag.done(event.id))
       }
     } header: {
       Text("Done Today")

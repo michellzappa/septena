@@ -8,11 +8,24 @@ struct NextView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
+  // Write boundaries for keyboard-driven Return / Space activation. The trio
+  // (chores / habits / supplements) flips through the ChecklistMutator; tasks
+  // toggle through the TaskMutator — the same paths the row buttons use.
+  @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(TaskMutator.self) private var taskMutator
+  @Environment(\.a11yMotion) private var motion
 
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
   @State private var suggestionsModel = NextSuggestionsModel()
   @State private var doneModel = NextDoneModel()
+
+  /// The keyboard cursor / native row highlight — bound straight to
+  /// `List(selection:)` so ↑↓ traverse every tagged row across all sections,
+  /// exactly like the Tasks tab. Return activates the row (open a task / toggle
+  /// the trio), Space toggles, Escape clears. Each row is `.tag`'d with a
+  /// `NextRowTag` kind-prefixed id so the cursor maps back to an action.
+  @State private var selection: Set<String> = []
 
   /// Tapping a task row (or its "Edit Task" menu item) opens the composer in
   /// edit mode — the same card the Tasks tab uses, which embeds the agent
@@ -44,12 +57,72 @@ struct NextView: View {
     Binding(get: { editingTask != nil }, set: { if !$0 { editingTask = nil } })
   }
 
+  // MARK: - Keyboard activation
+
+  /// The single selected row, when exactly one is highlighted. Multi-select
+  /// (⌘/⇧-click) has no single primary action, so Return/Space no-op there.
+  private var selectedTag: String? {
+    selection.count == 1 ? selection.first : nil
+  }
+
+  /// Return: open the row's primary surface. A task opens its composer; a trio
+  /// item (chore / habit / supplement) has no editor, so its primary action is
+  /// the check itself. Suggestions / done-log rows are read-through here.
+  private func activateSelection() {
+    guard let tag = selectedTag else { return }
+    let (kind, id) = NextRowTag.split(tag)
+    switch kind {
+    case "task":
+      if let t = tasksModel.openTasks.first(where: { $0.id == id }) { editingTask = t }
+    default:
+      toggleTrio(kind: kind, id: id)
+    }
+  }
+
+  /// Space: toggle the row's done state without opening anything — including a
+  /// task (the trio already toggles as its primary action).
+  private func toggleSelection() {
+    guard let tag = selectedTag else { return }
+    let (kind, id) = NextRowTag.split(tag)
+    if kind == "task" {
+      if let t = tasksModel.openTasks.first(where: { $0.id == id }) {
+        tasksModel.toggle(t, mutator: taskMutator, motion: motion)
+      }
+    } else {
+      toggleTrio(kind: kind, id: id)
+    }
+  }
+
+  /// Flip a chore / habit / supplement through its model mutator — the same
+  /// optimistic write the row's checkbox button performs.
+  private func toggleTrio(kind: String, id: String) {
+    switch kind {
+    case "chore":
+      guard let c = model.openChores.first(where: { $0.id == id }) else { return }
+      if model.completedChores.contains(c.id) {
+        model.uncompleteChore(c, mutator: checklistMutator)
+      } else {
+        model.completeChore(c, mutator: checklistMutator, motion: motion)
+      }
+    case "habit":
+      if let h = model.openHabits.first(where: { $0.id == id }) {
+        model.toggleHabit(h, mutator: checklistMutator, motion: motion)
+      }
+    case "supp":
+      if let s = model.openSupplements.first(where: { $0.id == id }) {
+        model.toggleSupplement(s, mutator: checklistMutator, motion: motion)
+      }
+    default:
+      break
+    }
+  }
+
   var body: some View {
     // A native grouped List, the same container the Coach landing uses, so the
     // two home tabs read as one family: each block is a `Section` with a tinted
     // header over native grouped cells (was a ScrollView of hand-rolled "pill"
     // cards). Single-column by design — the old wide-screen masonry is gone.
-    List {
+    List(selection: $selection) {
       // Title removed — the tab bar already labels this view.
 
       if model.hasLoaded && !model.hasAnyOpen && !hasAnyDone
@@ -84,6 +157,17 @@ struct NextView: View {
     #else
     .listStyle(.inset)
     #endif
+    // Keyboard navigation, mirroring the Tasks tab: the List is focusable so
+    // ↑↓ move the native selection cursor across every tagged row; Return
+    // activates, Space toggles, Escape clears. Suppressed while the task
+    // composer owns the keyboard (editorOpen) so its fields keep Return/Space.
+    .modifier(NextKeyboardModifier(
+      hasSelection: !selection.isEmpty,
+      editorOpen: editingTask != nil,
+      onReturn: activateSelection,
+      onSpace: toggleSelection,
+      onEscape: { selection = [] }
+    ))
     .septenaInlineTitle()
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
@@ -142,5 +226,46 @@ struct NextView: View {
         _ = await (a, b, c, d)
       }
     }
+  }
+}
+
+/// Makes the Next `List` keyboard-driven, mirroring the Tasks tab's modifier:
+/// the list takes focus (so ↑↓ run native `List(selection:)` traversal) and
+/// Return / Space / Escape map to the page's activation handlers. Focus is
+/// re-claimed when the task composer closes so the cursor survives an edit.
+private struct NextKeyboardModifier: ViewModifier {
+  let hasSelection: Bool
+  let editorOpen: Bool
+  let onReturn: () -> Void
+  let onSpace: () -> Void
+  let onEscape: () -> Void
+
+  @FocusState private var listFocused: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .focusable()
+      .focused($listFocused)
+      .focusEffectDisabled()
+      .onAppear { listFocused = true }
+      .onChange(of: editorOpen) { _, open in
+        guard !open else { return }
+        DispatchQueue.main.async { listFocused = true }
+      }
+      .onKeyPress(.return) {
+        guard !editorOpen, hasSelection else { return .ignored }
+        onReturn()
+        return .handled
+      }
+      .onKeyPress(.space) {
+        guard !editorOpen, hasSelection else { return .ignored }
+        onSpace()
+        return .handled
+      }
+      .onKeyPress(.escape) {
+        guard !editorOpen, hasSelection else { return .ignored }
+        onEscape()
+        return .handled
+      }
   }
 }
