@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1086,
+      "build": 1097,
       "date": "2026-06-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Your tasks keep their place when you check them off",
-          "detail": "Completing and reopening a task no longer shuffles where it sits in your list, and editing a task now reveals its existing notes automatically.",
-          "section": "tasks"
+          "title": "Hide Readwise highlights from your daily message",
+          "detail": "You can keep Readwise highlights out of the daily message without disconnecting the integration.",
+          "section": null
         },
         {
-          "title": "Smoother task selection on Mac",
-          "detail": "Tapping a task in the Mac list selects it more reliably.",
-          "section": "tasks"
+          "title": "Keyboard navigation in the Next list",
+          "detail": "Move through your Next list using the keyboard.",
+          "section": null
         },
         {
-          "title": "See all your intake trackers on Apple Watch",
-          "detail": "The watch summary now shows every intake tracker you've enabled, with bucket cutoffs synced to the wrist.",
+          "title": "Richer watch summaries for intake and fasting",
+          "detail": "The watch now shows all your intake trackers on a summary page, an expanded meal picker, and a fasting complication rounded to whole hours.",
           "section": "intake"
         },
         {
-          "title": "Cleaner fasting complication",
-          "detail": "The circular fasting complication now rounds elapsed time to whole hours for an easier glance.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Watch stays in sync across midnight and during a fast",
-          "detail": "Your watch snapshot and dashboard now refresh correctly as the day rolls over and while a fast is underway.",
+          "title": "Watch stays fresh across midnight and mid-fast",
+          "detail": "Your watch snapshot and dashboard update correctly as the day rolls over and during an active fast.",
           "section": null
         },
         {
-          "title": "What's New, right in the app",
-          "detail": "A new changelog surface lets you catch up on what changed with each update.",
+          "title": "Steadier task editing",
+          "detail": "Editing a task now reveals existing notes automatically, guards against accidental discards, and keeps a task in place through complete, reopen, and quick edits.",
+          "section": "tasks"
+        },
+        {
+          "title": "Training effort shown as a single series",
+          "detail": "The training sparkline now reads as one clear effort line instead of stacked bars.",
+          "section": "training"
+        },
+        {
+          "title": "Community supporter badge and Sign in with Apple",
+          "detail": "Supporters get a badge on their community profile, and Sign in with Apple now unlocks community features on macOS.",
           "section": null
         },
         {
-          "title": "The story behind Septena",
-          "detail": "A new maker identity and About entry share who builds Septena, alongside a seven-disc flourish.",
-          "section": null
-        },
-        {
-          "title": "Sign in with Apple for community on Mac",
-          "detail": "macOS now supports Sign in with Apple so community and support features work natively.",
+          "title": "Redesigned About pane with a What's New legend",
+          "detail": "About has a fresh look with a link to the build-story journal, and What's New gains a color legend and a \"Latest\" label.",
           "section": null
         }
       ]
