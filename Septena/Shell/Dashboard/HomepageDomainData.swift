@@ -9,14 +9,11 @@ import SwiftUI
 ///                   protein, intake sessions,
 ///                   groceries bought-per-day, gut movements, activity
 ///                   steps, tasks completed.
-///   * `.stackedBars` — two parallel series rendered together. Today
-///                   only training (strength volume + cardio minutes).
 ///   * `.centered` — per-day deltas from a baseline; `nil` entries are
 ///                   missing days that should render as stubs, not as
 ///                   zero deviation. Today only body weight.
 enum HistorySeries {
   case bars([Int])
-  case stackedBars(primary: [Double], secondary: [Double])
   case centered(values: [Double?], baseline: Double)
 }
 

@@ -179,7 +179,6 @@ private struct DenseDomainCard: View {
 
 /// Inline sparkline for a `HistorySeries`. Renders:
 ///   * `.bars`        → line + filled area under the curve
-///   * `.stackedBars` → primary line + secondary line layered
 ///   * `.centered`    → bars above/below a centered baseline
 ///
 /// Empty / all-zero data → a dash, so the row doesn't pretend to have
@@ -347,56 +346,6 @@ private struct DomainSparkline: View {
           }
         } else {
           emptyMark
-        }
-
-      case .stackedBars(let primary, let secondary):
-        // Two overlapping translucent lines — bars at this size are
-        // too busy. Training uses this case and opts into smoothing
-        // (`HomepageDomainData.smoothSparkline`), which collapses the
-        // every-other-day rest-day spikes into a sustained-load curve
-        // (cf. Apple Watch Exercise ring).
-        //
-        // The primary series gets a filled area under the curve to
-        // match `.bars` (visual parity across domains). Secondary
-        // stays line-only so the two series remain distinguishable
-        // — filling both would muddy the overlap.
-        // Smooth on the full upstream series *before* trimming to the
-        // display window, so the leftmost point already carries up to
-        // `window-1` days of prior history in its rolling mean. Doing
-        // it the other way around (align → smooth) made the first
-        // point average only itself — a rest day on the boundary
-        // would anchor the line at 0 instead of the real trailing
-        // average. Safe here because training's loader always
-        // provides ≥30 days; for shorter inputs `aligned` still pads
-        // with leading zeros after.
-        let p = aligned(smooth ? rollingMean(primary) : primary)
-        let s = aligned(smooth ? rollingMean(secondary) : secondary)
-        ForEach(Array(p.enumerated()), id: \.offset) { idx, value in
-          AreaMark(
-            x: .value("Day", idx),
-            y: .value("Primary", value),
-            series: .value("Series", "primary")
-          )
-          .foregroundStyle(accent.opacity(0.22))
-          .interpolationMethod(.monotone)
-          LineMark(
-            x: .value("Day", idx),
-            y: .value("Primary", value),
-            series: .value("Series", "primary")
-          )
-          .foregroundStyle(accent)
-          .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
-          .interpolationMethod(.monotone)
-        }
-        ForEach(Array(s.enumerated()), id: \.offset) { idx, value in
-          LineMark(
-            x: .value("Day", idx),
-            y: .value("Secondary", value),
-            series: .value("Series", "secondary")
-          )
-          .foregroundStyle(accent.opacity(0.45))
-          .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
-          .interpolationMethod(.monotone)
         }
 
       case .centered(let values, let baseline):

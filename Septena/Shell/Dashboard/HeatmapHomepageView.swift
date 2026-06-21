@@ -250,13 +250,6 @@ private struct HeatmapDomainRow: View {
     case .bars(let values):
       return normalizedLevels(values.map(Double.init))
 
-    case .stackedBars(let primary, let secondary):
-      // Combine the two series per day before normalizing — heatmap
-      // mode is about "was there activity," so total effort is the
-      // right signal even though the two series mean different things.
-      let combined = zip(primary, secondary).map { $0 + $1 }
-      return normalizedLevels(combined)
-
     case .centered(let values, _):
       // Absolute deviation: a big swing up *or* down counts as
       // "activity." `nil` days (no measurement) collapse to level 0.

@@ -1461,10 +1461,7 @@ struct WeekDashboardView: View {
   // is what made the homepage janky. Compute it ONCE whenever the underlying
   // data changes (`recomputeDerived`); the tiles just read the cached result.
   struct Derived {
-    var trainStrengthBars7: [Int] = []
-    var trainCardioBars7: [Int] = []
-    var trainStrengthSeries90: [Double] = []
-    var trainCardioSeries90: [Double] = []
+    var trainEffortSeries90: [Double] = []
     var weightActual30: [Double?] = []
     var githubCounts90: [Int] = []
     var githubStreak: Int = 0
@@ -1485,17 +1482,16 @@ struct WeekDashboardView: View {
         cal.date(byAdding: .day, value: -$0, to: now).map(fmt.string(from:))
       }
     }
-    let d7 = dayKeys(7)
     let d90 = dayKeys(90)
 
-    // Training effort → normalized 7-day bars (tile) + raw 90-day series (domain).
+    // Training effort → one combined 90-day daily-effort series. Every
+    // modality is already converted to comparable effort-minutes
+    // (`effortContribution`), so summing strength-like (which folds in
+    // mobility/yoga) + cardio gives an honest "total time invested per
+    // day" — the series the Dense tile draws as raw spikes + a 7-day
+    // trend.
     let effort = effortByDate(recentTraining, sessionTypes: sessionTypes)
-    let maxS = max(1, d7.map { effort.strengthLike[$0] ?? 0 }.max() ?? 0)
-    let maxC = max(1, d7.map { effort.cardio[$0] ?? 0 }.max() ?? 0)
-    d.trainStrengthBars7 = d7.map { Int(((effort.strengthLike[$0] ?? 0) / maxS) * 50) }
-    d.trainCardioBars7   = d7.map { Int(((effort.cardio[$0]       ?? 0) / maxC) * 50) }
-    d.trainStrengthSeries90 = d90.map { effort.strengthLike[$0] ?? 0 }
-    d.trainCardioSeries90   = d90.map { effort.cardio[$0] ?? 0 }
+    d.trainEffortSeries90 = d90.map { (effort.strengthLike[$0] ?? 0) + (effort.cardio[$0] ?? 0) }
 
     // GitHub daily counts (90d) + current streak (consecutive days back).
     let gByDate = Dictionary(github.days.map { ($0.date, $0.count) },
@@ -1538,11 +1534,14 @@ struct WeekDashboardView: View {
     let sessionCount = weeklySessionCount
     let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
-    // Series come from the precomputed cache (90-day effort-minutes, both
-    // in the same unit so cardio isn't crushed under strength volume; yoga
-    // folds into strength-like). Same `.stackedBars` visualization as before.
-    let strengthSeries = derived.trainStrengthSeries90
-    let cardioSeries = derived.trainCardioSeries90
+    // One combined 90-day effort-minutes series (all modalities), from the
+    // precomputed cache, rounded to whole minutes for the standard `.bars`
+    // sparkline. Training is the spikiest cadence on the dashboard (hard
+    // day, then rest-day zeros), so it opts into `smoothSparkline` — the
+    // renderer plots a trailing-7d mean as one clean filled line, the
+    // "am I trending up or down" read. The headline already carries the
+    // literal this-week numbers (sessions + Z2 minutes).
+    let effortSeries = derived.trainEffortSeries90.map { Int($0.rounded()) }
     return HomepageDomainData(
       domain: .training,
       title: String(localized: "Training", comment: "Section name"),
@@ -1556,12 +1555,11 @@ struct WeekDashboardView: View {
                       current: Double(minutes),
                       target: Double(max(target, 1)),
                       unit: "min"),
-      history: .stackedBars(primary: strengthSeries, secondary: cardioSeries),
+      history: .bars(effortSeries),
       tap: .openSheet(.training),
-      // Training spikes hard on rest days (zero) and peaks on session
-      // days. The Dense sparkline smooths to a trailing-7d average —
-      // same reason Apple Watch's Exercise ring shows weekly load,
-      // not point samples. Heatmap mode keeps daily cells.
+      // Spiky cadence → smooth to a trailing-7d mean so rest-day zeros
+      // don't read as a holey comb on the small chart. Same reason Apple
+      // Watch's Exercise ring shows weekly load, not point samples.
       smoothSparkline: true
     )
   }

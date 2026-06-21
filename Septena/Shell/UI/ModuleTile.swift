@@ -571,18 +571,6 @@ private struct TileHistogram: View {
                 emphasizedIndex: v.count - 1,
                 dayLabels: Self.weekdayLabels(count: v.count))
 
-    case .stackedBars(let primary, let secondary):
-      // Each series independently normalized to its own 7-day max ×50, so
-      // the two stack into a shared 0…100 ceiling (mirrors the training
-      // tile's old `derived.train*Bars7`). Strength-like sits on the bottom
-      // in full accent, cardio on top in the lighter shade.
-      let p = Self.normalize50(Self.last7(primary))
-      let s = Self.normalize50(Self.last7(secondary))
-      Histogram(values: p,
-                accent: accent,
-                dayLabels: Self.weekdayLabels(count: p.count),
-                secondaryValues: s)
-
     case .centered(let values, _):
       let v = Self.last7Optional(values)
       CenteredBarChart(values: v,
@@ -601,11 +589,6 @@ private struct TileHistogram: View {
   /// gap stays a gap rather than a fake zero deviation.
   private static func last7Optional(_ v: [Double?]) -> [Double?] {
     v.count >= 7 ? Array(v.suffix(7)) : Array(repeating: nil, count: 7 - v.count) + v
-  }
-
-  private static func normalize50(_ v: [Double]) -> [Int] {
-    let m = max(1, v.max() ?? 0)
-    return v.map { Int(($0 / m) * 50) }
   }
 
   private static let narrowWeekdayFormatter: DateFormatter = {

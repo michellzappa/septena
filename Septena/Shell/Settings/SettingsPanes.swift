@@ -699,25 +699,25 @@ struct AppIconSettingsPane: View {
 // MARK: - Layout preview
 //
 // One generic example rendered with the real homepage components
-// (`ModuleTile`, `DenseHomepageView`, `HeatmapHomepageView`) populated
-// with deterministic fake data — so the preview matches what the
-// homepage actually draws, not a hand-rolled approximation.
+// (`DomainTile`, `DenseHomepageView`, `HeatmapHomepageView`,
+// `RingsHomepageView`) populated from a single deterministic
+// `HomepageDomainData` — the same view model each mode draws on the
+// homepage, so the preview matches what the homepage actually draws
+// rather than a hand-rolled approximation.
 
 private enum LayoutPreviewSample {
-  /// Deterministic 90-day series shared by all three renderers — the
-  /// tile's 7-day histogram is just `bars90.suffix(7)`, the sparkline
-  /// and heatmap consume the full 90-day window. Values span 1…7 so
-  /// every day is visible (no all-zero gaps in the 7-day strip) while
-  /// still covering enough range for the heatmap to bucket into all
-  /// five levels.
+  /// Deterministic 90-day series shared by all four renderers — the
+  /// tile's 7-day histogram slices the trailing window itself, the
+  /// sparkline and heatmap consume the full 90-day window. Values span
+  /// 1…7 so every day is visible (no all-zero gaps in the 7-day strip)
+  /// while still covering enough range for the heatmap to bucket into
+  /// all five levels.
   static let bars90: [Int] = (0..<90).map { i in
     let phase = Double(i) * 0.42
     let v = 4.0 + 2.6 * sin(phase) + 1.2 * sin(phase * 0.31)
     return max(1, Int(v.rounded()))
   }
 
-  /// Trailing 7-day window of `bars90` — same source data, just sliced.
-  static let bars7: [Int] = Array(bars90.suffix(7))
   static let accent: Color = .green
 
   static let domainData = HomepageDomainData(
@@ -742,20 +742,16 @@ private struct LayoutPreviewExample: View {
     Group {
       switch mode {
       case .tiles:
-        ModuleTile(
-          title: "Habits",
-          accent: LayoutPreviewSample.accent,
-          stats: [
-            .init(label: "Today",   value: "5"),
-            .init(label: "Skipped", value: "1"),
-          ],
-          progress: .init(
-            label: "Today's progress",
-            current: 5,
-            target: 7
-          ),
-          history: .init(label: "7-day adherence", values: LayoutPreviewSample.bars7)
-        )
+        // Same `DomainTile` + `HomepageDomainData` the histogram dashboard
+        // actually renders (see `WeekDashboardView` `.tiles`), so the preview
+        // can't drift from the real tile. The dashboard lays tiles out in a
+        // 2-column grid, so a single tile is half-width — mirror that here
+        // with a trailing spacer rather than letting it stretch full width.
+        HStack(spacing: 0) {
+          DomainTile(data: LayoutPreviewSample.domainData)
+            .frame(maxWidth: .infinity)
+          Color.clear.frame(maxWidth: .infinity)
+        }
       case .dense:
         DenseHomepageView(
           items: [LayoutPreviewSample.domainData],

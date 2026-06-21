@@ -130,10 +130,6 @@ private struct RingDomainCell: View {
     case .bars(let values):
       let last = tail(values)
       return (last.filter { $0 > 0 }.count, last.count)
-    case .stackedBars(let primary, let secondary):
-      let combined = zip(primary, secondary).map { $0 + $1 }
-      let last = tail(combined)
-      return (last.filter { $0 > 0 }.count, last.count)
     case .centered(let values, _):
       let last = tail(values)
       return (last.filter { $0 != nil }.count, last.count)
