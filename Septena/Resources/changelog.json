@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1103,
+      "build": 1111,
       "date": "2026-06-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Bring back deleted tasks",
-          "detail": "Tasks you remove now go to Recently Deleted, where you can restore them or purge them for good, synced across your devices.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks now move to a Recently Deleted holding area where you can restore them or purge them for good, synced across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Keyboard navigation in Next",
-          "detail": "Move through your Next list and open items using the keyboard.",
+          "title": "Smoother task navigation on Mac",
+          "detail": "Select tasks with a click and move through the Next list and sidebar with the keyboard.",
           "section": "tasks"
         },
         {
-          "title": "Task editing feels safer",
-          "detail": "Editing a task now reveals existing notes automatically, guards against accidental discards, and keeps each task in its place through complete and reopen.",
-          "section": "tasks"
-        },
-        {
-          "title": "New Next settings",
-          "detail": "A dedicated Next pane lets you tune what shows up, replacing the old today/week wheel toggle.",
-          "section": null
-        },
-        {
-          "title": "More on your wrist",
-          "detail": "The watch now shows every enabled intake tracker, an expanded meal picker, a tappable Intakes summary, and ring rendering that stays fresh across midnight and through a fast.",
+          "title": "Give your trackers a personal emoji",
+          "detail": "Pick an emoji for intake tracking methods and varieties so they're easier to spot at a glance.",
           "section": "intake"
         },
         {
-          "title": "Cleaner training trends",
-          "detail": "The training sparkline now reads as one effort series instead of stacked bars.",
+          "title": "A richer Apple Watch experience",
+          "detail": "Every enabled tracker now appears on the watch with larger tiles, a meal picker, an Intakes summary page, and complications that stay fresh through midnight and during a fast.",
+          "section": "intake"
+        },
+        {
+          "title": "Clearer training trend chart",
+          "detail": "The dashboard now shows training as a single daily-trend effort line instead of stacked bars.",
           "section": "training"
         },
         {
-          "title": "Sync your service connections",
-          "detail": "Connected service tokens now travel with you through iCloud Keychain, so a new device picks up where the last left off.",
+          "title": "New Next settings pane",
+          "detail": "Tune what shows up in Next from a dedicated settings pane, with a deep link straight from the Next list.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your sign-ins follow you across devices",
+          "detail": "Service tokens now sync through your iCloud Keychain, so connected integrations carry over automatically.",
           "section": null
         },
         {
-          "title": "Quieter daily message",
-          "detail": "You can hide Readwise highlights from the daily message without disconnecting Readwise.",
-          "section": null
-        },
-        {
-          "title": "A refreshed What's New and About",
-          "detail": "The About pane gets a redesign with a link to the build-story journal, plus a dot-color legend and a Latest label in What's New.",
-          "section": null
-        },
-        {
-          "title": "Community member badge",
-          "detail": "A unified member badge now appears across the roadmap, testimonials, and support, with a supporter badge for Septena+ patrons.",
+          "title": "Refreshed About page and What's New",
+          "detail": "A redesigned About pane links out to the build-story journal, and What's New gains a color legend and a Latest label.",
           "section": null
         }
       ]
