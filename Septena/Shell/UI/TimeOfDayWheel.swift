@@ -276,24 +276,19 @@ struct TimeOfDayWheel: View {
   /// "present" activity rather than an ambient window.
   private let bandMaxOpacity: Double = 0.6
 
-  /// Shared defaults key for the today ⇄ week window, public so co-presenting
-  /// views (the hero's `AmbientHalo` style) can key off the same state.
-  static let windowDefaultsKey = "timeOfDayWheel.todayOnly"
-
-  /// Tap picks the window: just today (the default — a dense week can be
-  /// confusing, so the dial opens focused on today) or the full window. The
-  /// week's data is always loaded; the tap just reveals it. Stored in
-  /// `@AppStorage` under one shared key, so flipping the window on any dial
-  /// flips every other dial too (and the choice persists across launches).
-  @AppStorage(Self.windowDefaultsKey) private var todayOnly = true
-
   /// The resolved focus: a locked dial (the hero) is always single-day;
   /// compact tiles and aggregate section dials always show the full window (the
-  /// overlay *is* the point); the plain full dial honors the tap toggle.
+  /// overlay *is* the point); any plain dial defaults to today.
+  ///
+  /// There used to be a today ⇄ week tap toggle here (an `@AppStorage` window
+  /// flag, surfaced as Settings ▸ Home ▸ "Open on the full week"). Every live
+  /// dial is now either `lockToday` (the homepage glass donut) or `aggregate`
+  /// (the section dials), so the toggle never applied — it and its setting were
+  /// removed.
   private var focusToday: Bool {
     if lockToday { return true }
     if compact || aggregate { return false }
-    return todayOnly
+    return true
   }
   /// Outer margin for the labels/disc — collapses in compact so the dial fills
   /// its tile.
@@ -615,8 +610,7 @@ struct TimeOfDayWheel: View {
           ctx.fill(Path(ellipseIn: hub), with: .color(Theme.cardSurface))
           ctx.stroke(Path(ellipseIn: hub),
                      with: .color(Theme.inkSecondary.opacity(0.18)), lineWidth: 1)
-          let scope = todayOnly ? "Today" : "\(windowDays) days"
-          ctx.draw(Text(scope).font(.caption2.weight(.medium)).foregroundStyle(.secondary),
+          ctx.draw(Text("Today").font(.caption2.weight(.medium)).foregroundStyle(.secondary),
                    at: center)
         }
       }
@@ -641,18 +635,13 @@ struct TimeOfDayWheel: View {
     }
     .frame(width: diameter, height: diameter)
     .contentShape(Circle())
-    // A locked dial (the hero) handles its own tap/swipe in `DayDialHero`;
-    // only the toggling dials wire the today⇄week tap here.
-    .modifier(WheelTapToggle(enabled: !compact && !lockToday && !aggregate) { todayOnly.toggle() })
+    // The hero handles its own tap/swipe in `DayDialHero`; section dials are
+    // read-only. (The old today⇄week tap toggle was removed — see `focusToday`.)
     .accessibilityElement()
-    .accessibilityAddTraits(compact || lockToday || aggregate ? [] : .isButton)
     .accessibilityLabel(Text("Time-of-day wheel"))
     .accessibilityValue(Text(focusToday
       ? "\(shownEvents.count) events"
       : "\(events.count) events over the last \(windowDays) days"))
-    .accessibilityHint(compact || lockToday || aggregate
-      ? Text("")
-      : Text("Double tap to switch between today and the last \(windowDays) days"))
     // Seed the applied rotation without animating in from 0 on first appear.
     .onAppear {
       var t = Transaction(); t.disablesAnimations = true
@@ -730,22 +719,6 @@ struct AnnulusShape: Shape {
              startAngle: .zero, endAngle: .degrees(360), clockwise: true)
     p.closeSubpath()
     return p
-  }
-}
-
-/// Attaches the today/week tap toggle only when `enabled`. Compact tiles live
-/// inside a launcher `Button`, so a child tap gesture there would swallow the
-/// tile's tap — this keeps the thumbnail inert. (`todayOnly` is @AppStorage,
-/// so the tapped window persists and every dial flips together.)
-private struct WheelTapToggle: ViewModifier {
-  let enabled: Bool
-  let action: () -> Void
-  func body(content: Content) -> some View {
-    if enabled {
-      content.onTapGesture(perform: action)
-    } else {
-      content
-    }
   }
 }
 

@@ -292,7 +292,11 @@ final class NextSuggestionsModel {
     // actor; `[NextSuggestion]` is `Sendable` so it crosses back cleanly.
     let now = Date()
     let computed = await MirrorReader.shared.read { Self.computeAll(context: $0, now: now) }
-    suggestions = computed
+    // Apply the user's Next ▸ Suggestions prefs (master switch + per-kind
+    // opt-out, device-local). Filtered here rather than inside `computeAll`
+    // so the watch snapshot — which shares the scorer — is unaffected until
+    // its own parity pass lands.
+    suggestions = computed.filter { NextSuggestionsPrefs.allows(rawKind: $0.kind.rawValue) }
     skipped = Self.loadSkips(date: today)
     hasLoaded = true
   }

@@ -315,6 +315,37 @@ public enum NextLinger {
   public static let habitsDefault = false
 }
 
+/// UserDefaults keys + defaults for the Next view's learned time-of-day
+/// **suggestions** — the "log your coffee", "break your fast", mood check-in,
+/// and workout-nudge cards (`NextSuggestion.Kind`). Device-local like
+/// `NextLinger`: a glance filter, kept out of the CloudKit schema. A master
+/// switch plus a per-kind opt-out; defaults preserve shipped behavior
+/// (everything on). The phone Next list applies these in
+/// `NextSuggestionsModel.load`; the watch snapshot still computes its own
+/// suggestions, so watch parity is a deliberate follow-up, not wired here.
+public enum NextSuggestionsPrefs {
+  public static let enabledKey = "next.suggestions.enabled"
+  public static let enabledDefault = true
+  /// Per-kind opt-out, keyed by `NextSuggestion.Kind.rawValue`
+  /// (training / fastBreak / mood / intake). All default on.
+  public static let kindDefault = true
+  public static func kindKey(_ rawKind: String) -> String {
+    "next.suggestions.\(rawKind)"
+  }
+
+  /// Master switch state, honoring the shipped-on default for an unset key.
+  public static func isEnabled(_ defaults: UserDefaults = .standard) -> Bool {
+    defaults.object(forKey: enabledKey) as? Bool ?? enabledDefault
+  }
+
+  /// Whether a given suggestion kind should surface, given the master switch
+  /// and its per-kind opt-out.
+  public static func allows(rawKind: String, _ defaults: UserDefaults = .standard) -> Bool {
+    guard isEnabled(defaults) else { return false }
+    return defaults.object(forKey: kindKey(rawKind)) as? Bool ?? kindDefault
+  }
+}
+
 extension NextItemsResponse {
   /// The day's open items narrowed to the given time-of-day bucket, ready to show.
   ///

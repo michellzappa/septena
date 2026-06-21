@@ -14,6 +14,25 @@ struct NextView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.a11yMotion) private var motion
+  @Environment(NavigationState.self) private var nav
+
+  /// iOS presents Settings as a local sheet so the deep-link target
+  /// (`initialDestination`) is honored; macOS opens the dedicated window via
+  /// `nav` (the generic RootTabView sheet doesn't forward a destination).
+  @State private var showSettings = false
+  @State private var settingsTarget: SettingsView.SettingsDestination?
+
+  /// Open Settings to `dest` (or the root when nil), mirroring the pattern in
+  /// `InsightsDestination`: a contextual window on macOS, a local sheet on iOS.
+  private func openSettings(_ dest: SettingsView.SettingsDestination?) {
+    #if os(macOS)
+    nav.settingsDestination = dest
+    nav.showSettings = true
+    #else
+    settingsTarget = dest
+    showSettings = true
+    #endif
+  }
 
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
@@ -169,6 +188,31 @@ struct NextView: View {
       onEscape: { selection = [] }
     ))
     .septenaInlineTitle()
+    // The "…" overflow: a quick jump to the Next-specific preferences
+    // (suggestions, carry-over, which sections appear) and to global Settings.
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Menu {
+          Button {
+            openSettings(.nextFeed)
+          } label: {
+            Label("Next Settings", systemImage: "arrow.forward.circle")
+          }
+          Button {
+            openSettings(nil)
+          } label: {
+            Label("Settings", systemImage: "gearshape")
+          }
+        } label: {
+          Label("More", systemImage: "ellipsis.circle")
+        }
+      }
+    }
+    #if os(iOS)
+    .sheet(isPresented: $showSettings) {
+      SettingsView(initialDestination: settingsTarget)
+    }
+    #endif
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
     // drawer the Tasks tab uses. Edit mode embeds the agent conversation.

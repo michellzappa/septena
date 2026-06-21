@@ -75,10 +75,6 @@ enum SettingsKey {
   /// literal key `DayDialHero` / `RhythmHomepageView` / `TimeOfDayWheel`
   /// already read — kept verbatim so the constant binds to the same storage.
   static let wheelWakingDay = "wheel.wakingDay"
-  /// Whether the time-of-day wheels open focused on today (default) or on the
-  /// trailing 7-day overlay. Same literal as `TimeOfDayWheel.windowDefaultsKey`
-  /// — tapping a wheel writes this same key, so the setting stays in sync.
-  static let wheelTodayOnly = "timeOfDayWheel.todayOnly"
   /// Master switch for the optional daily-message line at the foot of the home
   /// dashboard. Off by default — a homepage display preference, device-local
   /// like the Day-dial toggles (the quote *content* syncs via `QuoteEntity`,
@@ -789,6 +785,7 @@ struct SettingsView: View {
     case data            // import / export (was Import & Export)
     case reports         // practitioner reports — scoped shareable section bundles
     case layout, correlations, timeOfDay
+    case nextFeed        // Next list: suggestions, carry-over, per-section visibility
     case quickActions, appIcon
     case skills, localMcp, motionGallery, dataTools
     case support
@@ -971,6 +968,7 @@ struct SettingsView: View {
     case .layout:       return "Layout"
     case .correlations: return "Insights"
     case .timeOfDay:    return "Time of Day"
+    case .nextFeed:     return "Next"
     case .notifications: return "Notifications"
     case .connections:  return "Connected Apps"
     case .data:         return "Import & Export"
@@ -1013,6 +1011,7 @@ struct SettingsView: View {
     case .layout:       return "square.grid.2x2"
     case .correlations: return "chart.dots.scatter"
     case .timeOfDay:    return "clock"
+    case .nextFeed:     return "arrow.forward.circle"
     case .notifications: return "bell.badge"
     case .connections:  return "app.connected.to.app.below.fill"
     case .data:         return "externaldrive"
@@ -1070,6 +1069,7 @@ struct SettingsView: View {
     case .layout:            LayoutSettingsPane()
     case .correlations:      CorrelationsSettingsPane()
     case .timeOfDay:         TimeOfDaySettingsPane()
+    case .nextFeed:          NextSettingsPane()
     case .notifications:     NotificationsOverviewPane()
     case .connections:       IntegrationsSettingsPane()
     case .data:              ImportExportSettingsPane(mode: .full)

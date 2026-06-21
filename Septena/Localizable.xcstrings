@@ -2051,6 +2051,9 @@
         }
       }
     },
+    "Carry over missed items" : {
+
+    },
     "Changing the unit doesn't rewrite past entries — history reads in the new unit." : {
 
     },
@@ -2446,7 +2449,11 @@
     "Cramp" : {
 
     },
+    "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
+
+    },
     "Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2456,7 +2463,11 @@
         }
       }
     },
+    "Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
+
+    },
     "Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2802,6 +2813,7 @@
       }
     },
     "Double tap to switch between today and the last %@ days" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4162,6 +4174,9 @@
         }
       }
     },
+    "Keep an undone habit on the list past its time of day, until you do it." : {
+
+    },
     "Keep an undone habit on the Next list after its time of day, until you do it. Off shows each habit only during its slot." : {
       "localizations" : {
         "pt-BR" : {
@@ -4171,6 +4186,9 @@
           }
         }
       }
+    },
+    "Keep an undone supplement on the list past its time of day, until you take it." : {
+
     },
     "Keep logging — a completion pattern appears here once there's a few days of history." : {
 
@@ -4260,6 +4278,7 @@
 
     },
     "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4268,6 +4287,12 @@
           }
         }
       }
+    },
+    "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer. Next shapes the daily list — suggestions, carry-over, and which sections appear." : {
+
+    },
+    "Learned, time-of-day nudge cards at the top of the Next list — they appear around when you usually do the thing and go quiet once you log it. Turn the lot off, or just the kinds you don't want." : {
+
     },
     "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
       "localizations" : {
@@ -4830,6 +4855,9 @@
         }
       }
     },
+    "Morning / afternoon / evening boundaries decide when a bucketed habit or supplement counts as “due now” in the list." : {
+
+    },
     "Motion Gallery tunes the logging flourishes. Data Tools re-pulls records from CloudKit and generates LLM import prompts." : {
 
     },
@@ -5389,6 +5417,9 @@
     "Off (use the AI mode)" : {
 
     },
+    "Off shows each item only during its slot. Tasks and chores have no time of day, so they always stay until done." : {
+
+    },
     "OK" : {
       "shouldTranslate" : false
     },
@@ -5777,7 +5808,7 @@
         }
       }
     },
-    "Pulls your highlights into the daily-message rotation. The token stays on this device and is never sent to any Septena server." : {
+    "Pulls your highlights into the daily-message rotation. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server." : {
 
     },
     "Purple" : {
@@ -6247,6 +6278,9 @@
         }
       }
     },
+    "Sections in Next" : {
+
+    },
     "See how well you slept each night" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6433,7 +6467,7 @@
         }
       }
     },
-    "Service tokens stay on this device." : {
+    "Service tokens live in your Keychain and are never sent to any Septena server. Oura, GitHub, and Readwise sync across your devices via iCloud Keychain (end-to-end encrypted); Withings stays on this device." : {
 
     },
     "Services" : {
@@ -6788,6 +6822,9 @@
         }
       }
     },
+    "Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day." : {
+
+    },
     "Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day. Open on the full week starts on the last 7 days instead of today — tap any wheel to switch." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6912,6 +6949,9 @@
           }
         }
       }
+    },
+    "Suggestions" : {
+
     },
     "Summarized from %@ sections." : {
       "localizations" : {
@@ -8055,6 +8095,9 @@
       }
     },
     "Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered." : {
+
+    },
+    "Which sections contribute their entries to the Next list. Turning one off here hides it from Next only — its page and data stay put." : {
 
     },
     "Whose turn?" : {

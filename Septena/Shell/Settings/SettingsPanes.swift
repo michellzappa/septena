@@ -186,8 +186,6 @@ struct HomeSettingsPane: View {
   private var dayViewRaw: String = DayViewStyle.dial.rawValue
   @AppStorage(SettingsKey.wheelWakingDay)
   private var wakingDay: Bool = true
-  @AppStorage(SettingsKey.wheelTodayOnly)
-  private var wheelTodayOnly: Bool = true
   @AppStorage(SettingsKey.dailyMessageEnabled)
   private var dailyMessageEnabled: Bool = false
   @AppStorage(SettingsKey.dailyMessagePacks)
@@ -218,8 +216,11 @@ struct HomeSettingsPane: View {
         NavigationLink(value: SettingsView.SettingsDestination.correlations) {
           Label("Insights", systemImage: "chart.dots.scatter")
         }
+        NavigationLink(value: SettingsView.SettingsDestination.nextFeed) {
+          Label("Next", systemImage: "arrow.forward.circle")
+        }
       } footer: {
-        Text("Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer.")
+        Text("Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer. Next shapes the daily list — suggestions, carry-over, and which sections appear.")
       }
 
       Section {
@@ -245,14 +246,10 @@ struct HomeSettingsPane: View {
         Toggle(isOn: $wakingDay) {
           Label("Start day at wake", systemImage: "sunrise")
         }
-        Toggle(isOn: Binding(get: { !wheelTodayOnly },
-                             set: { wheelTodayOnly = !$0 })) {
-          Label("Open on the full week", systemImage: "calendar")
-        }
       } header: {
         Text("Day dial")
       } footer: {
-        Text("Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day. Open on the full week starts on the last 7 days instead of today — tap any wheel to switch.")
+        Text("Start day at wake rolls the dial over when you wake rather than at midnight, so a late night stays on the same day.")
       }
 
       Section {
@@ -467,6 +464,143 @@ struct TimeOfDaySettingsPane: View {
     let base = cal.startOfDay(for: .now)
     let date = cal.date(byAdding: .hour, value: h, to: base) ?? base
     return date.formatted(date: .omitted, time: .shortened)
+  }
+}
+
+// MARK: - Next submenu
+//
+// Consolidates what shapes the daily Next list, which was previously scattered
+// across the feed's own context menus and each section's detail pane:
+//   • Suggestions — the learned time-of-day nudge cards (master switch +
+//     per-kind opt-out). Device-local, via `NextSuggestionsPrefs`.
+//   • Carry over missed items — the "linger" toggles for the two bucketed
+//     blocks (habits / supplements), via `NextLinger`. Same @AppStorage keys
+//     the section panes write, so flipping here and there stays in sync.
+//   • Sections in Next — a roll-up of the per-section "Show in Next" toggle
+//     (`SectionConfig.showInToday`), writing through the same mirror the
+//     section detail pane uses (one source of truth, no divergence).
+//   • A link to Time of Day, since the day's buckets decide what's "due now".
+
+struct NextSettingsPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
+  // Suggestions: master switch + per-kind opt-outs. Keys come from
+  // `NextSuggestionsPrefs` so the Next view's filter reads the same storage.
+  @AppStorage(NextSuggestionsPrefs.enabledKey)
+  private var suggestionsEnabled = NextSuggestionsPrefs.enabledDefault
+  @AppStorage(NextSuggestionsPrefs.kindKey("training"))
+  private var suggestTraining = NextSuggestionsPrefs.kindDefault
+  @AppStorage(NextSuggestionsPrefs.kindKey("fastBreak"))
+  private var suggestFastBreak = NextSuggestionsPrefs.kindDefault
+  @AppStorage(NextSuggestionsPrefs.kindKey("mood"))
+  private var suggestMood = NextSuggestionsPrefs.kindDefault
+  @AppStorage(NextSuggestionsPrefs.kindKey("intake"))
+  private var suggestIntake = NextSuggestionsPrefs.kindDefault
+
+  // Carry-over (linger) for the two bucketed blocks — same keys as the
+  // Habits / Supplements section panes.
+  @AppStorage(NextLinger.habitsKey)
+  private var lingerHabits = NextLinger.habitsDefault
+  @AppStorage(NextLinger.supplementsKey)
+  private var lingerSupplements = NextLinger.supplementsDefault
+
+  /// Enabled sections that actually contribute to the Next list — the only
+  /// ones with a meaningful "Show in Next" toggle.
+  private var todaySections: [SectionConfig] {
+    store.sections.filter {
+      $0.isEnabled && (SectionManifest.byKey[$0.key]?.appearsInToday ?? false)
+    }
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle(isOn: $suggestionsEnabled) {
+          Label("Suggestions", systemImage: "sparkles")
+        }
+        if suggestionsEnabled {
+          Toggle("Workouts", isOn: $suggestTraining)
+          Toggle("Break your fast", isOn: $suggestFastBreak)
+          Toggle("Mood check-in", isOn: $suggestMood)
+          Toggle("Intake reminders", isOn: $suggestIntake)
+        }
+      } header: {
+        Text("Suggestions")
+      } footer: {
+        Text("Learned, time-of-day nudge cards at the top of the Next list — they appear around when you usually do the thing and go quiet once you log it. Turn the lot off, or just the kinds you don't want.")
+      }
+
+      Section {
+        Toggle(isOn: $lingerHabits) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("Carry over missed habits")
+            Text("Keep an undone habit on the list past its time of day, until you do it.")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        Toggle(isOn: $lingerSupplements) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("Carry over missed doses")
+            Text("Keep an undone supplement on the list past its time of day, until you take it.")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        Text("Carry over missed items")
+      } footer: {
+        Text("Off shows each item only during its slot. Tasks and chores have no time of day, so they always stay until done.")
+      }
+
+      if !todaySections.isEmpty {
+        Section {
+          ForEach(todaySections, id: \.key) { config in
+            Toggle(isOn: showInNextBinding(config)) {
+              Label(
+                SectionManifest.displayLabel(key: config.key, stored: config.label),
+                systemImage: SectionManifest.byKey[config.key]?.iconSymbol ?? "circle.fill")
+            }
+          }
+        } header: {
+          Text("Sections in Next")
+        } footer: {
+          Text("Which sections contribute their entries to the Next list. Turning one off here hides it from Next only — its page and data stay put.")
+        }
+      }
+
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.timeOfDay) {
+          Label("Time of Day", systemImage: "clock")
+        }
+      } footer: {
+        Text("Morning / afternoon / evening boundaries decide when a bucketed habit or supplement counts as “due now” in the list.")
+      }
+    }
+    .formStyle(.grouped)
+  }
+
+  /// Read `SectionConfig.showInToday`, write through the same mirror the
+  /// section detail pane uses — so this roll-up never becomes a second source
+  /// of truth. Mirrors `SectionDetailPane.setShowInToday`.
+  private func showInNextBinding(_ config: SectionConfig) -> Binding<Bool> {
+    Binding(
+      get: { config.showInToday },
+      set: { value in
+        SettingsMirror.setSectionShowInToday(config.key,
+                                             showInToday: value,
+                                             context: modelContext,
+                                             engine: ckEngine)
+        store.sections = store.sections.map { c in
+          c.key == config.key
+            ? SectionConfig(key: c.key, label: c.label, color: c.color,
+                            isEnabled: c.isEnabled, showInToday: value,
+                            showInSpotlight: c.showInSpotlight,
+                            hasOnboarded: c.hasOnboarded)
+            : c
+        }
+      }
+    )
   }
 }
 
