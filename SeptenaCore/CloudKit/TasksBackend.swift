@@ -204,7 +204,9 @@ final class CloudKitTasksBackend: TasksBackend {
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     let all = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     // Shared rule with the badge (deriveConvo) — see TaskConvo.isPendingReasoning().
-    let pending = all.filter { $0.conversationJSON != nil && $0.conversation.isPendingReasoning() }
+    // Recently-Deleted rows never count toward the pending-reasoning queue/badge.
+    let pending = all.filter { $0.deletedAt == nil && !$0.pendingDeletion
+                               && $0.conversationJSON != nil && $0.conversation.isPendingReasoning() }
     return Array(pending.prefix(limit))
   }
 

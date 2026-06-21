@@ -763,11 +763,17 @@ struct TaskListView: View {
 
   private func applyCancel(_ id: String) {
     Haptics.warning()
-    // Optimistic flip so the user sees the row immediately switch to its
-    // cancelled treatment (strikethrough + dim, like a done task). The
-    // mutator durably enqueues the server-side cancel; if push ultimately
+    // Cancellation settles exactly like completion: the row lingers in place
+    // for the beat (struck through + dimmed), then fades out and lives on in
+    // the Logbook alongside completed work. Open the settle window BEFORE the
+    // status flip so the row stays put while it lingers — see `toggle` for the
+    // ordering rationale (the pool filter is `status == .open || isSettling`).
+    // The mutator durably enqueues the server-side cancel; if push ultimately
     // fails the next pull will surface server truth.
-    flipStatus(id: id, to: .cancelled)
+    settle.schedule(id) {
+      motion.run(Theme.Motion.settle) { }
+    }
+    motion.run(Theme.Motion.settle) { flipStatus(id: id, to: .cancelled) }
     sessionDoneIds.insert(id)
     mutator.cancel(id: id)
   }
@@ -854,7 +860,6 @@ struct TaskListView: View {
         .accessibilityLabel("File in \(suggestion.title)")
       }
     }
-    .background(rowBackground(for: task))
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
     // it. `.draggable` pairs with the sidebar's `.dropDestination(for:)`; the
     // explicit preview is a compact title pill.
@@ -1046,25 +1051,6 @@ struct TaskListView: View {
     #endif
   }
 
-  /// Selection leans entirely on the native `List(selection:)` highlight (the
-  /// system accent) — the modern SwiftUI standard, identical to Reminders /
-  /// Notes. macOS draws nothing custom here.
-  ///
-  /// The one gap native selection can't fill: on iPhone/iPad a `Set` selection
-  /// only renders in edit mode, so outside it there's no native highlight to
-  /// mark which row's detail is currently open. A light on-theme ghost anchors
-  /// that open row there. (Edit-mode multi-select circles are unaffected.)
-  @ViewBuilder
-  private func rowBackground(for task: SeptenaTask) -> some View {
-    #if os(iOS)
-    let isOpen = editingDetail?.id == task.id
-    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(theme.color(for: "tasks").opacity(isOpen ? 0.10 : 0))
-      .padding(.horizontal, Theme.hPadding - 6)
-    #else
-    Color.clear
-    #endif
-  }
 
   private func applySuggestion(task: SeptenaTask,
                                suggestion: SuggestionEngine.Suggestion) {
@@ -1133,10 +1119,10 @@ struct TaskListView: View {
   @ViewBuilder
   private var groupedOpenItems: some View {
     let base = (filter == .today) ? items + review : items
-    // Drop completed rows except those still settling (just checked), so a
-    // finished task lingers for the beat then fades — instead of sitting
-    // struck through until the next reload.
-    let pool = base.filter { $0.status != .done || settle.isSettling($0.id) }
+    // Drop finished rows (completed or cancelled) except those still settling
+    // (just checked / just cancelled), so a finished task lingers for the beat
+    // then fades — instead of sitting struck through until the next reload.
+    let pool = base.filter { $0.status == .open || settle.isSettling($0.id) }
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
@@ -1211,7 +1197,7 @@ struct TaskListView: View {
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
-      result = result.filter { $0.status != .done || settle.isSettling($0.id) }
+      result = result.filter { $0.status == .open || settle.isSettling($0.id) }
     }
     return result
   }
@@ -1334,10 +1320,10 @@ struct TaskListView: View {
     var order: [String] = []
     var grouped: [String: [SeptenaTask]] = [:]
     for task in items {
-      // Drop completed rows except those still settling, so a just-checked
-      // upcoming task lingers for the beat then fades (matches every other
-      // open-work list).
-      if task.status == .done && !settle.isSettling(task.id) { continue }
+      // Drop finished rows (completed or cancelled) except those still
+      // settling, so a just-checked / just-cancelled upcoming task lingers for
+      // the beat then fades (matches every other open-work list).
+      if task.status != .open && !settle.isSettling(task.id) { continue }
       let key = task.scheduled ?? task.deadline ?? ""
       guard !key.isEmpty else { continue }
       if grouped[key] == nil { order.append(key) }

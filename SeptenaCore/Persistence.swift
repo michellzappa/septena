@@ -3482,6 +3482,12 @@ enum LocalCache {
     // either confirm the deletion (row removed) or resurrect them if
     // the server rejects.
     if e.pendingDeletion { return nil }
+    // Hide soft-deleted rows (Recently Deleted, docs/RECENTLY_DELETED_SPEC.md).
+    // `delete(id:)` stamps `deletedAt` and the spec promises "every read path
+    // filters `deletedAt != nil`" — this central list read (TaskListView, every
+    // project/area view, and the MCP `tasks_list`) was the one path that didn't,
+    // so a deleted task kept rendering and looked un-deletable.
+    if e.deletedAt != nil { return nil }
     switch filter {
     case .today:
       // Today = ratified-and-due. An unratified row that happens to be due
@@ -3502,7 +3508,10 @@ enum LocalCache {
             e.scheduled == nil, e.deadline == nil else { return nil }
       return SeptenaTask(e)
     case .logbook:
-      guard e.status == .done else { return nil }
+      // The Logbook archives finished work — both completed and cancelled
+      // tasks. Cancelled rows carry `completedAt` (set by the cancel mutator)
+      // so they sort into the same most-recent-first archive as done rows.
+      guard e.status == .done || e.status == .cancelled else { return nil }
       return SeptenaTask(e)
     case .project(let pid):
       guard e.project == pid else { return nil }
@@ -3514,8 +3523,15 @@ enum LocalCache {
   }
 
   @MainActor
+  /// Every task except Recently-Deleted ones. Used by aggregates (sidebar
+  /// counts, project progress glyphs) and the suggestion engine — none of
+  /// which should see trashed rows. Honors the same `deletedAt`/`pendingDeletion`
+  /// hiding as `tasks(in:filter:)`; the truly-exhaustive readers (diagnostics,
+  /// export, migration) fetch `TaskEntity` directly instead.
   static func allTasks(in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>()))?.map(SeptenaTask.init) ?? []
+    (try? context.fetch(FetchDescriptor<TaskEntity>()))?
+      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
+      .map(SeptenaTask.init) ?? []
   }
 
   /// One-line diagnostic of what the local task store currently looks
@@ -3590,7 +3606,8 @@ enum LocalCache {
     let today = SeptenaDate.today
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     return rows.reduce(0) { acc, e in
-      guard e.status == .open, let d = e.deadline, d <= today else { return acc }
+      guard e.deletedAt == nil, !e.pendingDeletion,
+            e.status == .open, let d = e.deadline, d <= today else { return acc }
       return acc + 1
     }
   }

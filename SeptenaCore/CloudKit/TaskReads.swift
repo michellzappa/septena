@@ -210,6 +210,8 @@ enum TaskReads {
     var madeByDay: [String: Int] = [:]
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
     for e in rows {
+      // Recently-Deleted rows drop out of completion/creation history.
+      if e.deletedAt != nil || e.pendingDeletion { continue }
       // Bucket completions / cancellations by the date prefix of completedAt
       // ("yyyy-MM-dd" — the same shape the server stamps).
       if let stamp = e.completedAt, stamp.count >= 10 {
