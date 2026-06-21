@@ -22,6 +22,8 @@ interface FeatureRow {
   has_voted: number;
   author_username: string | null;
   author_display_name: string | null;
+  author_supporter_tier: string | null;
+  author_role: CurrentUser["role"] | null;
 }
 
 interface CommentRow {
@@ -34,13 +36,22 @@ interface CommentRow {
   status: string;
   author_username: string | null;
   author_display_name: string | null;
+  author_supporter_tier: string | null;
 }
 
 // Author identity is exposed ONLY for users who opted their profile public
 // (the join below is gated on is_public = 1, so non-public authors yield nulls).
-function authorJSON(username: string | null, displayName: string | null): Record<string, unknown> | null {
+// `role` + `supporterTier` ride along so callers can show one consistent member
+// badge (maintainer / supporter) beside the name — they're moot without a name,
+// so they only travel when there is one.
+function authorJSON(
+  username: string | null,
+  displayName: string | null,
+  role: string | null,
+  supporterTier: string | null,
+): Record<string, unknown> | null {
   if (!username && !displayName) return null;
-  return { username, displayName };
+  return { username, displayName, role: role ?? "user", supporterTier: supporterTier ?? null };
 }
 
 function canModerate(user: CurrentUser): boolean {
@@ -56,11 +67,13 @@ export async function listFeatures(env: Env, user: CurrentUser): Promise<Record<
     select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
            f.maintainer_note, f.is_locked,
            ap.username as author_username, ap.display_name as author_display_name,
+           ap.supporter_tier as author_supporter_tier, ai.role as author_role,
            (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
            (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
            (select count(*) from feature_vote v where v.request_id = f.id and v.user_hash = ?) as has_voted
     from feature_request f
     left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
+    left join user_identity ai on ai.user_hash = f.author_hash
     ${statusFilter}
     order by vote_count desc, f.created_at desc
     limit 200
@@ -80,11 +93,13 @@ export async function listPublicFeatures(env: Env): Promise<Record<string, unkno
     select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
            f.maintainer_note, f.is_locked,
            ap.username as author_username, ap.display_name as author_display_name,
+           ap.supporter_tier as author_supporter_tier, ai.role as author_role,
            (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
            (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
            0 as has_voted
     from feature_request f
     left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
+    left join user_identity ai on ai.user_hash = f.author_hash
     where f.status in ${PUBLIC_STATES}
     order by vote_count desc, f.created_at desc
     limit 200
@@ -103,7 +118,8 @@ export async function getFeature(
   const commentStates = canModerate(user) ? "('visible','hidden')" : "('visible')";
   const comments = await env.DB.prepare(`
     select c.id, c.parent_id, c.author_role, c.body, c.created_at, c.is_pinned, c.status,
-           ap.username as author_username, ap.display_name as author_display_name
+           ap.username as author_username, ap.display_name as author_display_name,
+           ap.supporter_tier as author_supporter_tier
     from feature_comment c
     left join user_profile ap on ap.user_hash = c.author_hash and ap.is_public = 1
     where c.request_id = ? and c.status in ${commentStates}
@@ -285,11 +301,13 @@ async function findFeature(env: Env, user: CurrentUser, id: string): Promise<Fea
     select f.id, f.title, f.detail, f.status, f.created_at, f.updated_at,
            f.maintainer_note, f.is_locked,
            ap.username as author_username, ap.display_name as author_display_name,
+           ap.supporter_tier as author_supporter_tier, ai.role as author_role,
            (select count(*) from feature_vote v where v.request_id = f.id) as vote_count,
            (select count(*) from feature_comment c where c.request_id = f.id and c.status = 'visible') as comment_count,
            (select count(*) from feature_vote v where v.request_id = f.id and v.user_hash = ?) as has_voted
     from feature_request f
     left join user_profile ap on ap.user_hash = f.author_hash and ap.is_public = 1
+    left join user_identity ai on ai.user_hash = f.author_hash
     where f.id = ? ${statusFilter}
     limit 1
   `).bind(user.userHash, id).first<FeatureRow>();
@@ -306,7 +324,7 @@ function featureJSON(row: FeatureRow): Record<string, unknown> {
     voteCount: row.vote_count,
     commentCount: row.comment_count,
     hasVoted: row.has_voted > 0,
-    author: authorJSON(row.author_username, row.author_display_name),
+    author: authorJSON(row.author_username, row.author_display_name, row.author_role, row.author_supporter_tier),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -317,7 +335,7 @@ function commentJSON(row: CommentRow): Record<string, unknown> {
     id: row.id,
     parentId: row.parent_id,
     authorRole: row.author_role,
-    author: authorJSON(row.author_username, row.author_display_name),
+    author: authorJSON(row.author_username, row.author_display_name, row.author_role, row.author_supporter_tier),
     body: row.body,
     isPinned: row.is_pinned === 1,
     status: row.status,

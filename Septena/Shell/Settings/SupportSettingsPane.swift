@@ -341,8 +341,11 @@ private struct SupportMessageRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 8) {
-        Label(roleLabel(message.authorRole), systemImage: roleIcon(message.authorRole))
+        Text(roleLabel(message.authorRole))
           .font(.caption.weight(.semibold))
+        // The maintainer's replies carry the Maker badge here too, so the
+        // support thread reads the same as the rest of the community.
+        CommunityBadge(role: message.authorRole, supporterTier: nil)
         if message.isInternal {
           Text("Internal")
             .font(.caption2.weight(.semibold))
@@ -516,10 +519,3 @@ private func roleLabel(_ role: String) -> String {
   }
 }
 
-private func roleIcon(_ role: String) -> String {
-  switch role {
-  case "maintainer": return "checkmark.seal.fill"
-  case "moderator": return "shield"
-  default: return "person.crop.circle"
-  }
-}

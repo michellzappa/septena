@@ -138,6 +138,11 @@ public struct CommunitySupportMetadata: Codable, Sendable, Equatable {
 public struct CommunityAuthor: Decodable, Sendable, Equatable {
   public let username: String?
   public let displayName: String?
+  /// The author's community role ("user"/"maintainer"/"moderator"), for the
+  /// member badge. Absent on older worker responses → decodes to nil.
+  public let role: String?
+  /// The author's Septena+ tier ("annual"/"monthly"/"lifetime"), or nil/none.
+  public let supporterTier: String?
 
   /// Best display string: name, else @handle.
   public var label: String? {

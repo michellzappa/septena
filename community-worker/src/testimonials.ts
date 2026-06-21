@@ -15,15 +15,24 @@ interface TestimonialRow {
   updated_at: string;
   author_username: string | null;
   author_display_name: string | null;
+  author_role: string | null;
+  author_supporter_tier: string | null;
 }
 
 function canModerate(user: CurrentUser): boolean {
   return user.role === "maintainer" || user.role === "moderator";
 }
 
-function authorJSON(username: string | null, displayName: string | null): Record<string, unknown> | null {
+// role + supporterTier ride along so the testimonial author can show the same
+// member badge used on the roadmap; only meaningful with a (public) name.
+function authorJSON(
+  username: string | null,
+  displayName: string | null,
+  role: string | null,
+  supporterTier: string | null,
+): Record<string, unknown> | null {
   if (!username && !displayName) return null;
-  return { username, displayName };
+  return { username, displayName, role: role ?? "user", supporterTier: supporterTier ?? null };
 }
 
 function testimonialJSON(row: TestimonialRow): Record<string, unknown> {
@@ -33,7 +42,7 @@ function testimonialJSON(row: TestimonialRow): Record<string, unknown> {
     rating: row.rating,
     status: row.status,
     isFeatured: row.is_featured === 1,
-    author: authorJSON(row.author_username, row.author_display_name),
+    author: authorJSON(row.author_username, row.author_display_name, row.author_role, row.author_supporter_tier),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -41,9 +50,13 @@ function testimonialJSON(row: TestimonialRow): Record<string, unknown> {
 
 const SELECT_COLS = `
   t.id, t.body, t.rating, t.status, t.is_featured, t.created_at, t.updated_at,
-  ap.username as author_username, ap.display_name as author_display_name
+  ap.username as author_username, ap.display_name as author_display_name,
+  ap.supporter_tier as author_supporter_tier, ai.role as author_role
 `;
-const JOIN_AUTHOR = `left join user_profile ap on ap.user_hash = t.user_hash and ap.is_public = 1`;
+const JOIN_AUTHOR = `
+  left join user_profile ap on ap.user_hash = t.user_hash and ap.is_public = 1
+  left join user_identity ai on ai.user_hash = t.user_hash
+`;
 
 /// The caller's own testimonial (any status), or null.
 export async function getMyTestimonial(env: Env, user: CurrentUser): Promise<Record<string, unknown>> {

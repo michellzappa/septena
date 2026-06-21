@@ -191,6 +191,7 @@ private struct FeatureRow: View {
           FeatureStatusBadge(status: feature.status)
           if let by = feature.author?.label {
             Text(by).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            CommunityBadge(role: feature.author?.role, supporterTier: feature.author?.supporterTier)
           }
           if feature.commentCount > 0 {
             Label("\(feature.commentCount)", systemImage: "bubble.left")
@@ -248,8 +249,11 @@ private struct FeatureDetailView: View {
               Text(d).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
             }
             if let by = f.author?.label {
-              Label("Suggested by \(by)", systemImage: "person.crop.circle")
-                .font(.caption).foregroundStyle(.secondary)
+              HStack(spacing: 6) {
+                Label("Suggested by \(by)", systemImage: "person.crop.circle")
+                  .font(.caption).foregroundStyle(.secondary)
+                CommunityBadge(role: f.author?.role, supporterTier: f.author?.supporterTier)
+              }
             }
             Button {
               Task { await vote(!f.hasVoted) }
@@ -444,9 +448,12 @@ private struct FeatureCommentRow: View {
         if isReply {
           Image(systemName: "arrow.turn.down.right").font(.caption2).foregroundStyle(.tertiary)
         }
-        Label(commentAuthorLabel(role: comment.authorRole, author: comment.author),
-              systemImage: commentAuthorIcon(comment.authorRole))
+        Text(commentAuthorLabel(role: comment.authorRole, author: comment.author))
           .font(.caption.weight(.semibold))
+        // role falls back to the comment's stored authorRole so a maintainer
+        // reply is badged even when they keep their profile private.
+        CommunityBadge(role: comment.author?.role ?? comment.authorRole,
+                       supporterTier: comment.author?.supporterTier)
         if comment.isPinned {
           Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.orange)
         }
@@ -566,14 +573,6 @@ private func commentAuthorLabel(role: String, author: CommunityAuthor?) -> Strin
   case "maintainer": return "Septena"
   case "moderator": return "Moderator"
   default: return author?.label ?? "Member"
-  }
-}
-
-private func commentAuthorIcon(_ role: String) -> String {
-  switch role {
-  case "maintainer": return "checkmark.seal.fill"
-  case "moderator": return "shield"
-  default: return "person.crop.circle"
   }
 }
 

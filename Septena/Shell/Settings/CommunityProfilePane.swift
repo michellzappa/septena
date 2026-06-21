@@ -154,7 +154,7 @@ struct CommunityProfilePane: View {
             Text(membershipTitle)
             Spacer()
             if supporterTier?.isEmpty == false {
-              SeptenaPlusBadge()
+              CommunityBadge(role: nil, supporterTier: supporterTier)
             } else {
               FreeAccountBadge()
             }

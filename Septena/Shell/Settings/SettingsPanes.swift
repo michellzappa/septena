@@ -1019,6 +1019,94 @@ struct SeptenaPlusBadge: View {
   }
 }
 
+/// The one member badge worn beside a name across every community surface —
+/// the roadmap, testimonials, support threads, and the profile pane. Precedence
+/// is maintainer → moderator → supporter tier → nothing, so a general member
+/// shows no badge and callers can drop it in unconditionally (it renders empty
+/// when there's nothing to say). Keeping this the single source is what makes
+/// the badge read the same everywhere. Supporter tiers reuse the `SeptenaPlus`
+/// ink-and-foil look of `SeptenaPlusBadge` so the two never diverge.
+struct CommunityBadge: View {
+  var role: String?
+  var supporterTier: String?
+
+  var body: some View {
+    if let kind = Kind(role: role, supporterTier: supporterTier) {
+      HStack(spacing: 3) {
+        Image(systemName: kind.symbol)
+          .font(.system(size: 8, weight: .bold))
+          .foregroundStyle(kind.usesFoil ? AnyShapeStyle(SeptenaPlus.foil) : AnyShapeStyle(Color.secondary))
+        Text(LocalizedStringKey(kind.word))
+          .foregroundStyle(kind.usesFoil ? AnyShapeStyle(Color.white) : AnyShapeStyle(Color.secondary))
+      }
+      .font(.caption2.weight(.bold))
+      .padding(.horizontal, 8)
+      .padding(.vertical, 3)
+      .background(kind.background, in: Capsule())
+      .overlay {
+        if kind.usesFoil {
+          Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75)
+        }
+      }
+      .accessibilityLabel(Text(kind.accessibility))
+    }
+  }
+
+  enum Kind {
+    case maker, moderator, supporter, founding
+
+    /// Role wins over tier — the maker/moderator mark is the identity that
+    /// matters most, and a maintainer needn't also wear a supporter badge.
+    init?(role: String?, supporterTier: String?) {
+      switch role {
+      case "maintainer": self = .maker; return
+      case "moderator":  self = .moderator; return
+      default: break
+      }
+      switch supporterTier {
+      case "lifetime":            self = .founding
+      case "annual", "monthly":   self = .supporter
+      default:                    return nil
+      }
+    }
+
+    var symbol: String {
+      switch self {
+      case .maker:      return "checkmark.seal.fill"
+      case .moderator:  return "shield.fill"
+      case .supporter:  return "heart.fill"
+      case .founding:   return "star.fill"
+      }
+    }
+
+    var word: String {
+      switch self {
+      case .maker:      return "Maker"
+      case .moderator:  return "Mod"
+      case .supporter:  return SeptenaPlus.badgeWord  // "Supporter"
+      case .founding:   return "Founding"
+      }
+    }
+
+    /// Maker/supporter wear the premium ink-and-foil plate; moderator stays a
+    /// quiet neutral capsule so it doesn't compete with it.
+    var usesFoil: Bool { self != .moderator }
+
+    var background: AnyShapeStyle {
+      usesFoil ? AnyShapeStyle(SeptenaPlus.ink) : AnyShapeStyle(Color.secondary.opacity(0.15))
+    }
+
+    var accessibility: String {
+      switch self {
+      case .maker:      return "Maker"
+      case .moderator:  return "Moderator"
+      case .supporter:  return "Supporter"
+      case .founding:   return "Founding supporter"
+      }
+    }
+  }
+}
+
 /// The quiet counterpart to `SeptenaPlusBadge`, worn by a non-supporter. The
 /// whole app is free, so this is a plain statement of fact, not a nudge — a
 /// muted capsule with no foil, deliberately understated next to the supporter

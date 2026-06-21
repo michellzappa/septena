@@ -244,6 +244,7 @@ private struct TestimonialRow: View {
       HStack(spacing: 8) {
         if let by = testimonial.author?.label {
           Text("— \(by)").font(.caption).foregroundStyle(.secondary)
+          CommunityBadge(role: testimonial.author?.role, supporterTier: testimonial.author?.supporterTier)
         } else {
           Text("— Anonymous").font(.caption).foregroundStyle(.tertiary)
         }
