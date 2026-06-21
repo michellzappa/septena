@@ -71,6 +71,14 @@ struct SidebarRootView: View {
   @State private var areaOpenCount: [String: Int] = [:]
   @State private var errorMessage: String?
 
+  #if os(macOS)
+  /// The highlighted sidebar row, decoupled from what's open in the detail
+  /// pane (the Finder/Mail source-list model): ↑↓ / single-click move this
+  /// selection without navigating; a double-click or Return opens the selected
+  /// row (`openSelection`). Synced to the open route on appear and whenever the
+  /// detail navigates elsewhere, so selection follows an external jump.
+  @State private var macSelection: SidebarSelection?
+  #endif
 
   /// Magic Plus on the homepage offers task / project / area creation.
   @State private var showingCreateMenu = false
@@ -245,22 +253,40 @@ struct SidebarRootView: View {
     // Reminders-like rhythm.
     .listSectionSpacing(18)
     #else
-    // macOS draws selection itself (no `selection:` binding). A `.sidebar`
-    // `List(selection:)` colors the selected row with the *active* accent only
-    // while the List holds focus, then grays it the instant a click hands focus
-    // to the detail pane — the blue→gray "flash". A custom `.listRowBackground`
-    // can't suppress that system capsule (it composites *under* it, giving two
-    // overlapping highlights), so instead we forgo the native selection
-    // entirely: rows are plain Buttons and `SidebarRowSelectionBackground`
-    // paints one focus-independent accent pill. Trade-off: no arrow-key row
-    // navigation, which the native binding provided.
-    List {
+    // macOS uses the native `.sidebar` `List(selection:)` — the standard
+    // source-list selection (Mail / Finder / Notes): accent while the list is
+    // focused, the system's unemphasized gray when the detail pane takes focus,
+    // plus ↑↓ row traversal for free. Selection is its OWN state (`macSelection`),
+    // decoupled from what's open: a single click / arrow key just moves the
+    // highlight; a double-click (in `navRow`) or Return opens it.
+    List(selection: $macSelection) {
       smartListSection
       areaProjectSections
     }
     .listStyle(.sidebar)
+    // Return opens the highlighted row, the keyboard twin of a double-click.
+    .onKeyPress(.return) {
+      guard let macSelection else { return .ignored }
+      openSelection(macSelection)
+      return .handled
+    }
+    // Start the highlight on whatever's already open, and follow the detail if
+    // it navigates from elsewhere (a deleted row bouncing to Today, a deep link).
+    .onAppear { syncMacSelectionToOpenRoute() }
+    .onChange(of: nav.path) { _, _ in syncMacSelectionToOpenRoute() }
     #endif
   }
+
+  #if os(macOS)
+  /// Move the sidebar highlight onto the route currently shown in the detail
+  /// pane. Called on appear and when `nav` changes externally — opening a row
+  /// already sets both, so this only catches navigation that originated
+  /// elsewhere (delete-bounce, deep link), never fighting an arrow-key move.
+  private func syncMacSelectionToOpenRoute() {
+    let token = nav.path.last.map(Self.token(for:))
+    if token != macSelection { macSelection = token }
+  }
+  #endif
 
   // MARK: - Smart lists section
   //
@@ -277,8 +303,7 @@ struct SidebarRootView: View {
           SmartListRow(icon: spec.icon,
                        iconColor: spec.color,
                        title: spec.title,
-                       count: spec.count,
-                       selected: isSelected(spec.route))
+                       count: spec.count)
         }
         .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
@@ -352,6 +377,16 @@ struct SidebarRootView: View {
         Label("New Project", systemImage: "number")
       }
       Divider()
+      // Page-specific settings, in the same slot Next uses (just above the
+      // shared Settings row): Tasks has no dedicated pane — its knobs live in
+      // Settings ▸ Sections ▸ Tasks, so deep-link straight there. Rides
+      // `NavigationState` (iOS forwards it through the shared settings sheet).
+      Button {
+        nav.settingsDestination = .section("tasks")
+        nav.showSettings = true
+      } label: {
+        Label("Task Settings", systemImage: "checklist")
+      }
     }
   }
 
@@ -476,26 +511,25 @@ struct SidebarRootView: View {
     ]
   }
 
-  /// A navigable sidebar row. On push-navigation surfaces (iPad regular /
-  /// macOS, where the sidebar drives a persistent detail pane) the row is a
-  /// plain `List(selection:)`-selectable cell tagged by its route, so selecting
-  /// it (click or arrow keys) highlights it natively *and* drives the detail
-  /// through `sidebarSelection`. On compact surfaces (iPhone / slide-over — a
-  /// push stack with no persistent sidebar to highlight) it's a Button that
-  /// sets `nav.path` directly. InertButtonStyle suppresses the click-tint flash.
+  /// A navigable sidebar row. Three behaviors, one per surface:
+  ///   • macOS: a native `List(selection:)` cell tagged by its route. Selection
+  ///     (`macSelection`) is decoupled from navigation — single-click / arrow
+  ///     keys move the highlight, a double-click (or Return) opens it.
+  ///   • iPad regular (push nav): a tagged cell whose selection drives the
+  ///     detail directly through `sidebarSelection` — select *is* open.
+  ///   • iPhone / slide-over (compact): a Button that sets `nav.path` directly;
+  ///     InertButtonStyle suppresses the click-tint flash.
   @ViewBuilder
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
     #if os(macOS)
-    // Self-drawn selection (see `sidebarListContent`): a Button drives nav and
-    // `SidebarRowSelectionBackground` paints the one consistent neutral pill,
-    // keyed off the id-based `isSelected` so it never grays out on focus loss.
-    // `focusEffectDisabled` suppresses the system focus ring (the stray blue
-    // outline) so the pill is the only selection cue, Reminders-style.
-    Button { selectRoute(route) } label: { content() }
-      .buttonStyle(InertButtonStyle())
-      .focusEffectDisabled()
-      .listRowBackground(SidebarRowSelectionBackground(selected: isSelected(route)))
+    // Native source-list cell: tagged so `List(selection:)` tracks it via
+    // `macSelection`. A single click / arrow key only moves the highlight; a
+    // double-click opens (the keyboard twin is Return, handled on the list).
+    content()
+      .tag(Self.token(for: route))
+      .contentShape(Rectangle())
+      .simultaneousGesture(TapGesture(count: 2).onEnded { selectRoute(route) })
     #else
     if usesPushNavigation {
       content().tag(Self.token(for: route))
@@ -532,16 +566,20 @@ struct SidebarRootView: View {
   private var sidebarSelection: Binding<SidebarSelection?> {
     Binding(
       get: { nav.path.last.map(Self.token(for:)) },
-      set: { token in
-        guard let token else { return }
-        switch token {
-        case .filter(let f):   selectRoute(.filter(f))
-        case .next:            selectRoute(.next)
-        case .project(let id): if let p = projects.first(where: { $0.id == id }) { selectRoute(.project(p)) }
-        case .area(let id):    if let a = areas.first(where: { $0.id == id }) { selectRoute(.area(a)) }
-        }
-      }
+      set: { token in if let token { openSelection(token) } }
     )
+  }
+
+  /// Resolve a selection token to its `Route` and open it in the detail pane.
+  /// Shared by the iOS selection binding (select == open) and the macOS
+  /// double-click / Return open path (where selection is otherwise decoupled).
+  private func openSelection(_ token: SidebarSelection) {
+    switch token {
+    case .filter(let f):   selectRoute(.filter(f))
+    case .next:            selectRoute(.next)
+    case .project(let id): if let p = projects.first(where: { $0.id == id }) { selectRoute(.project(p)) }
+    case .area(let id):    if let a = areas.first(where: { $0.id == id }) { selectRoute(.area(a)) }
+    }
   }
 
   private func selectRoute(_ route: Route) {
@@ -562,6 +600,11 @@ struct SidebarRootView: View {
   /// the shell uses — never the device idiom. A foldable iPhone reports the
   /// `.phone` idiom even when unfolded into a regular-width display, so an
   /// idiom check would wrongly suppress the default highlight on the big screen.
+  ///
+  /// iOS only: the macOS sidebar now uses native `List(selection:)`
+  /// (`macSelection`) for its highlight, so this hand-rolled "current route"
+  /// check is only needed by the iPhone smart-list tiles.
+  #if os(iOS)
   private var selectedRoute: Route? {
     if !usesPushNavigation {
       return nav.path.last
@@ -583,6 +626,7 @@ struct SidebarRootView: View {
     default:                                 return false
     }
   }
+  #endif
 
   // MARK: - Areas and projects
   //
@@ -632,8 +676,7 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func areaRow(_ area: Area) -> some View {
     navRow(.area(area)) {
-      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
-                     selected: isSelected(.area(area)))
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
     }
     #if os(iOS)
     .contextMenu {
@@ -654,8 +697,7 @@ struct SidebarRootView: View {
     navRow(.project(project)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
-                        count: projectOpenCount[project.id] ?? 0,
-                        selected: isSelected(.project(project)))
+                        count: projectOpenCount[project.id] ?? 0)
     }
     #if os(iOS)
     .contextMenu {
@@ -944,11 +986,6 @@ struct SmartListRow: View {
   let title: String
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
-  /// macOS: when this smart list is the current selection (sitting on the gray
-  /// pill), the title takes the Tasks accent (same as the `+` button), matching
-  /// the area/project rows. No effect on iOS.
-  var selected: Bool = false
-  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: 10) {
@@ -956,7 +993,9 @@ struct SmartListRow: View {
                    size: Theme.sidebarIconSize + 4)
       Text(title)
         .scaledFont(size: Theme.sidebarAreaTitleSize)
-        .foregroundStyle(selectedTitleColor)
+        // `.primary` (not a fixed Theme ink) so the native `.sidebar`
+        // selection inverts the title to white over the focused accent.
+        .foregroundStyle(.primary)
       Spacer()
       if let n = count, n > 0 {
         Text("\(n)")
@@ -966,14 +1005,6 @@ struct SmartListRow: View {
     }
     .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
-  }
-
-  private var selectedTitleColor: AnyShapeStyle {
-    #if os(macOS)
-    selected ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.primary)
-    #else
-    AnyShapeStyle(.primary)
-    #endif
   }
 }
 
@@ -1171,40 +1202,12 @@ struct SectionGlyph: View {
   }
 }
 
-#if os(macOS)
-/// Selection fill for the macOS Tasks sidebar. We draw the selection ourselves
-/// (the List has no `selection:` binding) so it stays one consistent appearance
-/// regardless of focus — the native `.sidebar` highlight otherwise flips from the
-/// active accent to an inactive gray the instant focus leaves the list (the
-/// blue→gray "flash"). Mail.app / Reminders look: a neutral gray pill (the system
-/// *unemphasized* selection gray), with the row drawing an accent-/item-colored
-/// title over it. Inset from the edges so it reads as a contained capsule, not an
-/// edge-to-edge band — `.sidebar` hands `.listRowBackground` the full row width,
-/// so without the inset it bleeds.
-private struct SidebarRowSelectionBackground: View {
-  let selected: Bool
-  var body: some View {
-    RoundedRectangle(cornerRadius: 6, style: .continuous)
-      // Half-strength so the indicator reads as a light wash, not a solid fill.
-      .fill(selected ? Color(nsColor: .unemphasizedSelectedContentBackgroundColor).opacity(0.5)
-                     : Color.clear)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 1)
-  }
-}
-#endif
-
 struct SidebarAreaRow: View {
   let name: String
   /// Optional user glyph; nil ⇒ the muted dot.
   var emoji: String? = nil
   /// Open task count rolled up across the area (loose + projects in it).
   var count: Int = 0
-  /// macOS: when this row is the current selection (sitting on the gray pill),
-  /// the title takes the section accent — Mail.app colors the selected item's
-  /// name. No effect on iOS.
-  var selected: Bool = false
-  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1212,7 +1215,7 @@ struct SidebarAreaRow: View {
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
-        .foregroundStyle(selectedTitleColor)
+        .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
       if count > 0 {
         Text("\(count)")
@@ -1223,14 +1226,6 @@ struct SidebarAreaRow: View {
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
-  }
-
-  private var selectedTitleColor: Color {
-    #if os(macOS)
-    selected ? theme.accent : Theme.inkPrimary
-    #else
-    Theme.inkPrimary
-    #endif
   }
 }
 
@@ -1273,11 +1268,6 @@ struct SidebarProjectRow: View {
   var tint: Color = Theme.iconMuted
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
-  /// macOS: when this row is the current selection (sitting on the gray pill),
-  /// the title takes the section accent — Mail.app colors the selected item's
-  /// name. No effect on iOS.
-  var selected: Bool = false
-  @Environment(SectionTheme.self) private var theme
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1285,7 +1275,7 @@ struct SidebarProjectRow: View {
         .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
-        .foregroundStyle(selectedTitleColor)
+        .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
       if count > 0 {
         Text("\(count)")
@@ -1297,10 +1287,16 @@ struct SidebarProjectRow: View {
     .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
   }
+}
 
-  private var selectedTitleColor: Color {
+/// The sidebar row title color. macOS uses `.primary` so the native `.sidebar`
+/// selection inverts the title (white over the focused accent); iOS keeps the
+/// app's fixed ink, since its list selection only shows in edit mode and never
+/// recolors row text.
+enum SidebarRowTitleStyle {
+  static var color: Color {
     #if os(macOS)
-    selected ? theme.accent : Theme.inkPrimary
+    .primary
     #else
     Theme.inkPrimary
     #endif
