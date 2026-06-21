@@ -26,6 +26,16 @@ app, the widgets, the complication, and the live-activity extension) reads
 xcconfig keeps the whole bundle's build numbers identical — App Store validation
 rejects archives whose extensions disagree with the parent.
 
+This only works because each target's hand-maintained `Info.plist` sets its two
+version keys to the build-setting *references*, not literals:
+`CFBundleShortVersionString` → `$(MARKETING_VERSION)` and `CFBundleVersion` →
+`$(CURRENT_PROJECT_VERSION)`. A plist that hardcodes a literal (the old `1.0` /
+`1`) silently ships the wrong version no matter what the config says — Settings ▸
+About reads these keys at runtime. `scripts/check-version-wiring.sh` enforces the
+wiring across all six plists; `scripts/stamp-version.sh` runs it before stamping
+so a mis-wired archive can't ship. **Add a new bundle target's plist to that
+script's `PLISTS` list.**
+
 **The build number is now stamped live, not just at archive.** The committer-cron
 runs `scripts/changelog-stamp.sh` after it lands real work, which stamps
 `CURRENT_PROJECT_VERSION` to the commit count (see *The in-development entry*

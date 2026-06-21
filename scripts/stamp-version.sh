@@ -18,6 +18,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# Refuse to stamp an archive whose plists hardcode the version instead of
+# reading the build settings — otherwise the bumped number below never reaches
+# the bundle. See scripts/check-version-wiring.sh.
+scripts/check-version-wiring.sh
+
 XCCONFIG="Config/Base.xcconfig"
 COUNT="$(git rev-list --count HEAD)"
 
