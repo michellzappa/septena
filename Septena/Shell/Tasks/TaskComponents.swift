@@ -1264,6 +1264,12 @@ struct TaskRowActions: ViewModifier {
   let mutator: TaskMutator
   /// Opens the task's edit / agent composer ("Edit Details…"). nil hides it.
   var onOpenDetail: ((SeptenaTask) -> Void)? = nil
+  /// Fired after a menu mutation that can change which list a row belongs to
+  /// (remove-from-today, reschedule, move, cancel, delete). Surfaces that hold
+  /// their task arrays in @State — like the Tasks drawer — pass a reload here so
+  /// the row leaves in real time. Surfaces that already refresh off
+  /// `.septenaTasksChanged` (the full `TaskListView`) leave it nil.
+  var onChange: (() -> Void)? = nil
 
   @State private var whenSheet: TaskListView.WhenSheet?
   @State private var showingMoveSheet = false
@@ -1287,13 +1293,14 @@ struct TaskRowActions: ViewModifier {
               else { mutator.removeFromToday(id: id) }
               mutator.acknowledge(id: id)
             }
+            onChange?()
           },
           onOpenWhen: { _ in whenSheet = .init(taskId: task.id, kind: .scheduled) },
           onOpenDeadline: { _ in whenSheet = .init(taskId: task.id, kind: .deadline) },
           onOpenMove: { _ in moveTargetId = task.id; showingMoveSheet = true },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
-          onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) } },
-          onDelete: { _ in Haptics.warning(); mutator.delete(id: task.id) }
+          onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) }; onChange?() },
+          onDelete: { _ in Haptics.warning(); mutator.delete(id: task.id); onChange?() }
         )
       }
       .modifier(TaskListModalPresenter(
@@ -1310,7 +1317,7 @@ struct TaskRowActions: ViewModifier {
         currentRecurrence: { _ in task.recurrence },
         applyWhen: applyWhen,
         applyMove: applyMove,
-        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule) }
+        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule); onChange?() }
       ))
   }
 
@@ -1336,6 +1343,7 @@ struct TaskRowActions: ViewModifier {
       }
     }
     mutator.acknowledge(id: id)
+    onChange?()
   }
 
   // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
@@ -1349,6 +1357,7 @@ struct TaskRowActions: ViewModifier {
       mutator.moveToProject(id: id, project: nil)
     }
     mutator.acknowledge(id: id)
+    onChange?()
   }
 }
 
@@ -1361,9 +1370,10 @@ extension View {
                       areas: [Area] = [],
                       projects: [Project] = [],
                       mutator: TaskMutator,
-                      onOpenDetail: ((SeptenaTask) -> Void)? = nil) -> some View {
+                      onOpenDetail: ((SeptenaTask) -> Void)? = nil,
+                      onChange: (() -> Void)? = nil) -> some View {
     modifier(TaskRowActions(task: task, filter: filter, areas: areas,
                             projects: projects, mutator: mutator,
-                            onOpenDetail: onOpenDetail))
+                            onOpenDetail: onOpenDetail, onChange: onChange))
   }
 }

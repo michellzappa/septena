@@ -1080,10 +1080,23 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   /// Disables the confirmation control (e.g. while a required field is
   /// empty). The form owns the validation; the scaffold owns the affordance.
   var canSave: Bool = true
+  /// Opt-in: there are unsaved changes. When an `onDiscard` is supplied, this
+  /// turns Cancel into a guarded discard — Cancel/Esc on a dirty form prompts
+  /// before dropping the work, and the interactive swipe-to-dismiss is blocked
+  /// so an accidental gesture can never discard. Forms without `onDiscard` (the
+  /// autosave-on-close ones) ignore this and Cancel just closes, as before.
+  var isDirty: Bool = false
+  /// Prompt shown in the discard confirmation (e.g. "Discard new task?").
+  var discardTitle: String = "Discard changes?"
   /// The save action. The scaffold runs it, then closes — forms must NOT
   /// call dismiss/close themselves (that's what produced the double-close
   /// and dismiss-no-op bugs the inspector exposed).
   let onSave: () -> Void
+  /// Opt-in discard action: run when the user explicitly confirms Cancel →
+  /// Discard. Supply it to get the dirty-aware Cancel guard above (the form
+  /// uses it to suppress any autosave-on-close so the draft is truly dropped).
+  /// When nil, Cancel is a plain close.
+  var onDiscard: (() -> Void)? = nil
   /// Optional trailing control in the header (e.g. a ⋯ overflow menu of
   /// contextual actions). Sits where Save would be when `showsSave` is false.
   var trailing: AnyView? = nil
@@ -1091,58 +1104,78 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
 
   @Environment(\.dismiss) private var dismiss
   @Environment(\.adaptiveDetailClose) private var adaptiveClose
+  @State private var showDiscardConfirm = false
 
   private var isInspector: Bool { adaptiveClose != nil }
   private func close() { (adaptiveClose ?? { dismiss() })() }
   private func confirm() { onSave(); close() }
 
+  /// The leading control's action. Without discard semantics it's a plain close
+  /// (the autosave-on-close forms persist via their own `.onDisappear`). With an
+  /// `onDiscard`, a dirty form prompts first; a clean one just closes.
+  private func requestCancel() {
+    guard onDiscard != nil else { close(); return }
+    if isDirty { showDiscardConfirm = true } else { discard() }
+  }
+  private func discard() { onDiscard?(); close() }
+
   var body: some View {
-    if isInspector {
-      content()
-        .safeAreaInset(edge: .top, spacing: 0) {
-          AdaptiveEditHeader(
-            title: title,
-            cancelTitle: cancelTitle,
-            saveTitle: saveTitle,
-            showsSave: showsSave,
-            canSave: canSave,
-            accent: accent,
-            onCancel: close,
-            onSave: confirm,
-            trailing: trailing
-          )
-        }
-    } else {
-      NavigationStack {
+    Group {
+      if isInspector {
         content()
-          // A default-styled macOS `Form` reports no flexible height, so in
-          // this sheet branch it collapses to no apparent height. Grouped (the
-          // app's house style, and already the iOS Form default) scrolls and
-          // fills the sheet. Centralized here so no individual form repeats it.
-          .formStyle(.grouped)
-          .navigationTitle(title)
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-          .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-              Button(cancelTitle, action: close)
-                .tint(accent)
-                .keyboardShortcut(.cancelAction) // Esc
-            }
-            if showsSave {
-              ToolbarItem(placement: .confirmationAction) {
-                Button(saveTitle, action: confirm)
+          .safeAreaInset(edge: .top, spacing: 0) {
+            AdaptiveEditHeader(
+              title: title,
+              cancelTitle: cancelTitle,
+              saveTitle: saveTitle,
+              showsSave: showsSave,
+              canSave: canSave,
+              accent: accent,
+              onCancel: requestCancel,
+              onSave: confirm,
+              trailing: trailing
+            )
+          }
+      } else {
+        NavigationStack {
+          content()
+            // A default-styled macOS `Form` reports no flexible height, so in
+            // this sheet branch it collapses to no apparent height. Grouped (the
+            // app's house style, and already the iOS Form default) scrolls and
+            // fills the sheet. Centralized here so no individual form repeats it.
+            .formStyle(.grouped)
+            .navigationTitle(title)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+              ToolbarItem(placement: .cancellationAction) {
+                Button(cancelTitle, action: requestCancel)
                   .tint(accent)
-                  .disabled(!canSave)
-                  .keyboardShortcut(.defaultAction) // Return / ⌘Return
+                  .keyboardShortcut(.cancelAction) // Esc
+              }
+              if showsSave {
+                ToolbarItem(placement: .confirmationAction) {
+                  Button(saveTitle, action: confirm)
+                    .tint(accent)
+                    .disabled(!canSave)
+                    .keyboardShortcut(.defaultAction) // Return / ⌘Return
+                }
+              }
+              if let trailing {
+                ToolbarItem(placement: .primaryAction) { trailing }
               }
             }
-            if let trailing {
-              ToolbarItem(placement: .primaryAction) { trailing }
-            }
-          }
+        }
       }
+    }
+    // A dirty form with discard semantics can't be swiped/clicked away — the
+    // only exits are Save (commit) or Cancel (confirmed discard), so an
+    // accidental gesture can never drop the work.
+    .interactiveDismissDisabled(onDiscard != nil && isDirty)
+    .confirmationDialog(discardTitle, isPresented: $showDiscardConfirm, titleVisibility: .visible) {
+      Button("Discard", role: .destructive, action: discard)
+      Button("Keep Editing", role: .cancel) {}
     }
   }
 }

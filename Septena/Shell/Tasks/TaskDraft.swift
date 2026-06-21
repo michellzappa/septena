@@ -141,6 +141,34 @@ struct TaskDraft {
       || areaId != prior.areaId
   }
 
+  // MARK: - Dirty tracking (drives the editor's Cancel / discard guard)
+
+  /// Create mode: is there anything worth keeping? A non-empty title or notes,
+  /// or any attribute the user set. Drives whether cancelling a *new* task needs
+  /// a "Discard new task?" confirmation — an untouched blank composer just
+  /// closes, a started one asks first.
+  var hasContent: Bool {
+    !trimmedTitle.isEmpty || !trimmedNotes.isEmpty
+      || onToday || scheduled != nil || deadline != nil
+      || recurrence != nil || areaId != nil || projectId != nil
+  }
+
+  /// Edit mode: does this draft differ from the task it was seeded from? Mirrors
+  /// exactly the fields `update(_:via:)` would write (normalized-vs-normalized
+  /// for the lossy When mapping), so "dirty" means precisely "Save would change
+  /// something" — no false discard prompt on a bare peek.
+  func differs(from original: SeptenaTask) -> Bool {
+    let prior = TaskDraft(task: original)
+    return trimmedTitle != original.title
+      || notes != (original.notes ?? "")
+      || storedScheduled != prior.storedScheduled
+      || pinToday != prior.pinToday
+      || deadline != prior.deadline
+      || recurrence != original.recurrence
+      || projectId != original.project
+      || areaId != original.area
+  }
+
   // MARK: - Pill value labels
 
   /// Resolve the "List" label (project wins, else area, else Inbox).

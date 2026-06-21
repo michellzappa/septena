@@ -101,17 +101,20 @@ struct TaskComposerCard: View {
     // other edit form. Save persists + reloads; the scaffold then closes.
     AdaptiveEditScaffold(
       title: headerTitle,
-      // Autosave-on-close: the left control just closes (the `.onDisappear`
-      // below persists), so it reads "Done", not "Cancel" — Esc, swipe, and
-      // click-away all keep your edits.
+      // Standard two-control chrome: an explicit commit (Add / Save) and a real
+      // Cancel. Cancel discards — but only through a confirmation when the form
+      // is dirty, and the scaffold blocks swipe-to-dismiss while dirty, so the
+      // ONLY way to lose a task is an explicit Cancel → Discard. Every other
+      // exit (and the `.onDisappear` net below) keeps the work.
       saveTitle: saveTitle,
-      cancelTitle: "Done",
-      // Edit mode autosaves on close, so a separate Save would be redundant —
-      // "Done" both saves and closes. Create mode keeps its "Add" primary action.
-      showsSave: !isEditing,
+      cancelTitle: "Cancel",
+      showsSave: true,
       accent: accent,
       canSave: draft.canSave,
-      onSave: { persistOnce() }
+      isDirty: isDirty,
+      discardTitle: isEditing ? "Discard changes?" : "Discard new task?",
+      onSave: { persistOnce() },
+      onDiscard: { discard() }
     ) {
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
@@ -157,9 +160,12 @@ struct TaskComposerCard: View {
     .presentationContentInteraction(.scrolls)
     #endif
     .onAppear(perform: seed)
-    // Autosave on any close (Esc / swipe / click-away / Done). Idempotent via
-    // `savedOrSkipped`, so the explicit Save and terminal-action paths that
-    // already ran don't write twice.
+    // Safety net: persist on any teardown the buttons didn't already handle
+    // (app backgrounded, the inspector toggled shut by the system, a parent
+    // removed). Idempotent via `savedOrSkipped` — an explicit Save already ran
+    // it, and an explicit Cancel → Discard flips the guard so this no-ops and
+    // the draft is truly dropped. This is the belt to the Cancel suspenders:
+    // the only path that loses work is a confirmed Discard.
     .onDisappear { persistOnce() }
     .onChange(of: draft.title) { _, newValue in
       // The title wraps (axis: .vertical) so long titles show in full instead
@@ -396,6 +402,24 @@ struct TaskComposerCard: View {
     guard draft.canSave else { return }
     persist()
     onDone()
+  }
+
+  /// Are there unsaved changes worth guarding? Create: any content entered;
+  /// edit: any field differs from the original. Drives the scaffold's Cancel
+  /// confirmation and the swipe-to-dismiss block.
+  private var isDirty: Bool {
+    switch mode {
+    case .create:          return draft.hasContent
+    case .edit(let task):  return draft.differs(from: task)
+    }
+  }
+
+  /// Explicit Cancel → Discard. Flip the autosave guard so the `.onDisappear`
+  /// net below doesn't resurrect the dropped draft: create makes no task, edit
+  /// leaves the original untouched (its mutations never ran). The scaffold
+  /// closes after this.
+  private func discard() {
+    savedOrSkipped = true
   }
 
   /// Persist + close (Return-to-save / newline-save). Closing then fires

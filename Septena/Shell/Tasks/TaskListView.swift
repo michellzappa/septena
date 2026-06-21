@@ -823,10 +823,10 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func row(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
-    // No swipe actions on task rows (removed by request — completion is the
-    // checkbox; everything else is the menu). `quickMenu` adds a visible
-    // trailing "⋯" that opens the same shared `rowActionsMenu` as right-click /
-    // long-press — used on Inbox rows so triage is one tap, not a hidden press.
+    // No swipe actions and no inline "⋯" button on task rows (removed by
+    // request — completion is the checkbox; everything else is the deep-press /
+    // right-click `.contextMenu`). `quickMenu` still gates the one-tap "file
+    // here" suggestion capsule shown on Inbox rows.
     HStack(spacing: 0) {
       rowContent(task)
       // One-tap "file here" — the learned destination, shown only when the
@@ -852,21 +852,6 @@ struct TaskListView: View {
         .fixedSize()
         .padding(.trailing, 2)
         .accessibilityLabel("File in \(suggestion.title)")
-      }
-      if quickMenu {
-        Menu {
-          rowActionsMenu(target: .single(task))
-        } label: {
-          Image(systemName: "ellipsis")
-            .scaledFont(size: 16, weight: .semibold)
-            .foregroundStyle(Theme.iconMuted)
-            .frame(width: 44, height: 32)
-            .contentShape(Rectangle())
-        }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .fixedSize()
-        .accessibilityLabel("Organize")
       }
     }
     .background(rowBackground(for: task))

@@ -107,7 +107,8 @@ struct TasksDestinationView: View {
               .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .triage, areas: areas,
                               projects: projects, mutator: mutator,
-                              onOpenDetail: { openEdit($0) })
+                              onOpenDetail: { openEdit($0) },
+                              onChange: { reloadAnimated() })
           }
         }
       }
@@ -125,7 +126,8 @@ struct TasksDestinationView: View {
               .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .today, areas: areas,
                               projects: projects, mutator: mutator,
-                              onOpenDetail: { openEdit($0) })
+                              onOpenDetail: { openEdit($0) },
+                              onChange: { reloadAnimated() })
               .transition(.opacity)
           }
         }
@@ -144,7 +146,8 @@ struct TasksDestinationView: View {
               .septenaOnDoubleClick { openEdit(task) }
               .taskRowActions(task: task, filter: .logbook, areas: areas,
                               projects: projects, mutator: mutator,
-                              onOpenDetail: { openEdit($0) })
+                              onOpenDetail: { openEdit($0) },
+                              onChange: { reloadAnimated() })
           }
         }
       }
@@ -180,6 +183,14 @@ struct TasksDestinationView: View {
   }
 
   // MARK: - Data
+
+  /// Re-read the lists with a fade so a row that leaves Today (removed from
+  /// today, rescheduled, moved, cancelled, deleted via the row menu) animates
+  /// out in real time. The checkbox path keeps its own optimistic settle beat
+  /// and does not route through here.
+  private func reloadAnimated() {
+    motion.run(Theme.Motion.settle) { reload() }
+  }
 
   private func reload() {
     settle.cancelAll()
