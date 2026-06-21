@@ -17,7 +17,11 @@ struct CommunityTestimonialPane: View {
   @State private var busy = false
   @State private var errorMessage: String?
 
-  private var canUse: Bool { CommunityClient.shared.appAttestSupported }
+  /// nil = still checking, false = no iCloud (show fallback), true = ready to
+  /// transact (iCloud + App Attest, or a Sign in with Apple session).
+  @State private var canUse: Bool?
+  /// iCloud is present but this device needs Sign in with Apple (no App Attest).
+  @State private var needsAppleSignIn = false
   private var isMaintainer: Bool { role == "maintainer" || role == "moderator" }
 
   private var canSubmit: Bool {
@@ -27,7 +31,11 @@ struct CommunityTestimonialPane: View {
 
   var body: some View {
     List {
-      if !canUse {
+      if canUse == nil {
+        Section { HStack { ProgressView(); Text("Checking iCloud…").foregroundStyle(.secondary) } }
+      } else if needsAppleSignIn {
+        CommunitySignInSection { Task { await reload() } }
+      } else if canUse == false {
         fallbackSection
       } else {
         if isMaintainer {
@@ -74,8 +82,13 @@ struct CommunityTestimonialPane: View {
       }
     }
     .formStyle(.grouped)
-    .task { if canUse { await loadRole(); await load() } }
-    .refreshable { if canUse { await load() } }
+    .task {
+      if canUse == nil { await refreshAccess() }
+      if canUse == true { await loadRole(); await load() }
+    }
+    .refreshable {
+      await reload()
+    }
   }
 
   @ViewBuilder
@@ -121,9 +134,9 @@ struct CommunityTestimonialPane: View {
 
   private var fallbackSection: some View {
     Section {
-      Label("Testimonials need App Attest and iCloud.", systemImage: "quote.bubble")
+      Label("Sign in to iCloud to leave a testimonial.", systemImage: "quote.bubble")
         .foregroundStyle(.secondary)
-      Text("This keeps them tied to the genuine app and your Apple ID without shipping a secret.")
+      Text("Testimonials are tied to your Apple ID — open Settings and sign in to iCloud, then come back.")
         .font(.footnote).foregroundStyle(.secondary)
     }
   }
@@ -136,6 +149,17 @@ struct CommunityTestimonialPane: View {
     case "hidden": return "Hidden by a maintainer. Editing resubmits it for review."
     default: return "Pending review. A maintainer will approve it before it can show publicly."
     }
+  }
+
+  @MainActor private func refreshAccess() async {
+    let access = await CommunityClient.shared.access()
+    canUse = (access == .ready)
+    needsAppleSignIn = (access == .needsAppleSignIn)
+  }
+
+  @MainActor private func reload() async {
+    await refreshAccess()
+    if canUse == true { await loadRole(); await load() }
   }
 
   @MainActor private func loadRole() async {

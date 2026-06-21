@@ -1,4 +1,5 @@
 import { rateLimited, verifyAssertion } from "./attest";
+import { verifySession } from "./apple";
 import type { CurrentUser, Env } from "./env";
 
 export async function requireUser(
@@ -12,44 +13,67 @@ export async function requireUser(
   }
 
   const mode = env.ATTEST_MODE ?? "enforce";
-  const keyId = req.headers.get("X-Attest-Key-Id") ?? "";
-  const assertion = req.headers.get("X-Attest-Assertion") ?? "";
-  const challenge = req.headers.get("X-Attest-Challenge") ?? "";
-  let attested = false;
-  if (mode !== "off") {
-    if (!keyId || !assertion || !challenge) {
-      if (mode === "enforce") return { error: problem("missing_attestation", 403), attestStatus: "missing" };
-    } else {
-      const res = await verifyAssertion(env, { keyId, assertionB64: assertion, challenge, body: bodyBytes });
-      if (!res.ok && mode === "enforce") {
-        return { error: problem(`attestation_${res.reason ?? "failed"}`, 403), attestStatus: res.reason ?? "failed" };
-      }
-      if (!res.ok) console.log(`attest.audit failed reason=${res.reason ?? ""}`);
-      else attested = true;
-    }
-  }
 
   const cloudKitUserID = req.headers.get("X-Septena-CloudKit-User")?.trim() ?? "";
   if (!cloudKitUserID) return { error: problem("missing_cloudkit_user", 400), attestStatus: "ok" };
   const userHash = await hmacUserHash(env, cloudKitUserID);
 
-  // Identity binding (trust-on-first-use). The CloudKit user id is a header the
-  // client asserts; App Attest only proves the app is genuine, not *which*
-  // iCloud user it is. Pin each genuine attest key to the first identity it
-  // presents so one device's key can't later hop between user identities (e.g.
-  // claim a maintainer's hash). A normal single-account user never trips this;
-  // it self-heals on reinstall (a fresh key gets a fresh binding). NOT a full
-  // fix for a first-contact spoof by someone who already knows a target's
-  // opaque CloudKit record id — closing that needs proven CloudKit identity.
-  if (attested && keyId) {
-    const bindKey = `bind:${keyId}`;
-    const bound = await env.ATTEST.get(bindKey);
-    if (!bound) {
-      await env.ATTEST.put(bindKey, userHash);
-    } else if (bound !== userHash) {
-      console.log(`attest.bind mismatch key=${keyId.slice(0, 8)}`);
-      return { error: problem("identity_mismatch", 403), attestStatus: "identity_mismatch" };
+  // A request proves it's genuine one of two ways, either of which satisfies
+  // enforce mode: an App Attest assertion (a real, unmodified app on a real
+  // Apple device) OR a Sign in with Apple session token (a proven Apple ID —
+  // the substitute for devices without App Attest, notably native macOS).
+  let attested = false;
+  let attestStatus = "missing";
+
+  // (1) Sign in with Apple session — worker-signed, bound to this identity.
+  const sessionTok = req.headers.get("X-Septena-Session")?.trim() ?? "";
+  if (sessionTok) {
+    const s = await verifySession(env, sessionTok);
+    if (s.ok) {
+      // The session is signed by us and pinned to an identity; reject replaying
+      // someone else's session under a different CloudKit user header.
+      if (s.userHash !== userHash) {
+        return { error: problem("identity_mismatch", 403), attestStatus: "identity_mismatch" };
+      }
+      attested = true;
+      attestStatus = "ok";
+    } else {
+      console.log(`session.verify failed reason=${s.reason ?? ""}`);
+      attestStatus = `session_${s.reason ?? "failed"}`;
     }
+  }
+
+  // (2) App Attest assertion. The CloudKit user id is a header the client
+  // asserts; App Attest only proves the app is genuine, not *which* iCloud user
+  // it is. Pin each genuine attest key to the first identity it presents so one
+  // device's key can't later hop between user identities (e.g. claim a
+  // maintainer's hash). A normal single-account user never trips this; it
+  // self-heals on reinstall (a fresh key gets a fresh binding).
+  const keyId = req.headers.get("X-Attest-Key-Id") ?? "";
+  const assertion = req.headers.get("X-Attest-Assertion") ?? "";
+  const challenge = req.headers.get("X-Attest-Challenge") ?? "";
+  if (!attested && mode !== "off" && keyId && assertion && challenge) {
+    const res = await verifyAssertion(env, { keyId, assertionB64: assertion, challenge, body: bodyBytes });
+    if (res.ok) {
+      const bindKey = `bind:${keyId}`;
+      const bound = await env.ATTEST.get(bindKey);
+      if (!bound) {
+        await env.ATTEST.put(bindKey, userHash);
+      } else if (bound !== userHash) {
+        console.log(`attest.bind mismatch key=${keyId.slice(0, 8)}`);
+        return { error: problem("identity_mismatch", 403), attestStatus: "identity_mismatch" };
+      }
+      attested = true;
+      attestStatus = "ok";
+    } else {
+      console.log(`attest.audit failed reason=${res.reason ?? ""}`);
+      attestStatus = `attestation_${res.reason ?? "failed"}`;
+    }
+  }
+
+  if (!attested && mode === "enforce") {
+    const reason = attestStatus === "missing" ? "missing_attestation" : "attestation_failed";
+    return { error: problem(reason, 403), attestStatus };
   }
 
   const row = await upsertIdentity(env, userHash);
@@ -76,7 +100,7 @@ async function upsertIdentity(env: Env, userHash: string): Promise<{ role: strin
   return row ?? { role: "user", is_banned: 0 };
 }
 
-async function hmacUserHash(env: Env, cloudKitUserID: string): Promise<string> {
+export async function hmacUserHash(env: Env, cloudKitUserID: string): Promise<string> {
   const salt = env.USER_HASH_SALT;
   if (!salt || salt.startsWith("REPLACE_")) throw new Error("USER_HASH_SALT is not configured");
   const key = await crypto.subtle.importKey(

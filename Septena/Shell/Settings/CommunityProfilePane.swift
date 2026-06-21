@@ -23,9 +23,11 @@ struct CommunityProfilePane: View {
   @State private var errorMessage: String?
   @State private var savedConfirmation = false
 
-  private var canUseCommunity: Bool {
-    CommunityClient.shared.appAttestSupported
-  }
+  /// nil = still checking, false = no iCloud (show fallback), true = ready to
+  /// transact (iCloud + App Attest, or a Sign in with Apple session).
+  @State private var canUseCommunity: Bool?
+  /// iCloud is present but this device needs Sign in with Apple (no App Attest).
+  @State private var needsAppleSignIn = false
 
   private var normalizedUsername: String {
     username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -74,7 +76,11 @@ struct CommunityProfilePane: View {
 
   var body: some View {
     Form {
-      if !canUseCommunity {
+      if canUseCommunity == nil {
+        Section { HStack { ProgressView(); Text("Checking iCloud…").foregroundStyle(.secondary) } }
+      } else if needsAppleSignIn {
+        CommunitySignInSection { Task { await reload() } }
+      } else if canUseCommunity == false {
         fallbackSection
       } else {
         if isBanned {
@@ -160,17 +166,22 @@ struct CommunityProfilePane: View {
               .foregroundStyle(.secondary)
           }
         }
+
+        // Mac-only in practice: lets a Sign-in-with-Apple user sign out. Renders
+        // nothing when there's no Apple session (e.g. on iOS via App Attest).
+        CommunitySignOutSection { Task { await refreshAccess() } }
       }
     }
     .formStyle(.grouped)
     .task {
-      if canUseCommunity, saved == nil { await load() }
+      if canUseCommunity == nil { await refreshAccess() }
+      if canUseCommunity == true, saved == nil { await load() }
     }
     .refreshable {
-      if canUseCommunity { await load() }
+      await reload()
     }
     .toolbar {
-      if canUseCommunity {
+      if canUseCommunity == true {
         ToolbarItem(placement: .confirmationAction) {
           Button {
             Task { await save() }
@@ -201,9 +212,9 @@ struct CommunityProfilePane: View {
 
   private var fallbackSection: some View {
     Section {
-      Label("Community profiles require App Attest and iCloud.", systemImage: "person.crop.circle.badge.exclamationmark")
+      Label("Sign in to iCloud to set up a profile.", systemImage: "person.crop.circle.badge.exclamationmark")
         .foregroundStyle(.secondary)
-      Text("This keeps profiles tied to the genuine app and your Apple ID without shipping a secret. Sign in to iCloud on a supported device to set one up.")
+      Text("Your profile is tied to your Apple ID — open Settings and sign in to iCloud, then come back to set one up.")
         .font(.footnote)
         .foregroundStyle(.secondary)
     }
@@ -223,6 +234,19 @@ struct CommunityProfilePane: View {
     case "moderator": return "shield"
     default: return "person.crop.circle"
     }
+  }
+
+  @MainActor
+  private func refreshAccess() async {
+    let access = await CommunityClient.shared.access()
+    canUseCommunity = (access == .ready)
+    needsAppleSignIn = (access == .needsAppleSignIn)
+  }
+
+  @MainActor
+  private func reload() async {
+    await refreshAccess()
+    if canUseCommunity == true { await load() }
   }
 
   @MainActor

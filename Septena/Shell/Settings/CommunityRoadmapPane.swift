@@ -11,12 +11,20 @@ struct CommunityRoadmapPane: View {
   @State private var errorMessage: String?
   @State private var showingComposer = false
 
-  private var canUse: Bool { CommunityClient.shared.appAttestSupported }
+  /// nil = still checking, false = no iCloud (show fallback), true = ready to
+  /// transact (iCloud + App Attest, or a Sign in with Apple session).
+  @State private var canUse: Bool?
+  /// iCloud is present but this device needs Sign in with Apple (no App Attest).
+  @State private var needsAppleSignIn = false
   private var isMaintainer: Bool { role == "maintainer" || role == "moderator" }
 
   var body: some View {
     List {
-      if !canUse {
+      if canUse == nil {
+        Section { HStack { ProgressView(); Text("Checking iCloud…").foregroundStyle(.secondary) } }
+      } else if needsAppleSignIn {
+        CommunitySignInSection { Task { await reload() } }
+      } else if canUse == false {
         fallbackSection
       } else {
         if isMaintainer {
@@ -79,10 +87,11 @@ struct CommunityRoadmapPane: View {
     }
     .formStyle(.grouped)
     .task {
-      if canUse { await loadRole(); await load() }
+      if canUse == nil { await refreshAccess() }
+      if canUse == true { await loadRole(); await load() }
     }
     .refreshable {
-      if canUse { await load() }
+      await reload()
     }
     .sheet(isPresented: $showingComposer) {
       FeatureComposer { detail in
@@ -90,7 +99,7 @@ struct CommunityRoadmapPane: View {
       }
     }
     .toolbar {
-      if canUse {
+      if canUse == true {
         ToolbarItem(placement: .primaryAction) {
           Button { showingComposer = true } label: { Image(systemName: "plus") }
             .accessibilityLabel("Suggest a feature")
@@ -101,9 +110,9 @@ struct CommunityRoadmapPane: View {
 
   private var fallbackSection: some View {
     Section {
-      Label("The roadmap needs App Attest and iCloud.", systemImage: "lightbulb.slash")
+      Label("Sign in to iCloud to use the roadmap.", systemImage: "lightbulb.slash")
         .foregroundStyle(.secondary)
-      Text("This keeps the board tied to the genuine app and your Apple ID without shipping a secret.")
+      Text("The board ties suggestions to your Apple ID — open Settings and sign in to iCloud, then come back.")
         .font(.footnote).foregroundStyle(.secondary)
     }
   }
@@ -112,6 +121,17 @@ struct CommunityRoadmapPane: View {
     if let i = features.firstIndex(where: { $0.id == updated.id }) {
       features[i] = updated
     }
+  }
+
+  @MainActor private func refreshAccess() async {
+    let access = await CommunityClient.shared.access()
+    canUse = (access == .ready)
+    needsAppleSignIn = (access == .needsAppleSignIn)
+  }
+
+  @MainActor private func reload() async {
+    await refreshAccess()
+    if canUse == true { await loadRole(); await load() }
   }
 
   @MainActor private func loadRole() async {

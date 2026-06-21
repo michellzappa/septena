@@ -43,7 +43,14 @@ APP_ATTEST_APP_ID = "992N457T8D.com.septena.cloud,992N457T8D.com.septena.cloud.m
 APP_ATTEST_ENV = "production"
 ADMIN_EMAILS = "mz@centaur-labs.io"
 
+# Sign in with Apple accepts these identity-token `aud` values. Derived from
+# APP_ATTEST_APP_ID (team prefix stripped) when unset; set explicitly to override.
+# SIWA_BUNDLE_IDS = "com.septena.cloud,com.septena.cloud.mac"
+
 # Set as a secret in production:
 #   npx wrangler secret put USER_HASH_SALT
 #   npx wrangler secret put TELEMETRY_HASH_SALT
 #   npx wrangler secret put ADMIN_DASHBOARD_TOKEN
+#   npx wrangler secret put SESSION_SIGNING_KEY   # signs Sign in with Apple
+#                                                 # sessions; falls back to
+#                                                 # USER_HASH_SALT if unset

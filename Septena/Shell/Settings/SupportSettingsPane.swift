@@ -7,9 +7,11 @@ struct SupportSettingsPane: View {
   @State private var showingComposer = false
   @State private var role = "user"
 
-  private var canUseInAppSupport: Bool {
-    CommunityClient.shared.appAttestSupported
-  }
+  /// nil = still checking, false = no iCloud (show email fallback), true =
+  /// ready to transact (iCloud + App Attest, or a Sign in with Apple session).
+  @State private var canUseInAppSupport: Bool?
+  /// iCloud is present but this device needs Sign in with Apple (no App Attest).
+  @State private var needsAppleSignIn = false
 
   private var isMaintainer: Bool {
     role == "maintainer" || role == "moderator"
@@ -17,7 +19,12 @@ struct SupportSettingsPane: View {
 
   var body: some View {
     List {
-      if !canUseInAppSupport {
+      if canUseInAppSupport == nil {
+        Section { HStack { ProgressView(); Text("Checking iCloud…").foregroundStyle(.secondary) } }
+      } else if needsAppleSignIn {
+        CommunitySignInSection { Task { await reload() } }
+        fallbackSection
+      } else if canUseInAppSupport == false {
         fallbackSection
       } else {
         if isMaintainer {
@@ -32,6 +39,12 @@ struct SupportSettingsPane: View {
             showingComposer = true
           } label: {
             Label("New support ticket", systemImage: "square.and.pencil")
+          }
+        } footer: {
+          // Block F (docs/MAKER_IDENTITY.md): personal, without pretending the
+          // support desk is a brand. Only non-maintainers see it.
+          if !isMaintainer {
+            Text("You're reaching me directly — I'm the one person who makes Septena, and I read every ticket.")
           }
         }
 
@@ -66,16 +79,14 @@ struct SupportSettingsPane: View {
     }
     .formStyle(.grouped)
     .task {
-      if canUseInAppSupport {
+      if canUseInAppSupport == nil { await refreshAccess() }
+      if canUseInAppSupport == true {
         await loadRole()
         await loadTickets()
       }
     }
     .refreshable {
-      if canUseInAppSupport {
-        await loadRole()
-        await loadTickets()
-      }
+      await reload()
     }
     .sheet(isPresented: $showingComposer) {
       SupportTicketComposer { thread in
@@ -84,7 +95,7 @@ struct SupportSettingsPane: View {
       }
     }
     .toolbar {
-      if canUseInAppSupport {
+      if canUseInAppSupport == true {
         ToolbarItem(placement: .primaryAction) {
           Button {
             showingComposer = true
@@ -102,9 +113,25 @@ struct SupportSettingsPane: View {
       Link(destination: URL(string: "mailto:mz@envisioning.com")!) {
         Label("Email support", systemImage: "envelope")
       }
-      Text("In-app support requires App Attest and iCloud so requests can be tied to the genuine app without shipping a secret.")
+      Text("Email goes straight to me — I make Septena alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time.")
         .font(.footnote)
         .foregroundStyle(.secondary)
+    }
+  }
+
+  @MainActor
+  private func refreshAccess() async {
+    let access = await CommunityClient.shared.access()
+    canUseInAppSupport = (access == .ready)
+    needsAppleSignIn = (access == .needsAppleSignIn)
+  }
+
+  @MainActor
+  private func reload() async {
+    await refreshAccess()
+    if canUseInAppSupport == true {
+      await loadRole()
+      await loadTickets()
     }
   }
 

@@ -204,6 +204,56 @@ public actor CommunityClient {
     AppAttestClient.shared.isSupported
   }
 
+  /// Whether the iCloud account that authors community writes is reachable.
+  /// App Attest is NOT required — it rides along best-effort when the device
+  /// supports it (see `attachCommunityAuth`), so community surfaces gate on
+  /// this (iCloud) rather than on attestation. That's what lets an
+  /// enclave-less Mac use feedback / the roadmap / support.
+  public func accountAvailable() async -> Bool {
+    (try? await cloudKitUserRecordName()) != nil
+  }
+
+  /// Whether a Sign in with Apple session token is stored for this Worker host.
+  public nonisolated func hasAppleSession(for baseURL: URL = CommunityEndpoint.baseURL) -> Bool {
+    CommunitySession.exists(forHost: baseURL.host ?? "")
+  }
+
+  /// What the device can do with the community Worker. The Worker enforces
+  /// attestation, so writing needs either App Attest (iOS) or a Sign in with
+  /// Apple session (native macOS) on top of iCloud — see `CommunityAccess`.
+  public func access(for baseURL: URL = CommunityEndpoint.baseURL) async -> CommunityAccess {
+    guard await accountAvailable() else { return .unavailable }
+    if appAttestSupported || hasAppleSession(for: baseURL) { return .ready }
+    return .needsAppleSignIn
+  }
+
+  /// Exchange an Apple identity token for a Worker session (the App-Attest
+  /// substitute on macOS). Stores the session in the Keychain on success and
+  /// posts `.septenaCommunityAuthChanged`. Purely additive — it changes no app
+  /// data; it only unlocks community writes on this device.
+  public func signInWithApple(identityToken: String,
+                              baseURL: URL = CommunityEndpoint.baseURL) async throws {
+    guard let userRecordName = try await cloudKitUserRecordName() else {
+      throw ClientError.cloudKitUserUnavailable
+    }
+    var req = URLRequest(url: baseURL.appendingPathComponent("api/auth/apple"))
+    req.httpMethod = "POST"
+    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    req.setValue(userRecordName, forHTTPHeaderField: "X-Septena-CloudKit-User")
+    let body = try JSONEncoder().encode(AppleSignInBody(identityToken: identityToken))
+    req.httpBody = body
+    let resp = try await send(req, as: AppleSessionResponse.self)
+    CommunitySession.store(resp.sessionToken, forHost: baseURL.host ?? "")
+    NotificationCenter.default.post(name: .septenaCommunityAuthChanged, object: nil)
+  }
+
+  /// Clear the Apple session on this device. Signing out removes nothing but the
+  /// session token — community contributions and all app data stay put.
+  public nonisolated func signOutApple(baseURL: URL = CommunityEndpoint.baseURL) {
+    CommunitySession.delete(forHost: baseURL.host ?? "")
+    NotificationCenter.default.post(name: .septenaCommunityAuthChanged, object: nil)
+  }
+
   public func me(baseURL: URL = CommunityEndpoint.baseURL) async throws -> CommunityMe {
     var req = URLRequest(url: baseURL.appendingPathComponent("api/me"))
     req.httpMethod = "GET"
@@ -416,6 +466,13 @@ public actor CommunityClient {
     }
     req.setValue(userRecordName, forHTTPHeaderField: "X-Septena-CloudKit-User")
 
+    // Sign in with Apple session — the genuineness proof on devices without App
+    // Attest (native macOS). Sent whenever present; the Worker uses whichever of
+    // session / attestation verifies.
+    if let session = CommunitySession.token(forHost: baseURL.host ?? "") {
+      req.setValue(session, forHTTPHeaderField: "X-Septena-Session")
+    }
+
     if let attestation = await AppAttestClient.shared.assertion(forBody: body, baseURL: baseURL, session: session) {
       req.setValue(attestation.keyId, forHTTPHeaderField: "X-Attest-Key-Id")
       req.setValue(attestation.assertionB64, forHTTPHeaderField: "X-Attest-Assertion")
@@ -434,6 +491,15 @@ public actor CommunityClient {
     let code = (response as? HTTPURLResponse)?.statusCode ?? 0
     guard (200..<300).contains(code) else { throw ClientError.badResponse(code) }
     return try JSONDecoder().decode(T.self, from: data)
+  }
+
+  private struct AppleSignInBody: Encodable {
+    let identityToken: String
+  }
+
+  private struct AppleSessionResponse: Decodable {
+    let sessionToken: String
+    let expiresAt: Double?
   }
 
   private struct ProfileUpdate: Encodable {

@@ -1,6 +1,7 @@
 import { issueChallenge, rateLimited, verifyAttestation } from "./attest";
+import { bindAppleSub, mintSession, verifyAppleIdentityToken } from "./apple";
 import { telemetryAdmin } from "./admin";
-import { requireUser } from "./auth";
+import { hmacUserHash, requireUser } from "./auth";
 import type { Env } from "./env";
 import { json, notFound, publicJson, readJson } from "./http";
 import { profileResponse, updateProfile } from "./profile";
@@ -60,6 +61,35 @@ async function route(req: Request, env: Env): Promise<Response> {
 
     if (req.method === "POST" && path === "/api/telemetry") {
       return ingestTelemetry(env, req);
+    }
+
+    // Sign in with Apple → a worker session token. The App-Attest substitute
+    // for devices without App Attest (native macOS). Verify the Apple identity
+    // token once, bind the Apple sub to this CloudKit identity, mint a
+    // long-lived session the app replays via X-Septena-Session. See apple.ts.
+    if (req.method === "POST" && path === "/api/auth/apple") {
+      const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
+      if (await rateLimited(env, `apple:${ip}`, 30, 60)) {
+        return json({ error: "rate_limited" }, 429);
+      }
+      const body = await readJson<{ identityToken?: string }>(req);
+      if (body.error) return body.error;
+      const identityToken = body.data?.identityToken?.trim() ?? "";
+      if (!identityToken) return json({ error: "missing_identity_token" }, 400);
+      const cloudKitUserID = req.headers.get("X-Septena-CloudKit-User")?.trim() ?? "";
+      if (!cloudKitUserID) return json({ error: "missing_cloudkit_user" }, 400);
+
+      const verified = await verifyAppleIdentityToken(env, identityToken);
+      if (!verified.ok) {
+        console.log(`apple.verify failed reason=${verified.reason ?? ""}`);
+        return json({ error: `apple_${verified.reason ?? "invalid"}` }, 401);
+      }
+      const userHash = await hmacUserHash(env, cloudKitUserID);
+      const bind = await bindAppleSub(env, verified.sub!, userHash);
+      if (!bind.ok) return json({ error: "identity_mismatch" }, 403);
+
+      const session = await mintSession(env, userHash, verified.sub!);
+      return json({ sessionToken: session.token, expiresAt: session.expiresAt });
     }
 
     if (req.method === "GET" && path === "/admin/telemetry") {
