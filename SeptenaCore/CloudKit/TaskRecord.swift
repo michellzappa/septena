@@ -147,6 +147,12 @@ extension TaskEntity {
       record[TaskCloudKitSchema.Field.position] = position
     }
 
+    // Recently-Deleted marker. `deletedAt` rides the already-deployed
+    // `reservedString1` field so soft-delete syncs across devices with no
+    // schema deploy (docs/RECENTLY_DELETED_SPEC.md). A trashed task's record
+    // SURVIVES in CloudKit (this is a record update); only `purge` deletes it.
+    record[TaskCloudKitSchema.Field.reservedString1] = deletedAt
+
     return record
   }
 }
@@ -190,6 +196,11 @@ func apply(_ record: CKRecord) {
     // Manual order. Absent on un-dragged rows (and gateway-authored ones) →
     // leave at 0 so the createdAt fallback orders them.
     if let v = record[TaskCloudKitSchema.Field.position] as? Double { position = v }
+
+    // Recently-Deleted marker (rides `reservedString1`). Mirror it directly —
+    // including clearing it on restore, when the remote value is absent — so a
+    // restore on another device un-trashes the task here too.
+    deletedAt = optionalTaskString(record[TaskCloudKitSchema.Field.reservedString1])
 
     captureCloudKitSystemFields(from: record)
   }
