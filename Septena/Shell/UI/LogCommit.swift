@@ -33,6 +33,21 @@ enum LogCommitStyle: Equatable {
   /// headline + caption instead of a streak count. Fired for training PRs
   /// and goal target/held rungs (see MilestonePresenter).
   case milestone(accent: Color, headline: String, caption: String)
+  /// The Septena mark "opening" — the seven logo discs burst outward from
+  /// center along their heptagonal vectors. `.spectrum` wears the canonical
+  /// rainbow (the everyday in-app celebration); `.gold` wears the foil and is
+  /// reserved for premium Septena+ moments (see `SeptenaPlusPaywall`).
+  case septenaOpen(headline: String, caption: String, palette: SeptenaMarkPalette)
+}
+
+/// Which coloring the seven-disc "open" flourish wears. The split is a brand
+/// rule, not a style knob: gold is reserved for premium (Septena+) moments;
+/// the spectrum is the everyday mark used anywhere in the app.
+enum SeptenaMarkPalette: Equatable {
+  /// The canonical seven-color spectrum (red → purple). Everyday, in-app.
+  case spectrum
+  /// The Septena+ foil. Reserved for premium moments only.
+  case gold
 }
 
 // MARK: - Center (the fire API)
@@ -119,6 +134,9 @@ struct LogCommitStyleView: View {
     case .milestone(let accent, let headline, let caption):
       IgnitionView(accent: accent, headline: headline, caption: caption,
                    trigger: trigger)
+    case .septenaOpen(let headline, let caption, let palette):
+      SeptenaOpenView(headline: headline, caption: caption,
+                      palette: palette, trigger: trigger)
     }
   }
 }
@@ -199,6 +217,104 @@ struct IgnitionView: View {
       withAnimation(.easeOut(duration: 0.4)) {
         numberScale = 1.15
         numberOpacity = 0
+      }
+    }
+  }
+}
+
+// MARK: - Septena open (the mark unfurling)
+
+/// The Septena mark unfurling: the seven canonical discs start clustered tight
+/// at the center, then radiate outward along their heptagonal vectors —
+/// *growing* the whole way out before they fade at the edges. The headline +
+/// caption spring in over the center. A seven-disc burst where `IgnitionView`
+/// is a three-ring one. The `palette` decides the coloring — spectrum for
+/// everyday in-app celebrations, gold for premium Septena+ moments. Honors
+/// Reduce Motion the same way (never rendered under it).
+struct SeptenaOpenView: View {
+  let headline: String
+  let caption: String
+  let palette: SeptenaMarkPalette
+  let trigger: Int
+
+  /// Point distance a unit heptagon vector travels at `spread == 1`. The
+  /// regular heptagon's vectors are ~0.277 long, so a disc reaches ~100pt out.
+  private let travel: CGFloat = 360
+  private let dotSize: CGFloat = 20
+
+  /// Per-disc fill. Spectrum gives each its canonical color; gold paints all
+  /// seven in the foil.
+  private func discColor(_ index: Int) -> Color {
+    switch palette {
+    case .spectrum: return SeptenaPlus.discColors[index]
+    case .gold:     return SeptenaPlus.foil
+    }
+  }
+
+  /// Headline + caption color. Gold matches the foil; the spectrum's text
+  /// stays neutral so it doesn't compete with the seven colored discs.
+  private var textColor: Color {
+    switch palette {
+    case .spectrum: return .primary
+    case .gold:     return SeptenaPlus.foil
+    }
+  }
+
+  @State private var spread: CGFloat = 0.0
+  @State private var dotScale: CGFloat = 0.12
+  @State private var dotOpacity: Double = 0
+  @State private var textScale: CGFloat = 0.5
+  @State private var textOpacity: Double = 0
+
+  var body: some View {
+    ZStack {
+      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
+        // Direction from the heptagon's center (0.5, 0.5) to this disc.
+        let dx = center.x - 0.5
+        let dy = center.y - 0.5
+        Circle()
+          .fill(discColor(index))
+          .frame(width: dotSize, height: dotSize)
+          .scaleEffect(dotScale)
+          .opacity(dotOpacity)
+          .offset(x: dx * travel * spread, y: dy * travel * spread)
+      }
+      VStack(spacing: 2) {
+        Text(headline)
+          .scaledFont(size: 64, weight: .bold, relativeTo: .largeTitle)
+          .foregroundStyle(textColor)
+        Text(caption)
+          .font(.septenaBadge)
+          .foregroundStyle(textColor)
+      }
+      .scaleEffect(textScale)
+      .opacity(textOpacity)
+    }
+    // Gating happens at the call site (LogCommitOverlay / the paywall's own
+    // Reduce-Motion branch), so bare `withAnimation` here is safe.
+    .task(id: trigger) {
+      guard trigger > 0 else { return }
+      spread = 0.0; dotScale = 0.12; dotOpacity = 0
+      textScale = 0.5; textOpacity = 0
+      // Open: the discs radiate outward from a tight center cluster, growing
+      // the whole way out in one continuous motion.
+      withAnimation(.easeIn(duration: 0.12)) { dotOpacity = 0.95 }
+      withAnimation(.easeOut(duration: 1.1)) {
+        spread = 2.6
+        dotScale = 2.8
+      }
+      // Fade them out near the edges, after they've grown and traveled.
+      withAnimation(.easeOut(duration: 0.45).delay(0.7)) {
+        dotOpacity = 0
+      }
+      withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) {
+        textScale = 1.0
+        textOpacity = 1.0
+      }
+      try? await Task.sleep(nanoseconds: 1_150_000_000)
+      withAnimation(.easeOut(duration: 0.4)) {
+        textScale = 1.15
+        textOpacity = 0
       }
     }
   }

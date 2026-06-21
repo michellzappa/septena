@@ -902,9 +902,9 @@ enum SeptenaPlus {
           title: "Keeps it independent",
           detail: "No ads, no investors, no data sold. Septena answers to the people who use it, and that only works if some of them chip in."),
     .init(id: "next",
-          icon: "hammer",
-          title: "Funds the next update",
-          detail: "Every fix and new section is built by one developer. Supporting is the most direct way to say “keep going.”"),
+          icon: "cpu",
+          title: "Pays the AI bill",
+          detail: "Septena is built by one person with a lot of AI help, and the AI is the one part that was never free. Chipping in keeps the tokens flowing — and the updates coming."),
   ]
 
   /// The cosmetic perks a supporter actually gets. Deliberately small — the
@@ -1093,9 +1093,9 @@ struct SeptenaPlusPaywall: View {
             dismiss()
           }
         } else {
-          celebrationStyle = .milestone(accent: SeptenaPlus.foil,
-                                        headline: String(localized: "Thank you"),
-                                        caption: String(localized: "YOU'RE A SUPPORTER"))
+          celebrationStyle = .septenaOpen(headline: String(localized: "Thank you"),
+                                          caption: String(localized: "YOU'RE A SUPPORTER"),
+                                          palette: .gold)
           celebrateTrigger += 1
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(1.9))
@@ -1363,11 +1363,6 @@ struct AccountSettingsPane: View {
         Text("Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID.")
       }
 
-      Section {
-        NavigationLink(value: SettingsView.SettingsDestination.about) {
-          Label("About Septena", systemImage: "info.circle")
-        }
-      }
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showPaywall) {

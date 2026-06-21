@@ -882,6 +882,12 @@ struct SettingsView: View {
           NavigationLink(value: dest) { staticRow(dest) }
         }
       }
+      // About sits on its own, below Feedback — a utility row (gray disc
+      // tile) set apart by the section break, not mixed in with the
+      // accent-colored intent groups.
+      SwiftUI.Section {
+        NavigationLink(value: SettingsDestination.about) { aboutRow }
+      }
     }
     .scrollContentBackground(.hidden)
     .background(SettingsTopGradient())
@@ -897,6 +903,10 @@ struct SettingsView: View {
         ForEach(staticDestinations, id: \.self) { dest in
           staticRow(dest).tag(dest)
         }
+      }
+      // About on its own, below Feedback — gray disc tile, set apart.
+      SwiftUI.Section {
+        aboutRow.tag(SettingsDestination.about)
       }
     }
   }
@@ -918,6 +928,21 @@ struct SettingsView: View {
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 20, glyphRatio: 0.38)
       #else
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
+      #endif
+    }
+  }
+
+  /// The About row, shared by both sidebars: the Septena disc tile (gray,
+  /// utility) plus the "About" label. Sized to match the platform's static
+  /// rows (29pt on iOS, 20pt on macOS).
+  private var aboutRow: some View {
+    Label {
+      Text(title(for: .about))
+    } icon: {
+      #if os(macOS)
+      SeptenaDiscTile(size: 20)
+      #else
+      SeptenaDiscTile(size: 29)
       #endif
     }
   }
@@ -1065,6 +1090,38 @@ struct SettingsView: View {
     #endif
     case .section(let key):  SectionDetailPane(sectionKey: key)
     }
+  }
+}
+
+/// The Settings-row icon for the About page: the seven Septena discs in
+/// their canonical rainbow on a neutral gray tile, matching `ColoredGlyph`'s
+/// shape and sheen so it sits flush with the colored rows above it. Gray (not
+/// a brand accent) marks About as a utility row, while the discs keep it
+/// unmistakably the app's own mark. Disc placement/colors reuse the shared
+/// `SeptenaPlus` constants so the emblem can't drift from the icon.
+struct SeptenaDiscTile: View {
+  var size: CGFloat = 29
+  @Environment(\.colorScheme) private var colorScheme
+
+  var body: some View {
+    let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+    let gray = Color(white: colorScheme == .dark ? 0.32 : 0.55)
+    ZStack {
+      shape.fill(gray)
+      shape.fill(
+        LinearGradient(
+          colors: [Color.white.opacity(0.26), .clear, Color.black.opacity(0.07)],
+          startPoint: .top, endPoint: .bottom
+        )
+      )
+      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
+        Circle()
+          .fill(SeptenaPlus.discColors[index])
+          .frame(width: size * 0.168, height: size * 0.168)
+          .position(x: size * center.x, y: size * center.y)
+      }
+    }
+    .frame(width: size, height: size)
   }
 }
 

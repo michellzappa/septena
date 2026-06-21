@@ -13,6 +13,9 @@
     "— Anonymous" : {
 
     },
+    "— mz" : {
+
+    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -2063,6 +2066,9 @@
     "Checked sections appear as aggregate trends. Sections marked “no trends yet” are listed but won't chart until their pattern view ships." : {
 
     },
+    "Checking iCloud…" : {
+
+    },
     "Chest" : {
       "localizations" : {
         "pt-BR" : {
@@ -2969,6 +2975,9 @@
         }
       }
     },
+    "Email goes straight to me — I make Septena alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time." : {
+
+    },
     "Emerald" : {
       "localizations" : {
         "pt-BR" : {
@@ -3053,6 +3062,7 @@
 
     },
     "Every fix and new section is built by one developer. Supporting is the most direct way to say “keep going.”" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3365,6 +3375,9 @@
         }
       }
     },
+    "From the maker" : {
+
+    },
     "Frustrated" : {
       "localizations" : {
         "pt-BR" : {
@@ -3376,6 +3389,7 @@
       }
     },
     "Funds the next update" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3685,6 +3699,9 @@
     "Helps us understand which features people use, so we improve the right things. Turning this off sends one privacy-preference update, then stops usage events." : {
 
     },
+    "Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too." : {
+
+    },
     "Hidden" : {
 
     },
@@ -3899,9 +3916,6 @@
           }
         }
       }
-    },
-    "In-app support requires App Attest and iCloud so requests can be tied to the genuine app without shipping a secret." : {
-
     },
     "Inbox" : {
       "comment" : "Phase 0 spike — test string, not a real translation pass",
@@ -4685,6 +4699,9 @@
       }
     },
     "Metric (kg, km)" : {
+
+    },
+    "Milestone (old)" : {
 
     },
     "Minimal" : {
@@ -6348,6 +6365,12 @@
     "Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations." : {
 
     },
+    "Septena open — gold" : {
+
+    },
+    "Septena open — spectrum" : {
+
+    },
     "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
       "localizations" : {
         "pt-BR" : {
@@ -6498,6 +6521,9 @@
           }
         }
       }
+    },
+    "Seven-disc open" : {
+
     },
     "Severity" : {
 
@@ -7188,6 +7214,9 @@
         }
       }
     },
+    "Testimonials are tied to your Apple ID — open Settings and sign in to iCloud, then come back." : {
+
+    },
     "Thank you" : {
       "localizations" : {
         "pt-BR" : {
@@ -7217,6 +7246,9 @@
           }
         }
       }
+    },
+    "The board ties suggestions to your Apple ID — open Settings and sign in to iCloud, then come back." : {
+
     },
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
 
@@ -7290,6 +7322,12 @@
         }
       }
     },
+    "The seven discs unfurl in foil — the Septena+ thank-you" : {
+
+    },
+    "The seven discs unfurl in the rainbow — everyday, in-app" : {
+
+    },
     "These four groups are the raw material for the north-star and commitments." : {
       "localizations" : {
         "pt-BR" : {
@@ -7353,15 +7391,6 @@
         }
       }
     },
-    "This keeps profiles tied to the genuine app and your Apple ID without shipping a secret. Sign in to iCloud on a supported device to set one up." : {
-
-    },
-    "This keeps the board tied to the genuine app and your Apple ID without shipping a secret." : {
-
-    },
-    "This keeps them tied to the genuine app and your Apple ID without shipping a secret." : {
-
-    },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
       "localizations" : {
         "pt-BR" : {
@@ -7371,6 +7400,9 @@
           }
         }
       }
+    },
+    "Three gold rings — the previous thank-you, for comparison" : {
+
     },
     "Three-times-a-day affect check-ins" : {
       "extractionState" : "stale",
@@ -8165,6 +8197,9 @@
         }
       }
     },
+    "You're reaching me directly — I'm the one person who makes Septena, and I read every ticket." : {
+
+    },
     "Your anonymous community identity. Useful when granting maintainer access from the server." : {
 
     },
@@ -8190,6 +8225,9 @@
           }
         }
       }
+    },
+    "Your profile is tied to your Apple ID — open Settings and sign in to iCloud, then come back to set one up." : {
+
     },
     "Your quotes" : {
 

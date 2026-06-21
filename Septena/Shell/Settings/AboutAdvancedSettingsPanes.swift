@@ -45,6 +45,22 @@ struct AboutSettingsPane: View {
           .foregroundStyle(.secondary)
       }
 
+      // The one human note in Settings. Voice and the data-backed claims behind
+      // it live in docs/MAKER_IDENTITY.md (Block A) — keep this in step with it.
+      Section {
+        VStack(alignment: .leading, spacing: 12) {
+          Text("Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too.")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+          Text("— mz")
+            .font(.callout.italic())
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+      } header: {
+        Text("From the maker")
+      }
+
       Section("Links") {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
         outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
@@ -248,6 +264,50 @@ struct MilestonePreviewPane: View {
       } footer: {
         Text("Each fires the real MilestonePresenter tiering — streaks and goal target/held get the full card, intermediate rungs and XP get the quiet burst. Under Reduce Motion the visual is suppressed by design.")
       }
+
+      // The seven-disc "open" flourishes don't flow through the presenter
+      // (they're fired directly), so play them raw here. Spectrum is the
+      // everyday in-app coloring; gold is reserved for premium moments.
+      Section {
+        Button {
+          fire(.septenaOpen(headline: String(localized: "Nice"),
+                            caption: String(localized: "LOGGED"),
+                            palette: .spectrum))
+        } label: {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Septena open — spectrum").foregroundStyle(.primary)
+            Text("The seven discs unfurl in the rainbow — everyday, in-app")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        .buttonStyle(.plain)
+        Button {
+          fire(.septenaOpen(headline: String(localized: "Thank you"),
+                            caption: String(localized: "YOU'RE A SUPPORTER"),
+                            palette: .gold))
+        } label: {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Septena open — gold").foregroundStyle(.primary)
+            Text("The seven discs unfurl in foil — the Septena+ thank-you")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        .buttonStyle(.plain)
+        Button {
+          fire(.milestone(accent: SeptenaPlus.foil,
+                          headline: String(localized: "Thank you"),
+                          caption: String(localized: "YOU'RE A SUPPORTER")))
+        } label: {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Milestone (old)").foregroundStyle(.primary)
+            Text("Three gold rings — the previous thank-you, for comparison")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        .buttonStyle(.plain)
+      } header: {
+        Text("Seven-disc open")
+      }
     }
     .formStyle(.grouped)
     .overlay {
@@ -259,7 +319,13 @@ struct MilestonePreviewPane: View {
   }
 
   private func fire(_ sample: Sample) {
-    style = MilestonePresenter.style(for: sample.make(), theme: theme)
+    fire(MilestonePresenter.style(for: sample.make(), theme: theme))
+  }
+
+  /// Play a style directly, bypassing the presenter — used for celebrations
+  /// (the Septena+ thank-you) that real call sites fire without it.
+  private func fire(_ style: LogCommitStyle) {
+    self.style = style
     trigger &+= 1
     Haptics.success()
   }

@@ -236,6 +236,10 @@ watch). The classic bug: a section with a manifest row + destination but **no
   reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
   `LICENSE`, `NOTICE`, `project.yml`. Reference docs by their `docs/…` path.
 - Match surrounding code: comment density, naming, idiom.
+- **Maker voice & identity** (the "made by mz" story across app, site, support,
+  journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks
+  from there, never invent maker claims. Every claim must trace to its data row;
+  the banned list (no "late nights" etc.) is binding.
 - Don't add FastAPI/server client code — the repo is CloudKit-first; remaining
   FastAPI references are migration history slated for cleanup.
 - **Two MCP servers, edited in lockstep.** There are TWO: the **in-app** server
