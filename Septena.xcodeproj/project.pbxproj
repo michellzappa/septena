@@ -70,6 +70,7 @@
 		15A711B2E528A620ADC513D2 /* DayDialHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3407AF16908C1033DF4DA6 /* DayDialHero.swift */; };
 		15EE3B56B18381CC683C9E5F /* ValuesPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8254C1AF91828DE8F75D78 /* ValuesPromptService.swift */; };
 		165E6473042BC172DBB53F65 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
+		16B1D2ED5505FC961FF92B33 /* ListKeyboardNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */; };
 		1700D3A58CB14FD90BAE2108 /* ReviewAndSaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9769DD4F4BB2D266390D9AE /* ReviewAndSaveView.swift */; };
 		171C4DED1F4D6CF052F024ED /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
 		174606742D6D5BE5AFBFCA50 /* HeatmapHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BD0C4383360CD1A06E2A546 /* HeatmapHomepageView.swift */; };
@@ -179,6 +180,7 @@
 		358BE1BB83A77C049141C467 /* SectionBreakdownList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D36B7807520398F99BFCC25 /* SectionBreakdownList.swift */; };
 		36325B1E6E5A771C01028105 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 31313A0E804B33A3E43FC1F6 /* Info.plist */; };
 		369638577C3010B9CD3FB351 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */; };
+		376DFEC50F389C3D73911189 /* ListKeyboardNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */; };
 		378961FCD47459D09152C2DB /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */; };
 		3797CC96603DC088851E9CA3 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
 		37A2D98F281B03FBEE6B6C75 /* ChoreIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43983E27660C2E98E3424D /* ChoreIntents.swift */; };
@@ -1074,6 +1076,7 @@
 		6D36B7807520398F99BFCC25 /* SectionBreakdownList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionBreakdownList.swift; sourceTree = "<group>"; };
 		6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
 		6DA5C3BACA3250B7408949D4 /* ClaudeReconnectCue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeReconnectCue.swift; sourceTree = "<group>"; };
+		6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListKeyboardNavigation.swift; sourceTree = "<group>"; };
 		6F4ACD20839911C83F3471FF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7027B881D1D8B1B09B105034 /* CalendarBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarBridge.swift; sourceTree = "<group>"; };
 		703257F32821B161F51B5CC1 /* LogDetailScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogDetailScaffold.swift; sourceTree = "<group>"; };
@@ -2032,6 +2035,7 @@
 				105A64B4FE28BF5907996A17 /* HomeChrome.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
 				C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */,
+				6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */,
 				6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */,
 				5DDBCEACF8957679BD5E02F2 /* LogRow.swift */,
 				112DA7513628EF825585692E /* MilestonePresenter.swift */,
@@ -2776,6 +2780,7 @@
 				3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */,
 				B952E848C59122F46C1DF7D3 /* KeyboardShortcutsView.swift in Sources */,
 				88DCC6E7BDFD768BD320F29B /* KeychainStore.swift in Sources */,
+				376DFEC50F389C3D73911189 /* ListKeyboardNavigation.swift in Sources */,
 				65675DD9901E66BA47721979 /* LocalMCPServer.swift in Sources */,
 				3E8232F947D6A67FFAED7EC5 /* LocalMCPSettingsPane.swift in Sources */,
 				FEF7B36E05988907669E6A03 /* LocalNotificationScheduler.swift in Sources */,
@@ -3194,6 +3199,7 @@
 				AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */,
 				8D1D5310AB62AF7E33538641 /* KeyboardShortcutsView.swift in Sources */,
 				A13DDF926FA144F9A7CFBF64 /* KeychainStore.swift in Sources */,
+				16B1D2ED5505FC961FF92B33 /* ListKeyboardNavigation.swift in Sources */,
 				D3852E3A3953E48A78381A8B /* LocalMCPServer.swift in Sources */,
 				70256EDB9597D9DA17B4E839 /* LocalMCPSettingsPane.swift in Sources */,
 				074A612AE1335D061817FE4A /* LocalNotificationScheduler.swift in Sources */,

@@ -345,14 +345,13 @@ struct TaskListView: View {
     }
     // The `+` toolbar button (and ⌘N, and the sidebar "New To-Do") open the
     // focused new-task composer via `shouldStartCreating` → `startCreate()`.
-    .modifier(KeyboardNavigationModifier(
-      isInputMode: false,
+    .listKeyboardNavigation(
+      inputActive: composerIsOpen,
       hasSelection: !selection.isEmpty,
-      editorOpen: composerIsOpen,
       onReturn: openSelectedForEdit,
-      onEscape: { clearSelection() },
-      onSpace: toggleSelected
-    ))
+      onSpace: toggleSelected,
+      onEscape: { clearSelection() }
+    )
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
@@ -1889,65 +1888,6 @@ struct TaskListRowContextMenu: View {
   }
 }
 
-/// Bundles ⌘N, ⌘T, ↑/↓, ⌘↑/⌘↓, Enter, Esc, Space into one modifier so the
-/// TaskListView body stays small enough for the SwiftUI type-checker.
-/// While a row is being edited, arrow/return/space/escape are forwarded to
-/// the native TextField; ⌘N and ⌘T remain globally active.
-private struct KeyboardNavigationModifier: ViewModifier {
-  /// True when a row is being edited OR a new-task draft is open. While in
-  /// input mode, all row-navigation keys forward to the active TextField.
-  let isInputMode: Bool
-  let hasSelection: Bool
-  /// True while the task editor (inspector / sheet) is open. When it closes we
-  /// pull keyboard focus back to the list so ↑↓ row traversal keeps working —
-  /// the editor steals focus on open and nothing returns it otherwise.
-  let editorOpen: Bool
-  let onReturn: () -> Void
-  let onEscape: () -> Void
-  let onSpace: () -> Void
-
-  /// Auto-focus the list on appear so the arrow keys / space / enter work
-  /// immediately, without the user having to click into the content first.
-  @FocusState private var listFocused: Bool
-
-  func body(content: Content) -> some View {
-    content
-      .focusable()
-      .focused($listFocused)
-      // Suppress the macOS blue focus ring around the whole list — the
-      // selection pill on the focused row is indicator enough.
-      .focusEffectDisabled()
-      .onAppear { listFocused = true }
-      // When the editor closes, the title field that stole focus is torn down
-      // and the list is left with none — ↑↓ would stop selecting. Pull focus
-      // back on the next runloop (after the inspector relinquishes it).
-      .onChange(of: editorOpen) { _, open in
-        guard !open else { return }
-        DispatchQueue.main.async { listFocused = true }
-      }
-      .onKeyPress(.return) {
-        guard !isInputMode, hasSelection else { return .ignored }
-        onReturn()
-        return .handled
-      }
-      .onKeyPress(.escape) {
-        guard !isInputMode, hasSelection else { return .ignored }
-        onEscape()
-        return .handled
-      }
-      .onKeyPress(.space) {
-        guard !isInputMode, hasSelection else { return .ignored }
-        onSpace()
-        return .handled
-      }
-      // ↑↓ row traversal is handled natively by `List(selection:)` on macOS —
-      // no custom key handling needed.
-      // Deletion is intentionally NOT bound to the bare ⌫ key — a hard delete
-      // is destructive and unrecoverable, so it's gated behind ⌘⌫ (the "Delete"
-      // menu command) to make an accidental delete much harder.
-  }
-
-}
 
 // MARK: - Focused values for the menu-bar "Task" commands
 //
