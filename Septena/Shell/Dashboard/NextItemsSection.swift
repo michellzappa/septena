@@ -126,8 +126,6 @@ struct TodayTaskRow: View {
   let tint: Color
   var areas: [Area] = []
   var projects: [Project] = []
-  /// Highlight this row while its edit / agent pane is open.
-  var isSelected: Bool = false
   /// Open this task's edit / agent pane. nil → tap only toggles (no editor host).
   var onOpen: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
@@ -135,19 +133,30 @@ struct TodayTaskRow: View {
   /// (see `TaskCelebration`). Optional and nil-safe.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
+  /// The checkbox owns its own tap region; a tap on the rest of the row opens
+  /// the editor. Platform split mirrors the Tasks tab:
+  ///   • iOS: single tap → open (touch convention).
+  ///   • macOS: the row's own tap is disabled (`nil`) so a single click stays
+  ///     native `List` selection (the keyboard-nav cursor + context-menu
+  ///     target); the caller wires double-click → open via a tap gesture.
+  private var rowTap: (() -> Void)? {
+    #if os(macOS)
+    nil
+    #else
+    onOpen
+    #endif
+  }
+
   var body: some View {
     // On the Next surface every row is already today, so no Today indicator and
     // no scheduled chip; an overdue `due` still surfaces via the canonical
     // trailing. The project / area subtitle renders when the catalog is loaded.
-    // The checkbox owns its own tap region; a tap on the rest of the row opens
-    // the editor (the same split the Tasks drawer uses).
     TaskRow(
       task: task,
       accent: tint,
       areas: areas,
       projects: projects,
       showsTodayIndicator: false,
-      isSelected: isSelected,
       onToggle: {
         let completing = task.status != .done
         model.toggle(task, mutator: mutator, motion: motion)
@@ -159,7 +168,7 @@ struct TodayTaskRow: View {
                                     accent: tint, logCommit: logCommit)
         }
       },
-      onTap: onOpen
+      onTap: rowTap
     )
     // The per-row context menu + its picker sheets are attached by the caller
     // via `.taskRowActions(...)` (see `TaskRowActions`) — the same shared menu
@@ -514,8 +523,10 @@ struct NextOpenSection: View {
   /// Open a task's edit / agent pane — handed down to the Tasks block's rows.
   /// nil keeps tasks a read-through checklist.
   var onOpenTask: ((SeptenaTask) -> Void)? = nil
-  /// Id of the task currently open in the composer, for the row highlight.
-  var selectedTaskId: String? = nil
+  /// macOS click-selection for a task row (honors ⌘/⇧). A tap gesture on the
+  /// row defeats native `List` click-selection, so the gesture writes the
+  /// page's selection set itself. Unused on iOS. See `NextView.clickSelectTask`.
+  var onClickSelect: (String) -> Void = { _ in }
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SettingsStore.self) private var settingsStore
@@ -585,13 +596,23 @@ struct NextOpenSection: View {
           TodayTaskRow(task: task, model: tasksModel, mutator: taskMutator,
                        tint: theme.color(for: "tasks"),
                        areas: areas, projects: projects,
-                       isSelected: selectedTaskId == task.id,
                        onOpen: onOpenTask.map { open in { open(task) } })
             // The full task menu (Edit Details… / When… / Deadline… / Move… /
             // Repeat… / Today / Cancel / Delete) + its picker sheets, shared
             // with the Tasks list so the two surfaces never drift.
             .taskRowActions(task: task, areas: areas, projects: projects,
                             mutator: taskMutator, onOpenDetail: onOpenTask)
+            // macOS: single click selects (the row's own tap is nil'd in
+            // `TodayTaskRow`), double-click opens — the same convention the
+            // Tasks tab uses. iOS keeps single-tap-to-open via the row.
+            #if os(macOS)
+            .simultaneousGesture(TapGesture(count: 2).onEnded {
+              onClickSelect(task.id); onOpenTask?(task)
+            })
+            .simultaneousGesture(TapGesture(count: 1).onEnded {
+              onClickSelect(task.id)
+            })
+            #endif
             .septenaNextRow()
             .tag(NextRowTag.task(task.id))
         }
@@ -773,64 +794,21 @@ struct NextDoneSection: View {
   /// Today's passive logs (intake / gut / mood / meals /
   /// training / completed tasks).
   var passive: [DoneEvent]
+  /// Open the editor for an editable done-row (mood / gut / nutrition). The
+  /// editor presentation itself is hosted up in `NextView`, on the `List`
+  /// container — NOT here. Attaching `adaptiveDetail` (a macOS `.inspector`)
+  /// to this `Section` collapses it, laying its rows out sideways instead of
+  /// stacked; the presentation must live outside the List.
+  var onEdit: (DoneEvent) -> Void
+  /// Delete an editable done-row through its section mutator.
+  var onDelete: (DoneEvent) -> Void
   @Environment(SectionTheme.self) private var theme
-  @Environment(\.modelContext) private var modelContext
 
-  // Edit/Delete from the Done log for the kinds whose `DoneEvent.id` resolves
-  // back to a single live entity (mood / gut / nutrition). Training is a
-  // collapsed session and "woke up" has no record, so those stay read-only.
-  @State private var editingMood: MoodEntry?
-  @State private var editingGut: GutEntry?
-  @State private var editingNutrition: NutritionEntry?
-
+  // Edit/Delete from the Done log apply only to the kinds whose `DoneEvent.id`
+  // resolves back to a single live entity (mood / gut / nutrition). Training is
+  // a collapsed session and "woke up" has no record, so those stay read-only.
   private static let editableKeys: Set<String> = ["mood", "gut", "nutrition"]
   private func isEditable(_ e: DoneEvent) -> Bool { Self.editableKeys.contains(e.sectionKey) }
-
-  /// `DoneEvent.id` is "<prefix>-<entityID>"; strip the prefix (which differs
-  /// from the section key for nutrition — "nut-") to recover the entity id.
-  private func entityID(_ e: DoneEvent) -> String? {
-    let prefix: String
-    switch e.sectionKey {
-    case "mood": prefix = "mood-"
-    case "gut": prefix = "gut-"
-    case "nutrition": prefix = "nut-"
-    default: return nil
-    }
-    guard e.id.hasPrefix(prefix) else { return nil }
-    return String(e.id.dropFirst(prefix.count))
-  }
-
-  // Re-resolve the live entity (the Done log keeps only a denormalized,
-  // Sendable DoneEvent) and open its section's existing editor — the same
-  // sheet the home surface presents.
-  private func beginEdit(_ e: DoneEvent) {
-    guard let id = entityID(e) else { return }
-    switch e.sectionKey {
-    case "mood":
-      editingMood = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
-        .entries.first { $0.id == id }
-    case "gut":
-      editingGut = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
-        .entries.first { $0.id == id }
-    case "nutrition":
-      editingNutrition = ChecklistMirror.loadNutritionToday(context: modelContext)
-        .first { $0.id == id }
-    default: break
-    }
-  }
-
-  // Delete through the section mutator (the write boundary); the feed refreshes
-  // off the mutator's change notification, same as the open rows.
-  private func delete(_ e: DoneEvent) {
-    guard let id = entityID(e) else { return }
-    Haptics.warning()
-    switch e.sectionKey {
-    case "mood":      SeptenaServices.shared.moodMutator.deleteEntry(id: id)
-    case "gut":       SeptenaServices.shared.gutMutator.deleteEntry(id: id)
-    case "nutrition": SeptenaServices.shared.nutritionMutator.deleteEntry(id: id)
-    default: break
-    }
-  }
 
   /// Merge the trio's live done splits with the passive logs into one
   /// newest-first stream.
@@ -856,33 +834,22 @@ struct NextDoneSection: View {
   }
 
   var body: some View {
+    // Pure list `Section` — no presentation modifiers. Mood / gut / nutrition
+    // get their home Edit + Delete menu (delegated up to `NextView`); the rest
+    // of the log (tasks, the trio's done splits, training, wake) stays a
+    // read-through record.
     Section {
       ForEach(events) { event in
         DoneEventRow(
           event: event,
-          // Mood / gut / nutrition get their home Edit + Delete menu; the rest
-          // of the log (tasks, the trio's done splits, training, wake) stays a
-          // read-through record.
-          onEdit: isEditable(event) ? { beginEdit(event) } : nil,
-          onDelete: isEditable(event) ? { delete(event) } : nil
+          onEdit: isEditable(event) ? { onEdit(event) } : nil,
+          onDelete: isEditable(event) ? { onDelete(event) } : nil
         )
         .septenaNextRow()
         .tag(NextRowTag.done(event.id))
       }
     } header: {
       Text("Done Today")
-    }
-    // The same editors the home surfaces use — `adaptiveDetail` is a drop-in
-    // `.sheet(item:)` (sheet on iPhone, docked inspector on iPad/Mac). The feed
-    // refreshes from the mutator's change notification, so onSave is a no-op.
-    .adaptiveDetail(item: $editingMood) { entry in
-      EditMoodEntrySheet(date: SeptenaDate.today, original: entry, onSave: {})
-    }
-    .adaptiveDetail(item: $editingGut) { entry in
-      EditGutEntrySheet(date: SeptenaDate.today, original: entry, onSave: { _ in })
-    }
-    .adaptiveDetail(item: $editingNutrition) { entry in
-      EditNutritionEntrySheet(original: entry, onDone: {})
     }
   }
 }

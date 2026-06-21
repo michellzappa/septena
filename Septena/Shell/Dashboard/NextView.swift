@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit  // NSEvent.modifierFlags for ⌘/⇧-click selection
+#endif
 
 // Dedicated screen for the daily "next" strip: chores, habits, supplements.
 // Pulled out of Today so Today stays focused on tasks (mirrors the web app).
@@ -14,25 +17,6 @@ struct NextView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.a11yMotion) private var motion
-  @Environment(NavigationState.self) private var nav
-
-  /// iOS presents Settings as a local sheet so the deep-link target
-  /// (`initialDestination`) is honored; macOS opens the dedicated window via
-  /// `nav` (the generic RootTabView sheet doesn't forward a destination).
-  @State private var showSettings = false
-  @State private var settingsTarget: SettingsView.SettingsDestination?
-
-  /// Open Settings to `dest` (or the root when nil), mirroring the pattern in
-  /// `InsightsDestination`: a contextual window on macOS, a local sheet on iOS.
-  private func openSettings(_ dest: SettingsView.SettingsDestination?) {
-    #if os(macOS)
-    nav.settingsDestination = dest
-    nav.showSettings = true
-    #else
-    settingsTarget = dest
-    showSettings = true
-    #endif
-  }
 
   @State private var model = NextItemsModel()
   @State private var tasksModel = TodayTasksModel()
@@ -51,6 +35,14 @@ struct NextView: View {
   /// conversation section. Hosted here at the page root so its docked inspector
   /// (iPad/macOS) attaches to the whole Next page; iPhone gets a sheet.
   @State private var editingTask: SeptenaTask?
+  // "Done Today" editors — mood / gut / nutrition rows reopen their home
+  // editor. Hosted HERE, on the `List` container, NOT inside `NextDoneSection`:
+  // `adaptiveDetail` resolves to a macOS `.inspector`, and attaching that to a
+  // `Section` collapses it (the rows render sideways instead of stacked). The
+  // presentation must live outside the List, alongside the task composer.
+  @State private var editingMood: MoodEntry?
+  @State private var editingGut: GutEntry?
+  @State private var editingNutrition: NutritionEntry?
   /// Areas / projects backing the composer's List picker + each row's subtitle.
   /// Loaded once alongside the day's data (small, effectively static).
   @State private var areas: [Area] = []
@@ -76,6 +68,74 @@ struct NextView: View {
     Binding(get: { editingTask != nil }, set: { if !$0 { editingTask = nil } })
   }
 
+  // MARK: - Done Today editing
+  //
+  // The Done log keeps only denormalized, Sendable `DoneEvent`s, so re-resolve
+  // the live entity by id before opening its section's editor. `DoneEvent.id`
+  // is "<prefix>-<entityID>"; the prefix differs from the section key for
+  // nutrition ("nut-").
+
+  private func doneEntityID(_ e: DoneEvent) -> String? {
+    let prefix: String
+    switch e.sectionKey {
+    case "mood":      prefix = "mood-"
+    case "gut":       prefix = "gut-"
+    case "nutrition": prefix = "nut-"
+    default: return nil
+    }
+    guard e.id.hasPrefix(prefix) else { return nil }
+    return String(e.id.dropFirst(prefix.count))
+  }
+
+  private func beginEditDone(_ e: DoneEvent) {
+    guard let id = doneEntityID(e) else { return }
+    switch e.sectionKey {
+    case "mood":
+      editingMood = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
+        .entries.first { $0.id == id }
+    case "gut":
+      editingGut = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+        .entries.first { $0.id == id }
+    case "nutrition":
+      editingNutrition = ChecklistMirror.loadNutritionToday(context: modelContext)
+        .first { $0.id == id }
+    default: break
+    }
+  }
+
+  // Delete through the section mutator (the write boundary); the feed refreshes
+  // off the mutator's change notification, same as the open rows.
+  private func deleteDone(_ e: DoneEvent) {
+    guard let id = doneEntityID(e) else { return }
+    Haptics.warning()
+    switch e.sectionKey {
+    case "mood":      SeptenaServices.shared.moodMutator.deleteEntry(id: id)
+    case "gut":       SeptenaServices.shared.gutMutator.deleteEntry(id: id)
+    case "nutrition": SeptenaServices.shared.nutritionMutator.deleteEntry(id: id)
+    default: break
+    }
+  }
+
+  // MARK: - macOS click selection
+
+  /// Write the task row's selection from its tap gesture. A tap gesture on a
+  /// `List` row defeats native click-selection, so we own it here (mirrors the
+  /// Tasks tab's `clickSelect`): plain click selects only this row, ⌘-click
+  /// toggles it, ⇧-click extends. No-op on iOS, where rows open on single tap.
+  private func clickSelectTask(_ id: String) {
+    #if os(macOS)
+    let tag = NextRowTag.task(id)
+    let mods = NSEvent.modifierFlags
+    if mods.contains(.command) {
+      if selection.contains(tag) { selection.remove(tag) } else { selection.insert(tag) }
+    } else if mods.contains(.shift) {
+      selection.insert(tag)
+    } else {
+      selection = [tag]
+    }
+    #endif
+  }
+
   // MARK: - Keyboard activation
 
   /// The single selected row, when exactly one is highlighted. Multi-select
@@ -92,10 +152,20 @@ struct NextView: View {
     let (kind, id) = NextRowTag.split(tag)
     switch kind {
     case "task":
-      if let t = tasksModel.openTasks.first(where: { $0.id == id }) { editingTask = t }
+      if let t = tasksModel.openTasks.first(where: { $0.id == id }) { openForEdit(t) }
     default:
       toggleTrio(kind: kind, id: id)
     }
+  }
+
+  /// Open a task in the composer and pin the native selection to its row, so
+  /// the keyboard cursor and the editing row stay in agreement (the row keeps
+  /// its native `List(selection:)` highlight while its editor is open — no
+  /// custom highlight; selection IS the anchor). Used by both a row tap and
+  /// the keyboard Return path.
+  private func openForEdit(_ task: SeptenaTask) {
+    selection = [NextRowTag.task(task.id)]
+    editingTask = task
   }
 
   /// Space: toggle the row's done state without opening anything — including a
@@ -161,14 +231,15 @@ struct NextView: View {
       // NextOpenSection.orderedKeys.
       NextOpenSection(model: model, tasksModel: tasksModel,
                       areas: areas, projects: projects,
-                      onOpenTask: { editingTask = $0 },
-                      selectedTaskId: editingTask?.id)
+                      onOpenTask: { openForEdit($0) },
+                      onClickSelect: clickSelectTask)
 
       // A chronological log of everything finished today — the trio the
       // user just ticked off (lingers struck-through above, then lands
       // here newest-first) plus passive logs (caffeine, meals, mood, …).
       if hasAnyDone {
-        NextDoneSection(model: model, passive: doneModel.events)
+        NextDoneSection(model: model, passive: doneModel.events,
+                        onEdit: beginEditDone, onDelete: deleteDone)
       }
     }
     #if os(iOS)
@@ -176,43 +247,19 @@ struct NextView: View {
     #else
     .listStyle(.inset)
     #endif
-    // Keyboard navigation, mirroring the Tasks tab: the List is focusable so
-    // ↑↓ move the native selection cursor across every tagged row; Return
-    // activates, Space toggles, Escape clears. Suppressed while the task
-    // composer owns the keyboard (editorOpen) so its fields keep Return/Space.
-    .modifier(NextKeyboardModifier(
+    // Keyboard navigation, the same shared contract the Tasks tab uses
+    // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
+    // selection cursor across every tagged row; Return activates, Space
+    // toggles, Escape clears. Suppressed while the task composer owns the
+    // keyboard so its fields keep Return/Space.
+    .listKeyboardNavigation(
+      inputActive: editingTask != nil,
       hasSelection: !selection.isEmpty,
-      editorOpen: editingTask != nil,
       onReturn: activateSelection,
       onSpace: toggleSelection,
       onEscape: { selection = [] }
-    ))
+    )
     .septenaInlineTitle()
-    // The "…" overflow: a quick jump to the Next-specific preferences
-    // (suggestions, carry-over, which sections appear) and to global Settings.
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Menu {
-          Button {
-            openSettings(.nextFeed)
-          } label: {
-            Label("Next Settings", systemImage: "arrow.forward.circle")
-          }
-          Button {
-            openSettings(nil)
-          } label: {
-            Label("Settings", systemImage: "gearshape")
-          }
-        } label: {
-          Label("More", systemImage: "ellipsis.circle")
-        }
-      }
-    }
-    #if os(iOS)
-    .sheet(isPresented: $showSettings) {
-      SettingsView(initialDestination: settingsTarget)
-    }
-    #endif
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
     // drawer the Tasks tab uses. Edit mode embeds the agent conversation.
@@ -222,6 +269,19 @@ struct NextView: View {
                          accent: theme.color(for: "tasks"),
                          onDone: { tasksModel.refreshFromCache() })
       }
+    }
+    // "Done Today" editors hosted on the List container (NOT inside the
+    // section — see `editingMood` above). `adaptiveDetail` is a sheet on
+    // iPhone, a docked inspector on iPad/macOS; the feed refreshes from each
+    // mutator's change notification, so onSave/onDone are no-ops.
+    .adaptiveDetail(item: $editingMood) { entry in
+      EditMoodEntrySheet(date: SeptenaDate.today, original: entry, onSave: {})
+    }
+    .adaptiveDetail(item: $editingGut) { entry in
+      EditGutEntrySheet(date: SeptenaDate.today, original: entry, onSave: { _ in })
+    }
+    .adaptiveDetail(item: $editingNutrition) { entry in
+      EditNutritionEntrySheet(original: entry, onDone: {})
     }
     .task {
       areas = LocalCache.areas(in: modelContext)
@@ -273,43 +333,3 @@ struct NextView: View {
   }
 }
 
-/// Makes the Next `List` keyboard-driven, mirroring the Tasks tab's modifier:
-/// the list takes focus (so ↑↓ run native `List(selection:)` traversal) and
-/// Return / Space / Escape map to the page's activation handlers. Focus is
-/// re-claimed when the task composer closes so the cursor survives an edit.
-private struct NextKeyboardModifier: ViewModifier {
-  let hasSelection: Bool
-  let editorOpen: Bool
-  let onReturn: () -> Void
-  let onSpace: () -> Void
-  let onEscape: () -> Void
-
-  @FocusState private var listFocused: Bool
-
-  func body(content: Content) -> some View {
-    content
-      .focusable()
-      .focused($listFocused)
-      .focusEffectDisabled()
-      .onAppear { listFocused = true }
-      .onChange(of: editorOpen) { _, open in
-        guard !open else { return }
-        DispatchQueue.main.async { listFocused = true }
-      }
-      .onKeyPress(.return) {
-        guard !editorOpen, hasSelection else { return .ignored }
-        onReturn()
-        return .handled
-      }
-      .onKeyPress(.space) {
-        guard !editorOpen, hasSelection else { return .ignored }
-        onSpace()
-        return .handled
-      }
-      .onKeyPress(.escape) {
-        guard !editorOpen, hasSelection else { return .ignored }
-        onEscape()
-        return .handled
-      }
-  }
-}

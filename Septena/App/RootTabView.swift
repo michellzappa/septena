@@ -93,8 +93,12 @@ struct RootTabView: View {
       // flag opens the dedicated `"settings"` Window (declared in App.swift)
       // so the surface carries real traffic lights and closes like a window.
       #if os(iOS)
-      .sheet(isPresented: $nav.showSettings) {
-        SettingsView()
+      // Forward the optional deep-link target so a contextual entry point
+      // (e.g. a home "…" menu's "Next Settings" row) can open Settings already
+      // pushed to its pane — matching the macOS window path below. Cleared on
+      // dismiss so the next plain open lands on the root.
+      .sheet(isPresented: $nav.showSettings, onDismiss: { nav.settingsDestination = nil }) {
+        SettingsView(initialDestination: nav.settingsDestination)
       }
       #else
       .onChange(of: nav.showSettings) { _, open in
