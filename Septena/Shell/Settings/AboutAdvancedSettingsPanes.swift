@@ -30,9 +30,12 @@ struct AboutSettingsPane: View {
               .foregroundStyle(.secondary)
               .multilineTextAlignment(.center)
           }
-          Text("Version \(version) (\(build))")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+          VStack(spacing: 2) {
+            Text("Version \(version) (\(build))")
+            Text(platformLabel)
+          }
+          .font(.caption)
+          .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -52,35 +55,49 @@ struct AboutSettingsPane: View {
           Text("Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too.")
             .font(.callout)
             .foregroundStyle(.secondary)
-          Text("— mz")
-            .font(.callout.italic())
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .trailing)
+          HStack(spacing: 8) {
+            // Restraint: the maker note links out to the full build story
+            // (the journal post) rather than telling it here.
+            Link(destination: URL(string: "https://septena.app/journal/from-a-logging-habit-to-an-app")!) {
+              HStack(spacing: 4) {
+                Text("How it was built")
+                Image(systemName: "arrow.up.right").font(.caption2)
+              }
+              .font(.callout)
+            }
+            .tint(.secondary)
+            Spacer(minLength: 8)
+            Text("— mz")
+              .font(.callout.italic())
+              .foregroundStyle(.secondary)
+          }
         }
       } header: {
         Text("From the maker")
       }
 
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.support) {
+          rowLabel("Support", icon: "lifepreserver")
+        }
+      }
+
       Section("Links") {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
         outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
-        NavigationLink(value: SettingsView.SettingsDestination.support) {
-          Label("Support", systemImage: "lifepreserver")
-        }
         outboundLink("Source code", destination: "https://github.com/septena/septena", icon: "chevron.left.forwardslash.chevron.right")
-        outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text")
+        outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text", trailing: "MIT")
       }
 
       Section {
         NavigationLink(value: SettingsView.SettingsDestination.whatsNew) {
-          Label("What's New", systemImage: "megaphone")
+          rowLabel("What's New", icon: "megaphone")
         }
-        infoRow("Platform", platformLabel)
       }
 
       Section {
         NavigationLink(value: SettingsView.SettingsDestination.advanced) {
-          Label("Advanced", systemImage: "wrench.and.screwdriver")
+          rowLabel("Advanced", icon: "wrench.and.screwdriver")
         }
       } footer: {
         Text("Developer and recovery tools. Safe to ignore in normal use.")
@@ -93,31 +110,48 @@ struct AboutSettingsPane: View {
     #if os(macOS)
     return "macOS"
     #else
-    return "iOS · iPadOS"
+    // Report the OS the device actually runs — iPadOS on iPad, iOS on iPhone —
+    // rather than the combined "iOS · iPadOS".
+    return UIDevice.current.userInterfaceIdiom == .pad ? "iPadOS" : "iOS"
     #endif
   }
 
-  private func outboundLink(_ title: String, destination: String, icon: String) -> some View {
-    Link(destination: URL(string: destination)!) {
-      HStack {
-        Label(title, systemImage: icon)
-          .foregroundStyle(.primary)
-        Spacer()
-        Image(systemName: "arrow.up.right")
-          .font(.caption2)
-          .foregroundStyle(.tertiary)
-      }
+  /// One consistent leading label for every row in About: the SF Symbol
+  /// pinned in a fixed-width slot (so titles left-align regardless of the
+  /// glyph's intrinsic width) at a single size, with both glyph and text in
+  /// primary white — no per-row accent or sizing drift.
+  private func rowLabel(_ title: String, icon: String) -> some View {
+    HStack(spacing: 12) {
+      Image(systemName: icon)
+        .font(.body)
+        .imageScale(.medium)
+        .foregroundStyle(.secondary)
+        .frame(width: 24, alignment: .center)
+      Text(title)
+        .foregroundStyle(.primary)
     }
   }
 
-  private func infoRow(_ label: String, _ value: String) -> some View {
-    HStack {
-      Text(label)
-      Spacer()
-      Text(value)
-        .foregroundStyle(.secondary)
-        .font(.callout.monospacedDigit())
+  private func outboundLink(_ title: String, destination: String,
+                            icon: String, trailing: String? = nil) -> some View {
+    Link(destination: URL(string: destination)!) {
+      HStack(spacing: 8) {
+        rowLabel(title, icon: icon)
+        Spacer(minLength: 8)
+        if let trailing {
+          Text(trailing)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+        Image(systemName: "arrow.up.right")
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      .contentShape(Rectangle())
     }
+    // `Link` tints its content with the app accent by default; pin it to
+    // primary so the outbound rows read white like the navigation rows.
+    .tint(.primary)
   }
 }
 

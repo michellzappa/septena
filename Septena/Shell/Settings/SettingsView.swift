@@ -930,7 +930,7 @@ struct SettingsView: View {
       Text(title(for: dest))
     } icon: {
       #if os(macOS)
-      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 20, glyphRatio: 0.38)
+      ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 20, glyphRatio: 0.48)
       #else
       ColoredGlyph(icon: icon(for: dest), color: tint(for: dest), size: 29, glyphRatio: 0.38)
       #endif
@@ -1099,11 +1099,11 @@ struct SettingsView: View {
 }
 
 /// The Settings-row icon for the About page: the seven Septena discs in
-/// their canonical rainbow on a neutral gray tile, matching `ColoredGlyph`'s
-/// shape and sheen so it sits flush with the colored rows above it. Gray (not
-/// a brand accent) marks About as a utility row, while the discs keep it
-/// unmistakably the app's own mark. Disc placement/colors reuse the shared
-/// `SeptenaPlus` constants so the emblem can't drift from the icon.
+/// white on a neutral gray tile, matching `ColoredGlyph`'s shape and sheen
+/// (white glyph on a saturated fill) so it sits flush with the colored rows
+/// above it. Gray (not a brand accent) marks About as a utility row, while
+/// the white discs keep it unmistakably the app's own mark. Disc placement
+/// reuses the shared `SeptenaPlus` constants so the emblem can't drift.
 struct SeptenaDiscTile: View {
   var size: CGFloat = 29
   @Environment(\.colorScheme) private var colorScheme
@@ -1121,7 +1121,7 @@ struct SeptenaDiscTile: View {
       )
       ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
         Circle()
-          .fill(SeptenaPlus.discColors[index])
+          .fill(.white)
           .frame(width: size * 0.168, height: size * 0.168)
           .position(x: size * center.x, y: size * center.y)
       }

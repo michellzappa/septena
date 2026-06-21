@@ -12,6 +12,11 @@ Referenced from:
 - `docs/DesignSpec.md` → a "Voice" note (one pointer line)
 - `../septena-site/docs/marketing.md` → the marketing source of truth (one pointer line)
 
+**Division of ownership:** this doc owns the *maker voice & identity* — who mz is,
+the build story, the reusable copy blocks. **Audience, positioning, taglines, and
+who-it's-for are owned by `marketing.md`** (its §3 "Who it's for" and §4 "the
+week"). Don't duplicate or contradict them here — link instead.
+
 If you change a fact or a copy block here, the surfaces are downstream — grep for
 the block and update each, same change. Treat this like a hotspot file.
 
@@ -25,65 +30,117 @@ fresh ones, don't pretend they're current if they're old.
 
 | Claim you may make | The data behind it |
 |---|---|
-| Built by one person | Across every repo, every commit is mine. Native: 1,039 mine + 50 from `envisioning-agent`, an automation I wrote. Webapp pilot: 242. No other human contributor. |
-| Piloted as a webapp, then rebuilt native | A Next.js + FastAPI pilot ("Setlist", `../septena-app`) ran Apr 19 → May 24, 230 commits. Its final commit exports data to bootstrap the iOS CloudKit build — the pilot fed the rebuild. The shipping app is the native version. |
+| Built by one person | Across every repo, every commit is mine. Native: 1,039 mine + 50 from a commit-cron I wrote. Webapp pilot: 242. No other human contributor. |
+| Piloted as a webapp, then rebuilt native | A Next.js + FastAPI webapp pilot ran Apr 19 → May 24, 230 commits. Its final commit exports data to bootstrap the iOS CloudKit build — the pilot fed the rebuild. The shipping app is the native version. |
+| Rooted in a years-long practice | Setlist and Septena are the *app form* of something I'd done by hand for years — structured training, nutrition, and symptom logging. (Septena's own DB only reaches back to 2024; the multi-year depth lives in the practice / prior exports — claim the *practice*, not in-app data, unless a start date is sourced.) |
 | Built fast, with AI | ~1,080 commits in the native app + 230 in the pilot (~1,310 app commits; ~1,410 incl. gateway + site), all inside ~11 weeks (Apr 4 → Jun 21 2026) — only possible paired with AI |
 | Evenings and weekends | Holds in **both** repos. Native: peaks 8–11pm (9pm = 131), Sat (199) + Sun (207) biggest. Pilot: single biggest day is Sunday (65). |
 | **Not** a night owl | **Zero** commits between 1am and 6am — in *either* repo. None. |
 | Built in the open | Public repo (`github.com/septena/septena`), MIT-licensed — every line that touches your data is readable |
 | Private by design | Local-first, CloudKit private DB, no third-party analytics, no investors, no growth team |
-| The numbers are trustworthy | `septena-cloud` has a single root + linear history; going open source rewrote hashes via `filter-repo` (secrets + PII scrub) but **preserved author dates**, so its counts/dates are real. Its ancestor is the private `engage-app` repo (the original Engage code) — `septena-cloud` is its renamed public continuation, so do **not** add engage-app's commits (they already live inside septena-cloud's early history). |
+| The numbers are trustworthy | The public repo has a single root + linear history; going open source rewrote hashes (a secrets + history scrub) but **preserved author dates**, so its counts/dates are real. It's the public continuation of an earlier private repo — the same codebase, renamed — so don't double-count: those early commits already live inside the public repo's history. |
 
-### The build, in three phases (day counts, for the record)
+### The build, in three phases (full internal record — public story is cropped to phases 2–3; see origin note + Block G)
 
-| Phase | What it was | Window | Days | Commits |
+The early builds carried throwaway codenames (irrelevant); the name **Septena**
+only landed ~May 13, a few weeks in. By *form*, not codename:
+
+| Phase | Form | Window | Days | Commits |
 |---|---|---|---|---|
-| 1 · **Engage** | a focused, Things-3-style **task manager** — its tasks/areas/projects engine *is* Septena's task section today | Apr 4–6 (initial build) | **3** | 53 |
-| 2 · **Setlist** | the webapp pilot (Next.js + FastAPI) — proved the broader life-tracking idea on myself | Apr 19 – May 24 | **35** | 230 |
-| 3 · **Septena** | the native build: Engage's task engine + Setlist's domain, rebranded onto CloudKit | May 13 – Jun 21 (ongoing) | **39** | ~1,030 |
+| 1 | an early native build — a **task manager** whose tasks/areas/projects engine *is* Septena's task section today | Apr 4–6 | **3** | 53 |
+| 2 | the **webapp pilot** (Next.js + FastAPI) — proved the broader life-tracking idea on myself | Apr 19 – May 24 | **35** | 230 |
+| 3 | the **native app** — the task engine + the pilot's domain, on CloudKit, now named Septena | May 13 – Jun 21 (ongoing) | **39** | ~1,030 |
 
-Engage was **not** a wrong turn — it's the foundation Septena is still built on
-(the rebrand `Engage → Septena` literally renames the same codebase). Between the
-Engage burst and the pilot the native app paused, but I wasn't idle: ~125 commits
-landed across **six other projects** in those ~12 days (day job at Envisioning —
-signals / research / .com — plus an Amsterdam event app, an iOS app, and site
-work). The "merge" was manual: on **May 13** Engage was rebranded and fused with
-what the webapp proved; the FastAPI seam was deleted **May 24**, the same day the
-pilot's last commit exported its data to seed CloudKit. Net: ~1,310 app commits
-across 78 days (~11 weeks), one person — *3 days to stand up the task engine, 35
-to prove the wider idea, 39 to build it for real.*
+The first build was **not** a wrong turn — it's the foundation the app is still
+built on (the rename was literally the same codebase). Between that burst and the
+pilot the native work paused, but I wasn't idle: ~125 commits landed across a few
+unrelated projects (a day job and side work) in those ~12 days. The "merge" was
+manual: ~May 13 the early build was renamed Septena and fused with what the webapp
+proved; the FastAPI seam was deleted May 24, the same day the pilot's last commit
+exported its data to seed CloudKit. Net: ~1,310 app commits across 78 days (~11
+weeks), one person — *3 days to stand up the task engine, 35 to prove the wider
+idea, 39 to build it for real.*
 
-**Canonical build visual:** a stacked **daily commit-volume** chart over Apr 4 →
-Jun 21 (series: Engage, Septena native, Setlist pilot, other projects), with the
-① May 13 rebrand and ② May 24 handoff marked. The bars *are* the data — height =
-commits that day — so the phases read off the shape. Fully reproducible from git
-(`git log --since=2026-04-04 --until=2026-06-22 --date=short --pretty=%ad | sort |
-uniq -c` per repo). Use this for the site `/about` and the book lede, not the flat
-phase ribbon.
+**Canonical build visual (public, cropped):** a stacked **daily commit-volume**
+chart over **Apr 19 → Jun 21** — the webapp pilot + the native app — with a
+left-edge note that both are the app form of years of hand-logged training /
+nutrition / symptom data. Markers: ① May 13 native build begins, ② May 24 pilot
+hands its data to CloudKit. The bars *are* the data — height = commits/day. Drop
+the earlier task-app burst and the other-projects band from the public version
+(internal record only). Reproducible from git (`git log --since=2026-04-19
+--until=2026-06-22 --date=short --pretty=%ad | sort | uniq -c` per repo). Use for
+site `/about` + the book lede.
 
-> **Canonical origin story — DECIDED (2026-06-21): the pilot → rebuild arc.**
-> Lead with it everywhere. The literal git arc is *a 3-day task-manager
-> foundation (Apr 4–6, "Engage") → webapp pilot (Apr 19–May 24, Next.js +
-> FastAPI) → native rebuild on CloudKit (May 13 → Jun 21)*, but the **story we
-> tell** is "I piloted it as a webapp on my own life, then rebuilt it native."
-> Engage is a good origin detail for the book — Septena grew out of a task
-> manager I built first, not a blank page — but the headline stays the pilot →
-> rebuild arc. That's honest (the pilot's last commit
-> really does export data to seed the native build) and it's the strongest indie
-> framing: validate first, build for real second. The graph reflects this (two
-> chapters). Honest nuance to preserve: the *dead zone* (1–6am) and the weekend
-> skew hold in both repos, but the peak hour shifted — pilot skewed mornings,
-> native skews evenings. Don't claim "always evenings"; claim "always waking
-> hours, never the night."
+### Why an app — the form evolution & the thesis
+
+The honest sequence of *forms* the idea passed through (the real "false starts" —
+context for the book + internal record, **not** the headline graph):
+
+1. **A self-hosted agentic rig** — a dedicated Mac on Tailscale running servers +
+   agents (on the *openclaw* framework). The pre-app attempt; powerful, but the
+   wrong shape for the data.
+2. **An early native task app** (Apr 4–6).
+3. **The webapp pilot** (Apr 19) — where the public story starts.
+4. **The native app** (May 13 →) — named Septena a few weeks in.
+
+The thesis that connects them: **the data was always structured and repetitive** —
+the same handful of fields, logged over and over. Agent rigs and freeform notes
+fight that shape; a typed app fits it, with **fast UX to input** as its real job.
+And the old reason *not* to build your own app — migration cost, format lock-in —
+**collapsed once agentic programming made converting between formats trivial.** So
+a bespoke app became the *ergonomic* choice, not the expensive one. The churn from
+form to form isn't thrash; it's the proof — each version was **vibe-coded in days**
+(sustained polish then accreted over weeks).
+
+The resolution of the *app vs. file* tension is the positioning: Septena is
+**"file over app."** It's an app for the ergonomics (fast structured input), but
+the data stays yours and portable — readable by your own AI over **MCP / Siri**,
+exportable, **open source by design**, in a **private** store you own. The app is
+the input/output surface; the data is the asset that outlives it. *All of those
+things matter* (pure portable data · AI access · fast input · open source ·
+private). [[project_local_mcp_server]] is one proof the data is agent-readable.
+
+> **Canonical origin story — DECIDED (2026-06-21, cropped to the app years).** The
+> public story is the **data → webapp pilot → native app** arc, and it leads with
+> the *practice, not the code*: for years I'd been logging my own training,
+> nutrition, and symptoms by hand — a scrappy webapp (Apr 19) was the first time
+> that practice became an app, and the native build is its rebuild. The name
+> **Septena** landed ~a few weeks in, not day one. **Cut from the public story**
+> (kept above only as the honest internal record): the earlier task-app the code
+> descends from, the throwaway codenames, and the side-project commits during the
+> April pause — true, but they dilute the line. Still binding: the weekend skew +
+> the 1–6am dead zone hold; claim "always waking hours, never the night," never a
+> specific wrong detail.
+>
+> ⚠️ Before publishing the word "years": Septena's own DB has nothing before 2024,
+> so the multi-year history is the *practice* (prior exports / spreadsheets /
+> device history), not in-app. Safe phrasing: "for years I'd been logging…". Only
+> claim "since 20XX" once pinned to a real source.
 
 ### Block G — the origin line (canonical, for site /about, book lede, press)
 
-> For five weeks Septena was a scrappy Next.js webapp I tested on my own life.
-> When it proved itself, I rebuilt it native for Apple — and the pilot's last act
-> was exporting my data to seed it.
+> For years I'd been logging my own training, nutrition, and symptoms by hand.
+> The first time that practice became an app, it was a scrappy webapp I tested on
+> my own life — and when it proved out, I rebuilt it native for Apple, carrying
+> the data straight across.
 
 For Phase 2, weave Block G into Block B (the long maker's note) — the website is
 where the arc gets told in full.
+
+### Block H — the thesis line (canonical, for site /about + book + talks)
+
+> The data was always structured and repetitive, so an app fits it better than
+> notes or an agent rig ever did. And once AI made converting between formats
+> trivial, building my own stopped being expensive — I vibe-coded each version in
+> days. It's still "file over app": an app for the ergonomics, but the data stays
+> mine — portable, exportable, and readable by my own AI.
+
+### Block I — the name (canonical)
+
+> **Septena** — Latin for a *group of seven*. Seven because the week is the unit a
+> life actually turns on, and the app is built around it (seven sections, the
+> seven-disc mark); the word itself has seven letters. (Marketing owns the tagline
+> side — see `marketing.md` §4 "the week.")
 
 ### Banned claims (untrue or off-voice)
 
@@ -178,7 +235,7 @@ Where the identity appears, which block, which repo/file, current state.
 
 | Surface | Repo · file | Block | Status |
 |---|---|---|---|
-| About pane (maker's note) | cloud · `AboutAdvancedSettingsPanes.swift` ("From the maker" section) | A | **done** (iOS+Mac green 2026-06-21) |
+| About pane (maker's note) | cloud · `AboutAdvancedSettingsPanes.swift` ("From the maker" section) | A | **done** (iOS+Mac green 2026-06-21) — now also links out to the build-story journal post (restrained: link, don't tell it in-app) |
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
@@ -186,7 +243,8 @@ Where the identity appears, which block, which repo/file, current state.
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
-| Journal | site · `content/journal/*.md` | E + §2 | **live, on-voice — keep cadence** |
+| Journal | site · `content/journal/*.md` | E + §2 | **live, on-voice — keep cadence**. Build story shipped 2026-06-21: `from-a-logging-habit-to-an-app` (the data → pilot → native arc, file-over-app thesis). |
+| Journal data-viz system | site · `content/journal/build-data.json` + `lib/journal-figures.ts` + `components/journal/figures.tsx` | — | **done** (site build green 2026-06-21). Reusable: a post embeds a chart with a `[figure:KEY]` line; add datasets to `build-data.json`. Server-SVG, no client JS. Use this, **not** one-off charts. |
 | Marketing source of truth | site · `docs/marketing.md` | all | add pointer to this doc |
 | Book proposition | see §6 | B + §2 | proposal only |
 
