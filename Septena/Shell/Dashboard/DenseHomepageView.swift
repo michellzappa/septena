@@ -179,6 +179,7 @@ private struct DenseDomainCard: View {
 
 /// Inline sparkline for a `HistorySeries`. Renders:
 ///   * `.bars`        → line + filled area under the curve
+///   * `.dailyTrend`  → 7-day sum fill + a raw daily line tucked under it
 ///   * `.centered`    → bars above/below a centered baseline
 ///
 /// Empty / all-zero data → a dash, so the row doesn't pretend to have
@@ -213,6 +214,18 @@ private struct DomainSparkline: View {
       let lo = max(0, i - window + 1)
       let slice = values[lo...i]
       return slice.reduce(0, +) / Double(slice.count)
+    }
+  }
+
+  /// Trailing-N-day rolling *sum* — the cumulative "how much in the last
+  /// 7 days" envelope. A day is part of its own window, so the sum is
+  /// always ≥ that day's value, which keeps the raw daily line underneath
+  /// it. Early points sum whatever history is available.
+  private func rollingSum(_ values: [Double], window: Int = 7) -> [Double] {
+    guard window > 1, values.count > 1 else { return values }
+    return values.indices.map { i in
+      let lo = max(0, i - window + 1)
+      return values[lo...i].reduce(0, +)
     }
   }
 
@@ -342,6 +355,53 @@ private struct DomainSparkline: View {
             )
             .foregroundStyle(accent)
             .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .interpolationMethod(.monotone)
+          }
+        } else {
+          emptyMark
+        }
+
+      case .dailyTrend(let daily):
+        // One series, two layers — the unified chart:
+        //   • the trailing-7d *sum* is the filled body (area + solid line)
+        //     — "how much I've trained this week," the smooth cumulative;
+        //   • the raw daily effort is a thinner line tucked underneath, so
+        //     each session still shows — "what I did each day."
+        // A day is part of its own 7-day window, so daily ≤ weekly always
+        // → the per-day line stays inside the cumulative envelope on the
+        // shared auto-scaled axis, no crushing. Sum on the full upstream
+        // series *before* trimming to the display window so the leftmost
+        // envelope point already carries up to `window-1` days of prior
+        // history (training's loader provides ≥30 days; `aligned` pads
+        // shorter input with leading zeros after).
+        let weekly = aligned(rollingSum(daily))
+        let perDay = aligned(daily)
+        if nonEmpty(weekly) != nil {
+          ForEach(Array(weekly.enumerated()), id: \.offset) { idx, value in
+            AreaMark(
+              x: .value("Day", idx),
+              y: .value("Weekly", value),
+              series: .value("Series", "weekly")
+            )
+            .foregroundStyle(accent.opacity(0.22))
+            .interpolationMethod(.monotone)
+            LineMark(
+              x: .value("Day", idx),
+              y: .value("Weekly", value),
+              series: .value("Series", "weekly")
+            )
+            .foregroundStyle(accent)
+            .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .interpolationMethod(.monotone)
+          }
+          ForEach(Array(perDay.enumerated()), id: \.offset) { idx, value in
+            LineMark(
+              x: .value("Day", idx),
+              y: .value("Daily", value),
+              series: .value("Series", "daily")
+            )
+            .foregroundStyle(accent.opacity(0.45))
+            .lineStyle(StrokeStyle(lineWidth: 1.2, lineCap: .round))
             .interpolationMethod(.monotone)
           }
         } else {

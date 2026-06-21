@@ -1535,13 +1535,11 @@ struct WeekDashboardView: View {
     let minutes = Int(cardio?.daily.last?.rolling7d ?? 0)
     let target = cardio?.targetWeeklyMin ?? 150
     // One combined 90-day effort-minutes series (all modalities), from the
-    // precomputed cache, rounded to whole minutes for the standard `.bars`
-    // sparkline. Training is the spikiest cadence on the dashboard (hard
-    // day, then rest-day zeros), so it opts into `smoothSparkline` — the
-    // renderer plots a trailing-7d mean as one clean filled line, the
-    // "am I trending up or down" read. The headline already carries the
+    // precomputed cache. Drawn as `.dailyTrend`: the raw per-day exercise
+    // (the filled body) plus its trailing-7d mean (the line through it) —
+    // both from this single series, in one chart. The headline carries the
     // literal this-week numbers (sessions + Z2 minutes).
-    let effortSeries = derived.trainEffortSeries90.map { Int($0.rounded()) }
+    let effortSeries = derived.trainEffortSeries90
     return HomepageDomainData(
       domain: .training,
       title: String(localized: "Training", comment: "Section name"),
@@ -1555,12 +1553,12 @@ struct WeekDashboardView: View {
                       current: Double(minutes),
                       target: Double(max(target, 1)),
                       unit: "min"),
-      history: .bars(effortSeries),
+      history: .dailyTrend(daily: effortSeries),
       tap: .openSheet(.training),
-      // Spiky cadence → smooth to a trailing-7d mean so rest-day zeros
-      // don't read as a holey comb on the small chart. Same reason Apple
-      // Watch's Exercise ring shows weekly load, not point samples.
-      smoothSparkline: true
+      // `.dailyTrend` draws the raw daily fill + its own 7-day mean line,
+      // so the generic `smoothSparkline` flag (which smooths a `.bars`
+      // series) doesn't apply here.
+      smoothSparkline: false
     )
   }
 

@@ -9,11 +9,18 @@ import SwiftUI
 ///                   protein, intake sessions,
 ///                   groceries bought-per-day, gut movements, activity
 ///                   steps, tasks completed.
+///   * `.dailyTrend` — one daily-effort series shown two ways in a single
+///                   chart: the trailing-7d *sum* as the filled body
+///                   (cumulative "done this week") + the raw per-day as a
+///                   line tucked under it. One series in, two layers out
+///                   (no duplicate data). Today only training; other modes
+///                   treat it like `.bars`.
 ///   * `.centered` — per-day deltas from a baseline; `nil` entries are
 ///                   missing days that should render as stubs, not as
 ///                   zero deviation. Today only body weight.
 enum HistorySeries {
   case bars([Int])
+  case dailyTrend(daily: [Double])
   case centered(values: [Double?], baseline: Double)
 }
 

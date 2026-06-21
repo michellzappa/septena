@@ -8,9 +8,14 @@ import SwiftUI
 ///   * Domains with an explicit daily target (`HomepageDomainData.progress`)
 ///     fill `current / target` and label the center with the percentage —
 ///     habits done, protein grams, hydration ml, steps, Z2 minutes, …
-///   * Domains without a target (sleep score, GitHub commits) fall back to
-///     a *week-activity* fraction — active days in the trailing 7 — drawn in
-///     a lighter accent and labeled `n/7` so it never masquerades as a goal.
+///   * Target-less *count* domains (intake trackers, GitHub commits) fill by
+///     today's own value over this week's peak, labeled with today's count —
+///     so two trackers read distinctly instead of collapsing to the same
+///     week-activity fraction.
+///   * Remaining target-less domains (sleep score, body) fall back to a
+///     *week-activity* fraction — active days in the trailing 7 — labeled
+///     `n/7`. Both fallbacks draw in a lighter accent so they never
+///     masquerade as a goal.
 ///
 /// Unlike Heatmap / Sparkline, this mode shows a grid on *every* size class
 /// (the rings are small and read fine 3-up on iPhone). Columns are adaptive:
@@ -114,6 +119,19 @@ private struct RingDomainCell: View {
                       centerLabel: "\(Int((frac * 100).rounded()))%",
                       hasTarget: true)
     }
+    // Target-less *count* domains (intake trackers, GitHub commits) read by
+    // today's own value, filled against this week's peak. The week-activity
+    // `n/7` fallback below counts only *days with any activity*, so two
+    // trackers logged on the same days collapsed to the same fraction —
+    // distinct counts read as identical rings. Today-vs-peak keeps them
+    // distinct and matches the tile's "N today" headline.
+    if case .bars(let values) = data.history, !values.isEmpty {
+      let recent = Array(values.suffix(7))
+      let today = recent.last ?? 0
+      let peak = recent.max() ?? 0
+      let frac = peak > 0 ? Double(today) / Double(peak) : 0
+      return RingFill(value: frac, centerLabel: "\(today)", hasTarget: false)
+    }
     let (active, span) = activeDays(in: data.history)
     let frac = span > 0 ? Double(active) / Double(span) : 0
     return RingFill(value: frac,
@@ -129,6 +147,9 @@ private struct RingDomainCell: View {
     switch history {
     case .bars(let values):
       let last = tail(values)
+      return (last.filter { $0 > 0 }.count, last.count)
+    case .dailyTrend(let daily):
+      let last = tail(daily)
       return (last.filter { $0 > 0 }.count, last.count)
     case .centered(let values, _):
       let last = tail(values)

@@ -250,6 +250,11 @@ private struct HeatmapDomainRow: View {
     case .bars(let values):
       return normalizedLevels(values.map(Double.init))
 
+    case .dailyTrend(let daily):
+      // Heatmap is "was there activity" per day — the raw daily effort
+      // is exactly the right signal.
+      return normalizedLevels(daily)
+
     case .centered(let values, _):
       // Absolute deviation: a big swing up *or* down counts as
       // "activity." `nil` days (no measurement) collapse to level 0.

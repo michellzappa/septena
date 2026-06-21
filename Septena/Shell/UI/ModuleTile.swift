@@ -571,6 +571,15 @@ private struct TileHistogram: View {
                 emphasizedIndex: v.count - 1,
                 dayLabels: Self.weekdayLabels(count: v.count))
 
+    case .dailyTrend(let daily):
+      // Tiles mode is a 7-day histogram — collapse to the trailing week's
+      // raw per-day effort (rounded to whole minutes), today emphasized.
+      let v = Self.last7(daily.map { Int($0.rounded()) })
+      Histogram(values: v,
+                accent: accent,
+                emphasizedIndex: v.count - 1,
+                dayLabels: Self.weekdayLabels(count: v.count))
+
     case .centered(let values, _):
       let v = Self.last7Optional(values)
       CenteredBarChart(values: v,
