@@ -136,6 +136,10 @@ struct SeptenaApp: App {
             LocalNotificationScheduler.shared.reconcile()
             Task {
               await TelemetryClient.shared.trackAppOpen()
+              let sections = await MainActor.run {
+                SettingsMirror.loadSections(context: localStore.container.mainContext)
+              }
+              await TelemetryClient.shared.trackSectionInventory(sections)
               await ckEngine.refreshAccountStatus()
               try? await ckEngine.fetchChanges()
               // Republish the watch snapshot after pulling — this is also how

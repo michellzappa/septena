@@ -31,6 +31,25 @@ interface ConsentRow {
   changes: number;
 }
 
+interface SectionStateRow {
+  section: string;
+  installs: number;
+  enabled: number;
+  disabled: number;
+}
+
+interface SectionChangeRow {
+  day: string;
+  section: string;
+  enabled: number;
+  changes: number;
+}
+
+interface SectionUsageRow {
+  section: string;
+  views: number;
+}
+
 const sessionCookie = "septena_admin";
 
 export async function telemetryAdmin(req: Request, env: Env): Promise<Response> {
@@ -117,6 +136,9 @@ async function loadTelemetryAdminData(env: Env): Promise<{
   daily: RollupRow[];
   topScreens: RollupRow[];
   consent: ConsentRow[];
+  sectionState: SectionStateRow[];
+  sectionChanges: SectionChangeRow[];
+  sectionUsage: SectionUsageRow[];
 }> {
   const summary = await env.DB.prepare(`
     select
@@ -184,6 +206,38 @@ async function loadTelemetryAdminData(env: Env): Promise<{
     limit 60
   `).all<ConsentRow>();
 
+  const sectionState = await env.DB.prepare(`
+    select
+      s.section,
+      count(*) as installs,
+      coalesce(sum(case when s.enabled = 1 then 1 else 0 end), 0) as enabled,
+      coalesce(sum(case when s.enabled = 0 then 1 else 0 end), 0) as disabled
+    from telemetry_section_state s
+    join telemetry_install i on i.install_hash = s.install_hash
+    where i.analytics_enabled = 1
+    group by s.section
+    order by enabled desc, installs desc, s.section asc
+    limit 40
+  `).all<SectionStateRow>();
+
+  const sectionChanges = await env.DB.prepare(`
+    select date(created_at) as day, section, enabled, count(*) as changes
+    from telemetry_section_change_event
+    where created_at >= datetime('now', '-30 days')
+    group by day, section, enabled
+    order by day desc, changes desc, section asc
+    limit 80
+  `).all<SectionChangeRow>();
+
+  const sectionUsage = await env.DB.prepare(`
+    select section, sum(count) as views
+    from telemetry_section_daily_rollup
+    where day >= date('now', '-30 days')
+    group by section
+    order by views desc, section asc
+    limit 40
+  `).all<SectionUsageRow>();
+
   return {
     summary,
     byPlatform: byPlatform.results ?? [],
@@ -191,6 +245,9 @@ async function loadTelemetryAdminData(env: Env): Promise<{
     daily: daily.results ?? [],
     topScreens: topScreens.results ?? [],
     consent: consent.results ?? [],
+    sectionState: sectionState.results ?? [],
+    sectionChanges: sectionChanges.results ?? [],
+    sectionUsage: sectionUsage.results ?? [],
   };
 }
 
@@ -303,7 +360,16 @@ function renderTelemetryDashboard(data: Awaited<ReturnType<typeof loadTelemetryA
     </section>
 
     <section class="grid two" style="margin-top:14px">
+      ${sectionStatePanel(data.sectionState)}
+      ${sectionUsagePanel(data.sectionUsage)}
+    </section>
+
+    <div style="margin-top:14px">
       ${topScreensPanel(data.topScreens)}
+    </div>
+
+    <section class="grid two" style="margin-top:14px">
+      ${sectionChangesPanel(data.sectionChanges)}
       ${consentPanel(data.consent)}
     </section>
 
@@ -350,6 +416,50 @@ function topScreensPanel(rows: RollupRow[]): string {
           const width = Math.max(2, Math.round((Number(row.count ?? 0) / max) * 120));
           return `<tr><td><span class="bar" style="width:${width}px"></span>${escapeHtml(row.screen)}</td><td class="num">${number(row.count)}</td></tr>`;
         }).join("") || emptyRow(2)}
+      </tbody>
+    </table>
+  </section>`;
+}
+
+function sectionUsagePanel(rows: SectionUsageRow[]): string {
+  const max = Math.max(1, ...rows.map((row) => Number(row.views ?? 0)));
+  return `<section class="panel">
+    <h2>Section Usage, Last 30 Days</h2>
+    <table>
+      <thead><tr><th>Section</th><th class="num">Opens</th></tr></thead>
+      <tbody>
+        ${rows.map((row) => {
+          const width = Math.max(2, Math.round((Number(row.views ?? 0) / max) * 120));
+          return `<tr><td><span class="bar" style="width:${width}px"></span>${escapeHtml(row.section)}</td><td class="num">${number(row.views)}</td></tr>`;
+        }).join("") || emptyRow(2)}
+      </tbody>
+    </table>
+  </section>`;
+}
+
+function sectionStatePanel(rows: SectionStateRow[]): string {
+  const max = Math.max(1, ...rows.map((row) => Number(row.enabled ?? 0)));
+  return `<section class="panel">
+    <h2>Sections Installed / Enabled</h2>
+    <table>
+      <thead><tr><th>Section</th><th class="num">Enabled</th><th class="num">Disabled</th><th class="num">Known</th></tr></thead>
+      <tbody>
+        ${rows.map((row) => {
+          const width = Math.max(2, Math.round((Number(row.enabled ?? 0) / max) * 120));
+          return `<tr><td><span class="bar" style="width:${width}px"></span>${escapeHtml(row.section)}</td><td class="num">${number(row.enabled)}</td><td class="num">${number(row.disabled)}</td><td class="num">${number(row.installs)}</td></tr>`;
+        }).join("") || emptyRow(4)}
+      </tbody>
+    </table>
+  </section>`;
+}
+
+function sectionChangesPanel(rows: SectionChangeRow[]): string {
+  return `<section class="panel">
+    <h2>Section Changes, Last 30 Days</h2>
+    <table>
+      <thead><tr><th>Day</th><th>Section</th><th>State</th><th class="num">Changes</th></tr></thead>
+      <tbody>
+        ${rows.map((row) => `<tr><td>${escapeHtml(row.day)}</td><td>${escapeHtml(row.section)}</td><td>${row.enabled ? "Enabled" : "Disabled"}</td><td class="num">${number(row.changes)}</td></tr>`).join("") || emptyRow(4)}
       </tbody>
     </table>
   </section>`;

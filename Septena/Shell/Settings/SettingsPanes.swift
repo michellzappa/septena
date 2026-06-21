@@ -41,6 +41,7 @@ struct PrivacySettingsPane: View {
 
       Section("What is sent") {
         bullet("Which screens you open (e.g. \"Nutrition\", \"Sleep\")")
+        bullet("Which sections are enabled, opened, and turned on or off")
         bullet("App version, build, and platform (iOS or macOS)")
         bullet("An anonymous app-install hash, used only for aggregate opt-in and opt-out counts")
         bullet("Changes to this analytics preference")

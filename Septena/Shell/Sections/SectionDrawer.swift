@@ -629,6 +629,7 @@ struct SectionDrawer<Content: View>: View {
     // Screen telemetry keyed by the section — internalized here so no drawer
     // hand-passes a `.trackScreen("key")` that always equals `sectionKey`.
     .trackScreen(sectionKey)
+    .trackSectionUsage(sectionKey)
     .toolbar {
       // Time travel sits on the LEADING edge; the quick-add "+" stays trailing.
       // `.topBarLeading` is the iOS leading slot; macOS uses `.navigation` (the

@@ -247,10 +247,14 @@ struct SectionDetailPane: View {
   }
 
   private func completeOnboarding() {
+    let wasEnabled = server?.isEnabled ?? false
     SettingsMirror.setSectionHasOnboarded(sectionKey, hasOnboarded: true,
                                           context: modelContext, engine: ckEngine)
     SettingsMirror.setSectionEnabled(sectionKey, enabled: true,
                                      context: modelContext, engine: ckEngine)
+    if !wasEnabled {
+      Task { await TelemetryClient.shared.recordSectionEnabled(section: sectionKey, enabled: true) }
+    }
     // Reload from the mirror (not a hand-patched map) so the accent that
     // `setSectionEnabled` auto-assigned is reflected, then repaint the theme
     // so the section's tile shows that color instead of gray.
@@ -467,6 +471,7 @@ struct SectionDetailPane: View {
   }
 
   private func setEnabled(_ enabled: Bool) {
+    let previous = server?.isEnabled
     // Off → on for a section whose plugin offers starter onboarding (and that
     // hasn't been onboarded yet, or opts into re-presenting): route through the
     // sheet, which does the enable + hasOnboarded write on completion.
@@ -483,6 +488,9 @@ struct SectionDetailPane: View {
                                      enabled: enabled,
                                      context: modelContext,
                                      engine: ckEngine)
+    if previous != enabled {
+      Task { await TelemetryClient.shared.recordSectionEnabled(section: sectionKey, enabled: enabled) }
+    }
     #if os(iOS)
     // Refresh App Shortcut suggestions so this section's items leave / re-enter
     // Siri + Spotlight in step with its enabled state.

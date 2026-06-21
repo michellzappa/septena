@@ -19,6 +19,7 @@ public actor TelemetryClient {
 
   private static let installIDKey = "septena.telemetry.installID"
   private static let pendingConsentKey = "septena.telemetry.pendingConsent"
+  private static let sectionInventoryDateKey = "septena.telemetry.sectionInventoryDate"
 
   private let session: URLSession
   private var lastSent: [String: Date] = [:]
@@ -37,7 +38,7 @@ public actor TelemetryClient {
   public func trackAppOpen() async {
     await flushPendingConsent()
     guard Self.isEnabled() else { return }
-    _ = await send(event: .appOpen, screen: nil, analyticsEnabled: true)
+    _ = await send(event: .appOpen, screen: nil, section: nil, enabled: nil, sections: nil, analyticsEnabled: true)
   }
 
   public func track(screen: String) async {
@@ -49,7 +50,47 @@ public actor TelemetryClient {
     if let last = lastSent[key], now.timeIntervalSince(last) < debounce { return }
     lastSent[key] = now
 
-    _ = await send(event: .screenView, screen: screen, analyticsEnabled: true)
+    _ = await send(event: .screenView, screen: screen, section: nil, enabled: nil, sections: nil, analyticsEnabled: true)
+  }
+
+  public func trackSectionInventory(_ sections: [SectionConfig]) async {
+    await flushPendingConsent()
+    guard Self.isEnabled() else { return }
+
+    let today = String(Self.nowISODate.prefix(10))
+    let defaults = UserDefaults.standard
+    if defaults.string(forKey: Self.sectionInventoryDateKey) == today { return }
+
+    let states = sections
+      .map { SectionTelemetryState(section: $0.key, enabled: $0.isEnabled) }
+      .sorted { $0.section < $1.section }
+    guard !states.isEmpty else { return }
+
+    if await send(event: .sectionInventory, screen: nil, section: nil, enabled: nil, sections: states, analyticsEnabled: true) {
+      defaults.set(today, forKey: Self.sectionInventoryDateKey)
+    }
+  }
+
+  public func recordSectionEnabled(section: String, enabled: Bool) async {
+    await flushPendingConsent()
+    guard Self.isEnabled() else { return }
+    _ = await send(event: .sectionEnabledChanged,
+                   screen: nil,
+                   section: section,
+                   enabled: enabled,
+                   sections: nil,
+                   analyticsEnabled: true)
+  }
+
+  public func recordSectionUsed(section: String) async {
+    await flushPendingConsent()
+    guard Self.isEnabled() else { return }
+    _ = await send(event: .sectionUsed,
+                   screen: nil,
+                   section: section,
+                   enabled: nil,
+                   sections: nil,
+                   analyticsEnabled: true)
   }
 
   public func recordConsent(enabled: Bool) async {
@@ -74,13 +115,18 @@ public actor TelemetryClient {
     let defaults = UserDefaults.standard
     guard defaults.object(forKey: Self.pendingConsentKey) != nil else { return }
     let enabled = defaults.bool(forKey: Self.pendingConsentKey)
-    if await send(event: .analyticsConsentChanged, screen: nil, analyticsEnabled: enabled) {
+    if await send(event: .analyticsConsentChanged, screen: nil, section: nil, enabled: nil, sections: nil, analyticsEnabled: enabled) {
       defaults.removeObject(forKey: Self.pendingConsentKey)
     }
     #endif
   }
 
-  private func send(event: TelemetryEvent, screen: String?, analyticsEnabled: Bool) async -> Bool {
+  private func send(event: TelemetryEvent,
+                    screen: String?,
+                    section: String?,
+                    enabled: Bool?,
+                    sections: [SectionTelemetryState]?,
+                    analyticsEnabled: Bool) async -> Bool {
     #if DEBUG
     return false
     #else
@@ -88,6 +134,9 @@ public actor TelemetryClient {
       installId: Self.installID,
       event: event.rawValue,
       screen: screen,
+      section: section,
+      enabled: enabled,
+      sections: sections,
       analyticsEnabled: analyticsEnabled,
       version: Self.version,
       build: Self.build,
@@ -131,6 +180,10 @@ public actor TelemetryClient {
     Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
   }
 
+  private static var nowISODate: String {
+    ISO8601DateFormatter().string(from: Date())
+  }
+
   private static var platform: String {
     #if os(macOS)
     return "macOS"
@@ -164,12 +217,23 @@ public actor TelemetryClient {
     case appOpen = "app_open"
     case screenView = "screen_view"
     case analyticsConsentChanged = "analytics_consent_changed"
+    case sectionInventory = "section_inventory"
+    case sectionEnabledChanged = "section_enabled_changed"
+    case sectionUsed = "section_used"
+  }
+
+  private struct SectionTelemetryState: Encodable {
+    let section: String
+    let enabled: Bool
   }
 
   private struct TelemetryPayload: Encodable {
     let installId: String
     let event: String
     let screen: String?
+    let section: String?
+    let enabled: Bool?
+    let sections: [SectionTelemetryState]?
     let analyticsEnabled: Bool
     let version: String
     let build: String
@@ -184,5 +248,10 @@ public extension View {
   /// and again only if the name changes.
   func trackScreen(_ name: String) -> some View {
     task(id: name) { await TelemetryClient.shared.track(screen: name) }
+  }
+
+  /// Reports a section drawer open as aggregate section usage.
+  func trackSectionUsage(_ section: String) -> some View {
+    task(id: "section:\(section)") { await TelemetryClient.shared.recordSectionUsed(section: section) }
   }
 }
