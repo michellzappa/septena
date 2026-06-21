@@ -43,7 +43,7 @@ async function modify(client: CloudKitClient, ops: ModifyOp[]): Promise<CKModify
 export interface IntakeMethodRow {
   token: string;
   label: string;
-  symbol?: string;
+  emoji?: string;
   defaultAmount?: number;
   usesContainer: boolean;
 }
@@ -75,7 +75,7 @@ function normalizeMethods(input: unknown): IntakeMethodRow[] | undefined {
       return {
         token: optStr(obj.token)?.toLowerCase() ?? slug(label),
         label,
-        symbol: optStr(obj.symbol),
+        emoji: optStr(obj.emoji),
         defaultAmount: num(obj.defaultAmount),
         usesContainer: obj.usesContainer === true,
       };
@@ -157,7 +157,7 @@ const methodsSchema = {
     properties: {
       token: { type: "string" },
       label: { type: "string" },
-      symbol: { type: "string" },
+      emoji: { type: "string", description: "Optional user glyph for this method." },
       defaultAmount: { type: "number" },
       usesContainer: { type: "boolean" },
     },
@@ -210,7 +210,10 @@ export const listIntakeItemsJsonSchema = {
 export const createIntakeItemJsonSchema = {
   type: "object",
   required: ["kind", "name"],
-  properties: { kind: { type: "string" }, name: { type: "string", minLength: 1 } },
+  properties: {
+    kind: { type: "string" }, name: { type: "string", minLength: 1 },
+    emoji: { type: "string", description: "Optional user glyph for this variety." },
+  },
 } as const;
 
 export const deleteIntakeItemJsonSchema = {
@@ -262,7 +265,7 @@ export interface CreateIntakeKindInput {
 }
 export interface UpdateIntakeKindInput extends Partial<CreateIntakeKindInput> { kind: string; archived?: boolean }
 export interface ListIntakeItemsInput { kind: string }
-export interface CreateIntakeItemInput { kind: string; name: string }
+export interface CreateIntakeItemInput { kind: string; name: string; emoji?: string }
 export interface ListIntakeEventsInput { kind: string; date?: string; from?: string; to?: string; limit?: number }
 export interface LogIntakeEventInput {
   kind: string; method: string; date?: string; time?: string;
@@ -361,6 +364,7 @@ export async function listIntakeItems(client: CloudKitClient, input: ListIntakeI
     .map((r) => ({
       id: r.recordName.replace(/^intake-item:/, ""),
       name: optStr(r.fields.name?.value) ?? "",
+      emoji: optStr(r.fields.emoji?.value),
     }));
   return { kind: kind.name, items };
 }
@@ -368,12 +372,16 @@ export async function listIntakeItems(client: CloudKitClient, input: ListIntakeI
 export async function createIntakeItem(client: CloudKitClient, input: CreateIntakeItemInput) {
   const kind = await resolveKind(client, input.kind);
   const id = `ii-${newId(8)}`;
+  const fields: Record<string, { value: unknown }> = {
+    kindID: { value: kind.id }, name: { value: input.name }, sortIndex: { value: 0 },
+  };
+  if (input.emoji) fields.emoji = { value: input.emoji };
   const res = await modify(client, [{
     operationType: "create",
     record: {
       recordType: "IntakeItem",
       recordName: `intake-item:${id}`,
-      fields: { kindID: { value: kind.id }, name: { value: input.name }, sortIndex: { value: 0 } },
+      fields,
     },
   }]);
   const code = res.records[0]?.serverErrorCode;
