@@ -11,6 +11,7 @@ struct DailyMessageFooter: View {
   @Environment(DayClock.self) private var clock
   @AppStorage(SettingsKey.dailyMessageEnabled) private var enabled = false
   @AppStorage(SettingsKey.dailyMessagePacks) private var packsRaw = "practice,stoic,zen"
+  @AppStorage(SettingsKey.dailyMessageReadwiseEnabled) private var readwiseEnabled = true
 
   /// User + Readwise lines, refreshed on appear and whenever the store changes.
   @State private var stored: [DailyMessage] = []
@@ -59,7 +60,9 @@ struct DailyMessageFooter: View {
 
   private var current: DailyMessage? {
     let packs = Set(packsRaw.split(separator: ",").compactMap { QuotePack(rawValue: String($0)) })
-    let pool = DailyMessageSelector.pool(packs: packs, stored: stored)
+    // Readwise highlights can be excluded from the rotation without disconnecting.
+    let lines = readwiseEnabled ? stored : stored.filter { $0.source != "readwise" }
+    let pool = DailyMessageSelector.pool(packs: packs, stored: lines)
     let slot = DayBucket.from(date: clock.now).order
     guard let base = DailyMessageSelector.index(count: pool.count, day: clock.today, slot: slot)
     else { return nil }

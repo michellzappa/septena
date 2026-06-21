@@ -85,9 +85,14 @@ enum SettingsKey {
   /// the on/off does not).
   static let dailyMessageEnabled = "septena.dailyMessage.enabled"
   /// Which preset `QuotePack`s feed the rotation, comma-separated rawValues.
-  /// Defaults to all three on; stored user + Readwise lines are always in the
-  /// pool when the feature is on, independent of this.
+  /// Defaults to all three on; stored user lines are always in the pool when the
+  /// feature is on, independent of this.
   static let dailyMessagePacks = "septena.dailyMessage.packs"
+  /// Whether imported Readwise highlights feed the rotation. On by default;
+  /// turning it off drops them from the pool WITHOUT disconnecting Readwise or
+  /// deleting the imported lines (your own quotes + packs stay). Device-local,
+  /// like the other daily-message display preferences.
+  static let dailyMessageReadwiseEnabled = "septena.dailyMessage.readwise.enabled"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
   static let welcomeName = "septena.homepage.welcomeName"

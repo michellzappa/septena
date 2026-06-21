@@ -82,6 +82,8 @@ struct ReadwiseConnectView: View {
   // The shared provider is @Observable, so reading its state here tracks it.
   private var provider: ReadwiseProvider { ReadwiseProvider.shared }
 
+  @AppStorage(SettingsKey.dailyMessageReadwiseEnabled) private var readwiseEnabled = true
+
   @State private var tokenInput = ""
   @State private var statusMessage: String?
   @State private var isError = false
@@ -128,6 +130,14 @@ struct ReadwiseConnectView: View {
 
   @ViewBuilder
   private var connectedSections: some View {
+    Section {
+      Toggle(isOn: $readwiseEnabled) {
+        Text("Show in daily message")
+      }
+    } footer: {
+      Text("Turn off to drop your Readwise highlights from the rotation without disconnecting — your imported highlights, packs, and own quotes stay.")
+    }
+
     Section {
       LabeledContent("Status") {
         if provider.isSyncing {
