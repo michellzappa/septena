@@ -46,41 +46,19 @@ public enum CommunitySession {
     delete(account: account(forHost: host))
   }
 
+  // The Apple session token is a stable bearer credential, so it rides iCloud
+  // Keychain to the user's other devices (see `KeychainStore`); the current
+  // session begins syncing the next time it's minted.
   private static func store(_ token: String, account: String) {
-    let data = Data(token.utf8)
-    let baseQuery: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-    ]
-    let update: [String: Any] = [kSecValueData as String: data]
-    let status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
-    if status == errSecItemNotFound {
-      var addQuery = baseQuery
-      addQuery[kSecValueData as String] = data
-      addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-      SecItemAdd(addQuery as CFDictionary, nil)
-    }
+    KeychainStore.store(token, account: account, synchronizable: true)
   }
 
   private static func load(account: String) -> String? {
-    let query: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-      kSecReturnData as String:  true,
-      kSecMatchLimit as String:  kSecMatchLimitOne,
-    ]
-    var item: CFTypeRef?
-    let status = SecItemCopyMatching(query as CFDictionary, &item)
-    guard status == errSecSuccess, let data = item as? Data else { return nil }
-    return String(data: data, encoding: .utf8)
+    KeychainStore.load(account: account)
   }
 
   private static func delete(account: String) {
-    let query: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-    ]
-    SecItemDelete(query as CFDictionary)
+    KeychainStore.delete(account: account)
   }
 }
 

@@ -78,6 +78,7 @@ public final class GitHubProvider {
     cfg.timeoutIntervalForRequest = 20
     cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
     self.session = URLSession(configuration: cfg)
+    KeychainStore.makeSynchronizable(account: keychainAccount)  // upgrade pre-sync tokens
     self.token = Self.loadToken(account: keychainAccount)
   }
 
@@ -224,42 +225,17 @@ public final class GitHubProvider {
     return f
   }()
 
-  // MARK: Keychain (same pattern as OuraProvider)
+  // MARK: Keychain — static PAT, synced via iCloud Keychain (see `KeychainStore`)
 
   private static func storeToken(_ token: String, account: String) {
-    let data = Data(token.utf8)
-    let baseQuery: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-    ]
-    let update: [String: Any] = [kSecValueData as String: data]
-    let status = SecItemUpdate(baseQuery as CFDictionary, update as CFDictionary)
-    if status == errSecItemNotFound {
-      var addQuery = baseQuery
-      addQuery[kSecValueData as String] = data
-      addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-      SecItemAdd(addQuery as CFDictionary, nil)
-    }
+    KeychainStore.store(token, account: account, synchronizable: true)
   }
 
   private static func loadToken(account: String) -> String? {
-    let query: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-      kSecReturnData as String:  true,
-      kSecMatchLimit as String:  kSecMatchLimitOne,
-    ]
-    var item: CFTypeRef?
-    let status = SecItemCopyMatching(query as CFDictionary, &item)
-    guard status == errSecSuccess, let data = item as? Data else { return nil }
-    return String(data: data, encoding: .utf8)
+    KeychainStore.load(account: account)
   }
 
   private static func deleteToken(account: String) {
-    let query: [String: Any] = [
-      kSecClass as String:       kSecClassGenericPassword,
-      kSecAttrAccount as String: account,
-    ]
-    SecItemDelete(query as CFDictionary)
+    KeychainStore.delete(account: account)
   }
 }

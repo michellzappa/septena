@@ -135,7 +135,8 @@ struct ConnectedAppsSettingsSections: View {
       }
 
       // GitHub — read-only contribution calendar via the GraphQL API.
-      // Per-device token (Keychain); nothing syncs to CloudKit.
+      // Static token (Keychain); syncs across the user's devices via iCloud
+      // Keychain, never to CloudKit or a Septena server.
       NavigationLink {
         GitHubIntegrationDetail()
           .navigationTitle("GitHub")
@@ -165,7 +166,7 @@ struct ConnectedAppsSettingsSections: View {
     } header: {
       Text("Services")
     } footer: {
-      Text("Service tokens stay on this device.")
+      Text("Service tokens live in your Keychain and are never sent to any Septena server. Oura, GitHub, and Readwise sync across your devices via iCloud Keychain (end-to-end encrypted); Withings stays on this device.")
     }
   }
 
@@ -676,7 +677,7 @@ private struct OuraIntegrationDetail: View {
         Text("Token")
       } footer: {
         VStack(alignment: .leading, spacing: 6) {
-          Text("Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server.")
+          Text("Create a Personal Access Token at cloud.ouraring.com/personal-access-tokens, then paste it here. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server.")
           Link("Open Oura tokens page",
                destination: URL(string: "https://cloud.ouraring.com/personal-access-tokens")!)
             .font(.callout)
@@ -776,7 +777,7 @@ private struct GitHubIntegrationDetail: View {
         Text("Token")
       } footer: {
         VStack(alignment: .leading, spacing: 6) {
-          Text("Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. Tokens stay on this device (Keychain) and are never sent to any Septena server.")
+          Text("Create a personal access token with the read:user scope at github.com/settings/tokens, then paste it here. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server.")
           Link("Open GitHub tokens page",
                destination: URL(string: "https://github.com/settings/tokens")!)
             .font(.callout)

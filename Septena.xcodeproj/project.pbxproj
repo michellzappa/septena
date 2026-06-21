@@ -432,6 +432,7 @@
 		88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
 		88D6592312AB55D1A314C247 /* EditNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */; };
 		88DB9A3D589E04E5E452A15C /* MedicationsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05717A5AFCE742FF68367E5F /* MedicationsPlugin.swift */; };
+		88DCC6E7BDFD768BD320F29B /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA820579EFB323F3CA111DD /* KeychainStore.swift */; };
 		8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */; };
 		892B9AF1DFB498BD9A0C0B67 /* AddNutritionPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */; };
 		896979AD0C8C48341B2DAEB8 /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46077D40BFADE69BDE238E84 /* Changelog.swift */; };
@@ -501,6 +502,7 @@
 		9F9B7F470B210E73A084536C /* WeekDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71619B3F8898583F88154FB7 /* WeekDashboardScreen.swift */; };
 		9FEA5131491ACDF98B92EC51 /* ConsumableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */; };
 		A04779CE2F7AA2CD40CDD020 /* CoachMessageRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115B3D035A8FFAB40EB1205D /* CoachMessageRecord.swift */; };
+		A13DDF926FA144F9A7CFBF64 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA820579EFB323F3CA111DD /* KeychainStore.swift */; };
 		A14B8DF03D6FC0799D8AA8C2 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = E17D3542734AB0B32527C12C /* AppIcon.icns */; };
 		A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */; };
@@ -1214,6 +1216,7 @@
 		C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubProvider.swift; sourceTree = "<group>"; };
 		C9D41E004025226ADBE31D93 /* IntakePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakePlugin.swift; sourceTree = "<group>"; };
 		C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseCache.swift; sourceTree = "<group>"; };
+		CAA820579EFB323F3CA111DD /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		CAAB47A883674C12F6D410D6 /* ReportsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportsSettingsPane.swift; sourceTree = "<group>"; };
 		CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
 		CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationFeatures.swift; sourceTree = "<group>"; };
@@ -2126,6 +2129,7 @@
 				53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */,
 				F61B77A80F53A6EEEBBC90EA /* HealthKitBridge.swift */,
 				1FDD99A14104B857C0AD4661 /* IntakeModel.swift */,
+				CAA820579EFB323F3CA111DD /* KeychainStore.swift */,
 				05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */,
 				EE89901CA806AA91E0441236 /* Logging.swift */,
 				F5B53F1EA33DC5B17A751664 /* MacroCatalog.swift */,
@@ -2771,6 +2775,7 @@
 				BE2DA1DB9438CBD99D22593B /* IntegrationsSettingsPane.swift in Sources */,
 				3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */,
 				B952E848C59122F46C1DF7D3 /* KeyboardShortcutsView.swift in Sources */,
+				88DCC6E7BDFD768BD320F29B /* KeychainStore.swift in Sources */,
 				65675DD9901E66BA47721979 /* LocalMCPServer.swift in Sources */,
 				3E8232F947D6A67FFAED7EC5 /* LocalMCPSettingsPane.swift in Sources */,
 				FEF7B36E05988907669E6A03 /* LocalNotificationScheduler.swift in Sources */,
@@ -3188,6 +3193,7 @@
 				A9D78A6B372376EB64E8AE8C /* IntegrationsSettingsPane.swift in Sources */,
 				AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */,
 				8D1D5310AB62AF7E33538641 /* KeyboardShortcutsView.swift in Sources */,
+				A13DDF926FA144F9A7CFBF64 /* KeychainStore.swift in Sources */,
 				D3852E3A3953E48A78381A8B /* LocalMCPServer.swift in Sources */,
 				70256EDB9597D9DA17B4E839 /* LocalMCPSettingsPane.swift in Sources */,
 				074A612AE1335D061817FE4A /* LocalNotificationScheduler.swift in Sources */,

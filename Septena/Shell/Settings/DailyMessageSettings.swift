@@ -122,7 +122,7 @@ struct ReadwiseConnectView: View {
       Text("Connect Readwise")
     } footer: {
       VStack(alignment: .leading, spacing: 6) {
-        Text("Pulls your highlights into the daily-message rotation. The token stays on this device and is never sent to any Septena server.")
+        Text("Pulls your highlights into the daily-message rotation. The token is kept in your Keychain, syncs to your other devices via iCloud Keychain, and is never sent to any Septena server.")
         Link("Get your access token", destination: URL(string: "https://readwise.io/access_token")!)
       }
     }
