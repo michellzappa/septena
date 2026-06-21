@@ -13,6 +13,7 @@ import SwiftUI
 struct ChangelogList: View {
   @Environment(SettingsStore.self) private var store
   var releases: [ChangelogRelease] = Changelog.releases
+  @State private var showLegend = false
 
   var body: some View {
     Group {
@@ -34,6 +35,20 @@ struct ChangelogList: View {
         }
       }
     }
+    // The dot-color key used to live as a section at the bottom of the list,
+    // which sank out of reach as releases piled up. It's a top-right ⓘ popover
+    // now — always one tap away, anchored to the button.
+    .toolbar {
+      if !legendItems.isEmpty {
+        ToolbarItem(placement: .primaryAction) {
+          Button { showLegend.toggle() } label: {
+            Image(systemName: "info.circle")
+          }
+          .accessibilityLabel("What the dots mean")
+          .popover(isPresented: $showLegend) { legendPopover }
+        }
+      }
+    }
   }
 
   private func accent(for key: String?) -> Color {
@@ -42,6 +57,52 @@ struct ChangelogList: View {
           !hex.isEmpty
     else { return .accentColor }
     return parseHexColor(hex)
+  }
+
+  /// A key explaining the colored dots: each highlight is dotted with the
+  /// color of the section it touches (Nutrition, Sleep, …), so the notes read
+  /// in the app's own visual language. Only lists the sections that actually
+  /// appear in the shown releases, in first-seen order, plus "General" for
+  /// app-wide changes with no section. Shown from the top-right ⓘ button.
+  private var legendPopover: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("What the dots mean").font(.headline)
+      ForEach(legendItems, id: \.label) { item in
+        HStack(spacing: 10) {
+          Circle().fill(item.color).frame(width: 8, height: 8)
+          Text(item.label).font(.callout)
+        }
+      }
+      Text("Each note is dotted with the color of the section it belongs to.")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding()
+    .frame(maxWidth: 280, alignment: .leading)
+    #if os(iOS)
+    .presentationCompactAdaptation(.popover)
+    #endif
+  }
+
+  private var legendItems: [(label: String, color: Color)] {
+    var keys: [String] = []
+    var hasGeneral = false
+    for release in releases {
+      for highlight in release.highlights {
+        if let key = highlight.section, !key.isEmpty {
+          if !keys.contains(key) { keys.append(key) }
+        } else {
+          hasGeneral = true
+        }
+      }
+    }
+    var items: [(label: String, color: Color)] = keys.map { key in
+      let stored = store.sections.first(where: { $0.key == key })?.label ?? ""
+      return (SectionManifest.displayLabel(key: key, stored: stored), accent(for: key))
+    }
+    if hasGeneral { items.append((String(localized: "General"), .accentColor)) }
+    return items
   }
 }
 
@@ -77,7 +138,7 @@ private struct ReleaseHeader: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline) {
-      Text(release.name ?? "Version \(release.version)")
+      Text(displayName)
         .font(.headline)
         .foregroundStyle(.primary)
         .textCase(nil)
@@ -90,12 +151,18 @@ private struct ReleaseHeader: View {
     .padding(.bottom, 2)
   }
 
-  /// Date plus the build (commit) number — the in-development entry leads with
-  /// "In progress" since it has no release date of its own yet.
+  /// The latest, not-yet-numbered entry is shipped in the running build — so it
+  /// reads "Latest", not "In development". Released entries keep their name.
+  private var displayName: String {
+    if release.isUnreleased { return String(localized: "Latest") }
+    return release.name ?? "Version \(release.version)"
+  }
+
+  /// Date plus the build (commit) number — the same for every entry, including
+  /// the latest (the cron stamps its date each time work lands).
   private var trailing: String {
     let build = release.build.map { "Build \($0)" }
-    let when = release.isUnreleased ? "In progress" : formattedDate
-    return [when, build].compactMap { $0 }.joined(separator: " · ")
+    return [formattedDate, build].compactMap { $0 }.joined(separator: " · ")
   }
 
   private var formattedDate: String {
