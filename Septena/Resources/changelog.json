@@ -4,49 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1097,
+      "build": 1103,
       "date": "2026-06-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Hide Readwise highlights from your daily message",
-          "detail": "You can keep Readwise highlights out of the daily message without disconnecting the integration.",
-          "section": null
-        },
-        {
-          "title": "Keyboard navigation in the Next list",
-          "detail": "Move through your Next list using the keyboard.",
-          "section": null
-        },
-        {
-          "title": "Richer watch summaries for intake and fasting",
-          "detail": "The watch now shows all your intake trackers on a summary page, an expanded meal picker, and a fasting complication rounded to whole hours.",
-          "section": "intake"
-        },
-        {
-          "title": "Watch stays fresh across midnight and mid-fast",
-          "detail": "Your watch snapshot and dashboard update correctly as the day rolls over and during an active fast.",
-          "section": null
-        },
-        {
-          "title": "Steadier task editing",
-          "detail": "Editing a task now reveals existing notes automatically, guards against accidental discards, and keeps a task in place through complete, reopen, and quick edits.",
+          "title": "Bring back deleted tasks",
+          "detail": "Tasks you remove now go to Recently Deleted, where you can restore them or purge them for good, synced across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Training effort shown as a single series",
-          "detail": "The training sparkline now reads as one clear effort line instead of stacked bars.",
-          "section": "training"
+          "title": "Keyboard navigation in Next",
+          "detail": "Move through your Next list and open items using the keyboard.",
+          "section": "tasks"
         },
         {
-          "title": "Community supporter badge and Sign in with Apple",
-          "detail": "Supporters get a badge on their community profile, and Sign in with Apple now unlocks community features on macOS.",
+          "title": "Task editing feels safer",
+          "detail": "Editing a task now reveals existing notes automatically, guards against accidental discards, and keeps each task in its place through complete and reopen.",
+          "section": "tasks"
+        },
+        {
+          "title": "New Next settings",
+          "detail": "A dedicated Next pane lets you tune what shows up, replacing the old today/week wheel toggle.",
           "section": null
         },
         {
-          "title": "Redesigned About pane with a What's New legend",
-          "detail": "About has a fresh look with a link to the build-story journal, and What's New gains a color legend and a \"Latest\" label.",
+          "title": "More on your wrist",
+          "detail": "The watch now shows every enabled intake tracker, an expanded meal picker, a tappable Intakes summary, and ring rendering that stays fresh across midnight and through a fast.",
+          "section": "intake"
+        },
+        {
+          "title": "Cleaner training trends",
+          "detail": "The training sparkline now reads as one effort series instead of stacked bars.",
+          "section": "training"
+        },
+        {
+          "title": "Sync your service connections",
+          "detail": "Connected service tokens now travel with you through iCloud Keychain, so a new device picks up where the last left off.",
+          "section": null
+        },
+        {
+          "title": "Quieter daily message",
+          "detail": "You can hide Readwise highlights from the daily message without disconnecting Readwise.",
+          "section": null
+        },
+        {
+          "title": "A refreshed What's New and About",
+          "detail": "The About pane gets a redesign with a link to the build-story journal, plus a dot-color legend and a Latest label in What's New.",
+          "section": null
+        },
+        {
+          "title": "Community member badge",
+          "detail": "A unified member badge now appears across the roadmap, testimonials, and support, with a supporter badge for Septena+ patrons.",
           "section": null
         }
       ]
