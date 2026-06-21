@@ -67,7 +67,7 @@ enum RhythmSnapshotBuilder {
     //    mirrors `DayTimelineView` / `RhythmData.taskEvents`.
     if visible.contains("tasks") {
       let rows = (try? context.fetch(
-        FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" })
+        FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.statusRaw == "done" && $0.deletedAt == nil })
       )) ?? []
       for t in rows {
         guard let cs = t.completedAt, let when = isoLocal.date(from: cs),

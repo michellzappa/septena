@@ -109,7 +109,10 @@ final class SpotlightIndexer {
     let entities: [TaskChoice]
     if SettingsMirror.showInSpotlight("tasks", context: context) {
       let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-      entities = rows.map { TaskChoice(id: $0.id, title: $0.title, notes: $0.notes) }
+      // Recently-Deleted tasks must drop out of Spotlight (reconcile then prunes
+      // any previously-indexed trashed row).
+      entities = rows.filter { $0.deletedAt == nil }
+                     .map { TaskChoice(id: $0.id, title: $0.title, notes: $0.notes) }
     } else {
       entities = []
     }

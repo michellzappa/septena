@@ -32,7 +32,13 @@ protocol TasksBackend: AnyObject {
   func complete(id: String)
   func uncomplete(id: String)
   func cancel(id: String)
+  /// Soft-delete → Recently Deleted (recoverable). See the impl.
   func delete(id: String)
+  /// Bring a task back from Recently Deleted.
+  func restore(id: String)
+  /// Permanently destroy a task (hard delete). Used by "Delete Permanently"
+  /// and the 30-day auto-purge.
+  func purge(id: String)
   func moveToToday(id: String, today: Bool)
   func removeFromToday(id: String)
   func schedule(id: String, date: Date?)
@@ -305,23 +311,45 @@ final class CloudKitTasksBackend: TasksBackend {
     commitAndPush(entity, op: "cancel")
   }
 
+  /// Soft-delete: move the task to Recently Deleted (Apple Reminders model,
+  /// docs/RECENTLY_DELETED_SPEC.md). We stamp `deletedAt` and push a record
+  /// UPDATE — the CloudKit record survives, the row is hidden everywhere
+  /// (every read path filters `deletedAt != nil`), and it stays recoverable via
+  /// `restore` until `purge` (30-day auto-purge or "Delete Permanently") removes
+  /// it for good. This replaces the old hard-delete, which destroyed the record
+  /// with no confirmation and no undo. A draft that never reached CloudKit has
+  /// no server record to keep, so it's purged outright.
   func delete(id: String) {
     guard let entity = fetch(id: id) else { return }
-    // CKSyncEngine deletes are durable and retried until success, so we
-    // hard-delete locally. If the user is offline the deletion sits in
-    // the engine's pendingRecordZoneChanges and drains on reconnect.
-    // If this entity never made it to CloudKit (deferred-push draft
-    // that the user cancelled), skip the engine call — there's no
-    // server-side record to delete.
+    if entity.cloudKitSystemFields == nil {
+      purge(id: id)   // never pushed — nothing to keep
+      return
+    }
+    entity.deletedAt = ckServerTimestamp()
+    commitAndPush(entity, op: "delete(soft)")
+  }
+
+  /// Bring a task back from Recently Deleted: clear the marker, push the update.
+  func restore(id: String) {
+    guard let entity = fetch(id: id) else { return }
+    entity.deletedAt = nil
+    commitAndPush(entity, op: "restore")
+  }
+
+  /// Permanently destroy a task — the old hard-delete, now reachable only from
+  /// "Delete Permanently" and the 30-day auto-purge. CKSyncEngine deletes are
+  /// durable and retried until success; an offline purge drains on reconnect.
+  func purge(id: String) {
+    guard let entity = fetch(id: id) else { return }
     let neverPushed = entity.cloudKitSystemFields == nil
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
     if neverPushed {
       do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
-      SeptenaLog.info("[CK] delete(local-only) id=\(id) — was never pushed, skipping engine")
+      SeptenaLog.info("[CK] purge(local-only) id=\(id) — was never pushed, skipping engine")
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     } else {
-      commitAndPush(staged, op: "delete", deletion: true)
+      commitAndPush(staged, op: "purge", deletion: true)
     }
   }
 

@@ -149,6 +149,9 @@ enum TaskReads {
     var todayN = 0, inbox = 0, triage = 0, upcoming = 0, unscheduled = 0
     var allOpen = 0
     for e in rows {
+      // Recently-Deleted rows are hidden from every count/bucket (including the
+      // open count — a trashed task is no longer "open" anywhere).
+      if e.deletedAt != nil { continue }
       // Matches the historical openCount (an `allTasks` reduce), which
       // did not exclude pendingDeletion rows.
       if e.status == .open { allOpen += 1 }

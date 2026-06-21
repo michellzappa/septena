@@ -281,7 +281,8 @@ enum MCPDispatch {
   /// lives in. Use `tasks_thread_get` for the full turn-by-turn conversation.
   private static func tasksGet(_ args: MCPArgs) throws -> Any {
     let id = try args.requireString("id")
-    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    // Recently-Deleted tasks read as unknown over MCP, mirroring tasks_list.
+    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil })
     guard let e = try? ctx.fetch(desc).first else {
       throw MCPError.badArgument("unknown task id '\(id)'")
     }

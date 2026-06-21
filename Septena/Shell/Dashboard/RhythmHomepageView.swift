@@ -303,7 +303,7 @@ enum RhythmData {
     // history on every reload — the unbounded fetch was the per-toggle hitch.
     let cutoff = RhythmFmt.isoLocal.string(from: weekStart)
     let desc = FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { $0.statusRaw == "done" && ($0.completedAt ?? "") >= cutoff })
+      predicate: #Predicate { $0.statusRaw == "done" && $0.deletedAt == nil && ($0.completedAt ?? "") >= cutoff })
     let rows = (try? context.fetch(desc)) ?? []
     return rows.compactMap { t in
       guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }

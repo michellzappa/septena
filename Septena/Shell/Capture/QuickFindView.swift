@@ -108,7 +108,7 @@ struct QuickFindView: View {
 
     var out: [QuickFindHit] = []
 
-    for t in tasks {
+    for t in tasks where t.deletedAt == nil {   // Recently-Deleted tasks aren't searchable
       let s = score(title: t.title, body: t.notes, tokens: tokens)
       guard s > 0 else { continue }
       out.append(QuickFindHit(

@@ -97,12 +97,31 @@ final class TaskMutator {
     cloudBackend.cancel(id: id)
   }
 
+  /// Soft-delete → Recently Deleted (recoverable; docs/RECENTLY_DELETED_SPEC.md).
   func delete(id: String) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] delete called before CK bound — dropping", nil)
       return
     }
     cloudBackend.delete(id: id)
+  }
+
+  /// Restore a task from Recently Deleted.
+  func restore(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restore called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.restore(id: id)
+  }
+
+  /// Permanently destroy a task (Delete Permanently / auto-purge).
+  func purge(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] purge called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.purge(id: id)
   }
 
   // MARK: - Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
