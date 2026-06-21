@@ -80,6 +80,58 @@ struct PaletteSwatchGrid: View {
   }
 }
 
+/// Compact "tap to change the color" affordance: the current color in a circle
+/// wrapped in the conic rainbow ring iOS's system `ColorPicker` well uses,
+/// opening a popover with the curated `PaletteSwatchGrid`. The single component
+/// every color selector uses (section identity, intake trackers, macro tiles) so
+/// they read identically and draw from the one curated palette rather than an
+/// inline full grid or the OS full-spectrum well.
+struct PaletteSwatchButton: View {
+  let selectedHex: String
+  var arrowEdge: Edge = .trailing
+  let onSelect: (String) -> Void
+
+  @State private var showingPicker = false
+
+  /// Gap color between the rainbow ring and the colored center, so the ring
+  /// stays visually detached from the row background on both platforms.
+  private var ringGap: Color {
+    #if canImport(UIKit)
+    Color(uiColor: .secondarySystemGroupedBackground)
+    #else
+    Color(nsColor: .windowBackgroundColor)
+    #endif
+  }
+
+  var body: some View {
+    Button {
+      showingPicker.toggle()
+    } label: {
+      ZStack {
+        Circle()
+          .fill(AngularGradient(
+            gradient: Gradient(colors: [.red, .orange, .yellow, .green,
+                                        .cyan, .blue, .purple, .red]),
+            center: .center))
+        Circle().fill(ringGap).padding(2)
+        Circle().fill(parseHexColor(selectedHex)).padding(4)
+      }
+      .frame(width: 26, height: 26)
+      .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Color")
+    .popover(isPresented: $showingPicker, arrowEdge: arrowEdge) {
+      PaletteSwatchGrid(selectedHex: selectedHex) { hex in
+        onSelect(hex)
+        showingPicker = false
+      }
+      .padding(12)
+      .presentationCompactAdaptation(.popover)
+    }
+  }
+}
+
 // MARK: - Sections pane (collapsed app-style list)
 
 /// The single "Sections" pane — Apple's iOS-18 "Apps" move. Every installed
@@ -186,7 +238,6 @@ struct SectionDetailPane: View {
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SectionTheme.self) private var theme
   let sectionKey: String
-  @State private var showingColorPicker = false
   /// Drives the starter-onboarding sheet when the user flips Enabled on for a
   /// section whose plugin offers one. Moved here from the old Manage Sections
   /// pane so there is a single enable path.
@@ -204,20 +255,6 @@ struct SectionDetailPane: View {
   }
   private var label: String {
     SectionManifest.displayLabel(key: sectionKey, stored: server?.label ?? "")
-  }
-  private var accent: Color {
-    parseHexColor(server?.color ?? "")
-  }
-
-  /// Background of a grouped-form row — used as the gap color between the
-  /// swatch's rainbow ring and its colored center, so the ring stays
-  /// visually detached on both platforms.
-  private var rowBackgroundColor: Color {
-    #if canImport(UIKit)
-    Color(uiColor: .secondarySystemGroupedBackground)
-    #else
-    Color(nsColor: .windowBackgroundColor)
-    #endif
   }
 
   var body: some View {
@@ -324,44 +361,14 @@ struct SectionDetailPane: View {
     }
   }
 
-  /// Trailing-aligned, circular color swatch wrapped in the conic
-  /// rainbow ring iOS's system `ColorPicker` well uses — the
-  /// unmistakable "tap to change the color" affordance. The current
-  /// section color fills the center; a thin gap in the row's background
-  /// separates it from the ring so the ring reads as a ring, not a
-  /// border. (We keep our own curated palette popover rather than the
-  /// system picker, so the ring is hand-rolled.)
+  /// Trailing-aligned "tap to change the color" swatch — the shared
+  /// `PaletteSwatchButton` (rainbow ring + curated palette popover).
   @ViewBuilder
   private var colorSwatchButton: some View {
-    Button {
-      showingColorPicker.toggle()
-    } label: {
-      ZStack {
-        Circle()
-          .fill(AngularGradient(
-            gradient: Gradient(colors: [.red, .orange, .yellow, .green,
-                                        .cyan, .blue, .purple, .red]),
-            center: .center))
-        Circle()
-          .fill(rowBackgroundColor)
-          .padding(2)
-        Circle()
-          .fill(accent)
-          .padding(4)
-      }
-      .frame(width: 26, height: 26)
-      .contentShape(Circle())
+    PaletteSwatchButton(selectedHex: server?.color ?? "") { hex in
+      updateColor(hex)
     }
-    .buttonStyle(.plain)
     .accessibilityLabel("Section color")
-    .popover(isPresented: $showingColorPicker, arrowEdge: .trailing) {
-      PaletteSwatchGrid(selectedHex: server?.color ?? "") { hex in
-        updateColor(hex)
-        showingColorPicker = false
-      }
-      .padding(12)
-      .presentationCompactAdaptation(.popover)
-    }
   }
 
   /// Per-section opt-out for the Next timeline. Only shown for sections
@@ -856,7 +863,6 @@ struct MacroTilesEditor: View {
 private struct MacroTileRow: View {
   @Binding var pref: MacroTilePref
   var onChange: () -> Void
-  @State private var showingPicker = false
 
   /// Hex currently stored for this tile, falling back to the catalog default.
   private var currentHex: String {
@@ -866,28 +872,14 @@ private struct MacroTileRow: View {
   var body: some View {
     let macro = MacroCatalog.byID[pref.id]
     HStack(spacing: 12) {
-      // Shared 22-color grid, same picker the sections and trackers use, so
+      // Shared swatch button, same picker the sections and trackers use, so
       // macro tiles draw from the one curated palette rather than the OS
       // full-spectrum well.
-      Button {
-        showingPicker.toggle()
-      } label: {
-        Circle()
-          .fill(AdaptiveColor.adaptive(currentHex) ?? .gray)
-          .frame(width: 26, height: 26)
-          .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+      PaletteSwatchButton(selectedHex: currentHex, arrowEdge: .leading) { hex in
+        pref.colorHex = hex
+        onChange()
       }
-      .buttonStyle(.plain)
       .accessibilityLabel("Tile color")
-      .popover(isPresented: $showingPicker, arrowEdge: .leading) {
-        PaletteSwatchGrid(selectedHex: currentHex) { hex in
-          pref.colorHex = hex
-          onChange()
-          showingPicker = false
-        }
-        .padding(12)
-        .presentationCompactAdaptation(.popover)
-      }
 
       VStack(alignment: .leading, spacing: 1) {
         Text(macro?.label ?? pref.id)
