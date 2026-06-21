@@ -33,6 +33,13 @@ public struct ChangelogRelease: Codable, Hashable, Identifiable, Sendable {
   public var highlights: [ChangelogHighlight]
 
   public var id: String { version }
+
+  /// The single in-development entry the committer-cron refreshes each time it
+  /// lands work — sentinel version `"Unreleased"`, carrying the live build
+  /// (commit) count. Pinned above real releases, excluded from the "What's New"
+  /// update sheet, but shown in the in-app history and on the website. Promoted
+  /// to a real version when a release is cut (see docs/VERSIONING.md).
+  public var isUnreleased: Bool { version == "Unreleased" }
 }
 
 public enum Changelog {
@@ -43,13 +50,22 @@ public enum Changelog {
   /// crashes on a bad changelog.
   public static let releases: [ChangelogRelease] = load()
 
-  /// The most recent release, or `nil` if the changelog is empty.
+  /// The most recent entry (may be the in-development `Unreleased` one), or
+  /// `nil` if the changelog is empty.
   public static var latest: ChangelogRelease? { releases.first }
 
+  /// The newest *shipped* release, skipping the in-development `Unreleased`
+  /// entry. This is the high-water mark the "What's New" launch sheet compares
+  /// against, so the auto-refreshed Unreleased entry never triggers the sheet.
+  public static var latestReleased: ChangelogRelease? {
+    releases.first { !$0.isUnreleased }
+  }
+
   /// Releases strictly newer than the version the user last saw — the cut
-  /// shown in the "What's New" sheet on update.
+  /// shown in the "What's New" sheet on update. The in-development `Unreleased`
+  /// entry is never included (it would re-fire the sheet every hour).
   public static func unseen(since seen: String) -> [ChangelogRelease] {
-    releases.filter { compare($0.version, seen) == .orderedDescending }
+    releases.filter { !$0.isUnreleased && compare($0.version, seen) == .orderedDescending }
   }
 
   /// SemVer-ish comparison of dotted version strings ("0.2.0" vs "0.1.3").
@@ -73,6 +89,11 @@ public enum Changelog {
           let data = try? Data(contentsOf: url),
           let file = try? JSONDecoder().decode(File.self, from: data)
     else { return [] }
-    return file.releases.sorted { compare($0.version, $1.version) == .orderedDescending }
+    return file.releases.sorted { lhs, rhs in
+      // The in-development entry sorts above every shipped release, regardless
+      // of its sentinel version string.
+      if lhs.isUnreleased != rhs.isUnreleased { return lhs.isUnreleased }
+      return compare(lhs.version, rhs.version) == .orderedDescending
+    }
   }
 }

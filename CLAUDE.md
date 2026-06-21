@@ -60,24 +60,39 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
   in `project.yml` and is **bumped by hand only when cutting a release**. The
   build number `CURRENT_PROJECT_VERSION` lives in `Config/Base.xcconfig` (NOT
   project.yml — a project-level value would override the xcconfig) and is
-  **stamped from the git commit count** by `scripts/stamp-version.sh` at archive
-  time. Never hand-bump the build number; never move it back into project.yml.
+  **the git commit count**, stamped live by the committer-cron
+  (`scripts/changelog-stamp.sh`) every time work lands, and re-stamped by
+  `scripts/stamp-version.sh` at archive time. Never hand-bump it; never move it
+  into project.yml. Every embedded target (apps, watch, widgets, complication,
+  live activity) reads `$(CURRENT_PROJECT_VERSION)`/`$(MARKETING_VERSION)` so the
+  whole bundle stays version-consistent — mismatched extensions fail App Store
+  validation.
 - **SemVer, pre-1.0.** Bump MINOR (`0.2.0`) for a batch of user-facing
   features, PATCH (`0.1.1`) for fixes-only. `1.0.0` = public App Store launch.
-- **Cutting a release is one deliberate act, done in a single session** (so the
-  hotspot `project.yml` + changelog don't conflict across parallel sessions):
-  `scripts/changelog-draft.sh` → curate `Septena/Resources/changelog.json` →
-  bump `MARKETING_VERSION` → `git tag vX.Y.Z` → `scripts/stamp-version.sh` →
-  archive. Do NOT bump the version or touch the changelog during ordinary
-  feature work — the cron commits green units without a version bump.
+- **The cron keeps an `"Unreleased"` changelog entry current.** Each run,
+  `scripts/changelog-stamp.sh` rewrites the single pinned `version:"Unreleased"`
+  entry at the top of `changelog.json` — Claude-curated, human-readable
+  highlights from the commits since the last release, carrying the live build
+  number — and stamps `Base.xcconfig` to match. It self-guards against churn
+  (skips when HEAD is already a refresh) and never touches released entries. So
+  ordinary feature work still **doesn't** hand-edit the version or changelog —
+  but the cron now does keep the unreleased notes + build number live. You just
+  leave a green tree.
+- **Cutting a release promotes the `"Unreleased"` entry**, one deliberate act in
+  a single session (so the hotspot `project.yml` + changelog don't conflict
+  across parallel sessions): in `Septena/Resources/changelog.json` rename the
+  Unreleased entry's `version` → the real number + set name/summary + curate
+  highlights → bump matching `MARKETING_VERSION` → `git tag vX.Y.Z` →
+  `scripts/stamp-version.sh` → archive.
 - **The changelog is one canonical JSON, two consumers.**
   `Septena/Resources/changelog.json` is bundled into the app (Settings ▸ About ▸
   What's New + the auto "What's New" sheet on update, read by `SeptenaCore/
-  Changelog.swift`) AND mirrored to the website at build time
-  (`../septena-site/scripts/sync-changelog.mjs` → `/changelog`). **Author here,
-  never in two places.** It is NOT generated from the runtime DB — that's
-  life-data; release notes come from git. A highlight's optional `section` key
-  drives its accent color on both surfaces.
+  Changelog.swift` — which hides the Unreleased entry from the launch sheet via
+  `latestReleased`) AND mirrored to the website at build time
+  (`../septena-site/scripts/sync-changelog.mjs` → `/changelog`; both surfaces
+  show the build number). **Author here, never in two places.** It is NOT
+  generated from the runtime DB — that's life-data; release notes come from git.
+  A highlight's optional `section` key drives its accent color on both surfaces.
 
 ## Branch & integration discipline
 

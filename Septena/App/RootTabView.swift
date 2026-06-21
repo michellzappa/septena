@@ -212,7 +212,7 @@ struct RootTabView: View {
       }
       // "What's New" after an update — see the gate notes on `showWhatsNew`.
       .task(id: welcomeCompleted) {
-        guard welcomeCompleted, let latest = Changelog.latest?.version else { return }
+        guard welcomeCompleted, let latest = Changelog.latestReleased?.version else { return }
         if lastSeenChangelog.isEmpty {
           lastSeenChangelog = latest            // fresh install: adopt silently
         } else if !Changelog.unseen(since: lastSeenChangelog).isEmpty {
@@ -220,7 +220,7 @@ struct RootTabView: View {
         }
       }
       .sheet(isPresented: $showWhatsNew, onDismiss: {
-        if let latest = Changelog.latest?.version { lastSeenChangelog = latest }
+        if let latest = Changelog.latestReleased?.version { lastSeenChangelog = latest }
       }) {
         WhatsNewSheet(since: lastSeenChangelog)
           #if os(iOS)

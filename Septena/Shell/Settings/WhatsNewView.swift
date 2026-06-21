@@ -82,12 +82,20 @@ private struct ReleaseHeader: View {
         .foregroundStyle(.primary)
         .textCase(nil)
       Spacer()
-      Text(formattedDate)
+      Text(trailing)
         .font(.caption)
         .foregroundStyle(.secondary)
         .textCase(nil)
     }
     .padding(.bottom, 2)
+  }
+
+  /// Date plus the build (commit) number — the in-development entry leads with
+  /// "In progress" since it has no release date of its own yet.
+  private var trailing: String {
+    let build = release.build.map { "Build \($0)" }
+    let when = release.isUnreleased ? "In progress" : formattedDate
+    return [when, build].compactMap { $0 }.joined(separator: " · ")
   }
 
   private var formattedDate: String {
