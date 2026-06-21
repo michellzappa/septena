@@ -61,6 +61,13 @@ private func fastingHM(_ elapsed: TimeInterval) -> (h: Int, m: Int) {
   return (totalMin / 60, totalMin % 60)
 }
 
+/// Whole hours for the hours-only circular face, rounded to the nearest hour
+/// (12h31m reads as 13h, 12h20m as 12h). A single big number has no room for
+/// the minutes, so rounding reads truer than truncating an half-hour down.
+private func fastingRoundedHours(_ elapsed: TimeInterval) -> Int {
+  Int((elapsed / 3600).rounded())
+}
+
 /// The single fasting ring, filling toward the target (laps past 100% like any
 /// other ring). The wire's authored color wins; `FastingStyle` is the fallback.
 private func fastingRing(_ fast: FastingComplication, elapsed: TimeInterval) -> ComplicationRing {
@@ -75,14 +82,13 @@ private struct CircularFastingView: View {
   let elapsed: TimeInterval
 
   var body: some View {
-    let hm = fastingHM(elapsed)
     ZStack {
       RingsView(rings: [fastingRing(fast, elapsed: elapsed)],
                 color: { _ in FastingStyle.color(fast.colorHex) },
                 lineWidth: 5, spacing: 0)
         .padding(1)
       VStack(spacing: -2) {
-        Text("\(hm.h)")
+        Text("\(fastingRoundedHours(elapsed))")
           .font(.system(size: 18, weight: .semibold, design: .rounded))
         Text("h")
           .font(.system(size: 9, weight: .medium))
