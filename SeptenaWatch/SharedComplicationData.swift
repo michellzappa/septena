@@ -41,22 +41,51 @@ struct ComplicationRing: Codable, Hashable {
   var colorHex: String? = nil
 }
 
-/// The live fast carried alongside the macro rings, mirrored from the phone's
-/// `FastingWire`. When present, the macro complication morphs into a fasting
-/// face (a single ring + elapsed timer) instead of drawing the macro rings —
-/// the same morph the phone's Nutrition tile does. Mirrors `ComplicationRing`'s
-/// app-group sharing: defined here so both the watch app and the complication
-/// extension see it (the extension doesn't link SeptenaCore's `FastingWire`).
+/// The fasting *context* carried alongside the macro rings, mirrored from the
+/// phone's `FastingWire`: the fast's anchor (most recent eating event) plus the
+/// target. When present and the live state machine says we're fasting, the macro
+/// complication morphs into a fasting face (a single ring + elapsed timer) — the
+/// same morph the phone's Nutrition tile does.
+///
+/// We carry the raw anchor, not a phone-frozen verdict, and decide fed-vs-fasting
+/// **here** at each render via `liveState(now:)`. That's what lets the wrist flip
+/// fed→fasting overnight (and roll over at midnight) without the suspended phone
+/// republishing. Both targets compile this file; `computeFastingState` rides in
+/// from `SeptenaCore/Fasting.swift` (added to both watch targets).
 struct FastingComplication: Codable, Hashable {
-  /// The absolute instant the fast began — the complication derives elapsed from
-  /// the timeline entry's date, so the ring + readout step forward over the fast.
-  var since: Date
-  /// "HH:mm" of the meal the fast started from (the "since 19:30" label).
+  /// The absolute instant of the most recent eating event — the fast's anchor.
+  /// Elapsed is `now − lastMealAt`, stepped by the timeline entry's date.
+  var lastMealAt: Date
+  /// "HH:mm" of that meal (the "since 19:30" label).
   var sinceLabel: String
   /// The lower fasting target in hours; the ring fills toward it.
   var targetHours: Double
   /// The fasting metric's authored color token, else the fixed fallback hue.
   var colorHex: String? = nil
+
+  /// The live fed-vs-fasting decision at `now`, reusing the shared
+  /// `computeFastingState` so the wrist matches the phone exactly. Recomputed per
+  /// render (view body) and per complication timeline entry, so the morph appears
+  /// overnight and rolls over at midnight without a phone republish.
+  ///
+  /// The state machine reasons in terms of "today"/"yesterday" relative to `now`,
+  /// so we bucket the anchor against `now`'s calendar day to rebuild its inputs:
+  /// a meal on an earlier day ⇒ the overnight-fast case (Case A); a meal today ⇒
+  /// the post-dinner case (Case B, gated on the evening hour + grace). Elapsed is
+  /// always derived from the real `lastMealAt`, so it stays exact regardless.
+  func liveState(now: Date) -> (isFasting: Bool, elapsed: TimeInterval) {
+    let cal = Calendar.current
+    let inputs: FastingStateInputs
+    if cal.isDate(lastMealAt, inSameDayAs: now) {
+      inputs = FastingStateInputs(todayLatestMeal: sinceLabel,
+                                  todayMealCount: 1, yesterdayLastMeal: nil)
+    } else {
+      inputs = FastingStateInputs(todayLatestMeal: nil,
+                                  todayMealCount: 0, yesterdayLastMeal: sinceLabel)
+    }
+    let fasting = computeFastingState(inputs: inputs, now: now).isFasting
+    return (fasting, max(0, now.timeIntervalSince(lastMealAt)))
+  }
 }
 
 /// Snapshot for the macro-ring complication, mirrored from the phone's
@@ -111,13 +140,19 @@ struct MacroComplicationData: Codable {
     updatedAt: .distantPast)
 
   /// A representative active fast — used by the fasting-face previews and the
-  /// DEBUG simulator fallback. ~14h in, since "19:30", 16h target.
-  static let fastingSample = MacroComplicationData(
-    rings: [],
-    updatedAt: .distantPast,
-    fasting: FastingComplication(
-      since: Date(timeIntervalSinceNow: -14.05 * 3600),
-      sinceLabel: "19:30", targetHours: 16, colorHex: "#8b5cf6"))
+  /// DEBUG simulator fallback. Anchored at *yesterday* 19:30 so `liveState` reads
+  /// it as fasting (the overnight case) regardless of the current hour, with a
+  /// 16h target.
+  static var fastingSample: MacroComplicationData {
+    let cal = Calendar.current
+    let yesterday = cal.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+    let anchor = cal.date(bySettingHour: 19, minute: 30, second: 0, of: yesterday) ?? yesterday
+    return MacroComplicationData(
+      rings: [],
+      updatedAt: .distantPast,
+      fasting: FastingComplication(
+        lastMealAt: anchor, sinceLabel: "19:30", targetHours: 16, colorHex: "#8b5cf6"))
+  }
 }
 
 /// Snapshot for the training-ring complication — this week's (trailing-7-day)

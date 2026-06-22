@@ -34,9 +34,18 @@ struct NutritionDetailView: View {
     WatchSectionTint.color(forSectionKey: "nutrition", colors: conn.sectionColors)
   }
 
+  /// The fasting context only when the live state machine says we're *actually*
+  /// fasting right now — the context is published whenever fasting is tracked, so
+  /// gate it here exactly as the complication face does, else a fed daytime would
+  /// wrongly take over the page.
+  private var liveFast: FastingComplication? {
+    guard let f = conn.fasting, f.liveState(now: Date()).isFasting else { return nil }
+    return f
+  }
+
   var body: some View {
     Group {
-      if let fast = conn.fasting {
+      if let fast = liveFast {
         // A live fast takes over the whole page — the complication's tap target
         // shows the fast the face is showing, not a list of zero macros (an
         // overnight fast has no meals logged yet). Mirrors the face's morph.
@@ -56,7 +65,7 @@ struct NutritionDetailView: View {
           recentTitle: "Recent meals")
       }
     }
-    .navigationTitle(conn.fasting == nil ? "Nutrition" : "Fasting")
+    .navigationTitle(liveFast == nil ? "Nutrition" : "Fasting")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       // Contextual quick-log: re-log one of the user's most-eaten meals straight
@@ -92,7 +101,7 @@ private struct FastingDetailPage: View {
 
   var body: some View {
     TimelineView(.periodic(from: .now, by: 60)) { ctx in
-      let elapsed = max(0, ctx.date.timeIntervalSince(fast.since))
+      let elapsed = max(0, ctx.date.timeIntervalSince(fast.lastMealAt))
       let totalMin = Int(elapsed) / 60
       let h = totalMin / 60, m = totalMin % 60
       let tint = FastingStyle.color(fast.colorHex)

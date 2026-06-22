@@ -41,21 +41,24 @@ struct MacroProvider: TimelineProvider {
     let data = currentData()
     let now = Date()
     if data.fasting != nil {
-      // A live fast: step the ring + elapsed readout forward without re-invoking
-      // the provider by emitting future entries (WidgetKit renders each at its
-      // own date, deriving elapsed from it). A 15-minute cadence over the next
-      // ~18h covers any fast; the watch app reloads this timeline on its next
-      // snapshot fetch anyway, so this is just the between-fetch fill.
+      // Fasting context is present (the user tracks fasting and has a recent meal).
+      // Emit future entries at a 15-minute cadence over the next ~24h so the *view*
+      // can re-decide fed-vs-fasting at each entry's date — this is what flips the
+      // face fed→fasting in the evening, holds it through the overnight fast, and
+      // rolls it over at midnight, all without re-invoking the provider or needing
+      // the suspended phone to republish. The watch app also reloads this timeline
+      // on its next snapshot fetch, so this is the between-fetch fill. `.atEnd`
+      // requests a fresh timeline once the window elapses.
       let step: TimeInterval = 15 * 60
-      let entries = (0..<72).map { i in
+      let entries = (0..<96).map { i in
         MacroEntry(date: now.addingTimeInterval(Double(i) * step), data: data)
       }
       completion(Timeline(entries: entries, policy: .atEnd))
       return
     }
-    // Macros: reload budget is tight on watchOS — the watch app calls
-    // WidgetCenter.shared.reloadTimelines(ofKind:) after every snapshot fetch,
-    // so a static, never-expiring timeline is enough.
+    // Macros only (fasting untracked / no meal): reload budget is tight on watchOS
+    // — the watch app calls WidgetCenter.shared.reloadTimelines(ofKind:) after every
+    // snapshot fetch, so a static, never-expiring timeline is enough.
     completion(Timeline(entries: [MacroEntry(date: now, data: data)], policy: .never))
   }
 }

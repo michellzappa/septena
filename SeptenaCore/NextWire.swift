@@ -201,15 +201,26 @@ struct TrainingRingsWire: Codable, Hashable {
   var rings: [RingMetricWire]
 }
 
-/// The live fasting window for the watch macro complication, so it morphs into a
-/// fasting face exactly as the phone's Nutrition tile does. Phone-computed and
-/// present only while a fast is running; the complication shows macros otherwise.
+/// The fasting *context* for the watch macro complication: the anchor (most
+/// recent eating event) plus the target, so the wrist can decide fed-vs-fasting
+/// **itself** at its own `now` and morph into a fasting face exactly as the
+/// phone's Nutrition tile does.
+///
+/// Crucially this ships the raw input, not a phone-frozen verdict: the fed→
+/// fasting transition and the day rollover both happen overnight while the iOS
+/// app is suspended and can't republish. By carrying the absolute last-meal
+/// instant, the watch app and the complication timeline re-run the shared
+/// `computeFastingState` at each render — so the morph appears on the wrist with
+/// no republish. Present whenever the user tracks fasting and has a recent meal;
+/// absent (so the wrist shows macros) when fasting is untracked or there's no
+/// meal to anchor.
 struct FastingWire: Codable, Hashable {
-  /// The absolute instant the current fast began (now − elapsed), so the wrist
-  /// can render a live elapsed timer (stepped by the complication timeline)
-  /// instead of a value frozen at publish time.
-  var since: Date
-  /// "HH:mm" of the meal the fast started from — the phone tile's "since" label.
+  /// The absolute instant of the user's most recent eating event — the fast's
+  /// anchor. The watch derives elapsed = now − `lastMealAt` and feeds the same
+  /// instant into the state machine, so elapsed and the morph stay live across
+  /// midnight without a phone republish.
+  var lastMealAt: Date
+  /// "HH:mm" of that meal — the phone tile's "since 19:30" label.
   var sinceLabel: String
   /// The user's lower fasting target in hours; the ring fills toward it.
   var targetHours: Double

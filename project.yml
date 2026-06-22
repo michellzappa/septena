@@ -196,6 +196,10 @@ targets:
       # Canonical mood word grid, shared with the phone's MoodCatalog so the
       # watch's 3×3 emotion picker can't diverge.
       - path: SeptenaCore/MoodVocabulary.swift
+      # The fasting state machine, so the watch decides fed-vs-fasting itself at
+      # its own `now` (FastingComplication.liveState) — the morph then appears
+      # overnight and rolls over at midnight without the phone republishing.
+      - path: SeptenaCore/Fasting.swift
       # Shared ring renderer + per-metric styling, compiled into both the watch
       # app (the in-app macro / training summary pages) and the complication
       # extension (the rings on the watch face) so the two can't drift.
@@ -237,6 +241,10 @@ targets:
       # the same localized "Morning"/"Afternoon"/"Evening" as every other
       # surface instead of capitalizing a raw string.
       - path: SeptenaCore/DayBucket.swift
+      # The fasting state machine — the complication face re-decides fed-vs-fasting
+      # per timeline entry (FastingComplication.liveState) so the morph steps over
+      # the fast and across midnight without a provider reload or a phone republish.
+      - path: SeptenaCore/Fasting.swift
     info:
       path: SeptenaWatchComplication/Info.plist
       properties:

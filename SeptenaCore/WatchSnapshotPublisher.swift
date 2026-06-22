@@ -185,9 +185,10 @@ enum WatchSnapshotPublisher {
     // training-ring complication. Present whenever a target exists (they always
     // have built-in defaults), so it mirrors the macro rings' availability.
     let trainingRings = buildTrainingRings(context: context)
-    // The live fast, if the user tracks fasting and one is running — so the watch
-    // macro complication morphs into a fasting face like the phone tile. Nil
-    // otherwise, so the wrist keeps showing macros.
+    // The fasting context (last-meal anchor + target), if the user tracks fasting
+    // and has a recent meal — the watch decides fed-vs-fasting itself from this
+    // and morphs the macro complication into a fasting face when due. Nil when
+    // untracked / no meal, so the wrist keeps showing macros.
     let fasting = buildFasting(context: context)
     // The medications / symptoms / groceries capture catalogs, each gated on the
     // section being enabled so the wrist + menu is dynamic — disabling a section
@@ -511,44 +512,45 @@ enum WatchSnapshotPublisher {
   /// the contract. When off, the wrist always shows macros, never a fast.
   private static let trackFastingDefaultsKey = "septena.nutrition.trackFasting"
 
-  /// The last fast we published this process, kept so a transient empty read
-  /// can't blank the wrist mid-fast (see `buildFasting`). Reset to nil whenever a
-  /// *real* read says the user isn't fasting, so breaking a fast clears it at once.
+  /// The last fasting context we published this process, kept so a transient
+  /// empty read can't blank the wrist mid-fast (see `buildFasting`). Reset to nil
+  /// whenever fasting tracking is off, so disabling it clears the wrist at once.
   @MainActor private static var lastFasting: FastingWire?
 
-  /// The live fast for the watch macro complication — present only when the user
-  /// tracks fasting *and* a fast is currently running, so the complication morphs
-  /// into a fasting face exactly as the phone's Nutrition tile does
-  /// (`WeekDashboardView.nutritionDomainData`). Same `computeFastingState` inputs
-  /// (from the shared stats builder, scanning just today + yesterday — all the
-  /// live state needs) and the same target source (`MacrosConfig.fasting.min`,
-  /// falling back to the default band).
+  /// The fasting *context* for the watch macro complication — the anchor (most
+  /// recent eating event) + target, published whenever the user tracks fasting
+  /// and has a recent meal. We deliberately ship the raw anchor, **not** a
+  /// fed/fasting verdict: the fed→fasting transition and the midnight rollover
+  /// both happen while the iOS app is suspended and can't republish, so a frozen
+  /// verdict would leave the wrist showing yesterday's meals all morning. The
+  /// watch re-runs `computeFastingState` from this anchor at its own `now`, so
+  /// the morph and the elapsed timer stay live with no republish.
+  ///
+  /// Target source mirrors the phone's Nutrition tile (`MacrosConfig.fasting.min`,
+  /// falling back to the default band); color mirrors the Fasting macro tile.
   @MainActor
   private static func buildFasting(context: ModelContext) -> FastingWire? {
     guard UserDefaults.standard.bool(forKey: trackFastingDefaultsKey) else {
       lastFasting = nil
       return nil
     }
-    let stats = ChecklistMirror.buildNutritionStatsResponse(context: context, days: 2)
-    let inputs = FastingStateInputs(
-      todayLatestMeal: stats.todayLatestMeal,
-      todayMealCount: stats.todayMealCount ?? 0,
-      yesterdayLastMeal: stats.yesterdayLastMeal)
-    let now = Date()
-    guard case .fasting(_, let since, let totalMin) = computeFastingState(inputs: inputs, now: now)
+    // The most recent non-water eating event in the last two days anchors the
+    // fast — two days is all the live state machine ever reasons over (today +
+    // yesterday). Water carries no macros and isn't a meal, so it can't end a fast.
+    let since = SeptenaDate.format(
+      Calendar.current.date(byAdding: .day, value: -2, to: Date()))
+    let meals = ChecklistMirror.loadNutritionEntries(context: context, since: since)
+      .filter { $0.foods != ["Water"] }
+    guard let last = meals.max(by: { ($0.date, $0.time) < ($1.date, $1.time) }),
+          let lastMealAt = SeptenaDate.instant(date: last.date, time: last.time)
     else {
-      // Not fasting per this read. A read that actually saw meals (`daily`
-      // non-empty) is trustworthy — "fed" means the fast is genuinely over, so
-      // clear and publish macros. But an *empty* read (the SwiftData fetch came
-      // back with nothing — transiently, or before a CloudKit absorb finished)
-      // would also land here and wrongly blank a running fast: the very flap
-      // where the wrist drops to "0 nutrients, no fast" while the phone still
-      // shows it. On an empty read, preserve the last known fast instead of
-      // overwriting the complication with zeroes. The 48h cap stops a stale fast
-      // from lingering if the empty reads never resolve.
-      if stats.daily.isEmpty, let last = lastFasting,
-         now.timeIntervalSince(last.since) < 48 * 3600 {
-        return last
+      // Empty/malformed read: a transient SwiftData miss (or a fetch before a
+      // CloudKit absorb finished) mustn't blank a running fast on the wrist.
+      // Preserve the last known anchor for up to 48h — past that a stale fast
+      // shouldn't linger if the empty reads never resolve.
+      if let prior = lastFasting,
+         Date().timeIntervalSince(prior.lastMealAt) < 48 * 3600 {
+        return prior
       }
       lastFasting = nil
       return nil
@@ -565,8 +567,8 @@ enum WatchSnapshotPublisher {
       ?? MacroCatalog.byID["fasting"]?.defaultColorHex
 
     let wire = FastingWire(
-      since: now.addingTimeInterval(-Double(totalMin) * 60),
-      sinceLabel: since,
+      lastMealAt: lastMealAt,
+      sinceLabel: String(last.time.prefix(5)),
       targetHours: max(targetH, 1),
       colorHex: colorHex)
     lastFasting = wire

@@ -1565,6 +1565,22 @@ enum SeptenaDate {
     return formatter.string(from: d)
   }
 
+  /// The absolute wall-clock instant of an event from its stored `date`
+  /// ("yyyy-MM-dd") and `time` ("HH:mm" or "HH:mm:ss") in the current calendar /
+  /// time zone. Used to anchor the fasting window for the watch, which then
+  /// reasons about elapsed time from this instant. Nil if either part is malformed.
+  static func instant(date: String, time: String) -> Date? {
+    let d = date.split(separator: "-").compactMap { Int($0) }
+    let t = time.split(separator: ":").compactMap { Int($0) }
+    guard d.count == 3, t.count >= 2 else { return nil }
+    var c = DateComponents()
+    c.year = d[0]; c.month = d[1]; c.day = d[2]
+    c.hour = t[0]; c.minute = t[1]; c.second = t.count >= 3 ? t[2] : 0
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = .current
+    return cal.date(from: c)
+  }
+
   static var today: String { formatter.string(from: Date()) }
 
   /// Wall-clock "HH:mm" right now.

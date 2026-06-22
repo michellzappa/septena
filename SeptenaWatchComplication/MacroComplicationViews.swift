@@ -36,13 +36,15 @@ struct MacroComplicationView: View {
   @ViewBuilder
   private var content: some View {
     // A live fast morphs the whole face — a single ring + elapsed timer — exactly
-    // as the phone's Nutrition tile does. Elapsed is derived from the timeline
-    // entry's date so it steps forward over the fast without a provider reload.
-    if let fast = entry.data.fasting {
-      let elapsed = max(0, entry.date.timeIntervalSince(fast.since))
+    // as the phone's Nutrition tile does. The fed-vs-fasting decision is recomputed
+    // *here*, per timeline entry, from the entry's date — so the morph appears (and
+    // the elapsed steps forward) over the fast and across midnight without a
+    // provider reload or a phone republish.
+    if let fast = entry.data.fasting, case let state = fast.liveState(now: entry.date),
+       state.isFasting {
       switch family {
-      case .accessoryRectangular: RectangularFastingView(fast: fast, elapsed: elapsed)
-      default:                    CircularFastingView(fast: fast, elapsed: elapsed)
+      case .accessoryRectangular: RectangularFastingView(fast: fast, elapsed: state.elapsed)
+      default:                    CircularFastingView(fast: fast, elapsed: state.elapsed)
       }
     } else {
       switch family {

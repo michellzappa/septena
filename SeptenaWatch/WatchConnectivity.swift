@@ -53,10 +53,11 @@ final class WatchConnectivity {
   /// listed on the in-app Intakes summary page. Empty until the first fetch /
   /// when nothing's been logged today.
   var intakeToday: [IntakeTodayWire] = []
-  /// The live fast from the snapshot, when one is running and the user tracks
-  /// fasting — held so the macro complication morphs into a fasting face and the
-  /// in-app Macros summary (its tap target) can show the live fast. Nil when not
-  /// fasting, so both surfaces fall back to macros.
+  /// The fasting context from the snapshot (last-meal anchor + target), present
+  /// whenever the user tracks fasting and has a recent meal. The surfaces decide
+  /// fed-vs-fasting live via `liveState(now:)` — the macro complication morphs to
+  /// a fasting face when due, and the in-app Macros summary (its tap target) shows
+  /// the live fast. Nil when untracked / no meal, so both fall back to macros.
   var fasting: FastingComplication? = nil
   /// Section keys enabled on the phone (from the snapshot), so the Next-list
   /// "Summaries" links show for an enabled section even on a day its ring data
@@ -737,7 +738,7 @@ final class WatchConnectivity {
       ComplicationRing(key: $0.key, value: $0.value, goal: $0.goal, colorHex: $0.colorHex)
     }
     let fast = wire2.map {
-      FastingComplication(since: $0.since, sinceLabel: $0.sinceLabel,
+      FastingComplication(lastMealAt: $0.lastMealAt, sinceLabel: $0.sinceLabel,
                           targetHours: $0.targetHours, colorHex: $0.colorHex)
     }
     nutritionRings = rings   // held for the in-app detail page (complication tap target)
