@@ -126,6 +126,10 @@ struct IntakeKindPageView: View {
                           accent: accent,
                           choices: quickChoices,
                           onPick: { id in pendingChoice = id; quickLogging = false })
+        // macOS sheets size to ideal content height, which a List-backed
+        // NavigationStack lacks — without a frame the chooser collapses to
+        // zero. No-op on iOS, where the detents above own the size.
+        .macSheetFrame(width: 420, height: 480)
     }
   }
 
