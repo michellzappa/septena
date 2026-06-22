@@ -135,14 +135,18 @@ enum IntakeReader {
     return rows.map { IntakeItemDTO(id: $0.id, name: $0.name, emoji: $0.emoji) }
   }
 
-  /// The most recent count today for the container method — feeds
+  /// The most recent container-method count on or before `date` — feeds
   /// ConsumableContainer's "Continue (use N)" row (the next hit/use in the
-  /// open container).
+  /// open container). A physical container persists across days, so this looks
+  /// back beyond today (`<= date`, not `== date`): a fresh morning continues
+  /// yesterday's capsule rather than always forcing a new one. The `<= date`
+  /// bound keeps it correct under time-travel (never "continues" a future
+  /// container). `hasActiveContainer` still ends a full one.
   static func lastContainerCount(context: ModelContext, kindID: String,
                                  containerToken: String, date: String) -> Int? {
     let rows = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(
       predicate: #Predicate {
-        $0.kindID == kindID && $0.date == date && $0.method == containerToken
+        $0.kindID == kindID && $0.date <= date && $0.method == containerToken
       },
       sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
     )))
@@ -177,11 +181,13 @@ enum IntakeReader {
     return kinds.map { k in
       let days = byDay[k.id] ?? [:]
       let methods = k.methods
-      // Today's latest count on the container method, for "Continue (use N)".
+      // Latest count on the container method on or before `date`, for
+      // "Continue (use N)" — spans days so a fresh morning continues the open
+      // capsule (matches `lastContainerCount`).
       var lastContainer: Int? = nil
       if let token = methods.first(where: { $0.usesContainer })?.token {
         lastContainer = events
-          .filter { $0.kindID == k.id && $0.date == date && $0.method == token }
+          .filter { $0.kindID == k.id && $0.date <= date && $0.method == token }
           .max(by: { $0.occurredAt < $1.occurredAt })?.count
       }
       return IntakeTileDTO(id: k.id, name: k.name, symbol: k.symbol, color: k.color,
