@@ -69,11 +69,40 @@ public enum ConsumableContainer {
     }
     // Container methods are represented by the rows above; everything else is a
     // plain choice. (When there's no cap, `usesContainer` is ignored and all
-    // methods list flat — the caffeine shape.)
+    // methods list flat — the caffeine shape.) Methods are emoji-first, but we
+    // also carry a guessed SF Symbol so emoji-less methods get a meaningful icon
+    // (the quick-add surfaces show emoji when present, else this symbol) instead
+    // of every row collapsing to the same generic fallback.
     for m in methods where !(m.usesContainer && containerCap != nil) {
-      out.append(.init(value: m.token, label: m.label, emoji: m.emoji))
+      let symbol = (m.emoji?.isEmpty ?? true) ? defaultSymbol(for: m) : nil
+      out.append(.init(value: m.token, label: m.label, symbol: symbol, emoji: m.emoji))
     }
     return out
+  }
+
+  /// A best-effort SF Symbol for an emoji-less method, keyed off keywords in its
+  /// token/label. Methods carry no symbol field (they're emoji-first by design),
+  /// so this keeps the quick-add menus visually consistent with every other
+  /// section's menu without reintroducing a per-method symbol the user must set.
+  public static func defaultSymbol(for method: Method) -> String {
+    let s = (method.token + " " + method.label).lowercased()
+    func has(_ keys: String...) -> Bool { keys.contains { s.contains($0) } }
+    switch true {
+    case has("vape", "vaporiz", "pen", "inhale", "dab"):            return "smoke"
+    case has("smoke", "joint", "cigarett", "cig", "spliff", "bong"): return "smoke.fill"
+    case has("edible", "gummy", "cookie", "brownie", "chocolate"):  return "fork.knife"
+    case has("capsule", "pill", "tablet", "softgel"):               return "pills"
+    case has("tincture", "drop", "oil", "sublingual", "subling"):   return "drop"
+    case has("inject", "shot", "syringe", "jab"):                   return "syringe"
+    case has("patch"):                                              return "bandage"
+    case has("spray", "mist", "nasal"):                             return "wind"
+    case has("espresso", "coffee", "v60", "brew", "pour", "americano", "drip"): return "cup.and.saucer"
+    case has("tea", "matcha", "latte", "chai"):                     return "cup.and.saucer.fill"
+    case has("drink", "beverage", "can", "bottle", "soda", "energy", "shake"):  return "waterbottle"
+    case has("powder", "scoop"):                                    return "scalemass"
+    case has("chew", "lozenge", "gum", "mint"):                     return "mouth"
+    default:                                                        return "plus.circle"
+    }
   }
 
   /// Decode a `choices` value back into `(token, count)`. Tolerant of a bare
