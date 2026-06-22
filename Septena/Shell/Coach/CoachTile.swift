@@ -76,6 +76,7 @@ struct CoachTile: View {
         .strokeBorder(accent.opacity(0.28), lineWidth: 1)
     )
     .contentShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+    .tileHover()
   }
 
   private var pillCloud: some View {

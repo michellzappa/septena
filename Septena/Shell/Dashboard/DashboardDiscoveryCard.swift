@@ -122,6 +122,7 @@ struct DashboardDiscoveryCard: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .tileHover(cornerRadius: 10)
   }
 
   private func presentation(for s: Suggestion) -> (icon: String, title: String, subtitle: String, accent: Color) {

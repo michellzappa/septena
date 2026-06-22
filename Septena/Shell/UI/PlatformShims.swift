@@ -322,6 +322,35 @@ extension View {
   }
 }
 
+extension View {
+  /// Universal pointer / Apple-Pencil-hover highlight for tappable custom
+  /// surfaces (dashboard tiles, cards, log rows). System controls (tab bar,
+  /// toolbar, `List` rows) get this for free; `.buttonStyle(.plain)` —
+  /// which this app uses on ~all tappable cards — opts *out* of the automatic
+  /// pointer effect, so anything tappable-but-plain must request it back.
+  ///
+  /// Pencil hover rides the same pointer-effect pipeline as the trackpad
+  /// pointer, so this one modifier lights up both. The explicit hover
+  /// content-shape makes the highlight follow the card's rounded corners
+  /// instead of bleeding into a hard rectangle. macOS has no `.hoverEffect`,
+  /// so it's a no-op there.
+  ///
+  /// Scope: rectangular tappable *surfaces* (tiles / cards / full-width rows),
+  /// not inline text buttons or chevrons — those want a plain
+  /// `.hoverEffect(.automatic)` with no card-shaped highlight.
+  @ViewBuilder
+  func tileHover(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
+    #if os(iOS)
+    self
+      .contentShape(.hoverEffect,
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+      .hoverEffect(.highlight)
+    #else
+    self
+    #endif
+  }
+}
+
 /// Zero-effect button style. Suppresses the brief label tint that SwiftUI's
 /// default `.plain` style applies on click — useful when a row already shows
 /// "I was tapped" via a persistent background pill, so the extra flash adds

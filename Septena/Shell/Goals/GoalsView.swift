@@ -276,6 +276,7 @@ struct GoalTile: View {
     )
     .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
     .contentShape(Rectangle())
+    .tileHover()
   }
 
   private var sectionPills: some View {

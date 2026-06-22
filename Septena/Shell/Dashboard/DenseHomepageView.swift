@@ -135,6 +135,7 @@ private struct DenseDomainRow: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 10)
   }
 }
 
@@ -174,6 +175,7 @@ private struct DenseDomainCard: View {
     .background(Theme.cardSurface)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 14)
   }
 }
 

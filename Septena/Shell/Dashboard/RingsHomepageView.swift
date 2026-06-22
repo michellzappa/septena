@@ -98,6 +98,7 @@ private struct RingDomainCell: View {
     .background(Theme.cardSurface)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 14)
   }
 
   /// The ring's fill fraction + how to label and tint it. `hasTarget`

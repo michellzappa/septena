@@ -139,6 +139,7 @@ private struct HeatmapDomainCard: View {
     .background(Theme.cardSurface)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 14)
   }
 
   private var firstDataDate: Date? {
@@ -189,6 +190,7 @@ private struct HeatmapDomainRow: View {
     .padding(.horizontal, 14)
     .padding(.vertical, 12)
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 10)
   }
 
   private var identityColumn: some View {

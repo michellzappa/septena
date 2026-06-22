@@ -549,6 +549,7 @@ struct DomainTile: View {
     .background(Theme.cardSurface)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
+    .tileHover(cornerRadius: 14)
   }
 }
 
