@@ -231,10 +231,18 @@ watch). The classic bug: a section with a manifest row + destination but **no
 
 ## Conventions
 
-- **All documentation lives in `docs/`.** Any new `.md` — plan, handoff, spec,
-  design note, feature write-up — goes in `docs/`, never the repo root. Root is
-  reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
+- **All *app* documentation lives in `docs/`.** Any new `.md` — plan, handoff,
+  spec, design note, feature write-up — goes in `docs/`, never the repo root. Root
+  is reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
   `LICENSE`, `NOTICE`, `project.yml`. Reference docs by their `docs/…` path.
+- **This repo is PUBLIC — keep only app-relevant docs here. Strategy lives in the
+  private site repo.** Competitive strategy, positioning, and the **book**
+  (manifesto / go-to-market) do NOT belong in this repo. They live in the
+  **private** `../septena-site` repo under `docs/` — the book thesis is
+  `septena-site/docs/THE_INSTRUMENT_MANIFESTO.md`. When the work is
+  strategy/positioning/book copy, edit it *there*, not here. App engineering docs
+  (schema, design spec, plans, specs) stay public in this `docs/`;
+  `docs/MAKER_IDENTITY.md` stays here too because it sources in-app maker copy.
 - Match surrounding code: comment density, naming, idiom.
 - **Maker voice & identity** (the "made by mz" story across app, site, support,
   journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks
