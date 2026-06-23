@@ -199,7 +199,7 @@ struct RhythmHomepageView<MenuContent: View>: View {
   }
 
   private func reload() async {
-    let snap = RhythmData.load(
+    let snap = await RhythmData.load(
       visible: Set(items.map { $0.domain.rawValue }),
       colors: byKey.mapValues { $0.accent },
       sleepNights: sleepNights,
@@ -233,6 +233,60 @@ enum RhythmData {
     var bands: [TimeOfDayWheel.Band] { bandsBySection.values.flatMap { $0 } }
   }
 
+  /// `Sendable` projection of the raw SwiftData rows the dial needs, fetched on
+  /// a background `ModelContext` so the store work stays off the main thread.
+  /// No `Color` (not `Sendable`) and no `@Model` entity crosses back — only flat
+  /// values; the main actor resolves colors and builds the wheel structs from
+  /// these (see `load`).
+  struct RawRows: Sendable {
+    var timed: [TimedEvent] = []
+    var tasks: [TaskRow] = []
+    var intake: [IntakeRow] = []
+    /// Intake kind id → its stored color token, resolved to a `Color` on main.
+    var intakeKindColors: [String: String] = [:]
+    var training: [TrainingRow] = []
+  }
+  struct TaskRow: Sendable { let id: String; let completedAt: String }
+  struct IntakeRow: Sendable { let id: String; let occurredAt: Date; let kindID: String }
+  struct TrainingRow: Sendable { let date: String; let occurredAt: Date; let durationMin: Double? }
+
+  /// The store-touching half of `load`: every window-bounded SwiftData fetch,
+  /// run on a background context off the main thread. Pure value-in / value-out
+  /// (`nonisolated`), so it's safe to call from a detached task. Predicates are
+  /// unchanged from the old inline fetches.
+  nonisolated static func fetchRows(visible: Set<String>, weekStart: Date,
+                                    context: ModelContext) -> RawRows {
+    var r = RawRows()
+    // Training renders as session pills (durations), not dots — drop it from the
+    // instant-event stream; it comes back as bands via the training rows below.
+    r.timed = LoggedEvents.timed(since: weekStart, in: context)
+      .filter { visible.contains($0.sectionKey) && $0.sectionKey != "training" }
+    if visible.contains("tasks") {
+      // `completedAt` is an ISO-local string that sorts lexicographically, so a
+      // string `>=` is a valid date bound — keeps history out of the fetch.
+      let cutoff = RhythmFmt.isoLocal.string(from: weekStart)
+      let desc = FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.statusRaw == "done" && $0.deletedAt == nil && ($0.completedAt ?? "") >= cutoff })
+      r.tasks = ((try? context.fetch(desc)) ?? []).compactMap { t in
+        t.completedAt.map { TaskRow(id: t.id, completedAt: $0) }
+      }
+    }
+    if visible.contains("intake") {
+      let rows = (try? context.fetch(
+        FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= weekStart }))) ?? []
+      r.intake = rows.map { IntakeRow(id: $0.id, occurredAt: $0.occurredAt, kindID: $0.kindID) }
+      // One fetch of the kinds, mapped id → color token; the join is in-memory.
+      let kinds = (try? context.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []
+      for k in kinds { r.intakeKindColors[k.id] = k.color }
+    }
+    if visible.contains("training") {
+      let rows = (try? context.fetch(
+        FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart }))) ?? []
+      r.training = rows.map { TrainingRow(date: $0.date, occurredAt: $0.occurredAt, durationMin: $0.durationMin) }
+    }
+    return r
+  }
+
   static func load(visible: Set<String>,
                    colors: [String: Color],
                    sleepNights: [OuraNight],
@@ -241,18 +295,22 @@ enum RhythmData {
                    windowDays: Int,
                    calendarFallback: Color,
                    wakingDay: WakingDay = WakingDay(enabled: false),
-                   context: ModelContext) -> Snapshot {
+                   context: ModelContext) async -> Snapshot {
     let weekStart = Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: todayStart) ?? todayStart
 
-    // Training renders as session pills (durations), not dots — pull it out of
-    // the instant-event stream and add it to the bands below instead.
-    let timed = LoggedEvents.timed(since: weekStart, in: context)
-      .filter { visible.contains($0.sectionKey) && $0.sectionKey != "training" }
+    // The SwiftData fetches (the heavy part) run on a background context off the
+    // main thread; only flat `Sendable` rows come back. The `ModelContainer` is
+    // `Sendable`, so a detached task can spin its own `ModelContext` from it.
+    let container = context.container
+    let rows = await Task.detached(priority: .userInitiated) {
+      fetchRows(visible: visible, weekStart: weekStart, context: ModelContext(container))
+    }.value
 
     // Bucket events/bands by section so each tile can draw its own mini wheel;
-    // the overlay dial is the flattened union of the buckets.
+    // the overlay dial is the flattened union of the buckets. `Color` resolution
+    // + struct construction stay here on the main actor (`Color` isn't `Sendable`).
     var snap = Snapshot()
-    for t in timed {
+    for t in rows.timed {
       guard let e = TimeOfDayWheel.Event(
         id: t.id, occurredAt: t.occurredAt, todayStart: todayStart,
         windowDays: windowDays, color: colors[t.sectionKey],
@@ -263,17 +321,17 @@ enum RhythmData {
     // Tasks aren't `LoggedEvent`s — add completed tasks as dots so the wheel
     // matches the timeline (which plots done tasks at their completedAt time).
     if visible.contains("tasks") {
-      let te = taskEvents(todayStart: todayStart, weekStart: weekStart, windowDays: windowDays,
-                          color: colors["tasks"], wakingDay: wakingDay, context: context)
+      let te = taskEvents(rows: rows.tasks, todayStart: todayStart, windowDays: windowDays,
+                          color: colors["tasks"], wakingDay: wakingDay)
       if !te.isEmpty { snap.eventsBySection["tasks", default: []].append(contentsOf: te) }
     }
     // Intake plots per *kind* color (coffee, matcha, … each carry their own),
     // not the flat section accent — so it gets its own path rather than the
     // section-keyed `timed` stream.
     if visible.contains("intake") {
-      let ie = intakeEvents(todayStart: todayStart, windowDays: windowDays,
-                            weekStart: weekStart, sectionColor: colors["intake"],
-                            wakingDay: wakingDay, context: context)
+      let ie = intakeEvents(rows: rows.intake, kindColors: rows.intakeKindColors,
+                            todayStart: todayStart, windowDays: windowDays,
+                            sectionColor: colors["intake"], wakingDay: wakingDay)
       if !ie.isEmpty { snap.eventsBySection["intake", default: []].append(contentsOf: ie) }
     }
 
@@ -281,33 +339,24 @@ enum RhythmData {
                            visible: visible, sleepColor: colors["sleep"], wakingDay: wakingDay)
     if !sleep.isEmpty { snap.bandsBySection["sleep"] = sleep }
     if visible.contains("training") {
-      let train = trainingBands(todayStart: todayStart, weekStart: weekStart,
+      let train = trainingBands(rows: rows.training, todayStart: todayStart,
                                 windowDays: windowDays, color: colors["training"],
-                                wakingDay: wakingDay, context: context)
+                                wakingDay: wakingDay)
       if !train.isEmpty { snap.bandsBySection["training"] = train }
     }
     // Calendar for the *displayed* day (today, or a scrubbed past day) — the
-    // `todayStart` the rest of this load is keyed to.
+    // `todayStart` the rest of this load is keyed to. EventKit, kept on main.
     snap.calendarBands = calendarBands(on: todayStart, fallback: calendarFallback)
     return snap
   }
 
   /// Completed tasks as dots, placed at their local `completedAt` time —
   /// mirrors `DayTimelineView`'s task handling. The `Event` init bounds them to
-  /// the window.
-  private static func taskEvents(todayStart: Date, weekStart: Date, windowDays: Int,
-                                 color: Color?, wakingDay: WakingDay,
-                                 context: ModelContext) -> [TimeOfDayWheel.Event] {
-    // Bound to the window. `completedAt` is an ISO-local string ("yyyy-MM-dd'T'…")
-    // that sorts lexicographically, so a string `>=` is a valid date bound. This
-    // stops the dial from fetching (and re-parsing) every completed task in
-    // history on every reload — the unbounded fetch was the per-toggle hitch.
-    let cutoff = RhythmFmt.isoLocal.string(from: weekStart)
-    let desc = FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { $0.statusRaw == "done" && $0.deletedAt == nil && ($0.completedAt ?? "") >= cutoff })
-    let rows = (try? context.fetch(desc)) ?? []
-    return rows.compactMap { t in
-      guard let cs = t.completedAt, let when = RhythmFmt.isoLocal.date(from: cs) else { return nil }
+  /// the window. Rows are the window-bounded fetch from `fetchRows`.
+  private static func taskEvents(rows: [TaskRow], todayStart: Date, windowDays: Int,
+                                 color: Color?, wakingDay: WakingDay) -> [TimeOfDayWheel.Event] {
+    rows.compactMap { t in
+      guard let when = RhythmFmt.isoLocal.date(from: t.completedAt) else { return nil }
       return TimeOfDayWheel.Event(id: t.id, occurredAt: when, todayStart: todayStart,
                                   windowDays: windowDays, color: color, wakingDay: wakingDay)
     }
@@ -316,17 +365,12 @@ enum RhythmData {
   /// Intake events as dots, each tinted by its *kind*'s own color (each kind
   /// defines one) rather than the flat section accent.
   /// Falls back to the section color for a kind with no color set.
-  private static func intakeEvents(todayStart: Date, windowDays: Int, weekStart: Date,
-                                   sectionColor: Color?, wakingDay: WakingDay,
-                                   context: ModelContext) -> [TimeOfDayWheel.Event] {
-    let rows = (try? context.fetch(
-      FetchDescriptor<IntakeEventEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
-    )) ?? []
+  private static func intakeEvents(rows: [IntakeRow], kindColors: [String: String],
+                                   todayStart: Date, windowDays: Int,
+                                   sectionColor: Color?, wakingDay: WakingDay) -> [TimeOfDayWheel.Event] {
     guard !rows.isEmpty else { return [] }
-    // One fetch of the kinds, mapped id → color, so the join is in-memory.
-    let kinds = (try? context.fetch(FetchDescriptor<IntakeKindEntity>())) ?? []
     var kindColor: [String: Color] = [:]
-    for k in kinds { if let c = AdaptiveColor.adaptive(k.color) { kindColor[k.id] = c } }
+    for (id, token) in kindColors { if let c = AdaptiveColor.adaptive(token) { kindColor[id] = c } }
     return rows.compactMap { e in
       TimeOfDayWheel.Event(id: e.id, occurredAt: e.occurredAt, todayStart: todayStart,
                            windowDays: windowDays,
@@ -337,13 +381,10 @@ enum RhythmData {
   /// Each day's training as a session pill (bedtime-style band), grouping the
   /// day's exercise rows and merging gaps under 0.75h — the same session idea
   /// `DayTimelineView` draws as a bar. Faded by recency like the other bands.
-  private static func trainingBands(todayStart: Date, weekStart: Date, windowDays: Int,
-                                    color: Color?, wakingDay: WakingDay,
-                                    context: ModelContext) -> [TimeOfDayWheel.Band] {
+  /// Rows are the window-bounded fetch from `fetchRows`.
+  private static func trainingBands(rows: [TrainingRow], todayStart: Date, windowDays: Int,
+                                    color: Color?, wakingDay: WakingDay) -> [TimeOfDayWheel.Band] {
     guard let color else { return [] }
-    let rows = (try? context.fetch(
-      FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
-    )) ?? []
     let cal = Calendar.current
     var out: [TimeOfDayWheel.Band] = []
     for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {

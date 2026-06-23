@@ -1,8 +1,5 @@
 import SwiftUI
 import SwiftData
-#if os(iOS)
-import CoreMotion
-#endif
 
 // The front door's hero object: today as a living 24-hour dial.
 //
@@ -60,7 +57,6 @@ struct DayDialHero: View {
   // Optional — the hero lives under the root env, but stays nil-safe like
   // the rows do. nil just means the comet never learns where the dial is.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// Switches tabs from inside the dashboard — tapping the dial opens Next.
   @Environment(TabSelection.self) private var tabSelection
   /// Goes non-`.active` exactly when iOS grabs the app-switcher thumbnail.
@@ -81,21 +77,8 @@ struct DayDialHero: View {
   /// Debounce token for `.septenaDataChanged`-driven reloads — coalesces the
   /// optimistic post with CloudKit's echo. Cancelled and replaced per post.
   @State private var reloadTask: Task<Void, Never>?
-  #if os(iOS)
-  @State private var tilt = TiltSource()
-  #endif
 
   private static let maxDaysBack = 30
-
-  /// The light layer's parallax offset — device tilt on iOS, static on
-  /// macOS (no motion hardware) and under Reduce Motion.
-  private var glowParallax: CGSize {
-    #if os(iOS)
-    reduceMotion ? .zero : tilt.offset
-    #else
-    .zero
-    #endif
-  }
 
   private let windowDays = 7
   private let dialDiameter: CGFloat = 297
@@ -262,14 +245,14 @@ struct DayDialHero: View {
       // instead of a transparent hole.
       flatGlass: snapshotting
     )
-    // A wide soft backwash for depth, drifting a few points against device
-    // tilt (iOS) while the glass stays put — the parallax that makes the
-    // donut read as glass with light floating behind it. (Night lives on the
-    // donut now, so no disc-edge halo.)
+    // A wide soft backwash for depth behind the glass — the day's light on the
+    // dial. (Night lives on the donut now, so no disc-edge halo.) Static: the
+    // device-tilt parallax that used to drift it was removed — at ±8pt behind a
+    // frosted donut it was imperceptible, and it forced the live glass to
+    // recomposite on every motion frame.
     .background {
       AmbientGlow()
         .frame(width: 460, height: 460)
-        .offset(glowParallax)
     }
     // Swipe ← → to scrub days; tap opens the Next feed. The dial follows the
     // finger a touch (resisted) and springs back on release — the "turning a
@@ -321,7 +304,15 @@ struct DayDialHero: View {
     }
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
-    .task(id: displayedStart) { reload() }
+    .task(id: displayedStart) {
+      // First-appearance cost-splitting. The live Liquid Glass donut and this
+      // cross-section SwiftData load are each heavy on first paint; run in the
+      // same main-actor hop they stack into ONE visible hitch. Yield first so
+      // the glass chrome composites and presents, then fill the dots/bands a
+      // beat later — the donut shows promptly instead of waiting on the fetch.
+      await Task.yield()
+      await reload()
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
       // Reload only when a section the dial plots changed (or the post is
       // unscoped — a CloudKit batch). Skips dial-less edits, and the debounce
@@ -329,15 +320,6 @@ struct DayDialHero: View {
       guard note.affectsAnySection(of: dialSections) else { return }
       scheduleReload()
     }
-    #if os(iOS)
-    // Motion runs only while the hero is actually on screen (TabView fires
-    // onDisappear on tab switches), and not under Reduce Motion.
-    .onAppear { if !reduceMotion { tilt.start() } }
-    .onDisappear { tilt.stop() }
-    .onChange(of: reduceMotion) { _, reduced in
-      reduced ? tilt.stop() : tilt.start()
-    }
-    #endif
   }
 
   /// Sections the dial can render — gates the data-changed listener so only
@@ -355,14 +337,14 @@ struct DayDialHero: View {
     reloadTask = Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(250))
       guard !Task.isCancelled else { return }
-      reload()
+      await reload()
     }
   }
 
-  private func reload() {
+  private func reload() async {
     var colors: [String: Color] = [:]
     for key in visibleSections { colors[key] = theme.color(for: key) }
-    snapshot = RhythmData.load(
+    snapshot = await RhythmData.load(
       visible: visibleSections,
       colors: colors,
       sleepNights: sleepNights,
@@ -377,53 +359,3 @@ struct DayDialHero: View {
     )
   }
 }
-
-#if os(iOS)
-/// Device-tilt source for the hero's glass-vs-light parallax. Attitude only
-/// (no permission, no location), 30 Hz while the hero is visible, stopped on
-/// disappear. The baseline is captured on start so the drift is relative to
-/// how the user is HOLDING the phone, not absolute gravity — flat on a
-/// table and upright in a hand both rest at zero. Low-passed and clamped to
-/// ±8pt: a touch of depth, never a gimbal.
-@MainActor
-@Observable
-final class TiltSource {
-  private let manager = CMMotionManager()
-  private(set) var offset: CGSize = .zero
-  private var baseRoll: Double?
-  private var basePitch: Double?
-
-  func start() {
-    guard manager.isDeviceMotionAvailable, !manager.isDeviceMotionActive else { return }
-    manager.deviceMotionUpdateInterval = 1.0 / 30.0
-    manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
-      MainActor.assumeIsolated {
-        guard let self, let a = motion?.attitude else { return }
-        if self.baseRoll == nil { self.baseRoll = a.roll; self.basePitch = a.pitch }
-        let dr = a.roll - (self.baseRoll ?? 0)
-        let dp = a.pitch - (self.basePitch ?? 0)
-        // Negative mapping: the light layer shifts AGAINST the tilt, the
-        // way a backdrop slides opposite your head when you look through a
-        // window — that's what places it *behind* the glass. ±0.35 rad of
-        // tilt spans the full travel.
-        func map(_ v: Double) -> CGFloat {
-          CGFloat(max(-8, min(8, -v / 0.35 * 8)))
-        }
-        let target = CGSize(width: map(dr), height: map(dp))
-        // Light low-pass so the drift feels like liquid, not telemetry.
-        self.offset = CGSize(
-          width: self.offset.width + (target.width - self.offset.width) * 0.15,
-          height: self.offset.height + (target.height - self.offset.height) * 0.15
-        )
-      }
-    }
-  }
-
-  func stop() {
-    manager.stopDeviceMotionUpdates()
-    offset = .zero
-    baseRoll = nil
-    basePitch = nil
-  }
-}
-#endif

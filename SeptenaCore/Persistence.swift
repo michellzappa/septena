@@ -3800,7 +3800,12 @@ enum LoggedEvents {
   /// Unlike `since` (which scans *all* history then filters), this predicates
   /// each fetch on the stored instant, so it touches only the window — a
   /// 7-day window stays fast regardless of how much total history exists.
-  public static func timed(since date: Date, in context: ModelContext) -> [TimedEvent] {
+  ///
+  /// `nonisolated` (the rest of `LoggedEvents` is `@MainActor`): it takes its
+  /// `ModelContext` as a parameter, touches no main-actor state, and returns
+  /// only `Sendable` value rows — so the rhythm dial can run it on a background
+  /// context off the main thread. Still callable from the main actor as before.
+  public nonisolated static func timed(since date: Date, in context: ModelContext) -> [TimedEvent] {
     var out: [TimedEvent] = []
     func grab<E: PersistentModel & LoggedEvent>(_ desc: FetchDescriptor<E>) {
       let rows = (try? context.fetch(desc)) ?? []
