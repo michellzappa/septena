@@ -395,7 +395,7 @@ struct SeptenaApp: App {
     // no matter which tab you're on, then sets nav.path to the route.
     .commands {
       CommandMenu("Go") {
-        Button("Week")  { navigation.pendingTab = .week }
+        Button("Today") { navigation.pendingTab = .week }
           .keyboardShortcut("1", modifiers: .command)
         Button("Next")  { navigation.pendingTab = .next }
           .keyboardShortcut("2", modifiers: .command)
