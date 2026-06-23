@@ -35,6 +35,9 @@ struct NextView: View {
   /// conversation section. Hosted here at the page root so its docked inspector
   /// (iPad/macOS) attaches to the whole Next page; iPhone gets a sheet.
   @State private var editingTask: SeptenaTask?
+  /// Quick-add: the Tasks section header's "+" opens the same composer in
+  /// create mode (defaulting new tasks to Today, like the Tasks drawer's +).
+  @State private var creating = false
   // "Done Today" editors — mood / gut / nutrition rows reopen their home
   // editor. Hosted HERE, on the `List` container, NOT inside `NextDoneSection`:
   // `adaptiveDetail` resolves to a macOS `.inspector`, and attaching that to a
@@ -62,10 +65,20 @@ struct NextView: View {
   /// "Done Today" log renders.
   private var hasAnyDone: Bool { model.hasAnyDone || !doneModel.events.isEmpty }
 
-  /// Drives the composer drawer from the optional `editingTask`; clearing it
-  /// (swipe-away / Cancel / Save) closes the editor.
+  /// Drives the composer drawer from either a quick-add (`creating`) or a row
+  /// edit (`editingTask`); clearing it (swipe-away / Cancel / Save) closes the
+  /// editor and resets both flags.
   private var composerBinding: Binding<Bool> {
-    Binding(get: { editingTask != nil }, set: { if !$0 { editingTask = nil } })
+    Binding(get: { creating || editingTask != nil },
+            set: { if !$0 { creating = false; editingTask = nil } })
+  }
+
+  /// Create vs. edit for the hosted composer card. Create wins if both are set
+  /// (they never are — opening one clears the other).
+  private var composerMode: TaskComposerCard.Mode? {
+    if creating { return .create(.today) }
+    if let task = editingTask { return .edit(task) }
+    return nil
   }
 
   // MARK: - Done Today editing
@@ -232,7 +245,8 @@ struct NextView: View {
       NextOpenSection(model: model, tasksModel: tasksModel,
                       areas: areas, projects: projects,
                       onOpenTask: { openForEdit($0) },
-                      onClickSelect: clickSelectTask)
+                      onClickSelect: clickSelectTask,
+                      onAddTask: { creating = true })
 
       // A chronological log of everything finished today — the trio the
       // user just ticked off (lingers struck-through above, then lands
@@ -264,10 +278,10 @@ struct NextView: View {
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
     // drawer the Tasks tab uses. Edit mode embeds the agent conversation.
     .taskComposerDrawer(isPresented: composerBinding) {
-      if let task = editingTask {
-        TaskComposerCard(mode: .edit(task), areas: areas, projects: projects,
+      if let mode = composerMode {
+        TaskComposerCard(mode: mode, areas: areas, projects: projects,
                          accent: theme.color(for: "tasks"),
-                         onDone: { tasksModel.refreshFromCache() })
+                         onDone: { Task { await tasksModel.load() } })
       }
     }
     // "Done Today" editors hosted on the List container (NOT inside the

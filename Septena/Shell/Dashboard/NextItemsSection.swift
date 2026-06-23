@@ -527,6 +527,9 @@ struct NextOpenSection: View {
   /// row defeats native `List` click-selection, so the gesture writes the
   /// page's selection set itself. Unused on iOS. See `NextView.clickSelectTask`.
   var onClickSelect: (String) -> Void = { _ in }
+  /// Quick-add from the Tasks section header's trailing "+". nil hides the
+  /// button (e.g. a read-only host).
+  var onAddTask: (() -> Void)? = nil
   @Environment(ChecklistMutator.self) private var checklistMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(SettingsStore.self) private var settingsStore
@@ -617,7 +620,7 @@ struct NextOpenSection: View {
             .tag(NextRowTag.task(task.id))
         }
       } header: {
-        sectionHeader("Tasks")
+        tasksSectionHeader(onAdd: onAddTask)
       }
 
     case "chores":
@@ -1230,6 +1233,35 @@ struct CompletionRateBadge: View {
 @ViewBuilder
 private func sectionHeader(_ title: String) -> some View {
   Text(title)
+}
+
+// Tasks header with a trailing quick-add "+". There's no dedicated SwiftUI API
+// for a control in a grouped-List section header — the standard composition is
+// a custom header `HStack { Text; Spacer; Button }`: `.textCase(nil)` keeps the
+// glyph from being upper-cased with the title, and `.buttonStyle(.borderless)`
+// makes the "+" independently tappable inside the header instead of triggering
+// the whole row. The glyph is `plus.circle` to match the intake suggestion
+// rows' trailing affordance (see `NextSuggestionsSection.rowLabel`) so every
+// "add" on the Next page reads as one family — same circled shape, with the
+// header's accent tint signalling it's a live action rather than a row hint.
+// nil action falls back to the plain title.
+@ViewBuilder
+private func tasksSectionHeader(onAdd: (() -> Void)?) -> some View {
+  if let onAdd {
+    HStack {
+      Text("Tasks")
+      Spacer()
+      Button(action: onAdd) {
+        Image(systemName: "plus.circle")
+          .font(.footnote.weight(.semibold))
+      }
+      .buttonStyle(.borderless)
+      .textCase(nil)
+      .accessibilityLabel("Add task")
+    }
+  } else {
+    sectionHeader("Tasks")
+  }
 }
 
 // MARK: - Bucketed section header
