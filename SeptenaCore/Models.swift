@@ -1379,10 +1379,17 @@ struct NutritionSettings: Codable, Hashable {
   /// Authoritative tile list. Nil for legacy payloads → consumers should
   /// fall back to `MacroCatalog.defaultTilePrefs()`.
   var macroTiles: [MacroTilePref]?
+  /// Whether the user tracks fasting (the Nutrition tile's live timer + the
+  /// wrist macro-complication morph). Synced so every device agrees — the
+  /// device-local `@AppStorage` mirror (`SettingsKey.nutritionTrackFasting`)
+  /// used by display surfaces stays in lockstep. Nil for legacy payloads →
+  /// consumers fall back to the local mirror (or `false`).
+  var trackFasting: Bool?
 
   enum CodingKeys: String, CodingKey {
-    case macroColors = "macro_colors"
-    case macroTiles  = "macro_tiles"
+    case macroColors  = "macro_colors"
+    case macroTiles   = "macro_tiles"
+    case trackFasting = "track_fasting"
   }
 }
 

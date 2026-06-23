@@ -73,6 +73,19 @@ enum WatchSnapshotPublisher {
   /// only refresh the snapshot through this observer. Idempotent.
   @MainActor
   static func install(context: ModelContext) {
+    // iOS is the sole author of the shared `WatchSnapshot` record. The watch
+    // pairs only with the iPhone and the Next widget is iOS-only, so the Mac
+    // (or any non-iOS companion) writing the *same* record is pure downside: it
+    // republishes from its own per-device defaults — `septena.nutrition.trackFasting`
+    // is `@AppStorage`/`UserDefaults.standard` and is NOT synced — so a Mac that
+    // was never told fasting is on clobbers the iPhone's running-fast snapshot
+    // with `fasting: nil` (and reset macro rings). That's what made the wrist
+    // fasting complication flip to empty macros after midnight: the Mac's
+    // `NSCalendarDayChanged` republish overwrote the iPhone's evening snapshot.
+    // Not installing the observers off-iOS removes the clobber at the source.
+    #if !os(iOS)
+    return
+    #else
     guard observers == nil else { return }
     let center = NotificationCenter.default
     let data = center.addObserver(
@@ -99,6 +112,7 @@ enum WatchSnapshotPublisher {
       MainActor.assumeIsolated { schedule(context: context) }
     }
     observers = [data, tasks, dayChange]
+    #endif
   }
 
   /// Compute on the main actor (SwiftData read), then save off-main. Best-effort:
@@ -530,7 +544,14 @@ enum WatchSnapshotPublisher {
   /// falling back to the default band); color mirrors the Fasting macro tile.
   @MainActor
   private static func buildFasting(context: ModelContext) -> FastingWire? {
-    guard UserDefaults.standard.bool(forKey: trackFastingDefaultsKey) else {
+    // Prefer the CloudKit-synced flag so every device agrees fasting is on;
+    // fall back to the device-local `@AppStorage` mirror for installs that
+    // haven't written/synced the payload field yet. (Only iOS publishes the
+    // snapshot now — see `install` — but reading the synced value keeps the
+    // decision correct regardless of which device authors it.)
+    let tracks = SettingsMirror.loadSettings(context: context)?.nutrition?.trackFasting
+      ?? UserDefaults.standard.bool(forKey: trackFastingDefaultsKey)
+    guard tracks else {
       lastFasting = nil
       return nil
     }
@@ -626,6 +647,12 @@ enum WatchSnapshotPublisher {
   }
 
   private static func save(payload: Data, rhythmPayload: Data? = nil, date: String) async {
+    // Belt-and-suspenders: the shared `WatchSnapshot` record is iOS-authored only
+    // (see `install`). Even if some future path triggered a publish off-iOS, the
+    // write boundary refuses it so a non-companion device can't clobber the record.
+    #if !os(iOS)
+    return
+    #else
     let db = CKContainer(identifier: containerID).privateCloudDatabase
     let id = CKRecord.ID(recordName: recordName)   // default zone
     do {
@@ -640,5 +667,6 @@ enum WatchSnapshotPublisher {
     } catch {
       // Best-effort — the next publish() call reconciles.
     }
+    #endif
   }
 }

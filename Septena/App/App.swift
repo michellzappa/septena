@@ -295,6 +295,11 @@ struct SeptenaApp: App {
             // default up so it syncs.
             settingsStore.reconcileUnits(
               context: localStore.container.mainContext, engine: ckEngine)
+            // Same bridge for the fasting flag: adopt an inbound value from
+            // another device, or push a pre-existing local-only value up so
+            // every device's watch-snapshot publisher agrees fasting is on.
+            settingsStore.reconcileTrackFasting(
+              context: localStore.container.mainContext, engine: ckEngine)
             // Grandfather established accounts past the first-run welcome:
             // `onboardedAt` is a new field, so every pre-existing user starts
             // nil — stamp it when the account already has data so the welcome

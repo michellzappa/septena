@@ -258,6 +258,8 @@ enum NutritionPlugin: SectionPlugin {
 
 private struct NutritionDetailContent: View {
   @Environment(SettingsStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
   @AppStorage(SettingsKey.nutritionTrackFasting)
   private var trackFasting: Bool = false
   @AppStorage(SettingsKey.nutritionHeatmapMetric)
@@ -272,7 +274,12 @@ private struct NutritionDetailContent: View {
     MacroTilesEditor(initialPrefs: MacroCatalog.reconcile(
       store.serverSettings?.nutrition?.macroTiles ?? MacroCatalog.defaultTilePrefs()))
     Section {
-      Toggle("Track fasting", isOn: $trackFasting)
+      // Write through the store so the choice syncs (the wrist publisher and
+      // every device read it); `setTrackFasting` keeps the local @AppStorage
+      // mirror this view binds to in lockstep.
+      Toggle("Track fasting", isOn: Binding(
+        get: { trackFasting },
+        set: { store.setTrackFasting($0, context: modelContext, engine: ckEngine) }))
     } footer: {
       Text("When on, the Nutrition tile shows a live fasting timer after your last meal of the day, and you can choose what the heatmap encodes.")
     }

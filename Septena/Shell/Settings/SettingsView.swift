@@ -370,6 +370,11 @@ final class SettingsStore {
     // the first frame's Training / Body weights format correctly. Inbound-only
     // here (no engine); the launch task pushes a fresh seed up.
     reconcileUnits(context: context, engine: nil)
+    // Same bridge for the fasting flag: adopt an inbound synced value into the
+    // local @AppStorage mirror so the Nutrition tile / dashboard read it on the
+    // first frame. Inbound-only here (no engine); the launch task pushes a
+    // pre-existing local-only value up.
+    reconcileTrackFasting(context: context, engine: nil)
     // Inbound-only at init (no engine): if a synced `onboardedAt` is already
     // in the local mirror, adopt it into the device-local flag now so the
     // welcome gate decides synchronously on the first frame and never waits
@@ -508,6 +513,55 @@ final class SettingsStore {
     if engine != nil {
       setWeightUnit(WeightUnit.resolve(UserDefaults.standard.string(forKey: key)),
                     context: context, engine: engine)
+    }
+  }
+
+  /// Set whether the user tracks fasting. Writes the device-local `@AppStorage`
+  /// mirror (`SettingsKey.nutritionTrackFasting`, read by the Nutrition tile /
+  /// dashboard for instant, offline-safe display) AND the CloudKit-synced
+  /// `nutrition.trackFasting` payload (so the choice follows them across
+  /// devices). Mirrors the `setWeightUnit` write pattern.
+  ///
+  /// Why synced matters: the watch macro complication's fasting morph is built
+  /// by `WatchSnapshotPublisher.buildFasting`, which gates on this flag. When it
+  /// lived only in per-device `UserDefaults.standard`, a second device (a Mac
+  /// that was never told fasting is on) would republish the shared snapshot with
+  /// `fasting: nil` and blank the wrist after midnight. Syncing the flag keeps
+  /// every publisher in agreement.
+  func setTrackFasting(_ on: Bool, context: ModelContext, engine: CKEngine?) {
+    UserDefaults.standard.set(on, forKey: SettingsKey.nutritionTrackFasting)
+    guard serverSettings?.nutrition?.trackFasting != on else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    var nut = s.nutrition ?? NutritionSettings(macroColors: nil, macroTiles: nil)
+    nut.trackFasting = on
+    s.nutrition = nut
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the synced fasting flag with the device-local `@AppStorage`
+  /// mirror display surfaces read. Same inbound/outbound shape as
+  /// `reconcileUnits`:
+  /// - A synced value wins: copy it into the local mirror so a choice made on
+  ///   another device shows up here (and so the wrist publisher agrees).
+  /// - No synced value but the local mirror is on (upgrade from the old
+  ///   local-only build): seed the payload from the local key and push it up.
+  ///   That leg enqueues a CloudKit save, so it only runs with a non-nil
+  ///   `engine` (the launch path); the init/paint path passes nil.
+  func reconcileTrackFasting(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.nutritionTrackFasting
+    if let synced = serverSettings?.nutrition?.trackFasting {
+      if UserDefaults.standard.bool(forKey: key) != synced {
+        UserDefaults.standard.set(synced, forKey: key)
+      }
+      return
+    }
+    // No synced preference yet. If this install already had fasting on locally,
+    // push that up so it syncs (launch path only).
+    if engine != nil, UserDefaults.standard.bool(forKey: key) {
+      setTrackFasting(true, context: context, engine: engine)
     }
   }
 
