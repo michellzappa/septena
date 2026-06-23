@@ -1431,6 +1431,11 @@ struct AppSettings: Codable {
   /// existing settings payloads decode cleanly. See [[project_practitioner_reports]].
   var reports: [ReportBundle]? = nil
 
+  /// Next suggestion IDs dismissed by the user, keyed by ISO date string.
+  /// Synced so a skip on one device propagates to others via union merge.
+  /// Only today's key is live; past dates are pruned on write and ignored on read.
+  var nextSkips: [String: [String]]? = nil
+
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
@@ -1440,6 +1445,7 @@ struct AppSettings: Codable {
     case afternoonCutoffHour = "afternoon_cutoff_hour"
     case onboardedAt = "onboarded_at"
     case reports
+    case nextSkips = "next_skips"
   }
 }
 

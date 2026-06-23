@@ -291,13 +291,19 @@ final class NextSuggestionsModel {
     // Next tab. `computeAll` is `nonisolated` so it can execute off the main
     // actor; `[NextSuggestion]` is `Sendable` so it crosses back cleanly.
     let now = Date()
-    let computed = await MirrorReader.shared.read { Self.computeAll(context: $0, now: now) }
+    let todayDate = today
+    let (computed, remoteSkips) = await MirrorReader.shared.read { ctx -> ([NextSuggestion], Set<String>) in
+      let suggestions = Self.computeAll(context: ctx, now: now)
+      let remote = Set(SettingsMirror.loadSettings(context: ctx)?.nextSkips?[todayDate] ?? [])
+      return (suggestions, remote)
+    }
     // Apply the user's Next ▸ Suggestions prefs (master switch + per-kind
     // opt-out, device-local). Filtered here rather than inside `computeAll`
     // so the watch snapshot — which shares the scorer — is unaffected until
     // its own parity pass lands.
     suggestions = computed.filter { NextSuggestionsPrefs.allows(rawKind: $0.kind.rawValue) }
-    skipped = Self.loadSkips(date: today)
+    // Union local (fast, device-only) with remote (synced via AppSettings).
+    skipped = Self.loadSkips(date: todayDate).union(remoteSkips)
     hasLoaded = true
   }
 
@@ -428,9 +434,10 @@ final class NextSuggestionsModel {
     return computeAll(context: ctx, now: now).filter { !skips.contains($0.id) }
   }
 
-  func toggleSkip(_ id: String) {
+  func toggleSkip(_ id: String, context: ModelContext) {
     Haptics.tick()
-    let key = Self.skipKey(date: today)
+    let date = today
+    let key = Self.skipKey(date: date)
     var arr = UserDefaults.standard.stringArray(forKey: key) ?? []
     if let i = arr.firstIndex(of: id) {
       arr.remove(at: i)
@@ -439,6 +446,7 @@ final class NextSuggestionsModel {
     }
     UserDefaults.standard.set(arr, forKey: key)
     skipped = Set(arr)
+    Self.pushSkipsToSettings(ids: arr, date: date, context: context)
   }
 
   // MARK: Skips persistence
@@ -447,6 +455,19 @@ final class NextSuggestionsModel {
 
   private static func loadSkips(date: String) -> Set<String> {
     Set(UserDefaults.standard.stringArray(forKey: skipKey(date: date)) ?? [])
+  }
+
+  /// Write today's skip list into AppSettings so other devices receive it via
+  /// CloudKit. Union-safe: incoming syncs are merged in `load()`. Prunes any
+  /// stale date keys before writing to keep the payload small.
+  private static func pushSkipsToSettings(ids: [String], date: String, context: ModelContext) {
+    var settings = SettingsMirror.loadSettings(context: context)
+      ?? AppSettings()
+    var skips = (settings.nextSkips ?? [:]).filter { $0.key == date }
+    skips[date] = ids
+    settings.nextSkips = skips
+    SettingsMirror.upsert(settings: settings, context: context,
+                          engine: SeptenaServices.shared.ckEngine)
   }
 
   // MARK: Date helpers
@@ -640,6 +661,7 @@ private struct NextSuggestionRow: View {
   let nav: NavigationState
   let tint: Color
 
+  @Environment(\.modelContext) private var modelContext
   @Environment(\.rowHInset) private var rowHInset
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
@@ -673,7 +695,7 @@ private struct NextSuggestionRow: View {
     }
     .contextMenu {
       Button {
-        model.toggleSkip(suggestion.id)
+        model.toggleSkip(suggestion.id, context: modelContext)
       } label: {
         Label("Skip today", systemImage: "forward.end")
       }
@@ -722,7 +744,7 @@ private struct NextSuggestionRow: View {
     IntakeNudgeLog.commit(kindID: kindID, value: value, logCommit: logCommit)
     // Optimistically hide this nudge; the dataChanged recompute reconciles
     // (a still-due "next" nudge has its own id and can reappear).
-    model.toggleSkip(suggestion.id)
+    model.toggleSkip(suggestion.id, context: modelContext)
   }
 
   private func perform() {
