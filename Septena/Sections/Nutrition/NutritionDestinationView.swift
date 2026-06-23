@@ -41,6 +41,9 @@ struct NutritionDestinationView: View {
   /// brand-new meal by hand is rare (usually done via MCP), so it's demoted
   /// to a corner button inside this sheet.
   @State private var searchingMeals = false
+  /// Photo-first meal capture — opens the meal form auto-launching the camera
+  /// (or photo picker where there's no camera).
+  @State private var scanning = false
   @State private var photoPickerEntry: NutritionEntry? = nil
   @State private var photoPickerItem: PhotosPickerItem? = nil
   @State private var photoPickerPresented = false
@@ -232,8 +235,12 @@ struct NutritionDestinationView: View {
         colors: MealChipColors(protein: proteinColor, fat: fatColor,
                                carbs: carbsColor, kcal: kcalColor),
         onPick: { entry in logAgainNow(entry) },
-        onCreateNew: { creating = true }
+        onCreateNew: { creating = true },
+        onScan: { scanning = true }
       )
+    }
+    .adaptiveDetail(isPresented: $scanning) {
+      NewNutritionEntrySheet(autoStartScan: true)
     }
     .photosPicker(
       isPresented: $photoPickerPresented,
@@ -1011,6 +1018,8 @@ struct MealRelogSearchView: View {
   let onPick: (NutritionEntry) -> Void
   /// Open the rare hand-authoring path. The sheet dismisses itself first.
   let onCreateNew: () -> Void
+  /// Open the photo-first scan path. The sheet dismisses itself first.
+  let onScan: () -> Void
 
   @Environment(\.dismiss) private var dismiss
   @State private var query = ""
@@ -1031,10 +1040,13 @@ struct MealRelogSearchView: View {
           } description: {
             Text("Log a meal and it'll show up here for one-tap re-logging.")
           } actions: {
+            Button { dismiss(); onScan() } label: {
+              Label("Scan a meal", systemImage: "camera.viewfinder")
+            }
+            .buttonStyle(.borderedProminent)
             Button { dismiss(); onCreateNew() } label: {
               Label("New meal", systemImage: "square.and.pencil")
             }
-            .buttonStyle(.borderedProminent)
           }
         } else if filtered.isEmpty {
           ContentUnavailableView.search(text: query)
@@ -1059,6 +1071,11 @@ struct MealRelogSearchView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .primaryAction) {
+          Button { dismiss(); onScan() } label: {
+            Label("Scan a meal", systemImage: "camera.viewfinder")
+          }
         }
         ToolbarItem(placement: .primaryAction) {
           Button { dismiss(); onCreateNew() } label: {

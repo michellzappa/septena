@@ -7,6 +7,11 @@ import PhotosUI
 // from the Nutrition QuickAdd menu's "New meal…" item.
 
 struct NewNutritionEntrySheet: View {
+  /// Photo-first mode: auto-present the photo picker on appear so the first
+  /// thing the user does is choose a meal photo, which analyzes and pre-fills
+  /// the form. Driven by the QuickAdd "Scan a meal…" entry point.
+  var autoStartScan: Bool = false
+
   @Environment(SectionTheme.self) private var theme
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @State private var time: Date = Date()
@@ -28,6 +33,11 @@ struct NewNutritionEntrySheet: View {
 
   @State private var photoItem: PhotosPickerItem? = nil
   @State private var photoAssetID: String? = nil
+  @State private var analyzing = false
+  @State private var analysisNote: String? = nil
+  @State private var scanPickerPresented = false
+  @State private var cameraPresented = false
+  @State private var didAutoScan = false
 
   var body: some View {
     AdaptiveEditScaffold(
@@ -38,11 +48,36 @@ struct NewNutritionEntrySheet: View {
       formBody
         .onChange(of: photoItem) { _, new in
           guard let new else { return }
-          Task {
-            await PhotosBridge.shared.ensureAccess()
-            await MainActor.run { photoAssetID = new.itemIdentifier }
+          Task { await handlePicked(new) }
+        }
+        // Photo-first launch: once, right after the form appears, open the
+        // camera so "Scan a meal…" lands the user straight on a shot. Where
+        // there's no camera (Simulator / Mac) fall back to the library picker.
+        .task {
+          guard autoStartScan, !didAutoScan else { return }
+          didAutoScan = true
+          if MealCamera.isAvailable {
+            cameraPresented = true
+          } else {
+            scanPickerPresented = true
           }
         }
+        .photosPicker(
+          isPresented: $scanPickerPresented,
+          selection: $photoItem,
+          matching: .images,
+          photoLibrary: .shared()
+        )
+        #if os(iOS)
+        .fullScreenCover(isPresented: $cameraPresented) {
+          MealCameraPicker { image in
+            cameraPresented = false
+            guard let image, let data = image.jpegData(compressionQuality: 0.8) else { return }
+            Task { await handleScannedData(data) }
+          }
+          .ignoresSafeArea()
+        }
+        #endif
     }
   }
 
@@ -76,11 +111,20 @@ struct NewNutritionEntrySheet: View {
                 Button(role: .destructive) {
                   photoItem = nil
                   photoAssetID = nil
+                  analysisNote = nil
                 } label: {
                   Text("Remove").font(.caption)
                 }
               }
             }
+          }
+          if analyzing {
+            HStack(spacing: 8) {
+              ProgressView()
+              Text("Reading the photo…").font(.caption).foregroundStyle(.secondary)
+            }
+          } else if let analysisNote {
+            Text(analysisNote).font(.caption).foregroundStyle(.secondary)
           }
         }
         Section("Macros") {
@@ -100,6 +144,72 @@ struct NewNutritionEntrySheet: View {
           macroField("Water (\(VolumeUnit.current.suffix))", text: $waterMl)
         }
       }
+  }
+
+  // Record the asset, then analyze the photo into a draft and pre-fill any
+  // fields the user hasn't already typed into. The draft is a starting point —
+  // every value lands in an editable field the user confirms before saving.
+  private func handlePicked(_ item: PhotosPickerItem) async {
+    await PhotosBridge.shared.ensureAccess()
+    await MainActor.run {
+      photoAssetID = item.itemIdentifier
+      analyzing = true
+      analysisNote = nil
+    }
+    guard let data = try? await item.loadTransferable(type: Data.self) else {
+      await MainActor.run { analyzing = false }
+      return
+    }
+    await analyzeAndFill(data)
+  }
+
+  // A camera capture isn't in the photo library, so save it first to mint the
+  // asset ID the meal thumbnail renders from, then analyze the same bytes.
+  private func handleScannedData(_ data: Data) async {
+    await MainActor.run { analyzing = true; analysisNote = nil }
+    await PhotosBridge.shared.ensureAccess()
+    if let id = await MealPhotoLibrary.save(data) {
+      await MainActor.run { photoAssetID = id }
+    }
+    await analyzeAndFill(data)
+  }
+
+  /// Analyze image bytes and pre-fill the empty fields. Caller has already set
+  /// `analyzing = true`.
+  private func analyzeAndFill(_ data: Data) async {
+    let draft = await MealPhotoAnalyzer.analyze(imageData: data)
+    await MainActor.run {
+      prefill(from: draft)
+      analysisNote = draft.note
+      analyzing = false
+    }
+  }
+
+  /// Fill only the fields the user has left blank — never clobber typed input.
+  private func prefill(from draft: MealPhotoDraft) {
+    if foodsText.isEmpty, !draft.foods.isEmpty {
+      foodsText = draft.foods.joined(separator: "\n")
+    }
+    if ingredientsText.isEmpty, !draft.ingredients.isEmpty {
+      ingredientsText = draft.ingredients.joined(separator: "\n")
+    }
+    fillIfEmpty($proteinG, draft.proteinG)
+    fillIfEmpty($fatG, draft.fatG)
+    fillIfEmpty($saturatedFatG, draft.saturatedFatG)
+    fillIfEmpty($carbsG, draft.carbsG)
+    fillIfEmpty($sugarG, draft.sugarG)
+    fillIfEmpty($fiberG, draft.fiberG)
+    fillIfEmpty($kcal, draft.kcal)
+    fillIfEmpty($sodiumMg, draft.sodiumMg)
+    fillIfEmpty($cholesterolMg, draft.cholesterolMg)
+    fillIfEmpty($potassiumMg, draft.potassiumMg)
+  }
+
+  private func fillIfEmpty(_ field: Binding<String>, _ value: Double?) {
+    guard field.wrappedValue.isEmpty, let value else { return }
+    field.wrappedValue = value == value.rounded()
+      ? String(Int(value))
+      : String(format: "%.1f", value)
   }
 
   private func macroField(_ label: String, text: Binding<String>) -> some View {

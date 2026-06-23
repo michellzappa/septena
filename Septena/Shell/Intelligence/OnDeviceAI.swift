@@ -31,6 +31,19 @@ enum OnDeviceAI {
     SystemLanguageModel.default.isAvailable
   }
 
+  /// True only where the on-device model can accept image input — iOS 27+ with
+  /// Apple Intelligence enabled on an eligible device. Image input is an iOS-27
+  /// symbol, so the actual multimodal call lives behind `#available` in
+  /// `MealPhotoModelAnalyzer`; this flag is the capability gate the meal-photo
+  /// ladder checks before trying that rung. False on the 26 SDK / older devices,
+  /// where the analyzer falls back to Vision OCR (no Apple Intelligence needed).
+  static var supportsImageInput: Bool {
+    if #available(iOS 27, macOS 27, *) {
+      return status == .available
+    }
+    return false
+  }
+
   static var unavailableReason: String? {
     switch availability {
     case .available:

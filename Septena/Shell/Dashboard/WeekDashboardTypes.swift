@@ -30,6 +30,7 @@ enum WeekDestination: String, Hashable, Identifiable {
 enum NutritionSheet: Hashable, Identifiable {
   case search        // history search modal
   case newEntry      // blank meal-form sheet
+  case scan          // photo-first: meal form that auto-opens the photo picker
 
   var id: Self { self }
 }

@@ -47,6 +47,8 @@
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.</string>
 	<key>NSHealthShareUsageDescription</key>

@@ -3,18 +3,23 @@ import SwiftUI
 // Single canonical menu for the Nutrition tile — same content from the
 // trailing-circle button (Menu) and the tile's `.contextMenu`.
 //
-// Two entry points + a recommendation section ("New meal…" is the full-input
+// Three entry points + a recommendation section ("New meal…" is the full-input
 // escape every section's quick-add ends with):
 //
-//   1. Search…  → focused search modal across the full meal history.
+//   1. Scan a meal… → photo-first: opens the meal form and auto-presents the
+//                     photo picker. The photo is analyzed (Vision OCR / barcode
+//                     now, on-device multimodal on iOS 27) and pre-fills the
+//                     macros + foods, which the user confirms.
+//
+//   2. Search…  → focused search modal across the full meal history.
 //                 The right path when "I know I've eaten this before
 //                 but it isn't in the top 3."
 //
-//   2. New meal… → opens the meal-form sheet for a fresh entry.
+//   3. New meal… → opens the meal-form sheet for a fresh entry.
 //                  Macros + emoji + foods + ingredients, same shape as
 //                  EditNutritionEntrySheet.
 //
-//   3. Section "Recommended" — top 3 meals scored by:
+//   4. Section "Recommended" — top 3 meals scored by:
 //        - time-of-day match (past instances within ±2h of now)
 //        - repetition count over the lookback window
 //        - recency bonus
@@ -25,6 +30,7 @@ import SwiftUI
 struct NutritionQuickAddMenu: View {
   let recommendations: [NutritionEntry]
   let onSearch: () -> Void
+  let onScan: () -> Void
   let onInput: () -> Void
   let onCommit: (NutritionEntry) -> Void
 
@@ -35,6 +41,9 @@ struct NutritionQuickAddMenu: View {
   }
 
   var body: some View {
+    Button { onScan() } label: {
+      Label("Scan a meal…", systemImage: "camera.viewfinder")
+    }
     Button { onSearch() } label: {
       Label("Search meals…", systemImage: "magnifyingglass")
     }

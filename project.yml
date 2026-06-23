@@ -99,6 +99,7 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSCameraUsageDescription: Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
         NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
@@ -152,6 +153,7 @@ targets:
         NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
         NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
         NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSCameraUsageDescription: Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
         NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)

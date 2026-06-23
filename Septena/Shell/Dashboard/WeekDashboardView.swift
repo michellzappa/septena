@@ -448,6 +448,14 @@ struct WeekDashboardView: View {
           #else
           .frame(width: 560, height: 600)
           #endif
+      case .scan:
+        NewNutritionEntrySheet(autoStartScan: true)
+          #if os(iOS)
+          .presentationDetents([.large])
+          .presentationDragIndicator(.visible)
+          #else
+          .frame(width: 560, height: 600)
+          #endif
       }
     }
     // The tracker tile's "New entry…" escape — the full intake editor for a
@@ -2414,6 +2422,7 @@ struct WeekDashboardView: View {
       recommendations: NutritionRecommendations.topRecommended(
         from: nutritionHistory, limit: 3),
       onSearch: { nutritionSheet = .search },
+      onScan: { nutritionSheet = .scan },
       onInput: { nutritionSheet = .newEntry },
       onCommit: { meal in commitNutritionDuplicate(meal) }
     )
