@@ -45,6 +45,10 @@ struct TaskComposerCard: View {
   @Environment(\.usesPushNavigation) private var useInspector
   @State private var draft = TaskDraft()
   @State private var seeded = false
+  /// The create-mode draft exactly as seeded from the list's defaults — the
+  /// baseline `isDirty` compares against so the pre-filled Today/project/area
+  /// defaults don't read as user edits. Unused in edit mode.
+  @State private var seededDraft = TaskDraft()
   #if os(iOS)
   /// Bottom-sheet height (iPhone only — the iPad/macOS inspector ignores this).
   /// New tasks open full so the autofocused title sits above the keyboard from
@@ -338,6 +342,7 @@ struct TaskComposerCard: View {
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
+      seededDraft = draft
       // Train the list classifier once so the "Suggested" chip can query it
       // cheaply per keystroke.
       SuggestionEngine.shared.prepare(
@@ -409,7 +414,7 @@ struct TaskComposerCard: View {
   /// confirmation and the swipe-to-dismiss block.
   private var isDirty: Bool {
     switch mode {
-    case .create:          return draft.hasContent
+    case .create:          return draft.differs(fromSeed: seededDraft)
     case .edit(let task):  return draft.differs(from: task)
     }
   }

@@ -7,7 +7,7 @@ import Foundation
 // clears the planning date; a project derives its area — lives in exactly one
 // place instead of being re-derived in each sheet.
 
-struct TaskDraft {
+struct TaskDraft: Equatable {
   var title: String = ""
   var notes: String = ""
   var onToday: Bool = false
@@ -143,15 +143,14 @@ struct TaskDraft {
 
   // MARK: - Dirty tracking (drives the editor's Cancel / discard guard)
 
-  /// Create mode: is there anything worth keeping? A non-empty title or notes,
-  /// or any attribute the user set. Drives whether cancelling a *new* task needs
-  /// a "Discard new task?" confirmation — an untouched blank composer just
-  /// closes, a started one asks first.
-  var hasContent: Bool {
-    !trimmedTitle.isEmpty || !trimmedNotes.isEmpty
-      || onToday || scheduled != nil || deadline != nil
-      || recurrence != nil || areaId != nil || projectId != nil
-  }
+  /// Create mode: has the user changed anything from the *seeded* draft? The new
+  /// composer arrives pre-filled with the list's defaults (Today pins `today`, a
+  /// project/area files it there), so "any non-default field" would falsely read
+  /// as dirty the instant you open New Task in a non-Inbox list — and cancelling
+  /// would wrongly prompt "Discard new task?" with nothing typed. Comparing
+  /// against the seed means an untouched composer just closes; a started one asks
+  /// first. (`TaskDraft` is `Equatable`, so this is a whole-struct compare.)
+  func differs(fromSeed seed: TaskDraft) -> Bool { self != seed }
 
   /// Edit mode: does this draft differ from the task it was seeded from? Mirrors
   /// exactly the fields `update(_:via:)` would write (normalized-vs-normalized
