@@ -366,6 +366,15 @@ final class NextSuggestionsModel {
     guard !recent.isEmpty else { return [] }
     let byKind = Dictionary(grouping: recent, by: \.kindID)
 
+    // The objective's cap (the daily "limit" target) lives on a linked Goal —
+    // fetch once, key by the kind's metricKey prefix. See IntakeReader.objectiveGoalInfo.
+    let goals = ((try? ctx.fetch(FetchDescriptor<GoalEntity>())) ?? [])
+    func objectiveGoal(_ kindID: String) -> (target: Double, weekly: Bool)? {
+      guard let g = goals.first(where: { $0.metricKey?.hasPrefix("intake.\(kindID).") == true })
+      else { return nil }
+      return (g.metricTarget ?? 0, g.metricKey?.hasSuffix(".count_week") == true)
+    }
+
     let cal = Calendar.current
     let nowMinutes = cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now)
     var out: [NextSuggestion] = []
@@ -373,6 +382,9 @@ final class NextSuggestionsModel {
     for kind in kinds {
       let evs = byKind[kind.id] ?? []
       guard !evs.isEmpty else { continue }
+      // Quit: never proactively suggest a dose — not even the first of the day.
+      let objective = kind.objective
+      if objective == "quit" { continue }
       let history = evs.map { (date: $0.date, time: EventTimestamp.hhmm(from: $0.occurredAt)) }
       let todays = evs.filter { $0.date == today }
 
@@ -409,14 +421,24 @@ final class NextSuggestionsModel {
         continue   // never the first AND next nudge at once
       }
 
+      // Reduce: keep the gentle first-of-day cue above, but never prompt the
+      // *next* dose — that would push consumption back up toward the old habit.
+      if objective == "reduce" { continue }
+
       // Next use — learned within-day rhythm, capped by typical count + curfew.
       let cadence = Cadence.withinDay(dateTimes: history, before: today)
       let curfew = NextScoring.median(
         NextScoring.lastDailyTimes(dateTimes: history, beforeDay: today))
       if !todays.isEmpty,
          let cadence, cadence.isConfident,
-         todays.count < cadence.typicalCount,
          let lastToday = todays.compactMap({ NextScoring.parseHHMM(EventTimestamp.hhmm(from: $0.occurredAt)) }).max() {
+        // Cap to the learned daily count, tightened to the user's limit when one
+        // is set as a *daily* cap — never suggest a use at or over the limit.
+        var cap = cadence.typicalCount
+        if objective == "limit", let g = objectiveGoal(kind.id), !g.weekly, g.target >= 1 {
+          cap = min(cap, Int(g.target))
+        }
+        guard todays.count < cap else { continue }
         let next = cadence.next(after: lastToday)
         let beforeCurfew = curfew.map { next <= $0 } ?? true
         if beforeCurfew, nowMinutes >= next - 45 {
