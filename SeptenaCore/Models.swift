@@ -427,6 +427,7 @@ enum TaskFilter: Equatable, Hashable {
   case upcoming
   case unscheduled
   case logbook
+  case recentlyDeleted
   case project(String)
   case area(String)
 
@@ -437,6 +438,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return "upcoming"
     case .unscheduled: return "unscheduled"
     case .logbook: return "logbook"
+    case .recentlyDeleted: return "all"
     case .project, .area: return "all"
     }
   }
@@ -451,6 +453,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
+    case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")
     case .project: return String(localized: "Project", comment: "Task filter")
     case .area: return String(localized: "Area", comment: "Task filter")
     }

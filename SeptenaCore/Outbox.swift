@@ -124,6 +124,12 @@ final class TaskMutator {
     cloudBackend.purge(id: id)
   }
 
+  /// 30-day auto-purge: permanently destroy all Recently Deleted tasks older than `cutoff`.
+  func purgeExpired(before cutoff: Date) {
+    guard let cloudBackend else { return }
+    cloudBackend.purgeExpired(before: cutoff)
+  }
+
   // MARK: - Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
 
   func conversation(id: String) -> TaskConvo? {

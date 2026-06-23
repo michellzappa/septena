@@ -254,6 +254,12 @@ struct TaskListView: View {
   @State private var newTodosDismissed: Bool =
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
+  // Undo snackbar — shown briefly after a soft-delete so the user can
+  // recover a mis-tapped task before it disappears.
+  @State private var deletedSnackbarTitle: String?
+  @State private var deletedSnackbarId: String?
+  @State private var snackbarTask: Task<Void, Never>?
+
   var body: some View {
     let base = taskList
       .modifier(TaskListModalPresenter(
@@ -272,6 +278,10 @@ struct TaskListView: View {
         applyMove: applyMove,
         applyRecurrence: applyRecurrence
       ))
+    let withSnackbar = base.overlay(alignment: .bottom) {
+      deleteSnackbar
+    }
+    .animation(.snappy, value: deletedSnackbarId != nil)
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
     // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
@@ -282,7 +292,7 @@ struct TaskListView: View {
     // trace). The iPad keyboard-HUD menu entries aren't worth a launch crash;
     // gestures and the `+` button are unaffected. macOS keeps the full menu.
     #if os(macOS)
-    return base.focusedSceneValue(\.taskActions, TaskActions(
+    return withSnackbar.focusedSceneValue(\.taskActions, TaskActions(
       newTask: { nav.shouldStartCreating = true },
       toggleToday: toggleTodayForSelected,
       openWhen: openWhenForSelected,
@@ -292,8 +302,36 @@ struct TaskListView: View {
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected
     ))
     #else
-    return base
+    return withSnackbar
     #endif
+  }
+
+  @ViewBuilder
+  private var deleteSnackbar: some View {
+    if let title = deletedSnackbarTitle, let id = deletedSnackbarId {
+      HStack(spacing: 12) {
+        Text("\"\(title)\" deleted")
+          .font(.callout)
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+        Spacer(minLength: 0)
+        Button("Undo") {
+          snackbarTask?.cancel()
+          deletedSnackbarTitle = nil
+          deletedSnackbarId = nil
+          mutator.restore(id: id)
+          Task { await load() }
+        }
+        .font(.callout.weight(.semibold))
+        .tint(.accentColor)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .padding(.horizontal, 20)
+      .padding(.bottom, 16)
+      .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
   }
 
   private var taskList: some View {
@@ -328,19 +366,22 @@ struct TaskListView: View {
     #endif
     .scrollDismissesKeyboard(.interactively)
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        // Identical to the drawer's action button (`DrawerActionButton`): a
-        // plain Button + `.glassProminent` + section tint, so the system draws
-        // the same prominent accent circle — no custom circle-in-a-pill.
-        Button {
-          SeptenaLog.info("[Create] + button tapped filter=\(String(describing: filter))")
-          nav.shouldStartCreating = true
-        } label: {
-          Image(systemName: "plus")
+      // No + button in the Recently Deleted view — you can't create trashed tasks.
+      if filter != .recentlyDeleted {
+        ToolbarItem(placement: .primaryAction) {
+          // Identical to the drawer's action button (`DrawerActionButton`): a
+          // plain Button + `.glassProminent` + section tint, so the system draws
+          // the same prominent accent circle — no custom circle-in-a-pill.
+          Button {
+            SeptenaLog.info("[Create] + button tapped filter=\(String(describing: filter))")
+            nav.shouldStartCreating = true
+          } label: {
+            Image(systemName: "plus")
+          }
+          .buttonStyle(.glassProminent)
+          .tint(theme.color(for: "tasks"))
+          .accessibilityLabel("New Task")
         }
-        .buttonStyle(.glassProminent)
-        .tint(theme.color(for: "tasks"))
-        .accessibilityLabel("New Task")
       }
     }
     // The `+` toolbar button (and ⌘N, and the sidebar "New To-Do") open the
@@ -554,6 +595,8 @@ struct TaskListView: View {
     case .upcoming:
       reviewRows
       groupedUpcomingItems
+    case .recentlyDeleted:
+      visibleRows
     default:
       reviewRows
       visibleRows
@@ -605,14 +648,25 @@ struct TaskListView: View {
   @ViewBuilder
   private var emptyStateRow: some View {
     if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && triageItems.isEmpty && !isLoading {
-      ContentUnavailableView(
-        "Nothing here yet",
-        systemImage: titleIcon,
-        description: Text("Tap the + button to add a task.")
-      )
-      .frame(maxWidth: .infinity)
-      .padding(.top, 40)
-      .plainListChrome()
+      if filter == .recentlyDeleted {
+        ContentUnavailableView(
+          "No Recently Deleted Tasks",
+          systemImage: titleIcon,
+          description: Text("Deleted tasks appear here for 30 days before being permanently removed.")
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .plainListChrome()
+      } else {
+        ContentUnavailableView(
+          "Nothing here yet",
+          systemImage: titleIcon,
+          description: Text("Tap the + button to add a task.")
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .plainListChrome()
+      }
     }
   }
 
@@ -779,11 +833,26 @@ struct TaskListView: View {
 
   private func applyDelete(_ id: String) {
     Haptics.warning()
+    let title = currentTask(id: id)?.title ?? ""
     // Remove from the visible buckets immediately — the row is filtered
     // from LocalCache via `pendingDeletion`, but the in-memory @State
     // arrays power the current screen and have to be poked separately.
     removeLocally(id: id)
     mutator.delete(id: id)
+    // Show undo snackbar (not in the Recently Deleted view — there the
+    // gesture is always intentional and Restore is a first-class action).
+    guard filter != .recentlyDeleted else { return }
+    snackbarTask?.cancel()
+    deletedSnackbarTitle = title.isEmpty ? "Task" : title
+    deletedSnackbarId = id
+    snackbarTask = Task {
+      try? await Task.sleep(for: .seconds(4))
+      guard !Task.isCancelled else { return }
+      await MainActor.run {
+        deletedSnackbarTitle = nil
+        deletedSnackbarId = nil
+      }
+    }
   }
 
   /// Persist title/notes from the Details pane. No-op when both fields
@@ -949,44 +1018,68 @@ struct TaskListView: View {
   /// surfaces at once.
   @ViewBuilder
   private func rowActionsMenu(target: ActionTarget) -> some View {
-    TaskListRowContextMenu(
-      target: target,
-      filter: filter,
-      rankedSuggestions: rankedSuggestions(for: target),
-      onOpenDetail: { task in editingDetail = task },
-      onApplySuggestion: applySuggestion,
-      onMoveToToday: { ids, today in
-        Haptics.tick()
-        for id in ids {
-          if today { mutator.moveToToday(id: id, today: true) }
-          else { mutator.removeFromToday(id: id) }
-          // Engagement — clear the agent cue so a ratified proposal leaves the
-          // Inbox. No-op for non-agent / already-seen rows.
-          mutator.acknowledge(id: id)
+    if filter == .recentlyDeleted {
+      // Recently Deleted: only Restore and Delete Permanently — no scheduling,
+      // no move, no normal task lifecycle actions apply to trashed rows.
+      Button {
+        for id in target.ids {
+          mutator.restore(id: id)
+          removeLocally(id: id)
         }
         Task { await load() }
-      },
-      onOpenWhen: { target in
-        if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .scheduled) }
-      },
-      onOpenDeadline: { target in
-        if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .deadline) }
-      },
-      onOpenMove: { target in
-        if case .single(let t) = target { moveTargetId = t.id; showingMoveSheet = true }
-      },
-      onOpenRepeat: { task in
-        repeatTargetId = task.id
-        showingRepeatSheet = true
-      },
-      onCancel: { ids in
-        for id in ids { applyCancel(id) }
-      },
-      onDelete: { target in
-        Haptics.warning()
-        for id in target.ids { applyDelete(id) }
+      } label: {
+        Label("Restore", systemImage: "arrow.uturn.backward")
       }
-    )
+      Divider()
+      Button(role: .destructive) {
+        Haptics.warning()
+        for id in target.ids {
+          removeLocally(id: id)
+          mutator.purge(id: id)
+        }
+      } label: {
+        Label("Delete Permanently", systemImage: "trash")
+      }
+    } else {
+      TaskListRowContextMenu(
+        target: target,
+        filter: filter,
+        rankedSuggestions: rankedSuggestions(for: target),
+        onOpenDetail: { task in editingDetail = task },
+        onApplySuggestion: applySuggestion,
+        onMoveToToday: { ids, today in
+          Haptics.tick()
+          for id in ids {
+            if today { mutator.moveToToday(id: id, today: true) }
+            else { mutator.removeFromToday(id: id) }
+            // Engagement — clear the agent cue so a ratified proposal leaves the
+            // Inbox. No-op for non-agent / already-seen rows.
+            mutator.acknowledge(id: id)
+          }
+          Task { await load() }
+        },
+        onOpenWhen: { target in
+          if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .scheduled) }
+        },
+        onOpenDeadline: { target in
+          if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .deadline) }
+        },
+        onOpenMove: { target in
+          if case .single(let t) = target { moveTargetId = t.id; showingMoveSheet = true }
+        },
+        onOpenRepeat: { task in
+          repeatTargetId = task.id
+          showingRepeatSheet = true
+        },
+        onCancel: { ids in
+          for id in ids { applyCancel(id) }
+        },
+        onDelete: { target in
+          Haptics.warning()
+          for id in target.ids { applyDelete(id) }
+        }
+      )
+    }
   }
 
   @ViewBuilder
@@ -1204,12 +1297,12 @@ struct TaskListView: View {
   private var hideHistoricalDone: Bool {
     switch filter {
     // Every open-work list hides done tasks (a just-completed one lingers via
-    // the settle exception in `visibleItems`, then fades). Only the Logbook —
-    // whose whole job is showing completed tasks — keeps them.
+    // the settle exception in `visibleItems`, then fades). Only the Logbook and
+    // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
     case .project, .area, .unscheduled, .upcoming, .triage: return true
     case .today:
       return !todayShowCompleted
-    case .logbook: return false
+    case .logbook, .recentlyDeleted: return false
     }
   }
 
@@ -1545,7 +1638,7 @@ struct TaskListView: View {
                                allTasks: allTasks,
                                projects: projects,
                                areas: areas)
-    } else if filter != .logbook {
+    } else if filter != .logbook && filter != .recentlyDeleted {
       suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
@@ -1631,6 +1724,7 @@ struct TaskListView: View {
     case .upcoming: return "calendar"
     case .unscheduled: return "rectangle.stack"
     case .logbook: return "checkmark.circle"
+    case .recentlyDeleted: return "trash"
     case .project: return "number"
     case .area: return "folder"
     }

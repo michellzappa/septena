@@ -274,6 +274,10 @@ struct SeptenaApp: App {
             // docs/SPOTLIGHT_READABILITY_PLAN.md.
             SpotlightIndexer.shared.start()
             await SpotlightIndexer.shared.backfill()
+            // 30-day auto-purge for Recently Deleted tasks (docs/RECENTLY_DELETED_SPEC.md).
+            // Runs after the CloudKit pull so remote-synced deletions are included.
+            let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+            taskMutator.purgeExpired(before: thirtyDaysAgo)
             await theme.refresh()
             await settingsStore.refresh()
             // Bridge the welcome name between the CloudKit-synced settings

@@ -29,6 +29,7 @@ struct SidebarRootView: View {
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var counts: TasksCounts? = nil
+  @State private var recentlyDeletedCount: Int = 0
 
   // Persisted sidebar order — arrays of IDs in display order.
   // Written on every Move Up/Down; applied when loading from cache/server.
@@ -654,6 +655,19 @@ struct SidebarRootView: View {
         }
       }
     }
+    // Recently Deleted — always last, only shown when there are trashed tasks.
+    if recentlyDeletedCount > 0 {
+      Section {
+        compactRow {
+          navRow(.filter(.recentlyDeleted)) {
+            SmartListRow(icon: "trash",
+                         iconColor: .secondary,
+                         title: "Recently Deleted",
+                         count: recentlyDeletedCount)
+          }
+        }
+      }
+    }
   }
 
   /// Tightens a sidebar list row to Reminders-like density. The row views carry
@@ -881,6 +895,7 @@ struct SidebarRootView: View {
     agg.counts = TaskReads.localCounts(context: modelContext)
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
+    recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
   }
 
   fileprivate struct Aggregate {

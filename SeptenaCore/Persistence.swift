@@ -3482,6 +3482,11 @@ enum LocalCache {
     // either confirm the deletion (row removed) or resurrect them if
     // the server rejects.
     if e.pendingDeletion { return nil }
+    // Recently Deleted view: show ONLY soft-deleted rows (the inverse of all
+    // other filters). Return early before the `deletedAt != nil` guard below.
+    if filter == .recentlyDeleted {
+      return e.deletedAt != nil ? SeptenaTask(e) : nil
+    }
     // Hide soft-deleted rows (Recently Deleted, docs/RECENTLY_DELETED_SPEC.md).
     // `delete(id:)` stamps `deletedAt` and the spec promises "every read path
     // filters `deletedAt != nil`" — this central list read (TaskListView, every
@@ -3519,6 +3524,9 @@ enum LocalCache {
     case .area(let aid):
       guard e.area == aid else { return nil }
       return SeptenaTask(e)
+    case .recentlyDeleted:
+      // Handled by the early-return above; unreachable here.
+      return nil
     }
   }
 

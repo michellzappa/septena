@@ -355,6 +355,24 @@ final class CloudKitTasksBackend: TasksBackend {
     }
   }
 
+  /// 30-day auto-purge: permanently delete all Recently Deleted tasks whose
+  /// `deletedAt` timestamp is older than `cutoff` (docs/RECENTLY_DELETED_SPEC.md).
+  func purgeExpired(before cutoff: Date) {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let fmt = ISO8601DateFormatter()
+    var purged = 0
+    for e in rows {
+      guard let stamp = e.deletedAt,
+            let date = fmt.date(from: stamp),
+            date < cutoff else { continue }
+      purge(id: e.id)
+      purged += 1
+    }
+    if purged > 0 {
+      SeptenaLog.info("[CK] purgeExpired: removed \(purged) task(s) older than 30d")
+    }
+  }
+
   func moveToToday(id: String, today: Bool) {
     guard let entity = fetch(id: id) else { return }
     entity.today = today

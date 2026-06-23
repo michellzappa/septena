@@ -25,6 +25,9 @@
     "“%@”" : {
 
     },
+    "\"%@\" deleted" : {
+
+    },
     "“%@” is overdue — mark it if you’ve done it." : {
       "localizations" : {
         "pt-BR" : {
@@ -2660,6 +2663,9 @@
           }
         }
       }
+    },
+    "Deleted tasks appear here for 30 days before being permanently removed." : {
+
     },
     "Despondent" : {
       "localizations" : {
