@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1118,
-      "date": "2026-06-22",
+      "build": 1129,
+      "date": "2026-06-23",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Emoji for your intake trackers",
-          "detail": "Give each tracking method and variety its own emoji, with a sensible icon picked automatically when you skip it.",
-          "section": "intake"
-        },
-        {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now move to a Recently Deleted area where you can restore or permanently purge them, synced across your devices.",
-          "section": "tasks"
-        },
-        {
-          "title": "Tasks stay where you put them",
-          "detail": "Completing, reopening, or editing a task no longer shuffles its position, and notes reveal automatically when you start editing.",
-          "section": "tasks"
-        },
-        {
-          "title": "Fasting tracks correctly overnight",
-          "detail": "The watch fasting complication now keeps counting through midnight and rounds to whole hours.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Nutrition now captures meals from a photo and analyzes them on-device, so logging what you ate takes a single tap.",
           "section": "nutrition"
         },
         {
-          "title": "More on your wrist",
-          "detail": "Every enabled intake tracker, a meal picker, and an Intakes summary page now appear on the watch.",
-          "section": "intake"
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks move to a Recently Deleted view where you can restore them for 30 days before they auto-purge, and the marker syncs across your devices.",
+          "section": "tasks"
         },
         {
-          "title": "Clearer training trends",
-          "detail": "A unified daily-trend chart replaces the stacked-bar sparkline with a single effort series.",
-          "section": "training"
-        },
-        {
-          "title": "Integrations stay connected across devices",
-          "detail": "Service tokens now sync through your iCloud keychain, so connections carry over to your other devices.",
+          "title": "The Week tab is now Today",
+          "detail": "The home tab is renamed to Today to better reflect what it shows.",
           "section": null
         },
         {
-          "title": "Refreshed What's New and About",
-          "detail": "A redesigned About pane, a color legend for release highlights, and a link to the build-story journal.",
+          "title": "Smarter Next suggestions",
+          "detail": "Next respects your intake objectives when suggesting doses, remembers dismissed suggestions across devices, and lets you quick-add a task right from the Tasks header.",
+          "section": null
+        },
+        {
+          "title": "Emoji for your intake trackers",
+          "detail": "Give intake methods and varieties their own emoji, with a sensible symbol guessed automatically when you leave one blank.",
+          "section": "intake"
+        },
+        {
+          "title": "A more capable Apple Watch",
+          "detail": "Fasting now morphs on your wrist overnight on its own, every enabled intake tracker shows up in the Next list and summary, and the meal picker and rings stay fresh across midnight.",
+          "section": null
+        },
+        {
+          "title": "Clearer training trends",
+          "detail": "Training charts now show a single unified daily-trend effort series instead of stacked bars.",
+          "section": "training"
+        },
+        {
+          "title": "A built-in What's New",
+          "detail": "See release highlights inside the app with a redesigned About pane, a color legend, and a link to the build-story journal.",
           "section": null
         }
       ]
