@@ -1,5 +1,8 @@
 import SwiftUI
 import simd
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // Sky wash — the front door's top gradient is the *real* current sky.
 //
@@ -216,17 +219,21 @@ enum SkyAtmosphere {
 struct SkyTopWash: View {
   @Environment(DayClock.self) private var clock
   @Environment(\.colorScheme) private var colorScheme
-  #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  #endif
 
-  /// Only iPad reserves the unpaintable top band that needs the soft top-fade
-  /// seam (see the wash mask). iPhone (compact) and Mac let the wash bleed to
-  /// the very top edge, so they want a hard `.white` top stop — gradient all
-  /// the way up.
+  /// Only iPad reserves the unpaintable top band (the iPadOS top system chrome)
+  /// that needs the soft top-fade seam, so the wash melts to the page
+  /// background there instead of cutting a sky-coloured line under it. iPhone
+  /// (any orientation) and Mac let the wash bleed to the very top edge, so they
+  /// want a hard `.white` top stop — gradient all the way up.
+  ///
+  /// Keyed off the device *idiom*, not the horizontal size class: the reserved
+  /// band is physical to iPad and present at every width, whereas size class
+  /// gets it wrong both ways — an iPhone in landscape ("widescreen") reports
+  /// `.regular` and would wrongly fade, while an iPad in a narrow split-view
+  /// reports `.compact` and would wrongly bleed sky under its top chrome.
   private var needsTopFadeSeam: Bool {
     #if os(iOS)
-    return horizontalSizeClass == .regular
+    return UIDevice.current.userInterfaceIdiom == .pad
     #else
     return false
     #endif
