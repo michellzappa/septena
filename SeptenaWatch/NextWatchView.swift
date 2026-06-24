@@ -336,8 +336,10 @@ enum WatchSectionTint {
 
   static func color(for item: NextItem, colors: [String: String]) -> Color {
     let k = key(for: item)
-    // Suggestions aren't a section — keep the row's lightbulb / plus accent.
-    if k == "suggestion" { return .orange }
+    // Suggestions aren't a section — they get a neutral rule, matching the
+    // phone's Next, where the "Suggested" group reads neutral rather than
+    // carrying a section tint.
+    if k == "suggestion" { return .secondary }
     return color(forSectionKey: k, colors: colors)
   }
 
@@ -499,7 +501,7 @@ struct NextItemRow: View {
         Spacer(minLength: 0)
         Image(systemName: "plus.circle.fill")
           .font(.caption2)
-          .foregroundStyle(.orange)
+          .foregroundStyle(.secondary)
       }
 
       // Overdue shown as a compact icon (not text) to free up label space.
@@ -522,7 +524,9 @@ struct NextItemRow: View {
 
   private var iconColor: Color {
     if done { return .green }
-    if isSuggestion { return .orange }
+    // Suggestions read neutral, like the phone's "Suggested" group — the
+    // grouping itself marks them as nudges, no accent needed.
+    if isSuggestion { return .secondary }
     // Overdue is carried by the trailing warning marker (below), not by
     // reddening the kind glyph — matches the widget's chore treatment.
     return .secondary
