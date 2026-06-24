@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1139,
+      "build": 1142,
       "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Your calendar now appears alongside tasks",
-          "detail": "System calendar events are woven into Today and Upcoming so your whole day is in one place.",
-          "section": "tasks"
-        },
-        {
           "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture analyzes food on-device and fills in the macros for you.",
+          "detail": "Capture meals photo-first and let on-device analysis estimate the macros for you.",
           "section": "nutrition"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now go to a Recently Deleted view where you can restore them, with automatic purge after 30 days.",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, so you can restore anything before it's purged.",
           "section": "tasks"
         },
         {
-          "title": "Rename and add tasks right in the list",
-          "detail": "Edit a task title inline or use the quick-add line to capture new tasks without leaving the list.",
+          "title": "Your calendar woven into Today and Upcoming",
+          "detail": "System calendar events now appear alongside your tasks in Today and per day in Upcoming.",
           "section": "tasks"
         },
         {
-          "title": "Collapse and tidy your task areas",
-          "detail": "Task areas can now collapse, with tighter rows and a quick-add button in each section header.",
+          "title": "Rename and add tasks inline",
+          "detail": "Edit a task title in place and use the quick-add line — or the section header — to drop in a new task without leaving the list.",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals you care about most front and center on the home dashboard.",
+          "title": "Collapsible task areas",
+          "detail": "Fold away areas you're not working on, with tighter, cleaner rows throughout the list.",
+          "section": "tasks"
+        },
+        {
+          "title": "Pin goals to the week dashboard",
+          "detail": "Keep the goals that matter most front and center on your weekly dashboard.",
           "section": "goals"
         },
         {
-          "title": "Smarter Next suggestions",
-          "detail": "Dose suggestions respect your intake objectives, and dismissed suggestions now stay dismissed across all your devices.",
-          "section": null
+          "title": "Smarter, synced Next suggestions",
+          "detail": "Dose nudges now respect your intake objectives, and dismissed suggestions stay dismissed across all your devices.",
+          "section": "intake"
         },
         {
-          "title": "Fasting complication that updates overnight",
-          "detail": "Your watch now tracks an active fast through the night and rolls over correctly at midnight.",
-          "section": "nutrition"
+          "title": "A richer watch experience",
+          "detail": "Tap intake nudges to log right from your wrist, see every tracker on the summary page, and watch the fasting complication morph correctly through the night.",
+          "section": null
         }
       ]
     },
