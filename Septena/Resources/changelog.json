@@ -4,55 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1133,
-      "date": "2026-06-24",
+      "build": 1139,
+      "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap photos of meals for instant macros",
-          "detail": "Capture a meal with your camera and on-device analysis estimates the food and nutrition for you.",
+          "title": "Your calendar now appears alongside tasks",
+          "detail": "System calendar events are woven into Today and Upcoming so your whole day is in one place.",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture analyzes food on-device and fills in the macros for you.",
           "section": "nutrition"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, so you can restore anything before it auto-purges.",
+          "detail": "Deleted tasks now go to a Recently Deleted view where you can restore them, with automatic purge after 30 days.",
           "section": "tasks"
         },
         {
-          "title": "Rename and add tasks inline",
-          "detail": "Edit a task title in place and add new tasks straight from a quick-add line in the list.",
+          "title": "Rename and add tasks right in the list",
+          "detail": "Edit a task title inline or use the quick-add line to capture new tasks without leaving the list.",
           "section": "tasks"
         },
         {
-          "title": "The Week tab is now Today",
-          "detail": "Your home view is named for what it shows — today.",
+          "title": "Collapse and tidy your task areas",
+          "detail": "Task areas can now collapse, with tighter rows and a quick-add button in each section header.",
+          "section": "tasks"
+        },
+        {
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep the goals you care about most front and center on the home dashboard.",
+          "section": "goals"
+        },
+        {
+          "title": "Smarter Next suggestions",
+          "detail": "Dose suggestions respect your intake objectives, and dismissed suggestions now stay dismissed across all your devices.",
           "section": null
         },
         {
-          "title": "Smarter, synced Next suggestions",
-          "detail": "Next now respects your intake objectives when suggesting doses, and dismissed suggestions stay dismissed across all your devices.",
-          "section": null
-        },
-        {
-          "title": "Personalize your intake trackers with emoji",
-          "detail": "Pick your own emoji for tracker methods and varieties, with a sensible symbol filled in when you skip it.",
-          "section": "intake"
-        },
-        {
-          "title": "A more capable watch",
-          "detail": "See every enabled intake tracker, pick meals, and watch the fasting complication morph correctly overnight and across midnight.",
-          "section": null
-        },
-        {
-          "title": "Service connections sync across devices",
-          "detail": "Your linked-service tokens now travel through iCloud Keychain, so integrations work everywhere without re-signing in.",
-          "section": null
-        },
-        {
-          "title": "A unified training trend chart",
-          "detail": "Training effort now reads as one clear daily-trend series instead of stacked bars.",
-          "section": "training"
+          "title": "Fasting complication that updates overnight",
+          "detail": "Your watch now tracks an active fast through the night and rolls over correctly at midnight.",
+          "section": "nutrition"
         }
       ]
     },
