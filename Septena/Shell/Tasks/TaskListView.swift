@@ -173,10 +173,12 @@ struct TaskListView: View {
   private var listSelection: Binding<Set<String>>? { $selection }
 
 
-  // The task editor — a standard detail drawer (notes + metadata), opened by
-  // tapping a row. Hosted by `.adaptiveDetail` — sheet on iPhone, docked
-  // inspector on iPad/macOS — like every other section. The app is agent-first
-  // (Claude does the heavy task work), so there's no inline editing surface.
+  // The full task editor — a standard detail drawer (When / Deadline / List /
+  // Notes / Repeat + the agent conversation). Hosted by `.adaptiveDetail` —
+  // sheet on iPhone, docked inspector on iPad/macOS — like every other section.
+  // Reached for the attributes the inline title field can't express: a
+  // double-click (macOS), the inline row's ⓘ Details button, or "Edit Details…"
+  // in the context menu. Plain title edits stay inline (see `beginEdit`).
   @State private var editingDetail: SeptenaTask?
 
   // Drives the focused "New Task" compose modal opened by the `+` toolbar
@@ -184,6 +186,39 @@ struct TaskListView: View {
   // the app-wide capture / quick-find sheet — so creating from a list lands
   // the task in that list's context with no search surface in the way.
   @State private var creating = false
+
+  // MARK: - Inline editing (the Reminders/Things "type-a-line" model)
+  //
+  // Title editing and quick-create are one behavior: an editable title field.
+  // Renaming an existing row swaps its `Text(title)` for a `TextField`;
+  // creating is the always-present quick-add line at the foot of the list. The
+  // full composer (When / Deadline / List / Notes / Repeat) stays one gesture
+  // away — a double-click (macOS) or the row's ⓘ Details button (iOS) — for the
+  // attributes the inline field can't express.
+
+  /// The keyboard-cursor target for the inline fields. `.row(id)` is a row
+  /// being renamed in place; `.newRow` is the quick-add line.
+  enum InlineFocus: Hashable {
+    case row(String)
+    case newRow
+  }
+  @FocusState private var inlineFocus: InlineFocus?
+  #if os(macOS)
+  /// Pending "click the selected row → rename" work, scheduled by a single
+  /// click on an already-selected row and cancelled by a double-click (which
+  /// opens the composer instead). This is the standard Finder/Notes rename
+  /// disambiguation — a slow second click renames, a fast one opens.
+  @State private var pendingRename: DispatchWorkItem?
+  #endif
+  /// The task whose title is being renamed in place (nil → none). Its row
+  /// renders the inline editor instead of the static `TaskRow`.
+  @State private var editingTitleId: String?
+  /// Working buffer for the in-place rename; seeded from the task on begin,
+  /// committed (or discarded) on submit / blur / Esc.
+  @State private var titleDraft: String = ""
+  /// Working buffer for the quick-add line. Commit creates a task in this
+  /// list's context and re-focuses the line for rapid entry.
+  @State private var newTaskText: String = ""
 
   /// Whether the Inbox section (on the Today view) is folded. Expanded by
   /// default; the header shows the count either way.
@@ -299,7 +334,8 @@ struct TaskListView: View {
       openDeadline: openDeadlineForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
-      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected
+      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
+      rename: renameSelectedAction
     ))
     #else
     return withSnackbar
@@ -427,6 +463,15 @@ struct TaskListView: View {
       settle.cancelAll()
       clearSelection()
       editingDetail = nil
+      // Drop any inline edit/quick-add in flight — the buffers belong to the
+      // list we're leaving, not the one we're switching to.
+      editingTitleId = nil
+      titleDraft = ""
+      newTaskText = ""
+      inlineFocus = nil
+      #if os(macOS)
+      pendingRename?.cancel(); pendingRename = nil
+      #endif
       Task { await load() }
     }
     // Leaving reorder edit mode drops the selection so nothing stale lingers.
@@ -491,6 +536,105 @@ struct TaskListView: View {
     }
   }
 
+  // MARK: - Inline editing
+
+  /// Whether this list accepts new rows. Logbook (completed) and Recently
+  /// Deleted are read-only histories — no quick-add line there.
+  private var allowsInlineCreate: Bool {
+    switch filter {
+    case .logbook, .recentlyDeleted: return false
+    default:                         return true
+    }
+  }
+
+  /// Begin renaming a row in place: seed the buffer and move the keyboard
+  /// cursor into its field. A completed row opens the composer instead (you
+  /// don't rename a done row inline). Commits any rename already in flight, and
+  /// drops half-typed new-row text, so only one inline field is ever live.
+  private func beginEdit(_ task: SeptenaTask) {
+    guard task.status != .done else { editingDetail = task; return }
+    if let prevId = editingTitleId, prevId != task.id,
+       let prev = currentTask(id: prevId) {
+      commitRename(prev)
+    }
+    newTaskText = ""
+    titleDraft = task.title
+    editingTitleId = task.id
+    // Mark the row selected so it reads as "selected" — the native source-list
+    // highlight on macOS, the tinted highlight on iOS — instead of leaning on
+    // the checkbox color to signal the active row.
+    selection = [task.id]
+    // Focus on the next runloop so the field (which appears this same update,
+    // as the row swaps from static → editing) is mounted before we focus it —
+    // a synchronous set is otherwise dropped before it joins the responder chain.
+    DispatchQueue.main.async { inlineFocus = .row(task.id) }
+  }
+
+  /// Commit a rename whose field just lost the cursor (keyboard dismissed,
+  /// tapped empty space / the quick-add line) — the iOS analog of Esc/Return,
+  /// so a half-typed rename is never silently dropped. Row→row switches are
+  /// already pre-committed in `beginEdit`, so this only fires for focus leaving
+  /// the inline rows entirely.
+  private func commitRenameOnFocusLoss(from old: InlineFocus?) {
+    guard case .row(let id)? = old, editingTitleId == id,
+          inlineFocus != .row(id), let task = currentTask(id: id) else { return }
+    commitRename(task)
+  }
+
+  /// Commit an in-place rename: write the trimmed title only when it actually
+  /// changed and isn't empty, then leave edit mode. An emptied title is treated
+  /// as "no change" (we never blank a task by erasing its line) — the row keeps
+  /// its old title.
+  private func commitRename(_ task: SeptenaTask) {
+    let trimmed = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty && trimmed != task.title {
+      mutator.update(id: task.id, title: trimmed)
+      Task { await load() }
+    }
+    endRename()
+  }
+
+  /// Abandon an in-place rename without writing (Esc / focus lost with no
+  /// commit). The row reverts to its stored title.
+  private func endRename() {
+    editingTitleId = nil
+    if case .row = inlineFocus { inlineFocus = nil }
+  }
+
+  /// Move keyboard focus into the quick-add line (the macOS empty-space
+  /// double-click and the iOS "+ New task" tap both land here).
+  private func focusNewTask() {
+    guard allowsInlineCreate else { return }
+    if let prevId = editingTitleId, let prev = currentTask(id: prevId) {
+      commitRename(prev)
+    }
+    DispatchQueue.main.async { inlineFocus = .newRow }
+  }
+
+  /// Commit the quick-add line: create a task in this list's context (reusing
+  /// the composer's `TaskDraft(filter:)` placement mapping so a row added on
+  /// Today lands on Today, on a project lands in that project, etc.), clear the
+  /// buffer, and keep the cursor on the line for rapid back-to-back entry.
+  private func commitNewTask() {
+    let trimmed = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { inlineFocus = nil; return }
+    // On Today the quick-add line lives in the Inbox section, so it captures a
+    // LOOSE task (no Today pin / date / list) — an unratified Inbox item, not a
+    // committed-today one. `.triage` seeds nothing, so the task lands in the
+    // triage band. Every other list files into its own context (project / area /
+    // a tomorrow date for Upcoming) via the normal seed.
+    var draft = TaskDraft(filter: filter == .today ? .triage : filter)
+    draft.title = trimmed
+    draft.create(via: mutator)
+    AddInfoSection.tasks.notifyTilesChanged()
+    newTaskText = ""
+    Task { await load() }
+    // Re-assert focus so the next title can be typed immediately (Reminders'
+    // rapid-entry: Return commits and drops you onto a fresh line). Async so the
+    // reload's rebuild can't drop the focus assignment.
+    DispatchQueue.main.async { inlineFocus = .newRow }
+  }
+
   private var taskListContent: some View {
     // `selection` is bound to List on both platforms; rows carry `.tag(id)` so
     // List can map a row to a selection value. The native selection highlight
@@ -504,9 +648,36 @@ struct TaskListView: View {
     List(selection: listSelection) {
       taskListHeader
       taskListRows
+      // The quick-add line lives in the Inbox section on Today (see
+      // `triageSection`); every other list gets it at the foot, where its single
+      // context is unambiguous.
+      if filter != .today { quickAddRow }
       taskListFooter
     }
+    // Commit a rename the moment its field loses the cursor — the iOS analog of
+    // Esc/Return (no hardware Esc there). Row→row switches are pre-committed in
+    // `beginEdit`; this catches focus going to the quick-add line or to nil.
+    .onChange(of: inlineFocus) { old, _ in commitRenameOnFocusLoss(from: old) }
   }
+
+  #if os(macOS)
+  /// The action behind the "Rename" menu command (Return). Nil — so the menu
+  /// item disables and Return falls through to any focused text field — whenever
+  /// a field or picker sheet is active or there's no plain row selected. Enabled
+  /// only when a single open row is selected, so Return renames it in place.
+  /// (A List-level `.onKeyPress`/`.focused` can't get Return inside a
+  /// NavigationSplitView — the sidebar column holds key focus — but a menu
+  /// key-equivalent fires regardless of which column is focused.)
+  private var renameSelectedAction: (() -> Void)? {
+    guard editingTitleId == nil, inlineFocus == nil, !composerIsOpen,
+          whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
+          !nav.showQuickFind,
+          let id = selection.first(where: { currentTask(id: $0) != nil }),
+          let task = currentTask(id: id), task.status != .done
+    else { return nil }
+    return { beginEdit(task) }
+  }
+  #endif
 
   @ViewBuilder
   private var taskListHeader: some View {
@@ -524,10 +695,15 @@ struct TaskListView: View {
   /// row, clearing it from the Inbox). See docs/TRIAGE_BAND_SPEC.md.
   @ViewBuilder
   private var triageSection: some View {
-    if filter == .today && !triageItems.isEmpty {
+    if filter == .today {
+      // Always rendered on Today (even with an empty Inbox) so the quick-add
+      // line has a home: a new capture is an unratified Inbox item, so this is
+      // where "New task" belongs — not dangling under the last project. The
+      // header count is hidden when empty so a clean Inbox stays quiet.
       Section {
         if !inboxCollapsed {
           ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id) }
+          quickAddLine().asListRow()
         }
       } header: {
         inboxHeader(count: triageItems.count)
@@ -560,10 +736,14 @@ struct TaskListView: View {
           Text("Inbox")
             .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
             .foregroundStyle(Theme.inkPrimary)
-          Text("\(count)")
-            .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
-            .monospacedDigit()
-            .foregroundStyle(Theme.inkSecondary)
+          // Count only when there's something to triage — an empty Inbox (now
+          // always shown on Today to host the quick-add line) stays quiet.
+          if count > 0 {
+            Text("\(count)")
+              .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
+              .monospacedDigit()
+              .foregroundStyle(Theme.inkSecondary)
+          }
           Spacer()
           Image(systemName: "chevron.down")
             .scaledFont(size: 12, weight: .semibold)
@@ -611,7 +791,15 @@ struct TaskListView: View {
     Color.clear
       .frame(minHeight: 96)
       .contentShape(Rectangle())
+      // A single tap on the empty space below the list clears the selection;
+      // a double-click in that blank space drops the cursor onto the quick-add
+      // line (the macOS "double-click empty space to add" affordance).
+      #if os(macOS)
+      .simultaneousGesture(TapGesture(count: 2).onEnded { focusNewTask() })
+      .simultaneousGesture(TapGesture(count: 1).onEnded { clearSelection() })
+      #else
       .onTapGesture { clearSelection() }
+      #endif
       .asListRow()
   }
 
@@ -900,34 +1088,9 @@ struct TaskListView: View {
     // No swipe actions and no inline "⋯" button on task rows (removed by
     // request — completion is the checkbox; everything else is the deep-press /
     // right-click `.contextMenu`). `quickMenu` still gates the one-tap "file
-    // here" suggestion capsule shown on Inbox rows.
-    HStack(spacing: 0) {
-      rowContent(task)
-      // One-tap "file here" — the learned destination, shown only when the
-      // classifier is confident (Tier 1 auto-triage). Tap files + acknowledges.
-      if quickMenu, let suggestion = inboxSuggestion(for: task) {
-        Button {
-          applySuggestion(task: task, suggestion: suggestion)
-        } label: {
-          HStack(spacing: 3) {
-            Image(systemName: suggestion.kind == .project ? "number" : "folder")
-              .scaledFont(size: 10, weight: .semibold)
-            Text(suggestion.title)
-              .scaledFont(size: 12, weight: .medium)
-              .lineLimit(1)
-          }
-          .padding(.horizontal, 8)
-          .padding(.vertical, 3)
-          .background(Capsule().fill(theme.color(for: "tasks").opacity(0.14)))
-          .foregroundStyle(theme.color(for: "tasks"))
-          .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .fixedSize()
-        .padding(.trailing, 2)
-        .accessibilityLabel("File in \(suggestion.title)")
-      }
-    }
+    // here" suggestion capsule, now threaded into the row as the inboard-most
+    // trailing accessory (left of the date) rather than appended at the edge.
+    rowContent(task, accessory: quickMenu ? suggestionCapsule(for: task) : nil)
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
     // it. `.draggable` pairs with the sidebar's `.dropDestination(for:)`; the
     // explicit preview is a compact title pill.
@@ -943,7 +1106,47 @@ struct TaskListView: View {
     #endif
   }
 
-  private func rowContent(_ task: SeptenaTask) -> some View {
+  /// The one-tap "file here" capsule for a confident Inbox suggestion — rendered
+  /// as the inboard-most trailing accessory (left of the date). Nil when the
+  /// classifier isn't confident. Tapping files the task + acknowledges.
+  private func suggestionCapsule(for task: SeptenaTask) -> AnyView? {
+    guard let suggestion = inboxSuggestion(for: task) else { return nil }
+    return AnyView(
+      Button {
+        applySuggestion(task: task, suggestion: suggestion)
+      } label: {
+        HStack(spacing: 3) {
+          Image(systemName: suggestion.kind == .project ? "number" : "folder")
+            .scaledFont(size: 10, weight: .semibold)
+          Text(suggestion.title)
+            .scaledFont(size: 12, weight: .medium)
+            .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(theme.color(for: "tasks").opacity(0.14)))
+        .foregroundStyle(theme.color(for: "tasks"))
+        .contentShape(Capsule())
+      }
+      .buttonStyle(.plain)
+      .fixedSize()
+      .accessibilityLabel("File in \(suggestion.title)")
+    )
+  }
+
+  @ViewBuilder
+  private func rowContent(_ task: SeptenaTask, accessory: AnyView? = nil) -> some View {
+    if editingTitleId == task.id {
+      inlineEditRow(task)
+    } else {
+      staticRow(task, accessory: accessory)
+    }
+  }
+
+  /// The canonical closed row — checkbox + title + subtitle/date — plus the
+  /// open/select gestures. Tapping it begins an in-place rename (iOS) or selects
+  /// (macOS); the full composer is one gesture further (double-click / ⓘ).
+  private func staticRow(_ task: SeptenaTask, accessory: AnyView? = nil) -> some View {
     // Suppress the project / area subtitle when the surrounding context already
     // shows it: a project page suppresses both; an area page suppresses area; a
     // Today / Unscheduled group renders project/area cluster headers above each
@@ -968,6 +1171,7 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
+      accessory: accessory,
       onToggle: { toggle(task) },
       onTap: nil
     )
@@ -975,33 +1179,44 @@ struct TaskListView: View {
     // transaction; every settle-driven removal runs through `motion.run`, so
     // Reduce Motion still gets an instant (un-animated) drop.
     .transition(.opacity)
-    // Tap opens the detail drawer. The checkbox is a Button and handles its
-    // own taps; we skip its hit region so toggling done doesn't also open the
-    // editor.
-    //   • iOS: single tap → open (skipped while reordering).
-    //   • macOS: double-click → open; single click stays List selection (the
-    //     keyboard-nav cursor + context-menu target).
+    // The Reminders/Things "type-a-line" model. The checkbox is a Button and
+    // handles its own taps; we skip its hit region so toggling done doesn't also
+    // start an edit.
+    //   • iOS: single tap → rename the title in place (skipped while reordering;
+    //     completed rows open the composer instead — you don't rename a done row
+    //     inline). The full composer is the ⓘ Details button in the inline row.
+    //   • macOS: single click selects, double-click opens the composer; Return
+    //     on the selected row renames in place (handled on the List).
     #if os(iOS)
     .simultaneousGesture(SpatialTapGesture().onEnded { value in
       guard !isEditMode else { return }
       if value.location.x < Theme.hPadding + Theme.checkboxTap { return }
-      editingDetail = task
+      beginEdit(task)
     })
     #else
-    // Selection + open on macOS. We can't lean on native List click-selection
-    // here: to open on double-click we need a SwiftUI tap gesture, and any tap
-    // gesture on the row captures the click before NSTableView can select (and
-    // the old AppKit double-click overlay never fires inside a List — the
-    // table's `mouseDown` tracking loop eats the second click). The old AppKit
-    // overlay route is therefore a dead end in a List. So we own selection in
-    // the gesture and write the same `selection` set the List binds to — which
-    // still drives the native highlight, plus keyboard ⇧/⌘+arrows. Single click
-    // selects (honoring ⌘/⇧ for multi-select), double click selects + opens.
+    // Selection + rename + open on macOS, all gesture-driven. Return can't be
+    // used: inside the NavigationSplitView the sidebar column holds key focus,
+    // so a List-level key handler never sees Return — it just re-activates the
+    // sidebar selection. We also can't lean on native click-selection: any tap
+    // gesture on a row captures the click before NSTableView selects, and the
+    // AppKit double-click overlay never fires inside a List. So we own it:
+    //   • single click on an UNselected row → select.
+    //   • single click on the ALREADY-selected row → rename in place, the
+    //     Finder/Notes "click the selected name" gesture. Scheduled with a short
+    //     delay and cancelled by a double-click, so it never pre-empts opening.
+    //   • double click → open the full composer.
     .simultaneousGesture(TapGesture(count: 2).onEnded {
+      pendingRename?.cancel(); pendingRename = nil
       clickSelect(task.id); editingDetail = task
     })
     .simultaneousGesture(TapGesture(count: 1).onEnded {
+      let wasSelected = (selection == [task.id])
       clickSelect(task.id)
+      pendingRename?.cancel()
+      guard wasSelected, task.status != .done else { pendingRename = nil; return }
+      let work = DispatchWorkItem { beginEdit(task) }
+      pendingRename = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: work)
     })
     #endif
     // Right-click selects this row (unless already part of a selection) so the
@@ -1010,6 +1225,74 @@ struct TaskListView: View {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
     .contextMenu { taskContextMenu(for: task) }
+  }
+
+  /// In-place title rename — the same row chrome with the title swapped for a
+  /// `TextField`. Return / blur commits; Esc (macOS) discards; the ⓘ button
+  /// commits then escalates to the full composer for the attributes the line
+  /// can't express. Reuses `TaskCheckbox` so the checkbox alignment and the
+  /// row metrics match the static row exactly.
+  private func inlineEditRow(_ task: SeptenaTask) -> some View {
+    InlineTaskRow(
+      text: $titleDraft,
+      placeholder: "Task name",
+      accent: theme.color(for: "tasks"),
+      isDone: task.status == .done,
+      // Neutral checkbox while editing — the Today-yellow checkbox means
+      // "promoted to Today" in other lists, so wearing it here would misread.
+      // The row instead shows as selected (native highlight on macOS via the
+      // selection set; the tinted highlight below on iOS).
+      isToday: false,
+      isSelected: true,
+      focus: $inlineFocus,
+      focusValue: .row(task.id),
+      showsDetails: true,
+      onToggle: { toggle(task) },
+      onCommit: { commitRename(task) },
+      onCancel: { endRename() },
+      onOpenDetails: {
+        commitRename(task)
+        editingDetail = task
+      }
+    )
+    .transition(.opacity)
+    .septenaOnRightClick {
+      if !selection.contains(task.id) { selectOnly(task.id) }
+    }
+    .contextMenu { taskContextMenu(for: task) }
+  }
+
+  /// The always-present quick-add line at the foot of a single-context list (the
+  /// Reminders empty bottom row). A single click / tap focuses it; Return
+  /// commits and re-focuses for rapid back-to-back entry. Today hosts the same
+  /// line inside its Inbox section instead (see `triageSection`).
+  @ViewBuilder
+  private var quickAddRow: some View {
+    if allowsInlineCreate {
+      quickAddLine().asListRow()
+    }
+  }
+
+  /// The shared quick-add field — one definition for both the Inbox-section line
+  /// (Today) and the foot-of-list line (every other creatable list). The
+  /// checkbox is neutral (never the Today-yellow): a not-yet-created task isn't
+  /// "promoted to Today".
+  private func quickAddLine() -> some View {
+    InlineTaskRow(
+      text: $newTaskText,
+      placeholder: "New task",
+      accent: theme.color(for: "tasks"),
+      isDone: false,
+      isToday: false,
+      isSelected: false,
+      focus: $inlineFocus,
+      focusValue: .newRow,
+      showsDetails: false,
+      onToggle: {},
+      onCommit: { commitNewTask() },
+      onCancel: { inlineFocus = nil },
+      onOpenDetails: nil
+    )
   }
 
   /// Single source of truth for per-row actions. Used by the per-row
@@ -1045,6 +1328,7 @@ struct TaskListView: View {
         target: target,
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
+        onRename: { task in beginEdit(task) },
         onOpenDetail: { task in editingDetail = task },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
@@ -1880,6 +2164,9 @@ struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?
+  /// Begin an in-place title rename. Optional — the deep Tasks list supplies it;
+  /// the Next surface (which has no inline editor) leaves it nil.
+  var onRename: ((SeptenaTask) -> Void)? = nil
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
   let onMoveToToday: ([String], Bool) -> Void
@@ -1892,6 +2179,13 @@ struct TaskListRowContextMenu: View {
 
   var body: some View {
     if case let .single(task) = target {
+      if let onRename, task.status != .done {
+        Button {
+          onRename(task)
+        } label: {
+          Label("Rename", systemImage: "pencil")
+        }
+      }
       Button {
         onOpenDetail(task)
       } label: {
@@ -2004,6 +2298,12 @@ struct TaskActions {
   var delete: (() -> Void)?
   /// Same gating as `delete` — ⌘. shouldn't act on an unintended row.
   var clearSchedule: (() -> Void)?
+  /// Return → rename the selected row in place. Nil (→ the menu item disables,
+  /// so Return falls through to any focused text field) whenever a field/sheet
+  /// is active or nothing's selected. This is how macOS gets Enter-to-rename:
+  /// a List-level key handler never sees Return inside a NavigationSplitView
+  /// (the sidebar column owns key focus), but a menu key-equivalent does.
+  var rename: (() -> Void)?
 }
 
 private struct TaskActionsKey: FocusedValueKey {
@@ -2048,5 +2348,86 @@ extension View {
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
       .selectionDisabled()
+  }
+}
+
+// MARK: - Inline editable task line
+//
+// The shared atom behind BOTH in-place rename and the quick-add footer — the
+// merged "type-a-line" behavior. It mirrors `CheckableRow`'s layout (a
+// baseline-aligned `TaskCheckbox` + the title) so an editing row sits flush
+// with its static neighbours, but renders the title as a `TextField`. The
+// quick-add line passes an inert `onToggle` (no task to check yet); rename
+// passes the row's real toggle so you can still check a task mid-edit.
+
+private struct InlineTaskRow: View {
+  @Binding var text: String
+  let placeholder: String
+  let accent: Color
+  let isDone: Bool
+  var isToday: Bool = false
+  /// Draw the row as selected. macOS gets the native source-list highlight from
+  /// the List selection set, so this only paints the iOS highlight (List
+  /// selection there shows only in edit mode).
+  var isSelected: Bool = false
+  @FocusState.Binding var focus: TaskListView.InlineFocus?
+  let focusValue: TaskListView.InlineFocus
+  /// Show the trailing ⓘ Details button (rename rows on iOS use it to escalate
+  /// to the full composer; the quick-add line doesn't).
+  var showsDetails: Bool = false
+  let onToggle: () -> Void
+  let onCommit: () -> Void
+  let onCancel: () -> Void
+  var onOpenDetails: (() -> Void)? = nil
+
+  @Environment(\.rowHInset) private var rowHInset
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggle)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      TextField(placeholder, text: $text)
+        .textFieldStyle(.plain)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkPrimary)
+        .focused($focus, equals: focusValue)
+        .submitLabel(.done)
+        .onSubmit(onCommit)
+        #if os(macOS)
+        // Esc abandons the edit without writing (the static row reappears with
+        // its stored title). iOS has no Esc; blurring the field commits/cancels.
+        .onExitCommand(perform: onCancel)
+        #endif
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      if showsDetails, let onOpenDetails {
+        Button(action: onOpenDetails) {
+          Image(systemName: "info.circle")
+            .font(.body)
+            .foregroundStyle(accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit details")
+      }
+    }
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, Theme.rowVPadding)
+    .background(selectionHighlight)
+    .contentShape(Rectangle())
+  }
+
+  /// The standard row-selection wash, mirroring `CheckableRow.selectionHighlight`
+  /// so an editing row reads exactly like a selected static one. iOS only —
+  /// macOS draws its own native source-list selection from the List.
+  @ViewBuilder
+  private var selectionHighlight: some View {
+    #if os(iOS)
+    if isSelected {
+      RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+        .fill(accent.opacity(0.18))
+        .padding(.horizontal, max(0, rowHInset - 6))
+    }
+    #endif
   }
 }

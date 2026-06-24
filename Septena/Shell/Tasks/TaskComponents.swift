@@ -504,6 +504,10 @@ struct TaskRow: View {
   var showsTodayIndicator: Bool = true
   /// Highlight this row while its edit modal is open (see `CheckableRow`).
   var isSelected: Bool = false
+  /// Optional inboard-most trailing accessory — the deep list passes the Inbox
+  /// "file here" capsule here so it sits left of the date (a variable-width
+  /// element kept inboard of the fixed glyphs). Nil on every other surface.
+  var accessory: AnyView? = nil
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
@@ -539,19 +543,25 @@ struct TaskRow: View {
     )
   }
 
+  // Right-side order (left → right): variable-width elements inboard, fixed-width
+  // pinned to the right edge so the row's right margin stays stable.
+  //   accessory (Inbox "file here") · date  →  recurrence · notes · status-dot
+  // The accessory and date flex with their content; the recurrence/notes glyphs
+  // and the agent/status dot are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
-    agentSignal
-    if hasNotes {
-      Image(systemName: "text.alignleft")
-        .scaledFont(size: 12)
-        .foregroundStyle(Theme.inkSecondary)
-    }
+    if let accessory { accessory }
+    trailingDate
     if task.recurrence != nil {
       Image(systemName: "arrow.triangle.2.circlepath")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
     }
-    trailingDate
+    if hasNotes {
+      Image(systemName: "text.alignleft")
+        .scaledFont(size: 12)
+        .foregroundStyle(Theme.inkSecondary)
+    }
+    agentSignal
   }
 
   /// The single trailing signal dot, in priority order: a live conversation's
@@ -567,7 +577,10 @@ struct TaskRow: View {
     } else if task.showsAgentCue() {
       AgentCueMarker(tint: accent)
     } else if task.showsArrivedToday() {
-      ArrivedTodayMarker(tint: accent)
+      // The "rolled into Today on its own" cue wears the Today accent (yellow),
+      // not the section accent — it's a Today signal, matching the checkbox's
+      // promoted-to-Today color.
+      ArrivedTodayMarker(tint: Theme.todayAccent)
     }
   }
 
