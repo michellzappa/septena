@@ -86,6 +86,12 @@ export const createTaskJsonSchema = {
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
     notes: { type: "string", description: "Free-text note body for the task." },
+    origin: {
+      type: "string",
+      enum: ["user_request", "agent_suggestion"],
+      description:
+        "Provenance. user_request = the user explicitly asked (lands committed, placed where specified). agent_suggestion = you surfaced it proactively (lands unratified in the inbox to review). Omit to use this connection's default (the gateway defaults to a proposal — secure by default).",
+    },
   },
 } as const;
 
@@ -133,6 +139,12 @@ export interface CreateTaskInput {
   area?: string;
   project?: string;
   notes?: string;
+  /**
+   * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
+   * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
+   * secure-by-default) lands it as an unratified proposal in the triage inbox.
+   */
+  origin?: "user_request" | "agent_suggestion";
 }
 
 export interface UpdateTaskInput {
@@ -163,6 +175,14 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
     sourceClient: { value: "Claude" },      // only Claude connects today; plumb clientId through later
     today: { value: input.today ? 1 : 0 },
   };
+  // Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4): a *committed* task is
+  // acknowledged at birth so it never wears the unseen-proposal cue and leaves
+  // the triage band immediately. A *proposal* stays unacknowledged → triage
+  // inbox → rendered dashed. The gateway is a consumer connection, so it
+  // defaults to a proposal (secure by default); only an explicit `user_request`
+  // commits.
+  const committed = input.origin === "user_request";
+  if (committed) fields.acknowledgedAt = { value: Date.now() };
   if (input.scheduled) fields.scheduled = { value: input.scheduled };
   const createDeadline = input.deadline ?? input.due;
   if (createDeadline) fields.deadline = { value: createDeadline };
@@ -187,11 +207,12 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
 
   // Signals exactly when the prod schema catches up: a non-empty list here
   // (containing source/sourceClient/createdAt) means provenance isn't sticking yet.
+  const placement = committed ? "committed" : "inbox_proposal";
   if (droppedFields.length > 0) {
     logEvent("task_create_dropped_fields", { id, droppedFields });
-    return { id, title: input.title, droppedFields };
+    return { id, title: input.title, placement, droppedFields };
   }
-  return { id, title: input.title };
+  return { id, title: input.title, placement };
 }
 
 export async function completeTask(client: CloudKitClient, input: { id: string }) {

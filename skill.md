@@ -90,35 +90,42 @@ possible choice. The loop is `confirm → ground → (scope if epic) → decide 
 - This mirrors the in-app on-device provider exactly (same shape, same verbs). Keep behavior
   identical so the two surfaces never disagree.
 
-#### View routing (critical)
-**Everything you create is a *proposal*.** Tasks you author via `tasks_create`
-are stamped `source: "mcp"`, so they land in the user's **triage** pile — the
-"to sort" band shown on top of Today — not directly in any committed list. The
-user ratifies what enters their day; you can't write straight into `today`. So:
+#### Provenance & view routing (critical)
+**Declare provenance with `origin`** — it decides whether a task lands committed
+or as a *proposal*:
 
-- A task you create shows up immediately in `tasks_list(view: "triage")`.
-- The `today` / `scheduled` / `deadline` / `project` you set become the *proposed
-  disposition* the user accepts with one tap. They do **not** make the task
-  appear in `today` / `upcoming` / `anytime` yet.
-- Once the user ratifies it (or after ~7 days unacknowledged, when the proposal
-  ages in), it flows into its natural view per the fields you set:
+- **`origin: "user_request"`** — the user explicitly asked you to create this
+  task. It's **committed**: it flows straight into its natural view per the
+  fields you set (table below), with no triage step.
+- **`origin: "agent_suggestion"` (or omitted)** — you surfaced it yourself,
+  proactively (from email, a transcript, your own initiative). It lands as a
+  **proposal** in the user's **triage** pile — the "to sort" band on top of Today
+  — awaiting their tap. The gateway defaults to this (secure by default), so if
+  you don't set `origin`, you are proposing.
 
-| Fields you set       | View *after the user ratifies* |
-|----------------------|--------------------------------|
-| `today: true`        | `today`, `anytime`             |
-| `scheduled: <date>`  | `upcoming`, `anytime`          |
-| `deadline: <date>`   | `anytime` (no route)           |
-| None of the above    | loose capture (stays to-sort)  |
+`tasks_create` returns `placement`: `"committed"` or `"inbox_proposal"`.
+
+For a **proposal**, the `today` / `scheduled` / `deadline` / `project` you set are
+the *proposed disposition* the user accepts with one tap — they do **not** move
+the task into `today` / `upcoming` / `anytime` until it's ratified (or until it
+ages in after ~7 days unacknowledged). A **committed** task routes immediately:
+
+| Fields you set       | View (committed now / proposal after ratify) |
+|----------------------|----------------------------------------------|
+| `today: true`        | `today`, `anytime`                           |
+| `scheduled: <date>`  | `upcoming`, `anytime`                        |
+| `deadline: <date>`   | `anytime` (no route)                         |
+| None of the above    | loose capture (stays to-sort)                |
 
 `area` and `project` tag a task for filtering but don't route it on their own.
 
-**Footgun**: a task you create is NOT in `today` even when you set `today: true`
-— it's in `triage`, awaiting the user's tap. Never claim "added to today"; say
-you've **proposed** it (e.g. "Proposed for today — accept it in your To sort
-band"). `tasks_list(view: "triage")` shows your pending proposals.
+**Footgun**: a *proposal* is NOT in `today` even when you set `today: true` — it's
+in `triage`, awaiting the user's tap. For proposals, never claim "added to
+today"; say you've **proposed** it ("Proposed for today — accept it in your To
+sort band"). A **committed** (`user_request`) task you may report as added.
 
-**Verification habit**: after creating, `tasks_list(view: "triage")` confirms the
-proposal is queued for the user.
+**Verification habit**: check `placement` in the create result, or
+`tasks_list(view: "triage")` for proposals.
 
 ```
 # "Add X to today" — proposes X for today; user taps to accept

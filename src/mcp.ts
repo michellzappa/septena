@@ -154,7 +154,7 @@ const GLOBAL_TOOLS: Tool[] = [
   },
   {
     name: "tasks_create",
-    description: "Create a new Septena task. Returns the new id.",
+    description: "Create a new Septena task. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked (lands committed, placed where specified) or `agent_suggestion` when you surfaced it yourself (lands as a PROPOSAL in the user's inbox to review). Omit → the gateway proposes (secure by default).",
     inputSchema: createTaskJsonSchema,
   },
   {
