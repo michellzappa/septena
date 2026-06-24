@@ -554,7 +554,12 @@ private struct QuickLogSheet: View {
   var body: some View {
     NavigationStack {
       Group {
-        if let block = item.logKind.flatMap({ SuggestionBlocks.byKind[$0] }) {
+        if item.logKind == "intake", let kind = intakeKind {
+          // Per-tracker nudge: the same container-aware input the + path offers,
+          // with the suggestion's id as the optimistic-hide target so the nudge
+          // clears on log.
+          IntakeCaptureInput(kind: kind, conn: conn, itemID: item.id, onDone: onDone)
+        } else if let block = item.logKind.flatMap({ SuggestionBlocks.byKind[$0] }) {
           // Same shared input as the on-demand + path; the suggestion's id is
           // the optimistic-hide target.
           CaptureInput(block: block, itemID: item.id, conn: conn, onDone: onDone)
@@ -567,6 +572,17 @@ private struct QuickLogSheet: View {
       .navigationTitle("Log")
       .navigationBarTitleDisplayMode(.inline)
     }
+  }
+
+  /// The intake tracker an `intake` nudge targets, resolved from the snapshot's
+  /// `intakeKinds` by the kind id encoded in the suggestion id
+  /// ("intake:<kindID>:<first|next>"). Defensive against a kind id that itself
+  /// contains colons.
+  private var intakeKind: IntakeKindWire? {
+    let parts = item.id.split(separator: ":")
+    guard parts.count >= 3, parts.first == "intake" else { return nil }
+    let kindID = parts[1..<(parts.count - 1)].joined(separator: ":")
+    return conn.intakeKinds.first { $0.id == kindID }
   }
 }
 
@@ -613,6 +629,9 @@ private struct CaptureInput: View {
 private struct IntakeCaptureInput: View {
   let kind: IntakeKindWire
   let conn: WatchConnectivity
+  /// Optimistic-hide target: the suggestion's id on the nudge-tap path, or the
+  /// default ad-hoc id on the toolbar **+** path (matches no row).
+  var itemID: String? = nil
   let onDone: () -> Void
 
   var body: some View {
@@ -635,7 +654,7 @@ private struct IntakeCaptureInput: View {
       tint: WatchSectionTint.color(forSectionKey: kind.id,
                                    colors: kind.color.map { [kind.id: $0] } ?? [:])
     ) { value in
-      conn.logIntake(kind: kind, value: value, itemID: "adhoc:intake:\(kind.id)")
+      conn.logIntake(kind: kind, value: value, itemID: itemID ?? "adhoc:intake:\(kind.id)")
       onDone()
     }
     .navigationTitle(kind.name)

@@ -108,8 +108,13 @@ enum NextEntry {
         overdue: false,
         sortKey: sortKey,
         // Tag the suggestion's sub-kind when it's quick-loggable from a tap so
-        // the watch can make the nudge interactive (see `SuggestionBlocks`).
-        logKind: SuggestionBlocks.isQuickLoggable(kind: s.kind.rawValue) ? s.kind.rawValue : nil)
+        // the watch can make the nudge interactive. The static loggables live in
+        // `SuggestionBlocks` (mood); `intake` is dynamic (per-tracker) and isn't
+        // in that table, but the watch resolves it from the snapshot's
+        // `intakeKinds` by the kind id encoded in the suggestion id — so tag it
+        // too rather than leaving the dominant nudge inert.
+        logKind: (SuggestionBlocks.isQuickLoggable(kind: s.kind.rawValue) || s.kind == .intake)
+          ? s.kind.rawValue : nil)
     case .task(let id, let title, let subtitle, let overdue):
       return NextItem(
         id: id, kind: "task", title: title, subtitle: subtitle,
