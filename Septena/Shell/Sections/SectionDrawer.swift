@@ -1318,6 +1318,10 @@ private struct RowHInsetKey: EnvironmentKey {
   static let defaultValue: CGFloat = Theme.hPadding
 }
 
+private struct RowVInsetKey: EnvironmentKey {
+  static let defaultValue: CGFloat = Theme.rowVPadding
+}
+
 extension EnvironmentValues {
   /// Horizontal inset a checkable / log row applies between its own edge and
   /// its content. Defaults to `Theme.hPadding` (20pt) — the value a row needs
@@ -1328,6 +1332,15 @@ extension EnvironmentValues {
   var rowHInset: CGFloat {
     get { self[RowHInsetKey.self] }
     set { self[RowHInsetKey.self] = newValue }
+  }
+
+  /// Vertical padding a checkable / task row applies top and bottom. Defaults to
+  /// `Theme.rowVPadding` — the airier rhythm the drawer's log/task rows keep.
+  /// The deep task-list surfaces override it to `Theme.rowVPaddingTight` for a
+  /// denser list without affecting drawer density.
+  var rowVInset: CGFloat {
+    get { self[RowVInsetKey.self] }
+    set { self[RowVInsetKey.self] = newValue }
   }
 }
 

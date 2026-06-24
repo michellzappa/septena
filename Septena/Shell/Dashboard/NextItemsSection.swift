@@ -358,8 +358,8 @@ final class NextItemsModel {
     let next = !habit.done
     // Done-side haptic is owned by the caller (HabitRow), which can reach
     // the environment and branch milestone (.ignition) vs everyday (the
-    // checkbox `.echo`). Undo stays a light tap here so every host feels
-    // the un-check.
+    // shared checkbox `.stamp`). Undo stays a light tap here so every host
+    // feels the un-check.
     if !next { Haptics.tap() }
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].done = next
@@ -389,7 +389,7 @@ final class NextItemsModel {
   func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
     let next = !supp.done
     // Taken-side haptic is owned by the caller (SupplementRow) — the
-    // checkbox plays the `.drop` feel; undo stays a light tap here.
+    // checkbox plays the shared `.stamp` feel; undo stays a light tap here.
     if !next { Haptics.tap() }
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
@@ -418,7 +418,7 @@ final class NextItemsModel {
 
   func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion) {
     // Completion haptic is owned by the caller (ChoreRow) — the checkbox
-    // plays the `.tuck` feel.
+    // plays the shared `.stamp` feel.
     completedChores.insert(chore.id)
     actedChores.insert(chore.id)
     deferredChores.removeValue(forKey: chore.id)
@@ -942,7 +942,7 @@ struct HabitRow: View {
     CheckableRow(
       tint: habit.skipped && !habit.done ? Theme.inkSecondary : tint,
       isDone: inactive,
-      feel: .echo,
+      feel: .stamp,
       isInactive: inactive,
       leadingEmoji: habit.emoji ?? "•",
       title: habit.name,
@@ -963,12 +963,12 @@ struct HabitRow: View {
         let done = !habit.done
         model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
         if done {
-          // Everyday completion — the checkbox plays the `.echo` feel (the
-          // streak answering itself); here we play its matched haptic, a
-          // touch fuller as you work through this bucket of the day. Count
-          // includes the just-completed habit (model flipped it above).
+          // Everyday completion — the checkbox plays the shared `.stamp` feel
+          // (standardized across all checkable rows); here we play its matched
+          // haptic, a touch fuller as you work through this bucket of the day.
+          // Count includes the just-completed habit (model flipped it above).
           let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
-          Haptics.play(CheckFeel.echo.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
+          Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
           // Cleared the whole day's habits — the canvas earns a burst.
           if model.habitsAllCleared {
             logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
@@ -1011,16 +1011,16 @@ struct SupplementRow: View {
   // root env. nil → the clear-out burst no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
-  /// Toggle + (on taken) the `.drop` celebration at the checkbox: the fill
-  /// falls in and lands with a soft splash. The haptic is its matched
-  /// swell-and-land, a touch fuller as the day's count grows. Undo's light
-  /// tap is handled inside the model.
+  /// Toggle + (on taken) the shared `.stamp` celebration at the checkbox
+  /// (standardized across all checkable rows). The haptic is the matched
+  /// stamp, a touch fuller as the day's count grows. Undo's light tap is
+  /// handled inside the model.
   private func commitToggle() {
     let taken = !supplement.done
     model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
     guard taken else { return }
     let count = model.supplements.filter { $0.done }.count
-    Haptics.play(CheckFeel.drop.hapticSpec(intensity: 0.8 + Double(count) * 0.08))
+    Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(count) * 0.08))
     // Took the last one — the whole day's supplements are done; the canvas
     // earns a burst.
     if model.supplementsAllCleared {
@@ -1033,7 +1033,7 @@ struct SupplementRow: View {
     CheckableRow(
       tint: supplement.skipped && !supplement.done ? Theme.inkSecondary : tint,
       isDone: inactive,
-      feel: .drop,
+      feel: .stamp,
       isInactive: inactive,
       leadingEmoji: supplement.emoji ?? "•",
       title: supplement.name,
@@ -1098,7 +1098,7 @@ struct ChoreRow: View {
     CheckableRow(
       tint: deferLabel != nil ? Theme.inkSecondary : tint,
       isDone: inactive,
-      feel: .tuck,
+      feel: .stamp,
       isInactive: inactive,
       leadingEmoji: chore.emoji ?? "•",
       title: chore.name,
@@ -1123,10 +1123,10 @@ struct ChoreRow: View {
           model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
           model.completeChore(chore, mutator: checklistMutator, motion: motion)
-          // Filed away — the checkbox plays the `.tuck` (dip + ring filing
-          // down); this is its matched haptic: a muted thud, then the
-          // drawer's softer close. Done is binary, so no intensity.
-          Haptics.play(CheckFeel.tuck.hapticSpec())
+          // Filed away — the checkbox plays the shared `.stamp` feel
+          // (standardized across all checkable rows); this is its matched
+          // haptic. Done is binary, so no intensity scaling.
+          Haptics.play(CheckFeel.stamp.hapticSpec())
           // Filed the last one — the whole day's chores are clear; the canvas
           // earns a burst.
           if model.choresAllCleared {

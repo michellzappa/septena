@@ -211,12 +211,15 @@ enum Theme {
   static let hPadding: CGFloat = 12
   static let rowHeight: CGFloat = 24
   static let rowTapHeight: CGFloat = 32
-  static let sidebarRowHeight: CGFloat = 28
-  static let sidebarSmartRowHeight: CGFloat = 26
-  static let sidebarProjectRowHeight: CGFloat = 30
+  // Tightened toward Things 3's compact sidebar rhythm — area/project/smart
+  // rows sit closer together (section gaps unchanged, so areas still breathe
+  // as group headers).
+  static let sidebarRowHeight: CGFloat = 22
+  static let sidebarSmartRowHeight: CGFloat = 20
+  static let sidebarProjectRowHeight: CGFloat = 22
   static let sectionSpacing: CGFloat = 16
   static let sidebarIconSize: CGFloat = 17
-  static let sidebarRowSpacing: CGFloat = 10
+  static let sidebarRowSpacing: CGFloat = 7
   static let sidebarTitleSize: CGFloat = 14
   static let sidebarTitleWeight: Font.Weight = .regular
   static let sidebarAreaTitleSize: CGFloat = 14
@@ -230,12 +233,14 @@ enum Theme {
   static let hPadding: CGFloat = 20
   static let rowHeight: CGFloat = 36
   static let rowTapHeight: CGFloat = 44
-  static let sidebarRowHeight: CGFloat = 44
-  static let sidebarSmartRowHeight: CGFloat = 38
-  static let sidebarProjectRowHeight: CGFloat = 45
+  // Tightened toward Things 3's compact sidebar rhythm. Kept ≥40pt so rows
+  // stay comfortably tappable; section gaps unchanged so areas still breathe.
+  static let sidebarRowHeight: CGFloat = 37
+  static let sidebarSmartRowHeight: CGFloat = 34
+  static let sidebarProjectRowHeight: CGFloat = 37
   static let sectionSpacing: CGFloat = 24
   static let sidebarIconSize: CGFloat = 22
-  static let sidebarRowSpacing: CGFloat = 14
+  static let sidebarRowSpacing: CGFloat = 10
   static let sidebarTitleSize: CGFloat = 17
   static let sidebarTitleWeight: Font.Weight = .regular
   static let sidebarAreaTitleSize: CGFloat = 17
@@ -256,6 +261,16 @@ enum Theme {
   static let rowVPadding: CGFloat = 6
   #else
   static let rowVPadding: CGFloat = 8
+  #endif
+
+  /// Tighter row padding for the deep task-list surfaces (Today, area/project
+  /// detail, the full Tasks list) — a denser, Things-3-like rhythm. Pushed in
+  /// through the `rowVInset` environment key so it overrides `rowVPadding`
+  /// only there; drawer/log rows keep their deliberate extra air.
+  #if os(macOS)
+  static let rowVPaddingTight: CGFloat = 4
+  #else
+  static let rowVPaddingTight: CGFloat = 6
   #endif
 
   /// Spacing scale shared across drawer chrome (SectionDrawer,
