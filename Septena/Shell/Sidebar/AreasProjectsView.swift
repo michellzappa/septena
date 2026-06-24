@@ -212,7 +212,9 @@ struct AreaDetailView: View {
       Spacer()
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.vertical, 8)
+    // Match the tightened task rows below so the area screen reads as one
+    // dense list rather than airy projects over compact tasks.
+    .padding(.vertical, Theme.rowVPaddingTight)
     .frame(minHeight: Theme.rowHeight)
     .contentShape(Rectangle())
   }

@@ -35,6 +35,10 @@ struct SidebarRootView: View {
   // Written on every Move Up/Down; applied when loading from cache/server.
   @AppStorage("sidebar.areaOrder")    private var areaOrderData: Data = Data()
   @AppStorage("sidebar.projectOrder") private var projectOrderData: Data = Data()
+  /// Areas the user has folded shut (Things-style) — their projects are
+  /// hidden until re-expanded. Stored as a JSON id set; only areas that
+  /// actually have projects ever show the fold control.
+  @AppStorage("sidebar.collapsedAreas") private var collapsedAreasData: Data = Data()
 
   // Seed sidebar lists from cache before first render so the sidebar isn't
   // ever blank — areas/projects barely change, so this is effectively the
@@ -613,10 +617,14 @@ struct SidebarRootView: View {
       }
     }
     ForEach(areas) { area in
+      let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
+      let collapsed = collapsedAreas.contains(area.id)
       Section {
-        compactRow { areaRow(area) }
-        ForEach(projects.filter { $0.area == area.id && $0.status == .active }) { project in
-          compactRow { projectRow(project, parent: area.id) }
+        compactRow { areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed) }
+        if !collapsed {
+          ForEach(areaProjects) { project in
+            compactRow { projectRow(project, parent: area.id) }
+          }
         }
       }
     }
@@ -653,9 +661,11 @@ struct SidebarRootView: View {
   /// in the context menu (and, on macOS, a task drop target). Sits at the top of
   /// its section's grouped card, projects underneath.
   @ViewBuilder
-  private func areaRow(_ area: Area) -> some View {
+  private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool) -> some View {
     navRow(.area(area)) {
-      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0)
+      SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
+                     isCollapsed: hasProjects ? collapsed : nil,
+                     onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
     }
     #if os(iOS)
     .contextMenu {
@@ -839,6 +849,23 @@ struct SidebarRootView: View {
 
   private var topLevelProjects: [Project] {
     projects.filter { $0.area == nil && $0.status == .active }
+  }
+
+  // MARK: - Area fold state
+
+  private var collapsedAreas: Set<String> {
+    (try? JSONDecoder().decode(Set<String>.self, from: collapsedAreasData)) ?? []
+  }
+
+  /// Fold / unfold an area's project list, persisting the choice. Animated so
+  /// the project rows slide in/out and the chevron rotates together.
+  private func toggleAreaCollapsed(_ areaId: String) {
+    Haptics.tick()
+    var set = collapsedAreas
+    if set.contains(areaId) { set.remove(areaId) } else { set.insert(areaId) }
+    withAnimation(.easeInOut(duration: 0.2)) {
+      collapsedAreasData = (try? JSONEncoder().encode(set)) ?? Data()
+    }
   }
 
   // MARK: - Load
@@ -1188,6 +1215,10 @@ struct SidebarAreaRow: View {
   var emoji: String? = nil
   /// Open task count rolled up across the area (loose + projects in it).
   var count: Int = 0
+  /// Fold state — non-nil only when the area has projects (so a fold control
+  /// is meaningful). When nil the plain navigate chevron is shown instead.
+  var isCollapsed: Bool? = nil
+  var onToggleCollapse: (() -> Void)? = nil
 
   var body: some View {
     HStack(spacing: Theme.sidebarRowSpacing) {
@@ -1197,15 +1228,42 @@ struct SidebarAreaRow: View {
         .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
         .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
+      if let isCollapsed, let onToggleCollapse {
+        SidebarFoldChevron(isCollapsed: isCollapsed, action: onToggleCollapse)
+      }
       if count > 0 {
         Text("\(count)")
           .scaledFont(size: 12, weight: .regular)
           .foregroundStyle(Theme.inkSecondary.opacity(0.6))
       }
-      SidebarRowChevron()
+      if isCollapsed == nil {
+        SidebarRowChevron()
+      }
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
+  }
+}
+
+/// Trailing fold control on an area row: a chevron that points right when the
+/// area is collapsed and rotates down when expanded. It takes its own tap via
+/// a `.highPriorityGesture` so folding never falls through to the row's
+/// navigation (iPhone Button label / iPad+macOS `List(selection:)`).
+struct SidebarFoldChevron: View {
+  let isCollapsed: Bool
+  let action: () -> Void
+
+  var body: some View {
+    Image(systemName: "chevron.right")
+      .scaledFont(size: 12, weight: .semibold)
+      .foregroundStyle(.tertiary)
+      .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+      .frame(width: 28, height: 28)
+      .contentShape(Rectangle())
+      .highPriorityGesture(TapGesture().onEnded { action() })
+      #if os(macOS)
+      .help(isCollapsed ? "Show projects" : "Hide projects")
+      #endif
   }
 }
 
@@ -1229,7 +1287,8 @@ struct AreaIcon: View {
   var body: some View {
     if let emoji, !emoji.isEmpty {
       Text(emoji)
-        .font(.system(size: resolvedDiameter * 0.82))
+        .font(.system(size: resolvedDiameter * 0.72))
+        .fixedSize()
         .frame(width: resolvedDiameter, height: resolvedDiameter)
     } else {
       Circle()
