@@ -80,7 +80,7 @@ enum MCPToolCatalog {
                 "id": ["type": "string"],
               ]]),
       MCPTool(name: "tasks_create",
-              description: "Create a new Septena task. Returns the new id.",
+              description: "Create a new Septena task. Returns the new id and its placement. Set `origin` to declare provenance: `user_request` when the user explicitly asked for this task (it lands committed, where you place it) or `agent_suggestion` when you surfaced it yourself, proactively (it lands as a PROPOSAL in the user's inbox to review). Omit and this connection's default applies.",
               inputSchema: ["type": "object", "required": ["title"], "properties": [
                 "title": ["type": "string", "minLength": 1],
                 "today": ["type": "boolean", "default": false],
@@ -89,6 +89,8 @@ enum MCPToolCatalog {
                 "area": ["type": "string", "description": "Area id (e.g. 'envisioning')"],
                 "project": ["type": "string", "description": "Project id (e.g. 'septena')"],
                 "notes": ["type": "string", "description": "Free-text note body for the task."],
+                "origin": ["type": "string", "enum": ["user_request", "agent_suggestion"],
+                           "description": "Provenance. user_request = the user asked (committed, placed where specified). agent_suggestion = you proposed it without being asked (lands unratified in the inbox for review). Omit to use the connection default."],
               ]]),
       MCPTool(name: "tasks_complete",
               description: "Mark a task done. Errors on recurring tasks (complete those in the app so the next occurrence spawns).",

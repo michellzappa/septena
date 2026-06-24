@@ -5,21 +5,25 @@ import SwiftUI
 // The checkbox's celebration vocabulary — the checkbox-local counterpart of
 // `CommitMotion`. Checkable rows celebrate *at the box*, never on the canvas
 // (checking things off is the app's highest-frequency action; full-screen
-// flourishes there would wear out fast). Each checkable type gets its own
-// feel so completing a habit reads differently from finishing a chore:
+// flourishes there would wear out fast).
 //
-//   • .stamp (tasks)        — a crisp stamp + one pulse ring. Done.
-//   • .echo  (habits)       — the pulse answers itself: one more mark on the
+// STANDARDIZED: every checkable row (tasks, habits, supplements, chores) now
+// shares `.stamp` — one consistent tap across the app. The other three feels
+// remain as an available vocabulary, demoed in Settings ▸ Customize's Motion
+// Gallery, and can be reassigned per row type if we ever want to differentiate
+// again:
+//
+//   • .stamp                — a crisp stamp + one pulse ring. Done. (in use)
+//   • .echo                 — the pulse answers itself: one more mark on the
 //                             streak, today echoed by the days behind it.
-//   • .drop  (supplements)  — the fill falls in and lands with a soft
+//   • .drop                 — the fill falls in and lands with a soft
 //                             splash. One more capsule down.
-//   • .tuck  (chores)       — stamps, dips, and files the ring downward.
+//   • .tuck                 — stamps, dips, and files the ring downward.
 //                             Put away, onto the pile.
 //
 // Every feel lives in the box's own geometry and resolves within ~0.45s,
 // with a matched CoreHaptics pattern timed to its visual beats — quiet
-// transients and faint swells, never a flat buzz. Past-day backfill rows
-// keep the default `.stamp`: a correction shouldn't claim a streak echo.
+// transients and faint swells, never a flat buzz.
 enum CheckFeel {
   case stamp
   case echo
@@ -69,6 +73,20 @@ enum CheckFeel {
   }
 }
 
+// MARK: - Task row language flag
+
+/// Feature flag for the revised task-row visual language
+/// (docs/TASK_ROW_LANGUAGE_SPEC.md): form-driven readiness on the left box
+/// (dashed = unratified proposal, a haloed corner accent dot = unread context),
+/// the agent cue lifted off the right edge, and Today relocated to a right-side
+/// chip so the box stays neutral. On by default; set the `taskRowLanguageV2`
+/// UserDefaults key to false to restore the legacy row.
+enum TaskRowFlags {
+  static var languageV2: Bool {
+    UserDefaults.standard.object(forKey: "taskRowLanguageV2") as? Bool ?? true
+  }
+}
+
 // MARK: - Checkbox
 
 struct TaskCheckbox: View {
@@ -77,13 +95,25 @@ struct TaskCheckbox: View {
   /// to wear their section accent. `nil` means inherit list tint.
   var tint: Color? = nil
   let isDone: Bool
+  /// Readiness form (language v2): when true the open box is drawn dashed to
+  /// mark an unratified *proposal* — not completable until ratified.
+  var dashed: Bool = false
+  /// Readiness form (language v2): a small haloed corner dot in this color marks
+  /// a committed task carrying *unread context*. `nil` → no dot.
+  var cornerDot: Color? = nil
+  /// Language v2: amber checkbox marking a task that newly *landed on Today on
+  /// its own* (a scheduled/due plan that rolled in at the day boundary —
+  /// Things-style "new on Today"). Transient; self-clears at the next rollover.
+  /// This is the one place amber rides the control: it's the app's temporal
+  /// identity color, and the trigger is recency, surfaced only as it arrives.
+  var arrivedToday: Bool = false
   /// When true (and not done), the checkbox stroke/fill switch to
   /// `Theme.todayAccent` to signal a task 'promoted to Today' — folding the
   /// today indicator into the checkbox itself, so it no longer sits as a
   /// separate glyph inline with the title.
   var isToday: Bool = false
-  /// Which celebration plays on check — the row's type picks it (tasks
-  /// `.stamp`, habits `.echo`, supplements `.drop`, chores `.tuck`).
+  /// Which celebration plays on check. Standardized to `.stamp` across every
+  /// checkable row; the other feels stay available (see `CheckFeel`).
   var feel: CheckFeel = .stamp
   /// When true, ignore the user's "Logging animations" opt-out and always
   /// play the feel on check (Reduce Motion is still honored). Set only by
@@ -108,11 +138,15 @@ struct TaskCheckbox: View {
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
   /// and fill to `Theme.todayAccent`.
   private var boxStrokeColor: Color {
-    if isToday { return Theme.todayAccent }
+    // Legacy: amber box meant "is on Today" on off-Today surfaces.
+    if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
+    // Language v2: the box is neutral EXCEPT when a task just landed on Today on
+    // its own — then it wears amber as a Things-style "new on Today" highlight.
+    if TaskRowFlags.languageV2, arrivedToday { return Theme.todayAccent }
     return Theme.inkSecondary.opacity(0.55)
   }
   private var boxFillColor: Color {
-    if isToday { return Theme.todayAccent }
+    if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
     return Theme.inkSecondary.opacity(0.85)
   }
 
@@ -150,9 +184,12 @@ struct TaskCheckbox: View {
           .frame(width: Self.boxSize, height: Self.boxSize)
           .scaleEffect(ringScale)
           .offset(y: ringDrift)
-        // Open chrome — fades out under the arriving fill.
+        // Open chrome — fades out under the arriving fill. Language v2 draws it
+        // dashed for an unratified proposal (a provisional, not-yet task).
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-          .strokeBorder(boxStrokeColor, lineWidth: Self.boxStroke)
+          .strokeBorder(boxStrokeColor,
+                        style: StrokeStyle(lineWidth: Self.boxStroke,
+                                           dash: (dashed && TaskRowFlags.languageV2) ? [2.5, 2] : []))
           .frame(width: Self.boxSize, height: Self.boxSize)
           .opacity(isDone ? 0 : 1)
           .a11yAnimation(Theme.Motion.quick, value: isDone)
@@ -176,11 +213,26 @@ struct TaskCheckbox: View {
         }
         .scaleEffect(x: 1, y: bodySquash, anchor: .bottom)
         .offset(y: bodyDrop + bodyDip)
+
+        // Unread-context corner dot (language v2): a haloed accent dot pinned to
+        // the box's top-right, reading as an "unread" marker on a committed task.
+        if let cornerDot, TaskRowFlags.languageV2 {
+          Circle()
+            .fill(cornerDot)
+            .frame(width: 7, height: 7)
+            .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 1.5))
+            .offset(x: Self.boxSize / 2, y: -Self.boxSize / 2)
+        }
       }
       .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    // Keep the checkbox OUT of the keyboard focus ring. On macOS a focusable
+    // button inside a selected List row gets activated by Space — which silently
+    // completed tasks. Completion is the checkbox-click or ⌘K; never a stray
+    // Space. (Mouse clicks are unaffected — this only governs keyboard focus.)
+    .focusable(false)
     .onChange(of: isDone) { _, done in
       // Celebrate only on a live check. `onChange` skips first render, so a
       // list of already-done rows (Logbook) never fires a wall of ripples.
@@ -379,9 +431,13 @@ struct CheckableRow<Trailing: View>: View {
   var tint: Color
   var isDone: Bool
   var isToday: Bool = false
-  /// The checkbox celebration this row's type plays on check (see
-  /// `CheckFeel`). Tasks keep the default `.stamp`; habits pass `.echo`,
-  /// supplements `.drop`, chores `.tuck`.
+  /// Readiness form (language v2) forwarded to `TaskCheckbox`: dashed = proposal,
+  /// `cornerDot` = unread-context marker on a committed task.
+  var dashed: Bool = false
+  var cornerDot: Color? = nil
+  var arrivedToday: Bool = false
+  /// The checkbox celebration this row plays on check (see `CheckFeel`).
+  /// Standardized to the default `.stamp` across every checkable row.
   var feel: CheckFeel = .stamp
   /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
   /// skipped and chores fold in deferred, so the caller decides.
@@ -400,12 +456,16 @@ struct CheckableRow<Trailing: View>: View {
   var onTap: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(
         tint: tint,
         isDone: isDone,
+        dashed: dashed,
+        cornerDot: cornerDot,
+        arrivedToday: arrivedToday,
         isToday: isToday,
         feel: feel,
         onToggle: onToggle
@@ -438,7 +498,7 @@ struct CheckableRow<Trailing: View>: View {
       trailing()
     }
     .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    .padding(.vertical, rowVInset)
     .background(selectionHighlight)
     .contentShape(Rectangle())
     .modifier(OptionalTap(action: onTap))
@@ -518,6 +578,21 @@ struct TaskRow: View {
     !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
+  /// A volunteered, still-unratified agent proposal — the dashed "not a task
+  /// yet" form (docs/TASK_ROW_LANGUAGE_SPEC.md). Human captures in the inbox
+  /// stay solid; only MCP-sourced triage-band rows read as proposals.
+  private var isProposal: Bool {
+    task.isInTriageBand && task.source == TaskSource.mcp
+  }
+  /// Accent corner dot for a *committed* task carrying unread agent context (a
+  /// live conversation that needs the user). Proposals are excluded — they
+  /// already read as dashed. `nil` → no dot.
+  private var cornerDotColor: Color? {
+    guard TaskRowFlags.languageV2, !isProposal else { return nil }
+    if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
+    return nil
+  }
+
   /// Project wins over area (a task in a project implies its area), each
   /// honoring its suppression flag. Mirrors the old `TaskListView.metaLine`.
   private var subtitle: String? {
@@ -533,6 +608,9 @@ struct TaskRow: View {
       tint: accent,
       isDone: task.status == .done,
       isToday: task.isOnToday && showsTodayIndicator,
+      dashed: TaskRowFlags.languageV2 && isProposal,
+      cornerDot: cornerDotColor,
+      arrivedToday: task.showsArrivedToday(),
       isInactive: isInactive,
       title: task.title,
       subtitle: subtitle,
@@ -572,7 +650,13 @@ struct TaskRow: View {
   /// every other row glyph. The `hasStarted && badge != nil` guard mirrors
   /// `ConvoBadgeView`'s own, so when it wins the badge always renders.
   @ViewBuilder private var agentSignal: some View {
-    if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil {
+    if TaskRowFlags.languageV2 {
+      // Language v2: the agent signal rides the LEFT box — dashed = proposal,
+      // corner dot = unread context. "Arrived in Today on its own" is now an
+      // amber checkbox (Things-style "new on Today"), not a right-edge dot, so
+      // the trailing edge carries nothing for these states.
+      EmptyView()
+    } else if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil {
       ConvoBadgeView(convo: task.conversation)
     } else if task.showsAgentCue() {
       AgentCueMarker(tint: accent)
@@ -618,6 +702,12 @@ struct TaskRow: View {
         Text(Self.shortDate(scheduled)).font(.septenaMeta)
       }
       .foregroundStyle(Theme.inkSecondary)
+    } else if TaskRowFlags.languageV2, showsTodayIndicator, task.isOnToday {
+      // Language v2: Today moved off the checkbox to this right-edge chip — the
+      // one sanctioned time-status color (amber), on a chip, not the control.
+      Text("Today")
+        .font(.septenaMeta.weight(.semibold))
+        .foregroundStyle(Theme.todayAccent)
     }
   }
 

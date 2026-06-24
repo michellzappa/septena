@@ -312,11 +312,23 @@ enum MCPDispatch {
   private static func tasksCreate(_ args: MCPArgs) throws -> Any {
     try validateContainer("area", args.string("area"))
     try validateContainer("project", args.string("project"))
-    // Stamp provenance "mcp" so a Claude-authored task lands as an agent
-    // proposal in the triage band (freshness cue + acknowledge-on-ratify),
-    // matching the hosted gateway. Without this it would read as the user's own
-    // app capture. See SeptenaTask.isInTriageBand / TaskSource.
-    let t = SeptenaServices.shared.taskMutator.create(
+    // Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). A task is a *proposal* —
+    // landing unratified in the triage-band inbox, rendered dashed — when the
+    // agent VOLUNTEERED it, and *committed* — solid, placed as specified — when
+    // the user SOLICITED it. The wire carries `origin`; omitted falls back to
+    // this connection's default. The in-app local server is first-party (the
+    // user's own Claude Code), so it defaults to committed. A committed task is
+    // acknowledged at birth so it never wears the unseen-proposal cue and leaves
+    // the triage band immediately.
+    let proposed: Bool = {
+      switch args.string("origin") {
+      case "agent_suggestion": return true
+      case "user_request":     return false
+      default:                 return false   // local (first-party) default = committed
+      }
+    }()
+    let m = SeptenaServices.shared.taskMutator
+    let t = m.create(
       title: try args.requireString("title"),
       area: args.string("area"), project: args.string("project"),
       scheduled: try args.date("scheduled"),
@@ -324,7 +336,9 @@ enum MCPDispatch {
       today: args.bool("today") ?? false,
       notes: args.string("notes"),
       source: TaskSource.mcp)
-    return ["id": t.id, "title": t.title]
+    if !proposed { m.acknowledge(id: t.id) }
+    return ["id": t.id, "title": t.title,
+            "placement": proposed ? "inbox_proposal" : "committed"]
   }
 
   /// Reject writes that point a task at an `area`/`project` id with no matching
