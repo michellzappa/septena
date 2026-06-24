@@ -197,6 +197,23 @@ watch). The classic bug: a section with a manifest row + destination but **no
 - **CloudKit Prod schema deploy is additive-only** and deploying schema does NOT
   move data (Prod private DB starts empty). See `docs/CloudKitSchema.md` (the
   authoritative 27-record field table) and the prod-cutover plan.
+- **macOS keyboard & focus in a `NavigationSplitView`** (a concrete case of the
+  "use standard SwiftUI, never get creative" rule under Conventions): unmodified
+  keys (Return, arrows) and `.onKeyPress` / unmodified `.keyboardShortcut` are
+  **focus-scoped** — they only fire in the column that holds key focus, and the
+  **sidebar holds it by default**, so a detail-pane `.onKeyPress(.return)` never
+  fires until the detail claims focus (the "Return triggers the sidebar" trap).
+  Only **modifier** menu commands (`⌘X`) are global (why `⌘T`/`⌘K`/`⌘R` work).
+  Worse, **Space** in a selected row activates the row's first button — the
+  checkbox — so a bare Space *completes the task* (do not bind Space; keep the
+  checkbox `.focusable(false)` so it can't be Space-activated). Standard fixes
+  only: native `List(selection:)` for selection + arrow nav (never hand-rolled
+  tap-gesture selection — it suppresses native keyboard nav and the List's
+  click-to-focus); `@FocusState`+`.focused()` to claim detail focus; **modifier
+  menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
+  complete = `⌘K`); click-to-edit `TextField` / double-click / right-click for
+  mouse. Do NOT bind unmodified Space/Return, and do NOT bring back the `NSEvent`
+  monitors or hidden shortcut buttons that were tried for this and removed.
 
 ## Where truth lives (priority order)
 
@@ -231,6 +248,20 @@ watch). The classic bug: a section with a manifest row + destination but **no
 
 ## Conventions
 
+- **Use standard, default SwiftUI. Never get creative.** Reach for the
+  first-party, idiomatic API every time — `List(selection:)` for selection and
+  arrow-key nav, `@FocusState`/`.focused()` for focus, `.onSubmit` / a focused
+  `TextField` for inline editing, `.commands` + a *modifier* `keyboardShortcut`
+  for global keys, native `.contextMenu` / `.swipeActions`, `NavigationSplitView`
+  for sidebar+detail. If something "needs" an `NSEvent` monitor, a hidden
+  zero-frame shortcut button, a hand-rolled tap-gesture selection, an AppKit
+  bridge, or any clever workaround to behave, **stop** — that's the signal the
+  approach is wrong, not that it needs more cleverness. Prefer the platform's
+  default behavior over a bespoke one even when the default is slightly less than
+  what you imagined; a standard pattern that works beats a creative one that
+  fights the framework (and that we then chase across sessions). When the
+  idiomatic API genuinely can't do it, say so plainly and pick the closest
+  standard behavior — don't invent.
 - **All *app* documentation lives in `docs/`.** Any new `.md` — plan, handoff,
   spec, design note, feature write-up — goes in `docs/`, never the repo root. Root
   is reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,

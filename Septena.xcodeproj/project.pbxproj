@@ -117,6 +117,7 @@
 		2233D19F321BC3DFA2A8177B /* SectionsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C36D5AA0C5C42E8D7F4057 /* SectionsSettingsPane.swift */; };
 		2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */; };
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
+		22CE6E07D02E3FA677E2660A /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */; };
 		23066386CF43922C111C7CEB /* CoachBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03669C5350B224AF8B8C7845 /* CoachBackend.swift */; };
 		235C8E02A2E919E2E5FA23D0 /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
 		2395786BEB918CD00236678C /* SupplementIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C110FEAA290C71AE8A57A4 /* SupplementIntents.swift */; };
@@ -800,6 +801,7 @@
 		F4F3805C73E352D7CAB13041 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		F521521DF4A08E1F5FA21461 /* RhythmHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FBC963243F9C04B7A1E1D3E /* RhythmHomepageView.swift */; };
 		F5B490D2166BAEB13EE3383A /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
+		F72A014720B113D75319A8F2 /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */; };
 		F74B83D0F08A33334D5D698F /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
 		F7739072DE3EDDE989C4B9FB /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
 		F85E889C41CE2E31C1502315 /* AddHabitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24E908729637004C14E5310 /* AddHabitPage.swift */; };
@@ -1058,6 +1060,7 @@
 		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskIntent.swift; sourceTree = "<group>"; };
 		59A88F76E4A01B4157081C37 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventRow.swift; sourceTree = "<group>"; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5C198F08A4BCFDFC1B254BA8 /* MealLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealLogEntity.swift; sourceTree = "<group>"; };
 		5C480659283E01C4B16C910C /* DiscoveryMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryMiniApp.swift; sourceTree = "<group>"; };
@@ -2004,6 +2007,7 @@
 			isa = PBXGroup;
 			children = (
 				D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */,
+				5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */,
 				3E344068B6FEE62E7F0C23E3 /* ConversationCard.swift */,
 				541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */,
 				0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */,
@@ -2669,6 +2673,7 @@
 				AA180D6CF5C6326D64004622 /* BrowseGutDaySheet.swift in Sources */,
 				EC80F6B72765AEF523B5A4E2 /* CKEngine.swift in Sources */,
 				7397EB4533BA4D026F9F7662 /* CalendarBridge.swift in Sources */,
+				F72A014720B113D75319A8F2 /* CalendarEventRow.swift in Sources */,
 				D9577A67DEBE15026B16C053 /* CanonicalExerciseName.swift in Sources */,
 				896979AD0C8C48341B2DAEB8 /* Changelog.swift in Sources */,
 				99277F861EF959F986D7589B /* ChartCard.swift in Sources */,
@@ -3095,6 +3100,7 @@
 				BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */,
 				5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */,
 				B09EA3455FBF702224C33616 /* CalendarBridge.swift in Sources */,
+				22CE6E07D02E3FA677E2660A /* CalendarEventRow.swift in Sources */,
 				1D9688F8151A47D8555D18FB /* CanonicalExerciseName.swift in Sources */,
 				1A088F3F0CCB07D3B1206654 /* Changelog.swift in Sources */,
 				DCDA3588548FB4D80137D355 /* ChartCard.swift in Sources */,

@@ -1984,6 +1984,9 @@
         }
       }
     },
+    "Calendar" : {
+
+    },
     "Calm" : {
       "localizations" : {
         "pt-BR" : {
@@ -7981,6 +7984,9 @@
           }
         }
       }
+    },
+    "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar." : {
+
     },
     "Week" : {
       "localizations" : {

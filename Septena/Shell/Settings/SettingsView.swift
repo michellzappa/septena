@@ -145,6 +145,12 @@ enum SettingsKey {
   /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
   /// users who prefer landing on the full Tasks tab can flip it.
   static let tasksOpenIn      = "septena.tasks.openIn"
+  /// Whether the Tasks lists weave in the day's calendar events — the day's
+  /// agenda at the top of Today and under each Upcoming day, Things-style.
+  /// Absent → on (events only ever show once calendar access is granted in
+  /// Settings → Integrations, so the default can't surprise-prompt). Read by
+  /// `TaskListView`.
+  static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
   /// Master switch for the per-log "commit flourish" animations (the
   /// `CommitMotion` / `LogCommitOverlay` celebrations that play when you log
   /// something). Absent → on. Off suppresses every logging animation

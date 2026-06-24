@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import EventKit  // optional calendar agenda woven into Today / Upcoming
 #if canImport(AppKit)
 import AppKit  // NSEvent.modifierFlags for ⌘/⇧-click selection
 #endif
@@ -41,6 +42,13 @@ struct TaskListView: View {
   let embeddedHeader: () -> AnyView
 
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  /// Opt-in: weave the day's calendar events into Today and Upcoming (Things-
+  /// style). Only ever populated for those two filters, and only when calendar
+  /// access is already granted (Settings → Integrations) — see `load()`.
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
+  /// The fetched calendar events for the current filter's window. `todayEvents()`
+  /// on Today; the next 30 days on Upcoming; empty everywhere else.
+  @State private var calendarEvents: [EKEvent] = []
 
   // Items/review/doneToday are filter-scoped. We store them alongside the
   // filter they correspond to; when the current `filter` doesn't match the
@@ -204,11 +212,11 @@ struct TaskListView: View {
   }
   @FocusState private var inlineFocus: InlineFocus?
   #if os(macOS)
-  /// Pending "click the selected row → rename" work, scheduled by a single
-  /// click on an already-selected row and cancelled by a double-click (which
-  /// opens the composer instead). This is the standard Finder/Notes rename
-  /// disambiguation — a slow second click renames, a fast one opens.
-  @State private var pendingRename: DispatchWorkItem?
+  /// Whether the task List owns key focus. In a NavigationSplitView the sidebar
+  /// column holds focus by default, so a detail `.onKeyPress` never fires; we
+  /// claim focus for the list (on appear / list-swap, the Mail/Notes model where
+  /// the content list holds focus for keyboard nav) so Return reaches it.
+  @FocusState private var listFocused: Bool
   #endif
   /// The task whose title is being renamed in place (nil → none). Its row
   /// renders the inline editor instead of the static `TaskRow`.
@@ -223,6 +231,15 @@ struct TaskListView: View {
   /// Whether the Inbox section (on the Today view) is folded. Expanded by
   /// default; the header shows the count either way.
   @State private var inboxCollapsed = false
+  /// Folds today's woven calendar agenda away — same gesture as the Inbox, but
+  /// the choice sticks **for the day**: we persist the date it was folded on, so
+  /// fold once and it stays folded across reloads / relaunches until tomorrow,
+  /// when the stored date no longer matches `SeptenaDate.today` and it reopens.
+  @AppStorage("septena.tasks.calendarFoldedOn") private var calendarFoldedOn = ""
+  private var calendarCollapsed: Bool { calendarFoldedOn == SeptenaDate.today }
+  private func toggleCalendarFold() {
+    calendarFoldedOn = calendarCollapsed ? "" : SeptenaDate.today
+  }
 
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
@@ -388,6 +405,10 @@ struct TaskListView: View {
     .listStyle(.plain)
     #endif
     .scrollContentBackground(.hidden)
+    // Deep task-list rhythm runs denser than the drawer's: task rows read
+    // `rowVInset` for their top/bottom padding, tightened here to Things-3
+    // density. Drawer/log rows keep the default (airier) `Theme.rowVPadding`.
+    .environment(\.rowVInset, Theme.rowVPaddingTight)
     #if os(macOS)
     // Clicking blank space (the paper behind the rows) clears the selection.
     // Rows sit above this background, so row clicks never reach it — only
@@ -443,7 +464,17 @@ struct TaskListView: View {
     }
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
-    .onAppear { Task { await load() } }
+    .onAppear {
+      // Refresh the woven calendar agenda SYNCHRONOUSLY on appear so the
+      // Calendar section is right on the first frame instead of popping in a
+      // beat later when the async load() resolves. This is the fresh-instance
+      // case: arriving at Today from a Project/Area page (a different view
+      // type) builds a brand-new TaskListView, so `.onChange(of: filter)`
+      // never fires and `calendarEvents` would otherwise stay empty until the
+      // load lands — a visible layout jump.
+      refreshCalendarEvents()
+      Task { await load() }
+    }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
     // batch — including pushes from other devices and the foreground
     // bootstrap fetch. Without this, the list only refreshes when the
@@ -454,6 +485,15 @@ struct TaskListView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
       Task { await load() }
     }
+    // EventKit fires this when calendar data changes (an event added/edited in
+    // Calendar, a remote calendar sync). Re-read so the woven agenda stays live
+    // without leaving and returning to the list. A plain re-fetch — no task load.
+    .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
+      refreshCalendarEvents()
+    }
+    // Flipping the opt-in in Settings should land immediately — fetch on, clear
+    // off — without waiting for the next load.
+    .onChange(of: showCalendarEvents) { _, _ in refreshCalendarEvents() }
     // Filter swaps reuse this same view (no .id(route) at the App level for
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear
@@ -469,9 +509,15 @@ struct TaskListView: View {
       titleDraft = ""
       newTaskText = ""
       inlineFocus = nil
-      #if os(macOS)
-      pendingRename?.cancel(); pendingRename = nil
-      #endif
+      // Re-fetch the woven calendar agenda SYNCHRONOUSLY, in the same
+      // transaction as the filter change. The view is reused across filter
+      // swaps, so without this the body re-renders for the new filter while
+      // `calendarEvents` still holds the PREVIOUS filter's events — e.g.
+      // Upcoming→Today briefly renders all 30 days of upcoming events as
+      // today's agenda, then snaps when the async load() resolves. That stale
+      // frame is the "weird rebuild between screens". Mirrors the synchronous
+      // correctness the `items`/`storageFilter` getter already gives the rows.
+      refreshCalendarEvents()
       Task { await load() }
     }
     // Leaving reorder edit mode drops the selection so nothing stale lingers.
@@ -538,12 +584,16 @@ struct TaskListView: View {
 
   // MARK: - Inline editing
 
-  /// Whether this list accepts new rows. Logbook (completed) and Recently
-  /// Deleted are read-only histories — no quick-add line there.
+  /// Whether this list accepts an inline quick-add line. Logbook (completed) and
+  /// Recently Deleted are read-only histories. Upcoming is excluded too: it's a
+  /// multi-day grouped grid with no single target day, so a foot-of-list line
+  /// would just dump every capture onto "tomorrow" regardless of context — use
+  /// the `+`/⌘N composer there (it lets you pick the day). Today hosts no foot
+  /// line either; its captures go through the composer as well.
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted: return false
-    default:                         return true
+    case .logbook, .recentlyDeleted, .upcoming: return false
+    default:                                    return true
     }
   }
 
@@ -599,6 +649,11 @@ struct TaskListView: View {
   private func endRename() {
     editingTitleId = nil
     if case .row = inlineFocus { inlineFocus = nil }
+    #if os(macOS)
+    // Hand key focus back to the list so ↑/↓ resume immediately after canceling
+    // (the field had it during the edit).
+    listFocused = true
+    #endif
   }
 
   /// Move keyboard focus into the quick-add line (the macOS empty-space
@@ -658,26 +713,31 @@ struct TaskListView: View {
     // Esc/Return (no hardware Esc there). Row→row switches are pre-committed in
     // `beginEdit`; this catches focus going to the quick-add line or to nil.
     .onChange(of: inlineFocus) { old, _ in commitRenameOnFocusLoss(from: old) }
+    #if os(macOS)
+    // Native selection holds key focus for click + ↑/↓ traversal. We deliberately
+    // attach NO unmodified-key (Space/Return) handlers: SwiftUI's List doesn't
+    // reliably deliver them and they fight the framework (Return → sidebar
+    // default action; Space → activates the row's checkbox button = accidental
+    // complete). Keyboard rename is the ⌘R menu command (a MODIFIER shortcut,
+    // which is reliable — see TaskCommandsMenu); double-click opens the composer
+    // and right-click → Rename. See CLAUDE.md "Known traps".
+    .focused($listFocused)
+    .onAppear { listFocused = true }
+    .onChange(of: filter) { _, _ in listFocused = true }
+    // Esc (the standard SwiftUI cancel command). The inline field carries its own
+    // `.onExitCommand` too, but the List and the field share focus uneasily, so
+    // we handle every state here as the reliable catch-all:
+    //   • editing  → cancel the edit. `endRename` removes the TextField, so its
+    //     selected-all text disappears with it; the row stays selected.
+    //   • quick-add → blur the new-task line.
+    //   • selected → deselect the row. With selection empty, ↑/↓ re-selects.
+    .onExitCommand {
+      if editingTitleId != nil { endRename() }
+      else if inlineFocus != nil { inlineFocus = nil }
+      else { clearSelection() }
+    }
+    #endif
   }
-
-  #if os(macOS)
-  /// The action behind the "Rename" menu command (Return). Nil — so the menu
-  /// item disables and Return falls through to any focused text field — whenever
-  /// a field or picker sheet is active or there's no plain row selected. Enabled
-  /// only when a single open row is selected, so Return renames it in place.
-  /// (A List-level `.onKeyPress`/`.focused` can't get Return inside a
-  /// NavigationSplitView — the sidebar column holds key focus — but a menu
-  /// key-equivalent fires regardless of which column is focused.)
-  private var renameSelectedAction: (() -> Void)? {
-    guard editingTitleId == nil, inlineFocus == nil, !composerIsOpen,
-          whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
-          !nav.showQuickFind,
-          let id = selection.first(where: { currentTask(id: $0) != nil }),
-          let task = currentTask(id: id), task.status != .done
-    else { return nil }
-    return { beginEdit(task) }
-  }
-  #endif
 
   @ViewBuilder
   private var taskListHeader: some View {
@@ -695,15 +755,14 @@ struct TaskListView: View {
   /// row, clearing it from the Inbox). See docs/TRIAGE_BAND_SPEC.md.
   @ViewBuilder
   private var triageSection: some View {
-    if filter == .today {
-      // Always rendered on Today (even with an empty Inbox) so the quick-add
-      // line has a home: a new capture is an unratified Inbox item, so this is
-      // where "New task" belongs — not dangling under the last project. The
-      // header count is hidden when empty so a clean Inbox stays quiet.
+    // Rendered on Today only when there's something to triage. (It used to be
+    // always-on to host the inline quick-add line; that line was dropped, so an
+    // empty Inbox now stays out of the way entirely.) New tasks come from the
+    // toolbar `+` / ⌘N composer.
+    if filter == .today, !triageItems.isEmpty {
       Section {
         if !inboxCollapsed {
           ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id) }
-          quickAddLine().asListRow()
         }
       } header: {
         inboxHeader(count: triageItems.count)
@@ -711,11 +770,23 @@ struct TaskListView: View {
     }
   }
 
-  /// Foldable Inbox header — same anatomy as the area `groupHeader` (icon
-  /// column, title, hairline) plus a live count and a fold chevron. Tapping
-  /// anywhere on it toggles the section.
+  /// Foldable Inbox header — see `foldableSectionHeader`.
   @ViewBuilder
   private func inboxHeader(count: Int) -> some View {
+    foldableSectionHeader(icon: "tray.full", title: "Inbox", count: count,
+                          isCollapsed: inboxCollapsed) {
+      inboxCollapsed.toggle()
+    }
+  }
+
+  /// A foldable section header — same anatomy as the area `groupHeader` (icon
+  /// column, title, hairline) plus a live count and a fold chevron. Tapping
+  /// anywhere on it toggles the section. Shared by the Inbox and the woven
+  /// Calendar agenda so both fold identically.
+  @ViewBuilder
+  private func foldableSectionHeader(icon: String, title: String, count: Int? = nil,
+                                     isCollapsed: Bool, showsHairline: Bool = true,
+                                     onToggle: @escaping () -> Void) -> some View {
     #if os(macOS)
     let headerTopPadding: CGFloat = 32
     let headerHorizontalCorrection: CGFloat = 0
@@ -725,20 +796,18 @@ struct TaskListView: View {
     #endif
     Button {
       Haptics.tick()
-      withAnimation(.easeInOut(duration: 0.2)) { inboxCollapsed.toggle() }
+      withAnimation(.easeInOut(duration: 0.2)) { onToggle() }
     } label: {
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: Theme.iconTextGap) {
-          Image(systemName: "tray.full")
+          Image(systemName: icon)
             .scaledFont(size: 16)
             .foregroundStyle(Theme.iconMuted)
             .frame(width: Theme.checkboxTap, alignment: .center)
-          Text("Inbox")
+          Text(title)
             .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
             .foregroundStyle(Theme.inkPrimary)
-          // Count only when there's something to triage — an empty Inbox (now
-          // always shown on Today to host the quick-add line) stays quiet.
-          if count > 0 {
+          if let count, count > 0 {
             Text("\(count)")
               .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
               .monospacedDigit()
@@ -748,13 +817,17 @@ struct TaskListView: View {
           Image(systemName: "chevron.down")
             .scaledFont(size: 12, weight: .semibold)
             .foregroundStyle(Theme.iconMuted)
-            .rotationEffect(.degrees(inboxCollapsed ? -90 : 0))
+            .rotationEffect(.degrees(isCollapsed ? -90 : 0))
         }
         .padding(.horizontal, Theme.hPadding)
         .padding(.horizontal, headerHorizontalCorrection)
         .padding(.top, headerTopPadding)
         .padding(.bottom, 6)
-        Hairline().padding(.bottom, 4)
+        // A collapsed Calendar drops its own hairline so it doesn't stack a
+        // second divider above the next section's — one rule, not two.
+        if showsHairline {
+          Hairline().padding(.bottom, 4)
+        }
       }
       .contentShape(Rectangle())
     }
@@ -767,6 +840,7 @@ struct TaskListView: View {
   private var taskListRows: some View {
     switch filter {
     case .today:
+      todayCalendarSection
       triageSection
       groupedOpenItems
     case .unscheduled:
@@ -894,7 +968,11 @@ struct TaskListView: View {
 
   private func currentTask(id: String?) -> SeptenaTask? {
     guard let id else { return nil }
-    return (items + review + doneToday).first(where: { $0.id == id })
+    // Include `triageItems` — the Inbox rows on Today are real, selectable rows
+    // but live outside `items`. Omitting them meant a selected Inbox task
+    // couldn't be resolved, so keyboard commands fell back to the first row of
+    // the first project/area (the "Space/⌘T acts on the wrong task" bug).
+    return (triageItems + items + review + doneToday).first(where: { $0.id == id })
   }
 
   // MARK: - Keyboard navigation
@@ -904,7 +982,8 @@ struct TaskListView: View {
   private var keyboardOrderedTaskIds: [String] {
     switch filter {
     case .today:
-      return orderedFromGroupedOpen(pool: items + review)
+      // Inbox rows render above the Today groups, so traverse them first.
+      return triageItems.map(\.id) + orderedFromGroupedOpen(pool: items + review)
     case .unscheduled:
       return review.map(\.id) + orderedFromGroupedOpen(pool: items)
     case .upcoming:
@@ -940,6 +1019,23 @@ struct TaskListView: View {
           let t = currentTask(id: id) else { return }
     editingDetail = t
   }
+
+  #if os(macOS)
+  /// The action behind the ⌘R "Rename" menu command. Nil — so the menu item
+  /// disables and ⌘R falls through — when a text field / picker sheet is active
+  /// or no plain open row is selected. Uses an EXPLICIT selection (not
+  /// `effectiveSelectionId`'s first-row fallback), and `currentTask` now includes
+  /// Inbox rows, so it renames exactly the selected task.
+  private var renameSelectedAction: (() -> Void)? {
+    guard editingTitleId == nil, inlineFocus == nil, !composerIsOpen,
+          whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
+          !nav.showQuickFind,
+          let id = selection.first(where: { currentTask(id: $0) != nil }),
+          let task = currentTask(id: id), task.status != .done
+    else { return nil }
+    return { beginEdit(task) }
+  }
+  #endif
 
   private func toggleSelected() {
     guard let id = effectiveSelectionId(),
@@ -1179,14 +1275,15 @@ struct TaskListView: View {
     // transaction; every settle-driven removal runs through `motion.run`, so
     // Reduce Motion still gets an instant (un-animated) drop.
     .transition(.opacity)
-    // The Reminders/Things "type-a-line" model. The checkbox is a Button and
-    // handles its own taps; we skip its hit region so toggling done doesn't also
-    // start an edit.
     //   • iOS: single tap → rename the title in place (skipped while reordering;
-    //     completed rows open the composer instead — you don't rename a done row
-    //     inline). The full composer is the ⓘ Details button in the inline row.
-    //   • macOS: single click selects, double-click opens the composer; Return
-    //     on the selected row renames in place (handled on the List).
+    //     completed rows open the composer instead). Full composer = the ⓘ on
+    //     the inline row.
+    //   • iOS: single tap renames in place.
+    //   • macOS: native List handles single-click select + ⌘/⇧-click + ↑/↓; a
+    //     plain `.onTapGesture(count: 2)` opens the composer. Unlike the
+    //     `.simultaneousGesture` form (which swallowed the selecting click), a
+    //     count-2 tap only matches the double-click and leaves the single click
+    //     to the List's native selection. Rename = ⌘R / right-click → Rename.
     #if os(iOS)
     .simultaneousGesture(SpatialTapGesture().onEnded { value in
       guard !isEditMode else { return }
@@ -1194,30 +1291,7 @@ struct TaskListView: View {
       beginEdit(task)
     })
     #else
-    // Selection + rename + open on macOS, all gesture-driven. Return can't be
-    // used: inside the NavigationSplitView the sidebar column holds key focus,
-    // so a List-level key handler never sees Return — it just re-activates the
-    // sidebar selection. We also can't lean on native click-selection: any tap
-    // gesture on a row captures the click before NSTableView selects, and the
-    // AppKit double-click overlay never fires inside a List. So we own it:
-    //   • single click on an UNselected row → select.
-    //   • single click on the ALREADY-selected row → rename in place, the
-    //     Finder/Notes "click the selected name" gesture. Scheduled with a short
-    //     delay and cancelled by a double-click, so it never pre-empts opening.
-    //   • double click → open the full composer.
-    .simultaneousGesture(TapGesture(count: 2).onEnded {
-      pendingRename?.cancel(); pendingRename = nil
-      clickSelect(task.id); editingDetail = task
-    })
-    .simultaneousGesture(TapGesture(count: 1).onEnded {
-      let wasSelected = (selection == [task.id])
-      clickSelect(task.id)
-      pendingRename?.cancel()
-      guard wasSelected, task.status != .done else { pendingRename = nil; return }
-      let work = DispatchWorkItem { beginEdit(task) }
-      pendingRename = work
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: work)
-    })
+    .onTapGesture(count: 2) { editingDetail = task }
     #endif
     // Right-click selects this row (unless already part of a selection) so the
     // menu's target is unambiguous.
@@ -1394,29 +1468,12 @@ struct TaskListView: View {
   // deselect path funnels through `clearSelection` so iOS edit mode can never
   // desync from an empty selection.
 
-  /// Replace the selection with exactly one row.
+  /// Replace the selection with exactly one row. Used by right-click to make the
+  /// context-menu target unambiguous; ordinary click / ⌘-click / ⇧-click / ↑↓
+  /// selection is now handled natively by `List(selection:)`.
   private func selectOnly(_ id: String) {
     selection = [id]
   }
-
-#if os(macOS)
-  /// macOS click selection, driven from the row's tap gesture (native
-  /// click-selection is unavailable once a tap gesture is attached — see the
-  /// row's `.simultaneousGesture`). Mirrors the system convention: plain click
-  /// selects only this row, ⌘-click toggles it in/out of the set, ⇧-click adds
-  /// it (extends). Writes the same `selection` set the List binds to, so the
-  /// native highlight + keyboard nav stay in sync.
-  private func clickSelect(_ id: String) {
-    let mods = NSEvent.modifierFlags
-    if mods.contains(.command) {
-      if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-    } else if mods.contains(.shift) {
-      selection.insert(id)
-    } else {
-      selection = [id]
-    }
-  }
-#endif
 
   /// Deselect everything — the single "clear selection" entry point used by
   /// every deselect path.
@@ -1670,6 +1727,78 @@ struct TaskListView: View {
     }
   }
 
+  // MARK: - Calendar events (woven agenda)
+
+  /// Stable agenda order for a day's events: all-day items first (they frame the
+  /// day), then timed events by start. Used by both Today and each Upcoming day.
+  private func sortedEvents(_ events: [EKEvent]) -> [EKEvent] {
+    events.sorted { a, b in
+      if a.isAllDay != b.isAllDay { return a.isAllDay }   // all-day first
+      return a.startDate < b.startDate
+    }
+  }
+
+  /// The day's events as a *single* condensed list row (a tight VStack), not one
+  /// list row per event — iOS `List` enforces a ~44pt minimum height per row, so
+  /// per-event rows balloon into a very airy block. As one row the internal
+  /// spacing is ours, giving the calm, dense Things-style strip.
+  @ViewBuilder
+  private func calendarEventsBlock(_ events: [EKEvent]) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(sortedEvents(events), id: \.calendarRowID) { event in
+        CalendarEventRow(event: event, fallback: theme.color(for: "calendar"))
+      }
+    }
+    .asListRow()
+  }
+
+  /// The YYYY-MM-DD day keys an event occupies within the Upcoming window —
+  /// every day from its start through its end, clamped to [today, today+30].
+  /// A single-day or timed event yields one key; a multi-day all-day event
+  /// yields one per day it spans, so it repeats down the list like in Calendar.
+  private func upcomingDayKeys(for event: EKEvent) -> [String] {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    guard let start = event.startDate,
+          let windowEnd = cal.date(byAdding: .day, value: 30, to: today) else { return [] }
+    // All-day end dates land on the next day's midnight (exclusive); pull back a
+    // moment so a single-day all-day event doesn't bleed onto the following day.
+    var endRef = event.endDate ?? start
+    if event.isAllDay, endRef == cal.startOfDay(for: endRef) {
+      endRef = endRef.addingTimeInterval(-1)
+    }
+    var day = max(cal.startOfDay(for: start), today)
+    let lastDay = min(cal.startOfDay(for: endRef), windowEnd)
+    var keys: [String] = []
+    while day <= lastDay {
+      if let key = SeptenaDate.format(day) { keys.append(key) }
+      guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+      day = next
+    }
+    return keys
+  }
+
+  /// The day's calendar events as a "Calendar" section at the top of Today —
+  /// the agenda you read before the to-dos. Only renders when the opt-in is on
+  /// and there's something to show; `calendarEvents` is already gated to
+  /// granted-access in `refreshCalendarEvents()`.
+  @ViewBuilder
+  private var todayCalendarSection: some View {
+    if showCalendarEvents, !calendarEvents.isEmpty {
+      Section {
+        if !calendarCollapsed {
+          calendarEventsBlock(calendarEvents)
+        }
+      } header: {
+        foldableSectionHeader(icon: "calendar", title: "Calendar",
+                              isCollapsed: calendarCollapsed,
+                              showsHairline: !calendarCollapsed) {
+          toggleCalendarFold()
+        }
+      }
+    }
+  }
+
   // MARK: - Upcoming grouping (by date)
 
   /// Buckets upcoming items by their scheduled (or due) date, in the order
@@ -1679,6 +1808,11 @@ struct TaskListView: View {
     let buckets = upcomingBuckets()
     ForEach(buckets, id: \.key) { bucket in
       Section {
+        // The day's calendar events frame it first (the agenda), then the tasks
+        // scheduled for that day — matching Today, where the agenda sits on top.
+        if !bucket.events.isEmpty {
+          calendarEventsBlock(bucket.events)
+        }
         ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id) }
       } header: {
         groupHeader(icon: "calendar", title: bucket.label)
@@ -1690,11 +1824,15 @@ struct TaskListView: View {
     let key: String        // YYYY-MM-DD
     let label: String
     let tasks: [SeptenaTask]
+    let events: [EKEvent]
   }
 
+  /// Buckets the upcoming list by day, merging the **union** of task-days and
+  /// calendar event-days so a day with only events (e.g. an all-day "off") still
+  /// gets a row — Things-style. Days are sorted ascending (event-only days can
+  /// land anywhere among task days, so first-seen order no longer suffices).
   private func upcomingBuckets() -> [DateBucket] {
-    var order: [String] = []
-    var grouped: [String: [SeptenaTask]] = [:]
+    var tasksByDay: [String: [SeptenaTask]] = [:]
     for task in items {
       // Drop finished rows (completed or cancelled) except those still
       // settling, so a just-checked / just-cancelled upcoming task lingers for
@@ -1702,11 +1840,26 @@ struct TaskListView: View {
       if task.status != .open && !settle.isSettling(task.id) { continue }
       let key = task.scheduled ?? task.deadline ?? ""
       guard !key.isEmpty else { continue }
-      if grouped[key] == nil { order.append(key) }
-      grouped[key, default: []].append(task)
+      tasksByDay[key, default: []].append(task)
     }
-    return order.map { key in
-      DateBucket(key: key, label: dateHeaderLabel(key), tasks: grouped[key] ?? [])
+
+    var eventsByDay: [String: [EKEvent]] = [:]
+    if showCalendarEvents {
+      for event in calendarEvents {
+        // A multi-day event (e.g. an all-day "off" spanning a long weekend)
+        // shows on every day it covers, not just its start day.
+        for key in upcomingDayKeys(for: event) {
+          eventsByDay[key, default: []].append(event)
+        }
+      }
+    }
+
+    let days = Set(tasksByDay.keys).union(eventsByDay.keys).sorted()
+    return days.map { key in
+      DateBucket(key: key,
+                 label: dateHeaderLabel(key),
+                 tasks: tasksByDay[key] ?? [],
+                 events: eventsByDay[key] ?? [])
     }
   }
 
@@ -1945,7 +2098,26 @@ struct TaskListView: View {
       let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
       newTodosDismissed = (last == SeptenaDate.today)
     }
+    refreshCalendarEvents()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
+  }
+
+  /// Pull the day's calendar events for the lists that show them (Today,
+  /// Upcoming). No-ops to empty when the feature is off, access isn't granted,
+  /// or this isn't one of those lists — so the rest of the view can render
+  /// straight from `calendarEvents` without re-checking. `CalendarBridge` is
+  /// `@MainActor`, same as this method, so the read is a direct call.
+  private func refreshCalendarEvents() {
+    guard showCalendarEvents,
+          filter == .today || filter == .upcoming,
+          CalendarBridge.shared.access == .granted
+    else {
+      if !calendarEvents.isEmpty { calendarEvents = [] }
+      return
+    }
+    calendarEvents = filter == .today
+      ? CalendarBridge.shared.todayEvents()
+      : CalendarBridge.shared.upcomingEvents(days: 30)
   }
 
   // MARK: - New-to-dos banner
@@ -2298,11 +2470,10 @@ struct TaskActions {
   var delete: (() -> Void)?
   /// Same gating as `delete` — ⌘. shouldn't act on an unintended row.
   var clearSchedule: (() -> Void)?
-  /// Return → rename the selected row in place. Nil (→ the menu item disables,
-  /// so Return falls through to any focused text field) whenever a field/sheet
-  /// is active or nothing's selected. This is how macOS gets Enter-to-rename:
-  /// a List-level key handler never sees Return inside a NavigationSplitView
-  /// (the sidebar column owns key focus), but a menu key-equivalent does.
+  /// ⌘R → rename the selected row in place. Nil (→ menu item disabled) when a
+  /// text field/sheet is active or no open row is selected. A MODIFIER menu
+  /// shortcut is the reliable way to do this on macOS — unmodified Space/Return
+  /// can't be (they hit the checkbox / the sidebar). See CLAUDE.md.
   var rename: (() -> Void)?
 }
 
@@ -2381,6 +2552,7 @@ private struct InlineTaskRow: View {
   var onOpenDetails: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
@@ -2412,7 +2584,7 @@ private struct InlineTaskRow: View {
       }
     }
     .padding(.horizontal, rowHInset)
-    .padding(.vertical, Theme.rowVPadding)
+    .padding(.vertical, rowVInset)
     .background(selectionHighlight)
     .contentShape(Rectangle())
   }

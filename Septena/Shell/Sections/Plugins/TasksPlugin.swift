@@ -181,6 +181,7 @@ private struct TasksDetailContent: View {
   @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
   @AppStorage(SettingsKey.tasksOpenIn)        private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
 
   var body: some View {
     Section("Open in") {
@@ -197,6 +198,13 @@ private struct TasksDetailContent: View {
     }
     Section("Today") {
       Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
+    }
+    Section {
+      Toggle("Show calendar events", isOn: $showCalendarEvents)
+    } header: {
+      Text("Calendar")
+    } footer: {
+      Text("Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar.")
     }
     Section {
       Text("Areas and projects are managed in the Tasks tab.")

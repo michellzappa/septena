@@ -10,17 +10,14 @@ struct TaskCommandsMenu: View {
   @FocusedValue(\.taskActions) private var actions
 
   var body: some View {
-    // ⌘N lives in the File menu via `NewTaskCommand` so it works even when
-    // no task list is focused (otherwise the system falls back to "New
-    // Window").
-
-    // Return renames the selected row in place. Disabled (so Return falls
-    // through to a focused text field — the inline editor, quick-add, the
-    // composer) whenever `rename` is nil. This menu key-equivalent is how macOS
-    // gets Enter-to-rename: a List-level key handler never sees Return inside the
-    // NavigationSplitView, but the menu does.
+    // ⌘N lives in the File menu via `NewTaskCommand` so it works even when no
+    // task list is focused. Rename is ⌘R — a MODIFIER menu shortcut, the only
+    // reliable keyboard path on macOS: unmodified Space activates the row's
+    // checkbox (completes it) and Return is stolen by the sidebar. Mouse rename
+    // is double-click → composer / right-click → Rename. Disabled (so ⌘R falls
+    // through to any focused text field) when `rename` is nil.
     Button("Rename") { actions?.rename?() }
-      .keyboardShortcut(.return, modifiers: [])
+      .keyboardShortcut("r", modifiers: .command)
       .disabled(actions?.rename == nil)
 
     Button("Mark as Complete") { actions?.toggleComplete?() }
