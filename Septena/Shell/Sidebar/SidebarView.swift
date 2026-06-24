@@ -72,15 +72,6 @@ struct SidebarRootView: View {
   @State private var areaOpenCount: [String: Int] = [:]
   @State private var errorMessage: String?
 
-  #if os(macOS)
-  /// The highlighted sidebar row, decoupled from what's open in the detail
-  /// pane (the Finder/Mail source-list model): ↑↓ / single-click move this
-  /// selection without navigating; a double-click or Return opens the selected
-  /// row (`openSelection`). Synced to the open route on appear and whenever the
-  /// detail navigates elsewhere, so selection follows an external jump.
-  @State private var macSelection: SidebarSelection?
-  #endif
-
   /// Magic Plus on the homepage offers task / project / area creation.
   @State private var showingCreateMenu = false
   @State private var showingNewProject = false
@@ -255,39 +246,20 @@ struct SidebarRootView: View {
     .listSectionSpacing(18)
     #else
     // macOS uses the native `.sidebar` `List(selection:)` — the standard
-    // source-list selection (Mail / Finder / Notes): accent while the list is
-    // focused, the system's unemphasized gray when the detail pane takes focus,
-    // plus ↑↓ row traversal for free. Selection is its OWN state (`macSelection`),
-    // decoupled from what's open: a single click / arrow key just moves the
-    // highlight; a double-click (in `navRow`) or Return opens it.
-    List(selection: $macSelection) {
+    // source-list selection (Mail / Finder / Notes / Reminders): accent while
+    // the list is focused, the system's unemphasized gray when the detail pane
+    // takes focus, plus ↑↓ row traversal for free. The selection binding drives
+    // navigation directly (`sidebarSelection`), so a *single* click / arrow key
+    // opens the row — matching every system source list. (It used to be a
+    // decoupled `macSelection` that only opened on double-click/Return, which
+    // read as broken: nothing else on macOS makes you double-click a sidebar.)
+    List(selection: sidebarSelection) {
       smartListSection
       areaProjectSections
     }
     .listStyle(.sidebar)
-    // Return opens the highlighted row, the keyboard twin of a double-click.
-    .onKeyPress(.return) {
-      guard let macSelection else { return .ignored }
-      openSelection(macSelection)
-      return .handled
-    }
-    // Start the highlight on whatever's already open, and follow the detail if
-    // it navigates from elsewhere (a deleted row bouncing to Today, a deep link).
-    .onAppear { syncMacSelectionToOpenRoute() }
-    .onChange(of: nav.path) { _, _ in syncMacSelectionToOpenRoute() }
     #endif
   }
-
-  #if os(macOS)
-  /// Move the sidebar highlight onto the route currently shown in the detail
-  /// pane. Called on appear and when `nav` changes externally — opening a row
-  /// already sets both, so this only catches navigation that originated
-  /// elsewhere (delete-bounce, deep link), never fighting an arrow-key move.
-  private func syncMacSelectionToOpenRoute() {
-    let token = nav.path.last.map(Self.token(for:))
-    if token != macSelection { macSelection = token }
-  }
-  #endif
 
   // MARK: - Smart lists section
   //
@@ -512,25 +484,18 @@ struct SidebarRootView: View {
     ]
   }
 
-  /// A navigable sidebar row. Three behaviors, one per surface:
-  ///   • macOS: a native `List(selection:)` cell tagged by its route. Selection
-  ///     (`macSelection`) is decoupled from navigation — single-click / arrow
-  ///     keys move the highlight, a double-click (or Return) opens it.
-  ///   • iPad regular (push nav): a tagged cell whose selection drives the
-  ///     detail directly through `sidebarSelection` — select *is* open.
+  /// A navigable sidebar row. Two behaviors:
+  ///   • macOS / iPad regular (push nav): a native `List(selection:)` cell
+  ///     tagged by its route, whose selection drives the detail directly through
+  ///     `sidebarSelection` — a single click (or arrow key) *is* open, the
+  ///     standard system source-list model.
   ///   • iPhone / slide-over (compact): a Button that sets `nav.path` directly;
   ///     InertButtonStyle suppresses the click-tint flash.
   @ViewBuilder
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
     #if os(macOS)
-    // Native source-list cell: tagged so `List(selection:)` tracks it via
-    // `macSelection`. A single click / arrow key only moves the highlight; a
-    // double-click opens (the keyboard twin is Return, handled on the list).
-    content()
-      .tag(Self.token(for: route))
-      .contentShape(Rectangle())
-      .simultaneousGesture(TapGesture(count: 2).onEnded { selectRoute(route) })
+    content().tag(Self.token(for: route))
     #else
     if usesPushNavigation {
       content().tag(Self.token(for: route))
@@ -572,8 +537,8 @@ struct SidebarRootView: View {
   }
 
   /// Resolve a selection token to its `Route` and open it in the detail pane.
-  /// Shared by the iOS selection binding (select == open) and the macOS
-  /// double-click / Return open path (where selection is otherwise decoupled).
+  /// Driven by `sidebarSelection`'s setter on every push surface (macOS + iPad
+  /// regular), so a single click / arrow-key move opens the row.
   private func openSelection(_ token: SidebarSelection) {
     switch token {
     case .filter(let f):   selectRoute(.filter(f))
@@ -602,8 +567,8 @@ struct SidebarRootView: View {
   /// `.phone` idiom even when unfolded into a regular-width display, so an
   /// idiom check would wrongly suppress the default highlight on the big screen.
   ///
-  /// iOS only: the macOS sidebar now uses native `List(selection:)`
-  /// (`macSelection`) for its highlight, so this hand-rolled "current route"
+  /// iOS only: the macOS sidebar uses native `List(selection:)` bound to
+  /// `sidebarSelection` for its highlight, so this hand-rolled "current route"
   /// check is only needed by the iPhone smart-list tiles.
   #if os(iOS)
   private var selectedRoute: Route? {
