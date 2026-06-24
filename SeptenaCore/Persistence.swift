@@ -520,6 +520,12 @@ final class GoalEntity {
   /// baseline).
   var metricBaseline: Double?
 
+  /// Pinned to the top of the Week dashboard as a full-width tile. Default
+  /// `false` (every existing row stays off the dashboard) — MUST have a
+  /// default so SwiftData's lightweight migration can backfill on-disk rows
+  /// without a store-migration crash. Stored in CloudKit `reservedInt1`.
+  var pinned: Bool = false
+
   init(id: String,
        text: String,
        sections: [String] = [],
@@ -532,7 +538,8 @@ final class GoalEntity {
        metricComparator: String? = nil,
        metricTarget: Double? = nil,
        metricBaseline: Double? = nil,
-       metricTargetUpper: Double? = nil) {
+       metricTargetUpper: Double? = nil,
+       pinned: Bool = false) {
     self.id = id
     self.text = text
     self.sections = sections
@@ -546,6 +553,7 @@ final class GoalEntity {
     self.metricTarget = metricTarget
     self.metricBaseline = metricBaseline
     self.metricTargetUpper = metricTargetUpper
+    self.pinned = pinned
   }
 }
 
@@ -1718,7 +1726,8 @@ extension Goal {
               metricComparator: e.metricComparator,
               metricTarget: e.metricTarget,
               metricBaseline: e.metricBaseline,
-              metricTargetUpper: e.metricTargetUpper)
+              metricTargetUpper: e.metricTargetUpper,
+              pinned: e.pinned)
   }
 }
 

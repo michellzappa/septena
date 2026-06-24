@@ -1814,6 +1814,15 @@ final class GoalMutator {
     commit(entity, op: "update metric")
   }
 
+  /// Pin (or unpin) a goal to the top of the Week dashboard. Pure
+  /// presentation flag — doesn't touch the goal's metric or sections.
+  func setPinned(id: String, pinned: Bool) {
+    guard let entity = fetchGoal(id: id), entity.pinned != pinned else { return }
+    entity.pinned = pinned
+    entity.updatedAt = .now
+    commit(entity, op: "pin")
+  }
+
   func deleteGoal(id: String) {
     guard let entity = fetchGoal(id: id) else { return }
     context.delete(entity)

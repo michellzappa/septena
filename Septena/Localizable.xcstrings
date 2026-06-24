@@ -5717,6 +5717,9 @@
         }
       }
     },
+    "Pinned" : {
+
+    },
     "Pins every reasoning step to one provider — for testing only. Leave Off in normal use." : {
 
     },

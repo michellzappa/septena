@@ -547,6 +547,7 @@ enum MCPDispatch {
       if let v = g.metricTarget { d["metricTarget"] = v }
       if let v = g.metricTargetUpper { d["metricTargetUpper"] = v }
       if let v = g.metricBaseline { d["metricBaseline"] = v }
+      if g.pinned { d["pinned"] = true }
       return d
     }]
   }

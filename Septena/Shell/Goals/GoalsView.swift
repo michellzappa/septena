@@ -132,6 +132,10 @@ struct GoalsView: View {
               }
               .buttonStyle(.plain)
               .contextMenu {
+                Button { togglePinned(goal) } label: {
+                  Label(goal.pinned ? "Unpin from dashboard" : "Pin to dashboard",
+                        systemImage: goal.pinned ? "pin.slash" : "pin")
+                }
                 Button(role: .destructive) { deleteGoal(goal) } label: {
                   Label("Delete", systemImage: "trash")
                 }
@@ -178,6 +182,15 @@ struct GoalsView: View {
     goalMutator.deleteGoal(id: goal.id)
     goals.removeAll { $0.id == goal.id }
     Haptics.warning()
+  }
+
+  private func togglePinned(_ goal: Goal) {
+    let next = !goal.pinned
+    goalMutator.setPinned(id: goal.id, pinned: next)
+    if let idx = goals.firstIndex(where: { $0.id == goal.id }) {
+      goals[idx].pinned = next
+    }
+    Haptics.tick()
   }
 
   private func saveDrafts(_ drafts: [DraftGoal]) {
@@ -318,6 +331,8 @@ struct EditGoalSheet: View {
   @State private var text: String
   @State private var selectedSections: Set<String>
   @State private var showDeleteConfirm = false
+  /// Pin this goal to the top of the Week dashboard. Applied on Save.
+  @State private var pinned: Bool
 
   // Optional measurement attachment — UI state for the disclosure section.
   // V1 ships a single metric (weekly training sessions); the picker is a
@@ -360,6 +375,7 @@ struct EditGoalSheet: View {
     self.onDelete = onDelete
     _text = State(initialValue: goal.text == "New goal" ? "" : goal.text)
     _selectedSections = State(initialValue: Set(goal.sections))
+    _pinned = State(initialValue: goal.pinned)
     let hasMetric = goal.metricKey != nil
     _trackMetric = State(initialValue: hasMetric)
     // Default to the first metric in the catalog (currently training
@@ -532,6 +548,13 @@ struct EditGoalSheet: View {
             }
           }
         }
+        Section {
+          Toggle(isOn: $pinned) {
+            Label("Pin to dashboard", systemImage: "pin")
+          }
+        } footer: {
+          Text("Show this goal at the top of the Week dashboard. Goals with a metric show live progress; habit goals show their streak.")
+        }
         // Earned milestone history — latched rungs from MilestoneEngine,
         // newest first. Grandfathered grants (celebrated == false) appear
         // dimmed: honest history, but they never had a moment.
@@ -595,6 +618,7 @@ struct EditGoalSheet: View {
     guard !clean.isEmpty else { return }
     let sections = Array(selectedSections)
     mutator.updateGoal(id: goal.id, text: clean, sections: sections)
+    mutator.setPinned(id: goal.id, pinned: pinned)
 
     // Metric: write only if the user toggled it on AND provided a valid
     // target. Toggling off (or invalid target) clears all four fields.
@@ -636,6 +660,7 @@ struct EditGoalSheet: View {
     var updated = goal
     updated.text = clean
     updated.sections = sections
+    updated.pinned = pinned
     if willTrack, let target = toKg(parsedTarget) {
       updated.metricKey = metricKey
       updated.metricWindow = metricWindow

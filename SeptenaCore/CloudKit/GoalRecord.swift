@@ -38,6 +38,10 @@ enum GoalCloudKitSchema {
     static let metricBaseline = "metricBaseline"
     static let metricTargetUpper = "metricTargetUpper"   // upper bound for `range`
 
+    // Pinned-to-dashboard flag, stored in the reservedInt1 slot (1 = pinned,
+    // 0/absent = not) so no new named field is needed.
+    static let pinned = "reservedInt1"
+
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedString1 = "reservedString1"
     static let reservedString2 = "reservedString2"
@@ -79,6 +83,7 @@ extension GoalEntity {
     record[GoalCloudKitSchema.Field.metricTarget] = metricTarget
     record[GoalCloudKitSchema.Field.metricBaseline] = metricBaseline
     record[GoalCloudKitSchema.Field.metricTargetUpper] = metricTargetUpper
+    record[GoalCloudKitSchema.Field.pinned] = pinned ? 1 : 0
     return record
   }
 }
@@ -97,6 +102,7 @@ extension GoalEntity {
     metricTarget = record[GoalCloudKitSchema.Field.metricTarget] as? Double
     metricBaseline = record[GoalCloudKitSchema.Field.metricBaseline] as? Double
     metricTargetUpper = record[GoalCloudKitSchema.Field.metricTargetUpper] as? Double
+    pinned = (record[GoalCloudKitSchema.Field.pinned] as? Int ?? 0) == 1
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }

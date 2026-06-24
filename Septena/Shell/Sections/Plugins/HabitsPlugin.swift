@@ -133,9 +133,49 @@ enum HabitsPlugin: SectionPlugin {
     ]
   }
 
+  /// Per-habit weekly-completion metric key: "habits.<habitID>.done_week".
+  /// Lets a goal target ONE habit ("do Surya 7 days/week") rather than only
+  /// the two aggregate metrics. One per definition, so a heavily-used habit
+  /// can be promoted to a measured, pinnable goal.
+  private static let perHabitPrefix = "habits."
+  private static let perHabitSuffix = ".done_week"
+  private static func perHabitKey(_ habitID: String) -> String {
+    "\(perHabitPrefix)\(habitID)\(perHabitSuffix)"
+  }
+
+  static func aimMetrics(context: ModelContext) -> [GoalMetric] {
+    var metrics = aimMetrics
+    let defs = (try? context.fetch(FetchDescriptor<HabitDefinitionEntity>(
+      sortBy: [SortDescriptor(\.sortIndex)]
+    ))) ?? []
+    for d in defs {
+      metrics.append(GoalMetric(
+        key: perHabitKey(d.id),
+        label: "\(d.title) — days done (this week)",
+        sectionKey: "habits",
+        window: "calendarWeek",
+        unitLabel: "days"))
+    }
+    return metrics
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
     else { return 0 }
+    // Per-habit weekly completion: distinct days this week where THIS habit
+    // was marked done. (Prefix+suffix match, so it can't collide with the two
+    // aggregate keys above, which don't end in ".done_week".)
+    if metric.key.hasPrefix(perHabitPrefix), metric.key.hasSuffix(perHabitSuffix) {
+      let habitID = String(metric.key.dropFirst(perHabitPrefix.count)
+                                     .dropLast(perHabitSuffix.count))
+      let descriptor = FetchDescriptor<HabitDayStateEntity>(
+        predicate: #Predicate {
+          $0.habitID == habitID && $0.date >= startStr && $0.date <= endStr && $0.done == true
+        }
+      )
+      let rows = (try? context.fetch(descriptor)) ?? []
+      return Double(Set(rows.map { $0.date }).count)
+    }
     switch metric.key {
     case "habits.done_today":
       // Count HabitDayState rows for today where done=true. Each row is

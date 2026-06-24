@@ -280,6 +280,10 @@ struct WeekDashboardView: View {
   /// Everything below (or, in the split layout, beside) the day view: the
   /// discovery card, the tile grid, and the optional closing line.
   @ViewBuilder private var rightColumnBody: some View {
+    // The user's pinned goals, surfaced above everything else, rendered through
+    // the same layout renderer as the section tiles (so they match the current
+    // mode). Renders nothing until at least one goal is pinned.
+    PinnedGoalsStrip(layoutMode: currentLayoutMode, columns: columns)
     // Introduces the capabilities the welcome leaves out (Coach, Insights,
     // Apple Health) once the user is in the app. Self-gating: renders nothing
     // once everything's discovered or it's dismissed.
@@ -1095,37 +1099,15 @@ struct WeekDashboardView: View {
     // that every mode renders from `visibleDomainData` the dependency has to
     // live here rather than inside a per-section tile.
     let _ = quickLogStamp
-    switch currentLayoutMode {
-    case .tiles:
-      // Histogram mode: same `visibleDomainData` + tap + quick-add plumbing
-      // as the other three renderers, so the four modes can't drift.
-      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
-        ForEach(visibleDomainData) { item in
-          Button { handleDomainTap(item.tap) } label: {
-            DomainTile(data: item)
-          }
-          .buttonStyle(.plain)
-          .contextMenu { quickAddMenu(for: item) }
-        }
-      }
-    case .dense:
-      DenseHomepageView(
-        items: visibleDomainData,
-        onTap: handleDomainTap,
-        menuContent: { item in quickAddMenu(for: item) }
-      )
-    case .heatmap:
-      HeatmapHomepageView(
-        items: visibleDomainData,
-        onTap: handleDomainTap,
-        menuContent: { item in quickAddMenu(for: item) }
-      )
-    case .rings:
-      RingsHomepageView(
-        items: visibleDomainData,
-        onTap: handleDomainTap,
-        menuContent: { item in quickAddMenu(for: item) }
-      )
+    // One shared renderer drives all four modes (and the pinned-goals strip),
+    // so they can't drift.
+    HomepageTileLayout(
+      mode: currentLayoutMode,
+      items: visibleDomainData,
+      columns: columns,
+      onTap: handleDomainTap
+    ) { item in
+      quickAddMenu(for: item)
     }
   }
 
@@ -1174,6 +1156,9 @@ struct WeekDashboardView: View {
     case .openSheet(let dest):     open(dest)
     case .switchToTasksTab:        openTasksFromTile()
     case .openIntakeKind(let id):  openIntakeKind(id)
+    // Pinned goals own their own tap handling inside PinnedGoalsStrip; a
+    // section tile never emits this, so it's a no-op on the section router.
+    case .openGoal:                break
     }
   }
 

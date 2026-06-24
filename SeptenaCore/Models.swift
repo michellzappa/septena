@@ -1525,6 +1525,9 @@ struct Goal: Identifiable, Codable, Hashable {
   var metricBaseline: Double? = nil
   /// Upper bound for a `range` comparator (`metricTarget` is the lower bound).
   var metricTargetUpper: Double? = nil
+  /// Pinned to the top of the Week dashboard. Defaulted so existing decoders
+  /// and call sites (and any cached JSON without the key) stay valid.
+  var pinned: Bool = false
 }
 
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)

@@ -51,6 +51,9 @@ enum DomainTapAction {
   /// Open one intake tracker's page directly (no switcher hop) — the
   /// per-kind tiles are peers of section tiles, so they deep-open like one.
   case openIntakeKind(String)
+  /// Open a pinned goal's editor. Emitted only by `PinnedGoalsStrip`, which
+  /// handles it itself; the section-tile tap router treats it as a no-op.
+  case openGoal(String)
 }
 
 /// Single mode-agnostic view-model for one homepage domain.
@@ -117,4 +120,38 @@ struct HomepageDomainData: Identifiable {
   /// variation. Count-based domains (tasks, habits) keep the default
   /// 0-anchored scale where "zero" is meaningful.
   var autoscaleSparkline: Bool = false
+}
+
+/// The single place the homepage maps a layout mode → a renderer. Both the
+/// section-tile grid (`WeekDashboardView.layoutBody`) and the pinned-goals
+/// strip render through this, so a pinned goal always looks like every other
+/// tile in whatever mode the user picked — heatmap when others are heatmaps,
+/// sparkline when others are sparklines. No bespoke per-surface renderer.
+struct HomepageTileLayout<Menu: View>: View {
+  let mode: HomepageLayoutMode
+  let items: [HomepageDomainData]
+  let columns: [GridItem]
+  let onTap: (DomainTapAction) -> Void
+  @ViewBuilder let menu: (HomepageDomainData) -> Menu
+
+  var body: some View {
+    switch mode {
+    case .tiles:
+      LazyVGrid(columns: columns, spacing: Theme.tileGap) {
+        ForEach(items) { item in
+          Button { onTap(item.tap) } label: {
+            DomainTile(data: item)
+          }
+          .buttonStyle(.plain)
+          .contextMenu { menu(item) }
+        }
+      }
+    case .dense:
+      DenseHomepageView(items: items, onTap: onTap, menuContent: menu)
+    case .heatmap:
+      HeatmapHomepageView(items: items, onTap: onTap, menuContent: menu)
+    case .rings:
+      RingsHomepageView(items: items, onTap: onTap, menuContent: menu)
+    }
+  }
 }
