@@ -354,6 +354,12 @@ struct TaskComposerCard: View {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
     case .edit(let task):
       draft = TaskDraft(task: task)
+      // Snapshot the seeded draft as the dirty baseline — the SAME approach as
+      // create mode. Comparing the whole struct against its own seed is immune to
+      // the per-field normalization subtleties of `differs(from:)` (computed
+      // `storedScheduled`/`pinToday`, trimmed-vs-raw title) that were leaving an
+      // untouched peek reading "dirty" and wrongly prompting "Discard changes?".
+      seededDraft = draft
       // Note: opening the editor must NOT acknowledge. The agent cue == triage-
       // band membership for agent rows, so acknowledging here would silently
       // ratify an unclassified proposal the moment you peek at it — it would
@@ -413,10 +419,11 @@ struct TaskComposerCard: View {
   /// edit: any field differs from the original. Drives the scaffold's Cancel
   /// confirmation and the swipe-to-dismiss block.
   private var isDirty: Bool {
-    switch mode {
-    case .create:          return draft.differs(fromSeed: seededDraft)
-    case .edit(let task):  return draft.differs(from: task)
-    }
+    // One rule for both modes: dirty iff the draft no longer equals the snapshot
+    // taken right after seeding (create from the list defaults, edit from the
+    // task). A pure whole-struct compare — no field-by-field normalization to get
+    // subtly wrong — so an untouched peek is never dirty.
+    draft.differs(fromSeed: seededDraft)
   }
 
   /// Explicit Cancel → Discard. Flip the autosave guard so the `.onDisappear`

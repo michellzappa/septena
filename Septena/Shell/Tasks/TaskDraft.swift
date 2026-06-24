@@ -143,30 +143,13 @@ struct TaskDraft: Equatable {
 
   // MARK: - Dirty tracking (drives the editor's Cancel / discard guard)
 
-  /// Create mode: has the user changed anything from the *seeded* draft? The new
-  /// composer arrives pre-filled with the list's defaults (Today pins `today`, a
-  /// project/area files it there), so "any non-default field" would falsely read
-  /// as dirty the instant you open New Task in a non-Inbox list — and cancelling
-  /// would wrongly prompt "Discard new task?" with nothing typed. Comparing
-  /// against the seed means an untouched composer just closes; a started one asks
-  /// first. (`TaskDraft` is `Equatable`, so this is a whole-struct compare.)
+  /// Dirty tracking for BOTH create and edit: has the user changed anything from
+  /// the snapshot taken right after seeding (the list defaults for create, the
+  /// task for edit)? A whole-struct `Equatable` compare — no field-by-field
+  /// normalization to get subtly wrong — so an untouched composer just closes and
+  /// only a real change prompts "Discard…". (An earlier `differs(from: task)`
+  /// that rebuilt a normalized baseline kept reading an untouched edit as dirty.)
   func differs(fromSeed seed: TaskDraft) -> Bool { self != seed }
-
-  /// Edit mode: does this draft differ from the task it was seeded from? Mirrors
-  /// exactly the fields `update(_:via:)` would write (normalized-vs-normalized
-  /// for the lossy When mapping), so "dirty" means precisely "Save would change
-  /// something" — no false discard prompt on a bare peek.
-  func differs(from original: SeptenaTask) -> Bool {
-    let prior = TaskDraft(task: original)
-    return trimmedTitle != original.title
-      || notes != (original.notes ?? "")
-      || storedScheduled != prior.storedScheduled
-      || pinToday != prior.pinToday
-      || deadline != prior.deadline
-      || recurrence != original.recurrence
-      || projectId != original.project
-      || areaId != original.area
-  }
 
   // MARK: - Pill value labels
 
