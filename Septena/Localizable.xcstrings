@@ -339,6 +339,16 @@
         }
       }
     },
+    "%@ of %@ trained muscles in the %@-set zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@ trained muscles in the %3$@-set zone."
+          }
+        }
+      }
+    },
     "%@ records · %@ types" : {
       "localizations" : {
         "en" : {
@@ -418,6 +428,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ vai soar **%2$@**. A disciplina dos fatos — citar números reais, nunca inventar dados — sempre se aplica."
+          }
+        }
+      }
+    },
+    "%@: %@ hard set%@ — %@ more to hit the zone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ hard set%3$@ — %4$@ more to hit the zone."
           }
         }
       }
@@ -2445,12 +2465,12 @@
     "Count" : {
 
     },
-    "Counts each set toward the exercise's primary muscle. Growth zone: %@–%@ sets/week." : {
+    "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: %@–%@ sets/week." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Counts each set toward the exercise's primary muscle. Growth zone: %1$@–%2$@ sets/week."
+            "value" : "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: %1$@–%2$@ sets/week."
           }
         }
       }
@@ -3111,6 +3131,9 @@
           }
         }
       }
+    },
+    "Every muscle you trained is in the zone. Keep it there." : {
+
     },
     "Every section, every feature — yours, with nothing held back and no ads watching you. That's a promise, not a trial. If it's become part of how you run your life, you can chip in to keep it independent. You won't unlock anything — there's nothing to unlock." : {
       "localizations" : {
@@ -7503,6 +7526,9 @@
           }
         }
       }
+    },
+    "THIS WEEK" : {
+
     },
     "Three gold rings — the previous thank-you, for comparison" : {
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Snapshot of a finished training session, captured at "Finish" tap
 /// so the celebration sheet can render after the draft is discarded.
@@ -112,6 +113,7 @@ struct SessionCompleteSheet: View {
 
   /// Bumped on appear → fires the completion flourish. One celebration
   /// per presentation; no looping.
+  @Environment(\.modelContext) private var context
   @State private var celebrate = 0
   @State private var note = ""
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
@@ -133,6 +135,7 @@ struct SessionCompleteSheet: View {
         if !stats.doneEntries.isEmpty {
           loggedList
         }
+        weeklyReview
         noteField
         Button(action: { onSaveNote(note); onDone() }) {
           Text("Back to dashboard")
@@ -369,6 +372,55 @@ struct SessionCompleteSheet: View {
     }
     if !e.difficulty.isEmpty { parts.append(effortText(e.difficulty)) }
     return parts.isEmpty ? "done" : parts.joined(separator: " · ")
+  }
+
+  // MARK: - Weekly muscle review (the "PT" nudge)
+
+  /// One incisive line after a strength session: how many trained muscles are
+  /// in the weekly growth zone, and the single most under-dosed one to chase.
+  /// Reads the same effort-weighted `MuscleVolume` the Muscle Balance screen
+  /// uses (hard/max = full set, moderate = half, easy/unrated = 0), so a
+  /// junk-volume week can't read as "in zone". Strength/mixed only — cardio and
+  /// mobility have no muscle volume to review.
+  @ViewBuilder
+  private var weeklyReview: some View {
+    if stats.kind == .strength || stats.kind == .mixed {
+      let floor = MuscleBalanceView.zoneFloor
+      let totals = MuscleVolume.setsPerMuscle(daysBack: 6, context: context)
+      let trained = totals.filter { $0.value > 0 }
+      if !trained.isEmpty {
+        let inZone = trained.filter { $0.value >= floor }.count
+        let lagging = trained
+          .filter { $0.value < floor }
+          .map { (muscle: $0.key, sets: $0.value, gap: floor - $0.value) }
+          .sorted { $0.gap > $1.gap }
+          .first
+        VStack(alignment: .leading, spacing: 8) {
+          Text("THIS WEEK")
+            .font(.caption2.weight(.semibold)).tracking(0.5)
+            .foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 4) {
+            Text("\(inZone) of \(trained.count) trained muscles in the \(floor)-set zone.")
+              .font(.subheadline.weight(.medium))
+            if let lag = lagging {
+              Text("\(lag.muscle.label): \(lag.sets) hard set\(lag.sets == 1 ? "" : "s") — \(lag.gap) more to hit the zone.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+              Text("Every muscle you trained is in the zone. Keep it there.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(14)
+          .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+              .fill(Theme.cardSurface)
+          )
+        }
+      }
+    }
   }
 
   // MARK: - Formatters

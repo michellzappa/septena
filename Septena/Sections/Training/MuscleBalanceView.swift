@@ -73,7 +73,7 @@ struct MuscleBalanceView: View {
              ? "Weekly average per muscle · last 4 weeks"
              : "Sets per muscle · last 7 days")
       } footer: {
-        Text("Counts each set toward the exercise's primary muscle. Growth zone: \(Self.zoneFloor)–\(Self.target) sets/week.")
+        Text("Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: \(Self.zoneFloor)–\(Self.target) sets/week.")
       }
     }
     .navigationTitle("Muscle Balance")
@@ -171,8 +171,14 @@ private struct MuscleBalanceRow: View {
 
 /// Shared sets-per-muscle aggregation. Resolves each logged entry's exercise
 /// to its definition's `primaryMuscle` (cardio/mobility have none, so they
-/// drop out → implicitly strength + core) and sums `sets` per muscle over a
-/// trailing day window.
+/// drop out → implicitly strength + core) and sums *effective hard sets* per
+/// muscle over a trailing day window. Each set is weighted by logged effort
+/// (`TrainingMetrics.difficultyWeight`: hard/max = 1.0, moderate = 0.5,
+/// easy/unrated = 0) so this matches the headline hard-sets number and the
+/// goal ring instead of counting every raw set — including warm-ups and easy
+/// sets — as a full hard set. Per-muscle effective totals are rounded for the
+/// integer growth-zone UI.
+@MainActor
 enum MuscleVolume {
   private static let ymd: DateFormatter = {
     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
@@ -191,12 +197,12 @@ enum MuscleVolume {
     let cutoffDate = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
     let cutoff = ymd.string(from: cutoffDate)
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
-    var totals: [Muscle: Int] = [:]
+    var effective: [Muscle: Double] = [:]
     for e in entries where e.date >= cutoff {
       guard let muscle = muscleByKey[exerciseKey(e.exercise)],
             let s = e.sets.flatMap(Int.init), s > 0 else { continue }
-      totals[muscle, default: 0] += s
+      effective[muscle, default: 0] += Double(s) * TrainingMetrics.difficultyWeight(e.difficulty)
     }
-    return totals
+    return effective.mapValues { Int($0.rounded()) }.filter { $0.value > 0 }
   }
 }
