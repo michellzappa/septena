@@ -211,13 +211,6 @@ struct TaskListView: View {
     case newRow
   }
   @FocusState private var inlineFocus: InlineFocus?
-  #if os(macOS)
-  /// Whether the task List owns key focus. In a NavigationSplitView the sidebar
-  /// column holds focus by default, so a detail `.onKeyPress` never fires; we
-  /// claim focus for the list (on appear / list-swap, the Mail/Notes model where
-  /// the content list holds focus for keyboard nav) so Return reaches it.
-  @FocusState private var listFocused: Bool
-  #endif
   /// The task whose title is being renamed in place (nil → none). Its row
   /// renders the inline editor instead of the static `TaskRow`.
   @State private var editingTitleId: String?
@@ -597,11 +590,20 @@ struct TaskListView: View {
     }
   }
 
-  /// Begin renaming a row in place: seed the buffer and move the keyboard
-  /// cursor into its field. A completed row opens the composer instead (you
-  /// don't rename a done row inline). Commits any rename already in flight, and
-  /// drops half-typed new-row text, so only one inline field is ever live.
+  /// Begin renaming a task.
+  ///
+  /// macOS: rename in the COMPOSER, never inline. Swapping a focusable
+  /// `TextField` into a selectable `List` row and removing it corrupts the
+  /// List's focus/selection on macOS (clicks + arrows die afterward, the field's
+  /// selected text lingers) — an unwinnable fight with SwiftUI's `List`. The
+  /// composer is a separate inspector where the title field's focus/Return/Esc
+  /// behave, and the List stays pure-native and unbroken.
+  ///
+  /// iOS: inline rename in place (no NavigationSplitView focus war there).
   private func beginEdit(_ task: SeptenaTask) {
+    #if os(macOS)
+    editingDetail = task
+    #else
     guard task.status != .done else { editingDetail = task; return }
     if let prevId = editingTitleId, prevId != task.id,
        let prev = currentTask(id: prevId) {
@@ -610,14 +612,12 @@ struct TaskListView: View {
     newTaskText = ""
     titleDraft = task.title
     editingTitleId = task.id
-    // Mark the row selected so it reads as "selected" — the native source-list
-    // highlight on macOS, the tinted highlight on iOS — instead of leaning on
-    // the checkbox color to signal the active row.
     selection = [task.id]
     // Focus on the next runloop so the field (which appears this same update,
     // as the row swaps from static → editing) is mounted before we focus it —
     // a synchronous set is otherwise dropped before it joins the responder chain.
     DispatchQueue.main.async { inlineFocus = .row(task.id) }
+    #endif
   }
 
   /// Commit a rename whose field just lost the cursor (keyboard dismissed,
@@ -649,11 +649,6 @@ struct TaskListView: View {
   private func endRename() {
     editingTitleId = nil
     if case .row = inlineFocus { inlineFocus = nil }
-    #if os(macOS)
-    // Hand key focus back to the list so ↑/↓ resume immediately after canceling
-    // (the field had it during the edit).
-    listFocused = true
-    #endif
   }
 
   /// Move keyboard focus into the quick-add line (the macOS empty-space
@@ -714,25 +709,19 @@ struct TaskListView: View {
     // `beginEdit`; this catches focus going to the quick-add line or to nil.
     .onChange(of: inlineFocus) { old, _ in commitRenameOnFocusLoss(from: old) }
     #if os(macOS)
-    // Native selection holds key focus for click + ↑/↓ traversal. We deliberately
-    // attach NO unmodified-key (Space/Return) handlers: SwiftUI's List doesn't
-    // reliably deliver them and they fight the framework (Return → sidebar
-    // default action; Space → activates the row's checkbox button = accidental
-    // complete). Keyboard rename is the ⌘R menu command (a MODIFIER shortcut,
-    // which is reliable — see TaskCommandsMenu); double-click opens the composer
-    // and right-click → Rename. See CLAUDE.md "Known traps".
-    .focused($listFocused)
-    .onAppear { listFocused = true }
-    .onChange(of: filter) { _, _ in listFocused = true }
-    // Esc (the standard SwiftUI cancel command). The inline field carries its own
-    // `.onExitCommand` too, but the List and the field share focus uneasily, so
-    // we handle every state here as the reliable catch-all:
-    //   • editing  → cancel the edit. `endRename` removes the TextField, so its
-    //     selected-all text disappears with it; the row stays selected.
-    //   • quick-add → blur the new-task line.
-    //   • selected → deselect the row. With selection empty, ↑/↓ re-selects.
+    // PURE native selection: click / ⌘/⇧-click / ↑↓ are the List's own, and a
+    // native click also gives the List key focus (no programmatic focus claim —
+    // an extra `@FocusState` on the List fought the inline field's focus and
+    // left clicks dead after an edit). Keyboard actions on the selected row are
+    // MODIFIER menu commands (⌘R rename, ⌘K complete) — reliable regardless of
+    // focus; unmodified Space/Return are NOT bound (they hit the checkbox /
+    // sidebar). Double-click opens the composer; right-click → Rename / Edit
+    // Details. Esc is handled in both places (the inline field owns it while it
+    // has focus — see InlineTaskRow — and this is the fallback when the list does):
+    //   editing → COMMIT the rename (safer than cancel) · quick-add → blur ·
+    //   selected → deselect.
     .onExitCommand {
-      if editingTitleId != nil { endRename() }
+      if let id = editingTitleId, let task = currentTask(id: id) { commitRename(task) }
       else if inlineFocus != nil { inlineFocus = nil }
       else { clearSelection() }
     }
@@ -1323,7 +1312,10 @@ struct TaskListView: View {
       showsDetails: true,
       onToggle: { toggle(task) },
       onCommit: { commitRename(task) },
-      onCancel: { endRename() },
+      // Esc commits too (safer than a cancel path that can leave a half-torn-down
+      // field with selected text) — it's just another way to finish, like Return
+      // or clicking away. `commitRename` writes only if the title actually changed.
+      onCancel: { commitRename(task) },
       onOpenDetails: {
         commitRename(task)
         editingDetail = task
@@ -2567,12 +2559,17 @@ private struct InlineTaskRow: View {
         .submitLabel(.done)
         .onSubmit(onCommit)
         #if os(macOS)
-        // Esc abandons the edit without writing (the static row reappears with
-        // its stored title). The macOS field editor SWALLOWS Esc before
-        // `.onExitCommand` fires, so handle it as a key press on the field — a
-        // key the text input doesn't consume — which reliably reaches us and
-        // tears the field down (taking its select-all highlight with it). Keep
-        // `.onExitCommand` too as a belt-and-suspenders (idempotent cancel).
+        // Return saves. `.onSubmit` alone leaks Return to the sidebar (it acts as
+        // the NavigationSplitView default action), so we ALSO catch Return as a
+        // direct key press on the focused field and CONSUME it (`.handled`) so it
+        // commits here and never reaches the sidebar.
+        .onKeyPress(.return) { onCommit(); return .handled }
+        // Esc finishes the edit via `onCancel` (rename → COMMIT, quick-add →
+        // blur) — committing is safer than a discard path. The macOS field
+        // editor swallows Esc before `.onExitCommand` fires, so we catch it as a
+        // key press on the field (a key text input doesn't consume); this tears
+        // the field down, taking its select-all highlight with it. `.onExitCommand`
+        // is kept as a redundant fallback (idempotent).
         .onKeyPress(.escape) { onCancel(); return .handled }
         .onExitCommand(perform: onCancel)
         #endif

@@ -211,9 +211,19 @@ watch). The classic bug: a section with a manifest row + destination but **no
   tap-gesture selection — it suppresses native keyboard nav and the List's
   click-to-focus); `@FocusState`+`.focused()` to claim detail focus; **modifier
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
-  complete = `⌘K`); click-to-edit `TextField` / double-click / right-click for
-  mouse. Do NOT bind unmodified Space/Return, and do NOT bring back the `NSEvent`
-  monitors or hidden shortcut buttons that were tried for this and removed.
+  complete = `⌘K`); double-click / right-click for mouse. Do NOT bind unmodified
+  Space/Return, and do NOT bring back the `NSEvent` monitors or hidden shortcut
+  buttons that were tried for this and removed.
+- **No inline `TextField` swapped into a *selectable* macOS `List` row.**
+  Replacing a row's `Text` with a focusable `TextField` (then removing it) on
+  edit corrupts the `List`'s focus/selection on macOS — after the edit ends,
+  clicks stop selecting, ↑/↓ die, and the field's selected text lingers. Every
+  focus workaround just moves the breakage (claim focus → dead clicks; don't →
+  orphaned focus after edit). So on macOS, **rename a task in the composer**
+  (a separate inspector where the field behaves), leaving the `List` pure-native.
+  Inline-edit-in-row is fine on iOS (no split-view focus war) and fine for a
+  *non-selectable* dedicated row (the quick-add line), just not for a selectable
+  row's in-place rename.
 
 ## Where truth lives (priority order)
 
