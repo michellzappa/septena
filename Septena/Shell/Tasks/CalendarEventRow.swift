@@ -29,6 +29,16 @@ struct CalendarEventRow: View {
     return Self.timeFormatter.string(from: event.startDate)
   }
 
+  /// The event's title, never blank. `EKEvent.title` is an implicitly-unwrapped
+  /// `String!`, so `?? "Event"` only catches a true nil — but busy blocks,
+  /// private/declined invites, and some imported calendars hand us an *empty*
+  /// (or whitespace-only) string, which slid past that guard and drew a blank
+  /// agenda line. Trim and fall back so every row reads as something.
+  private var displayTitle: String {
+    let trimmed = (event.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "Event" : trimmed
+  }
+
   var body: some View {
     // A condensed agenda line — denser and quieter than a task row (smaller
     // text, tighter rows) so the whole block reads as a calm reference strip,
@@ -44,7 +54,7 @@ struct CalendarEventRow: View {
           .monospacedDigit()
           .foregroundStyle(color)
       }
-      Text(event.title ?? "Event")
+      Text(displayTitle)
         .font(.system(size: 13))
         .foregroundStyle(event.isAllDay ? Theme.inkSecondary : Theme.inkPrimary)
         .lineLimit(1)
@@ -59,9 +69,8 @@ struct CalendarEventRow: View {
   }
 
   private var accessibilityText: String {
-    let title = event.title ?? "Event"
-    if let timeLabel { return "\(timeLabel), \(title)" }
-    return "All day, \(title)"
+    if let timeLabel { return "\(timeLabel), \(displayTitle)" }
+    return "All day, \(displayTitle)"
   }
 
   private static let timeFormatter: DateFormatter = {
