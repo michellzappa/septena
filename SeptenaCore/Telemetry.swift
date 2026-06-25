@@ -13,7 +13,13 @@ import SwiftUI
 // across the user's devices via `AppSettings.telemetryLevel`), not a single
 // on/off switch — see `TelemetryLevel`. Level changes are still sent as
 // operational privacy state (even when the new level is `.none`) so opt-out
-// counts remain knowable.
+// counts remain knowable — but that one `.none` ping is anonymized: no install
+// id, version, or build rides along, only the event and the chosen level.
+//
+// The human-readable "What is sent" list in Settings ▸ Privacy is rendered
+// straight from `dataCatalog` below, and every transmitted event is recorded to
+// an on-device `SentRecord` log the same pane can show — so the screen can never
+// claim something the code doesn't actually do.
 
 public actor TelemetryClient {
   public static let shared = TelemetryClient()
@@ -37,8 +43,70 @@ public actor TelemetryClient {
     case full
 
     /// Rank for threshold comparisons (`allows`). Higher = more is shared.
-    var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+    public var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+
+    /// Short label for the level picker.
+    public var title: String {
+      switch self {
+      case .none:     return "Off"
+      case .minimal:  return "Minimal"
+      case .balanced: return "Balanced"
+      case .full:     return "Full"
+      }
+    }
+
+    /// One-paragraph explanation shown under the picker.
+    public var summary: String {
+      switch self {
+      case .none:
+        return "No usage data leaves your device. Septena learns nothing about how you use the app."
+      case .minimal:
+        return "Only that the app launched, its version, and an anonymous install ID — so Septena knows the app is healthy and which versions are in use. No screens, no sections."
+      case .balanced:
+        return "Adds which sections you enable and open, so Septena improves the areas people actually use. Never which individual screens you visit. Recommended."
+      case .full:
+        return "Adds the individual screens you open, for the most detailed picture of what to improve. Still no logged data, identity, or IP."
+      }
+    }
   }
+
+  /// One human-readable description of a thing analytics can send, paired with
+  /// the lowest level at which it starts being sent. Single source of truth for
+  /// the "What is sent" list in Settings ▸ Privacy — the UI renders straight from
+  /// this, so the screen can't drift from the code. Keep in lockstep with the
+  /// `Category` gates and the `send` payload below: every field that leaves the
+  /// device must have a row here.
+  public struct DataItem: Identifiable, Hashable, Sendable {
+    public let text: String
+    public let from: TelemetryLevel
+    public var id: String { text }
+
+    /// Whether this item is actually sent at the given level.
+    public func isSent(at level: TelemetryLevel) -> Bool { level.rank >= from.rank }
+  }
+
+  public static let dataCatalog: [DataItem] = [
+    .init(text: "Changes to this privacy level", from: .none),
+    .init(text: "That the app launched", from: .minimal),
+    .init(text: "App version, build, and platform (iOS or macOS)", from: .minimal),
+    .init(text: "An anonymous app-install hash, used only for aggregate counts", from: .minimal),
+    .init(text: "Which sections are enabled, opened, and turned on or off", from: .balanced),
+    .init(text: "Which screens you open (e.g. \"Nutrition\", \"Sleep\")", from: .full),
+  ]
+
+  /// A record of one event actually transmitted from this device, kept on-device
+  /// only (newest first, capped at `maxLogEntries`) so the Privacy pane can show
+  /// the user exactly what has left their device. Holds only the event metadata
+  /// that was already sent — nothing more.
+  public struct SentRecord: Codable, Identifiable, Hashable, Sendable {
+    public let date: Date
+    public let event: String
+    public let detail: String?
+    public let level: String
+    public var id: String { "\(date.timeIntervalSince1970)|\(event)|\(detail ?? "")" }
+  }
+
+  public static let maxLogEntries = 20
 
   /// What a given event category needs at minimum to be sent.
   private enum Category {
@@ -67,6 +135,7 @@ public actor TelemetryClient {
   private static let installIDKey = "septena.telemetry.installID"
   private static let pendingLevelKey = "septena.telemetry.pendingLevel"
   private static let sectionInventoryDateKey = "septena.telemetry.sectionInventoryDate"
+  private static let recentLogKey = "septena.telemetry.recentLog"
 
   private let session: URLSession
   private var lastSent: [String: Date] = [:]
@@ -173,6 +242,26 @@ public actor TelemetryClient {
     currentLevel().rank >= category.minimumLevel.rank
   }
 
+  /// The most recent events actually transmitted from this device, newest first.
+  /// On-device only; the Privacy pane shows these as ground truth for the list of
+  /// what gets sent. Empty in DEBUG, since nothing is ever transmitted there.
+  public func recentlySent() -> [SentRecord] { Self.loadLog() }
+
+  private static func loadLog() -> [SentRecord] {
+    guard let data = UserDefaults.standard.data(forKey: recentLogKey),
+          let items = try? JSONDecoder().decode([SentRecord].self, from: data) else { return [] }
+    return items
+  }
+
+  private func appendLog(_ record: SentRecord) {
+    var items = Self.loadLog()
+    items.insert(record, at: 0)
+    if items.count > Self.maxLogEntries { items = Array(items.prefix(Self.maxLogEntries)) }
+    if let data = try? JSONEncoder().encode(items) {
+      UserDefaults.standard.set(data, forKey: Self.recentLogKey)
+    }
+  }
+
   private func flushPendingLevel() async {
     #if DEBUG
     return
@@ -195,8 +284,14 @@ public actor TelemetryClient {
     #if DEBUG
     return false
     #else
+    // The opt-out ping (turning the level to `.none`) is anonymized: it carries
+    // only the event and the new level, never the install id, version, or build.
+    // That keeps aggregate opt-out counts knowable without a final identifying
+    // ping, and makes the Privacy pane's "nothing but the level change" claim
+    // literally true.
+    let anonymous = (event == .levelChanged && level == .none)
     let payload = TelemetryPayload(
-      installId: Self.installID,
+      installId: anonymous ? nil : Self.installID,
       event: event.rawValue,
       screen: screen,
       section: section,
@@ -207,9 +302,9 @@ public actor TelemetryClient {
       // graded detail for Workers that understand it.
       analyticsEnabled: level != .none,
       level: level.rawValue,
-      version: Self.version,
-      build: Self.build,
-      platform: Self.platform
+      version: anonymous ? nil : Self.version,
+      build: anonymous ? nil : Self.build,
+      platform: anonymous ? nil : Self.platform
     )
     guard let body = try? JSONEncoder().encode(payload) else { return false }
 
@@ -224,7 +319,12 @@ public actor TelemetryClient {
     do {
       let (_, response) = try await session.data(for: req)
       let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-      return (200..<300).contains(code)
+      guard (200..<300).contains(code) else { return false }
+      appendLog(SentRecord(date: Date(),
+                           event: event.label,
+                           detail: screen ?? section ?? sections.map { "\($0.count) sections" },
+                           level: level.rawValue))
+      return true
     } catch {
       return false
     }
@@ -292,6 +392,18 @@ public actor TelemetryClient {
     case sectionInventory = "section_inventory"
     case sectionEnabledChanged = "section_enabled_changed"
     case sectionUsed = "section_used"
+
+    /// Human-readable label for the on-device sent-log.
+    var label: String {
+      switch self {
+      case .appOpen:              return "App launched"
+      case .screenView:           return "Screen viewed"
+      case .levelChanged:         return "Privacy level changed"
+      case .sectionInventory:     return "Section list"
+      case .sectionEnabledChanged: return "Section turned on/off"
+      case .sectionUsed:          return "Section opened"
+      }
+    }
   }
 
   private struct SectionTelemetryState: Encodable {
@@ -300,7 +412,9 @@ public actor TelemetryClient {
   }
 
   private struct TelemetryPayload: Encodable {
-    let installId: String
+    // Optional so the anonymized `.none` opt-out ping can omit identifying
+    // fields entirely (synthesized Encodable drops nil keys from the JSON).
+    let installId: String?
     let event: String
     let screen: String?
     let section: String?
@@ -308,9 +422,9 @@ public actor TelemetryClient {
     let sections: [SectionTelemetryState]?
     let analyticsEnabled: Bool
     let level: String
-    let version: String
-    let build: String
-    let platform: String
+    let version: String?
+    let build: String?
+    let platform: String?
   }
 }
 

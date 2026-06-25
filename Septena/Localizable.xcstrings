@@ -2105,6 +2105,9 @@
     "Checkbox feels" : {
 
     },
+    "Checked items are sent at your current level (%@). The rest stay on your device until you raise the level." : {
+
+    },
     "Checked sections appear as aggregate trends. Sections marked “no trends yet” are listed but won't chart until their pattern view ships." : {
 
     },
@@ -5331,6 +5334,9 @@
         }
       }
     },
+    "Nothing has been sent from this device yet." : {
+
+    },
     "Nothing here is held back for a paid tier. Your support is the reason there's no paywall — and the promise there never will be one." : {
       "localizations" : {
         "pt-BR" : {
@@ -6015,6 +6021,9 @@
         }
       }
     },
+    "Recently sent from this device" : {
+
+    },
     "Reconnect" : {
       "localizations" : {
         "pt-BR" : {
@@ -6415,6 +6424,9 @@
       }
     },
     "Septena is locked" : {
+
+    },
+    "Septena is open source. Read exactly what's collected and when, in the code:" : {
 
     },
     "Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
@@ -7408,6 +7420,9 @@
         }
       }
     },
+    "The last %@ analytics events actually transmitted, recorded only on this device. This is the ground truth for the list above." : {
+
+    },
     "The little celebration that plays when you log something — confetti, ripples, a streak landing — and the checkbox feels when you check things off. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
 
     },
@@ -8116,6 +8131,9 @@
           }
         }
       }
+    },
+    "What is sent" : {
+
     },
     "What moves your day — cross-section correlations" : {
       "extractionState" : "stale",

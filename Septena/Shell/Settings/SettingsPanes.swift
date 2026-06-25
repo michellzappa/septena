@@ -18,6 +18,8 @@ struct PrivacySettingsPane: View {
   @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled: Bool = false
   @AppStorage(SettingsKey.appLockGraceSeconds) private var appLockGrace: Int = 60
 
+  @State private var recent: [TelemetryClient.SentRecord] = []
+
   private var level: TelemetryClient.TelemetryLevel {
     TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
   }
@@ -52,7 +54,7 @@ struct PrivacySettingsPane: View {
       Section {
         Picker("Usage data", selection: levelBinding) {
           ForEach(TelemetryClient.TelemetryLevel.allCases, id: \.self) { lvl in
-            Text(Self.title(lvl)).tag(lvl)
+            Text(lvl.title).tag(lvl)
           }
         }
         .pickerStyle(.inline)
@@ -60,15 +62,43 @@ struct PrivacySettingsPane: View {
       } header: {
         Text("Anonymous usage data")
       } footer: {
-        Text(Self.levelDescription(level))
+        Text(level.summary)
       }
 
       Section {
-        ForEach(Self.allSentItems) { sentRow($0) }
+        ForEach(TelemetryClient.dataCatalog) { sentRow($0) }
       } header: {
         Text("What is sent")
       } footer: {
-        Text("Checked items are sent at your current level (\(Self.title(level))). The rest stay on your device until you raise the level.")
+        Text("Checked items are sent at your current level (\(level.title)). The rest stay on your device until you raise the level.")
+      }
+
+      Section {
+        if recent.isEmpty {
+          Text("Nothing has been sent from this device yet.")
+            .foregroundStyle(.secondary)
+        } else {
+          ForEach(recent) { rec in
+            VStack(alignment: .leading, spacing: 2) {
+              HStack(alignment: .firstTextBaseline) {
+                Text(rec.event)
+                Spacer()
+                Text(rec.date.formatted(date: .abbreviated, time: .shortened))
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+              if let detail = rec.detail {
+                Text(detail)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+        }
+      } header: {
+        Text("Recently sent from this device")
+      } footer: {
+        Text("The last \(TelemetryClient.maxLogEntries) analytics events actually transmitted, recorded only on this device. This is the ground truth for the list above.")
       }
 
       Section("What is never sent — at any level") {
@@ -103,10 +133,16 @@ struct PrivacySettingsPane: View {
           Link("cloudflare.com/privacypolicy",
                destination: URL(string: "https://www.cloudflare.com/privacypolicy/")!)
             .font(.callout)
+          Text("Septena is open source. Read exactly what's collected and when, in the code:")
+            .padding(.top, 4)
+          Link("View the analytics source on GitHub",
+               destination: URL(string: "https://github.com/septena/septena/blob/main/SeptenaCore/Telemetry.swift")!)
+            .font(.callout)
         }
       }
     }
     .formStyle(.grouped)
+    .task(id: levelRaw) { recent = await TelemetryClient.shared.recentlySent() }
   }
 
   private func bullet(_ text: String) -> some View {
@@ -116,68 +152,15 @@ struct PrivacySettingsPane: View {
     }
   }
 
-  private static func title(_ level: TelemetryClient.TelemetryLevel) -> String {
-    switch level {
-    case .none:     return "Off"
-    case .minimal:  return "Minimal"
-    case .balanced: return "Balanced"
-    case .full:     return "Full"
-    }
-  }
-
-  private static func levelDescription(_ level: TelemetryClient.TelemetryLevel) -> String {
-    switch level {
-    case .none:
-      return "No usage data leaves your device. Septena learns nothing about how you use the app."
-    case .minimal:
-      return "Only that the app launched, its version, and an anonymous install ID — so Septena knows the app is healthy and which versions are in use. No screens, no sections."
-    case .balanced:
-      return "Adds which sections you enable and open, so Septena improves the areas people actually use. Never which individual screens you visit. Recommended."
-    case .full:
-      return "Adds the individual screens you open, for the most detailed picture of what to improve. Still no logged data, identity, or IP."
-    }
-  }
-
-  // The full, ordered ladder of what analytics can send. Each item names the
-  // lowest level at which it starts being sent; levels are strict supersets, so
-  // an item is "sent" whenever the current level is at or above its threshold.
-  // We show the whole list at every level — dimming what isn't sent yet — so the
-  // difference between the options is visible in one place.
-  private struct SentItem: Identifiable, Hashable {
-    let text: String
-    let from: TelemetryClient.TelemetryLevel
-    var id: String { text }
-  }
-
-  private static let allSentItems: [SentItem] = [
-    .init(text: "Changes to this privacy level", from: .none),
-    .init(text: "That the app launched", from: .minimal),
-    .init(text: "App version, build, and platform (iOS or macOS)", from: .minimal),
-    .init(text: "An anonymous app-install hash, used only for aggregate counts", from: .minimal),
-    .init(text: "Which sections are enabled, opened, and turned on or off", from: .balanced),
-    .init(text: "Which screens you open (e.g. \"Nutrition\", \"Sleep\")", from: .full),
-  ]
-
-  private static func rank(_ level: TelemetryClient.TelemetryLevel) -> Int {
-    TelemetryClient.TelemetryLevel.allCases.firstIndex(of: level) ?? 0
-  }
-
   @ViewBuilder
-  private func sentRow(_ item: SentItem) -> some View {
-    let included = Self.rank(level) >= Self.rank(item.from)
+  private func sentRow(_ item: TelemetryClient.DataItem) -> some View {
+    let included = item.isSent(at: level)
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Image(systemName: included ? "checkmark.circle.fill" : "circle.dashed")
         .foregroundStyle(included ? Color.accentColor : Color.secondary)
         .accessibilityLabel(included ? "Sent" : "Not sent")
-      VStack(alignment: .leading, spacing: 1) {
-        Text(item.text)
-          .foregroundStyle(included ? .primary : .secondary)
-        if !included {
-          Text("From \(Self.title(item.from)) up")
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-        }
-      }
+      Text(item.text)
+        .foregroundStyle(included ? .primary : .secondary)
     }
   }
 }
