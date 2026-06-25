@@ -245,5 +245,8 @@ private struct GroceryRow: View {
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
+    // Whole row opens the editor (groceryButton wraps this) — make the
+    // Spacer and trailing area tappable, not just the name text.
+    .contentShape(Rectangle())
   }
 }

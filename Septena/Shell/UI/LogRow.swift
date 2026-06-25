@@ -58,6 +58,10 @@ struct LogRow: View {
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
     .background(selectionHighlight)
+    // Whole row is the tap target — not just the text. Without this the
+    // Spacer() and trailing gaps are dead zones when wrapped in a Button
+    // (LogEntryRow), so taps near the right edge silently miss.
+    .contentShape(Rectangle())
   }
 
   @ViewBuilder private var selectionHighlight: some View {
