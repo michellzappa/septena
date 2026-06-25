@@ -160,6 +160,19 @@ struct SidebarRootView: View {
     }
   }
 
+  private func moveProject(_ project: Project, to areaId: String?) {
+    guard project.area != areaId else { return }
+    Haptics.tick()
+    Task {
+      do {
+        try await projectsMutator.setArea(id: project.id, area: areaId)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
   private func deleteProject(_ project: Project) {
     Haptics.warning()
     // If the user was viewing the project that just got deleted, bounce them
@@ -730,6 +743,28 @@ struct SidebarRootView: View {
         Label("Move Down", systemImage: "chevron.down")
       }
       .disabled(idx == siblings.count - 1)
+    }
+    Divider()
+    Menu {
+      Button {
+        moveProject(project, to: nil)
+      } label: {
+        Label("No Area", systemImage: "tray")
+      }
+      .disabled(project.area == nil)
+      if !areas.isEmpty {
+        Divider()
+        ForEach(areas) { area in
+          Button {
+            moveProject(project, to: area.id)
+          } label: {
+            Label(area.title, systemImage: "square.stack.3d.up.fill")
+          }
+          .disabled(project.area == area.id)
+        }
+      }
+    } label: {
+      Label("Move to Area", systemImage: "folder")
     }
     Divider()
     Button(role: .destructive) {

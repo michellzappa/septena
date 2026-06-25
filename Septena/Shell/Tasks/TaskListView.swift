@@ -1417,6 +1417,14 @@ struct TaskListView: View {
         onOpenMove: { target in
           if case .single(let t) = target { moveTargetId = t.id; showingMoveSheet = true }
         },
+        onMoveTo: { target, areaId, projectId in
+          if case .single(let t) = target {
+            Haptics.pick()
+            applyMove(id: t.id, areaId: areaId, projectId: projectId)
+          }
+        },
+        moveAreas: areas,
+        moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
         onOpenRepeat: { task in
           repeatTargetId = task.id
           showingRepeatSheet = true
@@ -2337,6 +2345,14 @@ struct TaskListRowContextMenu: View {
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   let onOpenMove: (TaskListView.ActionTarget) -> Void
+  /// Move a task straight to a destination from the inline submenu, skipping the
+  /// sheet. `areaId`/`projectId` follow `MovePickerSheet.onPick` semantics
+  /// (both nil = Inbox; area only; or a project under its area).
+  let onMoveTo: (TaskListView.ActionTarget, _ areaId: String?, _ projectId: String?) -> Void
+  /// Destinations surfaced inline. Areas + top-level (no-area) projects only —
+  /// a bounded set; projects-under-areas stay behind "More…".
+  let moveAreas: [Area]
+  let moveTopProjects: [Project]
   let onOpenRepeat: (SeptenaTask) -> Void
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
@@ -2399,10 +2415,41 @@ struct TaskListRowContextMenu: View {
       Label("Deadline…", systemImage: "flag")
     }
 
-    Button {
-      onOpenMove(target)
+    Menu {
+      Button {
+        onMoveTo(target, nil, nil)
+      } label: {
+        Label("Inbox", systemImage: "tray")
+      }
+      if !moveAreas.isEmpty || !moveTopProjects.isEmpty {
+        Divider()
+        ForEach(moveAreas) { area in
+          Button {
+            onMoveTo(target, area.id, nil)
+          } label: {
+            if let emoji = area.emoji, !emoji.isEmpty {
+              Text("\(emoji)  \(area.title)")
+            } else {
+              Label(area.title, systemImage: "tray.full")
+            }
+          }
+        }
+        ForEach(moveTopProjects) { project in
+          Button {
+            onMoveTo(target, nil, project.id)
+          } label: {
+            Label(project.title, systemImage: "folder")
+          }
+        }
+      }
+      Divider()
+      Button {
+        onOpenMove(target)
+      } label: {
+        Label("More…", systemImage: "ellipsis")
+      }
     } label: {
-      Label("Move…", systemImage: "folder")
+      Label("Move", systemImage: "folder")
     }
 
     if case let .single(task) = target {

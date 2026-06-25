@@ -1401,6 +1401,9 @@ struct TaskRowActions: ViewModifier {
           onOpenWhen: { _ in whenSheet = .init(taskId: task.id, kind: .scheduled) },
           onOpenDeadline: { _ in whenSheet = .init(taskId: task.id, kind: .deadline) },
           onOpenMove: { _ in moveTargetId = task.id; showingMoveSheet = true },
+          onMoveTo: { _, areaId, projectId in applyMove(id: task.id, areaId: areaId, projectId: projectId) },
+          moveAreas: areas,
+          moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
           onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) }; onChange?() },
           onDelete: { _ in Haptics.warning(); mutator.delete(id: task.id); onChange?() }
