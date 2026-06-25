@@ -66,7 +66,7 @@ struct ClaudeReconnectCue: View {
 
   @ViewBuilder private var pillGlyph: some View {
     if justReconnected {
-      Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+      SecuredLockGlyph()
     } else if provider.isRefreshing {
       ProgressView().controlSize(.mini)
     } else if failed {
@@ -113,9 +113,7 @@ struct ClaudeReconnectCue: View {
 
   @ViewBuilder private var leadingGlyph: some View {
     if justReconnected {
-      Image(systemName: "checkmark.circle.fill")
-        .font(.subheadline)
-        .foregroundStyle(.green)
+      SecuredLockGlyph(font: .subheadline)
     } else if failed {
       Image(systemName: "exclamationmark.triangle.fill")
         .font(.subheadline)
@@ -140,5 +138,25 @@ struct ClaudeReconnectCue: View {
     if justReconnected { return nil }
     if failed { return "Couldn’t reconnect — tap to retry" }
     return "Verify it’s you to reconnect"
+  }
+}
+
+// MARK: - Secured-lock flash
+//
+// The brief "you're reconnected" confirmation. Instead of a generic green
+// check, the lock snaps shut — `lock.open.fill` morphs to `lock.fill` with a
+// bounce on appear — so the flash reads as "the connection is secure again,"
+// echoing the biometry/lock language of the default cue and AppLock.
+private struct SecuredLockGlyph: View {
+  var font: Font?
+  @State private var locked = false
+
+  var body: some View {
+    Image(systemName: locked ? "lock.fill" : "lock.open.fill")
+      .font(font)
+      .foregroundStyle(.green)
+      .contentTransition(.symbolEffect(.replace))
+      .symbolEffect(.bounce, value: locked)
+      .onAppear { withAnimation(.snappy) { locked = true } }
   }
 }
