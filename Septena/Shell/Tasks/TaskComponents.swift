@@ -140,9 +140,10 @@ struct TaskCheckbox: View {
   private var boxStrokeColor: Color {
     // Legacy: amber box meant "is on Today" on off-Today surfaces.
     if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    // Language v2: the box is neutral EXCEPT when a task just landed on Today on
-    // its own — then it wears amber as a Things-style "new on Today" highlight.
-    if TaskRowFlags.languageV2, arrivedToday { return Theme.todayAccent }
+    // Language v2: the box is neutral EXCEPT for a Today task seen on an off-Today
+    // surface (project/area) — it wears amber on the control, matching the
+    // Things-style "new on Today" highlight, instead of a separate right-edge chip.
+    if TaskRowFlags.languageV2, isToday || arrivedToday { return Theme.todayAccent }
     return Theme.inkSecondary.opacity(0.55)
   }
   private var boxFillColor: Color {
@@ -702,13 +703,9 @@ struct TaskRow: View {
         Text(Self.shortDate(scheduled)).font(.septenaMeta)
       }
       .foregroundStyle(Theme.inkSecondary)
-    } else if TaskRowFlags.languageV2, showsTodayIndicator, task.isOnToday {
-      // Language v2: Today moved off the checkbox to this right-edge chip — the
-      // one sanctioned time-status color (amber), on a chip, not the control.
-      Text("Today")
-        .font(.septenaMeta.weight(.semibold))
-        .foregroundStyle(Theme.todayAccent)
     }
+    // Language v2: an on-Today task seen on an off-Today surface is signalled by
+    // the amber checkbox (see `boxStrokeColor`), not a right-edge "Today" chip.
   }
 
   private static func shortDate(_ d: Date) -> String {
