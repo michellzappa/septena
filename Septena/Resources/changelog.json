@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1145,
+      "build": 1151,
       "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Snap a photo to log a meal",
-          "detail": "Nutrition now offers photo-first meal capture with on-device analysis to estimate what you ate.",
+          "detail": "Capture meals photo-first and let on-device analysis estimate the macros for you.",
           "section": "nutrition"
         },
         {
-          "title": "Your calendar woven into Tasks",
-          "detail": "Calendar events now appear alongside your tasks in Today and Upcoming so your whole day is in one place.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, so you can restore anything before it's purged.",
           "section": "tasks"
         },
         {
-          "title": "Edit and add tasks inline",
-          "detail": "Rename a task title in place and add new tasks from a quick-add line without leaving the list.",
+          "title": "Your calendar lives alongside your tasks",
+          "detail": "System calendar events now appear in Today and Upcoming, so your day reads in one place.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with undo",
-          "detail": "Deleted tasks move to a Recently Deleted view where you can restore them, with automatic purge after 30 days.",
+          "title": "Rename tasks and add them inline",
+          "detail": "Edit a task title in place, quick-add from the section header, and collapse task areas for a tighter list.",
           "section": "tasks"
         },
         {
-          "title": "Collapsible task areas",
-          "detail": "Group your tasks into areas you can fold away, with tighter, cleaner rows.",
-          "section": "tasks"
+          "title": "The Week tab is now Today",
+          "detail": "The home tab is renamed to Today to match where your attention starts.",
+          "section": null
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center on the week dashboard.",
+          "detail": "Keep the goals that matter most pinned to the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Smarter, synced Next suggestions",
-          "detail": "Next now respects your intake objectives when proposing doses, and dismissed suggestions sync across all your devices.",
+          "title": "A living sky on your wrist",
+          "detail": "The watch Next feed now floats over the real time-of-day sky in a smooth vertically-paged layout, with interactive intake nudges.",
           "section": null
         },
         {
-          "title": "Personalize your intake trackers",
-          "detail": "Add your own emoji to tracker methods and varieties, with a sensible icon guessed when none is set.",
-          "section": "intake"
-        },
-        {
-          "title": "Watch fasting that updates overnight",
-          "detail": "The fasting complication now morphs through the night and rolls over at midnight without waiting on your phone.",
-          "section": null
-        },
-        {
-          "title": "Week tab is now Today",
-          "detail": null,
+          "title": "Finer control over what Septena shares",
+          "detail": "New graded analytics levels (off, minimal, balanced, full) replace the single share-usage switch.",
           "section": null
         }
       ]
