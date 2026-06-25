@@ -2187,7 +2187,7 @@ struct TaskListView: View {
       return
     }
     calendarEvents = filter == .today
-      ? CalendarBridge.shared.todayEvents()
+      ? CalendarBridge.shared.remainingTodayEvents()
       : CalendarBridge.shared.upcomingEvents(days: 30)
   }
 

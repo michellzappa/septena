@@ -134,6 +134,15 @@ final class CalendarBridge {
   /// Used by the Next screen to surface earlier-today meetings as "Done Today".
   func todayEvents() -> [EKEvent] { events(on: Date()) }
 
+  /// Today's events that haven't ended yet — what's still ahead (ongoing or
+  /// upcoming). All-day events run until midnight, so they stay all day. Used by
+  /// the Tasks Today agenda, which should clear a meeting once it's over and show
+  /// nothing once the day's events are all behind us.
+  func remainingTodayEvents() -> [EKEvent] {
+    let now = Date()
+    return events(on: now).filter { $0.endDate > now }
+  }
+
   /// Every event on the given calendar day, including ones that have already
   /// ended — so a scrubbed past day on the dial can show its real meetings.
   func events(on day: Date) -> [EKEvent] {
