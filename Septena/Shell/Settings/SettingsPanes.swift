@@ -63,8 +63,12 @@ struct PrivacySettingsPane: View {
         Text(Self.levelDescription(level))
       }
 
-      Section(level == .none ? "What is sent" : "What is sent at this level") {
-        ForEach(Self.sentBullets(level), id: \.self) { bullet($0) }
+      Section {
+        ForEach(Self.allSentItems) { sentRow($0) }
+      } header: {
+        Text("What is sent")
+      } footer: {
+        Text("Checked items are sent at your current level (\(Self.title(level))). The rest stay on your device until you raise the level.")
       }
 
       Section("What is never sent — at any level") {
@@ -134,34 +138,46 @@ struct PrivacySettingsPane: View {
     }
   }
 
-  private static func sentBullets(_ level: TelemetryClient.TelemetryLevel) -> [String] {
-    switch level {
-    case .none:
-      return ["Nothing, beyond a single update recording that you turned usage data off."]
-    case .minimal:
-      return [
-        "That the app launched",
-        "App version, build, and platform (iOS or macOS)",
-        "An anonymous app-install hash, used only for aggregate counts",
-        "Changes to this privacy level",
-      ]
-    case .balanced:
-      return [
-        "That the app launched",
-        "Which sections are enabled, opened, and turned on or off",
-        "App version, build, and platform (iOS or macOS)",
-        "An anonymous app-install hash, used only for aggregate counts",
-        "Changes to this privacy level",
-      ]
-    case .full:
-      return [
-        "That the app launched",
-        "Which screens you open (e.g. \"Nutrition\", \"Sleep\")",
-        "Which sections are enabled, opened, and turned on or off",
-        "App version, build, and platform (iOS or macOS)",
-        "An anonymous app-install hash, used only for aggregate counts",
-        "Changes to this privacy level",
-      ]
+  // The full, ordered ladder of what analytics can send. Each item names the
+  // lowest level at which it starts being sent; levels are strict supersets, so
+  // an item is "sent" whenever the current level is at or above its threshold.
+  // We show the whole list at every level — dimming what isn't sent yet — so the
+  // difference between the options is visible in one place.
+  private struct SentItem: Identifiable, Hashable {
+    let text: String
+    let from: TelemetryClient.TelemetryLevel
+    var id: String { text }
+  }
+
+  private static let allSentItems: [SentItem] = [
+    .init(text: "Changes to this privacy level", from: .none),
+    .init(text: "That the app launched", from: .minimal),
+    .init(text: "App version, build, and platform (iOS or macOS)", from: .minimal),
+    .init(text: "An anonymous app-install hash, used only for aggregate counts", from: .minimal),
+    .init(text: "Which sections are enabled, opened, and turned on or off", from: .balanced),
+    .init(text: "Which screens you open (e.g. \"Nutrition\", \"Sleep\")", from: .full),
+  ]
+
+  private static func rank(_ level: TelemetryClient.TelemetryLevel) -> Int {
+    TelemetryClient.TelemetryLevel.allCases.firstIndex(of: level) ?? 0
+  }
+
+  @ViewBuilder
+  private func sentRow(_ item: SentItem) -> some View {
+    let included = Self.rank(level) >= Self.rank(item.from)
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Image(systemName: included ? "checkmark.circle.fill" : "circle.dashed")
+        .foregroundStyle(included ? Color.accentColor : Color.secondary)
+        .accessibilityLabel(included ? "Sent" : "Not sent")
+      VStack(alignment: .leading, spacing: 1) {
+        Text(item.text)
+          .foregroundStyle(included ? .primary : .secondary)
+        if !included {
+          Text("From \(Self.title(item.from)) up")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+        }
+      }
     }
   }
 }
