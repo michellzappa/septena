@@ -468,9 +468,10 @@ struct SeptenaApp: App {
           .keyboardShortcut("/", modifiers: [.command, .shift])
       }
       #if os(macOS)
-      // When the local MCP server is on, ⌘Q soft-quits (hides to the menu bar
-      // so the server keeps serving). ⌥⌘Q forces a real exit. When the server
-      // is off, plain ⌘Q quits as usual — the soft-quit path is gated on it.
+      // When soft-quit is on (MCP server enabled + "keep serving after quit"),
+      // ⌘Q hides to the menu bar so the server keeps serving, and ⌥⌘Q forces a
+      // real exit. Otherwise plain ⌘Q quits as usual — soft-quit is gated off
+      // by default, so this is the redundant-but-harmless explicit quit.
       CommandGroup(after: .appTermination) {
         Button("Quit Septena Completely") { MacAppLifecycle.quitCompletely() }
           .keyboardShortcut("q", modifiers: [.command, .option])

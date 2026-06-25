@@ -27,6 +27,9 @@ public enum MCPDefaultsKey {
   public static let token = "septena.dev.localMcpToken"
   /// String — `MCPAccessScope` raw value (which networks may connect).
   public static let scope = "septena.dev.localMcpScope"
+  /// Bool — when the server is on, keep the app alive after ⌘Q (soft-quit to
+  /// the menu bar) so it keeps serving. Off by default: ⌘Q quits normally.
+  public static let keepAlive = "septena.dev.localMcpKeepAlive"
 }
 
 /// Observable live state for the local MCP server, so menu-bar / Settings UI

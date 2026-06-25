@@ -48,7 +48,12 @@ private final class MenuBarTodayLoader {
 struct MenuBarMenu: View {
   @State private var loader = MenuBarTodayLoader()
   @AppStorage(MCPDefaultsKey.enabled) private var mcpEnabled = false
+  @AppStorage(MCPDefaultsKey.keepAlive) private var mcpKeepAlive = false
   @Environment(\.openWindow) private var openWindow
+
+  /// ⌘Q soft-quits to the menu bar only when the server is on *and* "keep
+  /// serving after quit" is opted in; otherwise it quits normally.
+  private var softQuit: Bool { mcpEnabled && mcpKeepAlive }
 
   var body: some View {
     Button("New To-Do") { startQuickAdd() }
@@ -76,12 +81,12 @@ struct MenuBarMenu: View {
     Divider()
 
     Button("Open Septena") { activateMainWindow() }
-    // ⌘Q soft-quits to the menu bar when the server is on (NSApp.terminate
+    // ⌘Q soft-quits to the menu bar only when soft-quit is on (NSApp.terminate
     // routes through MacAppDelegate.applicationShouldTerminate); otherwise it
     // quits normally. "Quit Completely" always exits.
-    Button(mcpEnabled ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
+    Button(softQuit ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
       .keyboardShortcut("q")
-    if mcpEnabled {
+    if softQuit {
       Button("Quit Completely") { MacAppLifecycle.quitCompletely() }
         .keyboardShortcut("q", modifiers: [.command, .option])
     }

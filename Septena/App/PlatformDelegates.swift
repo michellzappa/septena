@@ -176,20 +176,20 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// When the MCP server is on, closing the last window keeps the app alive so
-  /// it keeps serving (the Dock icon and menu bar stay; reopen brings the
-  /// window back). When the server is off, preserve the classic behavior
-  /// (last window closed → quit).
+  /// When soft-quit is on (MCP server enabled *and* "keep serving" opted in),
+  /// closing the last window keeps the app alive so it keeps serving (the Dock
+  /// icon and menu bar stay; reopen brings the window back). Otherwise the
+  /// classic behavior holds (last window closed → quit).
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    !MacAppLifecycle.serverEnabled
+    !MacAppLifecycle.softQuitEnabled
   }
 
-  /// Intercept ⌘Q / menu Quit: when the server is enabled and this isn't an
-  /// explicit "Quit Completely", hide the app instead of terminating so the
-  /// loopback server stays up.
+  /// Intercept ⌘Q / menu Quit: only when soft-quit is on and this isn't an
+  /// explicit "Quit Completely" do we hide the app instead of terminating so
+  /// the loopback server stays up. By default ⌘Q quits.
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     if Self.reallyQuit { return .terminateNow }
-    guard MacAppLifecycle.serverEnabled else { return .terminateNow }
+    guard MacAppLifecycle.softQuitEnabled else { return .terminateNow }
     MacAppLifecycle.enterBackground()
     return .terminateCancel
   }
@@ -202,13 +202,20 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 /// Soft-quit transitions for the Mac app. Gated on the local MCP server being
-/// enabled — that's the only reason to keep the process alive after the user
-/// quits. The Dock icon and menu bar always stay; this just hides/shows the
-/// app window, ⌘H-style, so the server keeps serving in the background.
+/// enabled *and* the user opting into "keep serving after quit" — that's the
+/// only reason to keep the process alive after the user quits. The Dock icon
+/// and menu bar always stay; this just hides/shows the app window, ⌘H-style, so
+/// the server keeps serving in the background.
 @MainActor
 enum MacAppLifecycle {
   static var serverEnabled: Bool {
     UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled)
+  }
+
+  /// True only when the server is on *and* "keep serving after quit" is opted
+  /// in. This is what gates the soft-quit — ⌘Q quits normally otherwise.
+  static var softQuitEnabled: Bool {
+    serverEnabled && UserDefaults.standard.bool(forKey: MCPDefaultsKey.keepAlive)
   }
 
   /// Soft-quit: hide the app. Windows aren't released, so `activate()` brings

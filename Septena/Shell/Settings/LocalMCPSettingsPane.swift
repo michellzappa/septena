@@ -11,6 +11,7 @@ struct LocalMCPSettingsPane: View {
   @AppStorage(SettingsKey.localMcpEnabled) private var enabled = false
   @AppStorage(SettingsKey.localMcpToken) private var token = ""
   @AppStorage(MCPDefaultsKey.scope) private var scopeRaw = MCPAccessScope.thisMac.rawValue
+  @AppStorage(MCPDefaultsKey.keepAlive) private var keepAlive = false
 
   private var port: UInt16 { LocalMCPServer.shared.port }
   private var scope: MCPAccessScope { MCPAccessScope(rawValue: scopeRaw) ?? .thisMac }
@@ -84,6 +85,17 @@ struct LocalMCPSettingsPane: View {
           } else {
             Text("Only a Claude Code running on this Mac can connect.")
           }
+        }
+
+        Section {
+          Toggle(isOn: $keepAlive) {
+            Label("Keep serving after quit", systemImage: "powersleep")
+          }
+        } footer: {
+          Text("Keep Septena running in the background after you press ⌘Q so it "
+             + "keeps answering Claude Code, instead of quitting. The Dock icon "
+             + "and menu bar stay; reopening brings the window back, and "
+             + "⌥⌘Q always quits completely. Off by default.")
         }
 
         Section("Connect Claude Code") {
