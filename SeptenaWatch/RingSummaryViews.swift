@@ -207,8 +207,10 @@ struct IntakeDetailView: View {
         List(rows) { row in
           IntakeTallyRow(row: row)
             .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+            .watchSkyRow()
         }
         .listStyle(.plain)
+        .watchSkyList()
       }
     }
     .navigationTitle("Today")

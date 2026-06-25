@@ -45,6 +45,7 @@
 		0C1E7C472066F981A4299600 /* MealPhotoDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6744A8B49ABCC48CA6DF276 /* MealPhotoDraft.swift */; };
 		0C5ED231827D97592F829BA0 /* ValuesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B41585BA876C731272F49A1 /* ValuesViewModel.swift */; };
 		0D173098848C45F953F3F0DF /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */; };
+		0D48D890C071C68736A38A7F /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		0D9E377F27B61E08EB23187E /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509271CE5A03BE4EC284151A /* OuraProvider.swift */; };
 		0DADAF699FE5AF519A581AF8 /* NextWidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C80A63D8E45192FE97CA9D /* NextWidgetViews.swift */; };
 		0ED02C4262546D720DCBE5DE /* AddChorePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241213EA8E591629280B7EE /* AddChorePage.swift */; };
@@ -92,6 +93,7 @@
 		1A6A9B5FB89C891F4D104C82 /* NextWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26E0516067040713136547D /* NextWire.swift */; };
 		1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */; };
 		1B7FA31CC9D25BA707B6EB31 /* ComplicationRingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */; };
+		1B8E660BFB9456540D7189F7 /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3795310A060A418D32730BFA /* SkyAtmosphere.swift */; };
 		1BBBC5F2298045DC6FD22C2F /* TrainingTabAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */; };
 		1C507D0995C20ECA4DA6479F /* ChoresQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = F531676F7BCEFA46F3A7D827 /* ChoresQuickAddMenu.swift */; };
 		1C66407AC9157A11987CE3DB /* WelcomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1B703F4A00C0E46140FEC1 /* WelcomeHeader.swift */; };
@@ -355,6 +357,7 @@
 		68FEC658F37E69C0360A47D5 /* NextComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27BE273FD1D064942278AD1 /* NextComplication.swift */; };
 		691AAEC0008DD1FF634C5250 /* DailyMessageFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB724A6C69A3232DBF569FB8 /* DailyMessageFooter.swift */; };
 		693B2845164FA3B7FC5828FE /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
+		694FA326F02773E0158DC824 /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3795310A060A418D32730BFA /* SkyAtmosphere.swift */; };
 		69B199F7FD55D3A98BDF10E6 /* GroceryStockHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CB56EDF55AC8C4125E54DE /* GroceryStockHistory.swift */; };
 		69B47DFE8D824BE6EDE19A50 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
 		6AE92DC393E450B35F86BD8C /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
@@ -413,6 +416,7 @@
 		7E0DAB605158CED4DB2249C9 /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
 		7E1425CF569454D46110E696 /* ExerciseStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD7F8E063810C0BD81EF824C /* ExerciseStatsView.swift */; };
 		7EACBD21879EB225D558CF78 /* SharedComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F191C9B4CF7C226C46AC330 /* SharedComplicationData.swift */; };
+		7EFB4D848BBD48F43925E0B5 /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3795310A060A418D32730BFA /* SkyAtmosphere.swift */; };
 		7F6213C67F6842241BA2CF09 /* PhotosBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019FD83A1963232155425024 /* PhotosBridge.swift */; };
 		7F86986DFF10251984C6D58F /* EditGroceryItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C5E5E15422EB17DB5D3960 /* EditGroceryItemSheet.swift */; };
 		7FE5815A1FDDD537C1337A6E /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
@@ -578,6 +582,7 @@
 		B0DA42E828CAC0BD0B0E64B9 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8645572712693D81587B7C /* TrainingDestinationView.swift */; };
 		B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		B2392A52F6D29B6BE1E64B02 /* CoachDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8CB429512008D4925614A9 /* CoachDomain.swift */; };
+		B2E14AA11D3195E8F27276BB /* WatchSky.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCA995E74F8AF991CB006F9 /* WatchSky.swift */; };
 		B30799862FEA58C9BB9874C3 /* IntakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D41E004025226ADBE31D93 /* IntakePlugin.swift */; };
 		B381B4AFB3CF25BE405853CC /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */; };
 		B3FA261BE4DD11C7753A19E6 /* DailyMessageFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB724A6C69A3232DBF569FB8 /* DailyMessageFooter.swift */; };
@@ -995,6 +1000,7 @@
 		3451FCEADE7C79C827433D73 /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
 		3478D00EF04684D27A69EECF /* NutritionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		356B3BA1FD42A9CB75318D25 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3795310A060A418D32730BFA /* SkyAtmosphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyAtmosphere.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
 		39261AEAACE14E6C8A503DFE /* OnboardingTargetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTargetsView.swift; sourceTree = "<group>"; };
 		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1073,6 +1079,7 @@
 		5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPicker.swift; sourceTree = "<group>"; };
 		5FB10CCDDEAC20D7E90832D7 /* LocalMCPSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMCPSettingsPane.swift; sourceTree = "<group>"; };
 		5FBFFB14069FB717EF02173A /* NextComplicationBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextComplicationBundle.swift; sourceTree = "<group>"; };
+		5FCA995E74F8AF991CB006F9 /* WatchSky.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSky.swift; sourceTree = "<group>"; };
 		624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseGutDaySheet.swift; sourceTree = "<group>"; };
 		6292E14A6AFBDD8FFC8E7E6E /* WakingDay+Oura.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WakingDay+Oura.swift"; sourceTree = "<group>"; };
 		62BF9F7C16DF9595A999267D /* TaskRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRecord.swift; sourceTree = "<group>"; };
@@ -1754,6 +1761,7 @@
 				F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */,
 				A09644381782A9A298BDC709 /* WatchConnectivity.swift */,
 				D19FFA7AF205D77FD446D409 /* WatchModels.swift */,
+				5FCA995E74F8AF991CB006F9 /* WatchSky.swift */,
 			);
 			path = SeptenaWatch;
 			sourceTree = "<group>";
@@ -2068,6 +2076,7 @@
 				4CB0FEA3128C7486D772B3A6 /* MilestoneUnits.swift */,
 				F79D2478011E9353A0DF90AC /* ModuleTile.swift */,
 				13011C553B04F0ACEFD189CD /* PlatformShims.swift */,
+				3795310A060A418D32730BFA /* SkyAtmosphere.swift */,
 				AE9CF6ECBC428C4253E69AC4 /* SkyTopWash.swift */,
 				2085456E2239FA343DA34D32 /* SolarClock.swift */,
 				3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */,
@@ -2926,6 +2935,7 @@
 				88D354F6ACC5B87602A1B731 /* ShortcutAction.swift in Sources */,
 				83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */,
 				1D075925DFF88985F673FD7F /* SiriShortcutsSettingsPane.swift in Sources */,
+				1B8E660BFB9456540D7189F7 /* SkyAtmosphere.swift in Sources */,
 				BF20A8E4492FCC0A2ADBE967 /* SkyTopWash.swift in Sources */,
 				A90F8338D53AE42BA5F3FA33 /* SleepDestinationView.swift in Sources */,
 				29BCD4B4754BFB299B32292B /* SleepPlugin.swift in Sources */,
@@ -3050,10 +3060,13 @@
 				18CBE616E858EE435D77B956 /* RingSummaryViews.swift in Sources */,
 				AD6AB8AB9F61D39820850F23 /* SeptenaWatchApp.swift in Sources */,
 				A4CE6F3B52A5191642AB9316 /* SharedComplicationData.swift in Sources */,
+				7EFB4D848BBD48F43925E0B5 /* SkyAtmosphere.swift in Sources */,
+				0D48D890C071C68736A38A7F /* SolarClock.swift in Sources */,
 				43877F17B51EB0A687E70FD7 /* SuggestionBlocks.swift in Sources */,
 				4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */,
 				B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */,
 				F4251470458A2411D47FC255 /* WatchModels.swift in Sources */,
+				B2E14AA11D3195E8F27276BB /* WatchSky.swift in Sources */,
 				9B1F584EB23911FBA6180A3C /* WolfActivityRing.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -3353,6 +3366,7 @@
 				A1D4907004FD78EC3D6F7C6F /* ShortcutAction.swift in Sources */,
 				3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */,
 				85732A2FE6393B89E0A992BC /* SiriShortcutsSettingsPane.swift in Sources */,
+				694FA326F02773E0158DC824 /* SkyAtmosphere.swift in Sources */,
 				38655ABEF6039FDF8415FFD3 /* SkyTopWash.swift in Sources */,
 				EFE1FEDBA1BFF8D046A0261C /* SleepDestinationView.swift in Sources */,
 				637C82B79BB177B96BD557E1 /* SleepPlugin.swift in Sources */,

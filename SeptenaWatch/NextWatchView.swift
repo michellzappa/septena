@@ -30,6 +30,10 @@ struct NextWatchView: View {
             }
           }
         }
+        // The time-of-day sky is the canvas behind the whole stack (feed +
+        // pushed summary pages), so the feed's glass rows float on the real
+        // current sky instead of a flat black.
+        .background(WatchSkyWash())
     }
     .sheet(item: $quickLogItem) { item in
       QuickLogSheet(item: item, conn: conn) { quickLogItem = nil }
@@ -98,39 +102,111 @@ struct NextWatchView: View {
           summaryLinkRows
         }
         .listStyle(.plain)
+        .watchSkyList()
         .environment(\.defaultMinListRowHeight, 0)
       } else {
         allDoneHero
       }
     } else {
-      // Snapshot the enumerated items once per render and read group boundaries
-      // from this local copy — never from live `conn.items` by index. Rapid
-      // wrist taps mutate `conn.items` (optimistic completion removals plus the
-      // post-write reconcile) while the List is mid-animation; a row closure
-      // re-evaluated against the now-shorter live array would index out of
-      // bounds. The captured copy stays consistent for the life of the closure.
-      let rows = Array(conn.items.enumerated())
-      List {
-        ForEach(rows, id: \.element.id) { index, item in
-          // A section header — accent rule plus a count label — at the start of
-          // each group: the first row, or wherever the group changes from the
-          // row above. The watch echo of iOS's tinted section headers.
-          if index == 0 ||
-             WatchSectionTint.key(for: item) != WatchSectionTint.key(for: rows[index - 1].element) {
-            sectionHeader(for: item, at: index, in: rows)
-          }
-          NextItemRow(item: item,
-                      done: conn.completedIDs.contains(item.id),
-                      onComplete: { conn.complete(item) },
-                      onQuickLog: { quickLogItem = item })
-          .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+      // Each section is its own full-screen page in a vertically-paginated
+      // TabView — the Weather-app affordance: the Digital Crown snaps page to
+      // page with a detent haptic at every section boundary, and watchOS swaps
+      // the navigation title to the focused page's section as you scroll. A
+      // "list of lists" that reads haptically and navigationally, not one long
+      // scroll. The Summaries page rides last, matching Apple's guidance to keep
+      // the longest freely-scrolling content in the final tab so its inner
+      // scroll never fights the page snap. The sky canvas behind the whole
+      // NavigationStack shows through every page's hidden list background.
+      TabView {
+        // Group ids are array offsets, not the section key: should a key ever
+        // recur (two non-adjacent runs of the same kind) the offsets stay unique
+        // where the keys wouldn't, so the pages never collapse into one.
+        ForEach(Array(groupedItems.enumerated()), id: \.offset) { _, group in
+          sectionPage(key: group.key, items: group.items)
         }
-        summaryLinkRows
+        if hasSummaries {
+          summariesPage
+        }
       }
-      .listStyle(.plain)
-      .environment(\.defaultMinListRowHeight, 0)
-      .animation(.default, value: conn.items)
+      .tabViewStyle(.verticalPage)
     }
+  }
+
+  /// The Next feed split into contiguous runs by section key — one run per
+  /// page. Built by walking the phone-ordered `conn.items` (already grouped
+  /// upstream) into value-type arrays, so a row closure never indexes the live,
+  /// mutating `conn.items`: rapid wrist taps remove completed rows mid-render,
+  /// and these captured arrays stay consistent for the page's lifetime.
+  private var groupedItems: [(key: String, items: [NextItem])] {
+    var groups: [(key: String, items: [NextItem])] = []
+    for item in conn.items {
+      let key = WatchSectionTint.key(for: item)
+      if let last = groups.last, last.key == key {
+        groups[groups.count - 1].items.append(item)
+      } else {
+        groups.append((key: key, items: [item]))
+      }
+    }
+    return groups
+  }
+
+  /// One section's page: the group's rows over a faint top-edge wash of the
+  /// section's accent — the same treatment the phone's `SectionDrawer` uses (a
+  /// barely-there gradient that makes each section "feel lit by its own color"
+  /// without coloring the content). It sits between the rows and the time-of-day
+  /// sky, so the glyphs stay white and the sky still shows through below the
+  /// wash. Titled with the section noun so the paged title bar names where you
+  /// are; the page boundary does the separating the old inline rule used to.
+  private func sectionPage(key: String, items: [NextItem]) -> some View {
+    // Real section colors only — suggestions aren't a section, and a key with no
+    // published color washes nothing (`.clear`), leaving just the sky.
+    let accent: Color = (key != "suggestion" && conn.sectionColors[key] != nil)
+      ? WatchSectionTint.color(forSectionKey: key, colors: conn.sectionColors)
+      : .clear
+    return List {
+      ForEach(items, id: \.id) { item in
+        NextItemRow(item: item,
+                    done: conn.completedIDs.contains(item.id),
+                    onComplete: { conn.complete(item) },
+                    onQuickLog: { quickLogItem = item })
+        .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+        .watchSkyRow()
+      }
+    }
+    .listStyle(.plain)
+    .watchSkyList()
+    .environment(\.defaultMinListRowHeight, 0)
+    // The drawer's top-edge accent wash, over the sky. Pitched a touch stronger
+    // than the phone's 0.055 peak because it sits on the dark sky (where 5.5%
+    // would vanish) rather than a light grouped background. Tunable — this is
+    // the value to dial if it reads too strong / too faint on the wrist.
+    .background {
+      LinearGradient(
+        stops: [
+          .init(color: accent.opacity(0.20), location: 0),
+          .init(color: .clear, location: 0.45),
+        ],
+        startPoint: .top, endPoint: .bottom
+      )
+      .ignoresSafeArea()
+      .allowsHitTesting(false)
+    }
+    .navigationTitle(WatchSectionTint.pageTitle(forKey: key))
+    .navigationBarTitleDisplayMode(.inline)
+  }
+
+  /// The final page: the macro / training / intake summary tiles, titled
+  /// "Summaries" so the paged title bar names it (the inline "Summaries" caption
+  /// the empty state uses would be redundant here).
+  private var summariesPage: some View {
+    List {
+      summaryTiles
+    }
+    .listStyle(.plain)
+    .watchSkyList()
+    .environment(\.defaultMinListRowHeight, 0)
+    .navigationTitle("Summaries")
+    .navigationBarTitleDisplayMode(.inline)
   }
 
   private var allDoneHero: some View {
@@ -174,6 +250,16 @@ struct NextWatchView: View {
         .foregroundStyle(.secondary)
         .listRowInsets(EdgeInsets(top: 10, leading: 6, bottom: 2, trailing: 6))
         .listRowBackground(Color.clear)
+      summaryTiles
+    }
+  }
+
+  /// The summary rows themselves (nutrition / training / per-intake tiles),
+  /// without the "Summaries" caption — so the empty-state footer can keep its
+  /// inline header while the paged Summaries page leans on its title bar instead.
+  @ViewBuilder
+  private var summaryTiles: some View {
+    if hasSummaries {
       if hasNutrition {
         summaryLink(.nutrition, title: "Nutrition", systemImage: "fork.knife",
                     color: WatchSectionTint.color(forSectionKey: "nutrition", colors: conn.sectionColors))
@@ -190,6 +276,16 @@ struct NextWatchView: View {
           intakeTile(row)
         }
       }
+      #if DEBUG
+      // TEMP: which intake trackers the fetched snapshot actually carries —
+      // `k` = kinds list, `t` = today's tally. If caffeine is absent from `k`,
+      // it's missing from the publish, not the watch UI. Remove once resolved.
+      Text("dbg k:[\(conn.intakeKinds.map(\.name).joined(separator: ","))] t:[\(conn.intakeToday.map(\.name).joined(separator: ","))]")
+        .font(.system(size: 9, design: .monospaced))
+        .foregroundStyle(.orange)
+        .listRowInsets(EdgeInsets(top: 8, leading: 6, bottom: 6, trailing: 6))
+        .listRowBackground(Color.clear)
+      #endif
     }
   }
 
@@ -238,6 +334,7 @@ struct NextWatchView: View {
     }
     .padding(.vertical, 4)
     .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    .watchSkyRow()
   }
 
   private func summaryLink(_ page: WatchPage, title: String,
@@ -256,45 +353,7 @@ struct NextWatchView: View {
       .padding(.vertical, 4)
     }
     .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
-  }
-
-  /// A group header in its own (separator-free) list row: a 2pt rule in the
-  /// group's section accent, plus an accent-tinted count caption ("3 tasks").
-  /// Renders before every group, so each section is labelled — not just the
-  /// boundaries between adjacent groups.
-  private func sectionHeader(for item: NextItem, at index: Int,
-                             in rows: [(offset: Int, element: NextItem)]) -> some View {
-    let accent = WatchSectionTint.color(for: item, colors: conn.sectionColors)
-    return VStack(alignment: .leading, spacing: 3) {
-      Capsule()
-        .fill(accent.opacity(0.7))
-        .frame(height: 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
-      Text(sectionLabel(startingAt: index, in: rows))
-        .font(.caption2)
-        .fontWeight(.semibold)
-        .foregroundStyle(accent)
-        .lineLimit(1)
-    }
-    // The very first header hugs the top; later ones get more breathing room
-    // above to read as a fresh group rather than another row.
-    .listRowInsets(EdgeInsets(top: index == 0 ? 2 : 8, leading: 6, bottom: 2, trailing: 6))
-    .listRowBackground(Color.clear)
-  }
-
-  /// "3 tasks" — the count of contiguous rows in the group that begins at
-  /// `index`, with the section's own noun. Counting the run (rather than every
-  /// matching row) stays correct even if a section key were ever to recur.
-  private func sectionLabel(startingAt index: Int,
-                            in rows: [(offset: Int, element: NextItem)]) -> String {
-    let key = WatchSectionTint.key(for: rows[index].element)
-    var count = 0
-    var i = index
-    while i < rows.count, WatchSectionTint.key(for: rows[i].element) == key {
-      count += 1
-      i += 1
-    }
-    return "\(count) \(WatchSectionTint.noun(forKey: key, count: count))"
+    .watchSkyRow()
   }
 }
 
@@ -334,13 +393,13 @@ enum WatchSectionTint {
     return count == 1 ? singular : singular + "s"
   }
 
-  static func color(for item: NextItem, colors: [String: String]) -> Color {
-    let k = key(for: item)
-    // Suggestions aren't a section — they get a neutral rule, matching the
-    // phone's Next, where the "Suggested" group reads neutral rather than
-    // carrying a section tint.
-    if k == "suggestion" { return .secondary }
-    return color(forSectionKey: k, colors: colors)
+  /// The paged title-bar label for a group key — the section name watchOS shows
+  /// as you snap to that page. Capitalized plural noun ("Tasks", "Habits"),
+  /// except suggestions, which read "Suggested" to match the phone's group.
+  static func pageTitle(forKey key: String) -> String {
+    if key == "suggestion" { return "Suggested" }
+    let plural = noun(forKey: key, count: 2)
+    return plural.prefix(1).uppercased() + plural.dropFirst()
   }
 
   /// Resolve a section's accent straight from its key (e.g. the Capture sheet's
@@ -527,20 +586,22 @@ struct NextItemRow: View {
     // Suggestions read neutral, like the phone's "Suggested" group — the
     // grouping itself marks them as nudges, no accent needed.
     if isSuggestion { return .secondary }
-    // Overdue is carried by the trailing warning marker (below), not by
-    // reddening the kind glyph — matches the widget's chore treatment.
-    return .secondary
+    // Section accent tints didn't read against the time-of-day sky, so the kind
+    // glyph stays plain white (matching the title text) — clean monochrome over
+    // the canvas. Overdue is still carried by the trailing warning marker, not
+    // by reddening the glyph.
+    return .primary
   }
 
+  // The leading glyph. Completable rows (task / habit / supplement / chore) all
+  // collapse to a plain `circle` — a real checkbox that the caller fills to a
+  // green `checkmark.circle.fill` when done. The per-kind symbols (repeat.circle
+  // / pill / house …) were redundant once each section became its own titled
+  // page: every row under "Habits" wore the same habit glyph the title already
+  // names. Suggestions aren't completable, so they keep an indicative `lightbulb`
+  // rather than a checkbox that would imply they can be ticked off.
   private var kindIcon: String {
-    switch item.kind {
-    case "suggestion": return "lightbulb"
-    case "task":       return "circle"
-    case "habit":      return "repeat.circle"
-    case "supplement": return "pill"
-    case "chore":      return "house"
-    default:           return "circle"
-    }
+    isSuggestion ? "lightbulb" : "circle"
   }
 }
 
