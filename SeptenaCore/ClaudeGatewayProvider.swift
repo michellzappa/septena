@@ -55,12 +55,25 @@ public final class ClaudeGatewayProvider {
   private static let ckEnvironment = "development"
 
   /// Re-mint when the last push is older than this — comfortably under the
-  /// ~8h token lifetime.
+  /// ~8h token lifetime. Still drives the proactive pre-expiry nudge
+  /// (`nudgeFireDate`); the foreground `needsReauth` decision no longer relies
+  /// on it as a guess — see `probeStoredToken`.
   private static let refreshInterval: TimeInterval = 7 * 60 * 60
+
+  /// Below this age a freshly-minted token is trusted without a network probe —
+  /// no point asking CloudKit about a token minted minutes ago on every
+  /// foreground. Past it we close the loop and verify the real verdict.
+  /// Conservatively under any observed CloudKit lifetime.
+  private static let probeAfter: TimeInterval = 5 * 60 * 60
 
   // MARK: Persisted state
   private static let enabledKey = "septena.claudeGateway.enabled"
   private static let lastRefreshKey = "septena.claudeGateway.lastRefreshAt"
+  /// Keychain account for the last token we minted+pushed, kept so we can ask
+  /// CloudKit whether it's still valid (the closed-loop expiry check). A
+  /// rotating, device-specific credential → device-local (not iCloud-synced),
+  /// same posture as the Withings OAuth token.
+  private static let tokenKeychainAccount = "septena.claudeGateway.ckToken"
 
   /// UserDefaults key for the "keep Claude connected" notification choice.
   /// Follows the `septena.notify.toggle.<id>` convention used by the section
@@ -122,13 +135,113 @@ public final class ClaudeGatewayProvider {
       await refreshNow()
       return
     }
-    if let last = lastRefreshAt, Date().timeIntervalSince(last) < Self.refreshInterval {
+
+    let age = lastRefreshAt.map { Date().timeIntervalSince($0) }
+
+    // A comfortably-fresh token is trusted without a round-trip.
+    if let age, age < Self.probeAfter {
       needsReauth = false
-      logger.info("Claude gateway fresh on foreground (age \(Int(Date().timeIntervalSince(last)), privacy: .public)s)")
-    } else {
-      needsReauth = true // stale (or never authed) — flag, don't pop UI
-      logger.info("Claude gateway stale on foreground → needsReauth (showing reconnect cue)")
+      logger.info("Claude gateway fresh on foreground (age \(Int(age), privacy: .public)s, no probe)")
+      return
     }
+
+    // Closed loop: past the floor, ask CloudKit whether the token we last
+    // minted is *actually* still accepted, instead of flipping `needsReauth`
+    // on a guessed interval. This kills both failure modes of the timer — a
+    // false reconnect nag while the token is still live, and a dead token that
+    // only surfaces when Claude fails mid-request. Never pops UI; just flags.
+    switch await probeStoredToken() {
+    case .some(true):
+      needsReauth = false
+      logger.info("Claude gateway token verified live (age \(age.map(Int.init) ?? -1, privacy: .public)s)")
+      if let age { recordMeasurement(ageSec: age, valid: true) }
+    case .some(false):
+      needsReauth = true
+      // The measured CloudKit token lifetime — the real number behind the 7h
+      // guess. Persisted (below) so it survives for later calibration.
+      logger.info("Claude gateway token expired after \(age.map(Int.init) ?? -1, privacy: .public)s → needsReauth")
+      if let age { recordMeasurement(ageSec: age, valid: false) }
+    case .none:
+      // Inconclusive (offline, or no stored token from a pre-upgrade connect):
+      // fall back to the original time heuristic so behaviour never regresses.
+      needsReauth = (age ?? .greatestFiniteMagnitude) >= Self.refreshInterval
+      logger.info("Claude gateway probe inconclusive → time heuristic, needsReauth=\(self.needsReauth, privacy: .public)")
+    }
+  }
+
+  /// Closed-loop validity check: ask CloudKit (the same authority Claude's
+  /// gateway depends on) whether the last token we minted + pushed is still
+  /// accepted on the private DB. Returns `true` (valid), `false`
+  /// (expired/rejected), or `nil` (couldn't tell — offline, or nothing stored
+  /// yet). No token is ever logged.
+  private func probeStoredToken() async -> Bool? {
+    guard
+      let token = KeychainStore.load(account: Self.tokenKeychainAccount),
+      !token.isEmpty
+    else { return nil }
+    var comps = URLComponents(
+      string: "https://api.apple-cloudkit.com/database/1/\(SeptenaCloudKit.containerIdentifier)/\(Self.ckEnvironment)/private/users/current"
+    )!
+    comps.queryItems = [
+      URLQueryItem(name: "ckAPIToken", value: Self.webServicesAPIToken),
+      URLQueryItem(name: "ckWebAuthToken", value: token),
+    ]
+    var req = URLRequest(url: comps.url!)
+    req.setValue("application/json", forHTTPHeaderField: "Accept")
+    do {
+      let (data, resp) = try await session.data(for: req)
+      let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+      // A live token resolves to a user record; an expired one gets a
+      // redirectURL (Apple sign-in) or a 401 instead — same signal the gateway
+      // reads server-side (CloudKitError.isAuthExpired).
+      struct Resp: Decodable { let userRecordName: String?; let redirectURL: String? }
+      let parsed = try? JSONDecoder().decode(Resp.self, from: data)
+      if let name = parsed?.userRecordName, !name.isEmpty { return true }
+      if code == 401 || parsed?.redirectURL != nil { return false }
+      return nil // unexpected shape — don't guess
+    } catch {
+      return nil // transient/offline — let the caller fall back
+    }
+  }
+
+  // MARK: Lifetime measurement (calibration)
+  //
+  // Each token cycle, track the largest age the probe still saw the token as
+  // valid (`lastValid`) and the age at which it first saw it expired
+  // (`expiredBy`). The true CloudKit lifetime lies in (lastValid, expiredBy].
+  // Finalized samples are appended to `samplesKey` so they outlive the `.info`
+  // logs — read them back in a few days with:
+  //   defaults read com.septena.cloud.mac septena.claudeGateway.measure.samples
+  // and calibrate `refreshInterval` / `probeAfter` to the observed minimum.
+  private static let measureCycleKey = "septena.claudeGateway.measure.cycleRefreshAt"
+  private static let measureValidKey = "septena.claudeGateway.measure.lastValidAge"
+  private static let measureFinalizedKey = "septena.claudeGateway.measure.finalizedCycle"
+  private static let measureSamplesKey = "septena.claudeGateway.measure.samples"
+
+  private func recordMeasurement(ageSec: Double, valid: Bool) {
+    guard let last = lastRefreshAt else { return }
+    let d = UserDefaults.standard
+    let cycle = last.timeIntervalSince1970
+    // New token cycle → reset the running lower bound.
+    if d.double(forKey: Self.measureCycleKey) != cycle {
+      d.set(cycle, forKey: Self.measureCycleKey)
+      d.set(0, forKey: Self.measureValidKey)
+    }
+    if valid {
+      if ageSec > d.double(forKey: Self.measureValidKey) {
+        d.set(ageSec, forKey: Self.measureValidKey)
+      }
+      return
+    }
+    // First expiry seen for this cycle → finalize one sample (dedup the
+    // repeated foregrounds that keep seeing the same dead token).
+    guard d.double(forKey: Self.measureFinalizedKey) != cycle else { return }
+    d.set(cycle, forKey: Self.measureFinalizedKey)
+    let lastValid = Int(d.double(forKey: Self.measureValidKey))
+    let minted = ISO8601DateFormatter().string(from: last)
+    var samples = d.stringArray(forKey: Self.measureSamplesKey) ?? []
+    samples.append("minted \(minted) | lastValid \(lastValid)s | expiredBy \(Int(ageSec))s")
+    d.set(Array(samples.suffix(12)), forKey: Self.measureSamplesKey)
   }
 
   /// Mint a token and push it now. Updates observable status either way.
@@ -144,6 +257,10 @@ public final class ClaudeGatewayProvider {
     do {
       let token = try await mintWebAuthToken()
       try await push(ckWebAuthToken: token)
+      // Keep the pushed token so we can later ask CloudKit whether it's still
+      // valid (the closed-loop expiry check) — it's the exact credential the
+      // gateway now holds, so its validity tracks Claude's connection.
+      KeychainStore.store(token, account: Self.tokenKeychainAccount, synchronizable: false)
       lastError = nil
       needsReauth = false
       lastRefreshAt = Date()
@@ -173,6 +290,7 @@ public final class ClaudeGatewayProvider {
     isEnabled = false
     lastError = nil
     needsReauth = false
+    KeychainStore.delete(account: Self.tokenKeychainAccount)
     // Withdraw any pending reconnect nudge.
     NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
   }
