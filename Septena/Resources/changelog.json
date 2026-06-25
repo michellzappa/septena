@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1166,
+      "build": 1173,
       "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Snap a photo to log a meal",
-          "detail": "Capture food with your camera and let on-device analysis estimate the meal and its macros — no manual entry needed.",
+          "detail": "Capture meals photo-first with on-device analysis that estimates what you ate.",
           "section": "nutrition"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view where you can restore them, with automatic cleanup after 30 days.",
-          "section": "tasks"
-        },
-        {
-          "title": "Your calendar events live alongside your tasks",
-          "detail": "Today and Upcoming now weave in events from your system calendar, showing only what's still ahead.",
-          "section": "tasks"
-        },
-        {
           "title": "Rename and add tasks right in the list",
-          "detail": "Edit a task's title in place and use a quick-add line to capture new ones without leaving the list.",
+          "detail": "Edit a task title inline and use a quick-add line to capture new ones without leaving the page.",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center on the week dashboard.",
+          "title": "Your calendar now lives in Today",
+          "detail": "System calendar events weave into Today and Upcoming, showing only what's still ahead.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recover deleted tasks",
+          "detail": "A Recently Deleted view keeps tasks for 30 days with one-tap restore before they auto-purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "Smarter training volume and a weekly review",
+          "detail": "Per-muscle volume is now effort-weighted, with a weekly muscle review after each session.",
+          "section": "training"
+        },
+        {
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep the goals you care about most front and center on the dashboard.",
           "section": "goals"
         },
         {
-          "title": "Add your own emoji to intake trackers",
-          "detail": "Personalize tracker methods and varieties with custom emoji, and intake nudges in Next now respect your objectives.",
-          "section": "intake"
-        },
-        {
-          "title": "A living sky on your wrist",
-          "detail": "The watch Next feed now floats over a sky that shifts with the time of day, paged section by section.",
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels let you see exactly what telemetry is sent, with a recently-sent log.",
           "section": null
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Analytics now offer graded levels — off, minimal, balanced, or full — instead of a single on/off switch.",
+          "title": "A richer Next feed on the watch",
+          "detail": "Intake nudges are now interactive, set against a live time-of-day sky in a paged Next feed.",
           "section": null
         }
       ]
