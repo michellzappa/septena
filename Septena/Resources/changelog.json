@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1151,
+      "build": 1153,
       "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Capture meals photo-first and let on-device analysis estimate the macros for you.",
-          "section": "nutrition"
+          "title": "Quicker task entry and editing",
+          "detail": "Rename a task in place and add new ones from a dedicated quick-add line, with inline submenus to move tasks between areas and projects.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar lives in Today and Upcoming",
+          "detail": "System calendar events now appear alongside your tasks so the day reads as one agenda.",
+          "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, so you can restore anything before it's purged.",
+          "detail": "Deleted tasks rest in a Recently Deleted view with undo and a 30-day auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar lives alongside your tasks",
-          "detail": "System calendar events now appear in Today and Upcoming, so your day reads in one place.",
+          "title": "Collapsible task areas",
+          "detail": "Fold away areas you're not working in for a tighter, calmer list.",
           "section": "tasks"
-        },
-        {
-          "title": "Rename tasks and add them inline",
-          "detail": "Edit a task title in place, quick-add from the section header, and collapse task areas for a tighter list.",
-          "section": "tasks"
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": "The home tab is renamed to Today to match where your attention starts.",
-          "section": null
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most pinned to the week dashboard.",
+          "detail": "Keep the goals that matter most in view right on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "A living sky on your wrist",
-          "detail": "The watch Next feed now floats over the real time-of-day sky in a smooth vertically-paged layout, with interactive intake nudges.",
+          "title": "Snap a photo of your meal",
+          "detail": "Photo-first meal capture analyzes food on-device to log it faster.",
+          "section": "nutrition"
+        },
+        {
+          "title": "A living sky on your watch",
+          "detail": "The watch Next feed now floats over the real time-of-day sky, with interactive intake nudges you can act on from your wrist.",
           "section": null
         },
         {
-          "title": "Finer control over what Septena shares",
-          "detail": "New graded analytics levels (off, minimal, balanced, full) replace the single share-usage switch.",
+          "title": "Choose how much you share",
+          "detail": "Graded privacy levels — off, minimal, balanced, or full — let you decide exactly what analytics Septena collects.",
           "section": null
         }
       ]
