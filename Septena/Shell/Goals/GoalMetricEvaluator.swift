@@ -202,17 +202,16 @@ enum GoalMetricWindow {
     fmt.dateFormat = "yyyy-MM-dd"
     fmt.locale = Locale(identifier: "en_US_POSIX")
     guard let (start, end) = dateRange(for: window) else { return nil }
-    var cal = Calendar.current
-    cal.firstWeekday = 2
+    let cal = Calendar.current
     let lastDay = cal.date(byAdding: .day, value: -1, to: end) ?? end
     return (fmt.string(from: start), fmt.string(from: lastDay))
   }
 
-  /// Half-open Date window [start, end). Monday-first week so training
-  /// schedules read the way users expect.
+  /// Half-open Date window [start, end). The week boundary follows the user's
+  /// locale (`Calendar.current.firstWeekday`) so goal weeks line up with the
+  /// week-start they see everywhere else (heatmaps, charts).
   static func dateRange(for window: String) -> (Date, Date)? {
-    var cal = Calendar.current
-    cal.firstWeekday = 2
+    let cal = Calendar.current
     let now = Date()
     switch window {
     case "today":

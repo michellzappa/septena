@@ -2,7 +2,8 @@ import SwiftUI
 
 // GitHub-style contribution heatmap, ported from the webapp's
 // `ContributionGrid` + `ChecklistConsistencyGrid`. Each column is a week
-// (Mon→Sun), each cell a day, color ramp derived from a section accent.
+// (top row = the user's locale week-start), each cell a day, color ramp
+// derived from a section accent.
 //
 // Used in destination views to show "past weeks of progress" at a glance.
 // Driver: a closure that maps an ISO date to a 0…4 level + optional count.
@@ -229,42 +230,43 @@ struct ConsistencyHeatmap: View {
     }
   }
 
-  // MARK: - Week columns (Mon-start, like the webapp)
+  // MARK: - Week columns (week-start follows the user's locale)
 
   /// Builds a column-major matrix of [week][weekday] dates that ends on the
   /// week containing `endDate`, with up to `maxWeeks` columns. The left edge
-  /// is the Monday of the week containing `firstDataDate` (or the viewport
-  /// boundary when `firstDataDate` is nil). Only cells past `endDate` are
-  /// nil; the leftmost column is always a full Mon→Sun so there's no gap.
+  /// is the week-start of the week containing `firstDataDate` (or the viewport
+  /// boundary when `firstDataDate` is nil). The top row is whichever weekday the
+  /// user's locale starts on (`Calendar.current.firstWeekday` — Monday in most
+  /// of the world, Sunday in the US). Only cells past `endDate` are nil; the
+  /// leftmost column is always a full week so there's no gap.
   private static func weekColumns(
     endDate: Date,
     firstDataDate: Date?,
     maxWeeks: Int
   ) -> [[Date?]] {
-    var cal = Calendar(identifier: .iso8601)
-    cal.firstWeekday = 2 // Monday
-    let lastMonday = mondayOfWeek(for: endDate, calendar: cal)
-    let lastSunday = cal.date(byAdding: .day, value: 6, to: lastMonday)!
-    // Viewport's earliest Monday given how many weeks fit on screen.
-    let viewportFirstMonday = cal.date(byAdding: .weekOfYear,
-                                       value: -(maxWeeks - 1),
-                                       to: lastMonday)!
+    let cal = Calendar.current
+    let lastWeekStart = startOfWeek(for: endDate, calendar: cal)
+    let lastWeekEnd = cal.date(byAdding: .day, value: 6, to: lastWeekStart)!
+    // Viewport's earliest week-start given how many weeks fit on screen.
+    let viewportFirstWeekStart = cal.date(byAdding: .weekOfYear,
+                                          value: -(maxWeeks - 1),
+                                          to: lastWeekStart)!
     // If we have a known first-data date, clamp forward so we don't render
     // empty pre-data columns. Otherwise just respect the viewport.
-    let firstMonday: Date = {
-      guard let first = firstDataDate else { return viewportFirstMonday }
-      let dataMonday = mondayOfWeek(for: first, calendar: cal)
-      return max(viewportFirstMonday, dataMonday)
+    let firstWeekStart: Date = {
+      guard let first = firstDataDate else { return viewportFirstWeekStart }
+      let dataWeekStart = startOfWeek(for: first, calendar: cal)
+      return max(viewportFirstWeekStart, dataWeekStart)
     }()
     var columns: [[Date?]] = []
-    var cursor = firstMonday
-    while cursor <= lastSunday {
+    var cursor = firstWeekStart
+    while cursor <= lastWeekEnd {
       var week: [Date?] = []
       for offset in 0..<7 {
         let d = cal.date(byAdding: .day, value: offset, to: cursor)!
         // Only hide cells that are past endDate (right-side partial week).
         // Left-side cells before firstDataDate are passed through so the
-        // first column is always a complete Mon→Sun — getDay returns level 0
+        // first column is always a complete week — getDay returns level 0
         // for those days, matching the visual weight of any other empty cell.
         week.append(d > endDate ? nil : d)
       }
@@ -274,7 +276,9 @@ struct ConsistencyHeatmap: View {
     return columns
   }
 
-  private static func mondayOfWeek(for date: Date, calendar: Calendar) -> Date {
+  /// Start of the week containing `date`, honoring the calendar's
+  /// `firstWeekday` (so it snaps to Monday or Sunday per the user's locale).
+  private static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
     let comps = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
     return calendar.date(from: comps) ?? date
   }

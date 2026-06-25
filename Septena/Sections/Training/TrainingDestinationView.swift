@@ -787,7 +787,7 @@ struct TrainingDestinationView: View {
   private var weeklyVolumeTrend: [WeekVolumePoint] {
     let cal = Calendar.current
     let fmt = Self.ymdFormatter
-    // Anchor to this week's start (Monday-ish per user locale).
+    // Anchor to this week's start (week-start per the user's locale).
     let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
     guard let thisWeekStart = cal.date(from: comps) else { return [] }
     var weeks: [Date] = []

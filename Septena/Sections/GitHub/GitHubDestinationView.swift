@@ -130,16 +130,16 @@ struct GitHubDestinationView: View {
 
   private struct WeekBucket { let weekStart: String; let total: Int }
 
-  /// Sum contributions into ISO weeks (Monday-start), oldest → newest.
+  /// Sum contributions into weeks (week-start follows the user's locale),
+  /// oldest → newest.
   private var weeklyBuckets: [WeekBucket] {
-    var cal = Calendar(identifier: .iso8601)
-    cal.firstWeekday = 2
+    let cal = Calendar.current
     var totals: [Date: Int] = [:]
     for day in contributions.days {
       guard let d = ConsistencyHeatmap.date(fromISO: day.date) else { continue }
       let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: d)
-      guard let monday = cal.date(from: comps) else { continue }
-      totals[monday, default: 0] += day.count
+      guard let weekStart = cal.date(from: comps) else { continue }
+      totals[weekStart, default: 0] += day.count
     }
     return totals.keys.sorted().map {
       WeekBucket(weekStart: ConsistencyHeatmap.iso($0), total: totals[$0] ?? 0)
