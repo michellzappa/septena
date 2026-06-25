@@ -510,6 +510,9 @@ private struct RemindersInboxDetail: View {
 // the Next page stop showing those events.
 
 private struct CalendarDetail: View {
+  @Environment(\.modelContext)    private var modelContext
+  @Environment(CKEngine.self)     private var ckEngine
+  @Environment(SettingsStore.self) private var store
   @State private var bridge = CalendarBridge.shared
   @State private var access: CalendarBridge.Access = .notDetermined
   @State private var calendars: [EKCalendar] = []
@@ -561,7 +564,8 @@ private struct CalendarDetail: View {
   private func calendarRow(_ cal: EKCalendar) -> some View {
     Toggle(isOn: Binding(
       get: { !bridge.isHidden(cal) },
-      set: { bridge.setHidden(!$0, for: cal) }
+      set: { store.setCalendarHidden(!$0, title: cal.title,
+                                     context: modelContext, engine: ckEngine) }
     )) {
       HStack(spacing: 10) {
         Circle()

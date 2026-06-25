@@ -305,6 +305,11 @@ struct SeptenaApp: App {
             // the graded privacy choice syncs across devices.
             settingsStore.reconcileTelemetryLevel(
               context: localStore.container.mainContext, engine: ckEngine)
+            // Same bridge for the hidden-calendar selection: adopt a synced
+            // selection from another device, or seed the account from this
+            // device's existing local pick (incl. legacy id→title migration).
+            settingsStore.reconcileHiddenCalendars(
+              context: localStore.container.mainContext, engine: ckEngine)
             // Grandfather established accounts past the first-run welcome:
             // `onboardedAt` is a new field, so every pre-existing user starts
             // nil — stamp it when the account already has data so the welcome

@@ -630,6 +630,52 @@ final class SettingsStore {
     }
   }
 
+  /// Show or hide one calendar (by `EKCalendar.title`) from the day timeline /
+  /// Next feed. Writes `CalendarBridge`'s local cache (the authority EventKit
+  /// fetches filter on) AND the CloudKit-synced `calendarHiddenTitles` payload,
+  /// so the selection follows the user across devices. Mirrors the
+  /// `setTelemetryLevel` write shape.
+  func setCalendarHidden(_ hidden: Bool, title: String,
+                         context: ModelContext, engine: CKEngine?) {
+    var titles = CalendarBridge.shared.hiddenCalendarTitles
+    if hidden { titles.insert(title) } else { titles.remove(title) }
+    let sorted = titles.sorted()
+    guard serverSettings?.calendarHiddenTitles != sorted else { return }
+    CalendarBridge.shared.hiddenCalendarTitles = titles
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.calendarHiddenTitles = sorted
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the synced hidden-calendar selection with `CalendarBridge`'s
+  /// local cache. Same inbound/outbound shape as `reconcileTelemetryLevel`:
+  /// - A synced value wins: adopt it into the bridge so a selection made on
+  ///   another device takes effect here.
+  /// - No synced value yet: migrate any legacy local selection (via
+  ///   `allCalendars()`, which maps old identifiers → titles) and, if this
+  ///   device has a non-empty selection, push it up so it seeds the account.
+  ///   Empty is the default, so we don't push it — that avoids a fresh device
+  ///   clobbering another device's real selection before it syncs in. The push
+  ///   enqueues a CloudKit save, so it only runs with a non-nil `engine`.
+  func reconcileHiddenCalendars(context: ModelContext, engine: CKEngine?) {
+    if let synced = serverSettings?.calendarHiddenTitles {
+      CalendarBridge.shared.hiddenCalendarTitles = Set(synced)
+      return
+    }
+    _ = CalendarBridge.shared.allCalendars()   // folds any legacy id-keyed selection into titles
+    let local = CalendarBridge.shared.hiddenCalendarTitles
+    guard engine != nil, !local.isEmpty else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.calendarHiddenTitles = local.sorted()
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Persist the saved practitioner-report definitions into the synced
   /// settings blob so the same reports show on every device.
   func setReports(_ reports: [ReportBundle], context: ModelContext, engine: CKEngine?) {

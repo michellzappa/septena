@@ -1452,6 +1452,16 @@ struct AppSettings: Codable {
   /// Defaulted so existing settings payloads decode cleanly. See [[project_versioning_changelog]].
   var telemetryLevel: String? = nil
 
+  /// Calendars the user has hidden from the day timeline / Next feed, stored by
+  /// `EKCalendar.title` (NOT `calendarIdentifier`, which EventKit assigns
+  /// per-store and is not stable across devices — see [[project_tasks_calendar_events]]).
+  /// Title-based matching is what makes "set it up once, applies everywhere"
+  /// work: the same iCloud calendar resolves by name on every device. Synced so
+  /// the selection follows the user; mirrored into `CalendarBridge`'s local
+  /// UserDefaults cache (the offline-safe authority EventKit fetches filter on).
+  /// Nil → nothing hidden yet. Defaulted so existing payloads decode cleanly.
+  var calendarHiddenTitles: [String]? = nil
+
   enum CodingKeys: String, CodingKey {
     case sectionOrder = "section_order"
     case targets, units, time, theme, eink, nutrition
@@ -1463,6 +1473,7 @@ struct AppSettings: Codable {
     case reports
     case nextSkips = "next_skips"
     case telemetryLevel = "telemetry_level"
+    case calendarHiddenTitles = "calendar_hidden_titles"
   }
 }
 

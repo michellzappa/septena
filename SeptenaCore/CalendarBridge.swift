@@ -17,41 +17,67 @@ final class CalendarBridge {
 
   // MARK: - Hidden calendars
   //
-  // User-controlled per-calendar visibility, persisted by calendarIdentifier.
+  // User-controlled per-calendar visibility, persisted by `EKCalendar.title`.
   // We treat hidden calendars as if they weren't there — both fetch helpers
   // strip them, so consumers (timeline, Next, dashboards) don't have to know.
+  //
+  // Title — not `calendarIdentifier` — is the key on purpose: EventKit assigns
+  // identifiers per-store, so the same iCloud calendar has a different id on
+  // each device. Matching by title is what lets the synced selection ("set it
+  // up once") resolve to the right calendars everywhere. The CloudKit round-trip
+  // lives in `SettingsStore` (the `calendarHiddenTitles` settings field); this
+  // UserDefaults cache is the offline-safe local authority the fetch filters use.
 
-  private static let hiddenKey = "septena.calendar.hiddenCalendarIDs"
+  private static let hiddenTitlesKey = "septena.calendar.hiddenCalendarTitles"
+  /// Pre-sync key, stored `calendarIdentifier`s. Migrated to titles once, then removed.
+  private static let legacyHiddenIDsKey = "septena.calendar.hiddenCalendarIDs"
 
-  var hiddenCalendarIDs: Set<String> = Set(UserDefaults.standard.stringArray(forKey: hiddenKey) ?? []) {
+  var hiddenCalendarTitles: Set<String> = Set(UserDefaults.standard.stringArray(forKey: hiddenTitlesKey) ?? []) {
     didSet {
-      UserDefaults.standard.set(Array(hiddenCalendarIDs), forKey: Self.hiddenKey)
+      UserDefaults.standard.set(Array(hiddenCalendarTitles), forKey: Self.hiddenTitlesKey)
     }
   }
 
   func isHidden(_ cal: EKCalendar) -> Bool {
-    hiddenCalendarIDs.contains(cal.calendarIdentifier)
+    hiddenCalendarTitles.contains(cal.title)
   }
 
   func setHidden(_ hidden: Bool, for cal: EKCalendar) {
-    var s = hiddenCalendarIDs
-    if hidden { s.insert(cal.calendarIdentifier) }
-    else      { s.remove(cal.calendarIdentifier) }
-    hiddenCalendarIDs = s
+    var s = hiddenCalendarTitles
+    if hidden { s.insert(cal.title) }
+    else      { s.remove(cal.title) }
+    hiddenCalendarTitles = s
   }
 
-  /// Every event calendar the user has, sorted by title for stable UI.
+  /// Every event calendar the user has, sorted by title for stable UI. Also the
+  /// point where any legacy identifier-keyed selection is folded into the
+  /// title-keyed set (we have the `EKCalendar`s in hand here to map id → title).
   func allCalendars() -> [EKCalendar] {
     guard access == .granted else { return [] }
-    return store.calendars(for: .event)
+    let cals = store.calendars(for: .event)
+    migrateLegacyHiddenIfNeeded(from: cals)
+    return cals
       .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+  }
+
+  /// One-shot: translate any pre-sync `hiddenCalendarIDs` (identifiers) into the
+  /// title-keyed set, then drop the legacy key so this never runs again. No-op
+  /// once migrated. Keeps an existing local selection from silently resetting on
+  /// the upgrade that moved this preference to titles.
+  private func migrateLegacyHiddenIfNeeded(from cals: [EKCalendar]) {
+    let defaults = UserDefaults.standard
+    guard let legacy = defaults.stringArray(forKey: Self.legacyHiddenIDsKey), !legacy.isEmpty else { return }
+    let legacyIDs = Set(legacy)
+    let titles = cals.filter { legacyIDs.contains($0.calendarIdentifier) }.map(\.title)
+    if !titles.isEmpty { hiddenCalendarTitles.formUnion(titles) }
+    defaults.removeObject(forKey: Self.legacyHiddenIDsKey)
   }
 
   /// Calendars to actually query — drops user-hidden ones. Returns nil
   /// when nothing is hidden so EventKit can take its default fast path.
   private var visibleCalendars: [EKCalendar]? {
-    if hiddenCalendarIDs.isEmpty { return nil }
-    return store.calendars(for: .event).filter { !hiddenCalendarIDs.contains($0.calendarIdentifier) }
+    if hiddenCalendarTitles.isEmpty { return nil }
+    return store.calendars(for: .event).filter { !hiddenCalendarTitles.contains($0.title) }
   }
 
   enum Access {
