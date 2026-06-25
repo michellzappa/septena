@@ -1020,6 +1020,21 @@ struct SidebarRootView: View {
 }
 // MARK: - Sidebar primitives
 
+/// The muted trailing count shown on every sidebar row (smart lists, areas,
+/// projects, Recently Deleted). One definition so all the numbers read
+/// identically — never restyle a count inline.
+struct SidebarCount: View {
+  let count: Int
+
+  var body: some View {
+    if count > 0 {
+      Text("\(count)")
+        .scaledFont(size: 12, weight: .regular)
+        .foregroundStyle(Theme.inkSecondary.opacity(0.6))
+    }
+  }
+}
+
 struct SmartListRow: View {
   let icon: String
   /// The list's color — fills the rounded-square icon container behind a
@@ -1039,11 +1054,7 @@ struct SmartListRow: View {
         // selection inverts the title to white over the focused accent.
         .foregroundStyle(.primary)
       Spacer()
-      if let n = count, n > 0 {
-        Text("\(n)")
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-      }
+      if let n = count { SidebarCount(count: n) }
     }
     .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
@@ -1266,11 +1277,7 @@ struct SidebarAreaRow: View {
       if let isCollapsed, let onToggleCollapse {
         SidebarFoldChevron(isCollapsed: isCollapsed, action: onToggleCollapse)
       }
-      if count > 0 {
-        Text("\(count)")
-          .scaledFont(size: 12, weight: .regular)
-          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
-      }
+      SidebarCount(count: count)
       if isCollapsed == nil {
         SidebarRowChevron()
       }
@@ -1351,11 +1358,7 @@ struct SidebarProjectRow: View {
         .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
-      if count > 0 {
-        Text("\(count)")
-          .scaledFont(size: 12, weight: .regular)
-          .foregroundStyle(Theme.inkSecondary.opacity(0.6))
-      }
+      SidebarCount(count: count)
       SidebarRowChevron()
     }
     .frame(height: Theme.sidebarProjectRowHeight)
