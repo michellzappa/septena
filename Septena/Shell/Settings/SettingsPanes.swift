@@ -9,9 +9,25 @@ import UIKit
 #endif
 
 struct PrivacySettingsPane: View {
-  @AppStorage(SettingsKey.shareUsageData) private var share: Bool = true
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
+  @AppStorage(SettingsKey.telemetryLevel) private var levelRaw: String =
+    TelemetryClient.TelemetryLevel.balanced.rawValue
   @AppStorage(SettingsKey.appLockEnabled) private var appLockEnabled: Bool = false
   @AppStorage(SettingsKey.appLockGraceSeconds) private var appLockGrace: Int = 60
+
+  private var level: TelemetryClient.TelemetryLevel {
+    TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
+  }
+
+  private var levelBinding: Binding<TelemetryClient.TelemetryLevel> {
+    Binding(
+      get: { level },
+      set: { store.setTelemetryLevel($0, context: modelContext, engine: ckEngine) }
+    )
+  }
 
   var body: some View {
     Form {
@@ -34,30 +50,52 @@ struct PrivacySettingsPane: View {
       }
 
       Section {
-        Toggle("Share anonymous usage data", isOn: $share)
+        Picker("Usage data", selection: levelBinding) {
+          ForEach(TelemetryClient.TelemetryLevel.allCases, id: \.self) { lvl in
+            Text(Self.title(lvl)).tag(lvl)
+          }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+      } header: {
+        Text("Anonymous usage data")
       } footer: {
-        Text("Helps us understand which features people use, so we improve the right things. Turning this off sends one privacy-preference update, then stops usage events.")
+        Text(Self.levelDescription(level))
       }
 
-      Section("What is sent") {
-        bullet("Which screens you open (e.g. \"Nutrition\", \"Sleep\")")
-        bullet("Which sections are enabled, opened, and turned on or off")
-        bullet("App version, build, and platform (iOS or macOS)")
-        bullet("An anonymous app-install hash, used only for aggregate opt-in and opt-out counts")
-        bullet("Changes to this analytics preference")
+      Section(level == .none ? "What is sent" : "What is sent at this level") {
+        ForEach(Self.sentBullets(level), id: \.self) { bullet($0) }
       }
 
-      Section("What is never sent") {
+      Section("What is never sent — at any level") {
         bullet("Anything you log — food, intake, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
         bullet("Your community profile, iCloud identity, or anything that links analytics to your personal data.")
         bullet("Your IP address. Cloudflare receives it to deliver the request, but Septena does not store it in analytics tables.")
+      }
+
+      // Future: opt-in donation of select, anonymized life data to support
+      // research. Deliberately unselectable for now — shown so the intent is
+      // transparent, but it does nothing until the contribution pipeline ships.
+      Section {
+        HStack {
+          Label("Contribute anonymized data to research", systemImage: "flask")
+          Spacer()
+          Text("Coming soon")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .foregroundStyle(.secondary)
+      } header: {
+        Text("Research")
+      } footer: {
+        Text("In a future update you'll be able to opt in to sharing a select, anonymized slice of your data to support health research. It will always be off by default, fully opt-in, and separate from the usage data above — never your raw logs or anything that identifies you.")
       }
 
       Section {
         EmptyView()
       } footer: {
         VStack(alignment: .leading, spacing: 8) {
-          Text("Analytics is processed by Septena on Cloudflare infrastructure.")
+          Text("Analytics is processed by Septena on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud.")
           Link("cloudflare.com/privacypolicy",
                destination: URL(string: "https://www.cloudflare.com/privacypolicy/")!)
             .font(.callout)
@@ -65,15 +103,65 @@ struct PrivacySettingsPane: View {
       }
     }
     .formStyle(.grouped)
-    .onChange(of: share) { _, enabled in
-      Task { await TelemetryClient.shared.recordConsent(enabled: enabled) }
-    }
   }
 
   private func bullet(_ text: String) -> some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Text("•").foregroundStyle(.secondary)
       Text(text).foregroundStyle(.primary)
+    }
+  }
+
+  private static func title(_ level: TelemetryClient.TelemetryLevel) -> String {
+    switch level {
+    case .none:     return "Off"
+    case .minimal:  return "Minimal"
+    case .balanced: return "Balanced"
+    case .full:     return "Full"
+    }
+  }
+
+  private static func levelDescription(_ level: TelemetryClient.TelemetryLevel) -> String {
+    switch level {
+    case .none:
+      return "No usage data leaves your device. Septena learns nothing about how you use the app."
+    case .minimal:
+      return "Only that the app launched, its version, and an anonymous install ID — so Septena knows the app is healthy and which versions are in use. No screens, no sections."
+    case .balanced:
+      return "Adds which sections you enable and open, so Septena improves the areas people actually use. Never which individual screens you visit. Recommended."
+    case .full:
+      return "Adds the individual screens you open, for the most detailed picture of what to improve. Still no logged data, identity, or IP."
+    }
+  }
+
+  private static func sentBullets(_ level: TelemetryClient.TelemetryLevel) -> [String] {
+    switch level {
+    case .none:
+      return ["Nothing, beyond a single update recording that you turned usage data off."]
+    case .minimal:
+      return [
+        "That the app launched",
+        "App version, build, and platform (iOS or macOS)",
+        "An anonymous app-install hash, used only for aggregate counts",
+        "Changes to this privacy level",
+      ]
+    case .balanced:
+      return [
+        "That the app launched",
+        "Which sections are enabled, opened, and turned on or off",
+        "App version, build, and platform (iOS or macOS)",
+        "An anonymous app-install hash, used only for aggregate counts",
+        "Changes to this privacy level",
+      ]
+    case .full:
+      return [
+        "That the app launched",
+        "Which screens you open (e.g. \"Nutrition\", \"Sleep\")",
+        "Which sections are enabled, opened, and turned on or off",
+        "App version, build, and platform (iOS or macOS)",
+        "An anonymous app-install hash, used only for aggregate counts",
+        "Changes to this privacy level",
+      ]
     }
   }
 }

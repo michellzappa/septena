@@ -4,21 +4,68 @@ import SwiftUI
 // Anonymous aggregate app telemetry via Septena's Cloudflare Worker.
 //
 // Payload: event name, low-cardinality screen name, app version, build,
-// platform, analytics preference, and an app-local install id. The Worker
+// platform, the chosen privacy level, and an app-local install id. The Worker
 // stores only an HMAC of the install id, which lets Septena count opt-outs
 // without linking analytics to logged content or community profile identity.
 //
-// Disabled in DEBUG so dev builds never hit production telemetry, and gated by
-// `septena.privacy.shareUsageData` for usage events. Consent changes are still
-// sent as operational privacy state so opt-out counts remain knowable.
+// Disabled in DEBUG so dev builds never hit production telemetry. What is sent
+// is gated by a graded privacy *level* (`septena.privacy.telemetryLevel`, synced
+// across the user's devices via `AppSettings.telemetryLevel`), not a single
+// on/off switch — see `TelemetryLevel`. Level changes are still sent as
+// operational privacy state (even when the new level is `.none`) so opt-out
+// counts remain knowable.
 
 public actor TelemetryClient {
   public static let shared = TelemetryClient()
 
+  /// Graded privacy levels, in increasing order of what leaves the device.
+  /// Each step is a strict superset of the one before it, so the UI can present
+  /// them as a single ladder and the gating below is a simple threshold check.
+  /// Synced across devices via `AppSettings.telemetryLevel`; the raw values are
+  /// the wire/storage contract, so don't rename them.
+  public enum TelemetryLevel: String, CaseIterable, Sendable {
+    /// Nothing leaves the device (bar the one operational level-change ping, so
+    /// opt-out counts stay knowable).
+    case none
+    /// App launches + version/build/platform + the anonymous install hash. Lets
+    /// Septena know the app is healthy and which versions are in use.
+    case minimal
+    /// Adds which sections you enable and use (feature-level, not screen-level),
+    /// so Septena improves the areas people actually reach for. The default.
+    case balanced
+    /// Adds the individual screens you open, for the most detailed product view.
+    case full
+
+    /// Rank for threshold comparisons (`allows`). Higher = more is shared.
+    var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+  }
+
+  /// What a given event category needs at minimum to be sent.
+  private enum Category {
+    case appHealth   // app_open — needs `.minimal`
+    case sectionUsage // section_* — needs `.balanced`
+    case screenViews  // screen_view — needs `.full`
+
+    var minimumLevel: TelemetryLevel {
+      switch self {
+      case .appHealth:    return .minimal
+      case .sectionUsage: return .balanced
+      case .screenViews:  return .full
+      }
+    }
+  }
+
+  /// Synced privacy level key. Mirrored device-locally from
+  /// `AppSettings.telemetryLevel` (see `SettingsStore.reconcileTelemetryLevel`)
+  /// so this actor can read it synchronously from `UserDefaults`.
+  public static let levelKey = "septena.privacy.telemetryLevel"
+
+  /// Legacy pre-levels on/off key. Still read by `currentLevel()` so an existing
+  /// user's explicit choice is honored once, then superseded by `levelKey`.
   public static let consentKey = "septena.privacy.shareUsageData"
 
   private static let installIDKey = "septena.telemetry.installID"
-  private static let pendingConsentKey = "septena.telemetry.pendingConsent"
+  private static let pendingLevelKey = "septena.telemetry.pendingLevel"
   private static let sectionInventoryDateKey = "septena.telemetry.sectionInventoryDate"
 
   private let session: URLSession
@@ -36,26 +83,26 @@ public actor TelemetryClient {
   }
 
   public func trackAppOpen() async {
-    await flushPendingConsent()
-    guard Self.isEnabled() else { return }
-    _ = await send(event: .appOpen, screen: nil, section: nil, enabled: nil, sections: nil, analyticsEnabled: true)
+    await flushPendingLevel()
+    guard Self.allows(.appHealth) else { return }
+    _ = await send(event: .appOpen, screen: nil, section: nil, enabled: nil, sections: nil, level: Self.currentLevel())
   }
 
   public func track(screen: String) async {
-    await flushPendingConsent()
-    guard Self.isEnabled() else { return }
+    await flushPendingLevel()
+    guard Self.allows(.screenViews) else { return }
 
     let now = Date()
     let key = "screen:\(screen)"
     if let last = lastSent[key], now.timeIntervalSince(last) < debounce { return }
     lastSent[key] = now
 
-    _ = await send(event: .screenView, screen: screen, section: nil, enabled: nil, sections: nil, analyticsEnabled: true)
+    _ = await send(event: .screenView, screen: screen, section: nil, enabled: nil, sections: nil, level: Self.currentLevel())
   }
 
   public func trackSectionInventory(_ sections: [SectionConfig]) async {
-    await flushPendingConsent()
-    guard Self.isEnabled() else { return }
+    await flushPendingLevel()
+    guard Self.allows(.sectionUsage) else { return }
 
     let today = String(Self.nowISODate.prefix(10))
     let defaults = UserDefaults.standard
@@ -66,57 +113,75 @@ public actor TelemetryClient {
       .sorted { $0.section < $1.section }
     guard !states.isEmpty else { return }
 
-    if await send(event: .sectionInventory, screen: nil, section: nil, enabled: nil, sections: states, analyticsEnabled: true) {
+    if await send(event: .sectionInventory, screen: nil, section: nil, enabled: nil, sections: states, level: Self.currentLevel()) {
       defaults.set(today, forKey: Self.sectionInventoryDateKey)
     }
   }
 
   public func recordSectionEnabled(section: String, enabled: Bool) async {
-    await flushPendingConsent()
-    guard Self.isEnabled() else { return }
+    await flushPendingLevel()
+    guard Self.allows(.sectionUsage) else { return }
     _ = await send(event: .sectionEnabledChanged,
                    screen: nil,
                    section: section,
                    enabled: enabled,
                    sections: nil,
-                   analyticsEnabled: true)
+                   level: Self.currentLevel())
   }
 
   public func recordSectionUsed(section: String) async {
-    await flushPendingConsent()
-    guard Self.isEnabled() else { return }
+    await flushPendingLevel()
+    guard Self.allows(.sectionUsage) else { return }
     _ = await send(event: .sectionUsed,
                    screen: nil,
                    section: section,
                    enabled: nil,
                    sections: nil,
-                   analyticsEnabled: true)
+                   level: Self.currentLevel())
   }
 
-  public func recordConsent(enabled: Bool) async {
+  /// Record a privacy-level change. Sent as operational state even when the new
+  /// level is `.none` (one final ping), so aggregate opt-out counts stay
+  /// knowable. The local mirror key is written at the edit site (SettingsStore);
+  /// this just emits the change event.
+  public func recordLevelChange(_ level: TelemetryLevel) async {
     #if DEBUG
     return
     #else
-    UserDefaults.standard.set(enabled, forKey: Self.pendingConsentKey)
-    await flushPendingConsent()
+    UserDefaults.standard.set(level.rawValue, forKey: Self.pendingLevelKey)
+    await flushPendingLevel()
     #endif
   }
 
-  public static func isEnabled() -> Bool {
+  /// The device's currently-effective privacy level. Reads the synced mirror
+  /// key first; falls back to honoring a pre-levels `shareUsageData` choice once
+  /// (on → `.full`, off → `.none`); otherwise the `.balanced` default.
+  public static func currentLevel() -> TelemetryLevel {
     let defaults = UserDefaults.standard
-    if defaults.object(forKey: consentKey) == nil { return true }
-    return defaults.bool(forKey: consentKey)
+    if let raw = defaults.string(forKey: levelKey),
+       let level = TelemetryLevel(rawValue: raw) {
+      return level
+    }
+    if defaults.object(forKey: consentKey) != nil {
+      return defaults.bool(forKey: consentKey) ? .full : .none
+    }
+    return .balanced
   }
 
-  private func flushPendingConsent() async {
+  /// Whether the current level permits sending the given event category.
+  private static func allows(_ category: Category) -> Bool {
+    currentLevel().rank >= category.minimumLevel.rank
+  }
+
+  private func flushPendingLevel() async {
     #if DEBUG
     return
     #else
     let defaults = UserDefaults.standard
-    guard defaults.object(forKey: Self.pendingConsentKey) != nil else { return }
-    let enabled = defaults.bool(forKey: Self.pendingConsentKey)
-    if await send(event: .analyticsConsentChanged, screen: nil, section: nil, enabled: nil, sections: nil, analyticsEnabled: enabled) {
-      defaults.removeObject(forKey: Self.pendingConsentKey)
+    guard let raw = defaults.string(forKey: Self.pendingLevelKey),
+          let level = TelemetryLevel(rawValue: raw) else { return }
+    if await send(event: .levelChanged, screen: nil, section: nil, enabled: nil, sections: nil, level: level) {
+      defaults.removeObject(forKey: Self.pendingLevelKey)
     }
     #endif
   }
@@ -126,7 +191,7 @@ public actor TelemetryClient {
                     section: String?,
                     enabled: Bool?,
                     sections: [SectionTelemetryState]?,
-                    analyticsEnabled: Bool) async -> Bool {
+                    level: TelemetryLevel) async -> Bool {
     #if DEBUG
     return false
     #else
@@ -137,7 +202,11 @@ public actor TelemetryClient {
       section: section,
       enabled: enabled,
       sections: sections,
-      analyticsEnabled: analyticsEnabled,
+      // Back-compat: the Worker's existing `analyticsEnabled` boolean stays a
+      // faithful "is any usage data flowing" flag, while `level` carries the new
+      // graded detail for Workers that understand it.
+      analyticsEnabled: level != .none,
+      level: level.rawValue,
       version: Self.version,
       build: Self.build,
       platform: Self.platform
@@ -216,7 +285,10 @@ public actor TelemetryClient {
   private enum TelemetryEvent: String {
     case appOpen = "app_open"
     case screenView = "screen_view"
-    case analyticsConsentChanged = "analytics_consent_changed"
+    // Kept on the wire as "analytics_consent_changed" so the Worker's existing
+    // event taxonomy doesn't change; the payload's `level` now carries the
+    // chosen graded level rather than a bare on/off.
+    case levelChanged = "analytics_consent_changed"
     case sectionInventory = "section_inventory"
     case sectionEnabledChanged = "section_enabled_changed"
     case sectionUsed = "section_used"
@@ -235,6 +307,7 @@ public actor TelemetryClient {
     let enabled: Bool?
     let sections: [SectionTelemetryState]?
     let analyticsEnabled: Bool
+    let level: String
     let version: String
     let build: String
     let platform: String

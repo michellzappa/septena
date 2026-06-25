@@ -1467,7 +1467,7 @@
         }
       }
     },
-    "Analytics is processed by Septena on Cloudflare infrastructure." : {
+    "Analytics is processed by Septena on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud." : {
 
     },
     "Analytics is provided by Plausible Analytics (EU-hosted, cookie-free)." : {
@@ -1503,6 +1503,9 @@
           }
         }
       }
+    },
+    "Anonymous usage data" : {
+
     },
     "Anxious" : {
       "localizations" : {
@@ -3723,9 +3726,6 @@
         }
       }
     },
-    "Helps us understand which features people use, so we improve the right things. Turning this off sends one privacy-preference update, then stops usage events." : {
-
-    },
     "Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too." : {
 
     },
@@ -3916,6 +3916,9 @@
           }
         }
       }
+    },
+    "In a future update you'll be able to opt in to sharing a select, anonymized slice of your data to support health research. It will always be off by default, fully opt-in, and separate from the usage data above — never your raw logs or anything that identifies you." : {
+
     },
     "In catalog" : {
       "localizations" : {
@@ -6118,6 +6121,9 @@
           }
         }
       }
+    },
+    "Research" : {
+
     },
     "Rest timer" : {
 

@@ -56,10 +56,16 @@ enum SettingsKey {
   /// ("Reset first-run welcome"); cleared when the welcome is completed.
   /// Never set in normal use, so the gate behaves exactly as before.
   static let welcomeForce = "septena.welcome.force"
-  /// Consent toggle for anonymous aggregate usage telemetry.
-  /// Same key string is referenced by `TelemetryClient.consentKey` so the
-  /// guard inside the actor and the @AppStorage binding stay in sync.
+  /// Legacy on/off consent toggle for anonymous aggregate usage telemetry,
+  /// superseded by the graded `telemetryLevel`. Still defined because
+  /// `TelemetryClient.currentLevel()` honors a pre-levels value once, on upgrade.
   static let shareUsageData   = "septena.privacy.shareUsageData"
+  /// Device-local mirror of `AppSettings.telemetryLevel` (a
+  /// `TelemetryClient.TelemetryLevel` raw value). Same key string as
+  /// `TelemetryClient.levelKey` so the actor's synchronous gating read and the
+  /// Privacy pane's `@AppStorage` binding stay in lockstep; kept in sync with
+  /// the CloudKit-synced payload by `SettingsStore.reconcileTelemetryLevel`.
+  static let telemetryLevel   = TelemetryClient.levelKey
   /// Which renderer the homepage uses. Raw value of `HomepageLayoutMode`.
   /// Default (`tiles`) preserves the existing card-grid behaviour, so
   /// users with no setting see no change.
@@ -381,6 +387,11 @@ final class SettingsStore {
     // first frame. Inbound-only here (no engine); the launch task pushes a
     // pre-existing local-only value up.
     reconcileTrackFasting(context: context, engine: nil)
+    // Same bridge for the analytics privacy level: adopt an inbound synced level
+    // into the local @AppStorage mirror so `TelemetryClient` gates correctly from
+    // the first frame. Inbound-only here (no engine); the launch task pushes a
+    // legacy/default level up.
+    reconcileTelemetryLevel(context: context, engine: nil)
     // Inbound-only at init (no engine): if a synced `onboardedAt` is already
     // in the local mirror, adopt it into the device-local flag now so the
     // welcome gate decides synchronously on the first frame and never waits
@@ -568,6 +579,54 @@ final class SettingsStore {
     // push that up so it syncs (launch path only).
     if engine != nil, UserDefaults.standard.bool(forKey: key) {
       setTrackFasting(true, context: context, engine: engine)
+    }
+  }
+
+  /// Set the analytics privacy level. Writes the device-local `@AppStorage`
+  /// mirror (`SettingsKey.telemetryLevel`, read synchronously by
+  /// `TelemetryClient` to gate what it sends) AND the CloudKit-synced
+  /// `telemetryLevel` payload (so the choice follows the user across devices).
+  /// Mirrors the `setTrackFasting` / `setWeightUnit` write pattern. Also emits
+  /// the operational level-change ping (sent even for `.none`, so opt-out counts
+  /// stay knowable).
+  func setTelemetryLevel(_ level: TelemetryClient.TelemetryLevel,
+                         context: ModelContext, engine: CKEngine?) {
+    UserDefaults.standard.set(level.rawValue, forKey: SettingsKey.telemetryLevel)
+    Task { await TelemetryClient.shared.recordLevelChange(level) }
+    guard serverSettings?.telemetryLevel != level.rawValue else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.telemetryLevel = level.rawValue
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
+  /// Reconcile the synced privacy level with the device-local `@AppStorage`
+  /// mirror `TelemetryClient` reads. Same inbound/outbound shape as
+  /// `reconcileTrackFasting`:
+  /// - A synced value wins: copy it into the local mirror so a level chosen on
+  ///   another device takes effect here.
+  /// - No synced value yet: resolve the effective local level (honoring a local
+  ///   pick or the legacy `shareUsageData` bool, else `.balanced`), materialize
+  ///   it into the mirror so the picker binds to a concrete value, and push it
+  ///   up so it syncs. The push enqueues a CloudKit save, so it only runs with a
+  ///   non-nil `engine` (the launch path); the init/paint path passes nil.
+  func reconcileTelemetryLevel(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.telemetryLevel
+    if let synced = serverSettings?.telemetryLevel,
+       TelemetryClient.TelemetryLevel(rawValue: synced) != nil {
+      if UserDefaults.standard.string(forKey: key) != synced {
+        UserDefaults.standard.set(synced, forKey: key)
+      }
+      return
+    }
+    let effective = TelemetryClient.currentLevel()
+    if UserDefaults.standard.string(forKey: key) != effective.rawValue {
+      UserDefaults.standard.set(effective.rawValue, forKey: key)
+    }
+    if engine != nil {
+      setTelemetryLevel(effective, context: context, engine: engine)
     }
   }
 
