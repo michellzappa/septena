@@ -137,7 +137,7 @@ final class SettleStore {
   /// How long a checked item lingers, struck through, before it fades out.
   /// This doubles as the "undo a completion" window — un-checking inside it
   /// aborts the fade — so it's kept generous rather than snappy.
-  static let delay: Duration = .milliseconds(3500)
+  static let delay: Duration = .milliseconds(7000)
 
   /// Ids currently lingering (checked, not yet faded). Read by views that need
   /// to keep a just-completed row on screen during the window.

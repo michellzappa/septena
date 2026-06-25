@@ -316,7 +316,7 @@ struct TaskListView: View {
   private struct TaskToast: Identifiable {
     let id = UUID()
     var message: String
-    var duration: Double = 6
+    var duration: Double = 7
     var undo: (() -> Void)?
   }
 
