@@ -60,6 +60,7 @@ struct TaskListView: View {
   @State private var itemsStorage: [SeptenaTask] = []
   @State private var reviewStorage: [SeptenaTask] = []
   @State private var doneTodayStorage: [SeptenaTask] = []
+  @State private var triageStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
 
   @State private var areas: [Area]
@@ -125,11 +126,18 @@ struct TaskListView: View {
   }
 
   /// The Inbox — the unratified layer rendered as a section above Today (only on
-  /// the Today view; see `triageSection`). Read straight from the mirror; the
-  /// table is personal-scale and this only renders on `.today`.
-  /// See docs/TRIAGE_BAND_SPEC.md.
+  /// the Today view; see `triageSection`). Backed by `triageStorage` (populated
+  /// in `load()` with the same settle-preservation as `items`), with a live
+  /// fallback for the pre-load frame. Like `visibleItems`, a just-checked row
+  /// stays in the set while it settles (`status == .open || isSettling`) so
+  /// completing an Inbox suggestion lingers struck-through and fades in place
+  /// rather than vanishing instantly. See docs/TRIAGE_BAND_SPEC.md.
   private var triageItems: [SeptenaTask] {
-    filter == .today ? LocalCache.tasks(in: modelContext, filter: .triage) : []
+    guard filter == .today else { return [] }
+    let base = storageFilter == filter
+      ? triageStorage
+      : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
+    return base.filter { $0.status == .open || settle.isSettling($0.id) }
   }
 
   /// Review tasks that genuinely rolled in overnight — i.e. were scheduled
@@ -299,11 +307,18 @@ struct TaskListView: View {
   @State private var newTodosDismissed: Bool =
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
-  // Undo snackbar — shown briefly after a soft-delete so the user can
-  // recover a mis-tapped task before it disappears.
-  @State private var deletedSnackbarTitle: String?
-  @State private var deletedSnackbarId: String?
-  @State private var snackbarTask: Task<Void, Never>?
+  // Transient bottom snackbar — a confirmation (delete / move / defer) with an
+  // optional Undo. The lifecycle is driven by a `.task(id:)` on the overlay so
+  // SwiftUI owns the dismiss timer (a manually-held `Task` could be orphaned by
+  // a body re-evaluation, which is why an earlier version flickered out early).
+  @State private var toast: TaskToast?
+
+  private struct TaskToast: Identifiable {
+    let id = UUID()
+    var message: String
+    var duration: Double = 6
+    var undo: (() -> Void)?
+  }
 
   var body: some View {
     let base = taskList
@@ -326,7 +341,15 @@ struct TaskListView: View {
     let withSnackbar = base.overlay(alignment: .bottom) {
       deleteSnackbar
     }
-    .animation(.snappy, value: deletedSnackbarId != nil)
+    .animation(.snappy, value: toast?.id)
+    // SwiftUI-owned dismiss timer: re-runs whenever the toast id changes
+    // (new toast restarts the clock; Undo / nil cancels the pending sleep).
+    .task(id: toast?.id) {
+      guard let seconds = toast?.duration else { return }
+      try? await Task.sleep(for: .seconds(seconds))
+      guard !Task.isCancelled else { return }
+      toast = nil
+    }
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
     // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
@@ -354,22 +377,21 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var deleteSnackbar: some View {
-    if let title = deletedSnackbarTitle, let id = deletedSnackbarId {
+    if let toast {
       HStack(spacing: 12) {
-        Text("\"\(title)\" deleted")
+        Text(toast.message)
           .font(.callout)
           .foregroundStyle(.primary)
           .lineLimit(1)
-        Spacer(minLength: 0)
-        Button("Undo") {
-          snackbarTask?.cancel()
-          deletedSnackbarTitle = nil
-          deletedSnackbarId = nil
-          mutator.restore(id: id)
-          Task { await load() }
+        if let undo = toast.undo {
+          Spacer(minLength: 0)
+          Button("Undo") {
+            undo()
+            self.toast = nil
+          }
+          .font(.callout.weight(.semibold))
+          .tint(.accentColor)
         }
-        .font(.callout.weight(.semibold))
-        .tint(.accentColor)
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
@@ -1115,17 +1137,16 @@ struct TaskListView: View {
     // Show undo snackbar (not in the Recently Deleted view — there the
     // gesture is always intentional and Restore is a first-class action).
     guard filter != .recentlyDeleted else { return }
-    snackbarTask?.cancel()
-    deletedSnackbarTitle = title.isEmpty ? "Task" : title
-    deletedSnackbarId = id
-    snackbarTask = Task {
-      try? await Task.sleep(for: .seconds(4))
-      guard !Task.isCancelled else { return }
-      await MainActor.run {
-        deletedSnackbarTitle = nil
-        deletedSnackbarId = nil
-      }
+    showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
+      mutator.restore(id: id)
+      Task { await load() }
     }
+  }
+
+  /// Present the bottom snackbar. The `.task(id:)` on the overlay owns the
+  /// auto-dismiss; this just sets the payload (a fresh id restarts the clock).
+  private func showToast(_ message: String, undo: (() -> Void)? = nil) {
+    toast = TaskToast(message: message, undo: undo)
   }
 
   /// Persist title/notes from the Details pane. No-op when both fields
@@ -1145,7 +1166,11 @@ struct TaskListView: View {
 
   private func applyMove(id: String, areaId: String?, projectId: String?) {
     Haptics.tick()
-    if let task = currentTask(id: id) {
+    // Capture the prior filing BEFORE the move so Undo can put it back.
+    let task = currentTask(id: id)
+    let prevArea = task?.area
+    let prevProject = task?.project
+    if let task {
       let chosenKind: SuggestionEngine.Suggestion.Kind? =
         projectId != nil ? .project : (areaId != nil ? .area : nil)
       let chosenId = projectId ?? areaId
@@ -1164,6 +1189,23 @@ struct TaskListView: View {
     // Inbox. No-op for non-agent / already-seen rows.
     mutator.acknowledge(id: id)
     Task { await load() }
+
+    // The inline move submenus relocate a row with no visible trace ("where did
+    // it go?"). Name the destination and offer a one-tap Undo back to the prior
+    // area/project — the same move primitives, run in reverse.
+    let destName =
+      projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
+      ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
+      ?? "No Project"
+    showToast("Moved to \(destName)") {
+      if let prevProject {
+        mutator.moveToProject(id: id, project: prevProject)
+      } else {
+        mutator.moveToArea(id: id, area: prevArea)
+        mutator.moveToProject(id: id, project: nil)
+      }
+      Task { await load() }
+    }
   }
 
   // MARK: - Row
@@ -1832,14 +1874,25 @@ struct TaskListView: View {
   /// gets a row — Things-style. Days are sorted ascending (event-only days can
   /// land anywhere among task days, so first-seen order no longer suffices).
   private func upcomingBuckets() -> [DateBucket] {
+    let today = SeptenaDate.today
     var tasksByDay: [String: [SeptenaTask]] = [:]
     for task in items {
       // Drop finished rows (completed or cancelled) except those still
       // settling, so a just-checked / just-cancelled upcoming task lingers for
       // the beat then fades (matches every other open-work list).
       if task.status != .open && !settle.isSettling(task.id) { continue }
-      let key = task.scheduled ?? task.deadline ?? ""
-      guard !key.isEmpty else { continue }
+      // Bucket on the date that actually places the task in the *future* —
+      // Things shows an overdue task under Today, never under its stale past
+      // day. A task enters Upcoming on either `scheduled` OR `deadline` being
+      // future (see LocalCache `.upcoming`), so a past `scheduled` paired with
+      // a future `deadline` must bucket on the deadline, not the elapsed
+      // scheduled day. Picking the earliest future of the two keeps it off any
+      // past-dated header.
+      let key = [task.scheduled, task.deadline]
+        .compactMap { $0 }
+        .filter { $0 > today }
+        .min()
+      guard let key else { continue }
       tasksByDay[key, default: []].append(task)
     }
 
@@ -1901,6 +1954,9 @@ struct TaskListView: View {
         } else {
           mutator.moveToToday(id: id, today: false)
           mutator.schedule(id: id, date: d)
+          // Deferring drops the row off Today; confirm where it landed. No
+          // Undo — re-opening the When picker is the natural reversal.
+          showToast("Deferred to \(dateHeaderLabel(SeptenaDate.format(d) ?? ""))")
         }
       } else {
         mutator.schedule(id: id, date: nil)
@@ -1986,7 +2042,10 @@ struct TaskListView: View {
         list[i].status = newStatus
       }
     }
-    apply(&items); apply(&review); apply(&doneToday)
+    // Include `triageStorage` so checking an Inbox row flips it to done in
+    // place; the settle window then keeps it visible (struck-through) until it
+    // fades — see `triageItems`.
+    apply(&items); apply(&review); apply(&doneToday); apply(&triageStorage)
   }
 
   /// Drop the matching task from every visible bucket. Paired with
@@ -2001,6 +2060,35 @@ struct TaskListView: View {
   }
 
   // MARK: - Load
+
+  /// Merge `fresh` with any row from `prior` that's mid-settle (just checked,
+  /// lingering for the fade) but which the fresh read dropped — the Today /
+  /// Inbox queries exclude done tasks, and completing one posts
+  /// `.septenaTasksChanged`, which reloads us. Without this a completion would
+  /// yank its own row before it could fade. Each lingering row is reinserted at
+  /// the slot it held in `prior` (anchored after its nearest still-present
+  /// predecessor) rather than appended, so it fades out in place instead of
+  /// jumping to the bottom — the "moves down" jump we're avoiding. `prior` order
+  /// makes earlier insertions valid anchors for adjacent lingering rows. The
+  /// settle timer (or a reload / filter swap, which cancels it) clears these
+  /// out; we never `cancelAll()` here for the same reason.
+  private func preservingSettling(fresh: [SeptenaTask], prior: [SeptenaTask]) -> [SeptenaTask] {
+    let freshIDs = Set(fresh.map(\.id))
+    let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
+    var merged = fresh
+    for task in lingering {
+      guard let priorIndex = prior.firstIndex(where: { $0.id == task.id }) else { continue }
+      var insertAt = 0
+      for i in stride(from: priorIndex - 1, through: 0, by: -1) {
+        if let anchor = merged.firstIndex(where: { $0.id == prior[i].id }) {
+          insertAt = anchor + 1
+          break
+        }
+      }
+      merged.insert(task, at: min(insertAt, merged.count))
+    }
+    return merged
+  }
 
   private func load() async {
     // Cache was already painted in init(); only show the loading state when
@@ -2024,33 +2112,7 @@ struct TaskListView: View {
     // fires, so a plain re-read is correct.
     let prior = items
     let local = LocalCache.tasks(in: modelContext, filter: filter)
-    // Preserve rows that are mid-settle (just checked, lingering for the fade)
-    // but which this fresh read drops — the Today/Inbox queries exclude done
-    // tasks, and completing one posts `.septenaTasksChanged`, which reloads us.
-    // Without this, a completion would yank its own row before it could fade.
-    // The settle timer (or a genuine reload/filter swap, which cancels it)
-    // clears these out. We do NOT cancelAll() here for the same reason.
-    let freshIDs = Set(local.map(\.id))
-    let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
-    // Reinsert each lingering row at the slot it held in `prior` rather than
-    // appending it. Appending would yank the just-checked row to the bottom of
-    // the list before it had a chance to fade — exactly the "moves down" jump
-    // we're avoiding. Anchor each one right after its nearest still-present
-    // predecessor so it fades out in place. `lingering` is in `prior` order, so
-    // earlier insertions become valid anchors for adjacent lingering rows.
-    var merged = local
-    for task in lingering {
-      guard let priorIndex = prior.firstIndex(where: { $0.id == task.id }) else { continue }
-      var insertAt = 0
-      for i in stride(from: priorIndex - 1, through: 0, by: -1) {
-        if let anchor = merged.firstIndex(where: { $0.id == prior[i].id }) {
-          insertAt = anchor + 1
-          break
-        }
-      }
-      merged.insert(task, at: min(insertAt, merged.count))
-    }
-    items = merged
+    items = preservingSettling(fresh: local, prior: prior)
     review = []
     doneToday = []
     loadedFilters.insert(filter)
@@ -2066,16 +2128,25 @@ struct TaskListView: View {
     // row's context menu can suggest a destination on demand via
     // `suggest(forText:)`.
     if filter == .today {
+      // Re-read the Inbox and merge back any just-checked row that's still
+      // settling (the `.triage` query drops done tasks), so an accepted
+      // suggestion lingers struck-through and fades in place like every other
+      // completed row — same preservation `items` gets above.
+      let localTriage = LocalCache.tasks(in: modelContext, filter: .triage)
+      triageStorage = preservingSettling(fresh: localTriage, prior: triageStorage)
       // The Inbox lives on the Today view now (the triage rows), so classify
-      // *those* — that's what powers the one-tap "file here" suggestion chip and
-      // the implicit "not this" learning. refresh also primes the model for the
-      // composer's on-keystroke suggest().
+      // the live open rows — that's what powers the one-tap "file here"
+      // suggestion chip and the implicit "not this" learning. refresh also
+      // primes the model for the composer's on-keystroke suggest().
       let allTasks = LocalCache.allTasks(in: modelContext)
-      suggestionEngine.refresh(inbox: triageItems,
+      suggestionEngine.refresh(inbox: localTriage,
                                allTasks: allTasks,
                                projects: projects,
                                areas: areas)
-    } else if filter != .logbook && filter != .recentlyDeleted {
+    } else {
+      triageStorage = []
+    }
+    if filter != .today && filter != .logbook && filter != .recentlyDeleted {
       suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
@@ -2430,7 +2501,7 @@ struct TaskListRowContextMenu: View {
             if let emoji = area.emoji, !emoji.isEmpty {
               Text("\(emoji)  \(area.title)")
             } else {
-              Label(area.title, systemImage: "tray.full")
+              Text(area.title)
             }
           }
         }
