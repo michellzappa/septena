@@ -393,9 +393,13 @@ struct TaskListView: View {
           .tint(.accentColor)
         }
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 12)
-      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+      .padding(.horizontal, 20)
+      .padding(.vertical, 14)
+      // The de-facto-standard toast surface: an iOS 26 Liquid Glass capsule
+      // (the same look Apple Mail / Mimestream use), via our single glass
+      // choke point — `.thinMaterial` capsule on macOS. There is no first-party
+      // Toast view to adopt, so this matches the system aesthetic instead.
+      .glassCapsule()
       .padding(.horizontal, 20)
       .padding(.bottom, 16)
       .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -2669,13 +2673,27 @@ private struct InlineTaskRow: View {
       TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggle)
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-      TextField(placeholder, text: $text)
+      TextField(placeholder, text: $text, axis: .vertical)
         .textFieldStyle(.plain)
         .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1...4)
         .focused($focus, equals: focusValue)
         .submitLabel(.done)
         .onSubmit(onCommit)
+        #if os(iOS)
+        // A vertical-axis TextField wraps long titles (so the editor grows to
+        // match the now-multiline static row), but on iOS the Return key inserts
+        // a newline instead of firing `.onSubmit`. We want Return to COMMIT, as
+        // it did single-line: catch the inserted newline, strip it, and commit.
+        // Soft visual wraps don't insert "\n", so only a real Return triggers this.
+        .onChange(of: text) { _, newValue in
+          if newValue.contains("\n") {
+            text = newValue.replacingOccurrences(of: "\n", with: "")
+            onCommit()
+          }
+        }
+        #endif
         #if os(macOS)
         // Return saves. `.onSubmit` alone leaks Return to the sidebar (it acts as
         // the NavigationSplitView default action), so we ALSO catch Return as a

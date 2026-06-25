@@ -483,7 +483,7 @@ struct CheckableRow<Trailing: View>: View {
           .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
           .strikethrough(isInactive)
           .opacity(isInactive ? 0.5 : 1)
-          .lineLimit(1)
+          .lineLimit(2)
           .truncationMode(.tail)
           .fixedSize(horizontal: false, vertical: true)
         if let subtitle {
