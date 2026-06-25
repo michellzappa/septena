@@ -89,9 +89,10 @@ struct TimeOfDayWheel: View {
   /// when `compact`.
   var heroDate: Date? = nil
   /// The night arc as `(start, end)` fractions (sunset → sunrise, wrapping
-  /// midnight). When set on the hero, the glass donut itself tints dark over
-  /// these hours — stained-glass night, drawn on the face — instead of a dark
-  /// wash behind it. `nil` keeps the plain clear-glass donut.
+  /// midnight). When set on the hero, the glass donut wears the day's sky
+  /// behind it — dark over the night hours, a warm ember at the dawn/dusk
+  /// edges, clear through the day — frosted and refracted into stained glass by
+  /// the live layer. `nil` keeps the plain clear-glass donut.
   var nightArc: (start: Double, end: Double)? = nil
   /// The hue the night arc wears instead of the fixed slate-indigo. The hero
   /// passes the user's Sleep section color so that in dark mode the night reads
@@ -125,12 +126,10 @@ struct TimeOfDayWheel: View {
   /// dial reorients, then back to 1 to reveal the new day. Avoids trying to
   /// spin every layer in unison (only the night wedge turns, visibly).
   var marksOpacity: Double = 1
-  /// Renders the hero face *flat* — an opaque faux-glass disc instead of the
-  /// live Liquid Glass donut, for any non-live composite where `.glassEffect`
-  /// can't render: the app-switcher snapshot, a widget, screen recording. Also
-  /// drops the dark night wedge, which only reads as glass when the live layer
-  /// frosts it (raw otherwise). No-op unless `heroDate` is set. Foreground app
-  /// surfaces leave this `false` and keep the real glass + night wedge.
+  /// Renders the hero face *flat* — an opaque frosted disc with no sky wash —
+  /// for the widget, where the dial is a static image and a translucent face
+  /// over a raw gradient reads muddy. The in-app dial leaves this `false` for
+  /// the translucent, sky-tinted face. No-op unless `heroDate` is set.
   var flatGlass: Bool = false
 
   /// Target degrees to spin the dial content so `northFraction` lands at the
@@ -177,7 +176,15 @@ struct TimeOfDayWheel: View {
   /// The dark tone the night arc wears behind the glass — a soft slate-indigo
   /// (lighter than a true night so the frosted glass stays gentle). Tune this
   /// for a darker/lighter night.
-  static let nightTone = Color(red: 0.26, green: 0.28, blue: 0.40).opacity(0.72)
+  static let nightTone = Color(red: 0.26, green: 0.28, blue: 0.40).opacity(0.15)
+
+  /// The warm embers the sky wash wears at the dawn and dusk terminators behind
+  /// the glass — soft light the lens bends at the day's edges. Mirror of
+  /// `AmbientLight.Phase.dawn/.dusk.tint.inner`; inlined (not referenced) so the
+  /// wheel still compiles into the widget target, which doesn't link the
+  /// dashboard's `AmbientLight`. Keep in sync with that single source.
+  static let dawnTone = Color(red: 1.00, green: 0.64, blue: 0.42)
+  static let duskTone = Color(red: 1.00, green: 0.48, blue: 0.32)
 
   /// The night arc's tone, resolved against the color scheme. In dark mode the
   /// fixed slate-indigo reads as muddy dark-on-dark, so the night is tinted
@@ -187,63 +194,85 @@ struct TimeOfDayWheel: View {
   /// Sleep color is supplied (widget, section dials).
   private var resolvedNightTone: Color {
     guard colorScheme == .dark, let nightColor else { return Self.nightTone }
-    return nightColor.opacity(0.55)
+    return nightColor.opacity(0.15)
   }
 
-  /// Conic shading for the night arc, filled on the whole band behind the
-  /// glass: transparent through the day, ramping to the night tone over ~1h at
-  /// sunset (dusk) and back to clear over ~1h before sunrise (dawn), so the
-  /// terminators feather instead of cutting hard. Angle −90° puts midnight
-  /// (location 0) at the top, sweeping clockwise — the dial's convention.
-  private func nightShading(_ arc: (start: Double, end: Double)) -> AngularGradient {
+  /// Conic shading for the sky behind the glass, filled on the whole band so
+  /// the live glass has the day's actual light to refract — the donut reads as
+  /// stained glass that shifts through the day, not a frosted white ring. Three
+  /// phases, feathered into each other so no terminator cuts hard:
+  ///   • night → the resolved night tone (indigo, or the Sleep hue in dark mode)
+  ///   • dawn / dusk → a soft ember at the sunrise/sunset edges, low enough to
+  ///     read as light bending through the glass rather than a blob on the face
+  ///   • day → fully transparent (plain glass) on purpose: a saturated daytime
+  ///     arc painted the whole hero blue (see `AmbientLight`), so the glass must
+  ///     read as clear glass at noon, gaining its color only at the day's edges.
+  /// Angle −90° puts midnight (location 0) at the top, sweeping clockwise — the
+  /// dial's convention; the enclosing `rotationEffect` turns it with the marks
+  /// so the dawn glow always sits under the dawn hours.
+  private func skyShading(_ arc: (start: Double, end: Double)) -> AngularGradient {
     let feather = 1.0 / 24          // ~1 hour, as dial fraction
+    let twilight = 2.0 / 24         // ~2 hours of dawn / dusk warmth
     let sunset = arc.start, sunrise = arc.end
-    let tone = resolvedNightTone
+    let night = resolvedNightTone
+    let dawnGlow = Self.dawnTone.opacity(0.20)
+    let duskGlow = Self.duskTone.opacity(0.10)
     let stops: [Gradient.Stop] = [
-      .init(color: tone,   location: 0),
-      .init(color: tone,   location: max(0, sunrise - feather)),
-      .init(color: .clear, location: sunrise),
-      .init(color: .clear, location: sunset),
-      .init(color: tone,   location: min(1, sunset + feather)),
-      .init(color: tone,   location: 1),
+      .init(color: night,    location: 0),
+      .init(color: night,    location: max(0, sunrise - feather)),
+      .init(color: dawnGlow, location: sunrise),
+      .init(color: .clear,   location: min(sunset, sunrise + twilight)),
+      .init(color: .clear,   location: max(sunrise, sunset - twilight)),
+      .init(color: duskGlow, location: sunset),
+      .init(color: night,    location: min(1, sunset + feather)),
+      .init(color: night,    location: 1),
     ]
     return AngularGradient(gradient: Gradient(stops: stops),
                            center: .center, angle: .degrees(-90))
   }
 
-  /// The hero dial's deterministic FAUX-GLASS face — a frosted-glass look
-  /// built from a light-from-above sheen and a rim highlight, with NO live
-  /// material, so it renders identically in app-switcher / widget snapshots
-  /// where `.glassEffect` can't composite. The real `.glassEffect` is layered
-  /// on top in `body` for the live refraction + press-lensing; this is what
-  /// reads through when it can't. Tune the sheen / rim constants here.
+  /// The hero dial's deterministic frosted face — a frosted-glass look built
+  /// from a light-from-above sheen and a rim highlight, with NO live material,
+  /// so it renders identically everywhere (in-app, app-switcher / widget
+  /// snapshots, screen recording). This is the dial's whole face: the real
+  /// `.glassEffect` was tried and removed (it never read as glass over a smooth
+  /// sky, and couldn't render in snapshots). Tune the sheen / rim constants here.
   @ViewBuilder private var heroGlassFace: some View {
     let annulus = AnnulusShape(holeFraction: Self.heroHoleFraction)
     let dark = colorScheme == .dark
     // `cardSurface` is ~white in light mode, so a white sheen would be
-    // invisible — glass reads on a light surface through DARKER cues: a depth
-    // shadow lifting it off the page, a dark refraction rim, and a specular
-    // SWEEP whose dark bottom-right edge (not the white highlight) carries the
-    // contrast. Opaque in the widget (no live glass over it); translucent
-    // in-app so the ambient-glow parallax still floats through the live glass.
+    // invisible — the frost reads on a light surface through DARKER cues: a
+    // depth shadow lifting it off the page, a dark refraction rim, and a
+    // specular SWEEP whose dark bottom-right edge (not the white highlight)
+    // carries the contrast. Opaque in the widget; translucent in-app so the
+    // day-aligned sky wash tints it from below.
     let face = flatGlass ? 1.0 : 0.55
     ZStack {
       // Body + depth shadow — the donut sits ABOVE the page, like real glass.
       annulus
         .fill(Theme.cardSurface.opacity(face))
         .shadow(color: .black.opacity(dark ? 0.0 : 0.12), radius: 7, y: 3)
-      // Catch-light: a soft highlight confined to the TOP, fading to clear by
-      // mid-height. Top-only (no diagonal sweep, no dark return) so it never
-      // streaks a bright band across the dark night wedge — that seam was the
-      // artificial tell. Depth shadow + rim carry the "it's a glass disc" read;
-      // this is just the light grazing the top edge.
+      // Catch-light: a soft glint grazing the TOP edge, falling off smoothly in
+      // every direction. Elliptical (not a top→bottom linear ramp) so there's no
+      // straight seam, AND eased into clear with a long low tail rather than a
+      // single white→clear stop — a two-stop ramp still kinks where it reaches
+      // clear, and the eye reads that slope change as a faint ring. The tail
+      // approaches zero gradually (…0.03 → clear), so there's no perceptible
+      // edge. Still top-only: brightest at the top, gone before the bottom, so
+      // it never washes the dots. Fractional radius scales the dial (hero/widget).
+      let glint = dark ? 0.26 : 0.90
       annulus.fill(
-        LinearGradient(
+        EllipticalGradient(
           stops: [
-            .init(color: .white.opacity(dark ? 0.26 : 0.90), location: 0.0),
-            .init(color: .clear, location: 0.5),
+            .init(color: .white.opacity(glint),        location: 0.00),
+            .init(color: .white.opacity(glint * 0.45), location: 0.35),
+            .init(color: .white.opacity(glint * 0.12), location: 0.60),
+            .init(color: .white.opacity(glint * 0.03), location: 0.82),
+            .init(color: .clear,                        location: 1.00),
           ],
-          startPoint: .top, endPoint: .bottom))
+          center: .top,
+          startRadiusFraction: 0,
+          endRadiusFraction: 0.72))
       // Refraction rim: a darker outer/contact edge under a bright inner
       // specular edge — the strongest glass tell on a light background.
       annulus.stroke(.black.opacity(dark ? 0.0 : 0.10), lineWidth: 1.5)
@@ -395,56 +424,32 @@ struct TimeOfDayWheel: View {
         }
       }
 
-      // The hero's face is the REAL Liquid Glass donut, drawn BELOW the
-      // marks. Real glass frosts whatever sits under it, so nothing
-      // data-bearing goes there (the old "machinery under glass" sandwich
-      // hid the sleep arc + calendar pills). Glass is just glass; every mark
-      // renders crisp in the single Canvas ON TOP. `.interactive` gives the
-      // press-lensing; the tilt parallax behind it supplies the motion that
-      // makes Liquid Glass actually read as glass.
-      // A dark conic wash over the night arc, BEHIND the glass, so the glass
-      // has real dark content to frost and refract. It ROTATES with the clock
-      // so the dark band tracks the (rotated) night hours; the glass refracts
-      // whatever sits behind it, so night still reads as dark *glass*. The
-      // dusk/dawn terminators feather over ~1h.
-      // Always-present base face for the hero, drawn FIRST (the night wedge and
-      // marks paint on top of it). `.glassEffect` is a live backdrop material
-      // and fails silently in any non-live composite — the app-switcher
-      // snapshot, widget snapshots, screen recording, or mid-rotation — where
-      // it no-ops back to `Color.clear` and leaves a transparent hole. A flat
-      // fill plugs the hole but reads as dead gray. Instead this is a
-      // deterministic FAUX-GLASS face — a light-from-above sheen plus a rim
-      // highlight — so the donut reads as frosted glass on its own in every
-      // snapshot, with the live `.glassEffect` layered on top for the real
-      // refraction + press-lensing when foregrounded. Kept translucent in-app
-      // so the ambient-glow parallax still floats through the live glass; the
-      // widget (`flatGlass`) makes it opaque and skips the live layer below.
+      // The hero's face is a frosted-material donut, drawn BELOW the marks. We
+      // tried the real `.glassEffect` here — it's genuine Liquid Glass — but it
+      // never read as glass: the donut sits over a smooth sky, with no detailed
+      // content beneath to refract (the data is crisp ON TOP, by design), so the
+      // lens had nothing to bend. It also can't render in any non-live composite
+      // (app-switcher / widget snapshots, screen recording), forcing a whole
+      // fallback apparatus, and recomposited every frame for no visible gain. So
+      // the face is a deterministic frosted disc — a light-from-above sheen plus
+      // a rim highlight — that renders identically everywhere. Kept translucent
+      // in-app so the sky wash below tints it; the widget (`flatGlass`) makes it
+      // opaque. The sky wash, drawn next, gives it the day's color; every mark
+      // renders crisp in the single Canvas above.
       if !compact, heroDate != nil {
         heroGlassFace.padding(20)
       }
-      // The night wedge only reads as *dark glass* because the live
-      // `.glassEffect` annulus below frosts and refracts it. Without that live
-      // layer — the app-switcher snapshot, a widget, screen recording — it's
-      // just a raw hard slate-indigo gradient hanging on the face. So it's
-      // gated on `!flatGlass`: drawn only when there's live glass to frost it.
+      // The sky wash tints the translucent face from below — indigo night, a
+      // warm dawn/dusk ember, clear day — so the donut carries the day's light
+      // and shifts through it. It rotates with the dial so the dawn glow stays
+      // under the dawn hours as "now" climbs to the top. Gated on `!flatGlass`:
+      // the widget draws an opaque face, where a raw gradient would read muddy.
       if !compact, heroDate != nil, !flatGlass, let nightArc {
         AnnulusShape(holeFraction: Self.heroHoleFraction)
-          .fill(nightShading(nightArc))
+          .fill(skyShading(nightArc))
           .padding(20)
           .rotationEffect(.degrees(displayedRotation))
           .animation(.easeInOut(duration: 0.6), value: displayedRotation)
-      }
-      // The clear glass donut is a uniform ring, so it must NOT rotate —
-      // `rotationEffect` disables `.glassEffect` (the live material can't
-      // render through a rotation transform). Static glass; the rotated dark
-      // wedge behind it supplies the night, the rotated marks above supply
-      // the data. `.interactive` gives the press lensing; tilt parallax the
-      // motion that makes it read as glass.
-      if !compact && heroDate != nil && !flatGlass {
-        Color.clear
-          .glassEffect(.regular.interactive(),
-                       in: AnnulusShape(holeFraction: Self.heroHoleFraction))
-          .padding(20)
       }
 
       // All marks, on top of the face: ticks, duration bands, dots, hour

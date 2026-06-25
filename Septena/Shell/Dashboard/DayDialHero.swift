@@ -59,8 +59,6 @@ struct DayDialHero: View {
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   /// Switches tabs from inside the dashboard — tapping the dial opens Next.
   @Environment(TabSelection.self) private var tabSelection
-  /// Goes non-`.active` exactly when iOS grabs the app-switcher thumbnail.
-  @Environment(\.scenePhase) private var scenePhase
 
   @State private var snapshot = RhythmData.Snapshot()
   /// Days back from today the dial is scrubbed to (0 = today, negative = past).
@@ -105,15 +103,6 @@ struct DayDialHero: View {
     Calendar.current.date(byAdding: .day, value: dayOffset, to: todayStart) ?? todayStart
   }
   private var isToday: Bool { dayOffset == 0 }
-
-  /// True while the app is leaving (or has left) the foreground — the window
-  /// iOS uses to snapshot for the app switcher. The live `.glassEffect` can't
-  /// render in that snapshot, so the dark night wedge it normally *frosts into
-  /// glass* is left showing as a raw, hard slate-indigo gradient. In this state
-  /// we hand the wheel `flatGlass`, which draws the opaque faux-glass face and
-  /// (gated in the wheel) drops the unfrostable night wedge — a clean static
-  /// dial in the thumbnail instead of a floating shadow.
-  private var snapshotting: Bool { scenePhase != .active }
 
   /// Step the scrubbed day, clamped to [today − maxDaysBack, today].
   private func stepDay(_ delta: Int) {
@@ -217,10 +206,10 @@ struct DayDialHero: View {
       nowColor: AmbientLight.Phase.from(date: clock.now).tint.inner,
       diameter: dialDiameter,
       heroDate: displayedStart,
-      // The glass donut tints dark across the night hours (sunset → sunrise):
-      // a crisp dark wedge sits BEHIND the clear glass (inside the wheel) so
-      // the glass frosts and refracts it into real dark glass — night on the
-      // face itself, not a wash behind it.
+      // The donut wears the day's sky, keyed off this arc (sunset → sunrise):
+      // a conic wash tints the translucent face from below — dark over the
+      // night hours, a warm ember at the dawn/dusk edges, clear by day —
+      // aligned to the hours and shifting as the dial turns.
       nightArc: nightArc,
       // The night wedge wears the user's Sleep color in dark mode (where a
       // dark tone would read as muddy dark-on-dark); light mode keeps the
@@ -239,17 +228,12 @@ struct DayDialHero: View {
       moonOpacity: moonOpacity,
       sunOpacity: 1,
       // Hidden while a day-swipe reorients the dial, then revealed.
-      marksOpacity: marksVisible ? 1 : 0,
-      // In the app-switcher snapshot the live glass can't render — fall back to
-      // the opaque faux-glass face so the donut reads as solid frosted glass
-      // instead of a transparent hole.
-      flatGlass: snapshotting
+      marksOpacity: marksVisible ? 1 : 0
     )
-    // A wide soft backwash for depth behind the glass — the day's light on the
-    // dial. (Night lives on the donut now, so no disc-edge halo.) Static: the
-    // device-tilt parallax that used to drift it was removed — at ±8pt behind a
-    // frosted donut it was imperceptible, and it forced the live glass to
-    // recomposite on every motion frame.
+    // A wide soft backwash for depth behind the dial — the day's light spilling
+    // off the face. (Night lives on the donut now, so no disc-edge halo.)
+    // Static: a device-tilt parallax that once drifted it was removed — at ±8pt
+    // behind a frosted donut it was imperceptible.
     .background {
       AmbientGlow()
         .frame(width: 460, height: 460)
@@ -305,11 +289,11 @@ struct DayDialHero: View {
     .onDisappear { logCommit?.dayDialAnchor = nil }
     .frame(maxWidth: .infinity)
     .task(id: displayedStart) {
-      // First-appearance cost-splitting. The live Liquid Glass donut and this
-      // cross-section SwiftData load are each heavy on first paint; run in the
-      // same main-actor hop they stack into ONE visible hitch. Yield first so
-      // the glass chrome composites and presents, then fill the dots/bands a
-      // beat later — the donut shows promptly instead of waiting on the fetch.
+      // First-appearance cost-splitting. The dial chrome and this cross-section
+      // SwiftData load are each heavy on first paint; run in the same main-actor
+      // hop they stack into ONE visible hitch. Yield first so the dial face
+      // composites and presents, then fill the dots/bands a beat later — the
+      // donut shows promptly instead of waiting on the fetch.
       await Task.yield()
       await reload()
     }
