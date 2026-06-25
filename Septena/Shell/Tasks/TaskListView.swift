@@ -2568,7 +2568,12 @@ private struct InlineTaskRow: View {
         .onSubmit(onCommit)
         #if os(macOS)
         // Esc abandons the edit without writing (the static row reappears with
-        // its stored title). iOS has no Esc; blurring the field commits/cancels.
+        // its stored title). The macOS field editor SWALLOWS Esc before
+        // `.onExitCommand` fires, so handle it as a key press on the field — a
+        // key the text input doesn't consume — which reliably reaches us and
+        // tears the field down (taking its select-all highlight with it). Keep
+        // `.onExitCommand` too as a belt-and-suspenders (idempotent cancel).
+        .onKeyPress(.escape) { onCancel(); return .handled }
         .onExitCommand(perform: onCancel)
         #endif
         .frame(maxWidth: .infinity, alignment: .leading)
