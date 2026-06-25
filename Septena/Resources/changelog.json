@@ -4,54 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1160,
+      "build": 1164,
       "date": "2026-06-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Recover deleted tasks",
-          "detail": "Deleted tasks now move to a Recently Deleted view where you can restore them, with automatic cleanup after 30 days and undo right after deleting.",
+          "title": "Recover deleted tasks for 30 days",
+          "detail": "Deleted tasks now move to a Recently Deleted view where you can restore them, with automatic purge after 30 days.",
           "section": "tasks"
         },
         {
           "title": "Rename and add tasks inline",
-          "detail": "Edit a task title in place and use a quick-add line to capture new tasks without leaving the list.",
+          "detail": "Edit a task's title in place and add new tasks straight from a quick-add line at the top of the list.",
           "section": "tasks"
         },
         {
           "title": "Your calendar in Today and Upcoming",
-          "detail": "Events from your system calendar now appear alongside tasks in Today and per-day in Upcoming.",
+          "detail": "Events from your system calendars now appear alongside tasks, with hidden-calendar choices syncing across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Capture meals photo-first and let on-device analysis estimate the details.",
-          "section": "nutrition"
+          "title": "The Week tab is now Today",
+          "detail": "A clearer name plus a longer undo window after completing a task and a gentle confirmation toast.",
+          "section": "tasks"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter front and center on the week dashboard.",
+          "detail": "Keep the goals that matter most front and center on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Emoji for your intake trackers",
-          "detail": "Add your own emoji to tracker methods and varieties for faster recognition.",
-          "section": "intake"
-        },
-        {
-          "title": "Smarter Next suggestions",
-          "detail": "Dose nudges now respect your intake objectives, and dismissed suggestions stay dismissed across all your devices.",
-          "section": "intake"
+          "title": "Capture meals from a photo",
+          "detail": "Snap a picture of your food and let on-device analysis fill in the details.",
+          "section": "nutrition"
         },
         {
           "title": "A living sky on your watch",
-          "detail": "The watch Next feed now floats over the real time-of-day sky in a vertically paged layout, with interactive intake nudges you can act on from your wrist.",
+          "detail": "The watch Next feed now floats over the real time-of-day sky in a smooth vertically-paged layout, and fastings morph correctly overnight.",
           "section": null
         },
         {
           "title": "Choose how much you share",
-          "detail": "Analytics now offer graded levels — off, minimal, balanced, or full — so you control exactly what's collected.",
+          "detail": "Analytics now offer graded levels — off, minimal, balanced, or full — so you decide exactly what's collected.",
           "section": null
         }
       ]
