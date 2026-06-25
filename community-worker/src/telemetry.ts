@@ -10,6 +10,7 @@ type TelemetryEvent =
   | "section_enabled_changed"
   | "section_used";
 type TelemetryPlatform = "iOS" | "macOS" | "Catalyst" | "Unknown";
+type TelemetryLevel = "none" | "minimal" | "balanced" | "full";
 
 interface TelemetryBody {
   installId?: unknown;
@@ -19,6 +20,7 @@ interface TelemetryBody {
   enabled?: unknown;
   sections?: unknown;
   analyticsEnabled?: unknown;
+  level?: unknown;
   version?: unknown;
   build?: unknown;
   platform?: unknown;
@@ -37,6 +39,7 @@ const allowedKeys = new Set([
   "enabled",
   "sections",
   "analyticsEnabled",
+  "level",
   "version",
   "build",
   "platform",
@@ -58,6 +61,13 @@ const platforms = new Set<TelemetryPlatform>([
   "Unknown",
 ]);
 
+const levels = new Set<TelemetryLevel>([
+  "none",
+  "minimal",
+  "balanced",
+  "full",
+]);
+
 export async function ingestTelemetry(env: Env, req: Request): Promise<Response> {
   const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
   if (await rateLimited(env, `telemetry-ip:${ip}`, 240, 60)) {
@@ -74,6 +84,7 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   const installId = cleanInstallId(data.installId);
   const event = cleanEvent(data.event);
   const analyticsEnabled = typeof data.analyticsEnabled === "boolean" ? data.analyticsEnabled : null;
+  const level = cleanLevel(data.level);
   const platform = cleanPlatform(data.platform);
   const version = cleanShortToken(data.version, 32);
   const build = cleanShortToken(data.build, 32);
@@ -81,6 +92,21 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   const section = cleanSection(data.section);
   const enabled = typeof data.enabled === "boolean" ? data.enabled : null;
   const sections = cleanSections(data.sections);
+
+  // Anonymized opt-out: the app sends a single identity-free ping when the user
+  // turns analytics Off — only the event and the `none` level, no install id,
+  // platform, version, or build. Record it as an aggregate count so opt-outs
+  // stay knowable without a final identifying ping.
+  if (event === "analytics_consent_changed" && installId === null) {
+    if (analyticsEnabled !== false || level !== "none") {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    if (platform || version || build || screen || section || enabled !== null || sections) {
+      return json({ error: "unexpected_fields" }, 400);
+    }
+    await incrementAnonOptOut(env);
+    return json({ ok: true });
+  }
 
   if (!installId || !event || analyticsEnabled === null || !platform) {
     return json({ error: "invalid_payload" }, 400);
@@ -109,6 +135,7 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   await upsertInstall(env, {
     installHash,
     analyticsEnabled,
+    level,
     platform,
     version,
     build,
@@ -122,8 +149,8 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   if (event === "analytics_consent_changed") {
     await env.DB.prepare(`
       insert into telemetry_consent_event
-        (id, install_hash, enabled, platform, app_version, build)
-      values (?, ?, ?, ?, ?, ?)
+        (id, install_hash, enabled, platform, app_version, build, level)
+      values (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       crypto.randomUUID(),
       installHash,
@@ -131,6 +158,7 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
       platform,
       version,
       build,
+      level,
     ).run();
     if (!analyticsEnabled) {
       await deletePerInstallSectionTelemetry(env, installHash);
@@ -255,6 +283,7 @@ async function upsertInstall(
   args: {
     installHash: string;
     analyticsEnabled: boolean;
+    level: TelemetryLevel | null;
     platform: TelemetryPlatform;
     version: string | null;
     build: string | null;
@@ -262,11 +291,12 @@ async function upsertInstall(
 ): Promise<void> {
   await env.DB.prepare(`
     insert into telemetry_install
-      (install_hash, analytics_enabled, platform, app_version, build, first_seen_at, last_seen_at, last_consent_at)
+      (install_hash, analytics_enabled, level, platform, app_version, build, first_seen_at, last_seen_at, last_consent_at)
     values
-      (?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+      (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
     on conflict(install_hash) do update set
       analytics_enabled = excluded.analytics_enabled,
+      level = coalesce(excluded.level, telemetry_install.level),
       platform = excluded.platform,
       app_version = excluded.app_version,
       build = excluded.build,
@@ -278,10 +308,19 @@ async function upsertInstall(
   `).bind(
     args.installHash,
     args.analyticsEnabled ? 1 : 0,
+    args.level,
     args.platform,
     args.version,
     args.build,
   ).run();
+}
+
+async function incrementAnonOptOut(env: Env): Promise<void> {
+  await env.DB.prepare(`
+    insert into telemetry_anon_optout_daily (day, count)
+    values (date('now'), 1)
+    on conflict(day) do update set count = count + 1
+  `).run();
 }
 
 async function incrementRollup(
@@ -317,6 +356,11 @@ function cleanEvent(value: unknown): TelemetryEvent | null {
 function cleanPlatform(value: unknown): TelemetryPlatform | null {
   if (typeof value !== "string") return null;
   return platforms.has(value as TelemetryPlatform) ? value as TelemetryPlatform : null;
+}
+
+function cleanLevel(value: unknown): TelemetryLevel | null {
+  if (typeof value !== "string") return null;
+  return levels.has(value as TelemetryLevel) ? value as TelemetryLevel : null;
 }
 
 function cleanShortToken(value: unknown, max: number): string | null {

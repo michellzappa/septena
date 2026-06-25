@@ -131,6 +131,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 async function loadTelemetryAdminData(env: Env): Promise<{
   summary: InstallSummary;
+  anonOptOut: { total: number; recent: number };
   byPlatform: DimensionRow[];
   byVersion: DimensionRow[];
   daily: RollupRow[];
@@ -238,8 +239,19 @@ async function loadTelemetryAdminData(env: Env): Promise<{
     limit 40
   `).all<SectionUsageRow>();
 
+  // Anonymized opt-outs land in their own counter, not telemetry_install (they
+  // carry no install identity), so the per-install opted_out metric above never
+  // sees them. Surface them separately.
+  const anonOptOut = await env.DB.prepare(`
+    select
+      coalesce(sum(count), 0) as total,
+      coalesce(sum(case when day >= date('now', '-29 days') then count else 0 end), 0) as recent
+    from telemetry_anon_optout_daily
+  `).first<{ total: number; recent: number }>() ?? { total: 0, recent: 0 };
+
   return {
     summary,
+    anonOptOut,
     byPlatform: byPlatform.results ?? [],
     byVersion: byVersion.results ?? [],
     daily: daily.results ?? [],
@@ -300,7 +312,7 @@ function renderTelemetryDashboard(data: Awaited<ReturnType<typeof loadTelemetryA
     h2 { font-size: 16px; margin: 0 0 12px; letter-spacing: 0; }
     p { margin: 0; color: var(--muted); }
     .grid { display: grid; gap: 14px; }
-    .metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 18px; }
+    .metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 18px; }
     .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .panel {
       background: var(--panel);
@@ -350,6 +362,7 @@ function renderTelemetryDashboard(data: Awaited<ReturnType<typeof loadTelemetryA
       ${metric("Installs", data.summary.installs, "anonymous installs")}
       ${metric("Opted In", data.summary.opted_in, "usage events enabled")}
       ${metric("Opted Out", data.summary.opted_out, `${optOutRate} opt-out rate`)}
+      ${metric("Anon Opt-Outs", data.anonOptOut.recent, "identity-free pings, 30d")}
       ${metric("App Opens", appOpens30, "last 30 days")}
       ${metric("Screen Views", screenViews30, "last 30 days")}
     </section>
