@@ -212,20 +212,33 @@ struct TimeOfDayWheel: View {
   /// so the dawn glow always sits under the dawn hours.
   private func skyShading(_ arc: (start: Double, end: Double)) -> AngularGradient {
     let feather = 1.0 / 24          // ~1 hour, as dial fraction
-    let twilight = 2.0 / 24         // ~2 hours of dawn / dusk warmth
+    let twilight = 1.0 / 24         // ~1 hour of dawn / dusk warmth (golden hour)
     let sunset = arc.start, sunrise = arc.end
     let night = resolvedNightTone
-    let dawnGlow = Self.dawnTone.opacity(0.20)
-    let duskGlow = Self.duskTone.opacity(0.10)
+    // In dark mode the warm orange embers read as out-of-place smears on the
+    // dark glass, so dawn/dusk collapse to a single hue: the night tone simply
+    // fading out across the twilight hours, no secondary color. Light mode keeps
+    // the golden-hour warmth.
+    let dark = colorScheme == .dark
+    let dawnGlow = dark ? night : Self.dawnTone.opacity(0.10)
+    let duskGlow = dark ? night : Self.duskTone.opacity(0.10)
+    // Fade each ember to its OWN hue at zero alpha, never to `.clear`: SwiftUI's
+    // `.clear` is transparent *black*, so fading a tint → `.clear` drags the RGB
+    // toward black and it muddies/greys on its way out. `.opacity(0)` on the hue
+    // keeps the color and drops only the alpha — a clean fade to nothing. (The
+    // day span between the two transparent stops is α 0 throughout, so its hue
+    // never shows.)
+    let dawnClear = dark ? night.opacity(0) : Self.dawnTone.opacity(0)
+    let duskClear = dark ? night.opacity(0) : Self.duskTone.opacity(0)
     let stops: [Gradient.Stop] = [
-      .init(color: night,    location: 0),
-      .init(color: night,    location: max(0, sunrise - feather)),
-      .init(color: dawnGlow, location: sunrise),
-      .init(color: .clear,   location: min(sunset, sunrise + twilight)),
-      .init(color: .clear,   location: max(sunrise, sunset - twilight)),
-      .init(color: duskGlow, location: sunset),
-      .init(color: night,    location: min(1, sunset + feather)),
-      .init(color: night,    location: 1),
+      .init(color: night,     location: 0),
+      .init(color: night,     location: max(0, sunrise - feather)),
+      .init(color: dawnGlow,  location: sunrise),
+      .init(color: dawnClear, location: min(sunset, sunrise + twilight)),
+      .init(color: duskClear, location: max(sunrise, sunset - twilight)),
+      .init(color: duskGlow,  location: sunset),
+      .init(color: night,     location: min(1, sunset + feather)),
+      .init(color: night,     location: 1),
     ]
     return AngularGradient(gradient: Gradient(stops: stops),
                            center: .center, angle: .degrees(-90))
