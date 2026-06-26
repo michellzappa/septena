@@ -3,8 +3,8 @@ import SwiftUI
 import AppIntents
 
 enum SectionTileWidgetMetrics {
-  /// Medium widget heatmap — six full week columns (~42 days).
-  static let heatmapWindowDays = 42
+  /// Medium widget heatmap — ~15 week columns (105 days).
+  static let heatmapWindowDays = 105
 }
 
 struct SectionTileEntry: TimelineEntry {
@@ -122,7 +122,7 @@ struct SectionTileWidget: Widget {
       SectionTileWidgetView(entry: entry)
     }
     .configurationDisplayName("Section Tile")
-    .description("Small: 7-day histogram. Wide: 6-week heatmap.")
+    .description("Small: 7-day histogram. Wide: ~15-week heatmap.")
     .supportedFamilies([.systemSmall, .systemMedium])
     .septenaWidgetMargins()
   }

@@ -38,7 +38,7 @@ struct DashboardSectionEntityQuery: EntityQuery {
 
 struct SectionTileConfigurationIntent: WidgetConfigurationIntent {
   static var title: LocalizedStringResource = "Section Tile"
-  static var description = IntentDescription("A dashboard tile for one section — 7-day histogram (small) or 6-week heatmap (wide).")
+  static var description = IntentDescription("A dashboard tile for one section — 7-day histogram (small) or ~15-week heatmap (wide).")
 
   @Parameter(title: "Section")
   var section: DashboardSectionEntity?

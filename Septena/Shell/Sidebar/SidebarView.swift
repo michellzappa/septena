@@ -216,7 +216,9 @@ struct SidebarRootView: View {
   private var sidebarSplit: some View {
     sidebarListContent()
     .navigationTitle("")
+    #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
+    #endif
     .toolbar { phoneToolbar }
     .modifier(sidebarBehavior)
   }
@@ -295,6 +297,7 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var smartListSection: some View {
+    #if os(iOS)
     if usesSidebarRows {
       Section {
         ForEach(smartListSpecs, id: \.title) { spec in
@@ -313,6 +316,13 @@ struct SidebarRootView: View {
           .selectionDisabled()
       }
     }
+    #else
+    Section {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        smartListRow(for: spec)
+      }
+    }
+    #endif
   }
 
   /// macOS and iPad regular use native sidebar rows; iPhone compact keeps the
