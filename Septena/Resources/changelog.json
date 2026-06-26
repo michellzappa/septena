@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1173,
-      "date": "2026-06-25",
+      "build": 1175,
+      "date": "2026-06-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Capture meals photo-first with on-device analysis that estimates what you ate.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and get an on-device analysis of what you ate.",
           "section": "nutrition"
         },
         {
-          "title": "Rename and add tasks right in the list",
-          "detail": "Edit a task title inline and use a quick-add line to capture new ones without leaving the page.",
+          "title": "Inline task editing and quick add",
+          "detail": "Rename tasks in place and add new ones from a quick-add line, with calendar events woven into Today and Upcoming.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar now lives in Today",
-          "detail": "System calendar events weave into Today and Upcoming, showing only what's still ahead.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, with restore and undo before they purge.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "A Recently Deleted view keeps tasks for 30 days with one-tap restore before they auto-purge.",
-          "section": "tasks"
-        },
-        {
-          "title": "Smarter training volume and a weekly review",
-          "detail": "Per-muscle volume is now effort-weighted, with a weekly muscle review after each session.",
-          "section": "training"
-        },
-        {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals you care about most front and center on the dashboard.",
-          "section": "goals"
-        },
-        {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels let you see exactly what telemetry is sent, with a recently-sent log.",
+          "title": "The Week tab is now Today",
+          "detail": "A clearer name for your daily dashboard, now backed by a day-aligned sky wash that tracks the real sky.",
           "section": null
         },
         {
-          "title": "A richer Next feed on the watch",
-          "detail": "Intake nudges are now interactive, set against a live time-of-day sky in a paged Next feed.",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep the goals that matter most in view right on the dashboard.",
+          "section": "goals"
+        },
+        {
+          "title": "Effort-weighted training volume",
+          "detail": "Muscle volume now weighs how hard each set was, with a weekly review after every session.",
+          "section": "training"
+        },
+        {
+          "title": "See exactly what telemetry is shared",
+          "detail": "Graded off/minimal/balanced/full analytics levels, a checklist of what's sent, and a log of recent activity — opt out anytime, fully anonymized.",
+          "section": null
+        },
+        {
+          "title": "A richer watch Next feed",
+          "detail": "A vertically paged Next feed floats over a live time-of-day sky, with interactive intake nudges and summary pages on the wrist.",
           "section": null
         }
       ]
