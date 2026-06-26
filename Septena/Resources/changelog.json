@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1184,
+      "build": 1186,
       "date": "2026-06-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Capture meals from a photo",
-          "detail": "Snap a picture of your food and Septena analyzes it on-device to log the meal and its macros.",
-          "section": "nutrition"
-        },
-        {
-          "title": "A faster, more capable Tasks list",
-          "detail": "Add a task from anywhere with a global entry point and Control Center button, quick-add inline, weave your calendar agenda into Today and Upcoming, and enjoy a longer undo window after completing.",
+          "title": "Inline task editing and quick capture",
+          "detail": "Rename tasks right in the list, add new ones from a quick-add line, and reach a global Add Task entry point from anywhere including Control Center.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
+          "detail": "Deleted tasks now rest in a Recently Deleted view with restore and a 30-day auto-purge, plus a longer undo window after completing.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring your existing to-dos over from a Things database export.",
+          "title": "Your calendar in Today",
+          "detail": "System calendar events weave into Today and Upcoming so your day and your tasks live in one place.",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter most front and center on the home screen.",
-          "section": "goals"
+          "title": "Import tasks from Things",
+          "detail": "Bring your existing tasks across from a Things database export.",
+          "section": "tasks"
         },
         {
-          "title": "Smarter training volume and a weekly review",
-          "detail": "Per-muscle volume is now effort-weighted, and a weekly muscle review appears at the end of a session.",
+          "title": "Snap a photo of your meal",
+          "detail": "Photo-first meal capture analyzes food on-device to log macros faster.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Smarter training review",
+          "detail": "Muscle volume is now effort-weighted, with a weekly review at the end of each session and a unified daily-trend chart.",
           "section": "training"
         },
         {
-          "title": "See and control exactly what analytics you share",
-          "detail": "Choose a graded telemetry level from off to full, and review a log of what was recently sent.",
-          "section": null
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most front and center on the week dashboard.",
+          "section": "goals"
         },
         {
-          "title": "A richer watch experience",
-          "detail": "The Next feed now floats over a live time-of-day sky with per-page titles, interactive intake nudges, and expanded summaries.",
+          "title": "Clearer, more private analytics",
+          "detail": "Choose a graded telemetry level from off to full, and see exactly what gets sent in a recently-sent log.",
           "section": null
         }
       ]
