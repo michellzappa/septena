@@ -123,7 +123,6 @@ struct IntakeKindPageView: View {
       if let id = pendingChoice { pendingChoice = nil; handleLogAction(id) }
     }) {
       IntakeQuickLogSheet(kindName: kind?.name ?? "Tracker",
-                          accent: accent,
                           choices: quickChoices,
                           onPick: { id in pendingChoice = id; quickLogging = false })
         // macOS sheets size to ideal content height, which a List-backed
@@ -346,7 +345,6 @@ struct IntakeKindPageView: View {
 /// its id back to the page, which logs it (or opens the method-detail sheet).
 private struct IntakeQuickLogSheet: View {
   let kindName: String
-  let accent: Color
   let choices: [LogAction]
   let onPick: (String) -> Void
   @Environment(\.dismiss) private var dismiss
@@ -362,6 +360,7 @@ private struct IntakeQuickLogSheet: View {
             Button { onPick(choice.id) } label: {
               Label {
                 Text(choice.title)
+                  .foregroundStyle(.primary)
               } icon: {
                 if let e = choice.emoji, !e.isEmpty {
                   Text(e)
@@ -370,6 +369,7 @@ private struct IntakeQuickLogSheet: View {
                 }
               }
             }
+            .buttonStyle(.plain)
           }
         }
         if let manage {
@@ -378,10 +378,10 @@ private struct IntakeQuickLogSheet: View {
               Label(manage.title, systemImage: manage.systemImage ?? "slider.horizontal.3")
                 .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
           }
         }
       }
-      .tint(accent)
       .navigationTitle("Log \(kindName)")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
