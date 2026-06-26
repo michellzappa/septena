@@ -90,8 +90,20 @@ struct ConsistencyHeatmap: View {
   /// scope chosen for event-stamped edit sheets.
   var tappableWindowDays: Int = 30
 
-  private let cell: CGFloat = 12
-  private let gap: CGFloat = 3
+  private let cell: CGFloat = {
+    #if WIDGET_EXTENSION
+    11
+    #else
+    12
+    #endif
+  }()
+  private let gap: CGFloat = {
+    #if WIDGET_EXTENSION
+    2
+    #else
+    3
+    #endif
+  }()
 
   private static let ymdFormatter: DateFormatter = {
     let f = DateFormatter()

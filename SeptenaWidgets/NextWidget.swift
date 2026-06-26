@@ -84,7 +84,11 @@ struct NextWidget: Widget {
 @main
 struct SeptenaWidgetsBundle: WidgetBundle {
   var body: some Widget {
+    AddTaskControl()
     NextWidget()
+    SectionTileWidget()
+    MacrosWidget()
+    TasksTodayWidget()
     // RhythmWidget() — the time-wheel/day-dial widget is DISABLED for now: the
     // hero's Liquid Glass face can't render in a static widget snapshot, and a
     // flat-faced fallback doesn't carry the look. All of its code is kept and

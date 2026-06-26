@@ -18,7 +18,7 @@ import Foundation
 ///
 /// Calendar is intentionally absent — it surfaces inline in the Next tab,
 /// not as a homepage tile.
-enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
+public enum HomepageDomain: String, CaseIterable, Hashable, Identifiable, Sendable {
   case tasks
   case habits
   case training
@@ -37,7 +37,7 @@ enum HomepageDomain: String, CaseIterable, Hashable, Identifiable {
   case activity
   case github
 
-  var id: String { rawValue }
+  public var id: String { rawValue }
 
   // Icon moved to SectionManifest.iconSymbol (lookup-by-key). Reach it
   // via `SectionManifest.byKey[rawValue]?.iconSymbol`. Going through

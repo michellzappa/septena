@@ -36,6 +36,10 @@ final class NavigationState {
   /// resets to nil. nil means "no pending switch".
   var pendingTab: SeptenaTab?
 
+  /// One-shot Section Tile widget deep link (`septena://section/<itemID>`).
+  /// WeekDashboardView consumes this to mirror a dashboard tile tap.
+  var pendingDashboardTile: String?
+
   /// One-shot driver for the section sheet presented at RootTabView when
   /// a Home Screen Quick Action resolves. Hosted at the tab-root (not
   /// inside WeekDashboardView) so the sheet presents reliably regardless

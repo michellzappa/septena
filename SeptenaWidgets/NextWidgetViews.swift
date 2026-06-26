@@ -39,12 +39,12 @@ struct NextWidgetView: View {
   @ViewBuilder
   private var content: some View {
     switch family {
-    case .systemSmall:          SmallView(entry: entry)
-    case .systemMedium:         MediumView(entry: entry)
+    case .systemSmall:          SmallView(entry: entry).widgetHorizontalBleed()
+    case .systemMedium:         MediumView(entry: entry).widgetHorizontalBleed()
     case .accessoryRectangular: RectangularView(entry: entry)
     case .accessoryInline:      InlineView(entry: entry)
     case .accessoryCircular:    CircularView(entry: entry)
-    default:                    SmallView(entry: entry)
+    default:                    SmallView(entry: entry).widgetHorizontalBleed()
     }
   }
 }

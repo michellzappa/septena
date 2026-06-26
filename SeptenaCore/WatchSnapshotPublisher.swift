@@ -194,7 +194,7 @@ enum WatchSnapshotPublisher {
     // Today's macro totals-so-far vs targets, for the watch macro-ring
     // complication. Nil when nutrition is untracked / no goals, so the wire
     // stays additive.
-    let nutritionRings = buildNutritionRings(context: context, date: date)
+    let nutritionRings = NutritionRingsBuilder.buildRings(context: context, date: date)
     // This week's training (trailing 7 days) vs targets, for the watch's
     // training-ring complication. Present whenever a target exists (they always
     // have built-in defaults), so it mirrors the macro rings' availability.
@@ -260,6 +260,8 @@ enum WatchSnapshotPublisher {
     // directly). No-op on platforms without the widget.
     #if os(iOS)
     WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
+    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: context))
+    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
     #endif
 
     Task.detached(priority: .utility) {
@@ -320,84 +322,6 @@ enum WatchSnapshotPublisher {
     }
 
     return ranked.prefix(topMealsCap).map(\.0)
-  }
-
-  // MARK: - Macro rings (wrist nutrition complication)
-
-  /// Macro key → its goal metric key, mirroring the app's `NutritionTargets`
-  /// (which lives in the app target, out of SeptenaCore's reach). Kept in the
-  /// canonical ring order: kcal, protein, carbs, fat, fiber.
-  private static let macroOrder: [(key: String, metricKey: String)] = [
-    ("kcal",    "nutrition.kcal_sum"),
-    ("protein", "nutrition.protein_sum"),
-    ("carbs",   "nutrition.carbs_sum"),
-    ("fat",     "nutrition.fat_sum"),
-    ("fiber",   "nutrition.fiber_sum"),
-  ]
-
-  /// Today's macro totals-so-far vs targets for the watch's macro-ring
-  /// complication. Sums today's `NutritionEntry` rows directly (robust whether
-  /// or not the daily-summary entity has recomputed yet), and reads each macro's
-  /// target from its range goal, falling back to the legacy `MacrosConfig`.
-  /// Returns nil when no macro has either data or a target, so an untracked user
-  /// carries nothing on the wire.
-  @MainActor
-  private static func buildNutritionRings(context: ModelContext, date: String)
-    -> NutritionRingsWire? {
-    let entries = ChecklistMirror.loadNutritionEntries(context: context, since: date)
-      .filter { $0.date == date }
-
-    // Per-macro running totals so far today.
-    let totals: [String: Double] = [
-      "kcal":    entries.reduce(0) { $0 + $1.kcal },
-      "protein": entries.reduce(0) { $0 + $1.proteinG },
-      "carbs":   entries.reduce(0) { $0 + $1.carbsG },
-      "fat":     entries.reduce(0) { $0 + $1.fatG },
-      "fiber":   entries.reduce(0) { $0 + ($1.fiberG ?? 0) },
-    ]
-
-    // Targets: range goals first (the modern source), legacy MacrosConfig as a
-    // fallback so users who never moved off the old config still get rings.
-    let goals = LocalCache.goals(in: context)
-    let legacy = NutritionPrefs.loadMacrosConfig()
-    func goalFor(_ key: String, metricKey: String) -> Double? {
-      if let g = goals.first(where: { $0.metricKey == metricKey }),
-         let target = g.metricTargetUpper ?? g.metricTarget, target > 0 {
-        return target
-      }
-      let range: MacroRange?
-      switch key {
-      case "kcal":    range = legacy?.kcal
-      case "protein": range = legacy?.protein
-      case "carbs":   range = legacy?.carbs
-      case "fat":     range = legacy?.fat
-      case "fiber":   range = legacy?.fiber
-      default:        range = nil
-      }
-      return range.map { $0.max }
-    }
-
-    // Each macro's authored color, resolved exactly as the Nutrition section
-    // does (`NutritionDestinationView.color(for:)`): the user's per-tile override
-    // else the `MacroCatalog` default — so the wrist ring matches the tile color
-    // on the phone. The catalog id == our ring key for these five.
-    let tiles = MacroCatalog.reconcile(
-      SettingsMirror.loadSettings(context: context)?.nutrition?.macroTiles
-        ?? MacroCatalog.defaultTilePrefs())
-    func colorFor(_ key: String) -> String? {
-      tiles.first(where: { $0.id == key })?.colorHex
-        ?? MacroCatalog.byID[key]?.defaultColorHex
-    }
-
-    let rings = macroOrder.map { macro in
-      RingMetricWire(key: macro.key,
-                     value: totals[macro.key] ?? 0,
-                     goal: goalFor(macro.key, metricKey: macro.metricKey),
-                     colorHex: colorFor(macro.key))
-    }
-    // Nothing logged and no target anywhere → don't bother the wire.
-    guard rings.contains(where: { $0.value > 0 || $0.goal != nil }) else { return nil }
-    return NutritionRingsWire(rings: rings)
   }
 
   // MARK: - Recent logs (wrist summary-page freshness lists)
@@ -544,54 +468,13 @@ enum WatchSnapshotPublisher {
   /// falling back to the default band); color mirrors the Fasting macro tile.
   @MainActor
   private static func buildFasting(context: ModelContext) -> FastingWire? {
-    // Prefer the CloudKit-synced flag so every device agrees fasting is on;
-    // fall back to the device-local `@AppStorage` mirror for installs that
-    // haven't written/synced the payload field yet. (Only iOS publishes the
-    // snapshot now — see `install` — but reading the synced value keeps the
-    // decision correct regardless of which device authors it.)
     let tracks = SettingsMirror.loadSettings(context: context)?.nutrition?.trackFasting
       ?? UserDefaults.standard.bool(forKey: trackFastingDefaultsKey)
     guard tracks else {
       lastFasting = nil
       return nil
     }
-    // The most recent non-water eating event in the last two days anchors the
-    // fast — two days is all the live state machine ever reasons over (today +
-    // yesterday). Water carries no macros and isn't a meal, so it can't end a fast.
-    let since = SeptenaDate.format(
-      Calendar.current.date(byAdding: .day, value: -2, to: Date()))
-    let meals = ChecklistMirror.loadNutritionEntries(context: context, since: since)
-      .filter { $0.foods != ["Water"] }
-    guard let last = meals.max(by: { ($0.date, $0.time) < ($1.date, $1.time) }),
-          let lastMealAt = SeptenaDate.instant(date: last.date, time: last.time)
-    else {
-      // Empty/malformed read: a transient SwiftData miss (or a fetch before a
-      // CloudKit absorb finished) mustn't blank a running fast on the wrist.
-      // Preserve the last known anchor for up to 48h — past that a stale fast
-      // shouldn't linger if the empty reads never resolve.
-      if let prior = lastFasting,
-         Date().timeIntervalSince(prior.lastMealAt) < 48 * 3600 {
-        return prior
-      }
-      lastFasting = nil
-      return nil
-    }
-
-    let targetH = NutritionPrefs.loadMacrosConfig()?.fasting?.min ?? FastingDefaults.targetMinH
-    // The Fasting metric's authored color, resolved exactly as the phone's
-    // Nutrition surfaces do: the user's per-tile override else the MacroCatalog
-    // default — so the wrist ring matches the phone.
-    let tiles = MacroCatalog.reconcile(
-      SettingsMirror.loadSettings(context: context)?.nutrition?.macroTiles
-        ?? MacroCatalog.defaultTilePrefs())
-    let colorHex = tiles.first(where: { $0.id == "fasting" })?.colorHex
-      ?? MacroCatalog.byID["fasting"]?.defaultColorHex
-
-    let wire = FastingWire(
-      lastMealAt: lastMealAt,
-      sinceLabel: String(last.time.prefix(5)),
-      targetHours: max(targetH, 1),
-      colorHex: colorHex)
+    let wire = NutritionRingsBuilder.buildFasting(context: context, prior: lastFasting)
     lastFasting = wire
     return wire
   }

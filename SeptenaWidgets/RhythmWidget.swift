@@ -89,6 +89,7 @@ struct RhythmWidget: Widget {
     .configurationDisplayName("Rhythm")
     .description("Today as a 24-hour dial — your day's shape across every section.")
     .supportedFamilies([.systemSmall, .systemLarge])
+    .septenaWidgetMargins()
   }
 }
 
@@ -101,6 +102,7 @@ struct RhythmWidgetView: View {
 
   var body: some View {
     content
+      .widgetSurfaceInsets()
       .widgetURL(homeDeepLink)
       .containerBackground(for: .widget) {
         LinearGradient(
@@ -171,7 +173,6 @@ private struct EmptyRhythm: View {
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
     }
-    .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }

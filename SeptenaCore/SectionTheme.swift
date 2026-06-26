@@ -99,6 +99,10 @@ final class SectionTheme {
   /// All section accents keyed by Septena section id (`tasks`, `habits`,
   /// `chores`, `supplements`, ...). Populated by `refresh()`.
   private(set) var accentByKey: [String: Color] = [:]
+  /// Authored color tokens (`#rrggbb`, `hsl(...)`, …) keyed by section id.
+  /// Used when publishing widget snapshots so the extension needn't run
+  /// `SectionTheme`.
+  private(set) var tokenByKey: [String: String] = [:]
 
   /// Hydrate from the local mirror / disk cache during construction so the
   /// very first frame the dashboard renders already has the user's accent
@@ -112,6 +116,13 @@ final class SectionTheme {
   /// sections we don't know about (or before the first refresh completes).
   func color(for sectionKey: String) -> Color {
     accentByKey[sectionKey] ?? Color(red: 0.541, green: 0.514, blue: 0.471)
+  }
+
+  /// Resolve the authored accent token for a section — for wire payloads.
+  func token(for sectionKey: String) -> String {
+    tokenByKey[sectionKey]
+      ?? Self.defaultPalette.first { $0.key == sectionKey }?.color
+      ?? "#8b8680"
   }
 
   /// Glyph for "this is the X section" chrome (e.g. SwiftUI's
@@ -172,10 +183,13 @@ final class SectionTheme {
 
   private func applySections(_ sections: [SectionConfig]) {
     var byKey: [String: Color] = [:]
+    var tokens: [String: String] = [:]
     for s in sections {
+      tokens[s.key] = s.color
       if let c = parseColor(s.color) { byKey[s.key] = c }
     }
     accentByKey = byKey
+    tokenByKey = tokens
   }
 
   // MARK: - Color string parsing

@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if !WIDGET_EXTENSION
 // Rich tile for the Week dashboard. One per module. Composed of optional
 // chunks: a header row (title + circular trailing action), a stats grid
 // (2-3 big-number cells with caption labels), a progress bar, and a
@@ -294,6 +295,8 @@ private struct CenteredHistoryView: View {
   }
 }
 
+#endif
+
 /// Bidirectional bar chart drawn manually with GeometryReader — no SwiftUI
 /// Charts dependency. A horizontal reference line sits at the midpoint (avg).
 /// Bars above the line = above-average weight (gain, full accent).
@@ -460,8 +463,10 @@ struct Histogram: View {
         // quick-add bumps today's bar (the last one), which slides up
         // smoothly instead of jumping. Stacked modifiers because SwiftUI's
         // `.animation(_:value:)` watches one value each.
+        #if !WIDGET_EXTENSION
         .a11yAnimation(Theme.Motion.standard, value: values)
         .a11yAnimation(Theme.Motion.standard, value: secondaryValues)
+        #endif
         if let dayLabels {
           HStack(spacing: gap) {
             ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, lbl in
@@ -491,18 +496,45 @@ struct Histogram: View {
 /// headline numbers above a 7-day histogram. No progress bar — that
 /// concept moved to Rings mode.
 struct DomainTile: View {
-  let data: HomepageDomainData
+  private let icon: String
+  private let title: String
+  private let accent: Color
+  private let stats: [TileStatWire]
+  #if !WIDGET_EXTENSION
+  private let appHistory: HistorySeries?
+  #endif
+  private let wireHistory: HistoryWire?
+  private let useHover: Bool
 
-  /// At most two stats. A 2-up grid cell is too narrow on iPhone for three
-  /// big numbers, and the `domainData` builders order `headlineStats` by
-  /// prominence — so the first two are the glance-worthy ones.
-  private var stats: [DomainStat] { Array(data.headlineStats.prefix(2)) }
+  #if !WIDGET_EXTENSION
+  init(data: HomepageDomainData) {
+    icon = data.icon
+    title = data.title
+    accent = data.accent
+    stats = data.headlineStats.prefix(2).map(\.wire)
+    appHistory = data.history
+    wireHistory = nil
+    useHover = true
+  }
+  #endif
+
+  init(display: TileDisplayData) {
+    icon = display.icon
+    title = display.title
+    accent = display.accent
+    stats = Array(display.headlineStats.prefix(2))
+    #if !WIDGET_EXTENSION
+    appHistory = nil
+    #endif
+    wireHistory = display.history
+    useHover = false
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(spacing: 8) {
-        SectionGlyph(icon: data.icon, accent: data.accent)
-        Text(data.title)
+        SectionGlyph(icon: icon, accent: accent)
+        Text(title)
           .font(.subheadline.weight(.semibold))
           .foregroundStyle(.primary)
           .lineLimit(1)
@@ -521,10 +553,11 @@ struct DomainTile: View {
               HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(stat.value)
                   .font(.system(.title2, design: .rounded).weight(.semibold))
-                  .foregroundStyle(data.accent)
-                  // Match the old tile's quick-add digit tween.
+                  .foregroundStyle(accent)
+                  #if !WIDGET_EXTENSION
                   .contentTransition(.numericText())
                   .a11yAnimation(Theme.Motion.gauge, value: stat.value)
+                  #endif
                   .lineLimit(1)
                   .minimumScaleFactor(0.6)
                 if let unit = stat.unit {
@@ -539,21 +572,51 @@ struct DomainTile: View {
         }
       }
 
-      if let history = data.history {
-        TileHistogram(history: history, accent: data.accent)
+      #if !WIDGET_EXTENSION
+      if let history = appHistory {
+        TileHistogram(history: history, accent: accent)
+          .frame(height: 58)
+      } else if let history = wireHistory {
+        TileWireHistogram(history: history, accent: accent)
           .frame(height: 58)
       }
+      #else
+      if let history = wireHistory {
+        TileWireHistogram(history: history, accent: accent)
+          .frame(height: 58)
+      }
+      #endif
     }
+    #if WIDGET_EXTENSION
+    .padding(.horizontal, 6)
+    .padding(.vertical, 12)
+    #else
     .padding(12)
+    #endif
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(Theme.cardSurface)
     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     .contentShape(Rectangle())
-    .tileHover(cornerRadius: 14)
+    .modifier(DomainTileChrome(useHover: useHover))
   }
 }
 
-/// Maps a `HomepageDomainData.history` series onto the tile's 7-day chart,
+private struct DomainTileChrome: ViewModifier {
+  let useHover: Bool
+  func body(content: Content) -> some View {
+    #if !WIDGET_EXTENSION
+    if useHover {
+      content.tileHover(cornerRadius: 14)
+    } else {
+      content
+    }
+    #else
+    content
+    #endif
+  }
+}
+
+#if !WIDGET_EXTENSION
 /// reusing the same primitives the tile always used (`Histogram` for
 /// counts / two-series effort, `CenteredBarChart` for body-weight deltas).
 /// 90-day series get sliced to the trailing 7 here — at ~half-screen tile
@@ -615,7 +678,60 @@ private struct TileHistogram: View {
     }
   }
 }
+#endif
 
+/// Widget / wire snapshot variant of `TileHistogram`.
+struct TileWireHistogram: View {
+  let history: HistoryWire
+  let accent: Color
+
+  var body: some View {
+    switch history {
+    case .bars(let values):
+      let v = Self.last7(values)
+      Histogram(values: v,
+                accent: accent,
+                emphasizedIndex: v.count - 1,
+                dayLabels: Self.weekdayLabels(count: v.count))
+
+    case .dailyTrend(let daily):
+      let v = Self.last7(daily.map { Int($0.rounded()) })
+      Histogram(values: v,
+                accent: accent,
+                emphasizedIndex: v.count - 1,
+                dayLabels: Self.weekdayLabels(count: v.count))
+
+    case .centered(let values, _):
+      let v = Self.last7Optional(values)
+      CenteredBarChart(values: v,
+                       accent: accent,
+                       dayLabels: Self.weekdayLabels(count: v.count))
+    }
+  }
+
+  private static func last7<T: ExpressibleByIntegerLiteral>(_ v: [T]) -> [T] {
+    v.count >= 7 ? Array(v.suffix(7)) : Array(repeating: 0, count: 7 - v.count) + v
+  }
+
+  private static func last7Optional(_ v: [Double?]) -> [Double?] {
+    v.count >= 7 ? Array(v.suffix(7)) : Array(repeating: nil, count: 7 - v.count) + v
+  }
+
+  private static let narrowWeekdayFormatter: DateFormatter = {
+    let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"
+    return fmt
+  }()
+
+  private static func weekdayLabels(count: Int) -> [String] {
+    let cal = Calendar.current
+    let fmt = narrowWeekdayFormatter
+    return (0..<count).reversed().compactMap { offset in
+      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+    }
+  }
+}
+
+#if !WIDGET_EXTENSION
 #Preview {
   ScrollView {
     VStack(spacing: 14) {
@@ -639,3 +755,4 @@ private struct TileHistogram: View {
     .padding()
   }
 }
+#endif

@@ -93,6 +93,11 @@ This is the surface most often missed. Wiring lives in
     `repaintAllMirrors()` (Mood and Hydration do this — they bypass
     `AddInfoSection`).
 
+**Section Tile widget** — if `supportsDashboard`, add a `*DomainData()` case in
+`DashboardTileBuilder` and the section auto-appears in the iOS home-screen
+"Section Tile" widget picker after the next dashboard refresh. No separate
+widget wiring per section.
+
 ### 5. Quick-add — **optional**
 
 Two patterns:

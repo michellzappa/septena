@@ -146,152 +146,19 @@ private struct HeatmapDomainCard: View {
     Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: Date())
   }
 
-  private var levelByIso: [String: Int] { HeatmapDomainRow.buildLevelMap(from: data.history, windowDays: windowDays) }
+  private var levelByIso: [String: Int] {
+    HeatmapLevels.buildLevelMap(from: data.history?.wire, windowDays: windowDays)
+  }
 }
 
 private struct HeatmapDomainRow: View {
+  @Environment(SectionTheme.self) private var theme
   let data: HomepageDomainData
 
-  private static let ymdFormatter: DateFormatter = {
-    let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
-    return fmt
-  }()
-
-  /// Days back from today the grid covers. 90 ≈ 13 week columns —
-  /// dense enough to read consistency patterns, narrow enough to fit
-  /// on an iPhone with the identity column.
-  private let windowDays: Int = 90
-
   var body: some View {
-    HStack(alignment: .top, spacing: 14) {
-      identityColumn
-
-      // No `Spacer` here — `ConsistencyHeatmap` uses a
-      // `GeometryReader` internally, which is already greedy. A
-      // `Spacer` between them creates a flex-vs-flex contention that
-      // SwiftUI sometimes resolves with a transient negative width
-      // for the heatmap, triggering CoreGraphics "Invalid frame
-      // dimension" log spam. Let the heatmap take all remaining
-      // HStack width — its own `.frame(maxWidth: .infinity,
-      // alignment: .trailing)` already right-aligns the cells within
-      // that space, so the visual outcome is identical.
-      ConsistencyHeatmap(
-        endDate: Date(),
-        firstDataDate: firstDataDate,
-        accent: data.accent,
-        getDay: { iso in
-          HeatmapDay(
-            level: levelByIso[iso] ?? 0,
-            label: "\(iso) · \(data.title)"
-          )
-        }
-      )
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
-    .contentShape(Rectangle())
-    .tileHover(cornerRadius: 10)
-  }
-
-  private var identityColumn: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
-        SectionGlyph(icon: data.icon,
-                     accent: data.accent)
-        Text(data.title)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.primary)
-          .lineLimit(1)
-      }
-      Text(data.headline)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    .frame(width: 140, alignment: .leading)
-  }
-
-  private var firstDataDate: Date? {
-    Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: Date())
-  }
-
-  private var levelByIso: [String: Int] { Self.buildLevelMap(from: data.history, windowDays: windowDays) }
-
-  /// Pre-computed ISO-date → 0…4 level map for the grid's `getDay`
-  /// closure. Shared by both `HeatmapDomainRow` and `HeatmapDomainCard`.
-  static func buildLevelMap(from history: HistorySeries?, windowDays: Int) -> [String: Int] {
-    var levels = Self.levels(for: history)
-    guard !levels.isEmpty else { return [:] }
-    // Pad with leading zeros if shorter than window so every date in the
-    // viewport has an entry. Do NOT truncate when longer — sources like
-    // Oura append a trailing 0 for today (sleep not yet recorded) to shift
-    // the anchor back by one day so the week-rounded first column is covered.
-    if levels.count < windowDays {
-      levels = Array(repeating: 0, count: windowDays - levels.count) + levels
-    }
-    let cal = Calendar.current
-    let fmt = Self.ymdFormatter
-    let today = cal.startOfDay(for: Date())
-    var map: [String: Int] = [:]
-    for (i, level) in levels.enumerated() {
-      // levels is oldest-first; last element maps to today.
-      let daysBack = levels.count - 1 - i
-      if let d = cal.date(byAdding: .day, value: -daysBack, to: today) {
-        map[fmt.string(from: d)] = level
-      }
-    }
-    return map
-  }
-
-  /// Map a `HistorySeries` to per-day 0…4 levels. Each domain
-  /// self-normalizes to its own series max so a quiet week still
-  /// shows relative variation rather than collapsing to all-0.
-  static func levels(for history: HistorySeries?) -> [Int] {
-    switch history {
-    case .bars(let values):
-      return normalizedLevels(values.map(Double.init))
-
-    case .dailyTrend(let daily):
-      // Heatmap is "was there activity" per day — the raw daily effort
-      // is exactly the right signal.
-      return normalizedLevels(daily)
-
-    case .centered(let values, _):
-      // Absolute deviation: a big swing up *or* down counts as
-      // "activity." `nil` days (no measurement) collapse to level 0.
-      let abs = values.map { $0.map(Swift.abs) ?? 0 }
-      let missing = values.map { $0 == nil }
-      return normalizedLevels(abs, isMissing: missing)
-
-    case .none:
-      return []
-    }
-  }
-
-  /// Normalize a series to its own max:
-  ///   * `0` stays at level 0 (empty).
-  ///   * `value / max` is bucketed into 1…4.
-  ///   * If `max == 0`, every day is level 0.
-  ///
-  /// `isMissing[i] == true` forces that day to level 0 even when the
-  /// raw value is non-zero, so e.g. body-weight days without a
-  /// measurement render as empty rather than as level cells.
-  static func normalizedLevels(
-    _ values: [Double],
-    isMissing: [Bool] = []
-  ) -> [Int] {
-    guard let maxV = values.max(), maxV > 0 else {
-      return Array(repeating: 0, count: values.count)
-    }
-    return values.enumerated().map { idx, v in
-      if idx < isMissing.count, isMissing[idx] { return 0 }
-      guard v > 0 else { return 0 }
-      let ratio = v / maxV
-      if ratio >= 0.75 { return 4 }
-      if ratio >= 0.5 { return 3 }
-      if ratio >= 0.25 { return 2 }
-      return 1
-    }
+    HeatmapTileRow(
+      display: data.tileDisplay(accentHex: data.accentHex ?? theme.token(for: data.domain.rawValue)),
+      useHover: true
+    )
   }
 }

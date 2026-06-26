@@ -310,12 +310,24 @@ targets:
       # on-device (no location, no payload field).
       - path: SeptenaCore/RhythmWire.swift
       - path: SeptenaCore/AdaptiveColor.swift
-      # TimeOfDayWheel's occurredAt→Event init references WakingDay (the dial's
-      # waking-day boundary). Foundation-only, no model deps, so it slots in.
+      - path: SeptenaCore/HomepageDomain.swift
+      - path: SeptenaCore/TileWidgetWire.swift
+      - path: SeptenaCore/TileWidgetSnapshotStore.swift
+      - path: SeptenaCore/MacroWidgetWire.swift
+      - path: SeptenaCore/MacroWidgetSnapshotStore.swift
+      - path: SeptenaCore/TasksWidgetWire.swift
+      - path: SeptenaCore/TasksWidgetSnapshotStore.swift
+      - path: SeptenaCore/HeatmapLevels.swift
       - path: SeptenaCore/WakingDay.swift
+      - path: Septena/Shell/UI/SectionGlyph.swift
+      - path: Septena/Shell/UI/ModuleTile.swift
+      - path: Septena/Shell/UI/ConsistencyHeatmap.swift
+      - path: Septena/Shell/Dashboard/HeatmapTileRow.swift
       - path: Septena/Shell/UI/TimeOfDayWheel.swift
       - path: Septena/Shell/UI/Theme.swift
       - path: Septena/Shell/UI/SolarClock.swift
+      # Control Center "Add Task" — intent type for ControlWidgetButton.
+      - path: Septena/App/Intents/OpenNewTaskControlIntent.swift
     info:
       path: SeptenaWidgets/Info.plist
       properties:
@@ -329,6 +341,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.widgets
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptenaWidgets/SeptenaWidgets.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: WIDGET_EXTENSION
 
   # Hermetic unit tests for pure SeptenaCore logic. SeptenaCore is NOT a
   # framework — it's source compiled into each app target — so there's nothing
@@ -350,6 +363,13 @@ targets:
       - path: SeptenaCore/SuggestionBlocks.swift
       - path: SeptenaCore/IntakeModel.swift
       - path: SeptenaCore/GutSymptomMigrationMap.swift
+      - path: SeptenaCore/ThingsImport/ThingsImportModels.swift
+      - path: SeptenaCore/ThingsImport/ThingsDateDecoder.swift
+      - path: SeptenaCore/ThingsImport/ThingsSQLiteReader.swift
+      - path: SeptenaCore/ThingsImport/ThingsImportParser.swift
+      - path: SeptenaCore/ThingsImport/ThingsImportMapping.swift
+      - path: SeptenaCore/ThingsImport/ThingsImportScratchpad.swift
+      - path: SeptenaCore/ThingsImport/ThingsToSeptenaMapper.swift
       - path: SeptenaCore/WakingDay.swift
     configFiles:
       Debug: Config/Base.xcconfig

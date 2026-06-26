@@ -214,7 +214,7 @@ struct TrainingRingsWire: Codable, Hashable {
 /// no republish. Present whenever the user tracks fasting and has a recent meal;
 /// absent (so the wrist shows macros) when fasting is untracked or there's no
 /// meal to anchor.
-struct FastingWire: Codable, Hashable {
+struct FastingWire: Codable, Hashable, Sendable {
   /// The absolute instant of the user's most recent eating event — the fast's
   /// anchor. The watch derives elapsed = now − `lastMealAt` and feeds the same
   /// instant into the state machine, so elapsed and the morph stay live across
@@ -227,12 +227,30 @@ struct FastingWire: Codable, Hashable {
   /// The Fasting metric's authored color token, mirrored from Settings so the
   /// ring matches the phone. Nil → the complication's fixed fallback hue.
   var colorHex: String? = nil
+
+  #if !WIDGET_EXTENSION
+  /// Live fed-vs-fasting at `now`, shared by watch complications so the morph
+  /// appears overnight without a republish.
+  func liveState(now: Date) -> (isFasting: Bool, elapsed: TimeInterval) {
+    let cal = Calendar.current
+    let inputs: FastingStateInputs
+    if cal.isDate(lastMealAt, inSameDayAs: now) {
+      inputs = FastingStateInputs(todayLatestMeal: sinceLabel,
+                                  todayMealCount: 1, yesterdayLastMeal: nil)
+    } else {
+      inputs = FastingStateInputs(todayLatestMeal: nil,
+                                  todayMealCount: 0, yesterdayLastMeal: sinceLabel)
+    }
+    let fasting = computeFastingState(inputs: inputs, now: now).isFasting
+    return (fasting, max(0, now.timeIntervalSince(lastMealAt)))
+  }
+  #endif
 }
 
 /// One ring on the wire: its key, the running total, and the value that fills
 /// the ring (nil when there's no target — the view draws a faint empty track
 /// instead of a fill). Shared by every rings-style complication.
-struct RingMetricWire: Codable, Hashable {
+struct RingMetricWire: Codable, Hashable, Sendable {
   var key: String
   /// The running total in the metric's unit (grams / kcal / minutes / count).
   var value: Double

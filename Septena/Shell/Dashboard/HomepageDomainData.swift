@@ -87,6 +87,9 @@ struct HomepageDomainData: Identifiable {
   }
   let title: String
   let accent: Color
+  /// When set, overrides `theme.token(for:)` when publishing widget wire /
+  /// rendering shared tile views (intake per-kind colors).
+  var accentHex: String? = nil
   /// Compact one-line summary used by Dense / List rows where there
   /// isn't room for the full stats array. Example: "2/5 · 1 skipped".
   let headline: String
@@ -120,6 +123,40 @@ struct HomepageDomainData: Identifiable {
   /// variation. Count-based domains (tasks, habits) keep the default
   /// 0-anchored scale where "zero" is meaningful.
   var autoscaleSparkline: Bool = false
+}
+
+extension HistorySeries {
+  var wire: HistoryWire {
+    switch self {
+    case .bars(let values):
+      return .bars(values)
+    case .dailyTrend(let daily):
+      return .dailyTrend(daily: daily)
+    case .centered(let values, let baseline):
+      return .centered(values: values, baseline: baseline)
+    }
+  }
+}
+
+extension DomainStat {
+  var wire: TileStatWire {
+    TileStatWire(label: label, value: value, unit: unit)
+  }
+}
+
+extension HomepageDomainData {
+  func tileDisplay(accentHex explicitHex: String? = nil) -> TileDisplayData {
+    TileDisplayData(
+      itemID: id,
+      iconSymbol: icon,
+      title: title,
+      accentHex: explicitHex ?? accentHex ?? "#8b8680",
+      headline: headline,
+      headlineStats: headlineStats.map(\.wire),
+      history: history?.wire,
+      trailingTodayPending: trailingTodayPending
+    )
+  }
 }
 
 /// The single place the homepage maps a layout mode → a renderer. Both the
