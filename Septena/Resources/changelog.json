@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1175,
+      "build": 1184,
       "date": "2026-06-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a photo of your meal and get an on-device analysis of what you ate.",
+          "title": "Capture meals from a photo",
+          "detail": "Snap a picture of your food and Septena analyzes it on-device to log the meal and its macros.",
           "section": "nutrition"
         },
         {
-          "title": "Inline task editing and quick add",
-          "detail": "Rename tasks in place and add new ones from a quick-add line, with calendar events woven into Today and Upcoming.",
+          "title": "A faster, more capable Tasks list",
+          "detail": "Add a task from anywhere with a global entry point and Control Center button, quick-add inline, weave your calendar agenda into Today and Upcoming, and enjoy a longer undo window after completing.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days, with restore and undo before they purge.",
+          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "The Week tab is now Today",
-          "detail": "A clearer name for your daily dashboard, now backed by a day-aligned sky wash that tracks the real sky.",
-          "section": null
+          "title": "Import your tasks from Things",
+          "detail": "Bring your existing to-dos over from a Things database export.",
+          "section": "tasks"
         },
         {
           "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter most in view right on the dashboard.",
+          "detail": "Keep the goals that matter most front and center on the home screen.",
           "section": "goals"
         },
         {
-          "title": "Effort-weighted training volume",
-          "detail": "Muscle volume now weighs how hard each set was, with a weekly review after every session.",
+          "title": "Smarter training volume and a weekly review",
+          "detail": "Per-muscle volume is now effort-weighted, and a weekly muscle review appears at the end of a session.",
           "section": "training"
         },
         {
-          "title": "See exactly what telemetry is shared",
-          "detail": "Graded off/minimal/balanced/full analytics levels, a checklist of what's sent, and a log of recent activity — opt out anytime, fully anonymized.",
+          "title": "See and control exactly what analytics you share",
+          "detail": "Choose a graded telemetry level from off to full, and review a log of what was recently sent.",
           "section": null
         },
         {
-          "title": "A richer watch Next feed",
-          "detail": "A vertically paged Next feed floats over a live time-of-day sky, with interactive intake nudges and summary pages on the wrist.",
+          "title": "A richer watch experience",
+          "detail": "The Next feed now floats over a live time-of-day sky with per-page titles, interactive intake nudges, and expanded summaries.",
           "section": null
         }
       ]
