@@ -88,10 +88,149 @@ extension View {
     self
     #endif
   }
+
+  /// Neutral-gray native `List(selection:)` row highlight on macOS and iPad.
+  /// The app root tints with the section accent; without an explicit override
+  /// here the selection capsule reads as meaningless blue. iPhone compact keeps
+  /// the system default (edit-mode circles only).
+  @ViewBuilder
+  func septenaNeutralListSelection() -> some View {
+    #if os(macOS)
+    self.tint(Theme.selectionNeutral)
+    #elseif os(iOS)
+    self.modifier(NeutralListSelectionOnPad())
+    #else
+    self
+    #endif
+  }
+
+  /// Task list chrome: `.inset` capsule rows on macOS and iPad regular width.
+  /// iPhone compact stays `.plain` (selection is edit-mode circles only).
+  @ViewBuilder
+  func septenaTaskListStyle() -> some View {
+    #if os(macOS)
+    self.listStyle(.inset)
+    #elseif os(iOS)
+    self.modifier(TaskListStyleOnPad())
+    #else
+    self
+    #endif
+  }
+
+  /// Disable the platform's accent selection fill so `listRowBackground` is the
+  /// only row highlight (UIKit blue on iOS, AppKit accent on macOS).
+  @ViewBuilder
+  func septenaSuppressListCellSelection() -> some View {
+    #if os(iOS)
+    self.background(TaskListCellSelectionSuppressor())
+    #elseif os(macOS)
+    self.background(TaskListRowSelectionSuppressor())
+    #else
+    self
+    #endif
+  }
 }
+
+#if os(iOS)
+/// Applies `Theme.selectionNeutral` to selectable lists on iPad (regular width).
+private struct NeutralListSelectionOnPad: ViewModifier {
+  @Environment(\.horizontalSizeClass) private var hSize
+  func body(content: Content) -> some View {
+    if hSize == .regular {
+      content.tint(Theme.selectionNeutral)
+    } else {
+      content
+    }
+  }
+}
+
+/// iPad regular width uses inset capsule rows like macOS; iPhone uses plain.
+private struct TaskListStyleOnPad: ViewModifier {
+  @Environment(\.horizontalSizeClass) private var hSize
+  func body(content: Content) -> some View {
+    if hSize == .regular {
+      content.listStyle(.inset)
+    } else {
+      content.listStyle(.plain)
+    }
+  }
+}
+
+/// UITableView paints accent-blue behind selected rows regardless of SwiftUI
+/// `.tint`. Disable the UIKit layer so our `listRowBackground` is the only
+/// highlight. Attached per task row (inside the cell hierarchy).
+private struct TaskListCellSelectionSuppressor: UIViewRepresentable {
+  @Environment(\.colorScheme) private var colorScheme
+
+  func makeUIView(context: Context) -> UIView {
+    let v = UIView()
+    v.isUserInteractionEnabled = false
+    return v
+  }
+  func updateUIView(_ uiView: UIView, context: Context) {
+    DispatchQueue.main.async {
+      var v: UIView? = uiView
+      while let current = v {
+        if let cell = current as? UITableViewCell {
+          cell.selectionStyle = .none
+          cell.selectedBackgroundView = UIView()
+          cell.multipleSelectionBackgroundView = UIView()
+          if #available(iOS 14.0, *) {
+            var bg = UIBackgroundConfiguration.listPlainCell()
+            bg.backgroundColor = .clear
+            cell.backgroundConfiguration = bg
+          }
+          // Selected cells inherit traits that flip SwiftUI `Color.primary` to
+          // white. Pin the cell subtree to the app color scheme so fixed ink wins.
+          let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
+          cell.contentView.overrideUserInterfaceStyle = style
+          cell.contentView.findHostingView()?.overrideUserInterfaceStyle = style
+          return
+        }
+        v = current.superview
+      }
+    }
+  }
+}
+
+private extension UIView {
+  func findHostingView() -> UIView? {
+    let name = String(describing: type(of: self))
+    if name.contains("Hosting") { return self }
+    for sub in subviews {
+      if let match = sub.findHostingView() { return match }
+    }
+    return nil
+  }
+}
+#endif
 
 #if os(macOS)
 import AppKit
+
+/// NSTableView paints accent-blue behind selected rows regardless of SwiftUI
+/// `.tint`. Disable the AppKit layer so our `listRowBackground` is the only
+/// highlight. Attached per task row (inside the cell hierarchy).
+private struct TaskListRowSelectionSuppressor: NSViewRepresentable {
+  func makeNSView(context: Context) -> NSView { PassThroughView() }
+
+  /// macOS equivalent of UIKit `isUserInteractionEnabled = false`.
+  private final class PassThroughView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+  }
+  func updateNSView(_ nsView: NSView, context: Context) {
+    DispatchQueue.main.async {
+      var v: NSView? = nsView
+      while let current = v {
+        if let row = current as? NSTableRowView {
+          row.selectionHighlightStyle = .none
+          return
+        }
+        v = current.superview
+      }
+    }
+  }
+}
 
 /// Transparent AppKit view that fires `action` on right-mouse-down then
 /// forwards to the next responder so SwiftUI's `.contextMenu` still opens.

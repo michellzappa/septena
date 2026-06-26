@@ -120,14 +120,43 @@ enum Theme {
   static let divider = border
 
   /// Neutral list-selection tint. The app reserves accent colors to carry
-  /// section meaning, so the macOS row-selection capsule must NOT use the
-  /// system blue accent. This matches the sidebar's unemphasized-gray
+  /// section meaning, so row-selection capsules on macOS / iPad must NOT use
+  /// the system blue accent. This matches the sidebar's unemphasized-gray
   /// selection so a highlighted task reads as "selected", not "tinted".
   static let selectionNeutral: Color = {
     #if os(macOS)
     return Color(nsColor: .secondaryLabelColor)
     #else
     return Color.secondary
+    #endif
+  }()
+
+  /// Neutral fill behind a selected task-list row. `List(selection:)` ignores
+  /// `.tint` for its highlight on iPad — we paint this via `listRowBackground`
+  /// instead so the capsule stays gray, not accent blue.
+  static let listSelectionFill: Color = {
+    #if os(macOS)
+    return Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+    #elseif canImport(UIKit)
+    return Color(uiColor: .tertiarySystemFill)
+    #else
+    return Color.secondary.opacity(0.18)
+    #endif
+  }()
+
+  /// Title + checkbox ink on the gray list-selection capsule. Must NOT be
+  /// `Color.primary` — UITableView's selected-cell traits flip primary to white.
+  static let listSelectedInk: Color = {
+    #if os(macOS)
+    return Color(nsColor: .labelColor)
+    #elseif canImport(UIKit)
+    return Color(uiColor: UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 1.0, alpha: 1.0)
+        : UIColor(white: 0.0, alpha: 0.88)
+    })
+    #else
+    return Color.black
     #endif
   }()
 
@@ -325,6 +354,8 @@ enum Theme {
     /// itself reads as "filling," which is what carries the feedback on a bar
     /// too thin for a glow. Pairs with the numeric count-up on the value.
     static let gauge: Animation = .spring(response: 0.5, dampingFraction: 0.68)
+    /// Today promote: the amber row wash after pinning a task to Today.
+    static let promote: Animation = .easeOut(duration: 0.65)
   }
 }
 

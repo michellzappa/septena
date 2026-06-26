@@ -147,19 +147,26 @@ final class SettleStore {
 
   func isSettling(_ id: String) -> Bool { settling.contains(id) }
 
-  /// Keep `id` lingering, then run `finalize` after the delay. The caller
-  /// wraps its own state mutation in the right (motion-gated) animation.
-  /// Re-scheduling the same id restarts the clock.
+  /// Keep `id` lingering, then run `finalize` after the delay. The caller must
+  /// call `endSettle(_:)` inside a motion-gated animation (`A11yMotion.run`)
+  /// so the row fades out and rows below slide up instead of flashing. Any
+  /// other state mutation (e.g. removing from an acted set) belongs in the same
+  /// animated transaction. Re-scheduling the same id restarts the clock.
   func schedule(_ id: String, finalize: @escaping () -> Void) {
     pending[id]?.cancel()
     settling.insert(id)
     pending[id] = Task { [weak self] in
       try? await Task.sleep(for: SettleStore.delay)
       guard !Task.isCancelled, let self else { return }
-      self.settling.remove(id)
       self.pending[id] = nil
       finalize()
     }
+  }
+
+  /// Drop `id` from the linger set. Call inside `A11yMotion.run` when the beat
+  /// ends so List/ForEach siblings animate into place.
+  func endSettle(_ id: String) {
+    settling.remove(id)
   }
 
   /// User un-checked within the window → abort the fade-out.
@@ -175,6 +182,32 @@ final class SettleStore {
     for task in pending.values { task.cancel() }
     pending.removeAll()
     settling.removeAll()
+  }
+}
+
+// MARK: - Today-promote flash
+//
+// A one-shot rising-edge signal when a task is pinned to Today. Rows read
+// `trigger(for:)` and play their own local fade/pulse; the store only bumps
+// a per-id counter so rapid re-promotes replay cleanly.
+
+@MainActor
+@Observable
+final class PromoteFlashStore {
+  private var counters: [String: Int] = [:]
+  private var pending: [String: Task<Void, Never>] = [:]
+
+  func trigger(for id: String) -> Int { counters[id] ?? 0 }
+
+  /// Bump `id`'s trigger so any row watching it plays its promote animation.
+  func flash(_ id: String) {
+    counters[id, default: 0] += 1
+    pending[id]?.cancel()
+    pending[id] = Task { [weak self] in
+      try? await Task.sleep(for: .milliseconds(50))
+      guard !Task.isCancelled, let self else { return }
+      self.pending[id] = nil
+    }
   }
 }
 

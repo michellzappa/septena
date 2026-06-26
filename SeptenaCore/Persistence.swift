@@ -3551,6 +3551,20 @@ enum LocalCache {
       .map(SeptenaTask.init) ?? []
   }
 
+  /// Of `ids`, the ones whose local mirror row is now completed. Lets a view
+  /// tell a *remote completion* (another device checked it — worth ghost-
+  /// checking in place) apart from a row that left a list for some other
+  /// reason (deleted, deferred, rescheduled off the filter). Cheap and only
+  /// called when a visible open row actually vanished, so a full fetch is fine.
+  static func completedIDs(among ids: Set<String>, in context: ModelContext) -> Set<String> {
+    guard !ids.isEmpty else { return [] }
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    return Set(rows.compactMap { e in
+      (ids.contains(e.id) && e.status == .done && !e.pendingDeletion && e.deletedAt == nil)
+        ? e.id : nil
+    })
+  }
+
   /// One-line diagnostic of what the local task store currently looks
   /// like — counts by status, today flag, and date-relative buckets.
   /// Logged on app launch so a partial-migration / data-corruption

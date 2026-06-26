@@ -112,6 +112,12 @@ struct TaskCheckbox: View {
   /// today indicator into the checkbox itself, so it no longer sits as a
   /// separate glyph inline with the title.
   var isToday: Bool = false
+  /// Native `List(selection:)` cursor — force dark checkbox chrome on the gray
+  /// capsule so UIKit doesn't wash it out.
+  var isListSelected: Bool = false
+  /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber ring
+  /// when the row is pinned to Today.
+  var promotePulseTrigger: Int = 0
   /// Which celebration plays on check. Standardized to `.stamp` across every
   /// checkable row; the other feels stay available (see `CheckFeel`).
   var feel: CheckFeel = .stamp
@@ -144,6 +150,8 @@ struct TaskCheckbox: View {
     // surface (project/area) — it wears amber on the control, matching the
     // Things-style "new on Today" highlight, instead of a separate right-edge chip.
     if TaskRowFlags.languageV2, isToday || arrivedToday { return Theme.todayAccent }
+    // List selection gray capsule — fixed ink; `Color.primary` flips to white here.
+    if isListSelected { return Theme.listSelectedInk }
     return Theme.inkSecondary.opacity(0.55)
   }
   private var boxFillColor: Color {
@@ -162,6 +170,7 @@ struct TaskCheckbox: View {
   // snaps them back on uncheck so a mid-animation undo can't strand them.
   @State private var ringScale: CGFloat = 1
   @State private var ringOpacity: Double = 0
+  @State private var ringStroke: Color? = nil
   @State private var ringDrift: CGFloat = 0    // tuck: ring files downward
   @State private var echoScale: CGFloat = 1    // echo: the second, quieter ring
   @State private var echoOpacity: Double = 0
@@ -169,7 +178,7 @@ struct TaskCheckbox: View {
   @State private var bodySquash: CGFloat = 1   // drop: impact squash
   @State private var bodyDip: CGFloat = 0      // tuck: box dips, then recovers
 
-  var body: some View {
+  private var checkboxButton: some View {
     Button(action: onToggle) {
       ZStack {
         // Echo ring (habits) — the second, quieter pulse behind the main one.
@@ -181,7 +190,7 @@ struct TaskCheckbox: View {
         // down as it fades). Local and brief on purpose: checkable rows
         // celebrate at the box, never on the canvas.
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-          .strokeBorder((tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
+          .strokeBorder((ringStroke ?? tint ?? boxFillColor).opacity(ringOpacity), lineWidth: 1.5)
           .frame(width: Self.boxSize, height: Self.boxSize)
           .scaleEffect(ringScale)
           .offset(y: ringDrift)
@@ -194,6 +203,7 @@ struct TaskCheckbox: View {
           .frame(width: Self.boxSize, height: Self.boxSize)
           .opacity(isDone ? 0 : 1)
           .a11yAnimation(Theme.Motion.quick, value: isDone)
+          .a11yAnimation(Theme.Motion.quick, value: isToday)
         // Fill + check, grouped so the feel choreography (drop, squash, dip)
         // moves them as one body. The fill pops with a touch of overshoot;
         // the check stamps in from smaller, reading as follow-through.
@@ -229,6 +239,16 @@ struct TaskCheckbox: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+  }
+
+  var body: some View {
+    Group {
+      if isListSelected {
+        checkboxButton.tint(Theme.listSelectedInk)
+      } else {
+        checkboxButton
+      }
+    }
     // Keep the checkbox OUT of the keyboard focus ring. On macOS a focusable
     // button inside a selected List row gets activated by Space — which silently
     // completed tasks. Completion is the checkbox-click or ⌘K; never a stray
@@ -241,11 +261,16 @@ struct TaskCheckbox: View {
       guard !reduceMotion, animationsEnabled || ignoresUserPreference else { return }
       playFeel()
     }
+    .onChange(of: promotePulseTrigger) { old, new in
+      guard new > old, !reduceMotion, animationsEnabled else { return }
+      playTodayPromotePulse()
+    }
   }
 
   /// One ring pulse from the box outward. `reach` tunes how far it travels —
   /// the splash of a drop stays tighter than a stamp's pulse.
-  private func pulse(reach: CGFloat = 1.9) {
+  private func pulse(color: Color? = nil, reach: CGFloat = 1.9) {
+    ringStroke = color
     ringScale = 0.9
     ringOpacity = 0.55
     ringDrift = 0
@@ -253,6 +278,11 @@ struct TaskCheckbox: View {
       ringScale = reach
       ringOpacity = 0
     }
+  }
+
+  /// A quiet amber ring when a task is pinned to Today.
+  private func playTodayPromotePulse() {
+    pulse(color: Theme.todayAccent, reach: 1.6)
   }
 
   /// The per-feel choreography. Imperative (like the flourish renderers) so
@@ -322,6 +352,7 @@ struct TaskCheckbox: View {
   private func resetFeel() {
     ringScale = 1
     ringOpacity = 0
+    ringStroke = nil
     ringDrift = 0
     echoScale = 1
     echoOpacity = 0
@@ -448,16 +479,29 @@ struct CheckableRow<Trailing: View>: View {
   var leadingEmoji: String? = nil
   let title: String
   var subtitle: String? = nil
-  /// Paints the row's active/selected highlight (tint at low opacity) while its
-  /// detail/edit modal is open, so the surface that opened the modal keeps a
-  /// visible anchor. Mirrors the deep `TaskListView` active-row treatment.
+  /// Neutral selection capsule while this row's detail/edit modal is open
+  /// (drawer surfaces — the deep list paints via `listRowBackground` instead).
   var isSelected: Bool = false
+  /// Native `List(selection:)` cursor — keep title ink dark on the gray capsule.
+  var isListSelected: Bool = false
+  /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber row wash.
+  var promoteFlashTrigger: Int = 0
   @ViewBuilder var trailing: () -> Trailing
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
   @Environment(\.rowVInset) private var rowVInset
+  @Environment(\.a11yMotion) private var motion
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var animationsEnabled = true
+  @State private var washOpacity: Double = 0
+
+  private var titleInk: Color {
+    if isInactive { return Theme.inkSecondary }
+    if isListSelected { return Theme.listSelectedInk }
+    return Theme.inkPrimary
+  }
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
@@ -468,6 +512,8 @@ struct CheckableRow<Trailing: View>: View {
         cornerDot: cornerDot,
         arrivedToday: arrivedToday,
         isToday: isToday,
+        isListSelected: isListSelected,
+        promotePulseTrigger: promoteFlashTrigger,
         feel: feel,
         onToggle: onToggle
       )
@@ -480,7 +526,7 @@ struct CheckableRow<Trailing: View>: View {
       VStack(alignment: .leading, spacing: 4) {
         Text(title)
           .font(.septenaTaskTitle)
-          .foregroundStyle(isInactive ? Theme.inkSecondary : Theme.inkPrimary)
+          .foregroundStyle(titleInk)
           .strikethrough(isInactive)
           .opacity(isInactive ? 0.5 : 1)
           .lineLimit(2)
@@ -503,13 +549,29 @@ struct CheckableRow<Trailing: View>: View {
     .background(selectionHighlight)
     .contentShape(Rectangle())
     .modifier(OptionalTap(action: onTap))
+    .onChange(of: promoteFlashTrigger) { old, new in
+      guard new > old, !reduceMotion, animationsEnabled else { return }
+      playPromoteWash()
+    }
+  }
+
+  private func playPromoteWash() {
+    washOpacity = 0.22
+    motion.run(Theme.Motion.promote) { washOpacity = 0 }
   }
 
   @ViewBuilder private var selectionHighlight: some View {
-    if isSelected {
-      RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-        .fill(tint.opacity(0.18))
-        .padding(.horizontal, max(0, rowHInset - 6))
+    ZStack {
+      if isSelected {
+        RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+          .fill(Theme.listSelectionFill)
+          .padding(.horizontal, max(0, rowHInset - 6))
+      }
+      if washOpacity > 0 {
+        RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+          .fill(Theme.todayAccent.opacity(washOpacity))
+          .padding(.horizontal, max(0, rowHInset - 6))
+      }
     }
   }
 }
@@ -565,12 +627,16 @@ struct TaskRow: View {
   var showsTodayIndicator: Bool = true
   /// Highlight this row while its edit modal is open (see `CheckableRow`).
   var isSelected: Bool = false
+  /// Native `List(selection:)` cursor on the deep task list.
+  var isListSelected: Bool = false
   /// Optional inboard-most trailing accessory — the deep list passes the Inbox
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
   var accessory: AnyView? = nil
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
+
+  @Environment(PromoteFlashStore.self) private var promoteFlash
 
   private var isInactive: Bool {
     task.status == .done || task.status == .cancelled
@@ -616,6 +682,8 @@ struct TaskRow: View {
       title: task.title,
       subtitle: subtitle,
       isSelected: isSelected,
+      isListSelected: isListSelected,
+      promoteFlashTrigger: promoteFlash.trigger(for: task.id),
       trailing: { trailing },
       onToggle: onToggle,
       onTap: onTap
@@ -1377,6 +1445,8 @@ struct TaskRowActions: ViewModifier {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
+  @Environment(PromoteFlashStore.self) private var promoteFlash
+
   func body(content: Content) -> some View {
     content
       .contextMenu {
@@ -1388,10 +1458,17 @@ struct TaskRowActions: ViewModifier {
           onApplySuggestion: { _, _ in },
           onMoveToToday: { ids, today in
             Haptics.tick()
-            for id in ids {
-              if today { mutator.moveToToday(id: id, today: true) }
-              else { mutator.removeFromToday(id: id) }
-              mutator.acknowledge(id: id)
+            if today {
+              for id in ids {
+                mutator.moveToToday(id: id, today: true)
+                mutator.acknowledge(id: id)
+                promoteFlash.flash(id)
+              }
+            } else {
+              for id in ids {
+                mutator.removeFromToday(id: id)
+                mutator.acknowledge(id: id)
+              }
             }
             onChange?()
           },
@@ -1436,6 +1513,7 @@ struct TaskRowActions: ViewModifier {
         if Calendar.current.isDateInToday(d) {
           mutator.schedule(id: id, date: nil)
           mutator.moveToToday(id: id, today: true)
+          promoteFlash.flash(id)
         } else {
           mutator.moveToToday(id: id, today: false)
           mutator.schedule(id: id, date: d)

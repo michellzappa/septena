@@ -26,6 +26,14 @@ import Foundation
 @MainActor
 @Observable
 final class SuggestionEngine {
+  /// Narrows which filing targets `classify` / `suggest` may return. Training
+  /// stays global; only eligibility at classify time changes.
+  enum SuggestionScope: Equatable {
+    case all
+    /// Active projects in one area — no area classes (area-direct → project).
+    case projects(Set<String>)
+  }
+
   struct Suggestion: Hashable {
     enum Kind: Hashable { case area, project }
     let kind: Kind
@@ -92,7 +100,8 @@ final class SuggestionEngine {
 
     var next: [String: [Suggestion]] = [:]
     for t in inbox {
-      let out = classify(taskTokens: tokenize(composite(t.title, t.notes)), model: model)
+      let out = classify(taskTokens: tokenize(composite(t.title, t.notes)),
+                         model: model, scope: .all)
       if !out.isEmpty { next[t.id] = out }
     }
     suggestions = next
@@ -109,9 +118,17 @@ final class SuggestionEngine {
   /// using the last-prepared model. Same evidence + margin gates as Inbox, so
   /// it stays quiet unless there's a clear, well-supported winner. Returns nil
   /// until `prepare`/`refresh` has run.
-  func suggest(forText text: String) -> Suggestion? {
+  func suggest(forText text: String, scope: SuggestionScope = .all) -> Suggestion? {
     guard let model = preparedModel, !model.keys.isEmpty else { return nil }
-    return classify(taskTokens: tokenize(text), model: model).first
+    return classify(taskTokens: tokenize(text), model: model, scope: scope).first
+  }
+
+  /// Ranked suggestions for freeform text — up to three gated targets (same as
+  /// Inbox `refresh`). Used by context menus when a scoped pick is needed.
+  func rankedSuggestions(forText text: String,
+                         scope: SuggestionScope = .all) -> [Suggestion] {
+    guard let model = preparedModel, !model.keys.isEmpty else { return [] }
+    return classify(taskTokens: tokenize(text), model: model, scope: scope)
   }
 
   // MARK: - Train / classify
@@ -170,19 +187,34 @@ final class SuggestionEngine {
                  rejectedSets: rejectedSets)
   }
 
+  /// Keys eligible under `scope`. Empty `projects` → no candidates (silence).
+  private func eligibleKeys(in model: Model, scope: SuggestionScope) -> [String] {
+    switch scope {
+    case .all:
+      return model.keys
+    case .projects(let ids):
+      guard !ids.isEmpty else { return [] }
+      return model.keys.filter { key in
+        key.hasPrefix("p:") && ids.contains(String(key.dropFirst(2)))
+      }
+    }
+  }
+
   /// Rank targets for a single tokenized text, returning the gated winner (+ up
   /// to two runners-up) or `[]` when nothing clears the evidence/margin gates.
-  private func classify(taskTokens: [String], model: Model) -> [Suggestion] {
-    guard !taskTokens.isEmpty, !model.keys.isEmpty else { return [] }
+  private func classify(taskTokens: [String], model: Model,
+                        scope: SuggestionScope) -> [Suggestion] {
+    let keys = eligibleKeys(in: model, scope: scope)
+    guard !taskTokens.isEmpty, !keys.isEmpty else { return [] }
     let taskSet = Set(taskTokens)
 
     var logScore: [String: Double] = [:]
     var matched: [String: Int] = [:]
-    for key in model.keys {
+    for key in keys {
       let counts = model.tokenCount[key] ?? [:]
       let denom = Double((model.classTokens[key] ?? 0) + model.vocabSize)
-      // Frequency prior, Laplace-smoothed.
-      var lp = log(Double((model.docCount[key] ?? 0) + 1) / Double(model.totalDocs + model.keys.count))
+      // Frequency prior, Laplace-smoothed (scoped to eligible keys).
+      var lp = log(Double((model.docCount[key] ?? 0) + 1) / Double(model.totalDocs + keys.count))
       var hits = 0
       for tok in taskTokens {
         let c = counts[tok] ?? 0
@@ -199,7 +231,7 @@ final class SuggestionEngine {
     }
 
     // Softmax → posteriors, best first.
-    let ordered = model.keys.sorted { logScore[$0]! > logScore[$1]! }
+    let ordered = keys.sorted { logScore[$0]! > logScore[$1]! }
     let ranked = Array(zip(ordered, softmax(ordered.map { logScore[$0]! })))
 
     guard let (topKey, topP) = ranked.first, let topLabel = model.labels[topKey]

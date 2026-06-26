@@ -23,6 +23,7 @@ struct TasksDestinationView: View {
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`).
   @State private var settle = SettleStore()
+  @State private var promoteFlash = PromoteFlashStore()
 
   /// Open tasks routed into Today (pinned, or scheduled / deadline ≤ today).
   /// Mirrors `LocalCache.tasks(in:filter:.today)`; held in @State so we can
@@ -83,7 +84,16 @@ struct TasksDestinationView: View {
       TaskPatternsSection(accent: accent, days: history)
     })
     .tint(accent)
+    .environment(promoteFlash)
     .task { reload() }
+    // A remote completion (another device checked a Today row) would otherwise
+    // only surface on the next reopen, with the row silently gone. Ghost-check
+    // it live instead — see `absorbRemoteCompletions`. We deliberately don't
+    // full-reload here (that would cancel in-flight local settle beats); other
+    // remote edits still fold in on reopen as before.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      absorbRemoteCompletions()
+    }
     // Host the composer here so it stacks on top of the drawer sheet and
     // dismisses back to it.
     .taskComposerDrawer(isPresented: composerBinding) { composerCard }
@@ -274,6 +284,7 @@ struct TasksDestinationView: View {
       }
       settle.schedule(task.id) {
         motion.run(Theme.Motion.settle) {
+          settle.endSettle(task.id)
           guard let i = openTasks.firstIndex(where: { $0.id == task.id }) else { return }
           let done = openTasks.remove(at: i)
           if showCompleted { doneTasks.insert(done, at: 0) }
@@ -285,6 +296,95 @@ struct TasksDestinationView: View {
       let clearedToday = !openTasks.contains { $0.status == .open }
       TaskCelebration.completed(isToday: true, clearedToday: clearedToday,
                                 accent: accent, logCommit: logCommit)
+    }
+  }
+
+  /// Ghost-check drawer rows that another device just completed. A remote
+  /// completion can drop the row from the fresh Today / Inbox read; rather than
+  /// let it vanish, we replay the exact beat a local Today check uses — flip it
+  /// struck-through in place (the checkbox refills off `isDone`), linger, then
+  /// fade into Done. Silent: no `TaskCelebration`, so a passive sync doesn't
+  /// buzz. Rows the user is mid-settling locally (or already flipped done) are
+  /// skipped — `.septenaTasksChanged` also fires for our own writes, and this
+  /// must be a no-op for those. Scoped to completions only; other remote edits
+  /// still fold in on the next reopen (the drawer never live-reloaded those).
+  private func absorbRemoteCompletions() {
+    let freshToday = LocalCache.tasks(in: modelContext, filter: .today)
+    let freshTriage = LocalCache.tasks(in: modelContext, filter: .triage)
+    let todayDone = remotelyCompletedIDs(prior: openTasks, fresh: freshToday)
+    let triageDone = remotelyCompletedIDs(prior: triageTasks, fresh: freshTriage)
+    guard !todayDone.isEmpty || !triageDone.isEmpty else { return }
+
+    for id in todayDone {
+      ghostTodayCompletion(id: id, completedAt: completedAt(for: id, in: freshToday))
+    }
+    for id in triageDone {
+      ghostInboxCompletion(id: id, completedAt: completedAt(for: id, in: freshTriage))
+    }
+  }
+
+  /// IDs from `prior` that are now completed in `fresh` or vanished from the
+  /// filter because their backing SwiftData row flipped to done. This mirrors
+  /// the full `TaskListView` detector so the drawer handles both filter shapes:
+  /// lists that drop done rows and lists that return the same row as `.done`.
+  private func remotelyCompletedIDs(prior: [SeptenaTask], fresh: [SeptenaTask]) -> Set<String> {
+    let candidates = prior.filter { $0.status == .open && !settle.isSettling($0.id) }
+    guard !candidates.isEmpty else { return [] }
+
+    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    var done = Set<String>()
+    var vanished = Set<String>()
+    for task in candidates {
+      if let freshTask = freshByID[task.id] {
+        if freshTask.status == .done { done.insert(task.id) }
+      } else {
+        vanished.insert(task.id)
+      }
+    }
+    if !vanished.isEmpty {
+      done.formUnion(LocalCache.completedIDs(among: vanished, in: modelContext))
+    }
+    return done
+  }
+
+  private func completedAt(for id: String, in fresh: [SeptenaTask]) -> String {
+    fresh.first(where: { $0.id == id })?.completedAt ?? SeptenaDate.today + "T00:00:00"
+  }
+
+  private func prependDone(_ task: SeptenaTask) {
+    doneTasks.removeAll { $0.id == task.id }
+    if showCompleted { doneTasks.insert(task, at: 0) }
+  }
+
+  private func ghostTodayCompletion(id: String, completedAt: String) {
+    motion.run(Theme.Motion.settle) {
+      guard let i = openTasks.firstIndex(where: { $0.id == id }) else { return }
+      openTasks[i].status = .done
+      openTasks[i].completedAt = completedAt
+    }
+    settle.schedule(id) {
+      motion.run(Theme.Motion.settle) {
+        settle.endSettle(id)
+        guard let i = openTasks.firstIndex(where: { $0.id == id }) else { return }
+        let done = openTasks.remove(at: i)
+        prependDone(done)
+      }
+    }
+  }
+
+  private func ghostInboxCompletion(id: String, completedAt: String) {
+    motion.run(Theme.Motion.settle) {
+      guard let i = triageTasks.firstIndex(where: { $0.id == id }) else { return }
+      triageTasks[i].status = .done
+      triageTasks[i].completedAt = completedAt
+    }
+    settle.schedule(id) {
+      motion.run(Theme.Motion.settle) {
+        settle.endSettle(id)
+        guard let i = triageTasks.firstIndex(where: { $0.id == id }) else { return }
+        let done = triageTasks.remove(at: i)
+        prependDone(done)
+      }
     }
   }
 
@@ -309,4 +409,3 @@ struct TasksDestinationView: View {
   }
 
 }
-

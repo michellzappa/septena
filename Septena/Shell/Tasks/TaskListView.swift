@@ -169,7 +169,8 @@ struct TaskListView: View {
   /// a just-completed row in place for a moment, then fades it out where it
   /// sits instead of yanking it the instant you tap.
   @State private var settle = SettleStore()
-
+  /// One-shot amber flash when a task is pinned to Today (row wash + checkbox pulse).
+  @State private var promoteFlash = PromoteFlashStore()
 
   /// Unified selection — the single source of truth for the keyboard cursor
   /// and multi-select batch operations, bound straight to `List(selection:)`
@@ -242,6 +243,38 @@ struct TaskListView: View {
     calendarFoldedOn = calendarCollapsed ? "" : SeptenaDate.today
   }
 
+  /// Project ids whose completed-task foldout is expanded. Collapsed by default;
+  /// persisted across relaunches (Things-style per-list memory).
+  @AppStorage("septena.tasks.projectLoggedExpanded") private var projectLoggedExpandedData: Data = Data()
+  private var projectLoggedExpandedIds: Set<String> {
+    (try? JSONDecoder().decode(Set<String>.self, from: projectLoggedExpandedData)) ?? []
+  }
+  private var projectFilterId: String? {
+    if case .project(let id) = filter { return id }
+    return nil
+  }
+  private var isProjectLoggedExpanded: Bool {
+    guard let id = projectFilterId else { return false }
+    return projectLoggedExpandedIds.contains(id)
+  }
+  /// Completed tasks for the current project page — done only, not settling
+  /// (settling rows stay in the open list until they fade), newest first.
+  private var loggedProjectItems: [SeptenaTask] {
+    guard case .project = filter else { return [] }
+    return items
+      .filter { $0.status == .done && !settle.isSettling($0.id) }
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+  }
+  private func toggleProjectLoggedExpanded() {
+    guard let id = projectFilterId else { return }
+    Haptics.tick()
+    var set = projectLoggedExpandedIds
+    if set.contains(id) { set.remove(id) } else { set.insert(id) }
+    withAnimation(.easeInOut(duration: 0.2)) {
+      projectLoggedExpandedData = (try? JSONEncoder().encode(set)) ?? Data()
+    }
+  }
+
   // When picker. Use a single Identifiable item so the sheet's kind
   // is intrinsic to the presentation — avoids stale-state races where
   // tapping "When" could open the prior "Deadline" pane.
@@ -295,9 +328,9 @@ struct TaskListView: View {
 
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
-  /// Per-row Inbox "file here" suggestions, snapshotted in `load()` (keyed by
-  /// task id). Held in @State — not read live off the engine — so the row chip
-  /// reliably renders on load (see `load()`).
+  /// Per-row "file here" suggestions (Inbox + area-direct tasks), snapshotted
+  /// in `load()` (keyed by task id). Held in @State — not read live off the
+  /// engine — so the row chip reliably renders on load (see `load()`).
   @State private var inboxSuggestions: [String: SuggestionEngine.Suggestion] = [:]
 
   // "You have N new to-dos" banner — compact start-of-day welcome that
@@ -322,6 +355,7 @@ struct TaskListView: View {
 
   var body: some View {
     let base = taskList
+      .environment(promoteFlash)
       .modifier(TaskListModalPresenter(
         whenSheet: $whenSheet,
         showingMoveSheet: $showingMoveSheet,
@@ -365,13 +399,25 @@ struct TaskListView: View {
       toggleToday: toggleTodayForSelected,
       openWhen: openWhenForSelected,
       openDeadline: openDeadlineForSelected,
+      openMove: openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       rename: renameSelectedAction
     ))
     #else
+    // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
+    // Modifier shortcuts still register from a zero-size button in the
+    // hierarchy — same pattern as the Week dashboard's time-travel keys.
     return withSnackbar
+      .background {
+        if filter != .recentlyDeleted {
+          Button("Move", action: openMoveForSelected)
+            .keyboardShortcut("m", modifiers: .command)
+            .opacity(0)
+            .accessibilityHidden(true)
+        }
+      }
     #endif
   }
 
@@ -408,21 +454,10 @@ struct TaskListView: View {
 
   private var taskList: some View {
     taskListContent
-    // macOS: `.inset` gives the modern content-list look — a rounded, inset
-    // selection capsule (Reminders / Notes / Mail), consistent with the
-    // sidebar's `.sidebar` style — instead of `.plain`'s full-bleed square bar.
-    // iOS keeps `.plain`: the standard edge-to-edge task list (selection there
-    // is edit-mode circles, not a row highlight).
-    #if os(macOS)
-    .listStyle(.inset)
-    // Keep the selection capsule neutral-gray, not the system blue accent —
-    // accent colors are reserved to carry section meaning in this app, so a
-    // blue highlight would read as a (meaningless) tint. `.tint` here only
-    // recolors the selection; row icons set their own explicit colors.
-    .tint(Theme.selectionNeutral)
-    #else
-    .listStyle(.plain)
-    #endif
+    // macOS / iPad: inset capsule rows; iPhone: plain (edit-mode circles).
+    .septenaTaskListStyle()
+    // Belt-and-suspenders tint; the real neutral fill is `listRowBackground`.
+    .septenaNeutralListSelection()
     .scrollContentBackground(.hidden)
     // Deep task-list rhythm runs denser than the drawer's: task rows read
     // `rowVInset` for their top/bottom padding, tightened here to Things-3
@@ -713,14 +748,9 @@ struct TaskListView: View {
 
   private var taskListContent: some View {
     // `selection` is bound to List on both platforms; rows carry `.tag(id)` so
-    // List can map a row to a selection value. The native selection highlight
-    // is the single indicator — on macOS it doubles as the context-menu
-    // target, on iOS the edit-mode circle shows membership. We never draw our
-    // own selection background (see `rowBackground`).
-    //   • macOS: single-click select, ⌘/⇧-click, ↑↓ — all native.
-    //   • iOS: a Set selection only engages in edit mode, so outside edit mode
-    //     taps fall through to our single-tap-to-edit gesture; inside it, taps
-    //     toggle the native circles.
+    // List can map a row to a selection value. The neutral gray capsule is
+    // painted via `listRowBackground`; native UIKit/AppKit accent fills are
+    // suppressed per row so only one highlight shows.
     List(selection: listSelection) {
       taskListHeader
       taskListRows
@@ -728,8 +758,10 @@ struct TaskListView: View {
       // `triageSection`); every other list gets it at the foot, where its single
       // context is unambiguous.
       if filter != .today { quickAddRow }
+      projectLoggedSection()
       taskListFooter
     }
+    .septenaNeutralListSelection()
     // Commit a rename the moment its field loses the cursor — the iOS analog of
     // Esc/Return (no hardware Esc there). Row→row switches are pre-committed in
     // `beginEdit`; this catches focus going to the quick-add line or to nil.
@@ -777,7 +809,7 @@ struct TaskListView: View {
     if filter == .today, !triageItems.isEmpty {
       Section {
         if !inboxCollapsed {
-          ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id) }
+          ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
         }
       } header: {
         inboxHeader(count: triageItems.count)
@@ -948,13 +980,73 @@ struct TaskListView: View {
   }
 
   private var reviewRows: some View {
-    ForEach(review) { task in row(task).asTaskRow(id: task.id) }
+    ForEach(review) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
   }
 
   private var visibleRows: some View {
     ForEach(visibleItems) { task in
-      row(task).asTaskRow(id: task.id)
+      row(task, quickMenu: showsFilingChip(for: task)).asTaskRow(id: task.id, isSelected: selection.contains(task.id))
     }
+  }
+
+  /// Things-style footer on project pages: a quiet link that expands completed
+  /// tasks for this project. Reuses `row(_:)` so checkboxes and context menus
+  /// match the open list.
+  @ViewBuilder
+  private func projectLoggedSection() -> some View {
+    if case .project = filter, !loggedProjectItems.isEmpty {
+      projectLoggedToggleRow
+      if isProjectLoggedExpanded {
+        ForEach(loggedProjectItems) { task in
+          row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id))
+        }
+      }
+    }
+  }
+
+  private var projectLoggedToggleLabel: String {
+    let count = loggedProjectItems.count
+    if isProjectLoggedExpanded {
+      return String(localized: "Hide \(count) logged items",
+                    comment: "Project footer — collapse completed tasks (plural)")
+    }
+    return String(localized: "Show \(count) logged items",
+                  comment: "Project footer — expand completed tasks (plural)")
+  }
+
+  private var projectLoggedToggleRow: some View {
+    Button {
+      toggleProjectLoggedExpanded()
+    } label: {
+      Text(projectLoggedToggleLabel)
+        .font(.septenaMeta)
+        .monospacedDigit()
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Theme.hPadding)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .asListRow()
+  }
+
+  /// One-tap "→ project" chip on Inbox loose captures and area-direct tasks.
+  private func showsFilingChip(for task: SeptenaTask) -> Bool {
+    guard task.status == .open || settle.isSettling(task.id) else { return false }
+    switch filter {
+    case .today:
+      return task.project == nil && task.area == nil
+    case .area:
+      return task.project == nil
+    default:
+      return false
+    }
+  }
+
+  /// Active project ids belonging to `areaId` — filing-chip scope on area pages.
+  private func childProjectIds(in areaId: String) -> Set<String> {
+    Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
   }
 
   /// Existing deadline for a target task, so the picker sheet can
@@ -1003,6 +1095,12 @@ struct TaskListView: View {
       return review.map(\.id) + orderedFromGroupedOpen(pool: items)
     case .upcoming:
       return review.map(\.id) + upcomingBuckets().flatMap { $0.tasks.map(\.id) }
+    case .project:
+      var ids = review.map(\.id) + visibleItems.map(\.id)
+      if isProjectLoggedExpanded {
+        ids.append(contentsOf: loggedProjectItems.map(\.id))
+      }
+      return ids
     default:
       return review.map(\.id) + visibleItems.map(\.id)
     }
@@ -1076,8 +1174,16 @@ struct TaskListView: View {
           let t = currentTask(id: id) else { return }
     Haptics.tick()
     if t.isOnToday { mutator.removeFromToday(id: t.id) }
-    else { mutator.moveToToday(id: t.id, today: true) }
+    else { promoteToToday([t.id]) }
     Task { await load() }
+  }
+
+  /// Pin tasks to Today and play the amber promote flash on each row.
+  private func promoteToToday(_ ids: [String]) {
+    for id in ids {
+      mutator.moveToToday(id: id, today: true)
+      promoteFlash.flash(id)
+    }
   }
 
   /// ⌘S — open the When (schedule) picker for the focused row.
@@ -1090,6 +1196,14 @@ struct TaskListView: View {
   private func openDeadlineForSelected() {
     guard let id = effectiveSelectionId() else { return }
     whenSheet = WhenSheet(taskId: id, kind: .deadline)
+  }
+
+  /// ⌘M — open the Move destination picker for the focused row.
+  private func openMoveForSelected() {
+    guard filter != .recentlyDeleted,
+          let id = effectiveSelectionId() else { return }
+    moveTargetId = id
+    showingMoveSheet = true
   }
 
   /// ⌘⌫ — delete every selected row (or the effective single row).
@@ -1123,7 +1237,7 @@ struct TaskListView: View {
     // The mutator durably enqueues the server-side cancel; if push ultimately
     // fails the next pull will surface server truth.
     settle.schedule(id) {
-      motion.run(Theme.Motion.settle) { }
+      motion.run(Theme.Motion.settle) { settle.endSettle(id) }
     }
     motion.run(Theme.Motion.settle) { flipStatus(id: id, to: .cancelled) }
     sessionDoneIds.insert(id)
@@ -1302,6 +1416,7 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
+      isListSelected: selection.contains(task.id),
       accessory: accessory,
       onToggle: { toggle(task) },
       onTap: nil
@@ -1349,10 +1464,7 @@ struct TaskListView: View {
       isDone: task.status == .done,
       // Neutral checkbox while editing — the Today-yellow checkbox means
       // "promoted to Today" in other lists, so wearing it here would misread.
-      // The row instead shows as selected (native highlight on macOS via the
-      // selection set; the tinted highlight below on iOS).
       isToday: false,
-      isSelected: true,
       focus: $inlineFocus,
       focusValue: .row(task.id),
       showsDetails: true,
@@ -1386,9 +1498,8 @@ struct TaskListView: View {
   }
 
   /// The shared quick-add field — one definition for both the Inbox-section line
-  /// (Today) and the foot-of-list line (every other creatable list). The
-  /// checkbox is neutral (never the Today-yellow): a not-yet-created task isn't
-  /// "promoted to Today".
+  /// (Today) and the foot-of-list line (every other creatable list). The dashed
+  /// box matches inbox proposals (unratified / not-yet-created); never Today-yellow.
   private func quickAddLine() -> some View {
     InlineTaskRow(
       text: $newTaskText,
@@ -1396,10 +1507,11 @@ struct TaskListView: View {
       accent: theme.color(for: "tasks"),
       isDone: false,
       isToday: false,
-      isSelected: false,
+      dashed: TaskRowFlags.languageV2,
       focus: $inlineFocus,
       focusValue: .newRow,
       showsDetails: false,
+      allowsMultiline: false,
       onToggle: {},
       onCommit: { commitNewTask() },
       onCancel: { inlineFocus = nil },
@@ -1445,12 +1557,14 @@ struct TaskListView: View {
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
           Haptics.tick()
-          for id in ids {
-            if today { mutator.moveToToday(id: id, today: true) }
-            else { mutator.removeFromToday(id: id) }
-            // Engagement — clear the agent cue so a ratified proposal leaves the
-            // Inbox. No-op for non-agent / already-seen rows.
-            mutator.acknowledge(id: id)
+          if today {
+            promoteToToday(ids)
+            for id in ids { mutator.acknowledge(id: id) }
+          } else {
+            for id in ids {
+              mutator.removeFromToday(id: id)
+              mutator.acknowledge(id: id)
+            }
           }
           Task { await load() }
         },
@@ -1496,6 +1610,13 @@ struct TaskListView: View {
     // Today's triage band keeps its richer pre-ranked list (computed in `load()`).
     if filter == .today, let top = suggestionEngine.topSuggestion(for: task.id) {
       return suggestionEngine.suggestions[task.id] ?? [top]
+    }
+    // Area page: only child projects of this area.
+    if case .area(let areaId) = filter {
+      let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
+      let ranked = suggestionEngine.rankedSuggestions(forText: task.title, scope: scope)
+      guard let top = ranked.first else { return nil }
+      return task.project == top.id ? nil : ranked
     }
     // Any other view: classify the title on demand against the trained model,
     // but only offer a destination the task ISN'T already filed under (no
@@ -1549,12 +1670,16 @@ struct TaskListView: View {
     Task { await load() }
   }
 
-  /// The one-tap "file here" suggestion for an Inbox row — only for genuinely
-  /// loose captures (no project/area yet) and only when the classifier is
-  /// confident (`topSuggestion` is already evidence + margin gated). Agent rows
-  /// that already carry a placement are ratified via the checkbox / ⋯, not this.
+  /// The one-tap "file here" suggestion — Inbox loose captures and area-direct
+  /// tasks. Only when the classifier is confident (snapshotted in `load()`).
   private func inboxSuggestion(for task: SeptenaTask) -> SuggestionEngine.Suggestion? {
     inboxSuggestions[task.id]
+  }
+
+  /// Top filing pick for implicit "not this" learning — engine map (Inbox) or
+  /// the per-view snapshot (area-direct rows).
+  private func topFilingSuggestion(for taskId: String) -> SuggestionEngine.Suggestion? {
+    suggestionEngine.topSuggestion(for: taskId) ?? inboxSuggestions[taskId]
   }
 
   /// Implicit "Not this" — fires when the user moves the task somewhere
@@ -1565,7 +1690,7 @@ struct TaskListView: View {
   private func recordImplicitRejectionIfMismatch(task: SeptenaTask,
                                                  chosenKind: SuggestionEngine.Suggestion.Kind?,
                                                  chosenId: String?) {
-    guard let top = suggestionEngine.topSuggestion(for: task.id) else { return }
+    guard let top = topFilingSuggestion(for: task.id) else { return }
     if let chosenId, top.kind == chosenKind, top.id == chosenId { return }
     let text = [task.title,
                 task.notes?.trimmingCharacters(in: .whitespacesAndNewlines)]
@@ -1620,14 +1745,14 @@ struct TaskListView: View {
         .padding(.bottom, 4)
         .plainListChrome()
     }
-    ForEach(loose) { task in row(task).asTaskRow(id: task.id) }
+    ForEach(loose) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
-          ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id) }
+          ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -1638,7 +1763,7 @@ struct TaskListView: View {
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
-            ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+            ForEach(tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -1652,7 +1777,7 @@ struct TaskListView: View {
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
-          ForEach(tasks) { task in row(task).asTaskRow(id: task.id) }
+          ForEach(tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
@@ -1859,7 +1984,7 @@ struct TaskListView: View {
         if !bucket.events.isEmpty {
           calendarEventsBlock(bucket.events)
         }
-        ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id) }
+        ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
       } header: {
         groupHeader(icon: "calendar", title: bucket.label)
       }
@@ -1954,7 +2079,7 @@ struct TaskListView: View {
       if let d = date {
         if Calendar.current.isDateInToday(d) {
           mutator.schedule(id: id, date: nil)
-          mutator.moveToToday(id: id, today: true)
+          promoteToToday([id])
         } else {
           mutator.moveToToday(id: id, today: false)
           mutator.schedule(id: id, date: d)
@@ -1988,8 +2113,9 @@ struct TaskListView: View {
     // keeps it visible (see `visibleItems` and the grouped pool) and `load()`
     // preserves settling rows, so the `.septenaTasksChanged` this completion
     // posts can't yank it. After the beat the settle clears and the row fades
-    // out IN PLACE and is gone (it lives on in the dedicated Logbook); the empty
-    // animated transaction lets that removal play `.transition(.opacity)`.
+    // out IN PLACE and is gone (it lives on in the dedicated Logbook);
+    // `endSettle` inside the animated transaction lets that removal play
+    // `.transition(.opacity)` and rows below slide up.
     // Uncomplete cancels the pending fade.
     //
     // Order matters: the pool filter is `status != .done || settle.isSettling`.
@@ -2004,7 +2130,7 @@ struct TaskListView: View {
     // leaves it across the two transactions.
     if newStatus == .done {
       settle.schedule(task.id) {
-        motion.run(Theme.Motion.settle) { }
+        motion.run(Theme.Motion.settle) { settle.endSettle(task.id) }
       }
     } else {
       settle.cancel(task.id)
@@ -2094,6 +2220,57 @@ struct TaskListView: View {
     return merged
   }
 
+  /// Ghost-check remote completions: a row that was open on screen a moment ago
+  /// and has *just been completed by another device* should animate exactly
+  /// like a local tap rather than silently disappear. We route it through the
+  /// very same settle window a tap uses — flip the prior row to `.done` (so the
+  /// box fills and the title strikes through on the next render; `TaskCheckbox`
+  /// replays its visual feel off `isDone`) and open its settle window so it
+  /// lingers, then fades out in place. Silent on purpose: we never call
+  /// `TaskCelebration`, so a passive sync doesn't buzz the haptics (the feel
+  /// itself is haptic-free). Rows the user is mid-settling locally, or already
+  /// completed this session, are left alone.
+  ///
+  /// A just-completed row shows up in the fresh read two different ways, so we
+  /// detect both: the drop-done filters (Today / Inbox / Upcoming) make it
+  /// *vanish*, while project / area views keep every status, so it's *present
+  /// but flipped to done*. The present case is read straight from `fresh` in
+  /// memory; only the vanished ids hit the store (they might instead be
+  /// deferred / deleted / rescheduled), so an ordinary reload stays a no-op.
+  ///
+  /// Returns `prior` with the ghosted rows flipped to done (so
+  /// `preservingSettling` can re-anchor any that vanished) plus the ids it
+  /// ghosted — empty means there's nothing new to animate.
+  private func ghostCheckRemoteCompletions(prior: [SeptenaTask], fresh: [SeptenaTask])
+    -> (rows: [SeptenaTask], ghosted: Set<String>) {
+    let candidates = prior.filter {
+      $0.status == .open && !settle.isSettling($0.id) && !sessionDoneIds.contains($0.id)
+    }
+    guard !candidates.isEmpty else { return (prior, []) }
+    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    var done = Set<String>()
+    var vanished = Set<String>()
+    for c in candidates {
+      if let f = freshByID[c.id] { if f.status == .done { done.insert(c.id) } }
+      else { vanished.insert(c.id) }
+    }
+    if !vanished.isEmpty {
+      done.formUnion(LocalCache.completedIDs(among: vanished, in: modelContext))
+    }
+    guard !done.isEmpty else { return (prior, []) }
+    var rows = prior
+    for id in done {
+      // Same finalize as `toggle()` — `endSettle` inside the animated
+      // transaction so the row fades and siblings slide up.
+      settle.schedule(id) {
+        self.motion.run(Theme.Motion.settle) { self.settle.endSettle(id) }
+      }
+      sessionDoneIds.insert(id)
+      if let i = rows.firstIndex(where: { $0.id == id }) { rows[i].status = .done }
+    }
+    return (rows, done)
+  }
+
   private func load() async {
     // Cache was already painted in init(); only show the loading state when
     // we have literally nothing to render (first ever launch, cache miss).
@@ -2116,7 +2293,12 @@ struct TaskListView: View {
     // fires, so a plain re-read is correct.
     let prior = items
     let local = LocalCache.tasks(in: modelContext, filter: filter)
-    items = preservingSettling(fresh: local, prior: prior)
+    let ghost = ghostCheckRemoteCompletions(prior: prior, fresh: local)
+    let merged = preservingSettling(fresh: local, prior: ghost.rows)
+    // Animate only when a remote completion needs the in-place strike+fade;
+    // an ordinary reload assigns without a transaction (no spurious motion).
+    if ghost.ghosted.isEmpty { items = merged }
+    else { motion.run(Theme.Motion.settle) { items = merged } }
     review = []
     doneToday = []
     loadedFilters.insert(filter)
@@ -2137,7 +2319,11 @@ struct TaskListView: View {
       // suggestion lingers struck-through and fades in place like every other
       // completed row — same preservation `items` gets above.
       let localTriage = LocalCache.tasks(in: modelContext, filter: .triage)
-      triageStorage = preservingSettling(fresh: localTriage, prior: triageStorage)
+      let triageGhost = ghostCheckRemoteCompletions(prior: triageStorage,
+                                                    fresh: localTriage)
+      let mergedTriage = preservingSettling(fresh: localTriage, prior: triageGhost.rows)
+      if triageGhost.ghosted.isEmpty { triageStorage = mergedTriage }
+      else { motion.run(Theme.Motion.settle) { triageStorage = mergedTriage } }
       // The Inbox lives on the Today view now (the triage rows), so classify
       // the live open rows — that's what powers the one-tap "file here"
       // suggestion chip and the implicit "not this" learning. refresh also
@@ -2155,17 +2341,24 @@ struct TaskListView: View {
                                projects: projects,
                                areas: areas)
     }
-    // Snapshot the per-row Inbox suggestions into @State so the chip renders
+    // Snapshot per-row filing suggestions into @State so the chip renders
     // (and re-renders) with each load. Reading the @Observable engine live
     // inside the row's body proved unreliable for this list; the composer's
     // own suggestion chip works precisely because it caches into @State too.
-    let suggestSource: [SeptenaTask] = filter == .today ? triageItems : []
     var freshSuggestions: [String: SuggestionEngine.Suggestion] = [:]
-    for t in suggestSource where t.project == nil && t.area == nil {
-      // Use the SAME call the composer's working chip uses, so the row and the
-      // edit box never disagree on confidence (the model was just trained by the
-      // refresh/prepare above).
-      if let s = suggestionEngine.suggest(forText: t.title) { freshSuggestions[t.id] = s }
+    if filter == .today {
+      for t in triageItems where t.project == nil && t.area == nil {
+        if let s = suggestionEngine.suggest(forText: t.title) {
+          freshSuggestions[t.id] = s
+        }
+      }
+    } else if case .area(let areaId) = filter {
+      let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
+      for t in items where t.project == nil {
+        if let s = suggestionEngine.suggest(forText: t.title, scope: scope) {
+          freshSuggestions[t.id] = s
+        }
+      }
     }
     inboxSuggestions = freshSuggestions
     // Refresh dismissed state — banner reappears next day automatically.
@@ -2576,6 +2769,7 @@ struct TaskActions {
   var toggleToday: () -> Void
   var openWhen: () -> Void
   var openDeadline: () -> Void
+  var openMove: () -> Void
   /// Toggles done/open on the selected row — same handler as Space.
   /// Nil-gated by selection so ⌘K can't fire on an empty list.
   var toggleComplete: (() -> Void)?
@@ -2620,12 +2814,13 @@ extension View {
       .selectionDisabled()
   }
 
-  func asTaskRow(id: String) -> some View {
+  func asTaskRow(id: String, isSelected: Bool) -> some View {
     self
       .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
+      .listRowBackground(TaskListSelectionBackground(isSelected: isSelected))
       .listRowInsets(EdgeInsets())
       .tag(id)
+      .septenaSuppressListCellSelection()
   }
 
   func plainListChrome() -> some View {
@@ -2633,6 +2828,18 @@ extension View {
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
       .selectionDisabled()
+  }
+}
+
+/// Neutral fill behind a selected task row. Native `List(selection:)` on iOS and
+/// macOS paints accent blue by default; an explicit `listRowBackground` plus
+/// per-row selection suppression replaces it with gray.
+private struct TaskListSelectionBackground: View {
+  let isSelected: Bool
+  var body: some View {
+    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+      .fill(isSelected ? Theme.listSelectionFill : Theme.paperBackground)
+      .padding(.horizontal, isSelected ? 5 : 0)
   }
 }
 
@@ -2651,15 +2858,15 @@ private struct InlineTaskRow: View {
   let accent: Color
   let isDone: Bool
   var isToday: Bool = false
-  /// Draw the row as selected. macOS gets the native source-list highlight from
-  /// the List selection set, so this only paints the iOS highlight (List
-  /// selection there shows only in edit mode).
-  var isSelected: Bool = false
+  var dashed: Bool = false
   @FocusState.Binding var focus: TaskListView.InlineFocus?
   let focusValue: TaskListView.InlineFocus
   /// Show the trailing ⓘ Details button (rename rows on iOS use it to escalate
   /// to the full composer; the quick-add line doesn't).
   var showsDetails: Bool = false
+  /// Rename rows grow to match wrapped static titles; the quick-add line stays
+  /// one row tall (a vertical-axis field reserves blank lines above the placeholder).
+  var allowsMultiline: Bool = true
   let onToggle: () -> Void
   let onCommit: () -> Void
   let onCancel: () -> Void
@@ -2670,45 +2877,10 @@ private struct InlineTaskRow: View {
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: isDone, isToday: isToday, onToggle: onToggle)
+      TaskCheckbox(isDone: isDone, dashed: dashed, isToday: isToday, onToggle: onToggle)
         .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
-      TextField(placeholder, text: $text, axis: .vertical)
-        .textFieldStyle(.plain)
-        .font(.septenaTaskTitle)
-        .foregroundStyle(Theme.inkPrimary)
-        .lineLimit(1...4)
-        .focused($focus, equals: focusValue)
-        .submitLabel(.done)
-        .onSubmit(onCommit)
-        #if os(iOS)
-        // A vertical-axis TextField wraps long titles (so the editor grows to
-        // match the now-multiline static row), but on iOS the Return key inserts
-        // a newline instead of firing `.onSubmit`. We want Return to COMMIT, as
-        // it did single-line: catch the inserted newline, strip it, and commit.
-        // Soft visual wraps don't insert "\n", so only a real Return triggers this.
-        .onChange(of: text) { _, newValue in
-          if newValue.contains("\n") {
-            text = newValue.replacingOccurrences(of: "\n", with: "")
-            onCommit()
-          }
-        }
-        #endif
-        #if os(macOS)
-        // Return saves. `.onSubmit` alone leaks Return to the sidebar (it acts as
-        // the NavigationSplitView default action), so we ALSO catch Return as a
-        // direct key press on the focused field and CONSUME it (`.handled`) so it
-        // commits here and never reaches the sidebar.
-        .onKeyPress(.return) { onCommit(); return .handled }
-        // Esc finishes the edit via `onCancel` (rename → COMMIT, quick-add →
-        // blur) — committing is safer than a discard path. The macOS field
-        // editor swallows Esc before `.onExitCommand` fires, so we catch it as a
-        // key press on the field (a key text input doesn't consume); this tears
-        // the field down, taking its select-all highlight with it. `.onExitCommand`
-        // is kept as a redundant fallback (idempotent).
-        .onKeyPress(.escape) { onCancel(); return .handled }
-        .onExitCommand(perform: onCancel)
-        #endif
+      titleField
         .frame(maxWidth: .infinity, alignment: .leading)
 
       if showsDetails, let onOpenDetails {
@@ -2723,21 +2895,52 @@ private struct InlineTaskRow: View {
     }
     .padding(.horizontal, rowHInset)
     .padding(.vertical, rowVInset)
-    .background(selectionHighlight)
     .contentShape(Rectangle())
   }
 
-  /// The standard row-selection wash, mirroring `CheckableRow.selectionHighlight`
-  /// so an editing row reads exactly like a selected static one. iOS only —
-  /// macOS draws its own native source-list selection from the List.
   @ViewBuilder
-  private var selectionHighlight: some View {
-    #if os(iOS)
-    if isSelected {
-      RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-        .fill(accent.opacity(0.18))
-        .padding(.horizontal, max(0, rowHInset - 6))
+  private var titleField: some View {
+    Group {
+      if allowsMultiline {
+        TextField(placeholder, text: $text, axis: .vertical)
+          .lineLimit(1...4)
+      } else {
+        TextField(placeholder, text: $text)
+          .lineLimit(1)
+      }
     }
+    .textFieldStyle(.plain)
+    .font(.septenaTaskTitle)
+    .foregroundStyle(Theme.inkPrimary)
+    .focused($focus, equals: focusValue)
+    .submitLabel(.done)
+    .onSubmit(onCommit)
+    #if os(iOS)
+    // A vertical-axis TextField wraps long titles (so the editor grows to
+    // match the now-multiline static row), but on iOS the Return key inserts
+    // a newline instead of firing `.onSubmit`. We want Return to COMMIT, as
+    // it did single-line: catch the inserted newline, strip it, and commit.
+    // Soft visual wraps don't insert "\n", so only a real Return triggers this.
+    .onChange(of: text) { _, newValue in
+      guard allowsMultiline, newValue.contains("\n") else { return }
+      text = newValue.replacingOccurrences(of: "\n", with: "")
+      onCommit()
+    }
+    #endif
+    #if os(macOS)
+    // Return saves. `.onSubmit` alone leaks Return to the sidebar (it acts as
+    // the NavigationSplitView default action), so we ALSO catch Return as a
+    // direct key press on the focused field and CONSUME it (`.handled`) so it
+    // commits here and never reaches the sidebar.
+    .onKeyPress(.return) { onCommit(); return .handled }
+    // Esc finishes the edit via `onCancel` (rename → COMMIT, quick-add →
+    // blur) — committing is safer than a discard path. The macOS field
+    // editor swallows Esc before `.onExitCommand` fires, so we catch it as a
+    // key press on the field (a key text input doesn't consume); this tears
+    // the field down, taking its select-all highlight with it. `.onExitCommand`
+    // is kept as a redundant fallback (idempotent).
+    .onKeyPress(.escape) { onCancel(); return .handled }
+    .onExitCommand(perform: onCancel)
     #endif
   }
 }

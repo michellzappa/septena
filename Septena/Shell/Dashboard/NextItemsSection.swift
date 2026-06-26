@@ -113,7 +113,10 @@ final class TodayTasksModel {
       // Linger struck through, then fade out of the open list. Next has no
       // tasks-done section, so a settled task simply drifts away.
       settle.schedule(task.id) { [weak self] in
-        motion.run(Theme.Motion.settle) { _ = self?.actedTasks.remove(task.id) }
+        motion.run(Theme.Motion.settle) {
+          self?.settle.endSettle(task.id)
+          _ = self?.actedTasks.remove(task.id)
+        }
       }
     }
   }
@@ -431,7 +434,10 @@ final class NextItemsModel {
     // linger set) — NOT `completedChores` — so the chore stays *completed* as
     // it moves from the open list to the Done strip.
     settle.schedule(chore.id) { [weak self] in
-      motion.run(Theme.Motion.settle) { _ = self?.actedChores.remove(chore.id) }
+      motion.run(Theme.Motion.settle) {
+        self?.settle.endSettle(chore.id)
+        _ = self?.actedChores.remove(chore.id)
+      }
     }
   }
 
@@ -445,7 +451,10 @@ final class NextItemsModel {
     guard done else { settle.cancel(id); return }
     settle.schedule(id) { [weak self] in
       guard let self else { return }
-      motion.run(Theme.Motion.settle) { _ = self[keyPath: keyPath].remove(id) }
+      motion.run(Theme.Motion.settle) {
+        self.settle.endSettle(id)
+        _ = self[keyPath: keyPath].remove(id)
+      }
     }
   }
 

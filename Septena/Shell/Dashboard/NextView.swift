@@ -29,6 +29,7 @@ struct NextView: View {
   /// the trio), Space toggles, Escape clears. Each row is `.tag`'d with a
   /// `NextRowTag` kind-prefixed id so the cursor maps back to an action.
   @State private var selection: Set<String> = []
+  @State private var promoteFlash = PromoteFlashStore()
 
   /// Tapping a task row (or its "Edit Task" menu item) opens the composer in
   /// edit mode — the same card the Tasks tab uses, which embeds the agent
@@ -256,11 +257,13 @@ struct NextView: View {
                         onEdit: beginEditDone, onDelete: deleteDone)
       }
     }
+    .environment(promoteFlash)
     #if os(iOS)
     .listStyle(.insetGrouped)
     #else
     .listStyle(.inset)
     #endif
+    .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
     // selection cursor across every tagged row; Return activates, Space

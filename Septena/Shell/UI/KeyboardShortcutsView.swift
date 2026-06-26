@@ -52,6 +52,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", "K"], label: "Mark as complete"),
       KeyboardShortcut2(keys: ["⌘", "S"], label: "When…"),
       KeyboardShortcut2(keys: ["⌘", "⇧", "D"], label: "Deadline…"),
+      KeyboardShortcut2(keys: ["⌘", "M"], label: "Move…"),
       KeyboardShortcut2(keys: ["⌘", "."], label: "Clear schedule"),
       KeyboardShortcut2(keys: ["⌘", "⌫"], label: "Delete"),
     ]),
