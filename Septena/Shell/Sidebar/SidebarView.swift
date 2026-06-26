@@ -100,7 +100,11 @@ struct SidebarRootView: View {
     #if os(macOS)
     sidebarMac.modifier(rightClickAlerts)
     #else
-    sidebarPhone.modifier(rightClickAlerts)
+    if usesPushNavigation {
+      sidebarSplit.modifier(rightClickAlerts)
+    } else {
+      sidebarPhone.modifier(rightClickAlerts)
+    }
     #endif
   }
 
@@ -205,7 +209,19 @@ struct SidebarRootView: View {
     }
   }
 
-  /// iPhone / iPad layout: scrolling list with a standard navigation bar and
+  /// iPad regular / foldable widescreen: the NavigationSplitView sidebar
+  /// column. System `.sidebar` list style — full-bleed top/leading/trailing,
+  /// no insetGrouped "floating card" margins (Notes / Reminders on macOS).
+  @ViewBuilder
+  private var sidebarSplit: some View {
+    sidebarListContent()
+    .navigationTitle("")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar { phoneToolbar }
+    .modifier(sidebarBehavior)
+  }
+
+  /// iPhone compact: scrolling list with a standard navigation bar and
   /// toolbar `+` menu (Reminders pattern). Settings is reachable from the
   /// top-left "…" overflow menu (and ⌘, on macOS).
   @ViewBuilder
@@ -253,14 +269,7 @@ struct SidebarRootView: View {
       smartListSection
       areaProjectSections
     }
-    .listStyle(.insetGrouped)
-    // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
-    // `sidebarPhone`) shows through, matching the app's surface rhythm.
-    .scrollContentBackground(.hidden)
-    // insetGrouped's default inter-section gap (~35pt) leaves too much air above
-    // the first area and between area cards; tighten it for a denser, more
-    // Reminders-like rhythm.
-    .listSectionSpacing(18)
+    .modifier(IOSSidebarListChrome())
     #else
     // macOS uses the native `.sidebar` `List(selection:)` — the standard
     // source-list selection (Mail / Finder / Notes / Reminders): accent while
@@ -286,29 +295,48 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var smartListSection: some View {
-    #if os(macOS)
-    Section {
-      ForEach(smartListSpecs, id: \.title) { spec in
-        navRow(spec.route) {
-          SmartListRow(icon: spec.icon,
-                       iconColor: spec.color,
-                       title: spec.title,
-                       count: spec.count)
+    if usesSidebarRows {
+      Section {
+        ForEach(smartListSpecs, id: \.title) { spec in
+          smartListRow(for: spec)
         }
-        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
+      }
+    } else {
+      Section {
+        smartListGrid
+          .listRowInsets(EdgeInsets())
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
+          // The tiles are a custom grid, not selectable List rows — they carry
+          // their own `isSelected` highlight and navigate via their Buttons, so
+          // keep `List(selection:)` from ever trying to select this row.
+          .selectionDisabled()
       }
     }
+  }
+
+  /// macOS and iPad regular use native sidebar rows; iPhone compact keeps the
+  /// 2-up tile grid on the grouped home screen.
+  private var usesSidebarRows: Bool {
+    #if os(macOS)
+    true
     #else
-    Section {
-      smartListGrid
-        .listRowInsets(EdgeInsets())
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        // The tiles are a custom grid, not selectable List rows — they carry
-        // their own `isSelected` highlight and navigate via their Buttons, so
-        // keep `List(selection:)` from ever trying to select this row.
-        .selectionDisabled()
+    usesPushNavigation
+    #endif
+  }
+
+  @ViewBuilder
+  private func smartListRow(for spec: SmartListSpec) -> some View {
+    let row = navRow(spec.route) {
+      SmartListRow(icon: spec.icon,
+                   iconColor: spec.color,
+                   title: spec.title,
+                   count: spec.count)
     }
+    #if os(macOS)
+    row.modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
+    #else
+    row
     #endif
   }
 
@@ -664,7 +692,11 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func compactRow<V: View>(@ViewBuilder _ row: () -> V) -> some View {
     #if os(iOS)
-    row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    if usesPushNavigation {
+      row()
+    } else {
+      row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
     #else
     row()
     #endif
@@ -1061,6 +1093,30 @@ struct SmartListRow: View {
   }
 }
 
+#if os(iOS)
+/// iPhone compact keeps insetGrouped tiles; iPad regular uses the system
+/// sidebar source list inside NavigationSplitView (Notes-style full bleed).
+private struct IOSSidebarListChrome: ViewModifier {
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
+
+  func body(content: Content) -> some View {
+    if usesPushNavigation {
+      content.listStyle(.sidebar)
+    } else {
+      content
+        .listStyle(.insetGrouped)
+        // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
+        // `sidebarPhone`) shows through, matching the app's surface rhythm.
+        .scrollContentBackground(.hidden)
+        // insetGrouped's default inter-section gap (~35pt) leaves too much air
+        // above the first area and between area cards; tighten it for a denser,
+        // more Reminders-like rhythm.
+        .listSectionSpacing(18)
+    }
+  }
+}
+#endif
+
 private struct SidebarBehaviorModifier: ViewModifier {
   @Binding var showingCreateMenu: Bool
   @Binding var showingNewProject: Bool
@@ -1229,31 +1285,7 @@ struct ColoredGlyph: View {
   }
 }
 
-/// Soft tinted section icon — the homepage treatment: an accent-tinted
-/// rounded square with the SF Symbol drawn *in the accent color* (not a
-/// white glyph on a saturated fill, which is `ColoredGlyph`). Shared by
-/// the Dense/Heatmap homepage rows and the Settings section rows so the
-/// same section reads identically in both places. Defaults match the
-/// homepage exactly (28pt square, 7pt corner, 14pt semibold glyph).
-struct SectionGlyph: View {
-  let icon: String
-  let accent: Color
-  var size: CGFloat = 28
-  /// Inner SF Symbol size as a fraction of `size`. Default `0.5` is the
-  /// homepage's 14-on-28 glyph.
-  var glyphRatio: CGFloat = 0.5
-
-  var body: some View {
-    RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
-      .fill(accent.opacity(0.18))
-      .frame(width: size, height: size)
-      .overlay {
-        Image(systemName: icon)
-          .scaledFont(size: size * glyphRatio, weight: .semibold)
-          .foregroundStyle(accent)
-      }
-  }
-}
+/// Soft tinted section icon — shared `SectionGlyph` in `SectionGlyph.swift`.
 
 struct SidebarAreaRow: View {
   let name: String
