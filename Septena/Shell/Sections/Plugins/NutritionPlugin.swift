@@ -38,6 +38,9 @@ enum NutritionPlugin: SectionPlugin {
     if breaksFast(at: loggedAt) {
       SectionLog.newLog(section: "nutrition", accent: accent,
                         announce: announce, canvas: true,
+                        canvasCaption: String(localized: "Broke fast",
+                                              comment: "First meal canvas caption"),
+                        canvasVoteEyebrow: false,
                         logCommit: logCommit, write: write)
     } else {
       SectionLog.quietLog(announce: announce, write: write)

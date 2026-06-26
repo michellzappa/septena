@@ -142,6 +142,9 @@ struct CommitFlourish: View {
   /// Only the budgeted canvas moments pass it (see the containment policy in
   /// `CommitFeedback.commit`); everyday logs leave it nil and stay wordless.
   var caption: String? = nil
+  /// When false, the caption stands alone — no "Vote cast" eyebrow. Used for
+  /// moment-specific lines (e.g. breaking the overnight fast).
+  var voteEyebrow: Bool = true
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   /// User opt-out for logging animations (Settings ▸ Customize). Absent → on.
@@ -163,7 +166,8 @@ struct CommitFlourish: View {
         case .fill:    FillFlourish(color: accent, intensity: intensity, trigger: trigger)
         }
         if let caption {
-          VoteCastLabel(text: caption, accent: accent, trigger: trigger)
+          VoteCastLabel(text: caption, accent: accent, trigger: trigger,
+                        showEyebrow: voteEyebrow)
         }
       }
     }
@@ -183,16 +187,19 @@ private struct VoteCastLabel: View {
   let text: String
   let accent: Color
   let trigger: Int
+  var showEyebrow: Bool = true
 
   @State private var opacity: Double = 0
   @State private var offset: CGFloat = 14
 
   var body: some View {
     VStack(spacing: 4) {
-      Text("Vote cast")
-        .font(.septenaBadge)
-        .textCase(.uppercase)
-        .foregroundStyle(accent)
+      if showEyebrow {
+        Text("Vote cast")
+          .font(.septenaBadge)
+          .textCase(.uppercase)
+          .foregroundStyle(accent)
+      }
       Text(text)
         .scaledFont(size: 22, weight: .semibold, design: .rounded, relativeTo: .title3)
         .foregroundStyle(.primary)
@@ -691,6 +698,7 @@ enum CommitFeedback {
                      announce: String? = nil,
                      canvas: Bool = false,
                      caption: String? = nil,
+                     voteEyebrow: Bool = true,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
     write()
@@ -703,7 +711,8 @@ enum CommitFeedback {
     // statement) rides along only here, so words never reach the everyday tap.
     if canvas {
       logCommit?.fire(.flourish(motion: motion, accent: accent,
-                                intensity: intensity, caption: caption))
+                                intensity: intensity, caption: caption,
+                                voteEyebrow: voteEyebrow))
     }
   }
 }
@@ -743,6 +752,8 @@ enum SectionLog {
                      intensity: Double = 1,
                      announce: String? = nil,
                      canvas: Bool = false,
+                     canvasCaption: String? = nil,
+                     canvasVoteEyebrow: Bool = true,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
     let resolved = motion
@@ -750,9 +761,13 @@ enum SectionLog {
       ?? .burst
     // The "vote cast" identity line only rides the budgeted canvas moments,
     // resolved once here from the manifest so every section reads the same.
-    let caption = canvas ? SectionManifest.byKey[sectionKey]?.identityStatement : nil
+    // Callers can override with a moment-specific line (fast broken, etc.).
+    let caption = canvas
+      ? (canvasCaption ?? SectionManifest.byKey[sectionKey]?.identityStatement)
+      : nil
     CommitFeedback.commit(motion: resolved, accent: accent, intensity: intensity,
                           announce: announce, canvas: canvas, caption: caption,
+                          voteEyebrow: canvasVoteEyebrow,
                           logCommit: logCommit, write: write)
   }
 
