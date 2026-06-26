@@ -185,6 +185,7 @@ struct SeptenaApp: App {
             navigation.pendingShortcut = pending
           }
           AppDelegate.navigation = navigation
+          _ = OpenNewTaskRouting.consumePending(into: navigation)
           // Apply the user's Quick Actions selection to UIApplication's
           // dynamic shortcut list so the Home Screen long-press menu
           // matches what they picked in Settings.
@@ -236,6 +237,8 @@ struct SeptenaApp: App {
           #endif
           #if os(macOS)
           MacAppDelegate.ckEngine = ckEngine
+          MacAppDelegate.navigation = navigation
+          _ = OpenNewTaskRouting.consumePending(into: navigation)
           // Resume the local MCP server if the user left it enabled. Mutators
           // are bound now (start() above), so it's safe to serve writes.
           if UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled) {
@@ -564,6 +567,25 @@ struct SeptenaApp: App {
       // The time-wheel widget opens the Week dashboard — where the full
       // homepage dial / Wheel layout lives.
       navigation.pendingTab = .week
+    } else if url.host == "section" {
+      let itemID = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+      guard !itemID.isEmpty else { return }
+      if itemID == HomepageDomain.tasks.rawValue {
+        navigation.pendingTab = .tasks
+      } else {
+        navigation.pendingTab = .week
+        navigation.pendingDashboardTile = itemID
+      }
+    } else if url.host == "tasks" {
+      let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+      if path == "new" {
+        OpenNewTaskRouting.apply(to: navigation)
+      } else {
+        navigation.pendingTab = .tasks
+        if path.isEmpty || path == "today" {
+          navigation.path = [.filter(.today)]
+        }
+      }
     }
   }
 

@@ -15,16 +15,6 @@ struct ContentView: View {
       // Settings / QuickFind / AddInfo sheets are mounted at the
       // RootTabView level (so they work from Week / Next, not just the
       // Tasks tab which hosts ContentView).
-      .onReceive(NotificationCenter.default
-        .publisher(for: .septenaOpenQuickAdd)) { _ in
-        // macOS menu bar "New To-Do" routes through here — same effect as
-        // iOS Home Screen Quick Action's `.newTodo` case.
-        nav.path = [.filter(.today)]
-        nav.shouldStartCreating = true
-      }
-      // Quick Action routing is hoisted to RootTabView — ContentView is
-      // only mounted inside the Tasks tab, so it can't reach sections
-      // hosted on the Week dashboard from here.
   }
 
   @ViewBuilder
@@ -70,6 +60,7 @@ struct ContentView: View {
           .background(Theme.paperBackground)
       }
     }
+    .navigationSplitViewStyle(.balanced)
   }
 
   // Per-route .id is applied INSIDE destination(for:) — TaskListView is

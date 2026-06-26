@@ -110,6 +110,13 @@ struct SiriShortcutsSettingsPane: View {
       } footer: {
         Text("Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase.")
       }
+
+      Section {
+        Text("Add **Add Task** in Settings → Control Center to open a new to-do.")
+          .foregroundStyle(.secondary)
+      } header: {
+        Text("Control Center")
+      }
       #else
       Section {
         Text("Open the Shortcuts app to build shortcuts and automations from Septena's actions. Trigger them with Siri on iPhone and iPad.")

@@ -101,9 +101,7 @@ struct MenuBarMenu: View {
 
   private func startQuickAdd() {
     activateMainWindow()
-    // Posted notification is observed in ContentView — sets path to Inbox
-    // and flips `shouldStartCreating`, same as Command-N / iOS quick action.
-    NotificationCenter.default.post(name: .septenaOpenQuickAdd, object: nil)
+    OpenNewTaskRouting.dispatch()
   }
 
   private func activateMainWindow() {

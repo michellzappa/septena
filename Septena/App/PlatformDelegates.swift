@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   /// Set by SeptenaApp once NavigationState is alive — lets warm-launch
   /// shortcut events publish directly without a stash.
   static weak var navigation: NavigationState?
+  /// Cold-launch stash for Control Center / deep-link new-task routing.
+  static var pendingOpenNewTask = false
   /// Set by SeptenaApp once the CloudKit engine exists. Silent CK pushes
   /// route through here to `engine.handleRemoteNotification`. Weak so
   /// app teardown doesn't leak.
@@ -164,6 +166,8 @@ import AppKit
 
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
   static weak var ckEngine: CKEngine?
+  static weak var navigation: NavigationState?
+  static var pendingOpenNewTask = false
 
   /// Set true only by "Quit Completely" before calling `terminate`, so the
   /// soft-quit interception below knows to let the process actually die.

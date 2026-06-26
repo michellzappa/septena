@@ -36,6 +36,10 @@ struct TaskCommandsMenu: View {
       .keyboardShortcut("d", modifiers: [.command, .shift])
       .disabled(actions == nil)
 
+    Button("Move…") { actions?.openMove() }
+      .keyboardShortcut("m", modifiers: .command)
+      .disabled(actions == nil)
+
     Divider()
 
     Button("Clear Schedule") { actions?.clearSchedule?() }
@@ -60,7 +64,7 @@ struct NewTaskCommand: View {
       if let actions {
         actions.newTask()
       } else {
-        NotificationCenter.default.post(name: .septenaOpenQuickAdd, object: nil)
+        OpenNewTaskRouting.dispatch()
       }
     }
     .keyboardShortcut("n", modifiers: .command)
