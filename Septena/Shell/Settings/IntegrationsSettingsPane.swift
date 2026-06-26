@@ -43,6 +43,15 @@ struct ConnectedAppsSettingsSections: View {
       }
 
       NavigationLink {
+        ThingsImportView()
+      } label: {
+        stateRow(title: "Things",
+                 systemImage: "square.and.arrow.down",
+                 state: "One-time import",
+                 isGranted: true)
+      }
+
+      NavigationLink {
         CalendarDetail()
           .navigationTitle("Calendar")
           #if os(iOS)

@@ -1040,6 +1040,9 @@
         }
       }
     },
+    "Add **Add Task** in Settings → Control Center to open a new to-do." : {
+
+    },
     "Add %lld categories" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2403,6 +2406,9 @@
         }
       }
     },
+    "Control Center" : {
+
+    },
     "Copied" : {
       "localizations" : {
         "pt-BR" : {
@@ -2518,6 +2524,9 @@
           }
         }
       }
+    },
+    "Create new" : {
+
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
       "localizations" : {
@@ -2640,6 +2649,9 @@
           }
         }
       }
+    },
+    "Database file" : {
+
     },
     "Date" : {
       "localizations" : {
@@ -3768,6 +3780,46 @@
     "Hidden" : {
 
     },
+    "Hide %lld logged items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hide %lld logged item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hide %lld logged items"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ocultar %lld item registrado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ocultar %lld itens registrados"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Hides this section everywhere. Your data and customizations stay." : {
       "localizations" : {
         "pt-BR" : {
@@ -3952,6 +4004,22 @@
           }
         }
       }
+    },
+    "Import %@ task%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Import %1$@ task%2$@"
+          }
+        }
+      }
+    },
+    "Import complete" : {
+
+    },
+    "Importing…" : {
+
     },
     "In a future update you'll be able to opt in to sharing a select, anonymized slice of your data to support health research. It will always be off by default, fully opt-in, and separate from the usage data above — never your raw logs or anything that identifies you." : {
 
@@ -4693,6 +4761,9 @@
         }
       }
     },
+    "Matches “%@”" : {
+
+    },
     "Maybe later" : {
       "localizations" : {
         "pt-BR" : {
@@ -4757,6 +4828,12 @@
           }
         }
       }
+    },
+    "Merge" : {
+
+    },
+    "Merge reuses your existing area or project. Create new adds a separate copy." : {
+
     },
     "Method" : {
       "extractionState" : "manual",
@@ -4924,6 +5001,9 @@
     },
     "n=%@" : {
       "shouldTranslate" : false
+    },
+    "Name matches" : {
+
     },
     "Needs Apple Intelligence" : {
 
@@ -5480,6 +5560,12 @@
     "On Automatic, every step runs on your device first — it leaves only for the steps on-device can't do (↗), never wholesale." : {
 
     },
+    "On iPhone or iPad: Things → Settings → General → Diagnostics → Enter Code → 491348 → Send Things Database. Save the file, then pick it here." : {
+
+    },
+    "On Mac: quit Things, copy Things Database.thingsdatabase from ~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/, then choose it here." : {
+
+    },
     "On-device coaches that reflect your logged data back to you." : {
 
     },
@@ -5531,6 +5617,9 @@
         }
       }
     },
+    "One-time migration from a Things database export. Your Things data is not modified." : {
+
+    },
     "Only a Claude Code running on this Mac can connect." : {
       "localizations" : {
         "pt-BR" : {
@@ -5575,6 +5664,9 @@
 
     },
     "Optional. This Mac can't use App Attest, so Sign in with Apple is how the community features — Roadmap, Testimonials, and in-app Support — confirm you're a real person. That's the only thing it does: it ties those contributions to your Apple ID and nothing else. It doesn't touch your data, your iCloud sync, or your account, and you can sign out any time." : {
+
+    },
+    "Options" : {
 
     },
     "Orange" : {
@@ -6390,6 +6482,9 @@
         }
       }
     },
+    "Select main.sqlite or a Things Database.thingsdatabase bundle exported from Things." : {
+
+    },
     "Send" : {
 
     },
@@ -6683,6 +6778,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ombros"
+          }
+        }
+      }
+    },
+    "Show %lld logged items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld logged item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld logged items"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mostrar %lld item registrado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mostrar %lld itens registrados"
+                }
+              }
+            }
           }
         }
       }
@@ -7475,6 +7610,9 @@
           }
         }
       }
+    },
+    "Things tags and headings are not first-class in Septena. Tasks filed in a project without a today, scheduled, or deadline date land in Inbox — preview shows where items will appear." : {
+
     },
     "Thinking…" : {
       "localizations" : {
@@ -8413,6 +8551,9 @@
       }
     },
     "Your testimonial" : {
+
+    },
+    "Your Things data was not modified. Check Inbox and Today in the Tasks tab to verify routing." : {
 
     },
     "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {

@@ -21,6 +21,8 @@ public enum TaskSource {
   public static let app = "app"
   /// Authored by the MCP gateway (Claude).
   public static let mcp = "mcp"
+  /// Imported from Cultured Code Things.
+  public static let things = "things"
 }
 
 /// Tunables for the "agent created this" freshness cue. Provenance is

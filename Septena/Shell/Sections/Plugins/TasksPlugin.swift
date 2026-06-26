@@ -211,6 +211,15 @@ private struct TasksDetailContent: View {
         .font(.callout)
         .foregroundStyle(.secondary)
     }
+    Section {
+      NavigationLink {
+        ThingsImportView()
+      } label: {
+        Label("Import from Things", systemImage: "square.and.arrow.down")
+      }
+    } footer: {
+      Text("One-time migration from a Things database export. Your Things data is not modified.")
+    }
   }
 }
 
