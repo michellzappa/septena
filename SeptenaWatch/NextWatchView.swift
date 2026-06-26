@@ -1,5 +1,28 @@
 import SwiftUI
 
+private extension View {
+  func watchPageTitle(_ title: String, count: Int) -> some View {
+    navigationTitle("")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(title)
+              .foregroundStyle(.white)
+            Text("\(count)")
+              .foregroundStyle(.white.opacity(0.58))
+          }
+          .font(.headline)
+          .fontWeight(.semibold)
+          .lineLimit(1)
+          .minimumScaleFactor(0.75)
+          .accessibilityElement(children: .combine)
+          .accessibilityAddTraits(.isHeader)
+        }
+      }
+  }
+}
+
 struct NextWatchView: View {
   @State private var conn = WatchConnectivity.shared
   @State private var quickLogItem: NextItem?
@@ -172,6 +195,7 @@ struct NextWatchView: View {
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         .watchSkyRow()
       }
+      pagerBottomSpacer
     }
     .listStyle(.plain)
     .watchSkyList()
@@ -191,8 +215,7 @@ struct NextWatchView: View {
       .ignoresSafeArea()
       .allowsHitTesting(false)
     }
-    .navigationTitle(WatchSectionTint.pageTitle(forKey: key))
-    .navigationBarTitleDisplayMode(.inline)
+    .watchPageTitle(WatchSectionTint.pageTitle(forKey: key), count: items.count)
   }
 
   /// The final page: the macro / training / intake summary tiles, titled
@@ -201,12 +224,30 @@ struct NextWatchView: View {
   private var summariesPage: some View {
     List {
       summaryTiles
+      pagerBottomSpacer
     }
     .listStyle(.plain)
     .watchSkyList()
     .environment(\.defaultMinListRowHeight, 0)
-    .navigationTitle("Summaries")
-    .navigationBarTitleDisplayMode(.inline)
+    .watchPageTitle("Summaries", count: summaryTileCount)
+  }
+
+  private var summaryTileCount: Int {
+    (hasNutrition ? 1 : 0)
+      + (hasTraining ? 1 : 0)
+      + (hasIntake ? intakeSummaryRows.count : 0)
+  }
+
+  /// The vertical pager takes over as the list reaches its bottom edge, which
+  /// can hide the last real row of a bucket behind the next page snap. Keep a
+  /// little inert scroll room after the content so the final item can settle
+  /// fully into view before watchOS starts paging.
+  private var pagerBottomSpacer: some View {
+    Color.clear
+      .frame(height: 32)
+      .listRowInsets(EdgeInsets())
+      .listRowBackground(Color.clear)
+      .allowsHitTesting(false)
   }
 
   private var allDoneHero: some View {
@@ -527,7 +568,9 @@ struct NextItemRow: View {
       // Read-only nudge (training / fast-break for now).
       rowBody
     } else {
-      // Checklist member: tap to complete.
+      // Checklist member: tap to complete. Task rows also carry trailing swipe
+      // actions (off-today / cancel) — wired at the call site, where `conn`
+      // lives, since `.swipeActions` must sit on the List row itself.
       Button(action: onComplete) { rowBody }
         .buttonStyle(.plain)
     }
