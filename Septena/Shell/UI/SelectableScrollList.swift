@@ -142,14 +142,20 @@ private struct SelectableRowGestures: ViewModifier {
   func body(content: Content) -> some View {
     #if os(macOS)
     content
-      // Single click selects (reading ⌘/⇧ live); double-click activates via the
-      // AppKit overlay that's purpose-built for LazyVStack rows and lets the
-      // single click fall through to this `onTapGesture`.
+      // Double-click activates (opens the inline editor). Detected with the
+      // native count-2 tap — NOT the AppKit `DoubleClickCatcher` overlay, whose
+      // `NSApp.currentEvent` hit-test loses the second click whenever the row is
+      // `.draggable` (AppKit's drag-tracking swallows the mouse-down sequence, so
+      // `clickCount` never reaches 2). SwiftUI's gesture system arbitrates this
+      // count-2 tap against `.draggable` and the count-1 tap below correctly.
+      // Attached BEFORE the single tap so the higher count gets priority.
+      .onTapGesture(count: 2) { actions.activate(id) }
+      // Single click selects (reading ⌘/⇧ live). On a non-selectable list
+      // (iPhone-style) a single click just activates.
       .onTapGesture {
         guard actions.selectable else { actions.activate(id); return }
         actions.click(id, currentEventModifiers())
       }
-      .septenaOnDoubleClick { actions.activate(id) }
     #else
     content.onTapGesture { actions.activate(id) }
     #endif
