@@ -385,20 +385,19 @@ final class CloudKitTasksBackend: TasksBackend {
   /// Today," shared by the context menu, the Next section, the ⌘T toggle, and
   /// the quick-edit sheet. Today membership is a *union* (pin OR scheduled≤today
   /// OR deadline≤today), so clearing the `today` flag alone often isn't enough:
-  /// a task still anchored by a "When" date that has arrived would silently
-  /// bounce right back into Today. So we also clear a `scheduled` date that's
-  /// already landed — the soft planning signal the user is dismissing.
-  ///
-  /// A live deadline (`due ≤ today`) is intentionally left intact: it's a real
-  /// commitment, so such a task stays in Today until the deadline itself is
-  /// changed (same principle as `setDeadline`'s clear-pin behavior). Callers should
-  /// label the affordance off `isOnToday`, not the raw `today` flag.
+  /// a task still anchored by a date that has arrived would silently bounce
+  /// right back into Today. So we also clear any `scheduled` or `deadline`
+  /// date that's already landed — the user explicitly dismissed the row from
+  /// Today, and the menu labels off `isOnToday`, not the raw pin.
   func removeFromToday(id: String) {
     guard let entity = fetch(id: id) else { return }
     entity.today = false
     entity.todaySetOn = nil
     if let s = entity.scheduled, s <= SeptenaDate.today {
       entity.scheduled = nil
+    }
+    if let d = entity.deadline, d <= SeptenaDate.today {
+      entity.deadline = nil
     }
     entity.pendingSync = true
     commitAndPush(entity, op: "removeFromToday")
