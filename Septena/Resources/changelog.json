@@ -4,49 +4,64 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1190,
+      "build": 1197,
       "date": "2026-06-27",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a photo of your meal and get macros estimated on-device.",
-          "section": "nutrition"
+          "title": "Sidebar-free task navigation",
+          "detail": "A Things-style nav menu and native, selectable scroll list let you move through tasks without a sidebar, with full keyboard navigation.",
+          "section": "tasks"
         },
         {
-          "title": "Calendar events in your day",
-          "detail": "Your system calendar now appears woven into Today and Upcoming, with hidden-calendar choices synced across devices.",
+          "title": "Inline rename and quick-add for tasks",
+          "detail": "Rename a task in place and add new ones from a quick-add line at the top of the list.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar woven into Today",
+          "detail": "System calendar events now appear in Today and Upcoming, with hidden-calendar choices synced across your devices.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recently Deleted with restore",
+          "detail": "Deleted tasks move to a Recently Deleted view with one-tap undo and automatic purge after 30 days.",
           "section": "tasks"
         },
         {
           "title": "Import tasks from Things",
-          "detail": "Bring your existing tasks over from a Things database export.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore them before they're purged.",
-          "section": "tasks"
-        },
-        {
-          "title": "Faster task entry everywhere",
-          "detail": "Add a task from a global entry point and Control Center, with inline rename and a quick-add line right in your lists.",
+          "detail": "Bring your existing tasks across from a Things database export.",
           "section": "tasks"
         },
         {
           "title": "Pin goals to your week",
-          "detail": "Keep the goals that matter front and center on the week dashboard.",
+          "detail": "Pin a goal to the week dashboard to keep its target front and center.",
           "section": "goals"
         },
         {
-          "title": "Smarter training review",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and let on-device analysis estimate the macros.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Smarter training muscle review",
+          "detail": "Volume is now effort-weighted, with a weekly per-muscle review after each session.",
           "section": "training"
         },
         {
-          "title": "Clearer control over your privacy",
-          "detail": "Choose graded analytics levels from off to full, and see exactly what's sent in a recent activity log.",
+          "title": "Choose what you share",
+          "detail": "Graded analytics levels (off, minimal, balanced, full) plus a clear view of exactly what telemetry is sent and a recently-sent log.",
+          "section": null
+        },
+        {
+          "title": "A livelier home screen",
+          "detail": "The day dial now sits over a day-aligned sky wash, dashboard tiles render faster, and reconnecting Claude pops a green lock.",
+          "section": null
+        },
+        {
+          "title": "Richer Apple Watch feed",
+          "detail": "A vertically-paged Next feed over a time-of-day sky, per-page titles and counts, interactive intake nudges, and a fast that morphs overnight.",
           "section": null
         }
       ]
