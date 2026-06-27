@@ -16,7 +16,8 @@ import AppKit
 //     that stays the single source of truth, exactly like `List(selection:)`.
 //   • Keyboard traversal — ↑/↓ move a cursor, ⇧+↑/↓ extend the range, ⌘+↑/↓
 //     jump to the ends; Return activates, Space toggles, Esc clears. Arrow keys
-//     nudge the cursor row into view without re-centering the viewport on click.
+//     nudge the cursor row into view only when it would clip — no viewport
+//     re-anchoring while the row is already on-screen.
 //   • The neutral selection capsule — reuses `SelectableListRowBackground`, the
 //     same view the `List` rows paint, so the highlight is pixel-identical.
 //   • Accessibility — selected rows carry `.isSelected`.
@@ -47,6 +48,42 @@ struct SelectableRowActions {
 
 private struct SelectableRowActionsKey: EnvironmentKey {
   static let defaultValue = SelectableRowActions()
+}
+
+/// Row frames in the scroll view's coordinate space — used to scroll only when
+/// the cursor row would clip, instead of re-anchoring the viewport on every
+/// arrow press.
+private struct SelectableRowFrameKey: PreferenceKey {
+  static var defaultValue: [String: CGRect] = [:]
+  static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+    value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+  }
+}
+
+/// Visible height of the scroll view's clip rect.
+private struct SelectableScrollViewportHeightKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private enum SelectableScrollListMetrics {
+  static let coordinateSpace = "selectableScrollList"
+}
+
+/// How a row sits relative to the scroll view's visible clip.
+private enum SelectableRowClip {
+  case fullyVisible
+  case clippedAbove
+  case clippedBelow
+}
+
+/// Keyboard-only scroll nudge — set after ↑/↓ so `onChange` runs with fresh
+/// layout metrics (a `DispatchQueue.main.async` closure would capture stale
+/// `@State` from the struct copy).
+private struct SelectableScrollRequest: Equatable {
+  let id: String
+  let scrollDown: Bool
+  let force: Bool
 }
 
 extension EnvironmentValues {
@@ -81,6 +118,14 @@ private struct SelectableScrollRowModifier: ViewModifier {
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
       .background(SelectableListRowBackground(isSelected: isSelected))
+      .background {
+        GeometryReader { geo in
+          Color.clear.preference(
+            key: SelectableRowFrameKey.self,
+            value: [id: geo.frame(in: .named(SelectableScrollListMetrics.coordinateSpace))]
+          )
+        }
+      }
       .id(id)
       .accessibilityElement(children: .contain)
       .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -147,6 +192,9 @@ struct SelectableScrollList<Content: View>: View {
   @State private var cursor: String?
   /// Anchor for ⇧-click / ⇧-arrow range selection.
   @State private var anchor: String?
+  @State private var viewportHeight: CGFloat = 0
+  @State private var rowFrames: [String: CGRect] = [:]
+  @State private var scrollRequest: SelectableScrollRequest?
 
   var body: some View {
     ScrollViewReader { proxy in
@@ -155,6 +203,27 @@ struct SelectableScrollList<Content: View>: View {
           content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
+      .onPreferenceChange(SelectableRowFrameKey.self) {
+        rowFrames = $0
+        fulfillPendingScroll(proxy: proxy)
+      }
+      .background {
+        GeometryReader { geo in
+          Color.clear.preference(
+            key: SelectableScrollViewportHeightKey.self,
+            value: geo.size.height
+          )
+        }
+      }
+      .onPreferenceChange(SelectableScrollViewportHeightKey.self) {
+        viewportHeight = $0
+        fulfillPendingScroll(proxy: proxy)
+      }
+      .onChange(of: scrollRequest) { _, request in
+        guard request != nil else { return }
+        fulfillPendingScroll(proxy: proxy)
       }
       // Clicking the empty paper behind the rows clears the selection — the
       // LazyVStack only fills its content height, so taps below the last row
@@ -190,9 +259,9 @@ struct SelectableScrollList<Content: View>: View {
         let extend = press.modifiers.contains(.shift)
         let down = press.key == .downArrow
         if press.modifiers.contains(.command) {
-          jumpToEnd(down: down, extend: extend, proxy: proxy)
+          jumpToEnd(down: down, extend: extend)
         } else {
-          move(down ? 1 : -1, extend: extend, proxy: proxy)
+          move(down ? 1 : -1, extend: extend)
         }
         return .handled
       }
@@ -253,7 +322,7 @@ struct SelectableScrollList<Content: View>: View {
     cursor = id
   }
 
-  private func move(_ delta: Int, extend: Bool, proxy: ScrollViewProxy) {
+  private func move(_ delta: Int, extend: Bool) {
     guard !orderedIDs.isEmpty else { return }
     // Start from the cursor, or — if a row is selected but the cursor was reset
     // (e.g. just closed an inline editor) — from the selected row, so ↑/↓ move
@@ -265,24 +334,24 @@ struct SelectableScrollList<Content: View>: View {
     } else {
       nextIndex = delta > 0 ? 0 : orderedIDs.count - 1
     }
-    apply(index: nextIndex, extend: extend, proxy: proxy, scrollDown: delta > 0)
+    apply(index: nextIndex, extend: extend, scrollDown: delta > 0, forceScroll: false)
   }
 
-  private func jumpToEnd(down: Bool, extend: Bool, proxy: ScrollViewProxy) {
+  private func jumpToEnd(down: Bool, extend: Bool) {
     guard !orderedIDs.isEmpty else { return }
     apply(
       index: down ? orderedIDs.count - 1 : 0,
       extend: extend,
-      proxy: proxy,
-      scrollDown: down
+      scrollDown: down,
+      forceScroll: true
     )
   }
 
   private func apply(
     index: Int,
     extend: Bool,
-    proxy: ScrollViewProxy? = nil,
-    scrollDown: Bool? = nil
+    scrollDown: Bool? = nil,
+    forceScroll: Bool = false
   ) {
     let id = orderedIDs[index]
     cursor = id
@@ -294,12 +363,73 @@ struct SelectableScrollList<Content: View>: View {
       anchor = id
     }
     // Scroll only for keyboard traversal — clicks set `cursor` too but must
-    // not re-anchor the viewport (`.center` was the "page jumps" complaint).
-    guard let proxy, let scrollDown else { return }
-    let anchor: UnitPoint = scrollDown
-      ? UnitPoint(x: 0.5, y: 0.85)
-      : UnitPoint(x: 0.5, y: 0.15)
-    withAnimation(.easeInOut(duration: 0.15)) { proxy.scrollTo(id, anchor: anchor) }
+    // not move the viewport. Defer via `scrollRequest` so clip detection reads
+    // post-layout row frames (not a stale struct copy).
+    guard let scrollDown else { return }
+    scrollRequest = SelectableScrollRequest(id: id, scrollDown: scrollDown, force: forceScroll)
+  }
+
+  private func fulfillPendingScroll(proxy: ScrollViewProxy) {
+    guard let request = scrollRequest else { return }
+    if request.force {
+      scrollToRowIfNeeded(
+        id: request.id,
+        scrollDown: request.scrollDown,
+        force: true,
+        proxy: proxy
+      )
+      scrollRequest = nil
+      return
+    }
+    switch rowClipStatus(request.id, scrollDown: request.scrollDown) {
+    case .fullyVisible:
+      scrollRequest = nil
+    case .clippedAbove, .clippedBelow:
+      scrollToRowIfNeeded(
+        id: request.id,
+        scrollDown: request.scrollDown,
+        force: false,
+        proxy: proxy
+      )
+      scrollRequest = nil
+    case nil:
+      // Layout not ready yet — keep the request until row frames land.
+      guard viewportHeight > 0 else { return }
+      scrollRequest = nil
+    }
+  }
+
+  private func scrollToRowIfNeeded(
+    id: String,
+    scrollDown: Bool,
+    force: Bool,
+    proxy: ScrollViewProxy
+  ) {
+    if force {
+      proxy.scrollTo(id, anchor: scrollDown ? .bottom : .top)
+      return
+    }
+    switch rowClipStatus(id, scrollDown: scrollDown) {
+    case .fullyVisible, nil:
+      return
+    case .clippedAbove:
+      proxy.scrollTo(id, anchor: .top)
+    case .clippedBelow:
+      proxy.scrollTo(id, anchor: .bottom)
+    }
+  }
+
+  /// `nil` when layout isn't ready — treat as visible so we don't spuriously
+  /// scroll on the first arrow after a click.
+  private func rowClipStatus(_ id: String, scrollDown: Bool) -> SelectableRowClip? {
+    guard viewportHeight > 0, let frame = rowFrames[id] else { return nil }
+    let slack: CGFloat = 2
+    let above = frame.minY < -slack
+    let below = frame.maxY > viewportHeight + slack
+    if above && below { return scrollDown ? .clippedBelow : .clippedAbove }
+    if above { return .clippedAbove }
+    if below { return .clippedBelow }
+    return .fullyVisible
   }
 
 }
