@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Septena Logo Configurator</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7f8;
+      --ink: #20242a;
+      --muted: #66727f;
+      --line: #d6dde3;
+      --panel: #ffffff;
+      --panel-2: #eef2f5;
+      --grid: rgb(214 221 227 / 45%);
+      --focus: #111827;
+      --button: #20242a;
+      --button-ink: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #181a1d;
+        --ink: #f4f6f8;
+        --muted: #a7adb7;
+        --line: #3a4047;
+        --panel: #22262b;
+        --panel-2: #2a3036;
+        --grid: rgb(58 64 71 / 46%);
+        --focus: #f4f6f8;
+        --button: #f4f6f8;
+        --button-ink: #181a1d;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1200px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(340px, 440px);
+      gap: 28px;
+      align-items: start;
+    }
+
+    .stage {
+      min-width: 0;
+    }
+
+    .stage-header,
+    .controls-header,
+    .export-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      letter-spacing: 0;
+      line-height: 1.1;
+    }
+
+    h1 {
+      font-size: clamp(22px, 2.8vw, 34px);
+      font-weight: 750;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .hint,
+    output,
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .preview-shell {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      min-height: min(70vh, 760px);
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        var(--panel);
+      background-size: 40px 40px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    svg {
+      display: block;
+      width: min(100%, 76vh);
+      max-height: 760px;
+      aspect-ratio: 1;
+      touch-action: none;
+    }
+
+    .apple-grid-guide,
+    .app-shape-guide {
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .apple-grid-guide {
+      opacity: 0.34;
+    }
+
+    .app-shape-guide {
+      color: var(--ink);
+      opacity: 0.13;
+    }
+
+    .disc {
+      cursor: grab;
+      opacity: 1;
+      transition: opacity 120ms ease;
+    }
+
+    .disc:active {
+      cursor: grabbing;
+    }
+
+    .disc.is-active {
+      opacity: 1;
+      stroke: var(--focus);
+      stroke-width: 8;
+    }
+
+    .side {
+      display: grid;
+      gap: 18px;
+    }
+
+    .controls,
+    .export {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+    }
+
+    .disc-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .disc-control {
+      display: grid;
+      gap: 10px;
+      padding: 0 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .disc-control:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .disc-title,
+    .layer-title {
+      display: grid;
+      grid-template-columns: 72px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgb(0 0 0 / 18%);
+    }
+
+    .disc-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+    }
+
+    .swatches {
+      display: flex;
+      min-width: 0;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: 68px 1fr 76px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input[type="range"],
+    select {
+      width: 100%;
+      accent-color: var(--ink);
+    }
+
+    select {
+      min-height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 10px;
+      background: var(--panel-2);
+      color: var(--ink);
+      font: inherit;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 184px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--panel-2);
+      color: var(--ink);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .layer-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--button);
+      border-radius: 8px;
+      padding: 0 13px;
+      background: var(--button);
+      color: var(--button-ink);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    button.compact {
+      min-height: 30px;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        width: min(100vw - 20px, 620px);
+        padding: 14px 0;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .preview-shell {
+        min-height: auto;
+      }
+
+      svg {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="app">
+      <section class="stage" aria-labelledby="title">
+        <div class="stage-header">
+          <div>
+            <h1 id="title">Septena mark</h1>
+            <div class="hint">Drag any dot or use the sliders. Apple’s icon grid and shape are shown as preview guides.</div>
+          </div>
+        </div>
+
+        <div class="preview-shell">
+          <svg id="preview" viewBox="0 0 1024 1024" role="img" aria-label="Configurable Septena seven dot logo">
+            <defs id="preview-defs"></defs>
+            <g class="apple-grid-guide" transform="translate(0.3, -0.0001)" stroke="#0A84FF" stroke-width="2" fill="none" fill-rule="evenodd">
+              <line x1="1024" y1="0" x2="0" y2="1024"/>
+              <line x1="1024" y1="1024" x2="0" y2="0"/>
+              <line x1="1024" y1="512" x2="0" y2="512"/>
+              <line x1="1024" y1="640" x2="0" y2="640"/>
+              <line x1="1024" y1="768" x2="0" y2="768"/>
+              <line x1="1024" y1="896" x2="0" y2="896"/>
+              <line x1="1024" y1="384" x2="0" y2="384"/>
+              <line x1="1024" y1="256" x2="0" y2="256"/>
+              <line x1="1024" y1="128" x2="0" y2="128"/>
+              <line x1="512" y1="0" x2="512" y2="1024"/>
+              <line x1="384" y1="1024" x2="384" y2="0"/>
+              <line x1="256" y1="1024" x2="256" y2="0"/>
+              <line x1="128" y1="1024" x2="128" y2="0"/>
+              <line x1="640" y1="1024" x2="640" y2="0"/>
+              <line x1="768" y1="1024" x2="768" y2="0"/>
+              <line x1="896" y1="1024" x2="896" y2="0"/>
+              <path d="M512,102 C738.437,102 922,285.563 922,512 C922,738.437 738.437,922 512,922 C285.563,922 102,738.437 102,512 C102,285.563 285.563,102 512,102 Z"/>
+              <path d="M512,256 C653.385,256 768,370.615 768,512 C768,653.385 653.385,768 512,768 C370.615,768 256,653.385 256,512 C256,370.615 370.615,256 512,256 Z"/>
+              <path d="M512,410 C568.333,410 614,455.667 614,512 C614,568.333 568.333,614 512,614 C455.667,614 410,568.333 410,512 C410,455.667 455.667,410 512,410 Z"/>
+            </g>
+            <g id="discs"></g>
+            <g class="app-shape-guide" transform="translate(0.3, -0.0001)" fill="currentColor" fill-rule="evenodd">
+              <path d="M0.00067266436,659.545571 C0.0033633218,670.939203 0.016816609,682.331683 0.084083045,693.726083 C0.153083045,705.722083 0.291083045,717.716083 0.617083045,729.709083 C1.32508304,755.842083 2.86308304,782.203083 7.50908304,808.046083 C12.221083,834.264083 19.913083,858.664083 32.037083,882.484083 C43.955083,905.897083 59.526083,927.321083 78.103083,945.897083 C96.679083,964.474083 118.104083,980.046083 141.516083,991.963083 C165.336083,1004.08808 189.736083,1011.77908 215.954083,1016.49208 C241.797083,1021.13708 268.158083,1022.67508 294.291083,1023.38408 C306.284083,1023.70908 318.278083,1023.84708 330.274083,1023.91608 C344.517083,1024.00017 358.757083,1024.00017 373.000083,1024.00017 L0.000183044982,1024.00008 Z M1024.00017,651.000083 L1024.00018,1024.00008 L651.000083,1024.00017 C665.243083,1024.00017 679.483083,1024.00017 693.726083,1023.91608 C705.722083,1023.84708 717.716083,1023.70908 729.709083,1023.38408 C755.843083,1022.67508 782.203083,1021.13708 808.047083,1016.49208 C834.264083,1011.77908 858.664083,1004.08808 882.484083,991.963083 C905.897083,980.046083 927.321083,964.474083 945.898083,945.897083 C964.474083,927.321083 980.046083,905.897083 991.963083,882.484083 C1004.08808,858.664083 1011.77908,834.264083 1016.49208,808.046083 C1021.13708,782.203083 1022.67508,755.842083 1023.38408,729.709083 C1023.70908,717.716083 1023.84708,705.722083 1023.91608,693.726083 C1024.00017,679.483083 1024.00017,665.243083 1024.00017,651.000083 Z M1024.00017,373.000083 C1024.00017,358.757083 1024.00017,344.517083 1023.91608,330.274083 C1023.84708,318.278083 1023.70908,306.284083 1023.38408,294.291083 C1022.67508,268.158083 1021.13708,241.797083 1016.49208,215.954083 C1011.77908,189.736083 1004.08808,165.336083 991.963083,141.516083 C980.046083,118.104083 964.474083,96.679083 945.898083,78.103083 C927.321083,59.526083 905.897083,43.954083 882.484083,32.037083 C858.664083,19.913083 834.264083,12.221083 808.047083,7.50908304 C782.203083,2.86308304 755.843083,1.32508304 729.709083,0.616083045 C717.716083,0.291083045 705.722083,0.153083045 693.726083,0.084083045 C679.483083,0 665.243083,0 651.000083,0 L1024.00018,8.30449826e-05 Z M0.000183044982,8.30449826e-05 L364.454595,0.00067266436 C353.060963,0.0033633218 341.668483,0.016816609 330.274083,0.084083045 C318.278083,0.153083045 306.284083,0.291083045 294.291083,0.616083045 C268.158083,1.32508304 241.797083,2.86308304 215.954083,7.50908304 C189.736083,12.221083 165.336083,19.913083 141.516083,32.037083 C118.104083,43.954083 96.679083,59.526083 78.103083,78.103083 C59.526083,96.679083 43.955083,118.104083 32.037083,141.516083 C19.913083,165.336083 12.221083,189.736083 7.50908304,215.954083 C2.86308304,241.797083 1.32508304,268.158083 0.617083045,294.291083 C0.291083045,306.284083 0.153083045,318.278083 0.084083045,330.274083 C0,344.517083 0,358.757083 0,373.000083 L0.000183044982,8.30449826e-05 Z"/>
+            </g>
+          </svg>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="controls" aria-labelledby="controls-title">
+          <div class="controls-header">
+            <h2 id="controls-title">Shape</h2>
+            <span class="hint">Distance + layers</span>
+          </div>
+          <div class="disc-list" id="controls"></div>
+        </section>
+
+        <section class="export" aria-labelledby="export-title">
+          <div class="export-header">
+            <h2 id="export-title">SVG</h2>
+            <span class="hint">Glass dots, no guide</span>
+          </div>
+          <textarea id="svg-output" spellcheck="false" aria-label="Generated SVG"></textarea>
+          <div class="actions">
+            <button id="copy-svg" type="button">Copy SVG</button>
+            <button id="reset" class="secondary" type="button">Reset</button>
+            <span class="status" id="status" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const VIEWBOX = 1024;
+    const CENTER = VIEWBOX / 2;
+    const DEFAULT_DISTANCE = 284;
+    const DEFAULT_RADIUS = 93.1;
+    const MIN_DISTANCE = 110;
+    const MAX_DISTANCE = 390;
+    const MIN_RADIUS = 20;
+    const MAX_RADIUS = 150;
+    const MIN_OPACITY = 0.05;
+    const MAX_OPACITY = 1;
+    const START_ANGLE = -Math.PI / 2;
+    const BLEND_MODES = ["normal", "screen", "plus-lighter", "soft-light"];
+
+    const state = {
+      distance: DEFAULT_DISTANCE,
+      blendMode: "normal",
+      layers: [
+        { id: 1, name: "Layer 1", radius: DEFAULT_RADIUS, opacity: 0.72 },
+      ],
+    };
+
+    let nextLayerId = 2;
+    let urlWriteTimer = null;
+
+    const discs = [
+      { name: "Red", color: "#ef4444" },
+      { name: "Orange", color: "#f97316" },
+      { name: "Yellow", color: "#eab308" },
+      { name: "Green", color: "#22c55e" },
+      { name: "Cyan", color: "#06b6d4" },
+      { name: "Blue", color: "#3b82f6" },
+      { name: "Purple", color: "#8b5cf6" },
+    ].map((disc, index) => ({
+      ...disc,
+      index,
+      angle: START_ANGLE + index * (Math.PI * 2 / 7),
+    }));
+
+    const discLayer = document.getElementById("discs");
+    const previewDefs = document.getElementById("preview-defs");
+    const controls = document.getElementById("controls");
+    const output = document.getElementById("svg-output");
+    const status = document.getElementById("status");
+    const preview = document.getElementById("preview");
+
+    let activeIndex = null;
+
+    function pointFor(disc) {
+      return {
+        x: CENTER + Math.cos(disc.angle) * state.distance,
+        y: CENTER + Math.sin(disc.angle) * state.distance,
+      };
+    }
+
+    function fmt(value) {
+      return Number(value.toFixed(2)).toString();
+    }
+
+    function glassDefs() {
+      return `<filter id="liquid-glass-depth" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="softEdge"/>
+      <feOffset in="softEdge" dx="0" dy="14" result="lowShadow"/>
+      <feColorMatrix in="lowShadow" type="matrix" values="0 0 0 0 0.07  0 0 0 0 0.08  0 0 0 0 0.10  0 0 0 0.18 0" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>`;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, Number(value)));
+    }
+
+    function defaultLayer(id = 1) {
+      return { id, name: `Layer ${id}`, radius: DEFAULT_RADIUS, opacity: 0.72 };
+    }
+
+    function serializeLayers() {
+      return state.layers.map((layer) => {
+        return `${Math.round(layer.radius)}:${Math.round(layer.opacity * 100)}`;
+      }).join(",");
+    }
+
+    function serializeState() {
+      return new URLSearchParams({
+        d: String(Math.round(state.distance)),
+        b: state.blendMode,
+        l: serializeLayers(),
+      });
+    }
+
+    function writeUrlState(mode = "replace") {
+      const params = serializeState();
+      const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (nextUrl === currentUrl) return;
+      window.history[mode === "push" ? "pushState" : "replaceState"](null, "", nextUrl);
+    }
+
+    function queueUrlState() {
+      window.clearTimeout(urlWriteTimer);
+      urlWriteTimer = window.setTimeout(() => writeUrlState(), 80);
+    }
+
+    function hydrateStateFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const distance = params.get("d");
+      const blendMode = params.get("b");
+      const layers = params.get("l");
+
+      if (distance !== null) {
+        state.distance = clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
+      }
+
+      if (BLEND_MODES.includes(blendMode)) {
+        state.blendMode = blendMode;
+      }
+
+      if (layers) {
+        const parsedLayers = layers.split(",").map((item, index) => {
+          const [radiusRaw, opacityRaw] = item.split(":");
+          const radius = clamp(radiusRaw, MIN_RADIUS, MAX_RADIUS);
+          const opacity = clamp(Number(opacityRaw) / 100, MIN_OPACITY, MAX_OPACITY);
+          if (!Number.isFinite(radius) || !Number.isFinite(opacity)) return null;
+          const id = index + 1;
+          return { id, name: `Layer ${id}`, radius, opacity };
+        }).filter(Boolean);
+
+        if (parsedLayers.length) {
+          state.layers = parsedLayers;
+          nextLayerId = parsedLayers.length + 1;
+        }
+      }
+    }
+
+    function layerLabel(index) {
+      return `Layer ${index + 1}`;
+    }
+
+    function circleMarkup(disc, layer, includePointerData) {
+      const p = pointFor(disc);
+      const activeClass = activeIndex === disc.index ? " is-active" : "";
+      const pointerData = includePointerData
+        ? ` class="disc${activeClass}" data-index="${disc.index}" data-layer-id="${layer.id}"`
+        : "";
+      const strokeOpacity = fmt(Math.min(0.46, layer.opacity * 0.62));
+      return `<circle${pointerData} cx="${fmt(p.x)}" cy="${fmt(p.y)}" r="${fmt(layer.radius)}" fill="${disc.color}" fill-opacity="${fmt(layer.opacity)}" filter="url(#liquid-glass-depth)" stroke="${disc.color}" stroke-opacity="${strokeOpacity}" stroke-width="3"/>`;
+    }
+
+    function layerMarkup(layer, includePointerData) {
+      const circles = discs.map((disc) => `    ${circleMarkup(disc, layer, includePointerData)}`).join("\n");
+      const blendStyle = state.blendMode === "normal" ? "" : ` style="mix-blend-mode:${state.blendMode}"`;
+      return `  <g id="layer-${layer.id}"${blendStyle}>\n${circles}\n  </g>`;
+    }
+
+    function svgMarkup() {
+      const defs = glassDefs();
+      const layers = state.layers.map((layer) => layerMarkup(layer, false)).join("\n");
+
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" style="isolation:isolate">\n  <defs>\n    ${defs}\n  </defs>\n${layers}\n</svg>`;
+    }
+
+    function setStatus(message) {
+      status.textContent = message;
+      window.clearTimeout(setStatus.timer);
+      setStatus.timer = window.setTimeout(() => {
+        status.textContent = "";
+      }, 1800);
+    }
+
+    function renderDiscs() {
+      previewDefs.innerHTML = glassDefs();
+      discLayer.innerHTML = state.layers.map((layer) => layerMarkup(layer, true)).join("");
+    }
+
+    function renderControls() {
+      const swatches = discs.map((disc) => `
+        <span class="swatch" style="background: ${disc.color}" title="${disc.name}"></span>
+      `).join("");
+
+      controls.innerHTML = `
+        <div class="disc-control">
+          <div class="disc-title">
+            <span class="disc-name">All dots</span>
+            <span class="swatches">${swatches}</span>
+            <output id="summary">${Math.round(state.distance)}</output>
+          </div>
+          <div class="field">
+            <label for="distance">Distance</label>
+            <input id="distance" data-prop="distance" type="range" min="${MIN_DISTANCE}" max="${MAX_DISTANCE}" step="1" value="${state.distance}">
+            <output id="distance-value">${Math.round(state.distance)}</output>
+          </div>
+          <div class="field">
+            <label for="blend-mode">Blend</label>
+            <select id="blend-mode" data-prop="blendMode">
+              <option value="normal" ${state.blendMode === "normal" ? "selected" : ""}>Normal</option>
+              <option value="screen" ${state.blendMode === "screen" ? "selected" : ""}>Screen</option>
+              <option value="plus-lighter" ${state.blendMode === "plus-lighter" ? "selected" : ""}>Plus lighter</option>
+              <option value="soft-light" ${state.blendMode === "soft-light" ? "selected" : ""}>Soft light</option>
+            </select>
+            <output id="blend-value">${state.blendMode}</output>
+          </div>
+        </div>
+        ${state.layers.map((layer, index) => `
+          <div class="disc-control" data-layer-id="${layer.id}">
+            <div class="layer-title">
+              <span class="disc-name">${layerLabel(index)}</span>
+              <span class="hint">same dots</span>
+              <output id="layer-summary-${layer.id}">${Math.round(layer.radius)} / ${Math.round(layer.opacity * 100)}%</output>
+            </div>
+            <div class="field">
+              <label for="radius-${layer.id}">Size</label>
+              <input id="radius-${layer.id}" data-layer-id="${layer.id}" data-prop="radius" type="range" min="${MIN_RADIUS}" max="${MAX_RADIUS}" step="1" value="${layer.radius}">
+              <output id="radius-value-${layer.id}">${Math.round(layer.radius)}</output>
+            </div>
+            <div class="field">
+              <label for="opacity-${layer.id}">Opacity</label>
+              <input id="opacity-${layer.id}" data-layer-id="${layer.id}" data-prop="opacity" type="range" min="${MIN_OPACITY}" max="${MAX_OPACITY}" step="0.01" value="${layer.opacity}">
+              <output id="opacity-value-${layer.id}">${Math.round(layer.opacity * 100)}%</output>
+            </div>
+            <div class="layer-actions">
+              <button class="secondary compact" type="button" data-action="duplicate" data-layer-id="${layer.id}">Duplicate</button>
+              <button class="secondary compact" type="button" data-action="remove" data-layer-id="${layer.id}" ${state.layers.length === 1 ? "disabled" : ""}>Remove</button>
+            </div>
+          </div>
+        `).join("")}
+      `;
+    }
+
+    function syncControls() {
+      const distanceInput = document.getElementById("distance");
+      const blendInput = document.getElementById("blend-mode");
+      const distanceValue = document.getElementById("distance-value");
+      const blendValue = document.getElementById("blend-value");
+      const summary = document.getElementById("summary");
+
+      if (distanceInput) distanceInput.value = state.distance;
+      if (blendInput) blendInput.value = state.blendMode;
+      if (distanceValue) distanceValue.textContent = Math.round(state.distance);
+      if (blendValue) blendValue.textContent = state.blendMode;
+      if (summary) summary.textContent = Math.round(state.distance);
+
+      state.layers.forEach((layer) => {
+        const radiusInput = document.getElementById(`radius-${layer.id}`);
+        const opacityInput = document.getElementById(`opacity-${layer.id}`);
+        const radiusValue = document.getElementById(`radius-value-${layer.id}`);
+        const opacityValue = document.getElementById(`opacity-value-${layer.id}`);
+        const layerSummary = document.getElementById(`layer-summary-${layer.id}`);
+
+        if (radiusInput) radiusInput.value = layer.radius;
+        if (opacityInput) opacityInput.value = layer.opacity;
+        if (radiusValue) radiusValue.textContent = Math.round(layer.radius);
+        if (opacityValue) opacityValue.textContent = `${Math.round(layer.opacity * 100)}%`;
+        if (layerSummary) layerSummary.textContent = `${Math.round(layer.radius)} / ${Math.round(layer.opacity * 100)}%`;
+      });
+    }
+
+    function render() {
+      renderDiscs();
+      syncControls();
+      output.value = svgMarkup();
+    }
+
+    function setSharedValue(prop, value) {
+      const min = prop === "distance" ? MIN_DISTANCE : MIN_RADIUS;
+      const max = prop === "distance" ? MAX_DISTANCE : MAX_RADIUS;
+      state[prop] = clamp(value, min, max);
+      render();
+      queueUrlState();
+    }
+
+    function setBlendMode(value) {
+      state.blendMode = BLEND_MODES.includes(value) ? value : "normal";
+      render();
+      writeUrlState("push");
+    }
+
+    function setLayerValue(layerId, prop, value) {
+      const layer = state.layers.find((item) => item.id === layerId);
+      if (!layer) return;
+      if (prop === "radius") {
+        layer.radius = clamp(value, MIN_RADIUS, MAX_RADIUS);
+      } else if (prop === "opacity") {
+        layer.opacity = clamp(value, MIN_OPACITY, MAX_OPACITY);
+      }
+      render();
+      queueUrlState();
+    }
+
+    function duplicateLayer(layerId) {
+      const index = state.layers.findIndex((item) => item.id === layerId);
+      if (index === -1) return;
+      const source = state.layers[index];
+      const id = nextLayerId++;
+      const duplicate = {
+        id,
+        name: `Layer ${id}`,
+        radius: clamp(source.radius * 0.72, MIN_RADIUS, MAX_RADIUS),
+        opacity: source.opacity,
+      };
+      state.layers.splice(index + 1, 0, duplicate);
+      renderControls();
+      render();
+      writeUrlState("push");
+      setStatus("Layer duplicated");
+    }
+
+    function removeLayer(layerId) {
+      if (state.layers.length === 1) return;
+      state.layers = state.layers.filter((layer) => layer.id !== layerId);
+      renderControls();
+      render();
+      writeUrlState("push");
+      setStatus("Layer removed");
+    }
+
+    function pointerToSvgPoint(event) {
+      const point = preview.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      return point.matrixTransform(preview.getScreenCTM().inverse());
+    }
+
+    function distanceFromPointer(index, event) {
+      const disc = discs[index];
+      const p = pointerToSvgPoint(event);
+      const dx = p.x - CENTER;
+      const dy = p.y - CENTER;
+      const projected = dx * Math.cos(disc.angle) + dy * Math.sin(disc.angle);
+      return Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, projected));
+    }
+
+    controls.addEventListener("input", (event) => {
+      const target = event.target;
+      if (!target.matches("input[type='range']")) return;
+      activeIndex = null;
+      if (target.dataset.layerId) {
+        setLayerValue(Number(target.dataset.layerId), target.dataset.prop, target.value);
+      } else {
+        setSharedValue(target.dataset.prop, target.value);
+      }
+    });
+
+    controls.addEventListener("change", () => {
+      activeIndex = null;
+      render();
+    });
+
+    controls.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target.matches("select[data-prop='blendMode']")) return;
+      activeIndex = null;
+      setBlendMode(target.value);
+    });
+
+    controls.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target.matches("button[data-action]")) return;
+      const layerId = Number(target.dataset.layerId);
+      if (target.dataset.action === "duplicate") duplicateLayer(layerId);
+      if (target.dataset.action === "remove") removeLayer(layerId);
+    });
+
+    preview.addEventListener("pointerdown", (event) => {
+      const target = event.target;
+      if (!target.classList.contains("disc")) return;
+      activeIndex = Number(target.dataset.index);
+      preview.setPointerCapture(event.pointerId);
+      setSharedValue("distance", distanceFromPointer(activeIndex, event));
+    });
+
+    preview.addEventListener("pointermove", (event) => {
+      if (activeIndex === null || !preview.hasPointerCapture(event.pointerId)) return;
+      setSharedValue("distance", distanceFromPointer(activeIndex, event));
+    });
+
+    preview.addEventListener("pointerup", (event) => {
+      if (preview.hasPointerCapture(event.pointerId)) {
+        preview.releasePointerCapture(event.pointerId);
+      }
+      activeIndex = null;
+      render();
+    });
+
+    preview.addEventListener("pointercancel", (event) => {
+      if (preview.hasPointerCapture(event.pointerId)) {
+        preview.releasePointerCapture(event.pointerId);
+      }
+      activeIndex = null;
+      render();
+    });
+
+    document.getElementById("copy-svg").addEventListener("click", async () => {
+      output.select();
+      try {
+        await navigator.clipboard.writeText(output.value);
+        setStatus("Copied");
+      } catch {
+        document.execCommand("copy");
+        setStatus("Copied");
+      }
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      state.distance = DEFAULT_DISTANCE;
+      state.blendMode = "normal";
+      state.layers = [
+        { id: 1, name: "Layer 1", radius: DEFAULT_RADIUS, opacity: 0.72 },
+      ];
+      nextLayerId = 2;
+      activeIndex = null;
+      renderControls();
+      render();
+      writeUrlState("push");
+      setStatus("Reset");
+    });
+
+    window.addEventListener("popstate", () => {
+      state.distance = DEFAULT_DISTANCE;
+      state.blendMode = "normal";
+      state.layers = [defaultLayer(1)];
+      nextLayerId = 2;
+      hydrateStateFromUrl();
+      activeIndex = null;
+      renderControls();
+      render();
+    });
+
+    hydrateStateFromUrl();
+    renderControls();
+    render();
+    writeUrlState();
+  </script>
+</body>
+</html>
