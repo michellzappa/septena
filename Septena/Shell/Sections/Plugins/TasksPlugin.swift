@@ -178,10 +178,42 @@ enum TasksPlugin: SectionPlugin {
 }
 
 private struct TasksDetailContent: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
   @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
   @AppStorage(SettingsKey.tasksOpenIn)        private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
+  @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = true
+  @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = true
+
+  private var tasksSection: SectionConfig? {
+    store.sections.first { $0.key == "tasks" }
+  }
+
+  /// `SectionConfig.showInToday` — same mirror the section identity row and
+  /// Settings → Next use, so this can't become a second source of truth.
+  private var showInNextBinding: Binding<Bool> {
+    Binding(
+      get: { tasksSection?.showInToday ?? true },
+      set: { value in
+        SettingsMirror.setSectionShowInToday("tasks",
+                                             showInToday: value,
+                                             context: modelContext,
+                                             engine: ckEngine)
+        store.sections = store.sections.map { config in
+          config.key == "tasks"
+            ? SectionConfig(key: config.key, label: config.label, color: config.color,
+                            isEnabled: config.isEnabled, showInToday: value,
+                            showInSpotlight: config.showInSpotlight,
+                            hasOnboarded: config.hasOnboarded)
+            : config
+        }
+      }
+    )
+  }
 
   var body: some View {
     Section("Open in") {
@@ -196,8 +228,43 @@ private struct TasksDetailContent: View {
     Section("Badge") {
       Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
     }
-    Section("Today") {
+    Section {
       Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
+      Toggle(isOn: $showAging) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Show aging on Today")
+          Text("Tint the checkbox as a task carries over day after day.")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    } header: {
+      Text("Today")
+    } footer: {
+      Text("Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off.")
+    }
+    Section {
+      Toggle(isOn: showInNextBinding) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Show in Next")
+          Text("Include today's open tasks on the Next list.")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    } footer: {
+      Text("Hides tasks from Next only — the Tasks tab and data stay put. The same switch lives under Settings → Next → Sections in Next.")
+    }
+    Section {
+      Toggle(isOn: $filingSuggestions) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Suggest filing destinations")
+          Text("Learn on-device where you usually file similar tasks.")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    } header: {
+      Text("Inbox")
+    } footer: {
+      Text("Shows a one-tap chip on inbox rows and a suggested list while you type. The model trains locally on your history and never leaves your device.")
     }
     Section {
       Toggle("Show calendar events", isOn: $showCalendarEvents)
@@ -219,6 +286,13 @@ private struct TasksDetailContent: View {
       }
     } footer: {
       Text("One-time migration from a Things database export. Your Things data is not modified.")
+    }
+    Section {
+      NavigationLink(value: SettingsView.SettingsDestination.claudeAI) {
+        Label("AI & Claude for tasks", systemImage: "brain.head.profile")
+      }
+    } footer: {
+      Text("Choose how far AI may reach and how tasks created by Claude arrive — as proposals to review in the inbox, or committed to the list you specify.")
     }
   }
 }

@@ -157,6 +157,14 @@ enum SettingsKey {
   /// Settings → Integrations, so the default can't surprise-prompt). Read by
   /// `TaskListView`.
   static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
+  /// Whether open Today tasks deepen their checkbox tint the longer they sit
+  /// on Today undone (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`).
+  /// Absent → on. Read by `TaskCheckboxModel`.
+  static let tasksShowAging = "septena.tasks.showAging"
+  /// Whether the on-device classifier suggests where to file inbox tasks
+  /// (`SuggestionEngine` → inbox chips, context-menu "Move to…", composer
+  /// "Suggested list" chip). Absent → on. Read by `TaskListView` / composer.
+  static let tasksFilingSuggestions = "septena.tasks.filingSuggestions"
   /// Tasks sidebar column visibility on push-navigation surfaces (iPad
   /// regular / macOS). Persisted locally so ⌘/ and the system sidebar
   /// controls survive relaunch. Raw values: `all`, `detailOnly`.

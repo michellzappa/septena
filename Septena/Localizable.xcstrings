@@ -4,6 +4,9 @@
     "" : {
 
     },
+    " " : {
+
+    },
     "—" : {
 
     },
@@ -1414,6 +1417,9 @@
         }
       }
     },
+    "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off." : {
+
+    },
     "AI & MCP" : {
 
     },
@@ -2136,6 +2142,9 @@
           }
         }
       }
+    },
+    "Choose how far AI may reach and how tasks created by Claude arrive — as proposals to review in the inbox, or committed to the list you specify." : {
+
     },
     "Choose how far AI may reach, connect Claude through MCP, and review the skills that teach models how to use your sections." : {
 
@@ -3820,6 +3829,9 @@
         }
       }
     },
+    "Hides tasks from Next only — the Tasks tab and data stay put. The same switch lives under Settings → Next → Sections in Next." : {
+
+    },
     "Hides this section everywhere. Your data and customizations stay." : {
       "localizations" : {
         "pt-BR" : {
@@ -4106,6 +4118,9 @@
           }
         }
       }
+    },
+    "Include today's open tasks on the Next list." : {
+
     },
     "Incomplete logs" : {
       "localizations" : {
@@ -4405,6 +4420,9 @@
       }
     },
     "Layout picks how the homepage renders — Histogram, Sparkline, Heatmap, Rings, or Wheel. Insights tunes the cross-section correlation explorer. Next shapes the daily list — suggestions, carry-over, and which sections appear." : {
+
+    },
+    "Learn on-device where you usually file similar tasks." : {
 
     },
     "Learned, time-of-day nudge cards at the top of the Next list — they appear around when you usually do the thing and go quiet once you log it. Turn the lot off, or just the kinds you don't want." : {
@@ -5039,6 +5057,9 @@
       }
     },
     "New report" : {
+
+    },
+    "New task" : {
 
     },
     "New Task" : {
@@ -6822,6 +6843,9 @@
         }
       }
     },
+    "Show aging on Today" : {
+
+    },
     "Show each section's goals and live progress toward target (read-only)." : {
 
     },
@@ -6845,6 +6869,9 @@
 
     },
     "Shown next to your contributions. Up to 80 characters." : {
+
+    },
+    "Shows a one-tap chip on inbox rows and a suggested list while you type. The model trains locally on your history and never leaves your device." : {
 
     },
     "Shows today at a glance, above the layout. Dial is a 24-hour clock with your logs as dots and sleep as an arc, lit by the real sunrise and sunset for your time zone — no location needed. Timeline shows the same day as a horizontal strip." : {
@@ -7147,6 +7174,9 @@
     "Suggest and vote on what comes next, share a testimonial, and choose the public profile attached to community contributions." : {
 
     },
+    "Suggest filing destinations" : {
+
+    },
     "Suggested" : {
       "localizations" : {
         "pt-BR" : {
@@ -7361,6 +7391,7 @@
       }
     },
     "Tap the + button to add a task." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7734,6 +7765,9 @@
     "Tingling" : {
 
     },
+    "Tint the checkbox as a task carries over day after day." : {
+
+    },
     "today" : {
       "localizations" : {
         "pt-BR" : {
@@ -7951,6 +7985,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tipo %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Type above to add your first task." : {
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Digite acima para adicionar sua primeira tarefa."
           }
         }
       }
