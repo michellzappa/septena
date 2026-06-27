@@ -117,6 +117,18 @@ extension View {
     #endif
   }
 
+  /// Neutral fill behind a selected `List(selection:)` row. Native UIKit/AppKit
+  /// paints accent blue by default; pair with `septenaSuppressListCellSelection`.
+  @ViewBuilder
+  func selectableListRow(tag: String, isSelected: Bool) -> some View {
+    self
+      .listRowSeparator(.hidden)
+      .listRowBackground(SelectableListRowBackground(isSelected: isSelected))
+      .listRowInsets(EdgeInsets())
+      .tag(tag)
+      .septenaSuppressListCellSelection()
+  }
+
   /// Disable the platform's accent selection fill so `listRowBackground` is the
   /// only row highlight (UIKit blue on iOS, AppKit accent on macOS).
   @ViewBuilder
@@ -128,6 +140,16 @@ extension View {
     #else
     self
     #endif
+  }
+}
+
+/// Neutral-gray selection capsule behind a selectable list row.
+struct SelectableListRowBackground: View {
+  let isSelected: Bool
+  var body: some View {
+    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
+      .fill(isSelected ? Theme.listSelectionFill : Theme.paperBackground)
+      .padding(.horizontal, isSelected ? 5 : 0)
   }
 }
 

@@ -2815,12 +2815,7 @@ extension View {
   }
 
   func asTaskRow(id: String, isSelected: Bool) -> some View {
-    self
-      .listRowSeparator(.hidden)
-      .listRowBackground(TaskListSelectionBackground(isSelected: isSelected))
-      .listRowInsets(EdgeInsets())
-      .tag(id)
-      .septenaSuppressListCellSelection()
+    selectableListRow(tag: id, isSelected: isSelected)
   }
 
   func plainListChrome() -> some View {
@@ -2828,18 +2823,6 @@ extension View {
       .listRowBackground(Color.clear)
       .listRowInsets(EdgeInsets())
       .selectionDisabled()
-  }
-}
-
-/// Neutral fill behind a selected task row. Native `List(selection:)` on iOS and
-/// macOS paints accent blue by default; an explicit `listRowBackground` plus
-/// per-row selection suppression replaces it with gray.
-private struct TaskListSelectionBackground: View {
-  let isSelected: Bool
-  var body: some View {
-    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isSelected ? Theme.listSelectionFill : Theme.paperBackground)
-      .padding(.horizontal, isSelected ? 5 : 0)
   }
 }
 
