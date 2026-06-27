@@ -34,9 +34,8 @@ import AppKit
 //   • WithingsProvider  — OAuth + paginated measure/getmeas fetch +
 //                         token rotation + Settings UI driver.
 //
-// CloudKit schema enum and the ChecklistCloudKitBackedEntity
-// extension live in Persistence.swift alongside Oura's, since that
-// helper protocol is fileprivate.
+// CloudKit schema enum and the CloudKitSystemFieldsBacked
+// extension live in Persistence.swift alongside Oura's.
 
 // MARK: - Entity
 

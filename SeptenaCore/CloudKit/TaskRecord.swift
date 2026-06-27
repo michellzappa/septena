@@ -76,26 +76,7 @@ static let reservedInt1 = "reservedInt1"
 
 // MARK: - Encode
 
-extension TaskEntity {
-  /// Decode the stored CKRecord system fields blob into a bare CKRecord
-  /// (recordID + change tag, no field values). Returns nil if we've never
-  /// seen this row via CloudKit before — caller mints a fresh record.
-  func decodedCloudKitRecord() -> CKRecord? {
-    guard let data = cloudKitSystemFields else { return nil }
-    let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data)
-    unarchiver?.requiresSecureCoding = true
-    return unarchiver.flatMap { CKRecord(coder: $0) }
-  }
-
-  /// Encode + store the system fields from `record`. Called after a save
-  /// is acked or after the engine fetches a record from the server.
-  func captureCloudKitSystemFields(from record: CKRecord) {
-    let archiver = NSKeyedArchiver(requiringSecureCoding: true)
-    record.encodeSystemFields(with: archiver)
-    archiver.finishEncoding()
-    cloudKitSystemFields = archiver.encodedData
-  }
-
+extension TaskEntity: CloudKitSystemFieldsBacked {
   /// Build a CKRecord for upload. Reuses any previously-captured system
   /// fields so the recordChangeTag is preserved (avoids 409s on re-save).
   /// The CKRecord.ID's recordName is the entity's `id` so identity

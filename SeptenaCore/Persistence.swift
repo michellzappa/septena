@@ -2293,19 +2293,25 @@ enum ActivityDayCloudKitSchema {
   }
 }
 
-private protocol ChecklistCloudKitBackedEntity: AnyObject {
+/// Shared CloudKit system-fields plumbing for every CK-backed `@Model`.
+/// A conformer only needs the `cloudKitSystemFields` blob; the archive/
+/// unarchive of the record's system fields (recordID + change tag) is
+/// identical for every record type, so it lives here once instead of being
+/// re-implemented per entity. Used by the checklist/section entities below and
+/// by the task-stack entities in `CloudKit/*Record.swift`.
+protocol CloudKitSystemFieldsBacked: AnyObject {
   var cloudKitSystemFields: Data? { get set }
 }
 
-extension ChecklistCloudKitBackedEntity {
-  fileprivate func decodedCloudKitRecord() -> CKRecord? {
+extension CloudKitSystemFieldsBacked {
+  func decodedCloudKitRecord() -> CKRecord? {
     guard let data = cloudKitSystemFields else { return nil }
     let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data)
     unarchiver?.requiresSecureCoding = true
     return unarchiver.flatMap { CKRecord(coder: $0) }
   }
 
-  fileprivate func captureCloudKitSystemFields(from record: CKRecord) {
+  func captureCloudKitSystemFields(from record: CKRecord) {
     let archiver = NSKeyedArchiver(requiringSecureCoding: true)
     record.encodeSystemFields(with: archiver)
     archiver.finishEncoding()
@@ -2313,7 +2319,7 @@ extension ChecklistCloudKitBackedEntity {
   }
 }
 
-extension HabitDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension HabitDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: HabitDefinitionCloudKitSchema.recordType,
@@ -2344,7 +2350,7 @@ extension HabitDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
+extension HabitDayStateEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: HabitEventCloudKitSchema.recordType,
@@ -2381,7 +2387,7 @@ extension HabitDayStateEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension SupplementDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension SupplementDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: SupplementDefinitionCloudKitSchema.recordType,
@@ -2411,7 +2417,7 @@ extension SupplementDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
+extension SupplementDayStateEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: SupplementEventCloudKitSchema.recordType,
@@ -2447,7 +2453,7 @@ extension SupplementDayStateEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension ChoreDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension ChoreDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ChoreDefinitionCloudKitSchema.recordType,
@@ -2478,7 +2484,7 @@ extension ChoreDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
+extension ChoreEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ChoreEventCloudKitSchema.recordType,
@@ -2519,7 +2525,7 @@ extension ChoreEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension GutEventEntity: ChecklistCloudKitBackedEntity {
+extension GutEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: GutEventCloudKitSchema.recordType,
@@ -2561,7 +2567,7 @@ extension GutEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension MoodEventEntity: ChecklistCloudKitBackedEntity {
+extension MoodEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: MoodEventCloudKitSchema.recordType,
@@ -2600,7 +2606,7 @@ extension MoodEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension SymptomDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension SymptomDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: SymptomDefinitionCloudKitSchema.recordType,
@@ -2636,7 +2642,7 @@ extension SymptomDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension SymptomEventEntity: ChecklistCloudKitBackedEntity {
+extension SymptomEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: SymptomEventCloudKitSchema.recordType,
@@ -2682,7 +2688,7 @@ extension SymptomEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension MedicationDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension MedicationDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: MedicationDefinitionCloudKitSchema.recordType,
@@ -2734,7 +2740,7 @@ extension MedicationDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension MedicationDoseEventEntity: ChecklistCloudKitBackedEntity {
+extension MedicationDoseEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: MedicationDoseEventCloudKitSchema.recordType,
@@ -2776,7 +2782,7 @@ extension MedicationDoseEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension OuraNightEntity: ChecklistCloudKitBackedEntity {
+extension OuraNightEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: OuraNightCloudKitSchema.recordType,
@@ -2827,7 +2833,7 @@ extension OuraNightEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension QuoteEntity: ChecklistCloudKitBackedEntity {
+extension QuoteEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: QuoteCloudKitSchema.recordType,
@@ -2856,7 +2862,7 @@ extension QuoteEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension WithingsRowEntity: ChecklistCloudKitBackedEntity {
+extension WithingsRowEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: WithingsRowCloudKitSchema.recordType,
@@ -2891,7 +2897,7 @@ extension WithingsRowEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension IntakeKindEntity: ChecklistCloudKitBackedEntity {
+extension IntakeKindEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: IntakeKindCloudKitSchema.recordType,
@@ -2944,7 +2950,7 @@ extension IntakeKindEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension IntakeItemEntity: ChecklistCloudKitBackedEntity {
+extension IntakeItemEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: IntakeItemCloudKitSchema.recordType,
@@ -2976,7 +2982,7 @@ extension IntakeItemEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension IntakeEventEntity: ChecklistCloudKitBackedEntity {
+extension IntakeEventEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: IntakeEventCloudKitSchema.recordType,
@@ -3014,7 +3020,7 @@ extension IntakeEventEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension GroceryItemEntity: ChecklistCloudKitBackedEntity {
+extension GroceryItemEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: GroceryItemCloudKitSchema.recordType,
@@ -3048,7 +3054,7 @@ extension GroceryItemEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension GroceryCategoryEntity: ChecklistCloudKitBackedEntity {
+extension GroceryCategoryEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: GroceryCategoryCloudKitSchema.recordType,
@@ -3073,7 +3079,7 @@ extension GroceryCategoryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
+extension ExerciseEntryEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ExerciseEntryCloudKitSchema.recordType,
@@ -3123,7 +3129,7 @@ extension ExerciseEntryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension ExerciseDefinitionEntity: ChecklistCloudKitBackedEntity {
+extension ExerciseDefinitionEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ExerciseDefinitionCloudKitSchema.recordType,
@@ -3161,7 +3167,7 @@ extension ExerciseDefinitionEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
+extension SessionTypeEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: SessionTypeCloudKitSchema.recordType,
@@ -3198,7 +3204,7 @@ extension SessionTypeEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension NutritionEntryEntity: ChecklistCloudKitBackedEntity {
+extension NutritionEntryEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: NutritionEntryCloudKitSchema.recordType,
@@ -3257,7 +3263,7 @@ extension NutritionEntryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension NutritionDailySummaryEntity: ChecklistCloudKitBackedEntity {
+extension NutritionDailySummaryEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: NutritionDailySummaryCloudKitSchema.recordType,
@@ -3312,7 +3318,7 @@ extension NutritionDailySummaryEntity: ChecklistCloudKitBackedEntity {
   }
 }
 
-extension ActivityDayEntity: ChecklistCloudKitBackedEntity {
+extension ActivityDayEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: ActivityDayCloudKitSchema.recordType,

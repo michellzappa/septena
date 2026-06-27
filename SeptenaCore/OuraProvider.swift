@@ -19,8 +19,7 @@ import SwiftData
 //                       merged [OuraNight] (same shape views consume).
 //
 // The CloudKit-record extension and schema enum live in Persistence.swift
-// alongside the other ChecklistCloudKitBackedEntity conformances (the
-// helper protocol is fileprivate there).
+// alongside the other CloudKitSystemFieldsBacked conformances.
 
 // MARK: - Entity
 
@@ -48,7 +47,7 @@ final class OuraNightEntity {
 
   var updatedAt: Date
   /// CKSyncEngine per-record system fields. Same pattern as the other
-  /// ChecklistCloudKitBackedEntity conformances.
+  /// CloudKitSystemFieldsBacked conformances.
   var cloudKitSystemFields: Data?
 
   init(id: String,

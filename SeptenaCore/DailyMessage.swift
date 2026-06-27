@@ -159,7 +159,7 @@ public final class QuoteEntity {
 
   public var updatedAt: Date
   /// CKSyncEngine per-record system fields. Same pattern as the other
-  /// ChecklistCloudKitBackedEntity conformances.
+  /// CloudKitSystemFieldsBacked conformances.
   public var cloudKitSystemFields: Data?
 
   public init(id: String,

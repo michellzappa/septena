@@ -37,21 +37,7 @@ enum AreaCloudKitSchema {
 
 // MARK: - Encode
 
-extension AreaEntity {
-  func decodedCloudKitRecord() -> CKRecord? {
-    guard let data = cloudKitSystemFields else { return nil }
-    let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: data)
-    unarchiver?.requiresSecureCoding = true
-    return unarchiver.flatMap { CKRecord(coder: $0) }
-  }
-
-  func captureCloudKitSystemFields(from record: CKRecord) {
-    let archiver = NSKeyedArchiver(requiringSecureCoding: true)
-    record.encodeSystemFields(with: archiver)
-    archiver.finishEncoding()
-    cloudKitSystemFields = archiver.encodedData
-  }
-
+extension AreaEntity: CloudKitSystemFieldsBacked {
   func toCloudKitRecord() -> CKRecord {
     let record = decodedCloudKitRecord() ?? CKRecord(
       recordType: AreaCloudKitSchema.recordType,
