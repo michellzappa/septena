@@ -35,6 +35,14 @@ enum NextFeed {
     NextBlocks.orderedSectionKeys(enabledKeys: enabledKeys)
   }
 
+  /// Section keys that contribute blocks to Next — enabled and opted into the
+  /// timeline (`SectionConfig.showInToday`). Single filter for the iOS list,
+  /// watch snapshot, and keyboard nav so the toggle can't drift.
+  static func nextSectionKeys(from sections: [SectionConfig]) -> [String] {
+    orderedSectionKeys(
+      enabledKeys: sections.filter { $0.isEnabled && $0.showInToday }.map(\.key))
+  }
+
   /// The complete Next feed as a flat, serializable list: read-only
   /// suggestions first, then the ordered section blocks (tasks / chores /
   /// habits / supplements). All habit buckets are included (each tagged in
@@ -76,9 +84,10 @@ enum NextFeed {
         return (block.sectionKey, entries)
       })
 
-    let enabled = SettingsMirror.loadSections(context: context)
-      .filter(\.isEnabled).map(\.key)
-    for key in orderedSectionKeys(enabledKeys: enabled) {
+    let visibleKeys = SettingsMirror.loadSections(context: context)
+      .filter { $0.isEnabled && $0.showInToday }
+      .map(\.key)
+    for key in orderedSectionKeys(enabledKeys: visibleKeys) {
       entries.append(contentsOf: blocksByKey[key] ?? [])
     }
 

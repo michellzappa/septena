@@ -90,8 +90,7 @@ struct NextView: View {
       .filter { !suggestionsModel.skipped.contains($0.id) }
     tags += visibleSuggestions.map { NextRowTag.suggestion($0.id) }
 
-    let enabled = settingsStore.sections.filter(\.isEnabled).map(\.key)
-    for key in NextFeed.orderedSectionKeys(enabledKeys: enabled) {
+    for key in NextFeed.nextSectionKeys(from: settingsStore.sections) {
       switch key {
       case "tasks":
         if !tasksModel.openTasks.isEmpty {

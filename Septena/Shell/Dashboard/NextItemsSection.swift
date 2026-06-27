@@ -559,8 +559,7 @@ struct NextOpenSection: View {
   /// list never diverges from the watch. Reads the reactive `SettingsStore`
   /// so reordering in Settings updates the list live.
   private var orderedKeys: [String] {
-    NextFeed.orderedSectionKeys(
-      enabledKeys: settingsStore.sections.filter(\.isEnabled).map(\.key))
+    NextFeed.nextSectionKeys(from: settingsStore.sections)
   }
 
   /// Habits and supplements are bucketed identically (see `DayBucket.isDueNow`):
