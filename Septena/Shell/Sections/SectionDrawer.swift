@@ -767,6 +767,11 @@ extension View {
   ///     should refresh after a write elsewhere). Pass the view's section
   ///     key(s) via `forSections` so scoped posts from *other* sections skip
   ///     the reload; nil reloads on every data change (pre-scoping behavior).
+  ///   • `mirrorReload` — optional full mirror re-read (e.g. `NextItemsModel.load()`)
+  ///     that runs only on inbound CloudKit batches. Scoped local writes already
+  ///     updated the UI optimistically; re-reading the mirror mid-settle would
+  ///     cancel linger/fade beats. Drawers whose `perform` already re-reads the
+  ///     mirror (nutrition, mood, …) can omit this.
   /// Collapses the `.task` + `.onChange` + `.onReceive` trio every drawer
   /// repeated. Accepts an `async` closure so both sync `reload()` and
   /// `paintFromCache(); await load()` shapes fit.
@@ -774,13 +779,17 @@ extension View {
     on value: V,
     onDataChange: Bool = false,
     forSections: Set<String>? = nil,
+    mirrorReload: (() async -> Void)? = nil,
     perform: @escaping () async -> Void
   ) -> some View {
     self
       .task(id: value) { await perform() }
       .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
         if onDataChange, note.affectsAnySection(of: forSections) {
-          Task { @MainActor in await perform() }
+          Task { @MainActor in
+            if note.isCloudKitBatch { await mirrorReload?() }
+            await perform()
+          }
         }
       }
   }
@@ -789,10 +798,11 @@ extension View {
   func sectionReload(
     onDataChange: Bool = false,
     forSections: Set<String>? = nil,
+    mirrorReload: (() async -> Void)? = nil,
     perform: @escaping () async -> Void
   ) -> some View {
     sectionReload(on: 0, onDataChange: onDataChange, forSections: forSections,
-                  perform: perform)
+                  mirrorReload: mirrorReload, perform: perform)
   }
 }
 

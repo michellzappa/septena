@@ -202,6 +202,8 @@ struct TrainingDestinationView: View {
     .task {
       paintFromCache()
       draftStore.refreshCatalog(context: modelContext)
+    }
+    .sectionReload(on: viewingDate, onDataChange: true, forSections: ["training"]) {
       await load()
     }
     .adaptiveDetail(item: $editing) { entry in

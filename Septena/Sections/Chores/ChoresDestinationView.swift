@@ -91,7 +91,8 @@ struct ChoresDestinationView: View {
       model.paintFromCache()
       await model.load()
     }
-    .sectionReload(onDataChange: true, forSections: ["chores"]) { await loadHistory() }
+    .sectionReload(onDataChange: true, forSections: ["chores"],
+                   mirrorReload: { await model.load() }) { await loadHistory() }
     // Tapping a chore opens its detail "infobox" (history + learned cadence);
     // the row's own checkbox still completes it. From the detail, "Edit" swaps
     // to the editor for the same chore.

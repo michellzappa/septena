@@ -66,6 +66,13 @@ extension Notification {
     userInfo?[DataChange.sectionsKey] as? Set<String>
   }
 
+  /// True when the post came from an inbound CloudKit batch (`applyDidFinishBatch`
+  /// posts unscoped). Scoped local mutator writes carry `changedSections`; only
+  /// remote arrivals are unscoped. Listeners that keep session-local UI state
+  /// (settle beats, acted-row sets) should do a full mirror reload on this path
+  /// only — not on scoped local posts.
+  var isCloudKitBatch: Bool { changedSections == nil }
+
   /// Whether a listener showing `sections` should react. True when either
   /// side is unscoped (nil) or the two sets intersect.
   func affectsAnySection(of sections: Set<String>?) -> Bool {

@@ -82,7 +82,8 @@ struct HabitsDestinationView: View {
       model.paintFromCache()
       await model.load()
     }
-    .sectionReload(on: viewingDate, onDataChange: true, forSections: ["habits"]) {
+    .sectionReload(on: viewingDate, onDataChange: true, forSections: ["habits"],
+                   mirrorReload: { await model.load() }) {
       await reloadPastDay()
       await loadRates()
       await loadHistory()
