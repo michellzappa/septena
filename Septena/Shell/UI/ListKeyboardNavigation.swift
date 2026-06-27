@@ -24,6 +24,9 @@ private struct ListKeyboardNavigation: ViewModifier {
   /// list's Return/Space/Escape so typing isn't hijacked, and — on its
   /// falling edge — triggers a focus-reclaim so ↑↓ keep selecting.
   let inputActive: Bool
+  /// When false, the surface is off-screen (another tab, a covered route).
+  /// Reclaim list focus when it flips back to true so ↑↓ work immediately.
+  let isActive: Bool
   let hasSelection: Bool
   let onReturn: () -> Void
   let onSpace: () -> Void
@@ -36,9 +39,13 @@ private struct ListKeyboardNavigation: ViewModifier {
       .focusable()
       .focused($listFocused)
       .focusEffectDisabled()
-      .onAppear { listFocused = true }
+      .onAppear { if isActive { listFocused = true } }
       .onChange(of: inputActive) { _, active in
-        guard !active else { return }
+        guard !active, isActive else { return }
+        DispatchQueue.main.async { listFocused = true }
+      }
+      .onChange(of: isActive) { _, active in
+        guard active, !inputActive else { return }
         DispatchQueue.main.async { listFocused = true }
       }
       .onKeyPress(.return) {
@@ -65,6 +72,7 @@ extension View {
   /// See `ListKeyboardNavigation`.
   func listKeyboardNavigation(
     inputActive: Bool,
+    isActive: Bool = true,
     hasSelection: Bool,
     onReturn: @escaping () -> Void,
     onSpace: @escaping () -> Void,
@@ -72,6 +80,7 @@ extension View {
   ) -> some View {
     modifier(ListKeyboardNavigation(
       inputActive: inputActive,
+      isActive: isActive,
       hasSelection: hasSelection,
       onReturn: onReturn,
       onSpace: onSpace,
