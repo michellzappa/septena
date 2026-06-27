@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1208,
+      "build": 1213,
       "date": "2026-06-27",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Faster task capture and editing",
-          "detail": "Create, rename, and quick-add tasks inline, with a Things-style navigation menu and a global Add Task entry point in Control Center.",
+          "title": "A faster, more capable Tasks experience",
+          "detail": "Create and rename tasks inline, add a task from anywhere including Control Center, and see your calendar events woven into Today and Upcoming.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted tasks with undo",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
+          "title": "Recently Deleted with restore",
+          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can bring them back, and you can import an existing Things database.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events are woven into your task agenda, with hidden-calendar choices synced across devices.",
+          "title": "The Week tab is now Today",
+          "detail": "A single Today tenure dial on the checkbox shows how long a task has been waiting, with neutral selection and a longer completion undo window.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring your existing to-dos over from a Things database export.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and have it analyzed on-device to log nutrition.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture analyzes your food on-device, plus a small flourish when you break a fast.",
           "section": "nutrition"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter front and center on the home screen.",
-          "section": "goals"
-        },
-        {
-          "title": "Smarter training volume and weekly reviews",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session.",
+          "title": "Smarter training review",
+          "detail": "Effort-weighted muscle volume and a post-session weekly review, with a unified daily-trend chart.",
           "section": "training"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels let you pick off, minimal, balanced, or full, and you can see exactly what is sent.",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep the goals that matter most front and center on the home screen.",
+          "section": "goals"
+        },
+        {
+          "title": "A richer Next feed and watch",
+          "detail": "Keyboard navigation and synced dismissals on the Next feed, a long-press action drawer and a time-of-day sky on Apple Watch.",
+          "section": null
+        },
+        {
+          "title": "Clearer privacy controls",
+          "detail": "Graded analytics levels from off to full, with a plain view of exactly what's sent and a recently-sent log.",
           "section": null
         }
       ]
