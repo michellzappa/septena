@@ -197,16 +197,18 @@ struct TaskListView: View {
   // `.inline` presentation, so the form is literally the same component the
   // create-drawer uses. Folding the row autosaves (see `collapseEdit`).
   @State private var expandedEditId: String?
+  /// Inline-create placeholders (`deferPush` drafts) — purged on fold when the
+  /// title never got a non-empty commit.
+  @State private var draftEditIds: Set<String> = []
   /// Shared namespace for the title hero-glide: the closed row's title and the
   /// open inline editor's title field carry the same `matchedGeometryEffect` id,
   /// so on expand/collapse the title moves between the two positions instead of
   /// cross-fading. See `CheckableRow.titleMatchID` / `editTitleMatchID`.
   @Namespace private var editTitleNS
 
-  // Drives the focused "New Task" compose modal opened by the `+` toolbar
-  // button (and ⌘N, and the sidebar "New To-Do"). A dedicated composer — not
-  // the app-wide capture / quick-find sheet — so creating from a list lands
-  // the task in that list's context with no search surface in the way.
+  // Upcoming-only: the multi-day grid has no single list context, so ⌘N / + fall
+  // back to the drawer composer (pick a day). Every other creatable list spawns
+  // a `deferPush` draft row and opens the inline expand-in-place editor.
   @State private var creating = false
 
   // MARK: - Inline editing (the Reminders/Things "type-a-line" model)
@@ -231,9 +233,6 @@ struct TaskListView: View {
   /// Working buffer for the in-place rename; seeded from the task on begin,
   /// committed (or discarded) on submit / blur / Esc.
   @State private var titleDraft: String = ""
-  /// Working buffer for the quick-add line. Commit creates a task in this
-  /// list's context and re-focuses the line for rapid entry.
-  @State private var newTaskText: String = ""
 
   /// Whether the Inbox section (on the Today view) is folded. Expanded by
   /// default; the header shows the count either way.
@@ -553,11 +552,11 @@ struct TaskListView: View {
       settle.cancelAll()
       clearSelection()
       expandedEditId = nil
+      draftEditIds = []
       // Drop any inline edit/quick-add in flight — the buffers belong to the
       // list we're leaving, not the one we're switching to.
       editingTitleId = nil
       titleDraft = ""
-      newTaskText = ""
       inlineFocus = nil
       // Re-fetch the woven calendar agenda SYNCHRONOUSLY, in the same
       // transaction as the filter change. The view is reused across filter
@@ -604,8 +603,8 @@ struct TaskListView: View {
     }
   }
 
-  /// The drawer composer is now CREATE-only — `+`/⌘N opens a new-task drawer
-  /// (picking the list/day with no surrounding list to type into). EDITING an
+  /// The drawer composer is Upcoming-only — every other creatable list spawns
+  /// a `deferPush` draft and opens the inline expand-in-place editor. EDITING an
   /// existing task expands inline in its row (`expandedEditId`), not here.
   private var composerMode: TaskComposerCard.Mode? {
     if creating { return .create(filter) }
@@ -621,15 +620,29 @@ struct TaskListView: View {
     creating = false
   }
 
-  /// Open the floating new-task capture card (`QuickTaskCapture`) for the
-  /// current list. Unlike the app-wide capture sheet, this is a plain compose
-  /// field — title + the list it lands in — with no search/quick-find surface;
-  /// it commits on submit, so there are no leftover placeholder rows.
+  /// Spawn a new task in this list's context and open the Things-style inline
+  /// editor on it. Creatable lists insert a local `deferPush` draft (no CloudKit
+  /// push until the title commits); Upcoming falls back to the drawer composer.
   private func startCreate() {
-    withAnimation(.snappy(duration: 0.25)) {
-      expandedEditId = nil
-      creating = true
+    guard filter != .recentlyDeleted else { return }
+    guard allowsInlineCreate else {
+      withAnimation(.snappy(duration: 0.25)) {
+        expandedEditId = nil
+        creating = true
+      }
+      return
     }
+    if expandedEditId != nil { collapseEdit() }
+    inlineFocus = nil
+    editingTitleId = nil
+    let seed = TaskDraft(filter: filter)
+    let task = seed.create(via: mutator, deferPush: true)
+    draftEditIds.insert(task.id)
+    withAnimation(.snappy(duration: 0.22)) {
+      items.insert(task, at: 0)
+      beginEdit(task)
+    }
+    AddInfoSection.tasks.notifyTilesChanged()
   }
 
   // MARK: - Inline editing
@@ -669,7 +682,7 @@ struct TaskListView: View {
   /// click on empty paper, which would otherwise have cleared the selection a
   /// beat before this runs). The one exception: if the user closed by selecting
   /// a DIFFERENT row, we respect that new selection instead of yanking it back.
-  private func collapseEdit() {
+  private func collapseEdit(purgingDrafts: Bool = true) {
     let closingId = expandedEditId
     withAnimation(.snappy(duration: 0.22)) {
       expandedEditId = nil
@@ -677,6 +690,22 @@ struct TaskListView: View {
         selection = [closingId]
       }
     }
+    guard purgingDrafts, let closingId, draftEditIds.contains(closingId) else { return }
+    let id = closingId
+    draftEditIds.remove(id)
+    // Defer one beat so the editor's `.onDisappear` autosave lands first.
+    DispatchQueue.main.async { purgeDraftIfEmpty(id: id) }
+  }
+
+  /// Drop an inline-create placeholder that never received a title.
+  private func purgeDraftIfEmpty(id: String) {
+    let trimmed = currentTask(id: id)?.title
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard trimmed.isEmpty else { return }
+    mutator.purge(id: id)
+    removeLocally(id: id)
+    selection.remove(id)
+    Task { await load() }
   }
 
   /// Commit a rename whose field just lost the cursor (keyboard dismissed,
@@ -710,39 +739,9 @@ struct TaskListView: View {
     if case .row = inlineFocus { inlineFocus = nil }
   }
 
-  /// Move keyboard focus into the quick-add line (the macOS empty-space
-  /// double-click and the iOS "+ New task" tap both land here).
-  private func focusNewTask() {
-    guard allowsInlineCreate else { return }
-    if let prevId = editingTitleId, let prev = currentTask(id: prevId) {
-      commitRename(prev)
-    }
-    DispatchQueue.main.async { inlineFocus = .newRow }
-  }
-
-  /// Commit the quick-add line: create a task in this list's context (reusing
-  /// the composer's `TaskDraft(filter:)` placement mapping so a row added on
-  /// Today lands on Today, on a project lands in that project, etc.), clear the
-  /// buffer, and keep the cursor on the line for rapid back-to-back entry.
-  private func commitNewTask() {
-    let trimmed = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { inlineFocus = nil; return }
-    // On Today the quick-add line lives in the Inbox section, so it captures a
-    // LOOSE task (no Today pin / date / list) — an unratified Inbox item, not a
-    // committed-today one. `.triage` seeds nothing, so the task lands in the
-    // triage band. Every other list files into its own context (project / area /
-    // a tomorrow date for Upcoming) via the normal seed.
-    var draft = TaskDraft(filter: filter == .today ? .triage : filter)
-    draft.title = trimmed
-    draft.create(via: mutator)
-    AddInfoSection.tasks.notifyTilesChanged()
-    newTaskText = ""
-    Task { await load() }
-    // Re-assert focus so the next title can be typed immediately (Reminders'
-    // rapid-entry: Return commits and drops you onto a fresh line). Async so the
-    // reload's rebuild can't drop the focus assignment.
-    DispatchQueue.main.async { inlineFocus = .newRow }
-  }
+  /// Move keyboard focus into the quick-add line — retained for call sites that
+  /// still route footer gestures through this name; opens the inline editor.
+  private func focusNewTask() { startCreate() }
 
   private var taskListContent: some View {
     // ONE container on every platform: a `SelectableScrollList`
@@ -769,9 +768,10 @@ struct TaskListView: View {
       taskListHeader
       taskListRows
       // The quick-add line lives in the Inbox section on Today (see
-      // `triageSection`); every other list gets it at the foot, where its single
-      // context is unambiguous.
-      if filter != .today { quickAddRow }
+      // `triageSection`); every other creatable list gets it at the foot once
+      // there's content. When the list is empty, the line sits above the empty
+      // state in the header so the first action is right under the title.
+      if showsQuickAddAtFoot { quickAddRow }
       projectLoggedSection()
       taskListFooter
     }
@@ -830,11 +830,28 @@ struct TaskListView: View {
     toggle(task)
   }
 
+  /// True once this filter's data has loaded and there are no rows to show.
+  private var showsEmptyTaskList: Bool {
+    loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty
+      && doneToday.isEmpty && triageItems.isEmpty && !isLoading
+  }
+
+  /// Inline quick-add under the title when a creatable list is empty.
+  private var showsQuickAddAtTop: Bool {
+    filter != .today && allowsInlineCreate && showsEmptyTaskList
+  }
+
+  /// Things-style foot quick-add once the list has content.
+  private var showsQuickAddAtFoot: Bool {
+    filter != .today && allowsInlineCreate && !showsEmptyTaskList
+  }
+
   @ViewBuilder
   private var taskListHeader: some View {
     titleRow
     newTodosBannerRow
     remindersRow
+    if showsQuickAddAtTop { quickAddRow }
     emptyStateRow
   }
 
@@ -960,7 +977,7 @@ struct TaskListView: View {
       // a double-click in that blank space drops the cursor onto the quick-add
       // line (the macOS "double-click empty space to add" affordance).
       #if os(macOS)
-      .simultaneousGesture(TapGesture(count: 2).onEnded { focusNewTask() })
+      .simultaneousGesture(TapGesture(count: 2).onEnded { startCreate() })
       .simultaneousGesture(TapGesture(count: 1).onEnded { clearSelection() })
       #else
       .onTapGesture { clearSelection() }
@@ -1009,7 +1026,7 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
-    if loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty && doneToday.isEmpty && triageItems.isEmpty && !isLoading {
+    if showsEmptyTaskList {
       if filter == .recentlyDeleted {
         ContentUnavailableView(
           "No Recently Deleted Tasks",
@@ -1023,10 +1040,14 @@ struct TaskListView: View {
         ContentUnavailableView(
           "Nothing here yet",
           systemImage: titleIcon,
-          description: Text("Tap the + button to add a task.")
+          description: Text(
+            showsQuickAddAtTop
+              ? "Type above to add your first task."
+              : "Tap + or double-click below to add a task."
+          )
         )
         .frame(maxWidth: .infinity)
-        .padding(.top, 40)
+        .padding(.top, showsQuickAddAtTop ? 24 : 40)
         .plainListChrome()
       }
     }
@@ -1257,9 +1278,30 @@ struct TaskListView: View {
   private func toggleTodayForSelected() {
     guard let id = effectiveSelectionId(),
           let t = currentTask(id: id) else { return }
+    if t.isOnToday { applyRemoveFromToday([t.id]) }
+    else {
+      Haptics.tick()
+      promoteToToday([t.id])
+      Task { await load() }
+    }
+  }
+
+  /// Context menu / ⌘T "Remove from Today" — clears every arrived Today signal
+  /// via the mutator, then drops ratified rows off the in-memory Today buckets
+  /// immediately (same pattern as delete's `removeLocally`) before the async
+  /// reload lands.
+  private func applyRemoveFromToday(_ ids: [String]) {
     Haptics.tick()
-    if t.isOnToday { mutator.removeFromToday(id: t.id) }
-    else { promoteToToday([t.id]) }
+    for id in ids {
+      mutator.removeFromToday(id: id)
+      mutator.acknowledge(id: id)
+    }
+    if filter == .today {
+      func drop(_ list: inout [SeptenaTask]) {
+        list.removeAll { ids.contains($0.id) }
+      }
+      drop(&items); drop(&review); drop(&doneToday)
+    }
     Task { await load() }
   }
 
@@ -1455,7 +1497,10 @@ struct TaskListView: View {
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: editTitleNS,
       showsTodayIndicator: filter != .today,
-      onDone: { Task { await load() } }
+      onDone: {
+        if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
+        Task { await load() }
+      }
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
@@ -1592,8 +1637,8 @@ struct TaskListView: View {
     .transition(.opacity)
     // Open + selection gestures live on `selectableScrollRow` (applied via
     // `asTaskRow`): tap → open (touch), single-click → select / double-click →
-    // open (Mac). `activateRow` routes "open" to `beginEdit` (inline rename on
-    // iPhone, composer on Mac). The checkbox Button consumes its own taps, so
+    // open (Mac). `activateRow` routes "open" to `beginEdit` (the Things-style
+    // expand-in-place editor). The checkbox Button consumes its own taps, so
     // tapping it toggles without also opening. Only right-click + the context
     // menu remain row-local.
     .septenaOnRightClick {
@@ -1648,26 +1693,9 @@ struct TaskListView: View {
     }
   }
 
-  /// The shared quick-add field — one definition for both the Inbox-section line
-  /// (Today) and the foot-of-list line (every other creatable list). The dashed
-  /// box matches inbox proposals (unratified / not-yet-created); never Today-yellow.
+  /// Tappable footer row — opens the same inline editor as ⌘N / +.
   private func quickAddLine() -> some View {
-    InlineTaskRow(
-      text: $newTaskText,
-      placeholder: "New task",
-      accent: theme.color(for: "tasks"),
-      isDone: false,
-      isToday: false,
-      dashed: TaskRowFlags.languageV2,
-      focus: $inlineFocus,
-      focusValue: .newRow,
-      showsDetails: false,
-      allowsMultiline: false,
-      onToggle: {},
-      onCommit: { commitNewTask() },
-      onCancel: { inlineFocus = nil },
-      onOpenDetails: nil
-    )
+    QuickAddTriggerRow(action: startCreate)
   }
 
   /// Single source of truth for per-row actions. Used by the per-row
@@ -1707,17 +1735,14 @@ struct TaskListView: View {
         onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
-          Haptics.tick()
           if today {
+            Haptics.tick()
             promoteToToday(ids)
             for id in ids { mutator.acknowledge(id: id) }
+            Task { await load() }
           } else {
-            for id in ids {
-              mutator.removeFromToday(id: id)
-              mutator.acknowledge(id: id)
-            }
+            applyRemoveFromToday(ids)
           }
-          Task { await load() }
         },
         onOpenWhen: { target in
           if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .scheduled) }
@@ -1757,6 +1782,7 @@ struct TaskListView: View {
   }
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
+    guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
     guard case let .single(task) = target, task.status == .open else { return nil }
     // Today's triage band keeps its richer pre-ranked list (computed in `load()`).
     if filter == .today, let top = suggestionEngine.topSuggestion(for: task.id) {
@@ -1824,7 +1850,8 @@ struct TaskListView: View {
   /// The one-tap "file here" suggestion — Inbox loose captures and area-direct
   /// tasks. Only when the classifier is confident (snapshotted in `load()`).
   private func inboxSuggestion(for task: SeptenaTask) -> SuggestionEngine.Suggestion? {
-    inboxSuggestions[task.id]
+    guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
+    return inboxSuggestions[task.id]
   }
 
   /// Top filing pick for implicit "not this" learning — engine map (Inbox) or
@@ -2502,15 +2529,18 @@ struct TaskListView: View {
       // the live open rows — that's what powers the one-tap "file here"
       // suggestion chip and the implicit "not this" learning. refresh also
       // primes the model for the composer's on-keystroke suggest().
-      let allTasks = LocalCache.allTasks(in: modelContext)
-      suggestionEngine.refresh(inbox: localTriage,
-                               allTasks: allTasks,
-                               projects: projects,
-                               areas: areas)
+      if TaskRowFlags.filingSuggestionsEnabled {
+        let allTasks = LocalCache.allTasks(in: modelContext)
+        suggestionEngine.refresh(inbox: localTriage,
+                                 allTasks: allTasks,
+                                 projects: projects,
+                                 areas: areas)
+      }
     } else {
       triageStorage = []
     }
-    if filter != .today && filter != .logbook && filter != .recentlyDeleted {
+    if TaskRowFlags.filingSuggestionsEnabled,
+       filter != .today && filter != .logbook && filter != .recentlyDeleted {
       suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
@@ -2520,17 +2550,19 @@ struct TaskListView: View {
     // inside the row's body proved unreliable for this list; the composer's
     // own suggestion chip works precisely because it caches into @State too.
     var freshSuggestions: [String: SuggestionEngine.Suggestion] = [:]
-    if filter == .today {
-      for t in triageItems where t.project == nil && t.area == nil {
-        if let s = suggestionEngine.suggest(forText: t.title) {
-          freshSuggestions[t.id] = s
+    if TaskRowFlags.filingSuggestionsEnabled {
+      if filter == .today {
+        for t in triageItems where t.project == nil && t.area == nil {
+          if let s = suggestionEngine.suggest(forText: t.title) {
+            freshSuggestions[t.id] = s
+          }
         }
-      }
-    } else if case .area(let areaId) = filter {
-      let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
-      for t in items where t.project == nil {
-        if let s = suggestionEngine.suggest(forText: t.title, scope: scope) {
-          freshSuggestions[t.id] = s
+      } else if case .area(let areaId) = filter {
+        let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
+        for t in items where t.project == nil {
+          if let s = suggestionEngine.suggest(forText: t.title, scope: scope) {
+            freshSuggestions[t.id] = s
+          }
         }
       }
     }
@@ -3003,12 +3035,35 @@ extension View {
 
 // MARK: - Inline editable task line
 //
-// The shared atom behind BOTH in-place rename and the quick-add footer — the
-// merged "type-a-line" behavior. It mirrors `CheckableRow`'s layout (a
-// baseline-aligned `TaskCheckbox` + the title) so an editing row sits flush
-// with its static neighbours, but renders the title as a `TextField`. The
-// quick-add line passes an inert `onToggle` (no task to check yet); rename
-// passes the row's real toggle so you can still check a task mid-edit.
+// The shared atom behind in-place rename rows. The quick-add footer is now a
+// separate `QuickAddTriggerRow` that opens the full inline editor.
+
+private struct QuickAddTriggerRow: View {
+  let action: () -> Void
+  @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
+
+  var body: some View {
+    Button(action: action) {
+      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+        TaskCheckbox(isDone: false, dashed: TaskRowFlags.languageV2,
+                     isToday: false, onToggle: {})
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        Text("New task")
+          .font(.septenaTaskTitle)
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .padding(.horizontal, rowHInset)
+      .padding(.vertical, rowVInset)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("New task")
+  }
+}
+
+// MARK: - Inline rename row
 
 private struct InlineTaskRow: View {
   @Binding var text: String

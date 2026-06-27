@@ -85,6 +85,14 @@ enum TaskRowFlags {
   static var languageV2: Bool {
     UserDefaults.standard.object(forKey: "taskRowLanguageV2") as? Bool ?? true
   }
+  /// Settings ▸ Tasks ▸ Today ▸ "Show aging on Today". Absent → on.
+  static var agingEnabled: Bool {
+    UserDefaults.standard.object(forKey: SettingsKey.tasksShowAging) as? Bool ?? true
+  }
+  /// Settings ▸ Tasks ▸ "Suggest filing destinations". Absent → on.
+  static var filingSuggestionsEnabled: Bool {
+    UserDefaults.standard.object(forKey: SettingsKey.tasksFilingSuggestions) as? Bool ?? true
+  }
 }
 
 // MARK: - Checkbox
@@ -528,6 +536,26 @@ struct CheckableRow<Trailing: View>: View {
     return Theme.inkPrimary
   }
 
+  /// Title as inline `Text` so a notes glyph flows at the end of the last
+  /// wrapped line (not parked beside line one in an `HStack`).
+  private var titleLine: some View {
+    titleText
+      .font(.septenaTaskTitle)
+      .strikethrough(isInactive)
+      .opacity(isInactive ? 0.5 : 1)
+      .lineLimit(2)
+      .truncationMode(.tail)
+      .fixedSize(horizontal: false, vertical: true)
+      .matchedHeroGeometry(titleMatchID, heroMatchNS)
+      .accessibilityLabel(showsNotesGlyph ? "\(title), has notes" : title)
+  }
+
+  private var titleText: Text {
+    let head = Text(title).foregroundStyle(titleInk)
+    guard showsNotesGlyph else { return head }
+    return head + Text("\u{00a0}") + TaskNotesGlyph.inlineText()
+  }
+
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       TaskCheckbox(
@@ -550,22 +578,7 @@ struct CheckableRow<Trailing: View>: View {
       }
 
       VStack(alignment: .leading, spacing: 4) {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-          Text(title)
-            .font(.septenaTaskTitle)
-            .foregroundStyle(titleInk)
-            .strikethrough(isInactive)
-            .opacity(isInactive ? 0.5 : 1)
-            .lineLimit(2)
-            .truncationMode(.tail)
-            .fixedSize(horizontal: false, vertical: true)
-            .matchedHeroGeometry(titleMatchID, heroMatchNS)
-          if showsNotesGlyph {
-            TaskNotesGlyph()
-              .opacity(isInactive ? 0.5 : 1)
-              .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
-          }
-        }
+        titleLine
         if let subtitle {
           Text(subtitle)
             .font(.septenaMeta)
@@ -688,7 +701,7 @@ struct TaskCheckboxModel {
       return nil
     }()
     arrivedToday = task.showsArrivedToday()
-    tenureFill = task.todayTenureFill()
+    tenureFill = TaskRowFlags.agingEnabled ? task.todayTenureFill() : nil
   }
 }
 
@@ -707,12 +720,15 @@ extension TaskCheckbox {
 }
 
 /// Compact notes marker that rides inline at the end of a task title.
-struct TaskNotesGlyph: View {
-  var body: some View {
-    Image(systemName: "text.alignleft")
-      .scaledFont(size: 12)
+enum TaskNotesGlyph {
+  /// Vertical nudge so the glyph reads mid-aligned with title cap height.
+  static let baselineOffset: CGFloat = 4
+
+  static func inlineText() -> Text {
+    Text(Image(systemName: "text.alignleft"))
+      .font(.system(size: 10))
       .foregroundStyle(Theme.inkSecondary)
-      .accessibilityLabel("Has notes")
+      .baselineOffset(baselineOffset)
   }
 }
 

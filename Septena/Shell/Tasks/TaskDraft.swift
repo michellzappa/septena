@@ -75,7 +75,7 @@ struct TaskDraft: Equatable {
   /// applied as a follow-up when set.
   @MainActor
   @discardableResult
-  func create(via mutator: TaskMutator) -> SeptenaTask {
+  func create(via mutator: TaskMutator, deferPush: Bool = false) -> SeptenaTask {
     let task = mutator.create(
       title: trimmedTitle,
       area: areaId,
@@ -83,7 +83,8 @@ struct TaskDraft: Equatable {
       scheduled: storedScheduled,
       deadline: deadline,
       today: pinToday,
-      notes: trimmedNotes.isEmpty ? nil : trimmedNotes
+      notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+      deferPush: deferPush
     )
     if let recurrence { mutator.setRecurrence(id: task.id, recurrence: recurrence) }
     return task
@@ -110,7 +111,8 @@ struct TaskDraft: Equatable {
       mutator.schedule(id: id, date: storedScheduled)
     }
     if pinToday != prior.pinToday {
-      mutator.moveToToday(id: id, today: pinToday)
+      if pinToday { mutator.moveToToday(id: id, today: true) }
+      else { mutator.removeFromToday(id: id) }
     }
     if deadline != prior.deadline {
       mutator.setDeadline(id: id, date: deadline)

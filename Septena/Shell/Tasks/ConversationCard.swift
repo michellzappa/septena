@@ -229,19 +229,15 @@ struct ConversationCard: View {
 }
 
 /// The conversation as a normal section inside the task composer's scroll: the
-/// `ConversationCard` (open question promoted to a title over its option pills),
-/// and the `AskAIButton` shown only before a conversation exists. No header
-/// chrome and no card box — it's inline content that scrolls with the drawer and
-/// runs full-width, like the rest of the form.
+/// `ConversationCard` once a thread exists (open question promoted to a title
+/// over its option pills). The Discuss kickoff lives in the attribute pill rail
+/// above — no header chrome and no card box here.
 struct ConversationSection: View {
   let task: SeptenaTask
   let accent: Color
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      ConversationCard(taskID: task.id, initial: task.conversation, accent: accent)
-      AskAIButton(task: task)
-    }
+    ConversationCard(taskID: task.id, initial: task.conversation, accent: accent)
   }
 }
 
@@ -344,55 +340,6 @@ struct AIExplainerView: View {
       Image(systemName: "circle.fill").font(.caption2).foregroundStyle(color)
       Text(text).font(.callout)
     }
-  }
-}
-
-/// Kicks off a conversation on a fresh task — runs the on-device first step
-/// (via `ConversationEngine`, which routes per the AI dial). Shows only when no
-/// conversation exists yet; once a turn lands, the card takes over. Press-to-
-/// advance: nothing runs until tapped.
-struct AskAIButton: View {
-  let task: SeptenaTask
-  @State private var hasStarted: Bool
-  @State private var working = false
-
-  init(task: SeptenaTask) {
-    self.task = task
-    _hasStarted = State(initialValue: task.conversation.hasStarted)
-  }
-
-  var body: some View {
-    Group {
-      if !hasStarted {
-        Button(action: run) {
-          HStack(spacing: 6) {
-            if working { ProgressView().controlSize(.small) }
-            else { Image(systemName: "bubble.left.and.bubble.right") }
-            Text(working ? "Thinking…" : "Talk it through with AI")
-          }
-          .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.bordered)
-        // Neutral chrome to match the inline editor — no section/system accent
-        // on the open editor; the bordered button reads gray, not blue.
-        .tint(Theme.inkSecondary)
-        .disabled(working || !OnDeviceAI.isAvailable)
-      }
-    }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in refresh() }
-  }
-
-  private func run() {
-    working = true
-    Task {
-      _ = await ConversationEngine.advance(task: task)
-      working = false
-      refresh()
-    }
-  }
-
-  private func refresh() {
-    hasStarted = SeptenaServices.shared.taskMutator.conversation(id: task.id)?.hasStarted ?? false
   }
 }
 

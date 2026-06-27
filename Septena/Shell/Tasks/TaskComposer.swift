@@ -4,8 +4,8 @@ import SwiftUI
 // hosted by the app's standard `AdaptiveEditScaffold` + `.adaptiveDetail`
 // (a sheet on iPhone, a docked inspector on iPad/macOS — like every other edit
 // drawer). Title + notes sit at the top; the electives (Today, When, Deadline,
-// Repeat, List) are glass pills underneath. A pill shows its glyph + label when
-// unset and its glyph + value (accent-tinted glass) when set. Tapping a
+// Repeat, List) are flat capsule pills underneath. A pill shows its glyph + label when
+// unset and its glyph + value (accent-tinted) when set. Tapping a
 // date/repeat pill expands its editor inline; the List picker opens as a sheet.
 // In edit mode the agent conversation is a section in the scroll. See
 // docs/DesignSpec.md §5.5 — glass is the floating-control material.
@@ -103,6 +103,8 @@ struct TaskComposerCard: View {
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
+  /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
+  @State private var discussKickoffVisible = false
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, onClose: (() -> Void)? = nil,
@@ -132,6 +134,11 @@ struct TaskComposerCard: View {
   private var isEditing: Bool {
     if case .edit = mode { return true }
     return false
+  }
+
+  private var editingTask: SeptenaTask? {
+    if case .edit(let task) = mode { return task }
+    return nil
   }
 
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
@@ -235,7 +242,9 @@ struct TaskComposerCard: View {
           accent: accent,
           neutral: inline,
           focus: $focus,
-          activate: $pendingPillActivate
+          activate: $pendingPillActivate,
+          discussTask: editingTask,
+          discussVisible: $discussKickoffVisible
         )
 
         // Edit mode only — a not-yet-created task has no id/conversation.
@@ -350,6 +359,10 @@ struct TaskComposerCard: View {
   }
 
   private func updateSuggestion() {
+    guard TaskRowFlags.filingSuggestionsEnabled else {
+      suggestedList = nil
+      return
+    }
     guard case .create = mode else { return }
     if draft.projectId != nil || draft.areaId != nil {
       suggestedList = nil
@@ -421,7 +434,7 @@ struct TaskComposerCard: View {
       .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .glassEffect(.regular.tint(accent.opacity(0.28)).interactive(), in: .capsule)
+    .background(Capsule().fill(accent.opacity(0.28)))
   }
 
   private func applySuggestedList() {
@@ -472,10 +485,12 @@ struct TaskComposerCard: View {
       seededDraft = draft
       // Train the list classifier once so the "Suggested" chip can query it
       // cheaply per keystroke.
-      SuggestionEngine.shared.prepare(
-        allTasks: LocalCache.allTasks(in: modelContext),
-        projects: projects, areas: areas
-      )
+      if TaskRowFlags.filingSuggestionsEnabled {
+        SuggestionEngine.shared.prepare(
+          allTasks: LocalCache.allTasks(in: modelContext),
+          projects: projects, areas: areas
+        )
+      }
       // Focus after the sheet settles — an immediate focus is dropped before the
       // field joins the responder chain, so the keyboard wouldn't come up.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
@@ -572,10 +587,13 @@ struct TaskComposerCard: View {
 
   // MARK: - Keyboard focus traversal
 
-  /// Tab order: title → every pill.
+  /// Tab order: title → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
-    order += TaskAttributeBar.Attribute.allCases.map { .pill($0) }
+    order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
+    if discussKickoffVisible {
+      order.append(.pill(.discuss))
+    }
     return order
   }
 
@@ -625,17 +643,27 @@ struct TaskAttributeBar: View {
   /// pill (Space / Return on a focused pill), the bar runs `select` and clears
   /// it. Pointer taps call `select` directly.
   @Binding var activate: Attribute?
+  /// Edit mode only — when set and no conversation exists yet, a Discuss pill
+  /// joins the rail to kick off the on-device conversation flow.
+  var discussTask: SeptenaTask? = nil
+  /// Written whenever `showsDiscuss` changes so the composer can Tab to the pill.
+  @Binding var discussVisible: Bool
 
   /// The electives, in rail order. Each is fully described by the enum (icon /
   /// label / how it presents); per-attribute *values* are derived from the draft
   /// in `value(for:)` / `isSet(_:)`, and each editor lives in its own panel. So
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
-  enum Attribute: CaseIterable, Identifiable {
+  enum Attribute: Identifiable {
     // Notes is NOT a pill — it's an always-editable field above the rail (see
     // `TaskComposerCard.notesField`).
     case when, deadline, repeatRule, list
+    /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
+    case discuss
     var id: Self { self }
+
+    /// Scheduling / filing electives — the `ForEach` rail.
+    static let draftCases: [Attribute] = [.when, .deadline, .repeatRule, .list]
 
     var icon: String {
       switch self {
@@ -643,6 +671,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "flag"
       case .repeatRule: "repeat"
       case .list:       "folder"
+      case .discuss:    "bubble.left.and.bubble.right"
       }
     }
     var label: String {
@@ -651,6 +680,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "Deadline"
       case .repeatRule: "Repeat"
       case .list:       "List"
+      case .discuss:    "Discuss"
       }
     }
     /// List opens a sheet — a rich, searchable area/project picker reused across
@@ -661,30 +691,56 @@ struct TaskAttributeBar: View {
   /// The currently expanded inline pill (never `.list`, which presents a sheet).
   @State private var expanded: Attribute?
   @State private var showingList = false
-  @Namespace private var glassNS
+  @State private var discussStarted: Bool
+  @State private var discussWorking = false
+
+  init(draft: Binding<TaskDraft>, areas: [Area], projects: [Project], accent: Color,
+       neutral: Bool = false, focus: FocusState<TaskEditFocus?>.Binding,
+       activate: Binding<Attribute?>, discussTask: SeptenaTask? = nil,
+       discussVisible: Binding<Bool> = .constant(false)) {
+    _draft = draft
+    self.areas = areas
+    self.projects = projects
+    self.accent = accent
+    self.neutral = neutral
+    _focus = focus
+    _activate = activate
+    self.discussTask = discussTask
+    _discussVisible = discussVisible
+    _discussStarted = State(initialValue: discussTask?.conversation.hasStarted ?? true)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       // Pills wrap onto extra rows as needed (FlowLayout) so every elective
       // stays visible — no offscreen horizontal scroll. "Today" isn't its own
       // pill: it's the same stored state as When=Today, so it lives inside the
-      // When control (quick chip) instead of duplicating the rail. The
-      // GlassEffectContainer lets the pills' glass morph/merge fluidly as their
-      // values change (DesignSpec §5.5) rather than cross-fading.
-      GlassEffectContainer(spacing: 8) {
-        FlowLayout(spacing: 8) {
-          ForEach(Attribute.allCases) { attr in
-            AttributePill(icon: attr.icon, label: attr.label,
-                          value: value(for: attr), isSet: isSet(attr),
-                          isActive: expanded == attr, isFocused: focus == .pill(attr),
-                          accent: accent, neutral: neutral,
-                          glassID: String(describing: attr), glassNS: glassNS) { select(attr) }
-              .focused($focus, equals: .pill(attr))
-          }
+      // When control (quick chip) instead of duplicating the rail. Flat
+      // capsule fills (no floating glass) — these sit inline on the form card.
+      FlowLayout(spacing: 8) {
+        ForEach(Attribute.draftCases) { attr in
+          AttributePill(icon: attr.icon, label: attr.label,
+                        value: value(for: attr), isSet: isSet(attr),
+                        isActive: expanded == attr, isFocused: focus == .pill(attr),
+                        accent: accent, neutral: neutral) { select(attr) }
+            .focused($focus, equals: .pill(attr))
+        }
+        if showsDiscuss {
+          AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
+                        value: discussWorking ? "Thinking…" : nil,
+                        isSet: discussWorking, isActive: false,
+                        isFocused: focus == .pill(.discuss),
+                        accent: accent, neutral: neutral) { select(.discuss) }
+            .focused($focus, equals: .pill(.discuss))
+            .disabled(discussWorking)
         }
       }
 
       inlineEditor
+    }
+    .onAppear(perform: reloadDiscussState)
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      reloadDiscussState()
     }
     .sheet(isPresented: $showingList) {
       MovePickerSheet(areas: areas, projects: projects,
@@ -703,10 +759,15 @@ struct TaskAttributeBar: View {
     }
   }
 
+  private var showsDiscuss: Bool {
+    discussTask != nil && !discussStarted && OnDeviceAI.isAvailable
+  }
+
   /// The value shown on a pill (its `nil` falls back to the plain label). All
   /// values are derived from the draft — the single read-side of the rail.
   private func value(for attr: Attribute) -> String? {
     switch attr {
+    case .discuss: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
@@ -726,6 +787,7 @@ struct TaskAttributeBar: View {
   /// Whether a pill counts as "filled" — drives the accent tint.
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
+    case .discuss:    discussWorking
     case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
     case .repeatRule: draft.recurrence != nil
@@ -743,7 +805,7 @@ struct TaskAttributeBar: View {
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent) {
         withAnimation(.snappy(duration: 0.22)) { expanded = nil }
       }
-      case .list, .none: EmptyView()
+      case .discuss, .list, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -754,6 +816,10 @@ struct TaskAttributeBar: View {
   /// a default, Notes autofocusing) lives in each panel's `onAppear`, so this
   /// stays uniform.
   private func select(_ attr: Attribute) {
+    if attr == .discuss {
+      startDiscuss()
+      return
+    }
     // Move the keyboard cursor onto the pill (also drops the title field's
     // keyboard before a calendar opens — what `onInteractStart` used to do).
     focus = .pill(attr)
@@ -765,6 +831,27 @@ struct TaskAttributeBar: View {
         expanded = (expanded == attr) ? nil : attr
       }
     }
+  }
+
+  private func startDiscuss() {
+    guard let task = discussTask, showsDiscuss, !discussWorking else { return }
+    focus = .pill(.discuss)
+    discussWorking = true
+    Task {
+      _ = await ConversationEngine.advance(task: task)
+      discussWorking = false
+      reloadDiscussState()
+    }
+  }
+
+  private func reloadDiscussState() {
+    guard let id = discussTask?.id else {
+      discussStarted = true
+      discussVisible = false
+      return
+    }
+    discussStarted = SeptenaServices.shared.taskMutator.conversation(id: id)?.hasStarted ?? false
+    discussVisible = showsDiscuss
   }
 
   /// "Today" / "Tomorrow" / "May 14" for a pill value.
@@ -794,17 +881,11 @@ private struct AttributePill: View {
   /// capsule and the focus ring goes gray, so no section accent leaks into the
   /// open editor. See `TaskAttributeBar.neutral`.
   var neutral: Bool = false
-  /// Stable identity inside the bar's `GlassEffectContainer`, so the pill's
-  /// glass morphs in place (and merges with neighbours) as its value changes
-  /// instead of cross-fading. See DesignSpec §5.5.
-  let glassID: String
-  let glassNS: Namespace.ID
   let action: () -> Void
 
-  /// Capsule fill for a filled/active pill — gray in neutral mode, the section
-  /// accent otherwise. `.clear` lets the bare glass show through for an empty pill.
-  private var fillTint: Color {
-    guard isSet || isActive else { return .clear }
+  /// Capsule fill — flat surface, no floating-glass elevation shadow.
+  private var capsuleFill: Color {
+    guard isSet || isActive else { return Theme.mutedSurface }
     return neutral ? Theme.inkPrimary.opacity(0.10) : accent.opacity(0.42)
   }
   private var ringColor: Color { neutral ? Theme.selectionNeutral : accent }
@@ -826,11 +907,7 @@ private struct AttributePill: View {
       .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .glassEffect(
-      .regular.tint(fillTint).interactive(),
-      in: .capsule
-    )
-    .glassEffectID(glassID, in: glassNS)
+    .background(Capsule().fill(capsuleFill))
     .overlay {
       Capsule()
         .strokeBorder(ringColor, lineWidth: 2)
@@ -912,7 +989,7 @@ private struct InlineWhenPanel: View {
         .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .glassEffect(.regular.tint(active ? accent.opacity(0.42) : .clear).interactive(), in: .capsule)
+    .background(Capsule().fill(active ? accent.opacity(0.42) : Theme.mutedSurface))
   }
 }
 
