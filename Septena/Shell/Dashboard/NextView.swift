@@ -367,16 +367,21 @@ struct NextView: View {
     .environment(promoteFlash)
     .scrollContentBackground(.hidden)
     #if os(iOS)
+    // Match the Tasks sidebar exactly: insetGrouped cells over the soft gray
+    // grouped background (was Theme.paperBackground = white, which left the
+    // white cells reading as "white on white"), with the same tightened
+    // section rhythm so the two home tabs feel like one family.
     .listStyle(.insetGrouped)
+    .listSectionSpacing(18)
+    .background(Theme.sidebarBackground)
     #else
     .listStyle(.inset)
     .background(
-      Theme.paperBackground
+      Theme.groupedBackground
         .contentShape(Rectangle())
         .onTapGesture { selection = [] }
     )
     #endif
-    .background(Theme.paperBackground)
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
