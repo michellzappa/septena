@@ -313,6 +313,65 @@ final class WatchConnectivity {
     scheduleReconcile()   // pull the phone's republished snapshot once it lands
   }
 
+  // MARK: - Task row actions (cancel / off-today)
+
+  /// Cancel a task from its long-press drawer. Task-only (the phone's cancel is
+  /// task-only); `finishSuggestion` gives the same optimistic hide + haptic +
+  /// reconcile as completion.
+  func cancelTask(_ item: NextItem) {
+    guard item.kind == "task" else { return }
+    finishSuggestion(item.id)
+    Task {
+      do { try await saveTaskCancel(taskID: item.id) }
+      catch { /* fire-and-forget; iOS reconciles on next open */ }
+    }
+  }
+
+  /// Drop a task off Today from its long-press drawer — the watch's defer: it
+  /// leaves the task open but removes it from the Today feed.
+  func offTodayTask(_ item: NextItem) {
+    guard item.kind == "task" else { return }
+    finishSuggestion(item.id)
+    Task {
+      do { try await saveTaskOffToday(taskID: item.id) }
+      catch { }
+    }
+  }
+
+  /// Skip a habit / supplement for today from its long-press drawer — mirrors
+  /// the phone's `skipHabit` / `skipSupplement`: writes the day event with
+  /// done=0, skipped=1. Same optimistic hide + haptic + reconcile as completion.
+  func skipItem(_ item: NextItem) {
+    guard item.kind == "habit" || item.kind == "supplement" else { return }
+    finishSuggestion(item.id)
+    let date = today
+    Task {
+      do {
+        switch item.kind {
+        case "habit":      try await saveHabitSkip(habitID: item.id, date: date)
+        case "supplement": try await saveSupplementSkip(supplementID: item.id, date: date)
+        default: break
+        }
+      } catch { }
+    }
+  }
+
+  /// Skip a suggestion for today — the phone's single suggestion action. Mirrors
+  /// `NextSuggestionsModel.toggleSkip`: appends the id to the synced Settings
+  /// blob's `next_skips[today]`, so the skip propagates to the phone (and back)
+  /// exactly 1:1. Optimistic local hide first; the CloudKit write is
+  /// fire-and-forget and oplock-guarded (see `saveSuggestionSkip`).
+  func skipSuggestion(_ item: NextItem) {
+    guard item.kind == "suggestion" else { return }
+    finishSuggestion(item.id)
+    let date = today
+    Task {
+      do { try await saveSuggestionSkip(itemID: item.id, date: date) }
+      catch { /* offline or a concurrent settings write rejected us; the nudge
+                 is hidden locally and a later skip re-pushes. */ }
+    }
+  }
+
   // MARK: - Quick-log (actionable suggestions)
 
   /// Log a `.choice`-input suggestion (hydration / gut) with the picked value.
@@ -484,6 +543,78 @@ final class WatchConnectivity {
     record["done"]         = 1
     record["time"]         = Self.timeFmt.string(from: now)
     record["occurredAt"]   = now
+    try await db.save(record)
+  }
+
+  /// Skip a habit for today — mirrors `saveHabitEvent` but done=0, skipped=1
+  /// (the phone's `setHabitState(done:false, skipped:true)`). Upserts the same
+  /// day-keyed record so a skip and a later complete don't collide.
+  private func saveHabitSkip(habitID: String, date: String) async throws {
+    let entityID = "habit:\(date):\(habitID)"
+    let recordID = CKRecord.ID(recordName: "habit-event:\(entityID)", zoneID: ckZoneID)
+    let existing = try? await db.record(for: recordID)
+    let record   = existing ?? CKRecord(recordType: "HabitEvent", recordID: recordID)
+    let now = Date()
+    record["date"]       = date
+    record["habitID"]    = habitID
+    record["done"]       = 0
+    record["skipped"]    = 1
+    record["time"]       = Self.timeFmt.string(from: now)
+    record["occurredAt"] = now
+    try await db.save(record)
+  }
+
+  /// Skip a supplement for today — mirrors `saveSupplementEvent` but done=0,
+  /// skipped=1 (the phone's `setSupplementState(done:false, skipped:true)`).
+  private func saveSupplementSkip(supplementID: String, date: String) async throws {
+    let entityID = "supplement:\(date):\(supplementID)"
+    let recordID = CKRecord.ID(recordName: "supplement-event:\(entityID)", zoneID: ckZoneID)
+    let existing = try? await db.record(for: recordID)
+    let record   = existing ?? CKRecord(recordType: "SupplementEvent", recordID: recordID)
+    let now = Date()
+    record["date"]         = date
+    record["supplementID"] = supplementID
+    record["done"]         = 0
+    record["skipped"]      = 1
+    record["time"]         = Self.timeFmt.string(from: now)
+    record["occurredAt"]   = now
+    try await db.save(record)
+  }
+
+  /// Append a suggestion id to the synced `Settings` singleton's
+  /// `next_skips[date]`, mirroring the phone's `pushSkipsToSettings`. We FETCH
+  /// the live record first so the save is change-tag oplocked: if the phone
+  /// changed settings since our read, CloudKit rejects this save (caught above)
+  /// rather than clobbering it. The JSON is edited surgically — every other
+  /// settings field is preserved untouched — and `next_skips` is pruned to today
+  /// only (matching the phone) to keep the payload small.
+  private func saveSuggestionSkip(itemID: String, date: String) async throws {
+    let recordID = CKRecord.ID(recordName: "app", zoneID: ckZoneID)
+    let record = (try? await db.record(for: recordID))
+      ?? CKRecord(recordType: "Settings", recordID: recordID)
+
+    var root: [String: Any] = {
+      guard let json = record["payloadJSON"] as? String,
+            let data = json.data(using: .utf8),
+            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+      else { return [:] }
+      return obj
+    }()
+
+    // Read today's existing skips, append ours, and write back only today's
+    // list — the phone prunes stale dates the same way.
+    var ids: [String] = []
+    if let raw = root["next_skips"] as? [String: Any],
+       let arr = raw[date] as? [Any] {
+      ids = arr.compactMap { $0 as? String }
+    }
+    guard !ids.contains(itemID) else { return }   // already skipped
+    ids.append(itemID)
+    root["next_skips"] = [date: ids]
+
+    let data = try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+    record["payloadJSON"] = String(decoding: data, as: UTF8.self)
+    record["updatedAt"]   = ISO8601DateFormatter().string(from: Date())
     try await db.save(record)
   }
 
@@ -694,6 +825,32 @@ final class WatchConnectivity {
     record["status"]      = "done"
     record["completedAt"] = Self.tsFmt.string(from: Date())
     record["today"]       = 0
+    try await db.save(record)
+  }
+
+  /// Cancels a task — mirrors `TasksBackend.cancel`: status → cancelled, stamp
+  /// completedAt. Writes the `Task` record in place; iOS reconciles on next open.
+  private func saveTaskCancel(taskID: String) async throws {
+    let recordID = CKRecord.ID(recordName: taskID, zoneID: ckZoneID)
+    guard let record = try? await db.record(for: recordID) else { return }
+    record["status"]      = "cancelled"
+    record["completedAt"] = Self.tsFmt.string(from: Date())
+    record["today"]       = 0
+    try await db.save(record)
+  }
+
+  /// Drops a task off Today — mirrors `TasksBackend.removeFromToday`: clear the
+  /// `today` flag + `todaySetOn`, plus a `scheduled` date that has already
+  /// landed (a future "When" date is left intact so the task re-surfaces on its
+  /// day). A live deadline is intentionally left alone — it's a real commitment.
+  private func saveTaskOffToday(taskID: String) async throws {
+    let recordID = CKRecord.ID(recordName: taskID, zoneID: ckZoneID)
+    guard let record = try? await db.record(for: recordID) else { return }
+    record["today"]      = 0
+    record["todaySetOn"] = nil
+    if let scheduled = record["scheduled"] as? String, scheduled <= today {
+      record["scheduled"] = nil
+    }
     try await db.save(record)
   }
 

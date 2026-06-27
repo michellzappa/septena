@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 private extension View {
   func watchPageTitle(_ title: String, count: Int) -> some View {
@@ -191,7 +192,15 @@ struct NextWatchView: View {
         NextItemRow(item: item,
                     done: conn.completedIDs.contains(item.id),
                     onComplete: { conn.complete(item) },
-                    onQuickLog: { quickLogItem = item })
+                    onQuickLog: { quickLogItem = item },
+                    onOffToday: { conn.offTodayTask(item) },
+                    onCancel: { conn.cancelTask(item) },
+                    onSkip: {
+                      // Suggestions skip via the synced Settings blob; daily
+                      // members skip via their day-event record.
+                      if item.kind == "suggestion" { conn.skipSuggestion(item) }
+                      else { conn.skipItem(item) }
+                    })
         .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
         .watchSkyRow()
       }
@@ -553,6 +562,15 @@ struct NextItemRow: View {
   let done: Bool
   let onComplete: () -> Void
   var onQuickLog: (() -> Void)? = nil
+  // Secondary actions surfaced in the long-press drawer. Which ones show is
+  // per-kind (see RowActionDrawer): tasks get off-today / cancel, habits and
+  // supplements get skip; every completable row gets complete.
+  var onOffToday: (() -> Void)? = nil
+  var onCancel: (() -> Void)? = nil
+  var onSkip: (() -> Void)? = nil
+
+  @State private var showActions = false
+  @State private var isPressing = false
 
   private var isSuggestion: Bool { item.kind == "suggestion" }
   /// A suggestion that can be logged from a tap (carries a `SuggestionBlocks`
@@ -560,20 +578,65 @@ struct NextItemRow: View {
   private var isActionableSuggestion: Bool { isSuggestion && item.logKind != nil }
 
   var body: some View {
-    if isActionableSuggestion {
-      // Quick-log nudge: tap opens the method / mood picker.
-      Button(action: { onQuickLog?() }) { rowBody }
-        .buttonStyle(.plain)
-    } else if isSuggestion {
-      // Read-only nudge (training / fast-break for now).
-      rowBody
+    // Every row gets the long-press action drawer (watchOS doesn't render
+    // `.contextMenu` reliably since Force Touch was removed, so this is the
+    // standard long-press → sheet equivalent). Only the *tap* differs by kind:
+    // a suggestion logs (actionable) or does nothing (read-only); a completable
+    // member completes. Separate tap / long-press gestures on a plain row (not a
+    // Button) so SwiftUI disambiguates them — a recognized long press won't also
+    // fire the tap, so the drawer never acts by accident.
+    if isSuggestion {
+      actionRow(onTap: { if isActionableSuggestion { onQuickLog?() } })
     } else {
-      // Checklist member: tap to complete. Task rows also carry trailing swipe
-      // actions (off-today / cancel) — wired at the call site, where `conn`
-      // lives, since `.swipeActions` must sit on the List row itself.
-      Button(action: onComplete) { rowBody }
-        .buttonStyle(.plain)
+      actionRow(onTap: { onComplete() })
     }
+  }
+
+  /// The interactive row: rowBody + the highlight + tap / long-press gestures +
+  /// the action sheet, shared across all kinds so the press feedback and drawer
+  /// stay identical. `onTap` is the only per-kind difference.
+  private func actionRow(onTap: @escaping () -> Void) -> some View {
+    rowBody
+      // Span the full row width so the highlight (and the tap target) cover the
+      // whole row, not just the label — otherwise a short title only lights up
+      // the few points of text.
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+      // Press feedback: the row lights while the finger is down (so a hold reads
+      // as "registering" before the drawer opens) and stays lit once tapped —
+      // `done` holds the highlight through the ~1.1s settle before the row fades.
+      .background(
+        RoundedRectangle(cornerRadius: 9, style: .continuous)
+          .fill(Color.white.opacity(highlightOpacity))
+      )
+      .scaleEffect(isPressing ? 0.98 : 1)
+      .animation(.easeOut(duration: 0.14), value: isPressing)
+      .animation(.easeOut(duration: 0.14), value: done)
+      .onTapGesture { onTap() }
+      .onLongPressGesture(minimumDuration: 0.4, pressing: { pressing in
+        isPressing = pressing
+      }, perform: {
+        // A light blip confirms the deep-press registered before the drawer
+        // slides up — the wrist's stand-in for a context-menu reveal.
+        WKInterfaceDevice.current().play(.click)
+        showActions = true
+      })
+      .sheet(isPresented: $showActions) {
+        RowActionDrawer(
+          item: item,
+          onComplete: onComplete,
+          onOffToday: { onOffToday?() },
+          onCancel: { onCancel?() },
+          onSkip: { onSkip?() })
+      }
+  }
+
+  /// Highlight strength behind the row: brightest while held, a softer hold once
+  /// the row is done/skipped (the flash that lingers until it fades out).
+  private var highlightOpacity: Double {
+    if isPressing { return 0.20 }
+    if done { return 0.13 }
+    return 0
   }
 
   private var rowBody: some View {
@@ -645,6 +708,63 @@ struct NextItemRow: View {
   // rather than a checkbox that would imply they can be ticked off.
   private var kindIcon: String {
     isSuggestion ? "lightbulb" : "circle"
+  }
+}
+
+// MARK: - Row action drawer
+
+/// The long-press drawer for a completable row: the phone's secondary actions on
+/// the wrist, shown per-kind. Every kind offers Complete; tasks add Off today /
+/// Cancel, habits + supplements add Skip today, chores have only Complete. Each
+/// button fires its action and dismisses. "Cancel task" is labelled in full so
+/// it doesn't read as "dismiss the sheet".
+private struct RowActionDrawer: View {
+  let item: NextItem
+  let onComplete: () -> Void
+  let onOffToday: () -> Void
+  let onCancel: () -> Void
+  let onSkip: () -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  private var canSkip: Bool { item.kind == "habit" || item.kind == "supplement" }
+
+  var body: some View {
+    List {
+      Section {
+        if item.kind == "suggestion" {
+          // A suggestion's only action — matches the phone's suggestion menu
+          // exactly (logging is the tap, not a menu item). `forward.end` is the
+          // same glyph the phone uses for "Skip today".
+          Button { onSkip(); dismiss() } label: {
+            Label("Skip today", systemImage: "forward.end")
+          }
+        } else {
+          Button { onComplete(); dismiss() } label: {
+            Label("Complete", systemImage: "checkmark.circle")
+          }
+          if canSkip {
+            Button { onSkip(); dismiss() } label: {
+              Label("Skip today", systemImage: "minus.circle")
+            }
+          }
+          if item.kind == "task" {
+            Button { onOffToday(); dismiss() } label: {
+              Label("Off today", systemImage: "calendar.badge.minus")
+            }
+            Button(role: .destructive) { onCancel(); dismiss() } label: {
+              Label("Cancel task", systemImage: "xmark.circle")
+            }
+          }
+        }
+      } header: {
+        // Full task title, untruncated and in its natural case — the drawer's
+        // header names exactly which row you're acting on.
+        Text(item.title)
+          .textCase(nil)
+          .lineLimit(nil)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
   }
 }
 
