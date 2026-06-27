@@ -493,7 +493,7 @@ struct TaskComposerCard: View {
       }
       // Focus after the sheet settles — an immediate focus is dropped before the
       // field joins the responder chain, so the keyboard wouldn't come up.
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
     case .edit(let task):
       draft = TaskDraft(task: task)
       // Snapshot the seeded draft as the dirty baseline — the SAME approach as
@@ -516,9 +516,21 @@ struct TaskComposerCard: View {
       // In the iPad/macOS inspector there's no detent to protect, so keep the
       // keyboard-driven "open row with Return, edit immediately" focus.
       if useInspector || presentation == .inline {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
       }
     }
+  }
+
+  /// Move keyboard focus into the title field and — on macOS — drop the cursor
+  /// at the END of the existing title instead of letting `NSTextField` select
+  /// the whole string. The cursor nudge is deferred one beat past the focus
+  /// assignment so the field editor has joined the responder chain first
+  /// (otherwise there's nothing to reposition). A no-op for a fresh empty title.
+  private func focusTitle() {
+    focus = .title
+    #if os(macOS)
+    DispatchQueue.main.async { septenaMoveCursorToEnd() }
+    #endif
   }
 
   /// Writes the draft through the mutator. The scaffold's Save runs this then
