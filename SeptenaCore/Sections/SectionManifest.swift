@@ -192,6 +192,40 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     SectionManifest.identityByKey[key]
   }
 
+  /// A one-to-two-sentence "what this section is for" explainer, shown at the
+  /// top of the section's Settings detail page so anyone opening it understands
+  /// the section at a glance. Richer than `shortDescription` (the terse list
+  /// caption); grounded in the marketing section copy (septena-site
+  /// `lib/sections.ts` blurbs) and kept in a by-key map so the manifest init
+  /// blocks stay terse — same pattern as `iconByKey` / `identityByKey`. A key
+  /// with no entry falls back to `shortDescription` via `explainer`.
+  private static let explainerByKey: [String: String] = [
+    "tasks": String(localized: "A real task manager — Inbox, Today, Upcoming, and Someday, with areas and projects. Capture anything in a second, then decide what today is; nothing gets dumped on your plate.", comment: "Section explainer"),
+    "training": String(localized: "Log strength, cardio, and mobility the day you do them. Septena tracks progression per exercise, surfaces your personal records, and shows whether the week landed.", comment: "Section explainer"),
+    "nutrition": String(localized: "Log a meal in seconds — protein, fat, carbs, calories, and what you ate. Targets are ranges to stay inside of, not rigid numbers you fail to hit.", comment: "Section explainer"),
+    "sleep": String(localized: "Your sleep, brought in read-only from Oura and set beside the rest of your week — so it can finally relate to caffeine, training, and mood. Nothing to log by hand.", comment: "Section explainer"),
+    "habits": String(localized: "A daily checklist bucketed by morning, afternoon, and evening. Streaks are counted from what you actually did — no grace days, no fudging.", comment: "Section explainer"),
+    "chores": String(localized: "Recurring household upkeep on a cadence in days, not a fixed weekday. Mark one done and its next due date moves out; the most overdue surfaces first.", comment: "Section explainer"),
+    "supplements": String(localized: "A daily checklist for your stack, one tap per item, with honest streaks and a single reminder timed to when you usually take them.", comment: "Section explainer"),
+    "groceries": String(localized: "A running shopping list built from what's actually running low. Flag an item when you notice it's down; restocking stamps the date and clears the flag.", comment: "Section explainer"),
+    "intake": String(localized: "One place for the consumables you want to watch — coffee, tea, alcohol, nicotine, or anything you define. Each kind gets its own methods, units, and a goal that fits: log it, hold a limit, cut back, or quit.", comment: "Section explainer"),
+    "body": String(localized: "Weight and body composition, read straight from your Withings scale and Apple Health. Nothing to log by hand — Septena sets the trend in context beside training and nutrition.", comment: "Section explainer"),
+    "gut": String(localized: "A plain, quick digestive log on the Bristol scale. One tap to record, set beside what you ate so sensitivities can surface.", comment: "Section explainer"),
+    "mood": String(localized: "A few seconds, a few times a day: where you are from unpleasant to pleasant, calm to energized, with a word and an optional note.", comment: "Section explainer"),
+    "symptoms": String(localized: "Log a symptom with a severity and a time — headaches, pain, congestion, whatever you're watching — and see its rhythm across the week, beside the things that might set it off.", comment: "Section explainer"),
+    "medications": String(localized: "Track medications the way you take them, by time of day, with an honest record of what you actually took. Due doses join your day's list.", comment: "Section explainer"),
+    "activity": String(localized: "Steps and exercise minutes, read from Apple Health as daily summaries. Movement set in context — a behavior to correlate, not a ring to close.", comment: "Section explainer"),
+    "github": String(localized: "Your GitHub contribution graph, mirrored read-only beside the rest of your life. Your token stays on this device; GitHub stays the source of truth.", comment: "Section explainer"),
+    "hydration": String(localized: "Tap to log a glass and watch the day fill toward your target. Water you log with a meal already counts — no double entry.", comment: "Section explainer"),
+    "goals": String(localized: "On-device coaching over your goals and data. Free-text intentions, each tagged to the sections it touches, with a coach that can read your week.", comment: "Section explainer"),
+  ]
+
+  /// The longer-form section explainer for the Settings detail page; falls
+  /// back to the terse `shortDescription` for any key without richer copy yet.
+  public var explainer: String {
+    SectionManifest.explainerByKey[key] ?? shortDescription
+  }
+
   /// Default `isEnabled` for a freshly-seeded `SectionEntity`. `.always`
   /// is always on. `.core`-onboarding sections start on; `.optional`
   /// and `.hidden` start off. `.integration` sections wait for the

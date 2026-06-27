@@ -355,8 +355,8 @@ struct SectionDetailPane: View {
       showInTodayRow
       showInSpotlightRow
     } footer: {
-      if let m = manifest, !m.shortDescription.isEmpty {
-        Text(m.shortDescription)
+      if let m = manifest, !m.explainer.isEmpty {
+        Text(m.explainer)
       }
     }
   }
