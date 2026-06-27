@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1213,
+      "build": 1215,
       "date": "2026-06-27",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A faster, more capable Tasks experience",
-          "detail": "Create and rename tasks inline, add a task from anywhere including Control Center, and see your calendar events woven into Today and Upcoming.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted with restore",
-          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can bring them back, and you can import an existing Things database.",
-          "section": "tasks"
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": "A single Today tenure dial on the checkbox shows how long a task has been waiting, with neutral selection and a longer completion undo window.",
-          "section": "tasks"
-        },
-        {
-          "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture analyzes your food on-device, plus a small flourish when you break a fast.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and Septena analyzes it on-device to log macros.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training review",
-          "detail": "Effort-weighted muscle volume and a post-session weekly review, with a unified daily-trend chart.",
-          "section": "training"
+          "title": "Rebuilt task list with inline editing",
+          "detail": "Create, rename, and organize tasks inline, with grouped section cards, wrapped long titles, and collapsible areas.",
+          "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter most front and center on the home screen.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Removed tasks rest in a Recently Deleted view for 30 days so you can restore them, with a longer undo window on completions.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events in your day",
+          "detail": "Your calendar events now appear alongside tasks in Today and Upcoming, with hidden-calendar choices synced across devices.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import tasks from Things",
+          "detail": "Bring your existing tasks over from a Things database export.",
+          "section": "tasks"
+        },
+        {
+          "title": "Pin goals to your week",
+          "detail": "Keep the goals that matter most front and center on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "A richer Next feed and watch",
-          "detail": "Keyboard navigation and synced dismissals on the Next feed, a long-press action drawer and a time-of-day sky on Apple Watch.",
-          "section": null
+          "title": "Smarter training review",
+          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
+          "section": "training"
         },
         {
-          "title": "Clearer privacy controls",
-          "detail": "Graded analytics levels from off to full, with a plain view of exactly what's sent and a recently-sent log.",
+          "title": "Richer Apple Watch experience",
+          "detail": "Long-press any Next row to complete, skip, or defer it, with a paged feed set against a live time-of-day sky.",
           "section": null
         }
       ]
