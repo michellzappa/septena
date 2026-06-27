@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1186,
-      "date": "2026-06-26",
+      "build": 1190,
+      "date": "2026-06-27",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Inline task editing and quick capture",
-          "detail": "Rename tasks right in the list, add new ones from a quick-add line, and reach a global Add Task entry point from anywhere including Control Center.",
-          "section": "tasks"
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and get macros estimated on-device.",
+          "section": "nutrition"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view with restore and a 30-day auto-purge, plus a longer undo window after completing.",
-          "section": "tasks"
-        },
-        {
-          "title": "Your calendar in Today",
-          "detail": "System calendar events weave into Today and Upcoming so your day and your tasks live in one place.",
+          "title": "Calendar events in your day",
+          "detail": "Your system calendar now appears woven into Today and Upcoming, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
           "title": "Import tasks from Things",
-          "detail": "Bring your existing tasks across from a Things database export.",
+          "detail": "Bring your existing tasks over from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo of your meal",
-          "detail": "Photo-first meal capture analyzes food on-device to log macros faster.",
-          "section": "nutrition"
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore them before they're purged.",
+          "section": "tasks"
         },
         {
-          "title": "Smarter training review",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review at the end of each session and a unified daily-trend chart.",
-          "section": "training"
+          "title": "Faster task entry everywhere",
+          "detail": "Add a task from a global entry point and Control Center, with inline rename and a quick-add line right in your lists.",
+          "section": "tasks"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center on the week dashboard.",
+          "title": "Pin goals to your week",
+          "detail": "Keep the goals that matter front and center on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Clearer, more private analytics",
-          "detail": "Choose a graded telemetry level from off to full, and see exactly what gets sent in a recently-sent log.",
+          "title": "Smarter training review",
+          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
+          "section": "training"
+        },
+        {
+          "title": "Clearer control over your privacy",
+          "detail": "Choose graded analytics levels from off to full, and see exactly what's sent in a recent activity log.",
           "section": null
         }
       ]
