@@ -648,6 +648,8 @@ private func isoTimestamp(date: String, time: String) -> Date {
 /// (or the Training session sheet). Long-press skips for the rest of today.
 struct NextSuggestionsSection: View {
   var model: NextSuggestionsModel
+  /// Page-level `List(selection:)` — drives row highlight + keyboard cursor.
+  var selection: Set<String> = []
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
 
@@ -660,6 +662,7 @@ struct NextSuggestionsSection: View {
     if !items.isEmpty {
       Section {
         ForEach(items) { suggestion in
+          let tag = NextRowTag.suggestion(suggestion.id)
           NextSuggestionRow(
             suggestion: suggestion,
             model: model,
@@ -667,8 +670,7 @@ struct NextSuggestionsSection: View {
             tint: suggestion.kindColor.flatMap(AdaptiveColor.adaptive)
               ?? theme.color(for: suggestion.kind.sectionKey)
           )
-          .septenaNextRow()
-          .tag(NextRowTag.suggestion(suggestion.id))
+          .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
         }
       } header: {
         Text("Suggested")
@@ -707,12 +709,14 @@ private struct NextSuggestionRow: View {
           }
         } label: { rowLabel }
         .buttonStyle(.plain)
+        .focusable(false)
       } else {
         Button {
           Haptics.tap()
           perform()
         } label: { rowLabel }
         .buttonStyle(.plain)
+        .focusable(false)
       }
     }
     .contextMenu {

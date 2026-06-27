@@ -129,6 +129,8 @@ struct TodayTaskRow: View {
   let tint: Color
   var areas: [Area] = []
   var projects: [Project] = []
+  /// Native `List(selection:)` cursor — dark ink on the gray capsule.
+  var isListSelected: Bool = false
   /// Open this task's edit / agent pane. nil → tap only toggles (no editor host).
   var onOpen: (() -> Void)? = nil
   @Environment(\.a11yMotion) private var motion
@@ -160,6 +162,7 @@ struct TodayTaskRow: View {
       areas: areas,
       projects: projects,
       showsTodayIndicator: false,
+      isListSelected: isListSelected,
       onToggle: {
         let completing = task.status != .done
         model.toggle(task, mutator: mutator, motion: motion)
@@ -524,6 +527,8 @@ final class NextItemsModel {
 struct NextOpenSection: View {
   var model: NextItemsModel
   var tasksModel: TodayTasksModel
+  /// Page-level `List(selection:)` — drives row highlight + keyboard cursor.
+  var selection: Set<String> = []
   /// Backing catalog for each task row's project / area subtitle + the task
   /// menu's pickers. Loaded once up in `NextView` (small, effectively static)
   /// and threaded down so the Tasks block doesn't re-fetch.
@@ -605,9 +610,11 @@ struct NextOpenSection: View {
     case "tasks":
       Section {
         ForEach(tasksModel.openTasks) { task in
+          let tag = NextRowTag.task(task.id)
           TodayTaskRow(task: task, model: tasksModel, mutator: taskMutator,
                        tint: theme.color(for: "tasks"),
                        areas: areas, projects: projects,
+                       isListSelected: selection.contains(tag),
                        onOpen: onOpenTask.map { open in { open(task) } })
             // The full task menu (Edit Details… / When… / Deadline… / Move… /
             // Repeat… / Today / Cancel / Delete) + its picker sheets, shared
@@ -625,8 +632,7 @@ struct NextOpenSection: View {
               onClickSelect(task.id)
             })
             #endif
-            .septenaNextRow()
-            .tag(NextRowTag.task(task.id))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
         }
       } header: {
         tasksSectionHeader(onAdd: onAddTask)
@@ -635,10 +641,11 @@ struct NextOpenSection: View {
     case "chores":
       Section {
         ForEach(model.openChores) { chore in
+          let tag = NextRowTag.chore(chore.id)
           ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "chores"))
-            .septenaNextRow()
-            .tag(NextRowTag.chore(chore.id))
+                   tint: theme.color(for: "chores"),
+                   isListSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
         }
       } header: {
         sectionHeader("Chores")
@@ -647,10 +654,11 @@ struct NextOpenSection: View {
     case "habits":
       Section {
         ForEach(habitsNow) { habit in
+          let tag = NextRowTag.habit(habit.id)
           HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
-                   tint: theme.color(for: "habits"))
-            .septenaNextRow()
-            .tag(NextRowTag.habit(habit.id))
+                   tint: theme.color(for: "habits"),
+                   isListSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
         }
       } header: {
         bucketSectionHeader("Habits", showsCountdown: !lingerHabits)
@@ -659,10 +667,11 @@ struct NextOpenSection: View {
     case "supplements":
       Section {
         ForEach(supplementsNow) { supp in
+          let tag = NextRowTag.supplement(supp.id)
           SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
-                        tint: theme.color(for: "supplements"))
-            .septenaNextRow()
-            .tag(NextRowTag.supplement(supp.id))
+                        tint: theme.color(for: "supplements"),
+                        isListSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
         }
       } header: {
         bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements)
@@ -806,6 +815,8 @@ struct NextDoneSection: View {
   /// Today's passive logs (intake / gut / mood / meals /
   /// training / completed tasks).
   var passive: [DoneEvent]
+  /// Page-level `List(selection:)` — drives row highlight + keyboard cursor.
+  var selection: Set<String> = []
   /// Open the editor for an editable done-row (mood / gut / nutrition). The
   /// editor presentation itself is hosted up in `NextView`, on the `List`
   /// container — NOT here. Attaching `adaptiveDetail` (a macOS `.inspector`)
@@ -852,13 +863,13 @@ struct NextDoneSection: View {
     // read-through record.
     Section {
       ForEach(events) { event in
+        let tag = NextRowTag.done(event.id)
         DoneEventRow(
           event: event,
           onEdit: isEditable(event) ? { onEdit(event) } : nil,
           onDelete: isEditable(event) ? { onDelete(event) } : nil
         )
-        .septenaNextRow()
-        .tag(NextRowTag.done(event.id))
+        .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
       }
     } header: {
       Text("Done Today")
@@ -934,6 +945,8 @@ struct HabitRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  /// Native `List(selection:)` cursor — dark ink on the gray capsule.
+  var isListSelected: Bool = false
   /// When set (the Habits checklist passes it), the row's trailing slot shows
   /// this 30-day completion rate (NN%) instead of the time-of-day — a
   /// glanceable consistency read on every habit. nil elsewhere (Next feed),
@@ -955,6 +968,7 @@ struct HabitRow: View {
       isInactive: inactive,
       leadingEmoji: habit.emoji ?? "•",
       title: habit.name,
+      isListSelected: isListSelected,
       trailing: {
         if habit.skipped {
           StatusBadge(text: "Skipped")
@@ -1011,6 +1025,8 @@ struct SupplementRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  /// Native `List(selection:)` cursor — dark ink on the gray capsule.
+  var isListSelected: Bool = false
   /// 30-day completion rate shown in the trailing slot (instead of the
   /// time-of-day) when the Supplements checklist passes it. nil in the Next
   /// feed, where the time stays.
@@ -1046,6 +1062,7 @@ struct SupplementRow: View {
       isInactive: inactive,
       leadingEmoji: supplement.emoji ?? "•",
       title: supplement.name,
+      isListSelected: isListSelected,
       trailing: {
         if supplement.skipped {
           StatusBadge(text: "Skipped")
@@ -1094,6 +1111,8 @@ struct ChoreRow: View {
   let checklistMutator: ChecklistMutator
   let tint: Color
   var onDelete: (() -> Void)? = nil
+  /// Native `List(selection:)` cursor — dark ink on the gray capsule.
+  var isListSelected: Bool = false
   @Environment(\.a11yMotion) private var motion
   // Optional — ChoreRow renders in multiple hosts; not all inherit the root
   // env. nil → the clear-out burst no-ops, completion still runs.
@@ -1111,6 +1130,7 @@ struct ChoreRow: View {
       isInactive: inactive,
       leadingEmoji: chore.emoji ?? "•",
       title: chore.name,
+      isListSelected: isListSelected,
       trailing: {
         if isDone {
           // Show when it was completed (persisted via the chore's complete
@@ -1192,13 +1212,12 @@ extension View {
   /// already supplies the white grouped "pill" background; we zero its content
   /// margins so the row's own internal padding governs — `rowHInset` for the
   /// horizontal inset (matched to the section header) and the row's baked-in
-  /// vertical padding — reproducing the old in-card density exactly. The List
-  /// owns the rounded corners + inter-section spacing the `nextSectionCard`
-  /// bubble used to draw by hand.
-  func septenaNextRow() -> some View {
+  /// vertical padding — reproducing the old in-card density exactly. Selection
+  /// chrome matches the Tasks list (`selectableListRow`).
+  func septenaNextRow(tag: String, isSelected: Bool) -> some View {
     self
       .environment(\.rowHInset, Theme.Spacing.xl)
-      .listRowInsets(EdgeInsets())
+      .selectableListRow(tag: tag, isSelected: isSelected)
   }
 }
 

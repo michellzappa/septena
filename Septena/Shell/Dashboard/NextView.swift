@@ -11,6 +11,9 @@ struct NextView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(TabSelection.self) private var tabSelection
+  @Environment(NavigationState.self) private var nav
   // Write boundaries for keyboard-driven Return / Space activation. The trio
   // (chores / habits / supplements) flips through the ChecklistMutator; tasks
   // toggle through the TaskMutator — the same paths the row buttons use.
@@ -51,6 +54,8 @@ struct NextView: View {
   /// Loaded once alongside the day's data (small, effectively static).
   @State private var areas: [Area] = []
   @State private var projects: [Project] = []
+  @AppStorage(NextLinger.supplementsKey) private var lingerSupplements = NextLinger.supplementsDefault
+  @AppStorage(NextLinger.habitsKey) private var lingerHabits = NextLinger.habitsDefault
 
   /// Section keys whose `.septenaDataChanged` posts the suggestions engine
   /// actually consumes (`NextSuggestionsModel.computeAll`).
@@ -65,6 +70,52 @@ struct NextView: View {
   /// (caffeine, meals, mood, …). Drives both the empty state and whether the
   /// "Done Today" log renders.
   private var hasAnyDone: Bool { model.hasAnyDone || !doneModel.events.isEmpty }
+
+  /// True while any modal editor owns the keyboard — suppresses list key bindings.
+  private var keyboardInputActive: Bool {
+    creating || editingTask != nil
+      || editingMood != nil || editingGut != nil || editingNutrition != nil
+  }
+
+  /// True when this surface is the frontmost list (Next tab or Tasks ▸ Next).
+  private var keyboardNavActive: Bool {
+    tabSelection.current == .next || nav.path.last == .next
+  }
+
+  /// Open + suggestion rows in display order — the keyboard cursor walks this list.
+  private var keyboardOrderedRowTags: [String] {
+    var tags: [String] = []
+    let visibleSuggestions = suggestionsModel.suggestions
+      .filter { !suggestionsModel.skipped.contains($0.id) }
+    tags += visibleSuggestions.map { NextRowTag.suggestion($0.id) }
+
+    let enabled = settingsStore.sections.filter(\.isEnabled).map(\.key)
+    for key in NextFeed.orderedSectionKeys(enabledKeys: enabled) {
+      switch key {
+      case "tasks":
+        if !tasksModel.openTasks.isEmpty {
+          tags += tasksModel.openTasks.map { NextRowTag.task($0.id) }
+        }
+      case "chores":
+        if !model.openChores.isEmpty {
+          tags += model.openChores.map { NextRowTag.chore($0.id) }
+        }
+      case "habits":
+        let habits = model.openHabits.filter {
+          DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerHabits)
+        }
+        if !habits.isEmpty { tags += habits.map { NextRowTag.habit($0.id) } }
+      case "supplements":
+        let supps = model.openSupplements.filter {
+          DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerSupplements)
+        }
+        if !supps.isEmpty { tags += supps.map { NextRowTag.supplement($0.id) } }
+      default:
+        break
+      }
+    }
+    return tags
+  }
 
   /// Drives the composer drawer from either a quick-add (`creating`) or a row
   /// edit (`editingTask`); clearing it (swipe-away / Cancel / Save) closes the
@@ -158,15 +209,28 @@ struct NextView: View {
     selection.count == 1 ? selection.first : nil
   }
 
+  /// Resolve the row Return / Space should act on — the lone selection, or the
+  /// first visible row (mirrors the Tasks list's `effectiveSelectionId`).
+  private func effectiveSelectedTag() -> String? {
+    if let tag = selectedTag { return tag }
+    guard let first = keyboardOrderedRowTags.first else { return nil }
+    selection = [first]
+    return first
+  }
+
   /// Return: open the row's primary surface. A task opens its composer; a trio
   /// item (chore / habit / supplement) has no editor, so its primary action is
   /// the check itself. Suggestions / done-log rows are read-through here.
   private func activateSelection() {
-    guard let tag = selectedTag else { return }
+    guard let tag = effectiveSelectedTag() else { return }
     let (kind, id) = NextRowTag.split(tag)
     switch kind {
     case "task":
       if let t = tasksModel.openTasks.first(where: { $0.id == id }) { openForEdit(t) }
+    case "sugg":
+      if let s = suggestionsModel.suggestions.first(where: { $0.id == id }) {
+        performSuggestion(s)
+      }
     default:
       toggleTrio(kind: kind, id: id)
     }
@@ -182,11 +246,28 @@ struct NextView: View {
     editingTask = task
   }
 
+  /// Return on a suggestion row — same routing as tapping the row.
+  private func performSuggestion(_ suggestion: NextSuggestion) {
+    Haptics.tap()
+    switch suggestion.kind {
+    case .fastBreak:
+      nav.addInfoRequestedSection = .nutrition
+      nav.showAddInfo = true
+    case .mood:
+      nav.showMoodCheckin = true
+    case .training:
+      nav.showTrainingSession = true
+    case .intake:
+      break
+    }
+  }
+
   /// Space: toggle the row's done state without opening anything — including a
   /// task (the trio already toggles as its primary action).
   private func toggleSelection() {
-    guard let tag = selectedTag else { return }
+    guard let tag = effectiveSelectedTag() else { return }
     let (kind, id) = NextRowTag.split(tag)
+    guard kind != "sugg", kind != "done" else { return }
     if kind == "task" {
       if let t = tasksModel.openTasks.first(where: { $0.id == id }) {
         tasksModel.toggle(t, mutator: taskMutator, motion: motion)
@@ -238,12 +319,13 @@ struct NextView: View {
         }
       }
 
-      NextSuggestionsSection(model: suggestionsModel)
+      NextSuggestionsSection(model: suggestionsModel, selection: selection)
 
       // Tasks / chores / habits / supplements render in the user's saved
       // section order (one order, shared with the homepage) — see
       // NextOpenSection.orderedKeys.
       NextOpenSection(model: model, tasksModel: tasksModel,
+                      selection: selection,
                       areas: areas, projects: projects,
                       onOpenTask: { openForEdit($0) },
                       onClickSelect: clickSelectTask,
@@ -254,28 +336,38 @@ struct NextView: View {
       // here newest-first) plus passive logs (caffeine, meals, mood, …).
       if hasAnyDone {
         NextDoneSection(model: model, passive: doneModel.events,
+                        selection: selection,
                         onEdit: beginEditDone, onDelete: deleteDone)
       }
     }
     .environment(promoteFlash)
+    .scrollContentBackground(.hidden)
     #if os(iOS)
     .listStyle(.insetGrouped)
     #else
     .listStyle(.inset)
+    .background(
+      Theme.paperBackground
+        .contentShape(Rectangle())
+        .onTapGesture { selection = [] }
+    )
     #endif
+    .background(Theme.paperBackground)
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
     // selection cursor across every tagged row; Return activates, Space
-    // toggles, Escape clears. Suppressed while the task composer owns the
+    // toggles, Escape clears. Suppressed while a modal editor owns the
     // keyboard so its fields keep Return/Space.
     .listKeyboardNavigation(
-      inputActive: editingTask != nil,
+      inputActive: keyboardInputActive,
+      isActive: keyboardNavActive,
       hasSelection: !selection.isEmpty,
       onReturn: activateSelection,
       onSpace: toggleSelection,
       onEscape: { selection = [] }
     )
+    .septenaOnEscape { selection = [] }
     .septenaInlineTitle()
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
