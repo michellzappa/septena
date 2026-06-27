@@ -46,7 +46,6 @@ struct TasksTodayWidgetView: View {
 
   var body: some View {
     content
-      .widgetTileInnerPadding()
       .widgetSurfaceInsets()
       .widgetURL(URL(string: "septena://tasks/today"))
       .containerBackground(for: .widget) {
@@ -63,15 +62,29 @@ struct TasksTodayWidgetView: View {
     }
   }
 
+  // Snapshot missing — keep the shared header, swap the rows for a hint.
   private var placeholder: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      TasksTodayHeader(totalCount: 0)
+    WidgetListLayout(
+      compact: family == .systemSmall,
+      header: header(totalCount: 0, compact: family == .systemSmall),
+      isEmpty: false
+    ) {
       Text("Open Septena once to load today.")
         .font(.caption)
         .foregroundStyle(.secondary)
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
+}
+
+/// Today's shared header — the gold sun, the "Today" title, and the open count.
+private func header(totalCount: Int, compact: Bool) -> WidgetListHeader {
+  WidgetListHeader(
+    icon: "sun.max.fill",
+    title: "Today",
+    accent: Theme.todayAccent,
+    trailing: "\(totalCount)",
+    compact: compact
+  )
 }
 
 private struct TasksTodayWidgetContent: View {
@@ -79,72 +92,24 @@ private struct TasksTodayWidgetContent: View {
   let compact: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: compact ? 6 : 8) {
-      TasksTodayHeader(totalCount: snapshot.totalCount)
-      if snapshot.totalCount == 0 {
-        Spacer(minLength: 0)
-        Text("All done")
-          .font(compact ? .subheadline.weight(.semibold) : .title3.weight(.semibold))
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-        Spacer(minLength: 0)
-      } else {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(snapshot.tasks.enumerated()), id: \.element.id) { index, task in
-            if index > 0 {
-              Spacer(minLength: compact ? 5 : 7)
-            }
-            TasksTodayRow(task: task, compact: compact)
-          }
+    WidgetListLayout(
+      compact: compact,
+      header: header(totalCount: snapshot.totalCount, compact: compact),
+      isEmpty: snapshot.totalCount == 0
+    ) {
+      ForEach(snapshot.tasks, id: \.id) { task in
+        WidgetListRow(
+          compact: compact,
+          title: task.title,
+          overdue: task.isOverdue
+        ) {
+          Circle()
+            .stroke(Theme.todayAccent, lineWidth: 1.5)
+            .frame(width: WidgetListMetrics.glyphFrame(compact),
+                   height: WidgetListMetrics.glyphFrame(compact))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-  }
-}
-
-private struct TasksTodayHeader: View {
-  let totalCount: Int
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 6) {
-      Image(systemName: "sun.max.fill")
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(Theme.todayAccent)
-      Text("Today")
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.primary)
-      Spacer(minLength: 0)
-      Text("\(totalCount)")
-        .font(.subheadline.weight(.semibold).monospacedDigit())
-        .foregroundStyle(.secondary)
-    }
-  }
-}
-
-private struct TasksTodayRow: View {
-  let task: TasksWidgetTaskWire
-  let compact: Bool
-
-  var body: some View {
-    HStack(alignment: .center, spacing: 8) {
-      Circle()
-        .stroke(Theme.todayAccent, lineWidth: 1.5)
-        .frame(width: compact ? 13 : 14, height: compact ? 13 : 14)
-      Text(task.title)
-        .font(.system(size: compact ? 12.5 : 13.5, weight: .medium))
-        .foregroundStyle(.primary)
-        .lineLimit(1)
-        .truncationMode(.tail)
-      if task.isOverdue {
-        Spacer(minLength: 0)
-        Image(systemName: "exclamationmark.circle.fill")
-          .font(.caption2)
-          .foregroundStyle(.secondary)
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 

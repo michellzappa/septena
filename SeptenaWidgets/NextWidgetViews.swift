@@ -15,11 +15,10 @@ struct NextWidgetView: View {
       .containerBackground(for: .widget) { background }
   }
 
-  /// Home Screen families get an adaptive opaque surface (white in light,
-  /// near-black in dark) via system colors, so the widget reads correctly in
-  /// both appearances. Lock Screen accessories stay transparent — the system
-  /// renders them monochrome over the wallpaper — and the circular accessory
-  /// uses the standard dark accessory disc.
+  /// Home Screen families share the list-widget card surface (`Theme.cardSurface`)
+  /// with Today, so the two read as siblings. Lock Screen accessories stay
+  /// transparent — the system renders them monochrome over the wallpaper — and
+  /// the circular accessory uses the standard dark accessory disc.
   @ViewBuilder
   private var background: some View {
     switch family {
@@ -28,11 +27,7 @@ struct NextWidgetView: View {
     case .accessoryRectangular, .accessoryInline:
       Color.clear
     default:
-      LinearGradient(
-        colors: [Color(.systemBackground), Color(.secondarySystemBackground)],
-        startPoint: .top,
-        endPoint: .bottom
-      )
+      Theme.cardSurface
     }
   }
 
@@ -76,106 +71,46 @@ private func categories(_ items: [NextItem]) -> [NextCategory] {
   }
 }
 
-// MARK: - Home Screen: small — top categories
+// MARK: - Home Screen: small (top 3 categories) & medium (top 4)
+//
+// Both render through the shared `WidgetListLayout` so Next and Today are the
+// same widget with a different accent and leading glyph. Next's glyph is the
+// per-category SF Symbol — load-bearing, it tells the categories apart — tinted
+// with `Theme.nextAccent`; the header carries the same accent on the bucket icon.
 
-private struct SmallView: View {
+private struct SmallView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: true) } }
+private struct MediumView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: false) } }
+
+private struct HomeList: View {
   let entry: NextEntry
-  private var cats: [NextCategory] { categories(entry.items) }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 7) {
-      Header(bucket: entry.bucket, total: entry.remaining)
-      if cats.isEmpty {
-        Spacer(minLength: 0)
-        AllDone()
-        Spacer(minLength: 0)
-      } else {
-        ForEach(cats.prefix(3)) { CategoryRow(cat: $0, compact: true) }
-        Spacer(minLength: 0)
-      }
-    }
-  }
-}
-
-// MARK: - Home Screen: medium — one row per open category
-
-private struct MediumView: View {
-  let entry: NextEntry
-  private var cats: [NextCategory] { categories(entry.items) }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 9) {
-      Header(bucket: entry.bucket, total: entry.remaining)
-      if cats.isEmpty {
-        Spacer(minLength: 0)
-        AllDone()
-        Spacer(minLength: 0)
-      } else {
-        ForEach(cats.prefix(4)) { CategoryRow(cat: $0, compact: false) }
-        Spacer(minLength: 0)
-      }
-    }
-  }
-}
-
-// MARK: - Shared home-screen pieces
-
-private struct Header: View {
-  let bucket: DayBucket
-  let total: Int
-
-  var body: some View {
-    HStack(spacing: 5) {
-      Image(systemName: bucket.icon)
-        .font(.system(size: 8, weight: .semibold))
-      Text(bucket.title.uppercased())
-      Spacer()
-      Text("\(total) left")
-    }
-    .font(.system(size: 9.5, weight: .semibold))
-    .foregroundStyle(.secondary)
-  }
-}
-
-private struct CategoryRow: View {
-  let cat: NextCategory
   let compact: Bool
-
-  // Icons −30%, text −15% vs. the prior callout/subheadline/footnote sizes.
-  private var iconSize: CGFloat { compact ? 9 : 11 }
-  private var iconFrame: CGFloat { compact ? 11 : 14 }
-  private var titleSize: CGFloat { compact ? 11 : 12.5 }
+  private var cats: [NextCategory] { categories(entry.items) }
 
   var body: some View {
-    HStack(spacing: 7) {
-      Image(systemName: kindIcon(cat.kind))
-        .font(.system(size: iconSize))
-        .foregroundStyle(.secondary)
-        .frame(width: iconFrame)
-      Text(displayTitle(cat.title))
-        .font(.system(size: titleSize, weight: .medium))
-        .foregroundStyle(.primary)
-        .lineLimit(1)
-      if cat.showsOverdueMarker {
-        Image(systemName: "exclamationmark.circle.fill")
-          .font(.system(size: compact ? 8.5 : 9.5, weight: .semibold))
-          .foregroundStyle(.secondary)
-      }
-      Spacer(minLength: 4)
-      if cat.count > 1 {
-        Text("\(cat.count)")
-          .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
-          .foregroundStyle(.secondary)
+    WidgetListLayout(
+      compact: compact,
+      header: WidgetListHeader(
+        icon: entry.bucket.icon,
+        title: entry.bucket.title,
+        accent: Theme.nextAccent,
+        trailing: "\(entry.remaining)",
+        compact: compact
+      ),
+      isEmpty: cats.isEmpty
+    ) {
+      ForEach(cats.prefix(compact ? 3 : 4)) { cat in
+        WidgetListRow(
+          compact: compact,
+          title: displayTitle(cat.title),
+          overdue: cat.showsOverdueMarker,
+          trailingCount: cat.count
+        ) {
+          Image(systemName: kindIcon(cat.kind))
+            .font(.system(size: compact ? 11 : 12))
+            .foregroundStyle(Theme.nextAccent)
+        }
       }
     }
-  }
-}
-
-private struct AllDone: View {
-  var body: some View {
-    Text("All done")
-      .font(.title3.weight(.semibold))
-      .foregroundStyle(.secondary)
   }
 }
 

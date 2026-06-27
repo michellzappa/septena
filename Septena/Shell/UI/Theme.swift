@@ -199,6 +199,13 @@ enum Theme {
   /// it as a warm gold, light mode as a saturated amber.
   static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
 
+  /// Next widget's signature tint — the app's violet accent (#7c3aed, the same
+  /// swatch Insights uses). Pairs with `todayAccent`'s gold so the two
+  /// home-screen list widgets read as siblings with distinct identities. Used on
+  /// Next's home-screen header icon and per-category row glyphs only; lock-screen
+  /// accessories stay monochrome (the system renders them that way regardless).
+  static let nextAccent     = Color(red: 0.486, green: 0.227, blue: 0.929)
+
   // MARK: - Shape & spacing
   //
   // Section drawer cards (and the goal strip's row) use a larger
