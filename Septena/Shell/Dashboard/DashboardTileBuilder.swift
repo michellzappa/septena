@@ -257,6 +257,10 @@ enum DashboardTileBuilder {
           iconSymbol: t.symbol,
           title: t.name,
           accent: accent,
+          // Per-kind color must survive every accentHex-driven path (Heatmap
+          // single-column rows, widget wire). Without it those fall back to the
+          // generic "intake" section token, collapsing all trackers to one color.
+          accentHex: t.color,
           headline: "\(t.todayCount) today",
           headlineStats: stats,
           progress: nil,
