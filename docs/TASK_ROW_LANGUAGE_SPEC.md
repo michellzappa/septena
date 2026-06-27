@@ -152,12 +152,20 @@ agent sort pill  ▸  date / today chip  ▸  (recurrence · notes glyphs)
 - **Date / today chip** — `trailingDate` as today, but it is now the *only* home
   for "today" (see §3.3). Overdue keeps its red treatment (coexists with an
   agent pill as a small flag glyph — §8).
-- The arrived-today cue ("landed in Today on its own", `showsArrivedToday`) is an
-  **amber checkbox** (Things-style "new on Today"), not a right-edge dot. This is
-  the one sanctioned place amber rides the *control*: it's the app's temporal
-  identity color, the trigger is the *narrow* rollover-arrival condition (a
-  scheduled/due plan whose day came — not every today task, not hand-added ones),
-  and it self-clears at the next rollover, so the Today list never goes all-amber.
+- **Today tenure fill (unifies arrived-today + carry-age).** The temporal axis
+  "how long has this been on Today" is one in-place treatment of the checkbox
+  itself (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`), not two
+  devices in two places. It folds together what used to be split — the amber
+  *box fill* for "arrived today" (`showsArrivedToday`, day 0) and a separate
+  *carry-age ring* (day 1+) — into a single treatment where **only the box's
+  fill opacity changes, never its shape**: the interior tints `Theme.todayAccent`
+  gold, transparent on the arrival day and a seventh more opaque each carried
+  day, capped just shy of opaque (~90%) so an aged task never reads as a
+  solid/done box. It shows only once earned — a task that has carried over undone
+  (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived-today rows stay
+  transparent. The box's amber *stroke* still means "this is on Today" (presence)
+  on off-Today surfaces (`isToday`); on the Today/Next surfaces the fill is the
+  sole temporal mark.
 
 ### 3.3 Color rules (the cleanup)
 
@@ -310,10 +318,13 @@ Ship behind a feature flag; one green build via `scripts/build.sh`.
 
 ## 7. Open decisions
 
-- **Today-amber.** ~~Keep amber on the right today chip, or strip it?~~ **Resolved
-  (broad):** amber is the app's temporal identity color. It rides the **checkbox**
-  for a task that just *landed on Today on its own* (`showsArrivedToday`,
-  Things-style "new on Today") and the right Today chip for today-pinned rows.
+- **Today-amber.** ~~Keep amber on the right today chip, or strip it?~~ ~~Resolved
+  (broad): amber rides the checkbox for `showsArrivedToday`.~~ **Superseded:** the
+  temporal axis is now a gold **tenure fill** of the checkbox interior (§3.2),
+  which unifies arrived-today (day 0) and carry-age (day 1+) into one in-place
+  treatment — only the fill *opacity* grows with days-on-Today (transparent →
+  ~90%), the shape never changes. The box's amber *stroke* is presence-only
+  (`isToday`, off-Today surfaces).
 - **Awaiting state.** Dropped from v1. Re-add the dimmed box later if "don't poke
   this, it's mid-processing" proves needed.
 - **Proposal-source override.** Is the per-connection "proposal" default

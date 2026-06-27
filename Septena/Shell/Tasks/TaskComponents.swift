@@ -112,9 +112,12 @@ struct TaskCheckbox: View {
   /// today indicator into the checkbox itself, so it no longer sits as a
   /// separate glyph inline with the title.
   var isToday: Bool = false
-  /// Native `List(selection:)` cursor — force dark checkbox chrome on the gray
-  /// capsule so UIKit doesn't wash it out.
-  var isListSelected: Bool = false
+  /// Language v2: fill (0…1) for the **Today tenure dial** that wraps the box —
+  /// the single temporal device that replaces the old amber `arrivedToday` box
+  /// fill *and* the trailing carry-age ring. `nil` → no dial. Driven by
+  /// `SeptenaTask.todayTenureFill`. Gold, concentric, fills one seventh per day
+  /// to full at a week; keeps the box itself pure form (no hue on the control).
+  var tenureFill: Double? = nil
   /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber ring
   /// when the row is pinned to Today.
   var promotePulseTrigger: Int = 0
@@ -140,23 +143,26 @@ struct TaskCheckbox: View {
   private static let boxStroke: CGFloat = 1.4
   private static let checkSize: CGFloat = 12
   #endif
+  /// Tenure fill never reaches full opacity — a hair of translucency keeps an
+  /// aged Today task from reading as a solid/"done" box.
+  private static let tenureMaxOpacity: Double = 0.9
 
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
   /// and fill to `Theme.todayAccent`.
   private var boxStrokeColor: Color {
     // Legacy: amber box meant "is on Today" on off-Today surfaces.
     if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    // Language v2: the box is neutral EXCEPT for a Today task seen on an off-Today
-    // surface (project/area) — it wears amber on the control, matching the
-    // Things-style "new on Today" highlight, instead of a separate right-edge chip.
-    if TaskRowFlags.languageV2, isToday || arrivedToday { return Theme.todayAccent }
-    // List selection gray capsule — fixed ink; `Color.primary` flips to white here.
-    if isListSelected { return Theme.listSelectedInk }
-    return Theme.inkSecondary.opacity(0.55)
+    // Language v2: the box stroke turns amber for a Today task — either seen on
+    // an off-Today surface (project/area), where it marks "this is on Today"
+    // (presence, `isToday`), or once it has carried over and carries a tenure
+    // fill, so the warming gold interior reads against an amber edge rather than
+    // a neutral one.
+    if TaskRowFlags.languageV2, isToday || tenureFill != nil { return Theme.todayAccent }
+    return Theme.checkboxStroke
   }
   private var boxFillColor: Color {
     if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    return Theme.inkSecondary.opacity(0.85)
+    return Theme.checkboxFill
   }
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -181,6 +187,18 @@ struct TaskCheckbox: View {
   private var checkboxButton: some View {
     Button(action: onToggle) {
       ZStack {
+        // Today tenure fill — the box's interior tints gold, deepening with
+        // days-on-Today (see `tenureFill`): transparent on the arrival day, a
+        // seventh more each carried day, capped just shy of opaque so an aged
+        // task never reads as a solid/done box. Shape never changes — only the
+        // fill's opacity. Sits behind the open stroke; hidden once done.
+        if TaskRowFlags.languageV2, !isDone, let tenureFill {
+          let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .fill(Theme.todayAccent.opacity(strength * Self.tenureMaxOpacity))
+            .frame(width: Self.boxSize, height: Self.boxSize)
+            .a11yAnimation(Theme.Motion.quick, value: strength)
+        }
         // Echo ring (habits) — the second, quieter pulse behind the main one.
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
           .strokeBorder((tint ?? boxFillColor).opacity(echoOpacity), lineWidth: 1.2)
@@ -242,13 +260,7 @@ struct TaskCheckbox: View {
   }
 
   var body: some View {
-    Group {
-      if isListSelected {
-        checkboxButton.tint(Theme.listSelectedInk)
-      } else {
-        checkboxButton
-      }
-    }
+    checkboxButton
     // Keep the checkbox OUT of the keyboard focus ring. On macOS a focusable
     // button inside a selected List row gets activated by Space — which silently
     // completed tasks. Completion is the checkbox-click or ⌘K; never a stray
@@ -406,7 +418,7 @@ enum TaskCelebration {
 // MARK: - Shared task row
 //
 // Canonical closed (non-editing) task row: checkbox + title + optional
-// subtitle/notes glyph + trailing date. Used by the Tasks drawer
+// inline notes glyph + trailing date. Used by the Tasks drawer
 // (`TasksDestinationView`) and intended to become the single row the deep
 // `TaskListView` surface renders too, so both surfaces stay visually
 // identical. Carries its own h/v padding so it drops straight into a
@@ -468,6 +480,8 @@ struct CheckableRow<Trailing: View>: View {
   var dashed: Bool = false
   var cornerDot: Color? = nil
   var arrivedToday: Bool = false
+  /// Forwarded to `TaskCheckbox`: fill (0…1) for the Today tenure dial, or nil.
+  var tenureFill: Double? = nil
   /// The checkbox celebration this row plays on check (see `CheckFeel`).
   /// Standardized to the default `.stamp` across every checkable row.
   var feel: CheckFeel = .stamp
@@ -478,6 +492,9 @@ struct CheckableRow<Trailing: View>: View {
   /// to the box. Tasks leave this nil; their agent cue rides the trailing slot.
   var leadingEmoji: String? = nil
   let title: String
+  /// Inline suffix hugging the title (e.g. the task notes glyph). Sits at the
+  /// end of the title text — never in the right-aligned trailing slot.
+  var showsNotesGlyph: Bool = false
   var subtitle: String? = nil
   /// Neutral selection capsule while this row's detail/edit modal is open
   /// (drawer surfaces — the deep list paints via `listRowBackground` instead).
@@ -486,6 +503,14 @@ struct CheckableRow<Trailing: View>: View {
   var isListSelected: Bool = false
   /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber row wash.
   var promoteFlashTrigger: Int = 0
+  /// Optional hero-animation anchors (`matchedGeometryEffect`): the Things-style
+  /// inline editor reuses the same id + namespace on ITS title and checkbox, so
+  /// on expand/collapse they GLIDE between the closed row and the open editor
+  /// instead of cross-fading into a new position. Shared namespace, distinct
+  /// ids. Nil everywhere else.
+  var titleMatchID: String? = nil
+  var checkboxMatchID: String? = nil
+  var heroMatchNS: Namespace.ID? = nil
   @ViewBuilder var trailing: () -> Trailing
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
@@ -512,11 +537,12 @@ struct CheckableRow<Trailing: View>: View {
         cornerDot: cornerDot,
         arrivedToday: arrivedToday,
         isToday: isToday,
-        isListSelected: isListSelected,
+        tenureFill: tenureFill,
         promotePulseTrigger: promoteFlashTrigger,
         feel: feel,
         onToggle: onToggle
       )
+      .matchedHeroGeometry(checkboxMatchID, heroMatchNS)
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       if let leadingEmoji {
@@ -524,14 +550,22 @@ struct CheckableRow<Trailing: View>: View {
       }
 
       VStack(alignment: .leading, spacing: 4) {
-        Text(title)
-          .font(.septenaTaskTitle)
-          .foregroundStyle(titleInk)
-          .strikethrough(isInactive)
-          .opacity(isInactive ? 0.5 : 1)
-          .lineLimit(2)
-          .truncationMode(.tail)
-          .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+          Text(title)
+            .font(.septenaTaskTitle)
+            .foregroundStyle(titleInk)
+            .strikethrough(isInactive)
+            .opacity(isInactive ? 0.5 : 1)
+            .lineLimit(2)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: true)
+            .matchedHeroGeometry(titleMatchID, heroMatchNS)
+          if showsNotesGlyph {
+            TaskNotesGlyph()
+              .opacity(isInactive ? 0.5 : 1)
+              .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] }
+          }
+        }
         if let subtitle {
           Text(subtitle)
             .font(.septenaMeta)
@@ -589,6 +623,23 @@ extension CheckableRow where Trailing == EmptyView {
   }
 }
 
+extension View {
+  /// Conditionally tag a view as a `matchedGeometryEffect` source/target so it
+  /// GLIDES between the closed row and the open inline editor instead of
+  /// cross-fading. Only position is matched (`.position`) — e.g. the closed-row
+  /// title `Text` and the editor's `TextField` have different intrinsic sizes —
+  /// so we glide the top-leading corner and let each keep its own size. No-op
+  /// when either arg is nil. Used for both the title and the checkbox.
+  @ViewBuilder
+  func matchedHeroGeometry(_ id: String?, _ ns: Namespace.ID?) -> some View {
+    if let id, let ns {
+      matchedGeometryEffect(id: id, in: ns, properties: .position, anchor: .topLeading)
+    } else {
+      self
+    }
+  }
+}
+
 /// Adds an `onTapGesture` only when an action is supplied. Rows inside a
 /// SwiftUI `List` (the deep `TaskListView`) pass `nil` so the row's own tap
 /// gesture never swallows List selection — they wire tap externally instead.
@@ -603,13 +654,76 @@ private struct OptionalTap: ViewModifier {
   }
 }
 
+// MARK: - Task checkbox model
+//
+// The SINGLE source of truth for how a `SeptenaTask` maps to its checkbox
+// chrome. Both the closed `TaskRow` and the open inline editor's title-line
+// checkbox (`TaskComposerCard`) derive their box from this, so the two can
+// never drift in logic — the box looks/behaves identically in view-row mode and
+// edit mode. Pure derivation from the task + the surface's `showsTodayIndicator`
+// (the one piece of context the box needs that isn't on the task itself).
+
+struct TaskCheckboxModel {
+  var tint: Color
+  var isDone: Bool
+  var isToday: Bool
+  var dashed: Bool
+  var cornerDot: Color?
+  var arrivedToday: Bool
+  var tenureFill: Double?
+
+  init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool) {
+    // A volunteered, still-unratified agent proposal — the dashed "not a task
+    // yet" form. Human captures stay solid; only MCP triage-band rows read so.
+    let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
+    tint = accent
+    isDone = task.status == .done
+    isToday = task.isOnToday && showsTodayIndicator
+    dashed = TaskRowFlags.languageV2 && isProposal
+    // Accent corner dot for a committed task carrying unread agent context.
+    // Proposals are excluded (they already read as dashed).
+    cornerDot = {
+      guard TaskRowFlags.languageV2, !isProposal else { return nil }
+      if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
+      return nil
+    }()
+    arrivedToday = task.showsArrivedToday()
+    tenureFill = task.todayTenureFill()
+  }
+}
+
+extension TaskCheckbox {
+  /// Build the row checkbox from the shared model. Selection / promote-pulse /
+  /// feel stay per-call — they're surface chrome (list highlight, pin flash),
+  /// not task identity, so they don't belong in the shared model.
+  init(model: TaskCheckboxModel, promotePulseTrigger: Int = 0, feel: CheckFeel = .stamp,
+       onToggle: @escaping () -> Void) {
+    self.init(tint: model.tint, isDone: model.isDone, dashed: model.dashed,
+              cornerDot: model.cornerDot, arrivedToday: model.arrivedToday,
+              isToday: model.isToday, tenureFill: model.tenureFill,
+              promotePulseTrigger: promotePulseTrigger,
+              feel: feel, onToggle: onToggle)
+  }
+}
+
+/// Compact notes marker that rides inline at the end of a task title.
+struct TaskNotesGlyph: View {
+  var body: some View {
+    Image(systemName: "text.alignleft")
+      .scaledFont(size: 12)
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel("Has notes")
+  }
+}
+
 // MARK: - Task row
 //
 // The single closed (non-editing) task row used by every task surface — the
 // Tasks drawer, the deep `TaskListView`, and the dashboard Next feed — so a
 // task looks identical wherever it appears. A thin, data-driven wrapper over
-// `CheckableRow`: it owns the canonical trailing (notes / recurrence glyphs +
+// `CheckableRow`: it owns the canonical trailing (recurrence glyph +
 // the due / scheduled date treatment) and resolves the project→area subtitle.
+// The notes glyph rides inline on the title via `showsNotesGlyph`.
 struct TaskRow: View {
   let task: SeptenaTask
   var accent: Color
@@ -633,6 +747,11 @@ struct TaskRow: View {
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
   var accessory: AnyView? = nil
+  /// Hero-animation anchors forwarded to `CheckableRow` so the closed row's
+  /// title + checkbox glide into the inline editor. See `CheckableRow`.
+  var titleMatchID: String? = nil
+  var checkboxMatchID: String? = nil
+  var heroMatchNS: Namespace.ID? = nil
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
@@ -643,21 +762,6 @@ struct TaskRow: View {
   }
   private var hasNotes: Bool {
     !(task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-  }
-
-  /// A volunteered, still-unratified agent proposal — the dashed "not a task
-  /// yet" form (docs/TASK_ROW_LANGUAGE_SPEC.md). Human captures in the inbox
-  /// stay solid; only MCP-sourced triage-band rows read as proposals.
-  private var isProposal: Bool {
-    task.isInTriageBand && task.source == TaskSource.mcp
-  }
-  /// Accent corner dot for a *committed* task carrying unread agent context (a
-  /// live conversation that needs the user). Proposals are excluded — they
-  /// already read as dashed. `nil` → no dot.
-  private var cornerDotColor: Color? {
-    guard TaskRowFlags.languageV2, !isProposal else { return nil }
-    if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
-    return nil
   }
 
   /// Project wins over area (a task in a project implies its area), each
@@ -671,19 +775,28 @@ struct TaskRow: View {
   }
 
   var body: some View {
-    CheckableRow(
-      tint: accent,
-      isDone: task.status == .done,
-      isToday: task.isOnToday && showsTodayIndicator,
-      dashed: TaskRowFlags.languageV2 && isProposal,
-      cornerDot: cornerDotColor,
-      arrivedToday: task.showsArrivedToday(),
+    // The box is derived once, in `TaskCheckboxModel`, shared with the inline
+    // editor's checkbox so view-row and edit-row can't drift.
+    let box = TaskCheckboxModel(task: task, accent: accent,
+                                showsTodayIndicator: showsTodayIndicator)
+    return CheckableRow(
+      tint: box.tint,
+      isDone: box.isDone,
+      isToday: box.isToday,
+      dashed: box.dashed,
+      cornerDot: box.cornerDot,
+      arrivedToday: box.arrivedToday,
+      tenureFill: box.tenureFill,
       isInactive: isInactive,
       title: task.title,
+      showsNotesGlyph: hasNotes,
       subtitle: subtitle,
       isSelected: isSelected,
       isListSelected: isListSelected,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),
+      titleMatchID: titleMatchID,
+      checkboxMatchID: checkboxMatchID,
+      heroMatchNS: heroMatchNS,
       trailing: { trailing },
       onToggle: onToggle,
       onTap: onTap
@@ -692,19 +805,15 @@ struct TaskRow: View {
 
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
-  //   accessory (Inbox "file here") · date  →  recurrence · notes · status-dot
-  // The accessory and date flex with their content; the recurrence/notes glyphs
-  // and the agent/status dot are fixed and anchor the trailing edge.
+  //   accessory (Inbox "file here") · date  →  recurrence · status-dot
+  // Notes ride inline at the end of the title (see `TaskNotesGlyph`). The
+  // accessory and date flex with their content; recurrence and the agent/status
+  // dot are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
     if let accessory { accessory }
     trailingDate
     if task.recurrence != nil {
       Image(systemName: "arrow.triangle.2.circlepath")
-        .scaledFont(size: 12)
-        .foregroundStyle(Theme.inkSecondary)
-    }
-    if hasNotes {
-      Image(systemName: "text.alignleft")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
     }

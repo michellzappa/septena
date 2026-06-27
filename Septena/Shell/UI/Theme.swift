@@ -97,6 +97,30 @@ enum Theme {
   /// Muted text (meta, captions, sublabels).
   static let inkSecondary = Color.secondary
 
+  /// Open-checkbox stroke. Darker than the old `inkSecondary` @ 0.55 chrome so
+  /// it reads on the list-selection capsule without flipping hue when the row
+  /// highlights — one constant weight in and out of selection.
+  static let checkboxStroke: Color = {
+    #if os(macOS)
+    return Color(nsColor: .secondaryLabelColor)
+    #elseif canImport(UIKit)
+    return Color(uiColor: .secondaryLabel)
+    #else
+    return Color.secondary.opacity(0.88)
+    #endif
+  }()
+
+  /// Done-checkbox fill — same family as `checkboxStroke`, slightly heavier.
+  static let checkboxFill: Color = {
+    #if os(macOS)
+    return Color(nsColor: .labelColor).opacity(0.78)
+    #elseif canImport(UIKit)
+    return Color(uiColor: .label).opacity(0.78)
+    #else
+    return Color.primary.opacity(0.78)
+    #endif
+  }()
+
   /// Icon color when an icon should recede behind row text. `.tertiary`
   /// matches what Reminders uses for non-tinted glyphs (calendar, bell,
   /// flag-outline) in row metadata.
@@ -144,8 +168,8 @@ enum Theme {
     #endif
   }()
 
-  /// Title + checkbox ink on the gray list-selection capsule. Must NOT be
-  /// `Color.primary` — UITableView's selected-cell traits flip primary to white.
+  /// Title ink on the gray list-selection capsule. Must NOT be `Color.primary`
+  /// — UITableView's selected-cell traits flip primary to white.
   static let listSelectedInk: Color = {
     #if os(macOS)
     return Color(nsColor: .labelColor)

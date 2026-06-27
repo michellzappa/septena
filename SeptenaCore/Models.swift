@@ -115,6 +115,55 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return scheduled == today || deadline == today
   }
 
+  /// "Carry-age": how many whole days this open task has sat on the Today list
+  /// without being completed — the *self-deferral* signal, deliberately
+  /// distinct from `isOverdue` (which is the world's deadline pressure). The
+  /// landing day is the earliest of the signals currently keeping it on Today —
+  ///   • `todaySetOn` (an explicit pin's stamp), or
+  ///   • `scheduled` once it has arrived (≤ today), or
+  ///   • `deadline` once it has arrived (≤ today).
+  /// Age = whole days from that landing day to today. `0` = arrived today
+  /// (already carried by the amber checkbox / `showsArrivedToday`); a positive
+  /// value means it survived that many day-rollovers undone. Derived, with NO
+  /// stored state (mirrors `showsArrivedToday`): it resets the moment a task
+  /// leaves Today and is re-committed, because re-committing is a fresh promise.
+  /// Returns `0` when the task is done, off Today, an unratified agent row
+  /// (it carries its own cue), or a legacy pin with no `todaySetOn` to date it.
+  func daysOnToday(today: String = SeptenaDate.today) -> Int {
+    guard status == .open, source != TaskSource.mcp, isOnToday else { return 0 }
+    var landed: [String] = []
+    if self.today, let t = todaySetOn { landed.append(t) }
+    if let s = scheduled, s <= today { landed.append(s) }
+    if let d = deadline, d <= today { landed.append(d) }
+    guard let earliest = landed.min(),
+          let from = SeptenaDate.parse(earliest),
+          let to = SeptenaDate.parse(today) else { return 0 }
+    let cal = Calendar.current
+    let days = cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: from),
+                                  to: cal.startOfDay(for: to)).day ?? 0
+    return max(0, days)
+  }
+
+  /// Tenure strength (0…1) for the **Today checkbox fill** — the single temporal
+  /// device that unifies what used to be two: the amber "arrived today" *box*
+  /// (day 0) and the gold carry-age *ring* (day 1+). They were the same axis
+  /// ("how long on Today") drawn in two positions/shapes; this folds them into
+  /// one in-place treatment where only the box's *fill opacity* changes, never
+  /// its shape. The arrival day is transparent (silent — a fresh task shouldn't
+  /// shout); each carried-over day adds one seventh, deepening the gold until it
+  /// tops out (the renderer caps the opacity at ~90% so it never reads as a
+  /// solid/done box). Returns `nil` until the task has carried over at least once
+  /// (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived today all stay
+  /// transparent. Derived, no stored state; self-clears when the task leaves
+  /// Today or is completed.
+  func todayTenureFill(today: String = SeptenaDate.today) -> Double? {
+    guard status == .open, source != TaskSource.mcp, isOnToday else { return nil }
+    let carried = daysOnToday(today: today)
+    guard carried >= 1 else { return nil }
+    return min(1, Double(carried) / 7.0)
+  }
+
   /// Canonical "overdue" test — Things-style: ONLY a hard `deadline` can make
   /// a task overdue. A scheduled ("When") date in the past is just a plan that
   /// rolled into Today; it never turns red. A deadline of *today or earlier*
