@@ -698,6 +698,34 @@ struct NextOpenSection: View {
 //     tasks) from `NextDoneModel`, read off the local mirror.
 // Newest at top, so the freshest completion lands right under the open list.
 
+/// Shared merge for the Done Today log — used by the section renderer and
+/// `NextView`'s keyboard-order walk so ↑↓ traverse the full timeline.
+@MainActor
+enum NextDoneEvents {
+  static func merged(model: NextItemsModel, passive: [DoneEvent]) -> [DoneEvent] {
+    var out = passive
+    for c in model.doneChores {
+      out.append(.init(id: "chore-\(c.id)", hour: c.lastCompletedTime.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: c.lastCompletedTime, label: c.name, detail: nil,
+                       sectionKey: "chores", moodQuadrant: nil))
+    }
+    for h in model.doneHabits {
+      out.append(.init(id: "habit-\(h.id)", hour: h.time.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: h.time, label: h.name,
+                       detail: (h.skipped && !h.done) ? "skipped" : nil,
+                       sectionKey: "habits", moodQuadrant: nil))
+    }
+    for s in model.doneSupplements {
+      out.append(.init(id: "supp-\(s.id)", hour: s.time.flatMap(DoneEvent.hour(from:)) ?? -1,
+                       time: s.time, label: s.name, detail: nil,
+                       sectionKey: "supplements", moodQuadrant: nil))
+    }
+    return out.sorted { $0.hour > $1.hour }
+  }
+}
+
+// MARK: - Done Today section
+
 /// One row in the Done Today log. Value type (no `Color`) so it crosses the
 /// `MirrorReader` actor boundary; the row view resolves color from the
 /// `sectionKey` (or `moodQuadrant`) at render time.
@@ -836,24 +864,7 @@ struct NextDoneSection: View {
   /// Merge the trio's live done splits with the passive logs into one
   /// newest-first stream.
   private var events: [DoneEvent] {
-    var out = passive
-    for c in model.doneChores {
-      out.append(.init(id: "chore-\(c.id)", hour: c.lastCompletedTime.flatMap(DoneEvent.hour(from:)) ?? -1,
-                       time: c.lastCompletedTime, label: c.name, detail: nil,
-                       sectionKey: "chores", moodQuadrant: nil))
-    }
-    for h in model.doneHabits {
-      out.append(.init(id: "habit-\(h.id)", hour: h.time.flatMap(DoneEvent.hour(from:)) ?? -1,
-                       time: h.time, label: h.name,
-                       detail: (h.skipped && !h.done) ? "skipped" : nil,
-                       sectionKey: "habits", moodQuadrant: nil))
-    }
-    for s in model.doneSupplements {
-      out.append(.init(id: "supp-\(s.id)", hour: s.time.flatMap(DoneEvent.hour(from:)) ?? -1,
-                       time: s.time, label: s.name, detail: nil,
-                       sectionKey: "supplements", moodQuadrant: nil))
-    }
-    return out.sorted { $0.hour > $1.hour }
+    NextDoneEvents.merged(model: model, passive: passive)
   }
 
   var body: some View {

@@ -157,6 +157,10 @@ enum SettingsKey {
   /// Settings → Integrations, so the default can't surprise-prompt). Read by
   /// `TaskListView`.
   static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
+  /// Tasks sidebar column visibility on push-navigation surfaces (iPad
+  /// regular / macOS). Persisted locally so ⌘/ and the system sidebar
+  /// controls survive relaunch. Raw values: `all`, `detailOnly`.
+  static let tasksSidebarVisibility = "septena.tasks.sidebarVisibility"
   /// Master switch for the per-log "commit flourish" animations (the
   /// `CommitMotion` / `LogCommitOverlay` celebrations that play when you log
   /// something). Absent → on. Off suppresses every logging animation

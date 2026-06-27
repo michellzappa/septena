@@ -107,42 +107,26 @@ struct RootTabView: View {
         nav.showSettings = false
       }
       #endif
-      // App-global Quick Find palette. Mounted here so the magnifyingglass
-      // button in every home view's top-right opens it, regardless of tab.
-      .sheet(isPresented: $nav.showQuickFind) {
-        QuickFindView()
-          #if os(iOS)
-          .presentationDetents([.medium, .large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(width: 560, height: 420)
-          #endif
-      }
-      // App-global Add Info palette. Still triggered by ⌘K (menu bar /
-      // keyboard); the floating + bubble that used to sit beside the tab
-      // bar has been removed.
-      .sheet(isPresented: $nav.showAddInfo) {
-        AddInfoSheet(initialSection: nav.addInfoRequestedSection)
-          #if os(iOS)
-          .presentationDetents([.medium, .large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(width: 560, height: 520)
-          #endif
-      }
-      .onChange(of: nav.showAddInfo) { _, open in
-        if !open { nav.addInfoRequestedSection = nil }
+      // Every app-global modal — Quick Find, Add Info, the Quick-Action section
+      // sheet, the Training logger, the Mood check-in, the keyboard cheat-sheet
+      // — routes through one `presentedModal` + this single `.sheet(item:)`,
+      // so each surface works regardless of the selected tab without its own
+      // boolean + onChange/onDismiss cleanup. Sizing is the shared
+      // `septenaModalSheet` (iOS detents / macOS frame). (Insights destination
+      // removed — Correlations now hosts its grids inline.)
+      .sheet(item: $nav.presentedModal) { modal in
+        modalSheet(modal)
       }
       // Home Screen Quick Action routing. Mounted at the tab-root so it
       // fires regardless of which tab is selected — ContentView (the
       // previous host) is only mounted while the Tasks tab is visible.
-      // We deliberately do NOT switch tabs; the sheet attached below
-      // covers the current tab and dismissing returns the user there.
+      // We deliberately do NOT switch tabs; the sheet covers the current
+      // tab and dismissing returns the user there.
       .onChange(of: nav.pendingShortcut) { _, action in
         guard let action else { return }
         switch action {
         case .openSection(let key):
-          nav.pendingSection = PendingSection(key: key)
+          nav.presentSection(key: key)
         }
         nav.pendingShortcut = nil
       }
@@ -151,68 +135,6 @@ struct RootTabView: View {
         guard let tab else { return }
         tabSelection.current = tab
         nav.pendingTab = nil
-      }
-      // The section sheet for Home Screen Quick Actions. Hosted here so
-      // it works regardless of which tab is selected. Renders the
-      // plugin's destinationView() inside a NavigationStack so titles +
-      // toolbars present cleanly.
-      .sheet(item: $nav.pendingSection) { pending in
-        NavigationStack {
-          if let view = SectionRegistry.plugin(forKey: pending.key)?.destinationView() {
-            view
-          } else {
-            Text("Section unavailable.")
-              .padding()
-          }
-        }
-        #if os(iOS)
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        #else
-        .frame(width: 560, height: 600)
-        #endif
-      }
-      // Training session sheet — mounted at the tab root so ⌘K's "Start
-      // training" rows present cleanly from any tab, and so the Start
-      // button inside the Week tab's Training destination can stack a
-      // second sheet on top without dismissing the dashboard.
-      .sheet(isPresented: $nav.showTrainingSession) {
-        TrainingSessionView()
-          #if os(iOS)
-          .presentationDetents([.large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(minWidth: 560, minHeight: 600)
-          #endif
-      }
-      // Mood check-in sheet — mounted at the tab root so the Next feed's
-      // "How are you feeling?" daypart suggestion presents the two-step
-      // quadrant picker from any tab. AddMoodPage owns its own
-      // NavigationStack and dismisses itself after logging; the mutator
-      // posts `.septenaDataChanged`, which the Next feed listens for to
-      // clear the suggestion for the now-logged bucket.
-      .sheet(isPresented: $nav.showMoodCheckin) {
-        AddMoodPage()
-          #if os(iOS)
-          .presentationDetents([.large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(minWidth: 560, minHeight: 600)
-          #endif
-      }
-      // (Insights destination removed — the Correlations homepage
-      // layout now hosts the trusted + exploratory grids inline, with
-      // per-pair DetailSheet drill-in on tap.)
-      // App-global keyboard-shortcuts cheat-sheet (⌘?). Mounted here so it
-      // opens over any tab.
-      .sheet(isPresented: $nav.showKeyboardShortcuts) {
-        KeyboardShortcutsView()
-          #if os(iOS)
-          .presentationDetents([.medium, .large])
-          .presentationDragIndicator(.visible)
-          #else
-          .frame(width: 480, height: 560)
-          #endif
       }
       // "What's New" after an update — see the gate notes on `showWhatsNew`.
       .task(id: welcomeCompleted) {
@@ -232,6 +154,40 @@ struct RootTabView: View {
           .presentationDragIndicator(.visible)
           #endif
       }
+  }
+
+  // The content + sizing for each app-global modal. One switch instead of one
+  // `.sheet` modifier per case; sizing shares `septenaModalSheet`.
+  @ViewBuilder
+  private func modalSheet(_ modal: AppModal) -> some View {
+    switch modal {
+    case .quickFind:
+      QuickFindView()
+        .septenaModalSheet(detents: [.medium, .large], macWidth: 560, macHeight: 420)
+    case .addInfo(let section):
+      AddInfoSheet(initialSection: section)
+        .septenaModalSheet(detents: [.medium, .large], macWidth: 560, macHeight: 520)
+    case .section(let key):
+      // Quick-Action section sheet — the plugin's destination in a
+      // NavigationStack so its title + toolbar present cleanly.
+      NavigationStack {
+        if let view = SectionRegistry.plugin(forKey: key)?.destinationView() {
+          view
+        } else {
+          Text("Section unavailable.").padding()
+        }
+      }
+      .septenaModalSheet(macWidth: 560, macHeight: 600)
+    case .trainingSession:
+      TrainingSessionView()
+        .septenaModalSheet(macWidth: 560, macHeight: 600)
+    case .moodCheckin:
+      AddMoodPage()
+        .septenaModalSheet(macWidth: 560, macHeight: 600)
+    case .keyboardShortcuts:
+      KeyboardShortcutsView()
+        .septenaModalSheet(detents: [.medium, .large], macWidth: 480, macHeight: 560)
+    }
   }
 
   // Standard iOS 26 TabView with the system tab-bar minimize behavior

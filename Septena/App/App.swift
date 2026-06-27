@@ -460,7 +460,7 @@ struct SeptenaApp: App {
       // New To-Do rather than in a bespoke top-level "Add" menu. Quick Find
       // (⌘⇧F) lives in the Go menu above.
       CommandGroup(after: .newItem) {
-        Button("Add Info…") { navigation.showAddInfo = true }
+        Button("Add Info…") { navigation.presentAddInfo() }
           .keyboardShortcut("k", modifiers: .command)
       }
       // Override the default ⌘N "New Window" with "New To-Do". When a task

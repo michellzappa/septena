@@ -61,8 +61,7 @@ private struct WelcomeGate: ViewModifier {
   private func openFirstLog() {
     guard let section = nav.pendingFirstLog else { return }
     nav.pendingFirstLog = nil
-    nav.addInfoRequestedSection = section
-    nav.showAddInfo = true
+    nav.presentAddInfo(section: section)
   }
 }
 

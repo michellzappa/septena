@@ -184,19 +184,24 @@ struct TaskListView: View {
   /// multi-select and manual reorder are gone — kept only so the few remaining
   /// `editMode`-clearing safety calls compile.
   @Environment(\.editMode) private var editMode
+  /// Compact (iPhone) vs regular (iPad) — picks the touch tap-to-edit model
+  /// vs the pointer+keyboard selection model in `usesSelectionModel`.
+  @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
-  /// Selection binding handed to `List` — the keyboard-nav cursor.
-  private var listSelection: Binding<Set<String>>? { $selection }
-
-
-  // The full task editor — a standard detail drawer (When / Deadline / List /
-  // Notes / Repeat + the agent conversation). Hosted by `.adaptiveDetail` —
-  // sheet on iPhone, docked inspector on iPad/macOS — like every other section.
-  // Reached for the attributes the inline title field can't express: a
-  // double-click (macOS), the inline row's ⓘ Details button, or "Edit Details…"
-  // in the context menu. Plain title edits stay inline (see `beginEdit`).
-  @State private var editingDetail: SeptenaTask?
+  // The full task editor — Things-style EXPAND-IN-PLACE. Opening a row
+  // (tap / Return / double-click / ⌘R / ⓘ / "Edit Details…") sets this to the
+  // task's id; that row then renders the editor (title + When / Deadline / List
+  // / Notes / Repeat pills + the agent conversation) inline, growing the row,
+  // instead of a separate drawer. The editor reuses `TaskComposerCard` in its
+  // `.inline` presentation, so the form is literally the same component the
+  // create-drawer uses. Folding the row autosaves (see `collapseEdit`).
+  @State private var expandedEditId: String?
+  /// Shared namespace for the title hero-glide: the closed row's title and the
+  /// open inline editor's title field carry the same `matchedGeometryEffect` id,
+  /// so on expand/collapse the title moves between the two positions instead of
+  /// cross-fading. See `CheckableRow.titleMatchID` / `editTitleMatchID`.
+  @Namespace private var editTitleNS
 
   // Drives the focused "New Task" compose modal opened by the `+` toolbar
   // button (and ⌘N, and the sidebar "New To-Do"). A dedicated composer — not
@@ -333,6 +338,13 @@ struct TaskListView: View {
   /// engine — so the row chip reliably renders on load (see `load()`).
   @State private var inboxSuggestions: [String: SuggestionEngine.Suggestion] = [:]
 
+  /// done / (done + open) per project, mirroring the sidebar's aggregate so the
+  /// project pie glyph in mixed-list headers (Today / Unscheduled) reads the
+  /// real completion ratio. Cancelled tasks count toward neither side.
+  /// Snapshotted in `load()` from the full local corpus, since `items` is
+  /// filter-scoped and never holds a project's done rows.
+  @State private var progressByProject: [String: Double] = [:]
+
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
   // per-day via UserDefaults (local only); reappears the next morning.
@@ -403,7 +415,8 @@ struct TaskListView: View {
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
-      rename: renameSelectedAction
+      rename: renameSelectedAction,
+      duplicate: duplicateSelectedAction
     ))
     #else
     // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
@@ -414,6 +427,10 @@ struct TaskListView: View {
         if filter != .recentlyDeleted {
           Button("Move", action: openMoveForSelected)
             .keyboardShortcut("m", modifiers: .command)
+            .opacity(0)
+            .accessibilityHidden(true)
+          Button("Duplicate", action: duplicateSelected)
+            .keyboardShortcut("d", modifiers: .command)
             .opacity(0)
             .accessibilityHidden(true)
         }
@@ -454,27 +471,12 @@ struct TaskListView: View {
 
   private var taskList: some View {
     taskListContent
-    // macOS / iPad: inset capsule rows; iPhone: plain (edit-mode circles).
-    .septenaTaskListStyle()
-    // Belt-and-suspenders tint; the real neutral fill is `listRowBackground`.
-    .septenaNeutralListSelection()
-    .scrollContentBackground(.hidden)
     // Deep task-list rhythm runs denser than the drawer's: task rows read
     // `rowVInset` for their top/bottom padding, tightened here to Things-3
     // density. Drawer/log rows keep the default (airier) `Theme.rowVPadding`.
+    // (List styling, the neutral-tint, the paper background + clear-on-tap, and
+    // keyboard nav now all live inside `SelectableScrollList`.)
     .environment(\.rowVInset, Theme.rowVPaddingTight)
-    #if os(macOS)
-    // Clicking blank space (the paper behind the rows) clears the selection.
-    // Rows sit above this background, so row clicks never reach it — only
-    // empty gutters and the area below the last row deselect.
-    .background(
-      Theme.paperBackground
-        .contentShape(Rectangle())
-        .onTapGesture { clearSelection() }
-    )
-    #else
-    .background(Theme.paperBackground)
-    #endif
     .scrollDismissesKeyboard(.interactively)
     .toolbar {
       // No + button in the Recently Deleted view — you can't create trashed tasks.
@@ -495,15 +497,9 @@ struct TaskListView: View {
         }
       }
     }
-    // The `+` toolbar button (and ⌘N, and the sidebar "New To-Do") open the
-    // focused new-task composer via `shouldStartCreating` → `startCreate()`.
-    .listKeyboardNavigation(
-      inputActive: composerIsOpen,
-      hasSelection: !selection.isEmpty,
-      onReturn: openSelectedForEdit,
-      onSpace: toggleSelected,
-      onEscape: { clearSelection() }
-    )
+    // (Keyboard navigation — ↑↓ traversal, Return/Space/Esc, focus reclaim —
+    // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
+    // open the composer via `shouldStartCreating` → `startCreate()`.)
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
@@ -556,7 +552,7 @@ struct TaskListView: View {
       sessionDoneIds = []
       settle.cancelAll()
       clearSelection()
-      editingDetail = nil
+      expandedEditId = nil
       // Drop any inline edit/quick-add in flight — the buffers belong to the
       // list we're leaving, not the one we're switching to.
       editingTitleId = nil
@@ -608,21 +604,21 @@ struct TaskListView: View {
     }
   }
 
-  /// The composer presents create when `+`/⌘N is tripped, otherwise edit when
-  /// a row is opened. The scrim blocks list taps while open, so the two are
-  /// naturally mutually exclusive.
+  /// The drawer composer is now CREATE-only — `+`/⌘N opens a new-task drawer
+  /// (picking the list/day with no surrounding list to type into). EDITING an
+  /// existing task expands inline in its row (`expandedEditId`), not here.
   private var composerMode: TaskComposerCard.Mode? {
     if creating { return .create(filter) }
-    if let task = editingDetail { return .edit(task) }
     return nil
   }
-  private var composerIsOpen: Bool { creating || editingDetail != nil }
+  /// True while the create drawer is up. (Editing is inline — see
+  /// `expandedEditId` / `listInputActive`.)
+  private var composerIsOpen: Bool { creating }
   private var composerBinding: Binding<Bool> {
     Binding(get: { composerIsOpen }, set: { if !$0 { closeComposer() } })
   }
   private func closeComposer() {
     creating = false
-    editingDetail = nil
   }
 
   /// Open the floating new-task capture card (`QuickTaskCapture`) for the
@@ -631,7 +627,7 @@ struct TaskListView: View {
   /// it commits on submit, so there are no leftover placeholder rows.
   private func startCreate() {
     withAnimation(.snappy(duration: 0.25)) {
-      editingDetail = nil
+      expandedEditId = nil
       creating = true
     }
   }
@@ -651,34 +647,36 @@ struct TaskListView: View {
     }
   }
 
-  /// Begin renaming a task.
-  ///
-  /// macOS: rename in the COMPOSER, never inline. Swapping a focusable
-  /// `TextField` into a selectable `List` row and removing it corrupts the
-  /// List's focus/selection on macOS (clicks + arrows die afterward, the field's
-  /// selected text lingers) — an unwinnable fight with SwiftUI's `List`. The
-  /// composer is a separate inspector where the title field's focus/Return/Esc
-  /// behave, and the List stays pure-native and unbroken.
-  ///
-  /// iOS: inline rename in place (no NavigationSplitView focus war there).
+  /// Open a task for editing — Things-style expand-in-place on every platform.
+  /// The row grows to host the full inline editor (`TaskComposerCard(.inline)`);
+  /// folding it autosaves. This works in a `SelectableScrollList` (not a native
+  /// `List`) precisely because the container can host an inline-editable
+  /// `TextField` on macOS without the List focus/selection corruption.
   private func beginEdit(_ task: SeptenaTask) {
-    #if os(macOS)
-    editingDetail = task
-    #else
-    guard task.status != .done else { editingDetail = task; return }
-    if let prevId = editingTitleId, prevId != task.id,
-       let prev = currentTask(id: prevId) {
-      commitRename(prev)
+    // Drop any focused quick-add line so its keyboard doesn't fight the editor.
+    inlineFocus = nil
+    withAnimation(.snappy(duration: 0.22)) {
+      selection = [task.id]
+      expandedEditId = task.id
     }
-    newTaskText = ""
-    titleDraft = task.title
-    editingTitleId = task.id
-    selection = [task.id]
-    // Focus on the next runloop so the field (which appears this same update,
-    // as the row swaps from static → editing) is mounted before we focus it —
-    // a synchronous set is otherwise dropped before it joins the responder chain.
-    DispatchQueue.main.async { inlineFocus = .row(task.id) }
-    #endif
+  }
+
+  /// Fold the inline editor shut (its `.onDisappear` autosaves). Called by the
+  /// editor's close hook (Return-to-save), Esc, and whenever we leave the list.
+  ///
+  /// Closing KEEPS the just-closed task selected so its row indicator stays put
+  /// — the single reliable rule across every close path (Return, Esc, even a
+  /// click on empty paper, which would otherwise have cleared the selection a
+  /// beat before this runs). The one exception: if the user closed by selecting
+  /// a DIFFERENT row, we respect that new selection instead of yanking it back.
+  private func collapseEdit() {
+    let closingId = expandedEditId
+    withAnimation(.snappy(duration: 0.22)) {
+      expandedEditId = nil
+      if let closingId, selection.isEmpty || selection == [closingId] {
+        selection = [closingId]
+      }
+    }
   }
 
   /// Commit a rename whose field just lost the cursor (keyboard dismissed,
@@ -747,11 +745,27 @@ struct TaskListView: View {
   }
 
   private var taskListContent: some View {
-    // `selection` is bound to List on both platforms; rows carry `.tag(id)` so
-    // List can map a row to a selection value. The neutral gray capsule is
-    // painted via `listRowBackground`; native UIKit/AppKit accent fills are
-    // suppressed per row so only one highlight shows.
-    List(selection: listSelection) {
+    // ONE container on every platform: a `SelectableScrollList`
+    // (ScrollView/LazyVStack) that re-earns native `List(selection:)`'s
+    // selection + keyboard nav while — unlike `List` — letting a row host an
+    // inline-editable `TextField` on macOS without corrupting focus/selection.
+    // `selection` stays the single source of truth; the neutral capsule is the
+    // same `SelectableListRowBackground` the List drew, so rows look identical.
+    //   • Mac / iPad: click / ⌘-click / ⇧-click select, ↑↓ traverse, the cursor
+    //     row stays on-screen; double-click (Mac) / tap (touch) opens the editor.
+    //   • iPhone: tap opens the editor; no selection chrome (`selectable=false`).
+    SelectableScrollList(
+      selection: $selection,
+      orderedIDs: keyboardOrderedTaskIds,
+      // Suppress the list's Space/Return/arrows (and reclaim focus on release)
+      // whenever a field owns the keyboard: the open composer, an inline rename,
+      // or the quick-add line.
+      inputActive: listInputActive,
+      selectable: usesSelectionModel,
+      onActivate: activateRow,
+      onToggle: toggleRow,
+      onClear: { clearSelection() }
+    ) {
       taskListHeader
       taskListRows
       // The quick-add line lives in the Inbox section on Today (see
@@ -761,29 +775,59 @@ struct TaskListView: View {
       projectLoggedSection()
       taskListFooter
     }
-    .septenaNeutralListSelection()
     // Commit a rename the moment its field loses the cursor — the iOS analog of
     // Esc/Return (no hardware Esc there). Row→row switches are pre-committed in
     // `beginEdit`; this catches focus going to the quick-add line or to nil.
     .onChange(of: inlineFocus) { old, _ in commitRenameOnFocusLoss(from: old) }
+    // Click-away collapses the inline editor (Things-style) — selecting any
+    // OTHER row folds the open editor, autosaving it. While editing, the list's
+    // arrow keys are suppressed (`listInputActive`), so selection only moves via
+    // an explicit click on a different row.
+    .onChange(of: selection) { _, sel in
+      if let id = expandedEditId, !sel.contains(id) { collapseEdit() }
+    }
     #if os(macOS)
-    // PURE native selection: click / ⌘/⇧-click / ↑↓ are the List's own, and a
-    // native click also gives the List key focus (no programmatic focus claim —
-    // an extra `@FocusState` on the List fought the inline field's focus and
-    // left clicks dead after an edit). Keyboard actions on the selected row are
-    // MODIFIER menu commands (⌘R rename, ⌘K complete) — reliable regardless of
-    // focus; unmodified Space/Return are NOT bound (they hit the checkbox /
-    // sidebar). Double-click opens the composer; right-click → Rename / Edit
-    // Details. Esc is handled in both places (the inline field owns it while it
-    // has focus — see InlineTaskRow — and this is the fallback when the list does):
-    //   editing → COMMIT the rename (safer than cancel) · quick-add → blur ·
-    //   selected → deselect.
+    // Esc fallback when the list itself holds focus (the inline field owns Esc
+    // while editing — see InlineTaskRow; the container's own Esc handler clears a
+    // selection). This catches the in-between: a half-typed rename whose field
+    // lost focus, or a focused quick-add line.
+    //   editing → COMMIT the rename (safer than cancel) · quick-add → blur.
     .onExitCommand {
       if let id = editingTitleId, let task = currentTask(id: id) { commitRename(task) }
       else if inlineFocus != nil { inlineFocus = nil }
       else { clearSelection() }
     }
     #endif
+  }
+
+  /// True while a field/editor owns the keyboard — the composer drawer, an
+  /// inline rename in progress, or a focused quick-add/rename line. Drives the
+  /// `SelectableScrollList`'s key-suppression + focus-reclaim.
+  private var listInputActive: Bool {
+    composerIsOpen || expandedEditId != nil || editingTitleId != nil || inlineFocus != nil
+  }
+
+  /// Whether the list runs the pointer+keyboard selection model (Mac always;
+  /// iPad regular width) or the touch tap-to-edit model (iPhone compact).
+  private var usesSelectionModel: Bool {
+    #if os(macOS)
+    return true
+    #else
+    return hSize == .regular
+    #endif
+  }
+
+  /// Return / double-click(Mac) / tap(touch) on a row → open it for editing.
+  private func activateRow(_ id: String) {
+    guard let task = currentTask(id: id) else { return }
+    beginEdit(task)
+  }
+
+  /// Space on the cursor row → toggle complete (the keyboard analog of the
+  /// checkbox).
+  private func toggleRow(_ id: String) {
+    guard let task = currentTask(id: id) else { return }
+    toggle(task)
   }
 
   @ViewBuilder
@@ -809,7 +853,7 @@ struct TaskListView: View {
     if filter == .today, !triageItems.isEmpty {
       Section {
         if !inboxCollapsed {
-          ForEach(triageItems) { task in row(task, quickMenu: true).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+          ForEach(triageItems) { task in taskRow(task, quickMenu: true) }
         }
       } header: {
         inboxHeader(count: triageItems.count)
@@ -927,8 +971,17 @@ struct TaskListView: View {
   @ViewBuilder
   private var titleRow: some View {
     if !embedded {
-      ScreenTitle(icon: titleIcon, iconTint: titleTint, title: filter.title)
-        .plainListChrome()
+      // The title IS the navigation dropdown (Things-style): tapping it opens
+      // the full destination menu so you can jump anywhere without the sidebar.
+      // The menu trigger is intrinsic-width; the Spacer fills the row so the
+      // title stays left-aligned without widening the dropdown to full width.
+      HStack(spacing: 0) {
+        TaskNavMenu {
+          ScreenTitleMenuLabel(icon: titleIcon, iconTint: titleTint, title: filter.title)
+        }
+        Spacer(minLength: 0)
+      }
+      .plainListChrome()
     } else {
       embeddedHeader()
         .plainListChrome()
@@ -980,12 +1033,12 @@ struct TaskListView: View {
   }
 
   private var reviewRows: some View {
-    ForEach(review) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+    ForEach(review) { task in taskRow(task) }
   }
 
   private var visibleRows: some View {
     ForEach(visibleItems) { task in
-      row(task, quickMenu: showsFilingChip(for: task)).asTaskRow(id: task.id, isSelected: selection.contains(task.id))
+      taskRow(task, quickMenu: showsFilingChip(for: task))
     }
   }
 
@@ -998,7 +1051,7 @@ struct TaskListView: View {
       projectLoggedToggleRow
       if isProjectLoggedExpanded {
         ForEach(loggedProjectItems) { task in
-          row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id))
+          taskRow(task)
         }
       }
     }
@@ -1127,12 +1180,6 @@ struct TaskListView: View {
     return ids
   }
 
-  private func openSelectedForEdit() {
-    guard let id = effectiveSelectionId(),
-          let t = currentTask(id: id) else { return }
-    editingDetail = t
-  }
-
   #if os(macOS)
   /// The action behind the ⌘R "Rename" menu command. Nil — so the menu item
   /// disables and ⌘R falls through — when a text field / picker sheet is active
@@ -1140,15 +1187,53 @@ struct TaskListView: View {
   /// `effectiveSelectionId`'s first-row fallback), and `currentTask` now includes
   /// Inbox rows, so it renames exactly the selected task.
   private var renameSelectedAction: (() -> Void)? {
-    guard editingTitleId == nil, inlineFocus == nil, !composerIsOpen,
-          whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
+    guard expandedEditId == nil, editingTitleId == nil, inlineFocus == nil,
+          !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
           !nav.showQuickFind,
           let id = selection.first(where: { currentTask(id: $0) != nil }),
           let task = currentTask(id: id), task.status != .done
     else { return nil }
     return { beginEdit(task) }
   }
+
+  /// The action behind the ⌘D "Duplicate" menu command. Nil — so the menu item
+  /// disables — while an editor / picker sheet is active, in Recently Deleted,
+  /// or when no resolvable row is selected. Uses an EXPLICIT selection (not the
+  /// first-row fallback) so ⌘D only ever clones the row the user picked.
+  private var duplicateSelectedAction: (() -> Void)? {
+    guard expandedEditId == nil, editingTitleId == nil, inlineFocus == nil,
+          !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
+          !nav.showQuickFind, filter != .recentlyDeleted,
+          let id = selection.first(where: { currentTask(id: $0) != nil })
+    else { return nil }
+    return { duplicate(id: id) }
+  }
   #endif
+
+  /// Clone a task into a brand-new one (new id) carrying the same title, filing
+  /// (area/project), notes, schedule, deadline, today flag and recurrence. The
+  /// copy always lands open even if the source was completed, and becomes the
+  /// new selection so the user can immediately rename / reschedule it.
+  private func duplicate(id: String) {
+    guard let task = currentTask(id: id) else { return }
+    Haptics.tick()
+    let copy = mutator.create(
+      title: task.title,
+      area: task.area,
+      project: task.project,
+      scheduled: SeptenaDate.parse(task.scheduled),
+      deadline: SeptenaDate.parse(task.deadline),
+      today: task.today,
+      notes: task.notes
+    )
+    if let rule = task.recurrence {
+      mutator.setRecurrence(id: copy.id, recurrence: rule)
+    }
+    Task {
+      await load()
+      selectOnly(copy.id)
+    }
+  }
 
   private func toggleSelected() {
     guard let id = effectiveSelectionId(),
@@ -1219,6 +1304,15 @@ struct TaskListView: View {
   private func clearScheduleForSelected() {
     guard let id = effectiveSelectionId() else { return }
     applyWhen(id: id, kind: .scheduled, date: nil)
+  }
+
+  /// ⌘D — duplicate the focused row. macOS gates this through
+  /// `duplicateSelectedAction` (explicit selection); the iPad hidden button
+  /// resolves the effective row, matching how Move behaves there.
+  private func duplicateSelected() {
+    guard filter != .recentlyDeleted,
+          let id = effectiveSelectionId() else { return }
+    duplicate(id: id)
   }
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
@@ -1328,6 +1422,74 @@ struct TaskListView: View {
 
   // MARK: - Row
 
+  /// The unit every list section renders: either the normal selectable row, or
+  /// — when this is the task being edited — the inline expand-in-place editor.
+  /// The editor is rendered WITHOUT `asTaskRow`'s selection gestures so its
+  /// title field / pills receive clicks directly (a selectable wrapper would
+  /// intercept them); it's still `.id`-tagged so `ScrollViewReader` can keep it
+  /// on-screen as it grows.
+  @ViewBuilder
+  private func taskRow(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
+    if expandedEditId == task.id {
+      expandedEditorRow(task)
+    } else {
+      row(task, quickMenu: quickMenu)
+        .asTaskRow(id: task.id, isSelected: selection.contains(task.id))
+    }
+  }
+
+  /// The Things-style inline editor that replaces a row while it's open: the
+  /// shared `TaskComposerCard` form, hosted `.inline` (no scaffold, no inner
+  /// scroll), on a neutral highlighted card. Folding it (Return, opening another
+  /// row, leaving the list) autosaves via the card's `.onDisappear`.
+  private func expandedEditorRow(_ task: SeptenaTask) -> some View {
+    TaskComposerCard(
+      mode: .edit(task),
+      areas: areas,
+      projects: projects,
+      accent: theme.color(for: "tasks"),
+      presentation: .inline,
+      onClose: { collapseEdit() },
+      onToggleComplete: { toggle(task) },
+      titleMatchID: "edit-title-\(task.id)",
+      checkboxMatchID: "edit-checkbox-\(task.id)",
+      heroMatchNS: editTitleNS,
+      showsTodayIndicator: filter != .today,
+      onDone: { Task { await load() } }
+    )
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      // Things-style card: the open editor stays on white (paper), set off from
+      // the list by a hairline outline only — not the gray selection fill (that's
+      // for collapsed selected rows). No shadow: it gets clipped by the list's
+      // scroll bounds; the outline alone reads cleanly.
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Theme.paperBackground)
+        .overlay(
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(Theme.border, lineWidth: 1)
+        )
+        .padding(.horizontal, 5)
+    )
+    // Breathing room above/below so the open card stands apart from its
+    // neighbouring rows and reads as the focused element.
+    .padding(.vertical, 24)
+    .id(task.id)
+    .transition(.opacity)
+    #if os(macOS)
+    // Esc folds the editor but LEAVES the task selected — `collapseEdit` only
+    // clears `expandedEditId`, never `selection` (which is already [task.id]).
+    // Handling it here, on the row that hosts the focused field, intercepts Esc
+    // before it reaches the container's `.onExitCommand` (which would clear the
+    // selection), so the now-closed task stays highlighted.
+    .onExitCommand { collapseEdit() }
+    #endif
+    .septenaOnRightClick {
+      if !selection.contains(task.id) { selectOnly(task.id) }
+    }
+    .contextMenu { taskContextMenu(for: task) }
+  }
+
   @ViewBuilder
   private func row(_ task: SeptenaTask, quickMenu: Bool = false) -> some View {
     // No swipe actions and no inline "⋯" button on task rows (removed by
@@ -1418,6 +1580,9 @@ struct TaskListView: View {
       showsTodayIndicator: filter != .today,
       isListSelected: selection.contains(task.id),
       accessory: accessory,
+      titleMatchID: "edit-title-\(task.id)",
+      checkboxMatchID: "edit-checkbox-\(task.id)",
+      heroMatchNS: editTitleNS,
       onToggle: { toggle(task) },
       onTap: nil
     )
@@ -1425,26 +1590,12 @@ struct TaskListView: View {
     // transaction; every settle-driven removal runs through `motion.run`, so
     // Reduce Motion still gets an instant (un-animated) drop.
     .transition(.opacity)
-    //   • iOS: single tap → rename the title in place (skipped while reordering;
-    //     completed rows open the composer instead). Full composer = the ⓘ on
-    //     the inline row.
-    //   • iOS: single tap renames in place.
-    //   • macOS: native List handles single-click select + ⌘/⇧-click + ↑/↓; a
-    //     plain `.onTapGesture(count: 2)` opens the composer. Unlike the
-    //     `.simultaneousGesture` form (which swallowed the selecting click), a
-    //     count-2 tap only matches the double-click and leaves the single click
-    //     to the List's native selection. Rename = ⌘R / right-click → Rename.
-    #if os(iOS)
-    .simultaneousGesture(SpatialTapGesture().onEnded { value in
-      guard !isEditMode else { return }
-      if value.location.x < Theme.hPadding + Theme.checkboxTap { return }
-      beginEdit(task)
-    })
-    #else
-    .onTapGesture(count: 2) { editingDetail = task }
-    #endif
-    // Right-click selects this row (unless already part of a selection) so the
-    // menu's target is unambiguous.
+    // Open + selection gestures live on `selectableScrollRow` (applied via
+    // `asTaskRow`): tap → open (touch), single-click → select / double-click →
+    // open (Mac). `activateRow` routes "open" to `beginEdit` (inline rename on
+    // iPhone, composer on Mac). The checkbox Button consumes its own taps, so
+    // tapping it toggles without also opening. Only right-click + the context
+    // menu remain row-local.
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
@@ -1476,7 +1627,7 @@ struct TaskListView: View {
       onCancel: { commitRename(task) },
       onOpenDetails: {
         commitRename(task)
-        editingDetail = task
+        beginEdit(task)
       }
     )
     .transition(.opacity)
@@ -1553,7 +1704,7 @@ struct TaskListView: View {
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
         onRename: { task in beginEdit(task) },
-        onOpenDetail: { task in editingDetail = task },
+        onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
           Haptics.tick()
@@ -1745,14 +1896,14 @@ struct TaskListView: View {
         .padding(.bottom, 4)
         .plainListChrome()
     }
-    ForEach(loose) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+    ForEach(loose) { task in taskRow(task) }
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
-          ForEach(areaTasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+          ForEach(areaTasks) { task in taskRow(task) }
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -1763,10 +1914,11 @@ struct TaskListView: View {
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
-            ForEach(tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+            ForEach(tasks) { task in taskRow(task) }
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
+                        projectProgress: progressByProject[project.id],
                         onTap: { nav.path = [.project(project)] })
           }
         }
@@ -1777,10 +1929,11 @@ struct TaskListView: View {
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
-          ForEach(tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+          ForEach(tasks) { task in taskRow(task) }
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
+                      projectProgress: progressByProject[project.id],
                       onTap: { nav.path = [.project(project)] })
         }
       }
@@ -1824,14 +1977,17 @@ struct TaskListView: View {
   private func groupHeader(icon: String?,
                            title: String,
                            areaEmoji: String? = nil,
+                           projectProgress: Double? = nil,
                            onTap: (() -> Void)? = nil) -> some View {
-    groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji, onTap: onTap)
+    groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
+                    projectProgress: projectProgress, onTap: onTap)
       .textCase(nil)
       .selectionDisabled()
   }
 
   private func groupHeaderBody(icon: String?, title: String,
                                areaEmoji: String? = nil,
+                               projectProgress: Double? = nil,
                                onTap: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
@@ -1863,7 +2019,7 @@ struct TaskListView: View {
             .foregroundStyle(Theme.iconMuted)
             .frame(width: Theme.checkboxTap, alignment: .center)
         } else {
-          ProjectProgressIcon(progress: 0.25, tint: Theme.inkSecondary, diameter: 14)
+          ProjectProgressIcon(progress: projectProgress ?? 0, tint: Theme.inkSecondary, diameter: 14)
             .frame(width: Theme.checkboxTap, alignment: .center)
         }
         // Tappable target is JUST the title (+ chevron) — not the whole row.
@@ -1984,7 +2140,7 @@ struct TaskListView: View {
         if !bucket.events.isEmpty {
           calendarEventsBlock(bucket.events)
         }
-        ForEach(bucket.tasks) { task in row(task).asTaskRow(id: task.id, isSelected: selection.contains(task.id)) }
+        ForEach(bucket.tasks) { task in taskRow(task) }
       } header: {
         groupHeader(icon: "calendar", title: bucket.label)
       }
@@ -2306,6 +2462,24 @@ struct TaskListView: View {
     // the local cache is authoritative — no network round-trip needed.
     projects = LocalCache.projects(in: modelContext)
     areas = LocalCache.areas(in: modelContext)
+    // Per-project completion ratio for the project pie glyph in mixed-list
+    // headers — computed from the full corpus (not the filter-scoped `items`,
+    // which omits a project's done rows). Mirrors SidebarView's aggregate.
+    do {
+      var done: [String: Int] = [:]
+      var total: [String: Int] = [:]
+      for t in LocalCache.allTasks(in: modelContext) {
+        guard let pid = t.project else { continue }
+        switch t.status {
+        case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
+        case .open: total[pid, default: 0] += 1
+        case .cancelled: break
+        }
+      }
+      progressByProject = total.reduce(into: [:]) { acc, kv in
+        acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
+      }
+    }
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
@@ -2441,18 +2615,9 @@ struct TaskListView: View {
 
   // MARK: - Title chrome
 
-  private var titleIcon: String {
-    switch filter {
-    case .today: return "sun.max.fill"
-    case .triage: return "tray.full"
-    case .upcoming: return "calendar"
-    case .unscheduled: return "rectangle.stack"
-    case .logbook: return "checkmark.circle"
-    case .recentlyDeleted: return "trash"
-    case .project: return "number"
-    case .area: return "folder"
-    }
-  }
+  // Canonical destination icon (single source: `Route`), shared with the
+  // sidebar smart-list rows and the title dropdown.
+  private var titleIcon: String { Route.filter(filter).icon }
 
   private var titleTint: Color {
     .secondary
@@ -2783,6 +2948,11 @@ struct TaskActions {
   /// shortcut is the reliable way to do this on macOS — unmodified Space/Return
   /// can't be (they hit the checkbox / the sidebar). See CLAUDE.md.
   var rename: (() -> Void)?
+  /// ⌘D → duplicate the selected row: a brand-new task (new id) carrying the
+  /// same title, filing (area/project), notes, schedule, deadline, today flag
+  /// and recurrence. Nil (→ menu item disabled) when nothing's selected or an
+  /// editor/sheet is active.
+  var duplicate: (() -> Void)?
 }
 
 private struct TaskActionsKey: FocusedValueKey {
@@ -2806,23 +2976,28 @@ extension FocusedValues {
 // Used in `body` directly and inside the grouping helpers.
 
 extension View {
+  // The Tasks list renders in a `SelectableScrollList` (ScrollView/LazyVStack)
+  // on EVERY platform now — never a native `List`. That's the only way to host
+  // an inline-editable row on macOS without the List focus/selection
+  // corruption, and keeping one container across iPhone/iPad/Mac is what makes
+  // the editing model "identical components" everywhere. These three helpers
+  // therefore drop all the old `List`-cell chrome (separators / row insets /
+  // selection suppression) — a LazyVStack row is just a full-width view.
+
+  /// A non-selectable full-bleed row (footer spacer, quick-add line, headers).
   func asListRow() -> some View {
-    self
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .listRowInsets(EdgeInsets())
-      .selectionDisabled()
+    frame(maxWidth: .infinity, alignment: .leading)
   }
 
+  /// A selectable task row — neutral capsule highlight, `.isSelected` a11y, and
+  /// click/tap selection routed through the container (see `selectableScrollRow`).
   func asTaskRow(id: String, isSelected: Bool) -> some View {
-    selectableListRow(tag: id, isSelected: isSelected)
+    selectableScrollRow(id: id, isSelected: isSelected)
   }
 
+  /// A non-selectable decorative row (section hairlines, banners, empty states).
   func plainListChrome() -> some View {
-    listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .listRowInsets(EdgeInsets())
-      .selectionDisabled()
+    frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 

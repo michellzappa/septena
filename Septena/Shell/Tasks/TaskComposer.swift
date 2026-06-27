@@ -18,6 +18,7 @@ import SwiftUI
 /// navigation OFF — see `moveFocus` / `activateFocused`.
 enum TaskEditFocus: Hashable {
   case title
+  case notes
   case pill(TaskAttributeBar.Attribute)
 }
 
@@ -27,10 +28,36 @@ struct TaskComposerCard: View {
     case edit(SeptenaTask)
   }
 
+  /// How the same form is hosted. `.drawer` is the standard adaptive edit
+  /// drawer (sheet on iPhone, docked inspector on iPad/macOS) with Cancel/Save
+  /// chrome. `.inline` is the Things-style expand-in-place editor: the bare form
+  /// rendered straight into the expanded task row — no scaffold, no inner
+  /// ScrollView (the list scrolls), autosaving on collapse.
+  enum Presentation { case drawer, inline }
+
   let mode: Mode
   let areas: [Area]
   let projects: [Project]
   let accent: Color
+  let presentation: Presentation
+  /// Inline collapse hook — how the form asks its host row to fold shut (Return
+  /// to save, etc.). The scaffold/`.adaptiveDetail` owns closing in `.drawer`.
+  let onClose: (() -> Void)?
+  /// Inline-only: toggle the task complete from the editor's title-line
+  /// checkbox (wired to the list's settle-aware `toggle`). Nil in the drawer /
+  /// create, where there's no checkbox.
+  let onToggleComplete: (() -> Void)?
+  /// Hero-animation anchors (`matchedGeometryEffect`) shared with the closed
+  /// row's title + checkbox, so they glide between the row and the open inline
+  /// editor instead of cross-fading. Inline only; nil in the drawer.
+  var titleMatchID: String? = nil
+  var checkboxMatchID: String? = nil
+  var heroMatchNS: Namespace.ID? = nil
+  /// Surface context for the title-line checkbox so it's derived identically to
+  /// the closed row (the row gates the Today indicator off Today surfaces).
+  /// Forwarded into the shared `TaskCheckboxModel`. Matches the row's
+  /// `showsTodayIndicator` (`filter != .today`).
+  var showsTodayIndicator: Bool = true
   /// Fired after a successful create/edit (or a terminal action) so the list
   /// reloads. Closing is owned by the scaffold / `.adaptiveDetail`, not here.
   let onDone: () -> Void
@@ -43,6 +70,11 @@ struct TaskComposerCard: View {
   // `.adaptiveDetail` switches on. Edit mode only autofocuses in the inspector,
   // where the keyboard doesn't fight the half-height sheet detent.
   @Environment(\.usesPushNavigation) private var useInspector
+  // Inline presentation lays out at the host list's row rhythm so the editor's
+  // title line sits flush with the rows above/below it (checkbox + title at the
+  // same insets). The drawer keeps its own airier padding.
+  @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
   @State private var draft = TaskDraft()
   @State private var seeded = false
   /// The create-mode draft exactly as seeded from the list's defaults — the
@@ -73,11 +105,22 @@ struct TaskComposerCard: View {
   @State private var suggestedList: SuggestionEngine.Suggestion?
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
+       presentation: Presentation = .drawer, onClose: (() -> Void)? = nil,
+       onToggleComplete: (() -> Void)? = nil,
+       titleMatchID: String? = nil, checkboxMatchID: String? = nil,
+       heroMatchNS: Namespace.ID? = nil, showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
     self.accent = accent
+    self.presentation = presentation
+    self.onClose = onClose
+    self.onToggleComplete = onToggleComplete
+    self.titleMatchID = titleMatchID
+    self.checkboxMatchID = checkboxMatchID
+    self.heroMatchNS = heroMatchNS
+    self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
@@ -94,22 +137,57 @@ struct TaskComposerCard: View {
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
-  /// Close through the docked-inspector hook with a sheet `dismiss()` fallback —
-  /// the same close path `AdaptiveEditScaffold` uses, so terminal actions match.
-  private func close() { (adaptiveClose ?? { dismiss() })() }
+  /// Close: fold the inline editor (`onClose`) when hosted inline, else go
+  /// through the docked-inspector hook with a sheet `dismiss()` fallback — the
+  /// same close path `AdaptiveEditScaffold` uses, so terminal actions match.
+  private func close() { (onClose ?? adaptiveClose ?? { dismiss() })() }
 
   var body: some View {
-    // The standard adaptive edit drawer: a grouped sheet on iPhone, a docked
-    // inspector on iPad/macOS, Cancel/Save chrome owned by the scaffold. The
-    // content is a plain scroll — no custom detents — so it scrolls like every
-    // other edit form. Save persists + reloads; the scaffold then closes.
+    presentedContent
+      .onAppear(perform: seed)
+      // Safety net: persist on any teardown the buttons didn't already handle
+      // (app backgrounded, the inspector toggled shut by the system, a parent
+      // removed, or — inline — the row folded). Idempotent via `savedOrSkipped`
+      // — an explicit Save already ran it, and a Cancel → Discard flips the
+      // guard so this no-ops and the draft is dropped. The belt to the Cancel
+      // suspenders: the only path that loses work is a confirmed Discard. For
+      // the inline editor this IS the save path — folding the row autosaves.
+      .onDisappear { persistOnce() }
+      .onChange(of: draft.title) { _, newValue in
+        // The title wraps (axis: .vertical) so long titles show in full instead
+        // of truncating — but it stays single-line in spirit: a Return inserts a
+        // newline, which we treat as "save". Strip it and commit (or just tidy it
+        // away when there's nothing to save yet).
+        if newValue.contains("\n") {
+          draft.title = newValue.replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+          if draft.canSave { commit(); return }
+        }
+        updateSuggestion()
+      }
+  }
+
+  @ViewBuilder
+  private var presentedContent: some View {
+    switch presentation {
+    case .inline:
+      // No scaffold, no inner ScrollView — the bare form expands inside the
+      // task row and the LIST scrolls. Autosaves on fold (see `.onDisappear`).
+      formBody
+    case .drawer:
+      drawerBody
+    }
+  }
+
+  /// The standard adaptive edit drawer: a grouped sheet on iPhone, a docked
+  /// inspector on iPad/macOS, Cancel/Save chrome owned by the scaffold.
+  private var drawerBody: some View {
     AdaptiveEditScaffold(
       title: headerTitle,
       // Standard two-control chrome: an explicit commit (Add / Save) and a real
       // Cancel. Cancel discards — but only through a confirmation when the form
       // is dirty, and the scaffold blocks swipe-to-dismiss while dirty, so the
-      // ONLY way to lose a task is an explicit Cancel → Discard. Every other
-      // exit (and the `.onDisappear` net below) keeps the work.
+      // ONLY way to lose a task is an explicit Cancel → Discard.
       saveTitle: saveTitle,
       cancelTitle: "Cancel",
       showsSave: true,
@@ -121,40 +199,9 @@ struct TaskComposerCard: View {
       onDiscard: { discard() }
     ) {
       ScrollView {
-        VStack(alignment: .leading, spacing: 14) {
-          titleNotesCard
-
-          quickEntryChips
-
-          TaskAttributeBar(
-            draft: $draft,
-            areas: areas,
-            projects: projects,
-            accent: accent,
-            focus: $focus,
-            activate: $pendingPillActivate
-          )
-
-          // Edit mode only — a not-yet-created task has no id/conversation.
-          // docs/TASK_CONVERSATIONS_PHASE1.md.
-          if case .edit(let task) = mode {
-            ConversationSection(task: task, accent: accent)
-          }
-        }
-        .padding(16)
+        formBody
       }
       .scrollDismissesKeyboard(.interactively)
-      // Tab / Shift-Tab cycle the whole form; Space / Return open a focused
-      // pill or fire a focused action. Attached here so it catches the keypress
-      // whenever any pill / action (a focusable descendant) holds the cursor;
-      // the title field carries its own copy (a TextField would otherwise eat
-      // Tab). Works with macOS keyboard navigation off — we move focus
-      // ourselves rather than relying on the system ring.
-      .onKeyPress(keys: [.tab]) { press in
-        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
-      }
-      .onKeyPress(.space) { activateFocused() }
-      .onKeyPress(.return) { activateFocused() }
     }
     #if os(iOS)
     // Half-height-when-possible bottom sheet; `detent` is seeded per-mode. The
@@ -163,34 +210,99 @@ struct TaskComposerCard: View {
     .presentationDetents([.medium, .large], selection: $detent)
     .presentationContentInteraction(.scrolls)
     #endif
-    .onAppear(perform: seed)
-    // Safety net: persist on any teardown the buttons didn't already handle
-    // (app backgrounded, the inspector toggled shut by the system, a parent
-    // removed). Idempotent via `savedOrSkipped` — an explicit Save already ran
-    // it, and an explicit Cancel → Discard flips the guard so this no-ops and
-    // the draft is truly dropped. This is the belt to the Cancel suspenders:
-    // the only path that loses work is a confirmed Discard.
-    .onDisappear { persistOnce() }
-    .onChange(of: draft.title) { _, newValue in
-      // The title wraps (axis: .vertical) so long titles show in full instead
-      // of truncating — but it stays single-line in spirit: a Return inserts a
-      // newline, which we treat as "save". Strip it and commit (or just tidy it
-      // away when there's nothing to save yet).
-      if newValue.contains("\n") {
-        draft.title = newValue.replacingOccurrences(of: "\n", with: " ")
-          .trimmingCharacters(in: .whitespacesAndNewlines)
-        if draft.canSave { commit(); return }
+  }
+
+  /// The form itself — title, quick-entry chips, the elective pill rail, and
+  /// (edit mode) the conversation. Shared verbatim by the drawer and the inline
+  /// editor so they're literally identical components.
+  private var formBody: some View {
+    // Inline rides the list's row rhythm (tight gaps, content aligned to the row
+    // inset); the drawer keeps a roomier 16pt card. Pills/conversation indent a
+    // touch past the checkbox so they hang off the title, Things-style.
+    let inline = presentation == .inline
+    return VStack(alignment: .leading, spacing: inline ? 10 : 14) {
+      titleNotesCard
+
+      Group {
+        notesField
+
+        quickEntryChips
+
+        TaskAttributeBar(
+          draft: $draft,
+          areas: areas,
+          projects: projects,
+          accent: accent,
+          neutral: inline,
+          focus: $focus,
+          activate: $pendingPillActivate
+        )
+
+        // Edit mode only — a not-yet-created task has no id/conversation.
+        // docs/TASK_CONVERSATIONS_PHASE1.md.
+        if case .edit(let task) = mode {
+          ConversationSection(task: task, accent: accent)
+        }
       }
-      updateSuggestion()
+      // Indent the rail/conversation to align with the title text (past the
+      // checkbox column) when inline; the drawer has no checkbox so no indent.
+      .padding(.leading, inline ? Theme.checkboxTap + Theme.iconTextGap : 0)
     }
+    .padding(.horizontal, inline ? rowHInset : 16)
+    // Inline: a touch of internal top/bottom inset so the title isn't glued to
+    // the card edge (the card's own 24pt margin is the EXTERNAL gap to siblings).
+    .padding(.vertical, inline ? rowVInset + 12 : 16)
+    // Tab / Shift-Tab cycle the whole form; Space / Return open a focused pill
+    // or fire a focused action. Attached here so it catches the keypress
+    // whenever any pill / action (a focusable descendant) holds the cursor; the
+    // title field carries its own copy (a TextField would otherwise eat Tab).
+    // Works with macOS keyboard navigation off — we move focus ourselves.
+    .onKeyPress(keys: [.tab]) { press in
+      moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+    }
+    .onKeyPress(.space) { activateFocused() }
+    .onKeyPress(.return) { activateFocused() }
   }
 
   // MARK: - Title / notes
 
+  @ViewBuilder
   private var titleNotesCard: some View {
     // Title only — notes moved to an elective pill in the attribute bar so the
     // card stays a single clean line; tapping the Notes pill expands an inline
     // editor like the When / Deadline / Repeat controls.
+    if presentation == .inline {
+      // Mirror the static row: a baseline-aligned checkbox + the title as a
+      // plain field, no boxed background — so the expanded row reads as the same
+      // line you clicked, now editable, instead of a heavy input card.
+      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+        if case .edit(let task) = mode, let onToggleComplete {
+          // Derived from the SAME `TaskCheckboxModel` the closed row uses, so the
+          // box is identical in view and edit modes (tint, Today gating, proposal
+          // dashing, tenure dial, unread-context dot — all shared, never re-rolled).
+          TaskCheckbox(
+            model: TaskCheckboxModel(task: task, accent: accent,
+                                     showsTodayIndicator: showsTodayIndicator),
+            onToggle: onToggleComplete
+          )
+          .matchedHeroGeometry(checkboxMatchID, heroMatchNS)
+          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        }
+        titleField
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .matchedHeroGeometry(titleMatchID, heroMatchNS)
+      }
+    } else {
+      titleField
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Theme.secondaryGroupedBackground,
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(focusRing(visible: focus == .title, cornerRadius: 18))
+    }
+  }
+
+  private var titleField: some View {
     TextField("What needs doing?", text: $draft.title, axis: .vertical)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
@@ -204,11 +316,26 @@ struct TaskComposerCard: View {
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
-      .padding(.horizontal, 14)
-      .padding(.vertical, 12)
-      .background(Theme.secondaryGroupedBackground,
-                  in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-      .overlay(focusRing(visible: focus == .title, cornerRadius: 18))
+  }
+
+  /// Notes — an always-editable multi-line field sitting directly under the
+  /// title (Things-style), no box and no Clear button. Replaces the old Notes
+  /// pill + expanding panel. Return inserts a newline here (it's prose), so —
+  /// unlike the title — there's no Return-to-save; Tab still cycles focus.
+  private var notesField: some View {
+    TextField("Notes", text: $draft.notes, axis: .vertical)
+      .textFieldStyle(.plain)
+      // Same size as the title (just regular weight / muted ink) — notes read as
+      // body prose, not fine print.
+      .font(.septenaTaskTitle)
+      .foregroundStyle(Theme.inkPrimary)
+      .lineLimit(1...8)
+      .focused($focus, equals: .notes)
+      // A little extra right margin so wrapped prose doesn't run to the card edge.
+      .padding(.trailing, 12)
+      .onKeyPress(keys: [.tab]) { press in
+        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+      }
   }
 
   /// The shared keyboard focus ring drawn on whatever holds the cursor — a
@@ -373,7 +500,7 @@ struct TaskComposerCard: View {
       // Tapping the title focuses it and the system promotes the sheet then.
       // In the iPad/macOS inspector there's no detent to protect, so keep the
       // keyboard-driven "open row with Return, edit immediately" focus.
-      if useInspector {
+      if useInspector || presentation == .inline {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = .title }
       }
     }
@@ -447,7 +574,7 @@ struct TaskComposerCard: View {
 
   /// Tab order: title → every pill.
   private var focusOrder: [TaskEditFocus] {
-    var order: [TaskEditFocus] = [.title]
+    var order: [TaskEditFocus] = [.title, .notes]
     order += TaskAttributeBar.Attribute.allCases.map { .pill($0) }
     return order
   }
@@ -486,6 +613,11 @@ struct TaskAttributeBar: View {
   let areas: [Area]
   let projects: [Project]
   let accent: Color
+  /// Neutral chrome: the inline (Things-style) editor keeps the whole rail
+  /// monochrome — filled pills wear a gray capsule, not the section accent — so
+  /// the open editor reads as calm form, with color reserved for the checkbox.
+  /// The drawer keeps the accent tint.
+  var neutral: Bool = false
   /// The composer's shared keyboard cursor — pills bind to `.pill(attr)` so Tab
   /// can land on them and they can draw the focus ring.
   @FocusState.Binding var focus: TaskEditFocus?
@@ -500,7 +632,9 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: CaseIterable, Identifiable {
-    case when, deadline, repeatRule, list, notes
+    // Notes is NOT a pill — it's an always-editable field above the rail (see
+    // `TaskComposerCard.notesField`).
+    case when, deadline, repeatRule, list
     var id: Self { self }
 
     var icon: String {
@@ -509,7 +643,6 @@ struct TaskAttributeBar: View {
       case .deadline:   "flag"
       case .repeatRule: "repeat"
       case .list:       "folder"
-      case .notes:      "text.alignleft"
       }
     }
     var label: String {
@@ -518,7 +651,6 @@ struct TaskAttributeBar: View {
       case .deadline:   "Deadline"
       case .repeatRule: "Repeat"
       case .list:       "List"
-      case .notes:      "Notes"
       }
     }
     /// List opens a sheet — a rich, searchable area/project picker reused across
@@ -529,13 +661,6 @@ struct TaskAttributeBar: View {
   /// The currently expanded inline pill (never `.list`, which presents a sheet).
   @State private var expanded: Attribute?
   @State private var showingList = false
-  /// Whether the Notes panel should grab the keyboard when it appears. True for
-  /// a user tap on the pill; false for the one-shot auto-expand below, where we
-  /// reveal existing notes without popping the keyboard.
-  @State private var notesAutoFocus = true
-  /// One-shot guard so the Notes panel auto-opens exactly once — when editing a
-  /// task that already has notes, show them straight away (no tap needed).
-  @State private var didAutoExpandNotes = false
   @Namespace private var glassNS
 
   var body: some View {
@@ -552,7 +677,7 @@ struct TaskAttributeBar: View {
             AttributePill(icon: attr.icon, label: attr.label,
                           value: value(for: attr), isSet: isSet(attr),
                           isActive: expanded == attr, isFocused: focus == .pill(attr),
-                          accent: accent,
+                          accent: accent, neutral: neutral,
                           glassID: String(describing: attr), glassNS: glassNS) { select(attr) }
               .focused($focus, equals: .pill(attr))
           }
@@ -576,16 +701,6 @@ struct TaskAttributeBar: View {
       activate = nil
       select(attr)
     }
-    // Editing a task that already has notes: reveal them on appear so they're
-    // never hidden behind a tap. `initial: true` plus watching `draft.notes`
-    // covers the order race with the parent's `seed()` — whichever populates the
-    // draft, this fires once notes are present. Doesn't steal keyboard focus.
-    .onChange(of: draft.notes, initial: true) { _, _ in
-      guard !didAutoExpandNotes, !draft.trimmedNotes.isEmpty else { return }
-      didAutoExpandNotes = true
-      notesAutoFocus = false
-      if expanded == nil { expanded = .notes }
-    }
   }
 
   /// The value shown on a pill (its `nil` falls back to the plain label). All
@@ -605,10 +720,6 @@ struct TaskAttributeBar: View {
     // or project once filed (but tinted only when explicitly filed, see isSet).
     case .list:
       return draft.listLabel(areas: areas, projects: projects)
-    // Notes shows its first line as a one-line preview; AttributePill truncates.
-    case .notes:
-      guard isSet(.notes) else { return nil }
-      return draft.trimmedNotes.split(whereSeparator: \.isNewline).first.map(String.init)
     }
   }
 
@@ -619,7 +730,6 @@ struct TaskAttributeBar: View {
     case .deadline:   draft.deadline != nil
     case .repeatRule: draft.recurrence != nil
     case .list:       draft.areaId != nil || draft.projectId != nil
-    case .notes:      !draft.trimmedNotes.isEmpty
     }
   }
 
@@ -630,9 +740,9 @@ struct TaskAttributeBar: View {
       switch expanded {
       case .when:       InlineWhenPanel(draft: $draft, accent: accent)
       case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
-      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent)
-      case .notes:      InlineNotesPanel(notes: $draft.notes, accent: accent,
-                                         autoFocus: notesAutoFocus)
+      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent) {
+        withAnimation(.snappy(duration: 0.22)) { expanded = nil }
+      }
       case .list, .none: EmptyView()
       }
     }
@@ -647,9 +757,6 @@ struct TaskAttributeBar: View {
     // Move the keyboard cursor onto the pill (also drops the title field's
     // keyboard before a calendar opens — what `onInteractStart` used to do).
     focus = .pill(attr)
-    // A user-initiated open of Notes should focus the field (unlike the silent
-    // auto-expand of pre-existing notes, which leaves the keyboard alone).
-    if attr == .notes { notesAutoFocus = true }
     withAnimation(.snappy(duration: 0.22)) {
       if attr.presentsSheet {
         expanded = nil
@@ -683,12 +790,24 @@ private struct AttributePill: View {
   /// never shows with macOS keyboard navigation off).
   var isFocused: Bool = false
   let accent: Color
+  /// Monochrome rail (inline editor): filled/active pills wear a neutral gray
+  /// capsule and the focus ring goes gray, so no section accent leaks into the
+  /// open editor. See `TaskAttributeBar.neutral`.
+  var neutral: Bool = false
   /// Stable identity inside the bar's `GlassEffectContainer`, so the pill's
   /// glass morphs in place (and merges with neighbours) as its value changes
   /// instead of cross-fading. See DesignSpec §5.5.
   let glassID: String
   let glassNS: Namespace.ID
   let action: () -> Void
+
+  /// Capsule fill for a filled/active pill — gray in neutral mode, the section
+  /// accent otherwise. `.clear` lets the bare glass show through for an empty pill.
+  private var fillTint: Color {
+    guard isSet || isActive else { return .clear }
+    return neutral ? Theme.inkPrimary.opacity(0.10) : accent.opacity(0.42)
+  }
+  private var ringColor: Color { neutral ? Theme.selectionNeutral : accent }
 
   var body: some View {
     Button(action: action) {
@@ -708,13 +827,13 @@ private struct AttributePill: View {
     }
     .buttonStyle(.plain)
     .glassEffect(
-      .regular.tint((isSet || isActive) ? accent.opacity(0.42) : .clear).interactive(),
+      .regular.tint(fillTint).interactive(),
       in: .capsule
     )
     .glassEffectID(glassID, in: glassNS)
     .overlay {
       Capsule()
-        .strokeBorder(accent, lineWidth: 2)
+        .strokeBorder(ringColor, lineWidth: 2)
         .opacity(isFocused ? 1 : 0)
         .allowsHitTesting(false)
     }
@@ -840,21 +959,34 @@ private struct InlineDatePanel: View {
 private struct InlineRepeatPanel: View {
   @Binding var recurrence: Recurrence?
   let accent: Color
+  /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
+  /// owned by `TaskAttributeBar.expanded`.
+  var onStop: () -> Void = {}
+
+  /// True once the user actually picks a value here (or the task already
+  /// repeated when the panel opened). A panel opened but left untouched reverts
+  /// on close — so merely *peeking* at Repeat never commits a recurrence, and
+  /// re-tapping the pill (or clicking away) cleanly undoes the open.
+  @State private var confirmed = false
+
+  /// Every control write goes through here so any real interaction marks the
+  /// recurrence as confirmed (and thus kept on close).
+  private func write(_ r: Recurrence) { recurrence = r; confirmed = true }
 
   private var unit: Binding<Recurrence.Unit> {
     Binding(get: { recurrence?.unit ?? .week },
-            set: { recurrence = Recurrence(unit: $0, interval: recurrence?.interval ?? 1,
-                                           afterCompletion: recurrence?.afterCompletion ?? true) })
+            set: { write(Recurrence(unit: $0, interval: recurrence?.interval ?? 1,
+                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
   }
   private var interval: Binding<Int> {
     Binding(get: { recurrence?.interval ?? 1 },
-            set: { recurrence = Recurrence(unit: recurrence?.unit ?? .week, interval: $0,
-                                           afterCompletion: recurrence?.afterCompletion ?? true) })
+            set: { write(Recurrence(unit: recurrence?.unit ?? .week, interval: $0,
+                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
   }
   private var afterCompletion: Binding<Bool> {
     Binding(get: { recurrence?.afterCompletion ?? true },
-            set: { recurrence = Recurrence(unit: recurrence?.unit ?? .week,
-                                           interval: recurrence?.interval ?? 1, afterCompletion: $0) })
+            set: { write(Recurrence(unit: recurrence?.unit ?? .week,
+                                    interval: recurrence?.interval ?? 1, afterCompletion: $0)) })
   }
 
   var body: some View {
@@ -877,7 +1009,9 @@ private struct InlineRepeatPanel: View {
         .tint(accent)
 
       Button(role: .destructive) {
-        withAnimation(.snappy(duration: 0.2)) { recurrence = nil }
+        recurrence = nil
+        confirmed = true   // explicit clear; don't let onDisappear second-guess it
+        onStop()
       } label: {
         Label("Don't Repeat", systemImage: "xmark.circle")
           .font(.septenaLabel)
@@ -888,10 +1022,15 @@ private struct InlineRepeatPanel: View {
     .padding(12)
     .background(Theme.secondaryGroupedBackground,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    // Expanding Repeat turns it on with a sensible default (Things-style); the
-    // panel's "Don't Repeat" clears it. Owned here so the rail's dispatch stays
-    // uniform — same pattern as the Notes panel autofocusing on appear.
-    .onAppear { if recurrence == nil { recurrence = Recurrence(unit: .week) } }
+    // Opening shows a weekly preview so the controls have something to bind, but
+    // it's only a peek: `confirmed` stays false until a real edit, and an
+    // untouched panel reverts to "no repeat" on close (`onDisappear`). A task
+    // that already repeated counts as confirmed, so editing never loses it.
+    .onAppear {
+      if recurrence == nil { recurrence = Recurrence(unit: .week); confirmed = false }
+      else { confirmed = true }
+    }
+    .onDisappear { if !confirmed { recurrence = nil } }
   }
 
   /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
@@ -910,40 +1049,6 @@ private struct InlineRepeatPanel: View {
 /// A multi-line notes field that writes `draft.notes`, expanded under the Notes
 /// pill. Autofocuses on appear (you tapped the pill to write), and offers a
 /// "Clear" when there's text — the same shape as the When / Deadline panels.
-private struct InlineNotesPanel: View {
-  @Binding var notes: String
-  let accent: Color
-  /// Grab the keyboard on appear. True for a user tap on the pill; false when
-  /// the panel is auto-expanded to reveal existing notes (no keyboard pop).
-  var autoFocus: Bool = true
-  @FocusState private var focused: Bool
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      TextField("Notes", text: $notes, axis: .vertical)
-        .textFieldStyle(.plain)
-        .font(.septenaNotes)
-        .foregroundStyle(Theme.inkPrimary)
-        .lineLimit(3...10)
-        .focused($focused)
-
-      if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        Button(role: .destructive) {
-          withAnimation(.snappy(duration: 0.2)) { notes = "" }
-        } label: {
-          Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.overdueRed)
-      }
-    }
-    .padding(12)
-    .background(Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    .onAppear { if autoFocus { focused = true } }
-  }
-}
-
 // MARK: - Presentation
 
 extension View {

@@ -511,32 +511,41 @@ struct SidebarRootView: View {
     let count: Int?
   }
 
+  // The smart-list SET + order is single-sourced in `TaskDestinations` (shared
+  // with the title dropdown); icon + title come off `Route`. Color and the live
+  // count are sidebar-specific styling, resolved per route here.
+  //
+  // No separate Inbox row — loose captures now live in the triage band on top
+  // of Today (docs/TRIAGE_BAND_SPEC.md). Next moved out of the Tasks sidebar —
+  // it's a top-level tab now.
   private var smartListSpecs: [SmartListSpec] {
-    [
-      // No separate Inbox row — loose captures now live in the triage band on
-      // top of Today (docs/TRIAGE_BAND_SPEC.md). The Today row's badge counts
-      // committed-today; the "to sort" pile shows on the Today screen itself.
-      SmartListSpec(route: .filter(.today),
-                    icon: "sun.max.fill", color: Theme.todayAccent,
-                    title: "Today",
-                    // Total = pinned-today + scheduled/due rolling in. Both
-                    // buckets live on Today, so the user-facing count is
-                    // the sum (matches the tile/sidebar Today screen).
-                    count: counts.map { $0.todayCount + $0.reviewCount }),
-      // Next moved out of the Tasks sidebar — it's a top-level tab now.
-      SmartListSpec(route: .filter(.upcoming),
-                    icon: "calendar", color: .red,
-                    title: "Upcoming",
-                    count: counts?.upcomingCount),
-      SmartListSpec(route: .filter(.unscheduled),
-                    icon: "rectangle.stack.fill", color: .orange,
-                    title: "Anytime",
-                    count: counts?.unscheduledCount),
-      SmartListSpec(route: .filter(.logbook),
-                    icon: "checkmark", color: .gray,
-                    title: "Completed",
-                    count: nil),
-    ]
+    TaskDestinations.smartListRoutes.map { route in
+      SmartListSpec(route: route,
+                    icon: route.icon,
+                    color: smartListColor(route),
+                    title: route.title,
+                    count: smartListCount(route))
+    }
+  }
+
+  private func smartListColor(_ route: Route) -> Color {
+    switch route {
+    case .filter(.upcoming):    return .red
+    case .filter(.unscheduled): return .orange
+    case .filter(.logbook):     return .gray
+    default:                    return Theme.todayAccent   // Today
+    }
+  }
+
+  private func smartListCount(_ route: Route) -> Int? {
+    switch route {
+    // Today total = pinned-today + scheduled/due rolling in. Both buckets live
+    // on Today, so the user-facing count is the sum.
+    case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
+    case .filter(.upcoming):    return counts?.upcomingCount
+    case .filter(.unscheduled): return counts?.unscheduledCount
+    default:                    return nil                  // Completed
+    }
   }
 
   /// A navigable sidebar row. Two behaviors:
@@ -550,10 +559,10 @@ struct SidebarRootView: View {
   private func navRow<Content: View>(_ route: Route,
                                      @ViewBuilder content: () -> Content) -> some View {
     #if os(macOS)
-    content().tag(Self.token(for: route))
+    content().tag(route.id)
     #else
     if usesPushNavigation {
-      content().tag(Self.token(for: route))
+      content().tag(route.id)
     } else {
       Button { selectRoute(route) } label: { content() }
         .buttonStyle(InertButtonStyle())
@@ -561,53 +570,36 @@ struct SidebarRootView: View {
     #endif
   }
 
-  /// Stable, id-based selection token for the sidebar `List`. Mirrors `Route`
-  /// but compares projects / areas by id, so a reload that swaps in a
-  /// freshly-fetched struct (same id, changed fields) can't drop the highlight —
-  /// the reason the old manual `isSelected` existed.
-  enum SidebarSelection: Hashable {
-    case filter(TaskFilter)
-    case next
-    case project(String)
-    case area(String)
-  }
-
-  private static func token(for route: Route) -> SidebarSelection {
-    switch route {
-    case .filter(let f):  return .filter(f)
-    case .next:           return .next
-    case .project(let p): return .project(p.id)
-    case .area(let a):    return .area(a.id)
-    }
+  /// Every route the sidebar can currently select — smart lists, areas, every
+  /// active project, and (when present) Recently Deleted. Used to resolve a
+  /// `Route.id` tag back to its full `Route` for the selection binding.
+  private var selectableRoutes: [Route] {
+    var routes = TaskDestinations.smartListRoutes
+    routes += areas.map(Route.area)
+    routes += projects.filter { $0.status == .active }.map(Route.project)
+    if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
+    return routes
   }
 
   /// Two-way bridge between `List(selection:)` and the app's `nav.path`: reads
-  /// the current route as a token, and writing one (a click / keyboard move)
-  /// routes through `selectRoute`, so selection and navigation stay one action.
-  private var sidebarSelection: Binding<SidebarSelection?> {
+  /// the current route's id, and writing one (a click / keyboard move) resolves
+  /// it back to a `Route` and routes through `selectRoute`, so selection and
+  /// navigation stay one action. Id-based so a reloaded project/area struct
+  /// (same id, changed fields) can't drop the highlight.
+  private var sidebarSelection: Binding<String?> {
     Binding(
-      get: { nav.path.last.map(Self.token(for:)) },
-      set: { token in if let token { openSelection(token) } }
+      get: { nav.path.last?.id },
+      set: { id in
+        if let id, let route = selectableRoutes.first(where: { $0.id == id }) {
+          selectRoute(route)
+        }
+      }
     )
   }
 
-  /// Resolve a selection token to its `Route` and open it in the detail pane.
-  /// Driven by `sidebarSelection`'s setter on every push surface (macOS + iPad
-  /// regular), so a single click / arrow-key move opens the row.
-  private func openSelection(_ token: SidebarSelection) {
-    switch token {
-    case .filter(let f):   selectRoute(.filter(f))
-    case .next:            selectRoute(.next)
-    case .project(let id): if let p = projects.first(where: { $0.id == id }) { selectRoute(.project(p)) }
-    case .area(let id):    if let a = areas.first(where: { $0.id == id }) { selectRoute(.area(a)) }
-    }
-  }
-
   private func selectRoute(_ route: Route) {
-    Haptics.tap()
-    // Tapping a sidebar row replaces the current detail rather than deepening
-    // the stack — the sidebar IS the navigation, not a "go back" affordance.
-    nav.path = [route]
+    // The sidebar IS the navigation (replace, not deepen) — `go` owns that rule.
+    nav.go(to: route)
   }
 
   /// Which route the sidebar should render as "current". In a compact-width
@@ -633,19 +625,11 @@ struct SidebarRootView: View {
     return nav.path.last ?? .filter(.today)
   }
 
-  /// Stable-id comparison. Default `Route` equality compares the whole
-  /// associated value (full `Project` / `Area` struct), which breaks the
-  /// highlight as soon as the sidebar reloads a project with any changed
-  /// field. We only care about identity here.
+  /// Stable-id comparison via `Route.sameDestination` — default `Route`
+  /// equality compares the whole `Project` / `Area` struct, which breaks the
+  /// highlight as soon as the sidebar reloads an entity with any changed field.
   private func isSelected(_ route: Route) -> Bool {
-    guard let selectedRoute else { return false }
-    switch (selectedRoute, route) {
-    case (.filter(let a), .filter(let b)):   return a == b
-    case (.next, .next):                     return true
-    case (.project(let a), .project(let b)): return a.id == b.id
-    case (.area(let a), .area(let b)):       return a.id == b.id
-    default:                                 return false
-    }
+    selectedRoute?.sameDestination(as: route) ?? false
   }
   #endif
 
@@ -954,8 +938,8 @@ struct SidebarRootView: View {
     // six more scans inside the old TaskReads.counts. Now: one structure
     // memo read, one task pass for the roll-ups, one for the counts.
     let structure = StructureCache.snapshot(in: modelContext)
-    areas = applyStoredOrder(to: structure.areas)
-    projects = applyStoredProjectOrder(to: structure.projects)
+    areas = TaskDestinations.orderedAreas(structure.areas)
+    projects = TaskDestinations.orderedProjects(structure.projects)
     let all = LocalCache.allTasks(in: modelContext).filter { $0.deletedAt == nil }
     var agg = Self.aggregate(tasks: all)
     // Per-smart-list counts come from the canonical filter semantics
@@ -1042,23 +1026,6 @@ struct SidebarRootView: View {
     areaOpenCount = agg.areaOpenCount
   }
 
-  private func applyStoredOrder(to loaded: [Area]) -> [Area] {
-    guard let ids = try? JSONDecoder().decode([String].self, from: areaOrderData),
-          !ids.isEmpty else { return loaded }
-    let byId = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
-    let ordered = ids.compactMap { byId[$0] }
-    let new = loaded.filter { !ids.contains($0.id) }
-    return ordered + new
-  }
-
-  private func applyStoredProjectOrder(to loaded: [Project]) -> [Project] {
-    guard let ids = try? JSONDecoder().decode([String].self, from: projectOrderData),
-          !ids.isEmpty else { return loaded }
-    let byId = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
-    let ordered = ids.compactMap { byId[$0] }
-    let new = loaded.filter { !ids.contains($0.id) }
-    return ordered + new
-  }
 }
 // MARK: - Sidebar primitives
 

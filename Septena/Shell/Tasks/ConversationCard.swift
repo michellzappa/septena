@@ -373,6 +373,9 @@ struct AskAIButton: View {
           .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
+        // Neutral chrome to match the inline editor — no section/system accent
+        // on the open editor; the bordered button reads gray, not blue.
+        .tint(Theme.inkSecondary)
         .disabled(working || !OnDeviceAI.isAvailable)
       }
     }

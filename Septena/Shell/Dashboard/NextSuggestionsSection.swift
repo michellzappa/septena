@@ -776,8 +776,7 @@ private struct NextSuggestionRow: View {
   private func perform() {
     switch suggestion.kind {
     case .fastBreak:
-      nav.addInfoRequestedSection = .nutrition
-      nav.showAddInfo = true
+      nav.presentAddInfo(section: .nutrition)
     case .mood:
       // Mood isn't in the AddInfo palette (its check-in is a bespoke
       // two-step quadrant picker, not a search-to-log row), so route to

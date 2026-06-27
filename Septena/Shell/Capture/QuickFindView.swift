@@ -215,7 +215,7 @@ struct QuickFindView: View {
   private func activateSelected() {
     let rows = hits
     guard rows.indices.contains(selection) else { return }
-    nav.path = [rows[selection].route]
+    nav.go(to: rows[selection].route)
     dismiss()
   }
 

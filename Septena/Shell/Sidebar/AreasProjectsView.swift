@@ -133,6 +133,12 @@ struct AreaDetailView: View {
             ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
               commitName(newName)
             }
+            // Jump to any other list without the sidebar — same dropdown the
+            // smart-list titles use, kept as a separate chevron right beside the
+            // title (reads as "Title ⌄") so the title text stays the rename tap
+            // target and the chevron is the menu — not detached at the far right.
+            TaskNavMenu { NavMenuChevron() }
+            Spacer(minLength: 0)
           }
           notesField($draftNotes, focused: $notesFocused)
         }
@@ -186,13 +192,9 @@ struct AreaDetailView: View {
   /// the flat replace.
   private func openProject(_ project: Project) {
     #if os(macOS)
-    nav.path = [.project(project)]
+    nav.go(to: .project(project))
     #else
-    if hSize == .compact {
-      nav.path.append(.project(project))
-    } else {
-      nav.path = [.project(project)]
-    }
+    nav.go(to: .project(project), push: hSize == .compact)
     #endif
   }
 
@@ -311,7 +313,6 @@ struct AreaDetailView: View {
 
 struct ProjectDetailView: View {
   let project: Project
-  @Environment(SectionTheme.self) private var theme
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -355,12 +356,20 @@ struct ProjectDetailView: View {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 10) {
           HStack(spacing: Theme.iconTextGap) {
-            ProjectProgressIcon(progress: progress, tint: theme.accent,
-                                diameter: Theme.checkboxTap, lineWidth: 2)
+            // Same glyph as the mixed-list group headers: ink (not accent),
+            // diameter 14 in the checkbox-width column so it reads identically
+            // wherever a project progress ring appears.
+            ProjectProgressIcon(progress: progress, tint: Theme.inkSecondary, diameter: 14)
               .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
             ClickToEditTitle(placeholder: "Project", text: $draftName) { newName in
               commitNameTo(newName)
             }
+            // Jump to any other list without the sidebar — same dropdown the
+            // smart-list titles use, kept as a separate chevron right beside the
+            // title (reads as "Title ⌄") so the title text stays the rename tap
+            // target and the chevron is the menu — not detached at the far right.
+            TaskNavMenu { NavMenuChevron() }
+            Spacer(minLength: 0)
           }
           notesField($draftNotes, focused: $notesFocused)
         }

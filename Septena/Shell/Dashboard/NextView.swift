@@ -82,7 +82,8 @@ struct NextView: View {
     tabSelection.current == .next || nav.path.last == .next
   }
 
-  /// Open + suggestion rows in display order — the keyboard cursor walks this list.
+  /// Every tagged row in display order — suggestions, open checklist blocks,
+  /// then the Done Today log. ↑↓ traverse the full list.
   private var keyboardOrderedRowTags: [String] {
     var tags: [String] = []
     let visibleSuggestions = suggestionsModel.suggestions
@@ -114,7 +115,26 @@ struct NextView: View {
         break
       }
     }
+
+    if hasAnyDone {
+      tags += NextDoneEvents.merged(model: model, passive: doneModel.events)
+        .map { NextRowTag.done($0.id) }
+    }
     return tags
+  }
+
+  /// macOS Task-menu ⌘K — nil unless a single togglable row is selected.
+  private var publishedNextListActions: NextListActions? {
+    guard keyboardNavActive, !keyboardInputActive, let tag = selectedTag else { return nil }
+    let kind = NextRowTag.split(tag).kind
+    guard kind != "sugg", kind != "done" else { return nil }
+    return NextListActions(toggleComplete: toggleSelection)
+  }
+
+  private static let editableDoneKeys: Set<String> = ["mood", "gut", "nutrition"]
+
+  private func doneEvent(id: String) -> DoneEvent? {
+    NextDoneEvents.merged(model: model, passive: doneModel.events).first { $0.id == id }
   }
 
   /// Drives the composer drawer from either a quick-add (`creating`) or a row
@@ -231,8 +251,14 @@ struct NextView: View {
       if let s = suggestionsModel.suggestions.first(where: { $0.id == id }) {
         performSuggestion(s)
       }
-    default:
+    case "done":
+      if let e = doneEvent(id: id), Self.editableDoneKeys.contains(e.sectionKey) {
+        beginEditDone(e)
+      }
+    case "chore", "habit", "supp":
       toggleTrio(kind: kind, id: id)
+    default:
+      break
     }
   }
 
@@ -251,8 +277,7 @@ struct NextView: View {
     Haptics.tap()
     switch suggestion.kind {
     case .fastBreak:
-      nav.addInfoRequestedSection = .nutrition
-      nav.showAddInfo = true
+      nav.presentAddInfo(section: .nutrition)
     case .mood:
       nav.showMoodCheckin = true
     case .training:
@@ -368,6 +393,11 @@ struct NextView: View {
       onEscape: { selection = [] }
     )
     .septenaOnEscape { selection = [] }
+    #if os(macOS)
+    // Publish checklist toggle to the Task menu (⌘K) while Next is focused.
+    // Task-list-only items stay disabled because `taskActions` is nil here.
+    .focusedSceneValue(\.nextListActions, publishedNextListActions)
+    #endif
     .septenaInlineTitle()
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
@@ -411,14 +441,21 @@ struct NextView: View {
       tasksModel.refreshFromCache()
       Task { await doneModel.load() }
     }
-    // Passive logs (mood check-in, caffeine, meals, …) post .septenaDataChanged
-    // via their mutators. Reload the suggestions so a just-logged mood daypart
-    // drops its "How are you feeling?" prompt, and the done log so the entry
-    // lands in "Done Today". Scoped: both `load()`s rerun the suggestions /
-    // done engines over 14–30 days of history, so a post that touches neither
-    // surface's inputs (a habit toggle, a grocery edit) must not trigger them.
-    // An unscoped post (CK batch) has nil sections and passes both filters.
+    // Passive logs (mood check-in, caffeine, meals, …) post scoped
+    // `.septenaDataChanged` via their mutators — reload suggestions / done
+    // only when the touched section feeds those engines. Inbound CloudKit
+    // batches post unscoped and reload every Next feed model from the mirror
+    // (habits / supplements / chores included — they don't ride `doneModel`).
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.isCloudKitBatch {
+        Task {
+          async let a: () = model.load()
+          async let b: () = suggestionsModel.load()
+          async let c: () = doneModel.load()
+          _ = await (a, b, c)
+        }
+        return
+      }
       let forSuggestions = note.affectsAnySection(of: Self.suggestionKeys)
       let forDone = note.affectsAnySection(of: Self.doneLogKeys)
       guard forSuggestions || forDone else { return }

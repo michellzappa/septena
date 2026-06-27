@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 // Tiny cross-platform shims so view files can call the same modifiers on
 // both iOS and macOS. UIKit-only nav-bar modifiers are no-ops on Mac.
@@ -10,6 +13,22 @@ extension View {
     self.toolbarTitleDisplayMode(.inline)
     #else
     self
+    #endif
+  }
+
+  /// Standard app-modal sheet sizing, so the tab-root's sheets don't each
+  /// repeat the iOS-detents / macOS-frame `#if os` split: iOS gets presentation
+  /// detents + a drag indicator; macOS gets a fixed frame (its sheets aren't
+  /// detent-driven).
+  @ViewBuilder
+  func septenaModalSheet(detents: Set<PresentationDetent> = [.large],
+                         macWidth: CGFloat,
+                         macHeight: CGFloat) -> some View {
+    #if os(iOS)
+    self.presentationDetents(detents)
+      .presentationDragIndicator(.visible)
+    #else
+    self.frame(width: macWidth, height: macHeight)
     #endif
   }
 
@@ -374,6 +393,7 @@ struct ClickToEditTitle: View {
           .font(font)
           .foregroundStyle(text.isEmpty ? Theme.inkSecondary : foreground)
           .contentShape(Rectangle())
+          .septenaEditableTitleCursor()
           .onTapGesture { startEditing() }
       }
     }
@@ -396,6 +416,24 @@ struct ClickToEditTitle: View {
       text = snapshot
     }
     isEditing = false
+  }
+}
+
+extension View {
+  /// I-beam on hover for click-to-edit titles (area / project detail headers).
+  @ViewBuilder
+  func septenaEditableTitleCursor() -> some View {
+    #if os(macOS)
+    self.onHover { hovering in
+      if hovering {
+        NSCursor.iBeam.push()
+      } else {
+        NSCursor.pop()
+      }
+    }
+    #else
+    self
+    #endif
   }
 }
 
