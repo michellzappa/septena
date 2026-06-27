@@ -117,7 +117,7 @@ private struct SelectableScrollRowModifier: ViewModifier {
     content
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .background(SelectableListRowBackground(isSelected: isSelected))
+      .background(ScrollRowSelectionBackground(isSelected: isSelected))
       .background {
         GeometryReader { geo in
           Color.clear.preference(
@@ -190,6 +190,10 @@ struct SelectableScrollList<Content: View>: View {
   var onToggle: (String) -> Void = { _ in }
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
+  /// Canvas fill behind the rows. Paper (white) for flat single-group lists;
+  /// the gray grouped background for sectioned lists whose rows sit in cards,
+  /// so the cards lift off the canvas (matching the sidebar / Next homes).
+  var canvasFill: Color = Theme.paperBackground
   @ViewBuilder var content: () -> Content
 
   @FocusState private var focused: Bool
@@ -235,7 +239,7 @@ struct SelectableScrollList<Content: View>: View {
       // LazyVStack only fills its content height, so taps below the last row
       // land here. Rows sit above and claim their own clicks first.
       .background(
-        Theme.paperBackground
+        canvasFill
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
       )

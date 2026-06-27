@@ -141,7 +141,9 @@ extension View {
   @ViewBuilder
   func selectableListRow(tag: String, isSelected: Bool) -> some View {
     self
-      .listRowSeparator(.hidden)
+      // Native hairline separators (was `.hidden`) so the rows read as one
+      // continuous grouped card, the same as the Tasks sidebar — not a stack
+      // of individually-rounded pills.
       .listRowBackground(SelectableListRowBackground(isSelected: isSelected))
       .listRowInsets(EdgeInsets())
       .tag(tag)
@@ -162,12 +164,30 @@ extension View {
   }
 }
 
-/// Neutral-gray selection capsule behind a selectable list row.
+/// Grouped-card row fill for native `insetGrouped` lists (the Next home).
+/// Full-bleed so the enclosing section supplies the single rounded card (corners
+/// on the first/last row only) — was a per-row `RoundedRectangle`, which made
+/// every row read as its own pill with curved gaps between them. `cardSurface`
+/// is the elevated grouped-cell color that lifts off the gray canvas; selected
+/// rows tint with the neutral selection fill, edge to edge.
 struct SelectableListRowBackground: View {
   let isSelected: Bool
   var body: some View {
+    Rectangle()
+      .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+  }
+}
+
+/// Things-style selection for the custom scroll list (the task-list detail).
+/// Unlike the grouped-card fill above, it paints NOTHING when unselected — the
+/// row sits flat on the container's paper surface, so a *sectioned* white list
+/// reads as clean rows + whitespace (no per-row card, no full-bleed bar). A
+/// selected row gains an inset rounded neutral capsule, the Things highlight.
+struct ScrollRowSelectionBackground: View {
+  let isSelected: Bool
+  var body: some View {
     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isSelected ? Theme.listSelectionFill : Theme.paperBackground)
+      .fill(isSelected ? Theme.listSelectionFill : Color.clear)
       .padding(.horizontal, isSelected ? 5 : 0)
   }
 }

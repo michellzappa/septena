@@ -763,7 +763,8 @@ struct TaskListView: View {
       selectable: usesSelectionModel,
       onActivate: activateRow,
       onToggle: toggleRow,
-      onClear: { clearSelection() }
+      onClear: { clearSelection() },
+      canvasFill: listCanvasFill
     ) {
       taskListHeader
       taskListRows
@@ -870,7 +871,7 @@ struct TaskListView: View {
     if filter == .today, !triageItems.isEmpty {
       Section {
         if !inboxCollapsed {
-          ForEach(triageItems) { task in taskRow(task, quickMenu: true) }
+          cardedRows(triageItems, quickMenu: { _ in true })
         }
       } header: {
         inboxHeader(count: triageItems.count)
@@ -929,13 +930,13 @@ struct TaskListView: View {
         }
         .padding(.horizontal, Theme.hPadding)
         .padding(.horizontal, headerHorizontalCorrection)
+        // Align the foldable header (Inbox / Calendar) over its carded rows, the
+        // same shift the area/project headers take.
+        .padding(.leading, TaskCardMetrics.headerLeadingDelta)
         .padding(.top, headerTopPadding)
-        .padding(.bottom, 6)
-        // A collapsed Calendar drops its own hairline so it doesn't stack a
-        // second divider above the next section's — one rule, not two.
-        if showsHairline {
-          Hairline().padding(.bottom, 4)
-        }
+        .padding(.bottom, 8)
+        // No hairline — the band's rows sit in a card now, so a rule here would
+        // read as the orphaned underline the flat list used to have.
       }
       .contentShape(Rectangle())
     }
@@ -943,6 +944,12 @@ struct TaskListView: View {
     .textCase(nil)
     .selectionDisabled()
   }
+
+  /// Every task list now rides in grouped cards on the gray canvas — the same
+  /// surface as the sidebar / Next homes and every section destination. A flat
+  /// single-group list (a project / area / logbook) is simply one card on the
+  /// canvas.
+  private var listCanvasFill: Color { Theme.groupedBackground }
 
   @ViewBuilder
   private var taskListRows: some View {
@@ -1054,13 +1061,11 @@ struct TaskListView: View {
   }
 
   private var reviewRows: some View {
-    ForEach(review) { task in taskRow(task) }
+    cardedRows(review)
   }
 
   private var visibleRows: some View {
-    ForEach(visibleItems) { task in
-      taskRow(task, quickMenu: showsFilingChip(for: task))
-    }
+    cardedRows(visibleItems, quickMenu: { showsFilingChip(for: $0) })
   }
 
   /// Things-style footer on project pages: a quiet link that expands completed
@@ -1071,9 +1076,7 @@ struct TaskListView: View {
     if case .project = filter, !loggedProjectItems.isEmpty {
       projectLoggedToggleRow
       if isProjectLoggedExpanded {
-        ForEach(loggedProjectItems) { task in
-          taskRow(task)
-        }
+        cardedRows(loggedProjectItems)
       }
     }
   }
@@ -1503,22 +1506,25 @@ struct TaskListView: View {
       }
     )
     .frame(maxWidth: .infinity, alignment: .leading)
+    // Content rides at the card's inner inset, same as a closed carded row, so
+    // the editor's fields line up with the rows above/below it.
+    .environment(\.rowHInset, TaskCardMetrics.contentInset)
     .background(
-      // Things-style card: the open editor stays on white (paper), set off from
-      // the list by a hairline outline only — not the gray selection fill (that's
-      // for collapsed selected rows). No shadow: it gets clipped by the list's
-      // scroll bounds; the outline alone reads cleanly.
-      RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Theme.paperBackground)
+      // The open editor is a lifted version of the same grouped card: same
+      // surface, radius and screen margin as a closed cell, plus a hairline rim
+      // so it reads as the focused element popped out of the run. No shadow — it
+      // gets clipped by the scroll bounds; the rim alone reads cleanly.
+      RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
+        .fill(Theme.cardSurface)
         .overlay(
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
+          RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
             .strokeBorder(Theme.border, lineWidth: 1)
         )
-        .padding(.horizontal, 5)
     )
+    .padding(.horizontal, TaskCardMetrics.margin)
     // Breathing room above/below so the open card stands apart from its
     // neighbouring rows and reads as the focused element.
-    .padding(.vertical, 24)
+    .padding(.vertical, 16)
     .id(task.id)
     .transition(.opacity)
     #if os(macOS)
@@ -1911,26 +1917,17 @@ struct TaskListView: View {
                             by: { $0.area! })
     let loose = pool.filter { $0.project == nil && $0.area == nil }
 
-    // Loose tasks first — uncategorized, no header. On Today with an Inbox
-    // stacked above, draw a hairline seam first so the first ratified row
-    // doesn't read as a 4th Inbox entry (see docs/TRIAGE_BAND_SPEC.md). Skip it
-    // when the Inbox is collapsed — its own header hairline already abuts the
-    // Today rows, so a second line would just stack on top of it.
-    if filter == .today && !triageItems.isEmpty && !loose.isEmpty && !inboxCollapsed {
-      Hairline()
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
-        .plainListChrome()
-    }
-    ForEach(loose) { task in taskRow(task) }
+    // Loose tasks first — uncategorized, no header — in their own card, which
+    // is itself the visual seam from the Inbox stacked above (no hairline needed
+    // now that grouped cards separate the runs; see docs/TRIAGE_BAND_SPEC.md).
+    cardedRows(loose)
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
-          ForEach(areaTasks) { task in taskRow(task) }
+          cardedRows(areaTasks)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -1941,7 +1938,7 @@ struct TaskListView: View {
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
-            ForEach(tasks) { task in taskRow(task) }
+            cardedRows(tasks)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -1956,13 +1953,32 @@ struct TaskListView: View {
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
-          ForEach(tasks) { task in taskRow(task) }
+          cardedRows(tasks)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
                       projectProgress: progressByProject[project.id],
                       onTap: { nav.path = [.project(project)] })
         }
+      }
+    }
+  }
+
+  /// Emit a run of task rows as one continuous grouped card — each row carries a
+  /// slice of the card (`TaskCardChrome`), first/last round the outer corners.
+  /// Kept a flat `ForEach` (no wrapping container) so every row stays a direct
+  /// child of the scroll list and the selection / drag / keyboard wiring is
+  /// untouched. The open inline editor lifts out of the card as its own elevated
+  /// cell (`expandedEditorRow`), so it gets no card slice behind it.
+  @ViewBuilder
+  private func cardedRows(_ tasks: [SeptenaTask],
+                          quickMenu: ((SeptenaTask) -> Bool)? = nil) -> some View {
+    ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
+      if expandedEditId == task.id {
+        taskRow(task, quickMenu: quickMenu?(task) ?? false)
+      } else {
+        taskRow(task, quickMenu: quickMenu?(task) ?? false)
+          .taskCardChrome(TaskCardPosition(index: idx, count: tasks.count))
       }
     }
   }
@@ -2023,7 +2039,11 @@ struct TaskListView: View {
     let headerHorizontalCorrection: CGFloat = 0
     let titleLeadingCorrection: CGFloat = -6
     #else
-    let headerTopPadding: CGFloat = 18
+    // Generous top whitespace IS the group break now that the hairline is gone
+    // (Things-style). 18pt was too tight on the phone — without a line and
+    // without enough air the groups didn't read as separated; ~30pt gives each
+    // cluster room to breathe, matching the organized feel macOS gets from 32.
+    let headerTopPadding: CGFloat = 30
     // Nudge the whole header (symbol + title) ~2pt left of where it sat so the
     // area/project symbol lines up over the task-row checkbox.
     let headerHorizontalCorrection: CGFloat = -18
@@ -2064,20 +2084,19 @@ struct TaskListView: View {
       }
       .padding(.horizontal, Theme.hPadding)
       .padding(.horizontal, headerHorizontalCorrection)
+      // Shift the header in by the same amount the carded rows shifted, so the
+      // area/project icon stays parked over the row checkbox below it.
+      .padding(.leading, TaskCardMetrics.headerLeadingDelta)
       // ~2 lines of whitespace above each project/area cluster header so
       // groups visually break apart in mixed list views (Unscheduled, Today,
       // Upcoming). Without this gap, a header reads as the next row of the
       // previous group instead of the start of a new one.
       .padding(.top, headerTopPadding)
-      .padding(.bottom, 6)
-
-      // Hairline beneath project/area cluster headers — separates the title
-      // from the tasks underneath in mixed-list views (Today, Unscheduled).
-      // Date buckets (Upcoming) are non-tappable and skip the rule.
-      if onTap != nil {
-        Hairline()
-          .padding(.bottom, 4)
-      }
+      .padding(.bottom, 8)
+      // No hairline beneath cluster headers — a rule over flat ungrouped rows
+      // read as an orphaned underline (the list looked "broken"). Things-style:
+      // the bold header plus the generous top whitespace is the group break;
+      // whitespace separates, not a line.
     }
   }
 
@@ -2141,7 +2160,7 @@ struct TaskListView: View {
     if showCalendarEvents, !calendarEvents.isEmpty {
       Section {
         if !calendarCollapsed {
-          calendarEventsBlock(calendarEvents)
+          calendarEventsBlock(calendarEvents).taskCardChrome(.solo)
         }
       } header: {
         foldableSectionHeader(icon: "calendar", title: "Calendar",
@@ -2165,9 +2184,9 @@ struct TaskListView: View {
         // The day's calendar events frame it first (the agenda), then the tasks
         // scheduled for that day — matching Today, where the agenda sits on top.
         if !bucket.events.isEmpty {
-          calendarEventsBlock(bucket.events)
+          calendarEventsBlock(bucket.events).taskCardChrome(.solo)
         }
-        ForEach(bucket.tasks) { task in taskRow(task) }
+        cardedRows(bucket.tasks)
       } header: {
         groupHeader(icon: "calendar", title: bucket.label)
       }
@@ -2995,6 +3014,82 @@ extension FocusedValues {
   var taskActions: TaskActions? {
     get { self[TaskActionsKey.self] }
     set { self[TaskActionsKey.self] = newValue }
+  }
+}
+
+// MARK: - Grouped-card chrome (sectioned task lists)
+//
+// On the sectioned lists (Today / Unscheduled) rows ride in rounded cards on the
+// gray canvas — the same grouped-card look as the sidebar / Next homes (a flat
+// white list read as "broken" once it had section headers, and whitespace alone
+// couldn't carry the grouping on the phone). Each row paints a slice of its
+// group's card behind itself; only the first/last row in a group round their
+// outer corners, so a run of rows reads as ONE continuous card with hairline
+// separators between them. The rows are NOT nested in a container — they stay
+// direct children of the scroll list, so selection / drag / keyboard nav are
+// completely untouched.
+
+enum TaskCardPosition {
+  case solo, top, middle, bottom
+  init(index: Int, count: Int) {
+    if count <= 1            { self = .solo }
+    else if index == 0       { self = .top }
+    else if index == count-1 { self = .bottom }
+    else                     { self = .middle }
+  }
+}
+
+/// Card geometry, shared by the row chrome, the group headers, and the inline
+/// editor so all three line up and match every other grouped page in the app.
+enum TaskCardMetrics {
+  /// Card margin off the screen edge — the app-wide page gutter (sidebar / Next /
+  /// every section destination use this, so the task cards sit at the same X).
+  static let margin = Theme.pageGutter
+  /// Row content inset INSIDE the card — the same value `DrawerSection` lowers
+  /// its rows to, so a task row's checkbox/title sit where a drawer card's do.
+  static let contentInset = Theme.Spacing.xl
+  static let radius: CGFloat = 14
+  /// Leading X of the title column, measured from the card's inner edge.
+  static let separatorInset = contentInset + Theme.checkboxTap + Theme.iconTextGap
+  /// How far the carded content shifts vs. an un-carded full-bleed row — added to
+  /// the group headers so their icon stays over the checkbox.
+  static var headerLeadingDelta: CGFloat { margin + contentInset - Theme.hPadding }
+}
+
+private struct TaskCardChrome: ViewModifier {
+  let position: TaskCardPosition
+
+  func body(content: Content) -> some View {
+    let r = TaskCardMetrics.radius
+    let topR = (position == .top || position == .solo) ? r : 0
+    let botR = (position == .bottom || position == .solo) ? r : 0
+    content
+      // Row content rides at the card's inner inset (matches DrawerSection rows).
+      .environment(\.rowHInset, TaskCardMetrics.contentInset)
+      .background(alignment: .bottom) {
+        ZStack(alignment: .bottom) {
+          UnevenRoundedRectangle(
+            topLeadingRadius: topR, bottomLeadingRadius: botR,
+            bottomTrailingRadius: botR, topTrailingRadius: topR,
+            style: .continuous
+          )
+          .fill(Theme.cardSurface)
+          if position == .top || position == .middle {
+            Rectangle()
+              .fill(Theme.border)
+              .frame(height: 0.5)
+              .padding(.leading, TaskCardMetrics.separatorInset)
+          }
+        }
+      }
+      // Card margin off the screen edge (content shifts in with it).
+      .padding(.horizontal, TaskCardMetrics.margin)
+  }
+}
+
+extension View {
+  func taskCardChrome(_ position: TaskCardPosition) -> some View {
+    modifier(TaskCardChrome(position: position))
   }
 }
 
