@@ -143,20 +143,22 @@ struct ClaudeReconnectCue: View {
 
 // MARK: - Secured-lock flash
 //
-// The brief "you're reconnected" confirmation. Instead of a generic green
-// check, the lock snaps shut — `lock.open.fill` morphs to `lock.fill` with a
-// bounce on appear — so the flash reads as "the connection is secure again,"
-// echoing the biometry/lock language of the default cue and AppLock.
+// The brief "you're reconnected" confirmation: a green `lock.fill` that simply
+// pops in with a spring-y zoom — no glyph swap — so the flash reads as "the
+// connection is secure again," echoing the biometry/lock language of the
+// default cue and AppLock.
 private struct SecuredLockGlyph: View {
   var font: Font?
-  @State private var locked = false
+  @State private var shown = false
 
   var body: some View {
-    Image(systemName: locked ? "lock.fill" : "lock.open.fill")
+    Image(systemName: "lock.fill")
       .font(font)
       .foregroundStyle(.green)
-      .contentTransition(.symbolEffect(.replace))
-      .symbolEffect(.bounce, value: locked)
-      .onAppear { withAnimation(.snappy) { locked = true } }
+      .scaleEffect(shown ? 1 : 0.6)
+      .opacity(shown ? 1 : 0)
+      .onAppear {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { shown = true }
+      }
   }
 }
