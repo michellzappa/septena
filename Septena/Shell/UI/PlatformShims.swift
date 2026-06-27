@@ -355,9 +355,19 @@ struct DoubleClickCatcher: NSViewRepresentable {
 
 #endif
 
+/// Layout constants for `ClickToEditTitle` (file-scoped — generics can't hold statics).
+private enum ClickToEditTitleMetrics {
+  static let menuSpacing: CGFloat = 6
+  static let menuWidth: CGFloat = 28
+  /// Matches `.septenaScreenTitle` (large title) single-line cap height.
+  static let titleLineHeight: CGFloat = 40
+}
+
 /// Click-to-edit title: renders as `Text` until tapped, then becomes a
 /// `TextField` focused for editing. Commit on Enter / blur, cancel on Esc.
-struct ClickToEditTitle: View {
+/// An optional trailing `menu` (e.g. the list-jump chevron) sits inline after
+/// the title, hidden while editing so the field can use the full row width.
+struct ClickToEditTitle<Menu: View>: View {
   let placeholder: String
   @Binding var text: String
   /// Called once the user finishes editing with a non-empty title. Receives
@@ -366,36 +376,75 @@ struct ClickToEditTitle: View {
   /// Font + foreground style applied to both the Text view and the field.
   var font: Font = .septenaScreenTitle
   var foreground: Color = Theme.inkPrimary
+  @ViewBuilder var menu: () -> Menu
 
   @State private var isEditing = false
   @State private var snapshot: String = ""
   @FocusState private var focused: Bool
 
+  init(placeholder: String,
+       text: Binding<String>,
+       font: Font = .septenaScreenTitle,
+       foreground: Color = Theme.inkPrimary,
+       onCommit: @escaping (String) -> Void,
+       @ViewBuilder menu: @escaping () -> Menu) {
+    self.placeholder = placeholder
+    self._text = text
+    self.font = font
+    self.foreground = foreground
+    self.onCommit = onCommit
+    self.menu = menu
+  }
+
   var body: some View {
-    Group {
+    GeometryReader { geo in
+      let maxW = geo.size.width
       if isEditing {
-        TextField(placeholder, text: $text)
-          .textFieldStyle(.plain)
-          .focusEffectDisabled()
-          .focused($focused)
-          .font(font)
-          .foregroundStyle(foreground)
-          .submitLabel(.done)
-          .onSubmit { finish(commit: true) }
-          .onChange(of: focused) { _, isFocused in
-            if !isFocused { finish(commit: true) }
-          }
-          .onAppear { focused = true }
-          .septenaOnEscape { finish(commit: false) }
-          .onKeyPress(.escape) { finish(commit: false); return .handled }
+        titleField(maxWidth: maxW)
+          .frame(width: maxW, alignment: .leading)
       } else {
-        Text(text.isEmpty ? placeholder : text)
-          .font(font)
-          .foregroundStyle(text.isEmpty ? Theme.inkSecondary : foreground)
-          .contentShape(Rectangle())
-          .septenaEditableTitleCursor()
-          .onTapGesture { startEditing() }
+        HStack(spacing: ClickToEditTitleMetrics.menuSpacing) {
+          titleField(maxWidth: maxW)
+          menu()
+            .fixedSize()
+        }
+        // Hug title + chevron; cap at row width so long titles truncate in
+        // place and the chevron never drifts to the far right.
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(maxWidth: maxW, alignment: .leading)
       }
+    }
+    .frame(height: ClickToEditTitleMetrics.titleLineHeight)
+  }
+
+  @ViewBuilder
+  private func titleField(maxWidth: CGFloat) -> some View {
+    if isEditing {
+      TextField(placeholder, text: $text)
+        .textFieldStyle(.plain)
+        .focusEffectDisabled()
+        .focused($focused)
+        .font(font)
+        .foregroundStyle(foreground)
+        .lineLimit(1)
+        .frame(maxWidth: maxWidth, alignment: .leading)
+        .submitLabel(.done)
+        .onSubmit { finish(commit: true) }
+        .onChange(of: focused) { _, isFocused in
+          if !isFocused { finish(commit: true) }
+        }
+        .onAppear { focused = true }
+        .septenaOnEscape { finish(commit: false) }
+        .onKeyPress(.escape) { finish(commit: false); return .handled }
+    } else {
+      Text(text.isEmpty ? placeholder : text)
+        .font(font)
+        .foregroundStyle(text.isEmpty ? Theme.inkSecondary : foreground)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .contentShape(Rectangle())
+        .septenaEditableTitleCursor()
+        .onTapGesture { startEditing() }
     }
   }
 

@@ -130,15 +130,11 @@ struct AreaDetailView: View {
             .popover(isPresented: $showingEmojiEditor) {
               EmojiPickerContent(emoji: $draftEmoji) { commitEmoji($0) }
             }
-            ClickToEditTitle(placeholder: "Area", text: $draftName) { newName in
-              commitName(newName)
+            ClickToEditTitle(placeholder: "Area", text: $draftName,
+                             onCommit: { commitName($0) }) {
+              TaskNavMenu { NavMenuChevron() }
             }
-            // Jump to any other list without the sidebar — same dropdown the
-            // smart-list titles use, kept as a separate chevron right beside the
-            // title (reads as "Title ⌄") so the title text stays the rename tap
-            // target and the chevron is the menu — not detached at the far right.
-            TaskNavMenu { NavMenuChevron() }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
           }
           notesField($draftNotes, focused: $notesFocused)
         }
@@ -347,6 +343,29 @@ struct ProjectDetailView: View {
     _originalNotes = State(initialValue: project.notes ?? "")
     _originalRepo = State(initialValue: project.githubRepo ?? "")
     _status = State(initialValue: project.status)
+    // Seed the progress ring synchronously from the local cache so the very
+    // first render already shows the right fraction — otherwise it paints an
+    // empty ring (progress 0), then flashes to the cached value, then to the
+    // refreshed one as `loadProgress()` resolves.
+    _progress = State(initialValue:
+      Self.cachedProgress(projectId: project.id,
+                          context: LocalStore.shared.container.mainContext) ?? 0)
+  }
+
+  /// done / (done + open) for a project, computed synchronously from the local
+  /// SwiftData mirror. `nil` when the project has no tasks cached yet (so the
+  /// caller can keep whatever value it already has rather than reset to 0).
+  private static func cachedProgress(projectId: String,
+                                     context: ModelContext) -> Double? {
+    var done = 0, total = 0
+    for t in LocalCache.allTasks(in: context) where t.project == projectId {
+      switch t.status {
+      case .done: done += 1; total += 1
+      case .open: total += 1
+      case .cancelled: break
+      }
+    }
+    return total > 0 ? Double(done) / Double(total) : nil
   }
 
   var body: some View {
@@ -361,15 +380,11 @@ struct ProjectDetailView: View {
             // wherever a project progress ring appears.
             ProjectProgressIcon(progress: progress, tint: Theme.inkSecondary, diameter: 14)
               .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
-            ClickToEditTitle(placeholder: "Project", text: $draftName) { newName in
-              commitNameTo(newName)
+            ClickToEditTitle(placeholder: "Project", text: $draftName,
+                             onCommit: { commitNameTo($0) }) {
+              TaskNavMenu { NavMenuChevron() }
             }
-            // Jump to any other list without the sidebar — same dropdown the
-            // smart-list titles use, kept as a separate chevron right beside the
-            // title (reads as "Title ⌄") so the title text stays the rename tap
-            // target and the chevron is the menu — not detached at the far right.
-            TaskNavMenu { NavMenuChevron() }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
           }
           notesField($draftNotes, focused: $notesFocused)
         }
@@ -502,21 +517,12 @@ struct ProjectDetailView: View {
   }
 
   private func loadProgress() async {
-    // Compute optimistic progress from the cache first, then refresh.
-    let cached = LocalCache.tasks(in: modelContext, filter: .project(project.id))
-      + LocalCache.allTasks(in: modelContext).filter {
-        $0.project == project.id && $0.status == .done
-      }
-    if !cached.isEmpty {
-      var d = 0, t = 0
-      for x in cached {
-        switch x.status {
-        case .done:                 d += 1; t += 1
-        case .open:                 t += 1
-        case .cancelled:            break
-        }
-      }
-      progress = t > 0 ? Double(d) / Double(t) : 0
+    // Optimistic value straight from the cache (skip when empty so we don't
+    // blink to 0). Assign only on a real change so an unchanged refresh never
+    // re-renders the ring.
+    if let cached = Self.cachedProgress(projectId: project.id, context: modelContext),
+       cached != progress {
+      progress = cached
     }
     do {
       let all = await TaskReads.list(view: "all", project: project.id,
@@ -529,7 +535,8 @@ struct ProjectDetailView: View {
         case .cancelled:            break
         }
       }
-      progress = total > 0 ? Double(done) / Double(total) : 0
+      let fresh = total > 0 ? Double(done) / Double(total) : 0
+      if fresh != progress { progress = fresh }
     } catch {
       // Non-fatal — progress just stays at its previous value.
     }
