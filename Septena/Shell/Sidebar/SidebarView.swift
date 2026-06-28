@@ -746,7 +746,7 @@ struct SidebarRootView: View {
     if usesPushNavigation {
       let tuck = hasProjects && !collapsed
       row()
-        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: tuck ? -5 : 0, trailing: 0))
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: tuck ? SidebarSplitMetrics.areaProjectTuck : 0, trailing: 0))
     } else {
       row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
@@ -763,9 +763,9 @@ struct SidebarRootView: View {
     #if os(iOS)
     if usesPushNavigation {
       row()
-        .listRowInsets(EdgeInsets(top: -5,
+        .listRowInsets(EdgeInsets(top: SidebarSplitMetrics.projectRowInsetY,
                                   leading: nested ? 12 : 0,
-                                  bottom: -5,
+                                  bottom: SidebarSplitMetrics.projectRowInsetY,
                                   trailing: 0))
         .listRowSeparator(.hidden)
     } else {
@@ -1109,28 +1109,43 @@ struct SidebarRootView: View {
 /// identically — never restyle a count inline.
 struct SidebarCount: View {
   let count: Int
+  #if os(iOS)
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
+  #endif
 
   var body: some View {
     if count > 0 {
       Text("\(count)")
-        .scaledFont(size: 12, weight: .regular)
+        .scaledFont(size: fontSize, weight: .regular)
         .foregroundStyle(Theme.inkSecondary.opacity(0.6))
     }
   }
+
+  #if os(iOS)
+  private var fontSize: CGFloat {
+    usesPushNavigation ? 14 : 12
+  }
+  #else
+  private var fontSize: CGFloat { 12 }
+  #endif
 }
 
 #if os(iOS)
 /// macOS sidebar row metrics reused on iPad regular (split-view source list).
 private enum SidebarSplitMetrics {
-  static let rowHeight: CGFloat = 22
-  static let smartRowHeight: CGFloat = 20
-  static let projectRowHeight: CGFloat = 18
+  static let rowHeight: CGFloat = 24
+  static let smartRowHeight: CGFloat = 22
+  static let projectRowHeight: CGFloat = 20
   static let iconSize: CGFloat = 21
   static let rowSpacing: CGFloat = 7
-  static let projectRowSpacing: CGFloat = 5
-  static let areaTitleSize: CGFloat = 14
-  static let titleSize: CGFloat = 14
-  static let projectTitleSize: CGFloat = 13
+  static let projectRowSpacing: CGFloat = 4
+  static let areaTitleSize: CGFloat = 16
+  static let titleSize: CGFloat = 16
+  static let projectTitleSize: CGFloat = 15
+  /// Negative vertical insets on project rows — collapses List cell padding.
+  static let projectRowInsetY: CGFloat = -9
+  /// Area bottom tuck when projects are expanded underneath.
+  static let areaProjectTuck: CGFloat = -8
 }
 #endif
 
@@ -1537,7 +1552,7 @@ struct SidebarProjectRow: View {
     usesPushNavigation ? SidebarSplitMetrics.projectRowHeight : Theme.sidebarProjectRowHeight
   }
   private var progressIconDiameter: CGFloat? {
-    usesPushNavigation ? 12 : nil
+    usesPushNavigation ? 13 : nil
   }
   #else
   private var rowSpacing: CGFloat { Theme.sidebarRowSpacing }
