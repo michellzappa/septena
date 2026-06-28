@@ -240,17 +240,22 @@ struct SelectableScrollList<Content: View>: View {
         guard request != nil else { return }
         fulfillPendingScroll(proxy: proxy)
       }
-      // Fill the detail pane edge-to-edge (same gray canvas as Next / Week).
-      // Clicking the empty paper behind the rows clears the selection — the
-      // LazyVStack only fills its content height, so taps below the last row
-      // land here. Rows sit above and claim their own clicks first.
+      // Fill the detail pane edge-to-edge on macOS (click-to-clear on empty
+      // paper). On iOS let the ScrollView size naturally so content scrolls
+      // under the nav bar like Week — `.frame(maxHeight: .infinity)` pinned
+      // the viewport below the bar and left a dead gray band.
+      #if os(macOS)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      #else
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      #endif
       .background {
         canvasFill
           .ignoresSafeArea()
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
       }
+      .scrollEdgeEffectStyle(.soft, for: .top)
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,

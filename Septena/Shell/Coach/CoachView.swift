@@ -45,8 +45,12 @@ struct CoachView: View {
       #if os(iOS)
       .listStyle(.insetGrouped)
       #else
-      .listStyle(.inset)
+      .listStyle(.plain)
+      .padding(.bottom, Theme.pageBottom)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       #endif
+      .scrollContentBackground(.hidden)
+      .homeTabScrollSurface()
       // No title — the tab bar already labels this view, matching the Next
       // landing (both home tabs rely on the tab label, not a nav-bar title).
       .navigationTitle("")
@@ -56,7 +60,7 @@ struct CoachView: View {
       // Shared home-landing chrome (top-left "…" → Settings), identical to
       // Week / Next. No top-right "+" — goals are added from the Goals header,
       // the section strips, or the coach.
-      .homeChrome()
+      .homeToolbar()
       // A coach pushes as a full pane inside this stack — a real screen with a
       // back button — on every idiom. Lists belong with navigation stacks.
       .navigationDestination(for: CoachDomain.self) { domain in
@@ -94,14 +98,18 @@ struct CoachView: View {
   // MARK: - Sections
 
   private var coachesSection: some View {
-    Section {
-      ForEach(CoachDomain.allCases) { domain in
+    let domains = CoachDomain.allCases
+    return Section {
+      ForEach(Array(domains.enumerated()), id: \.element.id) { idx, domain in
         let pills = coachPills[domain] ?? []
         NavigationLink(value: domain) {
           CoachLandingRow(domain: domain, pills: pills)
         }
         // 0 hides the badge, so this doubles as "entries in the window".
         .badge(pills.reduce(0) { $0 + $1.count })
+        #if os(macOS)
+        .septenaHomeListRow(index: idx, count: domains.count)
+        #endif
       }
     } header: {
       Text("Coaches")
@@ -116,7 +124,8 @@ struct CoachView: View {
   private var exercisesSection: some View {
     Section {
       if OnDeviceAI.isAvailable {
-        ForEach(DiscoveryRegistry.all) { exercise in
+        let exercises = DiscoveryRegistry.all
+        ForEach(Array(exercises.enumerated()), id: \.element.id) { idx, exercise in
           Button {
             activeExercise = AnyDiscoveryMiniApp(descriptor: exercise)
             Haptics.tick()
@@ -127,11 +136,18 @@ struct CoachView: View {
                           accent: exercise.accent)
           }
           .buttonStyle(.plain)
+          #if os(macOS)
+          .septenaHomeListRow(index: idx, count: exercises.count)
+          #endif
         }
       } else {
         AppleIntelligenceUnavailableCard()
+          #if os(iOS)
           .listRowBackground(Color.clear)
           .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+          #else
+          .septenaHomeListRow(index: 0, count: 1)
+          #endif
       }
     } header: {
       Text("Exercises")
@@ -143,7 +159,7 @@ struct CoachView: View {
   @ViewBuilder
   private var goalsSection: some View {
     Section {
-      ForEach(goals) { goal in
+      ForEach(Array(goals.enumerated()), id: \.element.id) { idx, goal in
         Button { editing = goal } label: {
           GoalListRow(goal: goal, theme: theme)
         }
@@ -153,11 +169,17 @@ struct CoachView: View {
             Label("Delete", systemImage: "trash")
           }
         }
+        #if os(macOS)
+        .septenaHomeListRow(index: idx, count: max(goals.count, 1))
+        #endif
       }
       if goals.isEmpty {
         Text("No goals yet. Tag a goal with sections so your coaches have context for what you're working toward.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
+          #if os(macOS)
+          .septenaHomeListRow(index: 0, count: 1)
+          #endif
       }
     } header: {
       HStack {

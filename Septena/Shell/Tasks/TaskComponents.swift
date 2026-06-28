@@ -726,7 +726,7 @@ extension TaskCheckbox {
 /// Compact notes marker that rides inline at the end of a task title.
 enum TaskNotesGlyph {
   /// Vertical nudge so the glyph reads mid-aligned with the title's last line.
-  static let baselineOffset: CGFloat = 3.75
+  static let baselineOffset: CGFloat = 3.5
 
   static func inlineText() -> Text {
     Text(Image(systemName: "text.alignleft"))

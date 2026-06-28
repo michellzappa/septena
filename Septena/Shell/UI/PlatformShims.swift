@@ -534,6 +534,27 @@ extension View {
       .padding(.bottom, Theme.pageBottom)
   }
 
+  /// Grouped-gray canvas + top scroll-edge blur for home-tab List / ScrollView
+  /// roots. Pair with `.scrollContentBackground(.hidden)` on List surfaces.
+  /// No `.toolbarBackground` — Liquid Glass owns the bar material.
+  func homeTabScrollSurface() -> some View {
+    self
+      .background { Theme.groupedBackground.ignoresSafeArea() }
+      .scrollEdgeEffectStyle(.soft, for: .top)
+  }
+
+  #if os(macOS)
+  /// macOS grouped-list cell: plain List row shaped as a Tasks-style card slice.
+  func septenaHomeListRow(index: Int, count: Int, isSelected: Bool = false) -> some View {
+    self
+      .listRowInsets(EdgeInsets())
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .septenaSuppressListCellSelection()
+      .taskCardChrome(TaskCardPosition(index: index, count: count), isSelected: isSelected)
+  }
+  #endif
+
   /// Apply the Septena sheet chrome — thin-material glass background plus a
   /// large continuous corner radius so modals match the iOS 26 Liquid Glass
   /// aesthetic. Detents must still be set per-sheet.
@@ -624,6 +645,32 @@ extension View {
       .contentShape(.hoverEffect,
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
       .hoverEffect(.highlight)
+    #else
+    self
+    #endif
+  }
+
+  /// Pointer / Apple-Pencil-hover for compact plain buttons (menu triggers,
+  /// section-header labels, chevrons, filing pills). `.buttonStyle(.plain)`
+  /// opts out of the system hover; call this to restore it. Pass
+  /// `cornerRadius` or `capsule: true` when the highlight should hug a shaped
+  /// control; omit both for the lighter automatic effect on text-sized targets.
+  /// macOS: no-op — pair with `.onHover` locally when a custom fill is wanted.
+  @ViewBuilder
+  func inlineHover(cornerRadius: CGFloat? = nil, capsule: Bool = false) -> some View {
+    #if os(iOS)
+    if capsule {
+      self
+        .contentShape(.hoverEffect, Capsule())
+        .hoverEffect(.highlight)
+    } else if let cornerRadius {
+      self
+        .contentShape(.hoverEffect,
+                      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .hoverEffect(.highlight)
+    } else {
+      self.hoverEffect(.automatic)
+    }
     #else
     self
     #endif

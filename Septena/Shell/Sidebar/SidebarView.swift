@@ -221,7 +221,8 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    .toolbar { phoneToolbar }
+    .toolbar { sidebarSplitToolbar }
+    .homeToolbar { tasksMenuExtraRows }
     .modifier(sidebarBehavior)
   }
 
@@ -378,6 +379,11 @@ struct SidebarRootView: View {
   #endif
 
   @ToolbarContentBuilder
+  private var sidebarSplitToolbar: some ToolbarContent {
+    ToolbarItem(placement: .primaryAction) { searchButton(accessibilityLabel: "Search") }
+  }
+
+  @ToolbarContentBuilder
   private var phoneToolbar: some ToolbarContent {
     ToolbarItem(placement: .navigation) { phoneMoreMenu }
     ToolbarItem(placement: .primaryAction) { searchButton(accessibilityLabel: "Search") }
@@ -393,29 +399,32 @@ struct SidebarRootView: View {
   // reuses `HomeMenu` for the phone "…" menu so the glyph, Settings row, and
   // accessibility label can't drift from the Week / Next / Coach peers.
   private var phoneMoreMenu: some View {
-    HomeMenu {
-      Button {
-        showingNewArea = true
-        newAreaName = ""
-      } label: {
-        Label("New Area", systemImage: "square.stack.3d.up")
-      }
-      Button {
-        showingNewProject = true
-      } label: {
-        Label("New Project", systemImage: "number")
-      }
-      Divider()
-      // Page-specific settings, in the same slot Next uses (just above the
-      // shared Settings row): Tasks has no dedicated pane — its knobs live in
-      // Settings ▸ Sections ▸ Tasks, so deep-link straight there. Rides
-      // `NavigationState` (iOS forwards it through the shared settings sheet).
-      Button {
-        nav.settingsDestination = .section("tasks")
-        nav.showSettings = true
-      } label: {
-        Label("Task Settings", systemImage: "checklist")
-      }
+    HomeMenu { tasksMenuExtraRows }
+  }
+
+  @ViewBuilder
+  private var tasksMenuExtraRows: some View {
+    Button {
+      showingNewArea = true
+      newAreaName = ""
+    } label: {
+      Label("New Area", systemImage: "square.stack.3d.up")
+    }
+    Button {
+      showingNewProject = true
+    } label: {
+      Label("New Project", systemImage: "number")
+    }
+    Divider()
+    // Page-specific settings, in the same slot Next uses (just above the
+    // shared Settings row): Tasks has no dedicated pane — its knobs live in
+    // Settings ▸ Sections ▸ Tasks, so deep-link straight there. Rides
+    // `NavigationState` (iOS forwards it through the shared settings sheet).
+    Button {
+      nav.settingsDestination = .section("tasks")
+      nav.showSettings = true
+    } label: {
+      Label("Task Settings", systemImage: "checklist")
     }
   }
 

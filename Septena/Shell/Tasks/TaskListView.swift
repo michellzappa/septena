@@ -477,22 +477,17 @@ struct TaskListView: View {
     // keyboard nav now all live inside `SelectableScrollList`.)
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
+    #if os(iOS)
+    .homeToolbarTrailing(when: !embedded && hSize == .regular && filter != .recentlyDeleted) {
+      TaskListNewTaskButton()
+    }
+    #endif
     .toolbar {
       // No + button in the Recently Deleted view — you can't create trashed tasks.
-      if filter != .recentlyDeleted {
+      // iPad regular: + lives in the TabView toolbar (tab-bar height).
+      if filter != .recentlyDeleted && usesLocalNewTaskToolbar {
         ToolbarItem(placement: .primaryAction) {
-          // Identical to the drawer's action button (`DrawerActionButton`): a
-          // plain Button + `.glassProminent` + section tint, so the system draws
-          // the same prominent accent circle — no custom circle-in-a-pill.
-          Button {
-            SeptenaLog.info("[Create] + button tapped filter=\(String(describing: filter))")
-            nav.shouldStartCreating = true
-          } label: {
-            Image(systemName: "plus")
-          }
-          .buttonStyle(.glassProminent)
-          .tint(theme.color(for: "tasks"))
-          .accessibilityLabel("New Task")
+          TaskListNewTaskButton()
         }
       }
     }
@@ -815,6 +810,16 @@ struct TaskListView: View {
     return true
     #else
     return hSize == .regular
+    #endif
+  }
+
+  /// iPad regular lifts the + button to the TabView toolbar; phone and macOS
+  /// keep it in the local navigation bar.
+  private var usesLocalNewTaskToolbar: Bool {
+    #if os(iOS)
+    embedded || hSize != .regular
+    #else
+    true
     #endif
   }
 
@@ -1576,11 +1581,12 @@ struct TaskListView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(Capsule().fill(theme.color(for: "tasks").opacity(0.14)))
-        .foregroundStyle(theme.color(for: "tasks"))
+        .background(Capsule().fill(Theme.mutedSurface))
+        .foregroundStyle(Theme.inkSecondary)
         .contentShape(Capsule())
       }
       .buttonStyle(.plain)
+      .inlineHover(capsule: true)
       .fixedSize()
       .accessibilityLabel("File in \(suggestion.title)")
     )
@@ -2669,13 +2675,15 @@ struct TaskListView: View {
 
 /// Compact tappable target for area / project section headers inside a list.
 /// Wraps just the title (and optional chevron) so the click target matches the
-/// visible text rather than the whole row width. Lights up with a subtle hover
-/// background on macOS / iPadOS pointer; no-op on touch-only devices.
+/// visible text rather than the whole row width. macOS: subtle fill via
+/// `.onHover`; iPadOS pointer / Pencil: native `.hoverEffect` highlight.
 private struct GroupHeaderLabel: View {
   let title: String
   let hasChevron: Bool
   let action: () -> Void
+  #if os(macOS)
   @State private var hovered = false
+  #endif
 
   var body: some View {
     Button(action: action) {
@@ -2691,10 +2699,12 @@ private struct GroupHeaderLabel: View {
       }
       .padding(.horizontal, 6)
       .padding(.vertical, 2)
+      #if os(macOS)
       .background(
         RoundedRectangle(cornerRadius: 6, style: .continuous)
           .fill(hovered ? Color.primary.opacity(0.06) : Color.clear)
       )
+      #endif
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -2703,7 +2713,30 @@ private struct GroupHeaderLabel: View {
     // Tab traverse only task rows. Without this, the header Button steals a
     // focus stop between every group.
     .focusable(false)
+    #if os(macOS)
     .onHover { hovered = $0 }
+    #else
+    .inlineHover(cornerRadius: 6)
+    #endif
+  }
+}
+
+/// Prominent "+" for creating a task — shared between the local nav toolbar
+/// (iPhone / macOS) and the iPad TabView trailing slot.
+struct TaskListNewTaskButton: View {
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
+
+  var body: some View {
+    Button {
+      SeptenaLog.info("[Create] + button tapped")
+      nav.shouldStartCreating = true
+    } label: {
+      Image(systemName: "plus")
+    }
+    .buttonStyle(.glassProminent)
+    .tint(theme.color(for: "tasks"))
+    .accessibilityLabel("New Task")
   }
 }
 
@@ -2715,7 +2748,10 @@ private struct TopLevelChromeModifier: ViewModifier {
   func body(content: Content) -> some View {
     if showChrome {
       content
-        .septenaInlineTitle()
+        .navigationTitle("")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     } else {
       content
     }

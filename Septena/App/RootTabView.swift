@@ -45,10 +45,16 @@ struct RootTabView: View {
   // is attached only mid-workout — an empty accessory content still draws
   // a blank bar, so the bar has to be absent, not just empty.
   @Environment(TrainingDraftStore.self) private var draftStore
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
   #if os(macOS)
   @Environment(\.openWindow) private var openWindow
   #endif
   @State private var tabSelection = TabSelection()
+  #if os(iOS)
+  @State private var homeToolbarExtras = HomeToolbarExtras()
+  #endif
 
   // "What's New" gate. We show the sheet once when the app's marketing version
   // climbs past the last release the user saw — but never on a fresh install
@@ -227,21 +233,44 @@ struct RootTabView: View {
         .tag(SeptenaTab.goals)
     }
     #if os(iOS)
-    let bar = tv.tabBarMinimizeBehavior(.onScrollDown)
-    // In-flight training session lives here as a Music-style pill above the
-    // tab bar (collapses inline when the bar minimizes) — twin of the Live
-    // Activity. Attach the accessory only while a session is active; an
-    // empty accessory still draws a blank bar, so it must be absent
-    // otherwise. `@Observable` draftStore re-renders this on start/end.
-    if let draft = draftStore.draft, draft.totalCount > 0 {
-      bar.tabViewBottomAccessory {
-        TrainingTabAccessory()
+    Group {
+      if hSize == .regular {
+        tv
+          .environment(homeToolbarExtras)
+          .tabBarMinimizeBehavior(.onScrollDown)
+          .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+              HomeMenu { homeToolbarExtras.content }
+            }
+            if homeToolbarExtras.hasTrailing {
+              ToolbarItem(placement: .topBarTrailing) {
+                homeToolbarExtras.trailingContent
+              }
+            }
+          }
+          .trainingTabAccessory(when: draftStore)
+      } else {
+        tv
+          .environment(homeToolbarExtras)
+          .tabBarMinimizeBehavior(.onScrollDown)
+          .trainingTabAccessory(when: draftStore)
       }
-    } else {
-      bar
     }
     #else
     tv
     #endif
   }
 }
+
+#if os(iOS)
+private extension View {
+  @ViewBuilder
+  func trainingTabAccessory(when draftStore: TrainingDraftStore) -> some View {
+    if let draft = draftStore.draft, draft.totalCount > 0 {
+      tabViewBottomAccessory { TrainingTabAccessory() }
+    } else {
+      self
+    }
+  }
+}
+#endif

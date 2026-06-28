@@ -38,6 +38,7 @@ struct TaskNavMenu<Trigger: View>: View {
     .menuStyle(.button)
     .buttonStyle(.plain)
     .menuIndicator(.hidden)
+    .inlineHover()
   }
 
   // MARK: - Menu content
@@ -138,6 +139,7 @@ struct NavMenuChevron: View {
       .foregroundStyle(.secondary)
       .frame(width: 28, height: 28)
       .contentShape(Rectangle())
+      .inlineHover(cornerRadius: 8)
       .accessibilityLabel("Go to list")
   }
 }

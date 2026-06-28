@@ -382,7 +382,7 @@ struct NextView: View {
     // section rhythm so the two home tabs feel like one family.
     .listStyle(.insetGrouped)
     .listSectionSpacing(18)
-    .background(Theme.sidebarBackground)
+    .homeTabScrollSurface()
     #else
     // Plain list + per-row `taskCardChrome` — the same grouped-card surface
     // the Tasks tab paints via `SelectableScrollList`. Native `.inset` draws
@@ -396,6 +396,7 @@ struct NextView: View {
         .contentShape(Rectangle())
         .onTapGesture { selection = [] }
     }
+    .scrollEdgeEffectStyle(.soft, for: .top)
     #endif
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses

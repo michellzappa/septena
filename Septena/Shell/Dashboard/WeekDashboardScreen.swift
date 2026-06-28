@@ -71,6 +71,7 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
         }
         .ignoresSafeArea()
       }
+      .scrollEdgeEffectStyle(.soft, for: .top)
       // Tab bar already labels this view. Keep the nav bar present so
       // iOS's default scroll-edge effect kicks in (content fades to bg
       // material as it scrolls under the top — same shape as the
@@ -83,7 +84,7 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
       // Shared home-landing chrome across Week / Next / Coach: the top-left
       // "…" menu, with Week's dashboard-layout switcher + Insights injected
       // above the shared Settings row. See HomeChrome.swift.
-      .homeChrome { menuExtra() }
+      .homeToolbar { menuExtra() }
       // iOS: float the "keep Claude connected" cue as a glass pill in the top
       // bar's TRAILING corner — opposite the leading "…" menu, so the system
       // doesn't fold the two into one shared glass bar. Renders nothing unless

@@ -20,7 +20,7 @@ struct NextDashboardView: View {
         // carry-over, which sections appear). The deep-link rides
         // `NavigationState`: macOS opens the Settings window at that pane,
         // iOS forwards it through the shared settings sheet (see RootTabView).
-        .homeChrome {
+        .homeToolbar {
           Button {
             nav.settingsDestination = .nextFeed
             nav.showSettings = true
