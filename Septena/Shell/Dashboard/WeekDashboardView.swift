@@ -302,7 +302,11 @@ struct WeekDashboardView: View {
       currentDay: clock.today,
       onInitialLoad: {
         paintFromCache()
-        await loadAll()
+        // Mirror reads + task counts run ~6–12s on a large account; don't hold
+        // the screen's `.task` (or the main actor through `apply` /
+        // `refreshTasks`) across that window — gestures freeze when launch work
+        // and interaction overlap. Cached blobs already painted above.
+        Task { await loadAll() }
       },
       onTaskChange: {
         // A task mutation only touches the Tasks tile — reload just that,
@@ -849,17 +853,17 @@ struct WeekDashboardView: View {
   @MainActor
   private func refreshTasks() async {
     let ctx = LocalStore.shared.container.mainContext
-    async let countsTask = TaskReads.counts(context: ctx)
-    let history = TaskReads.tasksHistory(days: Self.historyDays, context: ctx)
+    async let statsTask = Task { @MainActor in
+      TaskReads.dashboardStats(days: Self.historyDays, context: ctx)
+    }.value
     async let listTask = TaskReads.list(view: "logbook", days: 1, context: ctx)
-    let counts = await countsTask
-    taskCounts = counts
-    ResponseCache.save(counts, forKey: CacheKey.taskCounts)
-    tasksHistory = history
-    ResponseCache.save(history, forKey: CacheKey.tasksHistory)
-    let items = await listTask.items
-    completedTasks = items
-    ResponseCache.save(items, forKey: CacheKey.completedTasks)
+    let (stats, listResult) = await (statsTask, listTask)
+    taskCounts = stats.counts
+    ResponseCache.save(stats.counts, forKey: CacheKey.taskCounts)
+    tasksHistory = stats.history
+    ResponseCache.save(stats.history, forKey: CacheKey.tasksHistory)
+    completedTasks = listResult.items
+    ResponseCache.save(listResult.items, forKey: CacheKey.completedTasks)
     #if os(iOS)
     TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: ctx))
     WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")

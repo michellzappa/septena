@@ -3452,6 +3452,87 @@ final class LocalStore {
 /// Filter semantics roughly mirror the server's `view=` parameter; they're
 /// approximations — the network response always wins on the next render.
 enum LocalCache {
+  /// Live mirror rows — excludes Recently Deleted (`deletedAt != nil`) but
+  /// still includes `pendingDeletion` rows (openCount semantics count them).
+  @MainActor
+  static func liveEntities(in context: ModelContext) -> [TaskEntity] {
+    (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.deletedAt == nil }
+    ))) ?? []
+  }
+
+  /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
+  @MainActor
+  static func liveTasks(in context: ModelContext) -> [SeptenaTask] {
+    liveEntities(in: context)
+      .filter { !$0.pendingDeletion }
+      .map(SeptenaTask.init)
+  }
+
+  /// Assigned, non-cancelled tasks — the SuggestionEngine training corpus.
+  /// Unassigned inbox/logbook rows don't teach filing targets.
+  @MainActor
+  static func trainingTasks(in context: ModelContext) -> [SeptenaTask] {
+    liveEntities(in: context)
+      .filter {
+        !$0.pendingDeletion && $0.status != .cancelled &&
+        ($0.area != nil || $0.project != nil)
+      }
+      .map(SeptenaTask.init)
+  }
+
+  /// Tasks filed in a project — project progress glyphs without scanning the
+  /// full logbook.
+  @MainActor
+  static func tasksWithProject(in context: ModelContext) -> [SeptenaTask] {
+    (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion && e.project != nil
+      }
+    )))?.map(SeptenaTask.init) ?? []
+  }
+
+  /// Predicate-narrowed fetch for each list filter. Open smart lists still
+  /// post-filter in memory (`isOnToday`, triage-band decay) but start from
+  /// ~open rows instead of the full logbook.
+  @MainActor
+  private static func fetchEntities(for filter: TaskFilter,
+                                    in context: ModelContext) -> [TaskEntity] {
+    switch filter {
+    case .recentlyDeleted:
+      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.deletedAt != nil }
+      ))) ?? []
+    case .logbook:
+      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { e in
+          e.deletedAt == nil && !e.pendingDeletion &&
+          (e.statusRaw == "done" || e.statusRaw == "cancelled")
+        }
+      ))) ?? []
+    case .project(let pid):
+      let projectId = pid
+      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { e in
+          e.deletedAt == nil && !e.pendingDeletion && e.project == projectId
+        }
+      ))) ?? []
+    case .area(let aid):
+      let areaId = aid
+      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { e in
+          e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
+        }
+      ))) ?? []
+    case .today, .triage, .upcoming, .unscheduled:
+      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { e in
+          e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
+        }
+      ))) ?? []
+    }
+  }
+
   @MainActor
   static func tasks(in context: ModelContext,
                     filter: TaskFilter) -> [SeptenaTask] {
@@ -3470,7 +3551,7 @@ enum LocalCache {
     // click (TaskListView's `items` getter + `load()`), which is where the
     // macOS click latency came from. Filtering first sorts only the rows
     // the view keeps, over plain tuple fields.
-    guard let rows = try? context.fetch(FetchDescriptor<TaskEntity>()) else { return [] }
+    let rows = fetchEntities(for: filter, in: context)
     let today = SeptenaDate.today
     let result = rows
       .compactMap { e -> (key: Double, id: String, task: SeptenaTask)? in
@@ -3552,9 +3633,7 @@ enum LocalCache {
   /// hiding as `tasks(in:filter:)`; the truly-exhaustive readers (diagnostics,
   /// export, migration) fetch `TaskEntity` directly instead.
   static func allTasks(in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>()))?
-      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
-      .map(SeptenaTask.init) ?? []
+    liveTasks(in: context)
   }
 
   /// Of `ids`, the ones whose local mirror row is now completed. Lets a view

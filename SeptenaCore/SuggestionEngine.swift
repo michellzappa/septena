@@ -54,6 +54,9 @@ final class SuggestionEngine {
   /// "suggested list" chip) can classify without retraining on every keystroke.
   /// Refreshed by `refresh` and `prepare`.
   private var preparedModel: Model?
+  /// Fingerprint of the last-built training corpus — skip `buildModel` when
+  /// assigned tasks, structure, and rejections haven't changed.
+  private var cachedCorpusSignature: UInt64?
 
   /// The trained Naive-Bayes classifier — class token counts + the gates'
   /// supporting tallies — shared by Inbox classification and free-text queries.
@@ -87,16 +90,15 @@ final class SuggestionEngine {
 
   // MARK: - Public API
 
-  /// Recompute Inbox suggestions. `allTasks` (every assigned task, any status
-  /// except cancelled) is the training corpus; `inbox` are the items to
-  /// classify. Synchronous and cheap — call it on each Inbox load.
+  /// Recompute Inbox suggestions. `allTasks` should be the assigned training
+  /// corpus (`LocalCache.trainingTasks`); unassigned rows don't teach targets.
+  /// Synchronous and cheap when the corpus is unchanged — call on each Inbox load.
   func refresh(inbox: [SeptenaTask],
                allTasks: [SeptenaTask],
                projects: [Project],
                areas: [Area]) {
-    let model = buildModel(allTasks: allTasks, projects: projects, areas: areas)
-    preparedModel = model
-    guard !model.keys.isEmpty else { suggestions = [:]; return }
+    ensureModel(allTasks: allTasks, projects: projects, areas: areas)
+    guard let model = preparedModel, !model.keys.isEmpty else { suggestions = [:]; return }
 
     var next: [String: [Suggestion]] = [:]
     for t in inbox {
@@ -111,7 +113,7 @@ final class SuggestionEngine {
   /// free-text query can run cheaply afterwards. Call once when a composer
   /// opens; `suggest(forText:)` then reuses the stored model per keystroke.
   func prepare(allTasks: [SeptenaTask], projects: [Project], areas: [Area]) {
-    preparedModel = buildModel(allTasks: allTasks, projects: projects, areas: areas)
+    ensureModel(allTasks: allTasks, projects: projects, areas: areas)
   }
 
   /// Top area/project suggestion for freeform text (e.g. a task being typed),
@@ -132,6 +134,39 @@ final class SuggestionEngine {
   }
 
   // MARK: - Train / classify
+
+  /// Assigned tasks only — inbox/logbook rows with no area/project don't
+  /// contribute lexical signal to any filing target.
+  private func trainingCorpus(from allTasks: [SeptenaTask]) -> [SeptenaTask] {
+    allTasks.filter { $0.status != .cancelled && ($0.area != nil || $0.project != nil) }
+  }
+
+  private func ensureModel(allTasks: [SeptenaTask],
+                           projects: [Project],
+                           areas: [Area]) {
+    let corpus = trainingCorpus(from: allTasks)
+    let sig = corpusSignature(tasks: corpus, projects: projects, areas: areas)
+    if sig == cachedCorpusSignature, preparedModel != nil { return }
+    cachedCorpusSignature = sig
+    preparedModel = buildModel(allTasks: corpus, projects: projects, areas: areas)
+  }
+
+  private func corpusSignature(tasks: [SeptenaTask],
+                               projects: [Project],
+                               areas: [Area]) -> UInt64 {
+    var hasher = Hasher()
+    hasher.combine(areas.map(\.id).sorted().joined())
+    hasher.combine(projects.filter { $0.status == .active }.map(\.id).sorted().joined())
+    for t in tasks.sorted(by: { $0.id < $1.id }) {
+      hasher.combine(t.id)
+      hasher.combine(t.title)
+      hasher.combine(t.area)
+      hasher.combine(t.project)
+      hasher.combine(t.notes)
+    }
+    hasher.combine(rejectedTexts.map { "\($0.key):\($0.value.count)" }.sorted().joined())
+    return UInt64(bitPattern: Int64(hasher.finalize()))
+  }
 
   private func buildModel(allTasks: [SeptenaTask],
                           projects: [Project],
@@ -274,6 +309,7 @@ final class SuggestionEngine {
     if arr.count > 50 { arr = Array(arr.suffix(50)) }
     rejectedTexts[key] = arr
     saveRejections()
+    cachedCorpusSignature = nil
   }
 
   // MARK: - Tokenize / math

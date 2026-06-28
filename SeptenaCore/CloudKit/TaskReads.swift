@@ -126,7 +126,13 @@ enum TaskReads {
     }
   }
 
-  // MARK: - counts
+  // MARK: - counts + history (single pass)
+
+  /// Dashboard task tile inputs — one live-table fetch, one loop.
+  struct DashboardStats {
+    var counts: TasksCounts
+    var history: TasksHistory
+  }
 
   static func counts(context: ModelContext) async -> TasksCounts {
     // Force the SwiftData reads onto the main thread regardless of
@@ -135,29 +141,39 @@ enum TaskReads {
     // an `async let` boundary, the runtime can run this body off-main,
     // which crashes SwiftData (mainContext is not thread-safe). See
     // malloc double-free repro 2026-05-21 (TaskReads.localCount path).
-    return await MainActor.run { localCounts(context: context) }
+    return await MainActor.run { dashboardStats(context: context).counts }
   }
 
   static func localCounts(context: ModelContext) -> TasksCounts {
-    // ONE pass over the table. This used to be five filtered
-    // `LocalCache.tasks` calls plus an `allTasks` — six full-table
-    // fetch+convert scans on the main thread, and it runs on every task
-    // change (sidebar reload + the dashboard's Tasks tile). The bucket
-    // rules mirror `LocalCache.convert`'s filter semantics — keep in sync.
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    dashboardStats(context: context).counts
+  }
+
+  /// One fetch + one loop for smart-list counts and the 7-day done histogram.
+  /// Replaces separate `localCounts` + `tasksHistory` full-table scans.
+  static func dashboardStats(days: Int = 7, context: ModelContext) -> DashboardStats {
     let today = SeptenaDate.today
+    let cal = Calendar.current
+    let now = Date()
+    var dayKeys: [String] = []
+    let dayFormatter = DateFormatter()
+    dayFormatter.dateFormat = "yyyy-MM-dd"
+    dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+    for offset in stride(from: days - 1, through: 0, by: -1) {
+      guard let d = cal.date(byAdding: .day, value: -offset, to: now) else { continue }
+      dayKeys.append(dayFormatter.string(from: d))
+    }
+    let historyStartDay = dayKeys.first ?? today
+
     var todayN = 0, inbox = 0, triage = 0, upcoming = 0, unscheduled = 0
     var allOpen = 0
-    for e in rows {
-      // Recently-Deleted rows are hidden from every count/bucket (including the
-      // open count — a trashed task is no longer "open" anywhere).
-      if e.deletedAt != nil { continue }
-      // Matches the historical openCount (an `allTasks` reduce), which
-      // did not exclude pendingDeletion rows.
+    var doneByDay: [String: Int] = [:]
+    var cancelledByDay: [String: Int] = [:]
+    var madeByDay: [String: Int] = [:]
+
+    for e in LocalCache.liveEntities(in: context) {
       if e.status == .open { allOpen += 1 }
       guard !e.pendingDeletion else { continue }
-      // Today excludes the triage band — unratified rows live above Today,
-      // not in it (docs/TRIAGE_BAND_SPEC.md). `triage` counts the band.
+
       if e.isInTriageBand { triage += 1 }
       if e.isOnToday && !e.isInTriageBand { todayN += 1 }
       switch e.status {
@@ -172,15 +188,42 @@ enum TaskReads {
       default:
         break
       }
+
+      if let stamp = e.completedAt, stamp.count >= 10 {
+        let day = String(stamp.prefix(10))
+        if day >= historyStartDay {
+          switch e.status {
+          case .done: doneByDay[day, default: 0] += 1
+          case .cancelled: cancelledByDay[day, default: 0] += 1
+          default: break
+          }
+        }
+      }
+      if e.createdAt != .distantPast {
+        let createdDay = dayFormatter.string(from: e.createdAt)
+        if createdDay >= historyStartDay {
+          madeByDay[createdDay, default: 0] += 1
+        }
+      }
     }
-    return TasksCounts(today: today,
-                       todayCount: todayN,
-                       reviewCount: 0,
-                       inboxCount: inbox,
-                       triageCount: triage,
-                       upcomingCount: upcoming,
-                       unscheduledCount: unscheduled,
-                       openCount: allOpen)
+
+    let counts = TasksCounts(today: today,
+                             todayCount: todayN,
+                             reviewCount: 0,
+                             inboxCount: inbox,
+                             triageCount: triage,
+                             upcomingCount: upcoming,
+                             unscheduledCount: unscheduled,
+                             openCount: allOpen)
+    let daily = dayKeys.map { day in
+      TasksHistoryDay(date: day,
+                      made: madeByDay[day] ?? 0,
+                      done: doneByDay[day] ?? 0,
+                      deferred: 0,
+                      cancelled: cancelledByDay[day] ?? 0)
+    }
+    let history = TasksHistory(daily: daily, today: today, windowDays: days)
+    return DashboardStats(counts: counts, history: history)
   }
 
   // MARK: - tasksHistory
@@ -191,50 +234,7 @@ enum TaskReads {
   /// today. The Tasks tile histogram only consumes `daily[*].done` —
   /// `made` and `deferred` are best-effort and `cancelled` is exact.
   static func tasksHistory(days: Int = 7, context: ModelContext) -> TasksHistory {
-    let todayIso = SeptenaDate.today
-    let cal = Calendar.current
-    let now = Date()
-
-    // Build the day buckets in chronological order ending today.
-    var dayKeys: [String] = []
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd"
-    f.locale = Locale(identifier: "en_US_POSIX")
-    for offset in stride(from: days - 1, through: 0, by: -1) {
-      guard let d = cal.date(byAdding: .day, value: -offset, to: now) else { continue }
-      dayKeys.append(f.string(from: d))
-    }
-
-    var doneByDay: [String: Int] = [:]
-    var cancelledByDay: [String: Int] = [:]
-    var madeByDay: [String: Int] = [:]
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    for e in rows {
-      // Recently-Deleted rows drop out of completion/creation history.
-      if e.deletedAt != nil || e.pendingDeletion { continue }
-      // Bucket completions / cancellations by the date prefix of completedAt
-      // ("yyyy-MM-dd" — the same shape the server stamps).
-      if let stamp = e.completedAt, stamp.count >= 10 {
-        let day = String(stamp.prefix(10))
-        switch e.status {
-        case .done: doneByDay[day, default: 0] += 1
-        case .cancelled: cancelledByDay[day, default: 0] += 1
-        default: break
-        }
-      }
-      if e.createdAt != .distantPast {
-        madeByDay[f.string(from: e.createdAt), default: 0] += 1
-      }
-    }
-
-    let daily = dayKeys.map { day in
-      TasksHistoryDay(date: day,
-                      made: madeByDay[day] ?? 0,
-                      done: doneByDay[day] ?? 0,
-                      deferred: 0,
-                      cancelled: cancelledByDay[day] ?? 0)
-    }
-    return TasksHistory(daily: daily, today: todayIso, windowDays: days)
+    dashboardStats(days: days, context: context).history
   }
 
   // MARK: - helpers
