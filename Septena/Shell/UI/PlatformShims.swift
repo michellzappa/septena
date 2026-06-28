@@ -622,58 +622,53 @@ extension View {
   }
 }
 
+/// Subtle pointer-hover background wash — no scale/lift, just a 6% primary
+/// tint. Works on macOS trackpad and iPadOS pointer / Apple Pencil hover.
+private struct PointerHoverWash<S: Shape>: ViewModifier {
+  let shape: S
+  var opacity: Double = 0.06
+  @State private var hovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .background {
+        shape.fill(Color.primary.opacity(hovered ? opacity : 0))
+      }
+      .onHover { hovered = $0 }
+  }
+}
+
 extension View {
-  /// Universal pointer / Apple-Pencil-hover highlight for tappable custom
-  /// surfaces (dashboard tiles, cards, log rows). System controls (tab bar,
-  /// toolbar, `List` rows) get this for free; `.buttonStyle(.plain)` —
-  /// which this app uses on ~all tappable cards — opts *out* of the automatic
-  /// pointer effect, so anything tappable-but-plain must request it back.
-  ///
-  /// Pencil hover rides the same pointer-effect pipeline as the trackpad
-  /// pointer, so this one modifier lights up both. The explicit hover
-  /// content-shape makes the highlight follow the card's rounded corners
-  /// instead of bleeding into a hard rectangle. macOS has no `.hoverEffect`,
-  /// so it's a no-op there.
+  /// Universal pointer / Apple-Pencil-hover for tappable custom surfaces
+  /// (dashboard tiles, cards, log rows). System controls get hover for free;
+  /// `.buttonStyle(.plain)` opts out, so tappable-but-plain surfaces must
+  /// request it back. Background wash only — no scale or lift.
   ///
   /// Scope: rectangular tappable *surfaces* (tiles / cards / full-width rows),
-  /// not inline text buttons or chevrons — those want a plain
-  /// `.hoverEffect(.automatic)` with no card-shaped highlight.
-  @ViewBuilder
+  /// not inline text buttons or chevrons — use `inlineHover` for those.
   func tileHover(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
-    #if os(iOS)
-    self
-      .contentShape(.hoverEffect,
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-      .hoverEffect(.highlight)
-    #else
-    self
-    #endif
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    return modifier(PointerHoverWash(shape: shape))
   }
 
-  /// Pointer / Apple-Pencil-hover for compact plain buttons (menu triggers,
-  /// section-header labels, chevrons, filing pills). `.buttonStyle(.plain)`
-  /// opts out of the system hover; call this to restore it. Pass
-  /// `cornerRadius` or `capsule: true` when the highlight should hug a shaped
-  /// control; omit both for the lighter automatic effect on text-sized targets.
-  /// macOS: no-op — pair with `.onHover` locally when a custom fill is wanted.
+  /// Alias for list rows — same affordance as `tileHover`, canonical row radius.
+  func rowHover(cornerRadius: CGFloat = Theme.cornerRadiusSmall) -> some View {
+    tileHover(cornerRadius: cornerRadius)
+  }
+
+  /// Pointer hover for compact plain buttons (menu triggers, chevrons, filing
+  /// pills). Background wash only — no scale or lift.
   @ViewBuilder
   func inlineHover(cornerRadius: CGFloat? = nil, capsule: Bool = false) -> some View {
-    #if os(iOS)
     if capsule {
-      self
-        .contentShape(.hoverEffect, Capsule())
-        .hoverEffect(.highlight)
+      modifier(PointerHoverWash(shape: Capsule()))
     } else if let cornerRadius {
-      self
-        .contentShape(.hoverEffect,
-                      RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .hoverEffect(.highlight)
+      let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      modifier(PointerHoverWash(shape: shape))
     } else {
-      self.hoverEffect(.automatic)
+      modifier(PointerHoverWash(
+        shape: RoundedRectangle(cornerRadius: 6, style: .continuous)))
     }
-    #else
-    self
-    #endif
   }
 }
 
@@ -684,6 +679,20 @@ extension View {
 struct InertButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
+  }
+}
+
+/// Plain button with cross-platform pointer hover for full-width tappable rows.
+/// Drop-in for `.buttonStyle(.plain)` on navigation rows, picker sheets, and
+/// any surface where `.buttonStyle(.plain)` opts out of the system hover.
+/// Parent chrome (`taskCardChrome`, `septenaNextRow`) already paints hover —
+/// keep `.plain` there to avoid doubling up.
+struct PlainHoverRowButtonStyle: ButtonStyle {
+  var cornerRadius: CGFloat = Theme.cornerRadiusSmall
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .rowHover(cornerRadius: cornerRadius)
   }
 }
 

@@ -1433,7 +1433,7 @@ struct MovePickerSheet: View {
       .contentShape(Rectangle())
       .background(selected ? Theme.mutedSurface : Color.clear)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle())
   }
 
   @ViewBuilder
@@ -1515,7 +1515,7 @@ struct ActionSheet: View {
           .frame(height: Theme.sidebarRowHeight)
           .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PlainHoverRowButtonStyle())
         Hairline()
       }
 

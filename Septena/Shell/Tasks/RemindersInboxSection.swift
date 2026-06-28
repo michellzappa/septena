@@ -78,7 +78,7 @@ struct RemindersInboxSection: View {
              title: "Pick a Reminders list",
              subtitle: "Mirror items from Apple Reminders into your Inbox.")
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle())
   }
 
   @ViewBuilder
@@ -88,7 +88,7 @@ struct RemindersInboxSection: View {
              title: "Connect Apple Reminders",
              subtitle: "Grant access to mirror reminders into your Inbox.")
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle())
   }
 
   @ViewBuilder
@@ -195,7 +195,7 @@ struct RemindersInboxSection: View {
       .contentShape(Rectangle())
       .opacity(isImporting ? 0.5 : 1)
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: Theme.cornerRadiusSmall))
     .disabled(isImporting || bulkImporting)
   }
 

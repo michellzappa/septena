@@ -38,7 +38,7 @@ struct SectionBreakdownList: View {
                    tint: accent,
                    isSelected: selectedID == row.id)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: 10))
         }
       }
     }

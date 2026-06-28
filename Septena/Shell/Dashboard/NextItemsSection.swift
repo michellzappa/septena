@@ -1249,6 +1249,9 @@ extension View {
     self
       .environment(\.rowHInset, Theme.Spacing.xl)
       .selectableListRow(tag: tag, isSelected: isSelected)
+      // Native insetGrouped cells don't inherit hover from `.buttonStyle(.plain)`
+      // children — paint pointer affordance on the whole row.
+      .rowHover(cornerRadius: 10)
     #endif
   }
 }

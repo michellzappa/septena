@@ -153,7 +153,7 @@ struct AreaDetailView: View {
             Button { openProject(project) } label: {
               projectRow(project)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PlainHoverRowButtonStyle())
           }
         }
       }
@@ -654,14 +654,14 @@ struct AreaPickerSheet: View {
         Button { onPick(nil); dismiss() } label: {
           row(label: "No Area", icon: "tray", selected: currentAreaId == nil)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PlainHoverRowButtonStyle())
 
         ForEach(areas) { area in
           Button { onPick(area.id); dismiss() } label: {
             row(label: area.title, icon: "square.stack.3d.up.fill",
                 emoji: area.emoji, selected: currentAreaId == area.id)
           }
-          .buttonStyle(.plain)
+          .buttonStyle(PlainHoverRowButtonStyle())
         }
       }
       .navigationTitle("Move to Area")

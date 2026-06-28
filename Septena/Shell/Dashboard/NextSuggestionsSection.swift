@@ -760,7 +760,6 @@ private struct NextSuggestionRow: View {
     .padding(.horizontal, rowHInset)
     .padding(.vertical, Theme.rowVPadding + 2)
     .contentShape(Rectangle())
-    .tileHover(cornerRadius: 10)
   }
 
   private func commitIntake(_ value: String) {

@@ -33,8 +33,7 @@ struct LogEntryRow: View {
     Group {
       if let onEdit {
         Button(action: onEdit) { row }
-          .buttonStyle(.plain)
-          .tileHover(cornerRadius: 10)
+          .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: 10))
       } else {
         row
       }
