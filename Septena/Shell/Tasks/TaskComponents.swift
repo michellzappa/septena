@@ -519,6 +519,9 @@ struct CheckableRow<Trailing: View>: View {
   var titleMatchID: String? = nil
   var checkboxMatchID: String? = nil
   var heroMatchNS: Namespace.ID? = nil
+  /// Which endpoint of the hero glide is the `matchedGeometryEffect` source.
+  /// Closed row and open editor must never both be `true` during a transition.
+  var heroMatchIsSource: Bool = true
   @ViewBuilder var trailing: () -> Trailing
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
@@ -546,7 +549,7 @@ struct CheckableRow<Trailing: View>: View {
       .lineLimit(2)
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
-      .matchedHeroGeometry(titleMatchID, heroMatchNS)
+      .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       .accessibilityLabel(showsNotesGlyph ? "\(title), has notes" : title)
   }
 
@@ -570,7 +573,7 @@ struct CheckableRow<Trailing: View>: View {
         feel: feel,
         onToggle: onToggle
       )
-      .matchedHeroGeometry(checkboxMatchID, heroMatchNS)
+      .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
       .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
 
       if let leadingEmoji {
@@ -644,9 +647,10 @@ extension View {
   /// so we glide the top-leading corner and let each keep its own size. No-op
   /// when either arg is nil. Used for both the title and the checkbox.
   @ViewBuilder
-  func matchedHeroGeometry(_ id: String?, _ ns: Namespace.ID?) -> some View {
+  func matchedHeroGeometry(_ id: String?, _ ns: Namespace.ID?, isSource: Bool = true) -> some View {
     if let id, let ns {
-      matchedGeometryEffect(id: id, in: ns, properties: .position, anchor: .topLeading)
+      matchedGeometryEffect(
+        id: id, in: ns, properties: .position, anchor: .topLeading, isSource: isSource)
     } else {
       self
     }
@@ -721,8 +725,8 @@ extension TaskCheckbox {
 
 /// Compact notes marker that rides inline at the end of a task title.
 enum TaskNotesGlyph {
-  /// Vertical nudge so the glyph reads mid-aligned with title cap height.
-  static let baselineOffset: CGFloat = 4
+  /// Vertical nudge so the glyph reads mid-aligned with the title's last line.
+  static let baselineOffset: CGFloat = 3.75
 
   static func inlineText() -> Text {
     Text(Image(systemName: "text.alignleft"))
@@ -768,6 +772,7 @@ struct TaskRow: View {
   var titleMatchID: String? = nil
   var checkboxMatchID: String? = nil
   var heroMatchNS: Namespace.ID? = nil
+  var heroMatchIsSource: Bool = true
   let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
@@ -813,6 +818,7 @@ struct TaskRow: View {
       titleMatchID: titleMatchID,
       checkboxMatchID: checkboxMatchID,
       heroMatchNS: heroMatchNS,
+      heroMatchIsSource: heroMatchIsSource,
       trailing: { trailing },
       onToggle: onToggle,
       onTap: onTap
@@ -1386,7 +1392,7 @@ struct MovePickerSheet: View {
   private func loadProgress() {
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
-    for t in LocalCache.allTasks(in: modelContext) {
+    for t in LocalCache.tasksWithProject(in: modelContext) {
       guard let pid = t.project else { continue }
       switch t.status {
       case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
@@ -1540,8 +1546,8 @@ struct Hairline: View {
 
 /// The full task context menu + its picker sheets, bundled into one modifier so
 /// any surface (the Tasks list, the Next feed) attaches the *same* menu — Edit
-/// Details…, Move to / Remove from Today, When…, Deadline…, Move…, Repeat…,
-/// Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
+/// Details…, Duplicate, Move to / Remove from Today, When…, Deadline…, Move…,
+/// Repeat…, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
 /// `TaskListModalPresenter`, both shared with `TaskListView`, so the two
 /// surfaces can't drift. Which picker is open is owned per-row.
 ///
@@ -1579,6 +1585,7 @@ struct TaskRowActions: ViewModifier {
           target: .single(task),
           filter: filter,
           rankedSuggestions: nil,
+          onDuplicate: { _ in duplicateTask(task) },
           onOpenDetail: { onOpenDetail?($0) },
           onApplySuggestion: { _, _ in },
           onMoveToToday: { ids, today in
@@ -1649,6 +1656,24 @@ struct TaskRowActions: ViewModifier {
       }
     }
     mutator.acknowledge(id: id)
+    onChange?()
+  }
+
+  // Mirrors `TaskListView.duplicate` — clone into a new open task (new id).
+  private func duplicateTask(_ task: SeptenaTask) {
+    Haptics.tick()
+    let copy = mutator.create(
+      title: task.title,
+      area: task.area,
+      project: task.project,
+      scheduled: SeptenaDate.parse(task.scheduled),
+      deadline: SeptenaDate.parse(task.deadline),
+      today: task.today,
+      notes: task.notes
+    )
+    if let rule = task.recurrence {
+      mutator.setRecurrence(id: copy.id, recurrence: rule)
+    }
     onChange?()
   }
 

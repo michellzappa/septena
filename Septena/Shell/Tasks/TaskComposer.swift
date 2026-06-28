@@ -53,6 +53,9 @@ struct TaskComposerCard: View {
   var titleMatchID: String? = nil
   var checkboxMatchID: String? = nil
   var heroMatchNS: Namespace.ID? = nil
+  /// Hero-glide source flag — paired with the closed row's inverse so only one
+  /// endpoint is `isSource: true` during expand/collapse transitions.
+  var heroMatchIsSource: Bool = true
   /// Surface context for the title-line checkbox so it's derived identically to
   /// the closed row (the row gates the Today indicator off Today surfaces).
   /// Forwarded into the shared `TaskCheckboxModel`. Matches the row's
@@ -110,7 +113,8 @@ struct TaskComposerCard: View {
        presentation: Presentation = .drawer, onClose: (() -> Void)? = nil,
        onToggleComplete: (() -> Void)? = nil,
        titleMatchID: String? = nil, checkboxMatchID: String? = nil,
-       heroMatchNS: Namespace.ID? = nil, showsTodayIndicator: Bool = true,
+       heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
+       showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void) {
     self.mode = mode
     self.areas = areas
@@ -122,6 +126,7 @@ struct TaskComposerCard: View {
     self.titleMatchID = titleMatchID
     self.checkboxMatchID = checkboxMatchID
     self.heroMatchNS = heroMatchNS
+    self.heroMatchIsSource = heroMatchIsSource
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     #if os(iOS)
@@ -294,12 +299,12 @@ struct TaskComposerCard: View {
                                      showsTodayIndicator: showsTodayIndicator),
             onToggle: onToggleComplete
           )
-          .matchedHeroGeometry(checkboxMatchID, heroMatchNS)
+          .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
         }
         titleField
           .frame(maxWidth: .infinity, alignment: .leading)
-          .matchedHeroGeometry(titleMatchID, heroMatchNS)
+          .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       }
     } else {
       titleField
@@ -487,7 +492,7 @@ struct TaskComposerCard: View {
       // cheaply per keystroke.
       if TaskRowFlags.filingSuggestionsEnabled {
         SuggestionEngine.shared.prepare(
-          allTasks: LocalCache.allTasks(in: modelContext),
+          allTasks: LocalCache.trainingTasks(in: modelContext),
           projects: projects, areas: areas
         )
       }

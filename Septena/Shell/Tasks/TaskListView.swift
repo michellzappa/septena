@@ -864,17 +864,22 @@ struct TaskListView: View {
   /// row, clearing it from the Inbox). See docs/TRIAGE_BAND_SPEC.md.
   @ViewBuilder
   private var triageSection: some View {
-    // Rendered on Today only when there's something to triage. (It used to be
-    // always-on to host the inline quick-add line; that line was dropped, so an
-    // empty Inbox now stays out of the way entirely.) New tasks come from the
-    // toolbar `+` / ⌘N composer.
-    if filter == .today, !triageItems.isEmpty {
-      Section {
-        if !inboxCollapsed {
-          cardedRows(triageItems, quickMenu: { _ in true })
+    // "Inbox" on Today = agent proposals (triageItems, today==false) + loose
+    // manually-added tasks (today==true, no project/area). Both are unclassified
+    // work — the Inbox header should appear for either source.
+    if filter == .today {
+      let looseToday = (items + review).filter {
+        $0.project == nil && $0.area == nil && ($0.status == .open || settle.isSettling($0.id))
+      }
+      let allInbox = triageItems + looseToday
+      if !allInbox.isEmpty {
+        Section {
+          if !inboxCollapsed {
+            cardedRows(allInbox, quickMenu: { _ in true })
+          }
+        } header: {
+          inboxHeader(count: allInbox.count)
         }
-      } header: {
-        inboxHeader(count: triageItems.count)
       }
     }
   }
@@ -897,11 +902,9 @@ struct TaskListView: View {
                                      isCollapsed: Bool, showsHairline: Bool = true,
                                      onToggle: @escaping () -> Void) -> some View {
     #if os(macOS)
-    let headerTopPadding: CGFloat = 32
-    let headerHorizontalCorrection: CGFloat = 0
+    let headerTopPadding: CGFloat = 24
     #else
     let headerTopPadding: CGFloat = 18
-    let headerHorizontalCorrection: CGFloat = -16
     #endif
     Button {
       Haptics.tick()
@@ -928,11 +931,10 @@ struct TaskListView: View {
             .foregroundStyle(Theme.iconMuted)
             .rotationEffect(.degrees(isCollapsed ? -90 : 0))
         }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.horizontal, headerHorizontalCorrection)
-        // Align the foldable header (Inbox / Calendar) over its carded rows, the
-        // same shift the area/project headers take.
-        .padding(.leading, TaskCardMetrics.headerLeadingDelta)
+        // Park the icon column over the carded rows below, exactly like the
+        // area/project headers.
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
         .padding(.top, headerTopPadding)
         .padding(.bottom, 8)
         // No hairline — the band's rows sit in a card now, so a rule here would
@@ -1166,8 +1168,12 @@ struct TaskListView: View {
   private var keyboardOrderedTaskIds: [String] {
     switch filter {
     case .today:
-      // Inbox rows render above the Today groups, so traverse them first.
-      return triageItems.map(\.id) + orderedFromGroupedOpen(pool: items + review)
+      // Inbox section = agent proposals + loose today tasks, rendered above
+      // area/project groups. Pass only the classified tasks to orderedFromGroupedOpen.
+      let todayPool = items + review
+      let looseToday = todayPool.filter { $0.project == nil && $0.area == nil }
+      let classified = todayPool.filter { $0.project != nil || $0.area != nil }
+      return triageItems.map(\.id) + looseToday.map(\.id) + orderedFromGroupedOpen(pool: classified)
     case .unscheduled:
       return review.map(\.id) + orderedFromGroupedOpen(pool: items)
     case .upcoming:
@@ -1499,6 +1505,7 @@ struct TaskListView: View {
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: editTitleNS,
+      heroMatchIsSource: expandedEditId == task.id,
       showsTodayIndicator: filter != .today,
       onDone: {
         if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
@@ -1506,25 +1513,12 @@ struct TaskListView: View {
       }
     )
     .frame(maxWidth: .infinity, alignment: .leading)
-    // Content rides at the card's inner inset, same as a closed carded row, so
-    // the editor's fields line up with the rows above/below it.
-    .environment(\.rowHInset, TaskCardMetrics.contentInset)
-    .background(
-      // The open editor is a lifted version of the same grouped card: same
-      // surface, radius and screen margin as a closed cell, plus a hairline rim
-      // so it reads as the focused element popped out of the run. No shadow — it
-      // gets clipped by the scroll bounds; the rim alone reads cleanly.
-      RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
-        .fill(Theme.cardSurface)
-        .overlay(
-          RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
-            .strokeBorder(Theme.border, lineWidth: 1)
-        )
-    )
-    .padding(.horizontal, TaskCardMetrics.margin)
-    // Breathing room above/below so the open card stands apart from its
-    // neighbouring rows and reads as the focused element.
-    .padding(.vertical, 16)
+    // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
+    // the card surface + margin (and sets `rowHInset`), so the editor simply
+    // expands the row IN PLACE inside the group card instead of floating as a
+    // separate rounded box. Just vertical breathing room so the taller editing
+    // cell reads as the focused row.
+    .padding(.vertical, Theme.Spacing.sm)
     .id(task.id)
     .transition(.opacity)
     #if os(macOS)
@@ -1634,6 +1628,7 @@ struct TaskListView: View {
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: editTitleNS,
+      heroMatchIsSource: expandedEditId != task.id,
       onToggle: { toggle(task) },
       onTap: nil
     )
@@ -1738,6 +1733,9 @@ struct TaskListView: View {
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
         onRename: { task in beginEdit(task) },
+        onDuplicate: { target in
+          if case .single(let t) = target { duplicate(id: t.id) }
+        },
         onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
@@ -1917,10 +1915,11 @@ struct TaskListView: View {
                             by: { $0.area! })
     let loose = pool.filter { $0.project == nil && $0.area == nil }
 
-    // Loose tasks first — uncategorized, no header — in their own card, which
-    // is itself the visual seam from the Inbox stacked above (no hairline needed
-    // now that grouped cards separate the runs; see docs/TRIAGE_BAND_SPEC.md).
-    cardedRows(loose)
+    // Loose tasks on Today are merged into the Inbox section above (triageSection).
+    // For other filters (Unscheduled, Area, etc.) show them headerless as before.
+    if filter != .today {
+      cardedRows(loose)
+    }
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
@@ -1968,18 +1967,17 @@ struct TaskListView: View {
   /// slice of the card (`TaskCardChrome`), first/last round the outer corners.
   /// Kept a flat `ForEach` (no wrapping container) so every row stays a direct
   /// child of the scroll list and the selection / drag / keyboard wiring is
-  /// untouched. The open inline editor lifts out of the card as its own elevated
-  /// cell (`expandedEditorRow`), so it gets no card slice behind it.
+  /// untouched. The open inline editor takes its slice too, so it expands the row
+  /// in place inside the card rather than floating as a separate box.
   @ViewBuilder
   private func cardedRows(_ tasks: [SeptenaTask],
                           quickMenu: ((SeptenaTask) -> Bool)? = nil) -> some View {
     ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
-      if expandedEditId == task.id {
-        taskRow(task, quickMenu: quickMenu?(task) ?? false)
-      } else {
-        taskRow(task, quickMenu: quickMenu?(task) ?? false)
-          .taskCardChrome(TaskCardPosition(index: idx, count: tasks.count))
-      }
+      taskRow(task, quickMenu: quickMenu?(task) ?? false)
+        .taskCardChrome(TaskCardPosition(index: idx, count: tasks.count),
+                        // The open editor keeps the plain card surface (a clean
+                        // editing field), not the gray selection fill.
+                        isSelected: selection.contains(task.id) && expandedEditId != task.id)
     }
   }
 
@@ -2035,21 +2033,15 @@ struct TaskListView: View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
     #if os(macOS)
-    let headerTopPadding: CGFloat = 32
-    let headerHorizontalCorrection: CGFloat = 0
+    let headerTopPadding: CGFloat = 24
     let titleLeadingCorrection: CGFloat = -6
     #else
-    // Generous top whitespace IS the group break now that the hairline is gone
-    // (Things-style). 18pt was too tight on the phone — without a line and
-    // without enough air the groups didn't read as separated; ~30pt gives each
-    // cluster room to breathe, matching the organized feel macOS gets from 32.
-    let headerTopPadding: CGFloat = 30
-    // Nudge the whole header (symbol + title) ~2pt left of where it sat so the
-    // area/project symbol lines up over the task-row checkbox.
-    let headerHorizontalCorrection: CGFloat = -18
-    // Cancel GroupHeaderLabel's internal 6pt leading (less the 2pt the group
-    // already shifted) so the tappable title lands at the same X as task-row
-    // text — the same alignment macOS gets from its -6.
+    // Whitespace IS the group break (no hairline). The card below already adds
+    // `groupGap` underneath itself, so the header's own top padding sits on top
+    // of that — together they give each cluster room to breathe.
+    let headerTopPadding: CGFloat = 18
+    // Cancel GroupHeaderLabel's internal 6pt leading so the tappable title lands
+    // at the same X as task-row text.
     let titleLeadingCorrection: CGFloat = -4
     #endif
     return VStack(alignment: .leading, spacing: 0) {
@@ -2082,11 +2074,10 @@ struct TaskListView: View {
         }
         Spacer()
       }
-      .padding(.horizontal, Theme.hPadding)
-      .padding(.horizontal, headerHorizontalCorrection)
-      // Shift the header in by the same amount the carded rows shifted, so the
-      // area/project icon stays parked over the row checkbox below it.
-      .padding(.leading, TaskCardMetrics.headerLeadingDelta)
+      // Park the header's icon column at the same X as the row checkbox below it
+      // (card margin + in-card content inset); trailing matches the card margin.
+      .padding(.leading, TaskCardMetrics.headerLeading)
+      .padding(.trailing, TaskCardMetrics.margin)
       // ~2 lines of whitespace above each project/area cluster header so
       // groups visually break apart in mixed list views (Unscheduled, Today,
       // Upcoming). Without this gap, a header reads as the next row of the
@@ -2514,7 +2505,7 @@ struct TaskListView: View {
     do {
       var done: [String: Int] = [:]
       var total: [String: Int] = [:]
-      for t in LocalCache.allTasks(in: modelContext) {
+      for t in LocalCache.tasksWithProject(in: modelContext) {
         guard let pid = t.project else { continue }
         switch t.status {
         case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
@@ -2549,9 +2540,9 @@ struct TaskListView: View {
       // suggestion chip and the implicit "not this" learning. refresh also
       // primes the model for the composer's on-keystroke suggest().
       if TaskRowFlags.filingSuggestionsEnabled {
-        let allTasks = LocalCache.allTasks(in: modelContext)
+        let training = LocalCache.trainingTasks(in: modelContext)
         suggestionEngine.refresh(inbox: localTriage,
-                                 allTasks: allTasks,
+                                 allTasks: training,
                                  projects: projects,
                                  areas: areas)
       }
@@ -2560,7 +2551,7 @@ struct TaskListView: View {
     }
     if TaskRowFlags.filingSuggestionsEnabled,
        filter != .today && filter != .logbook && filter != .recentlyDeleted {
-      suggestionEngine.prepare(allTasks: LocalCache.allTasks(in: modelContext),
+      suggestionEngine.prepare(allTasks: LocalCache.trainingTasks(in: modelContext),
                                projects: projects,
                                areas: areas)
     }
@@ -2823,6 +2814,7 @@ struct TaskListRowContextMenu: View {
   /// Begin an in-place title rename. Optional — the deep Tasks list supplies it;
   /// the Next surface (which has no inline editor) leaves it nil.
   var onRename: ((SeptenaTask) -> Void)? = nil
+  let onDuplicate: (TaskListView.ActionTarget) -> Void
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
   let onMoveToToday: ([String], Bool) -> Void
@@ -2850,6 +2842,12 @@ struct TaskListRowContextMenu: View {
           Label("Rename", systemImage: "pencil")
         }
       }
+      Button {
+        onDuplicate(target)
+      } label: {
+        Label("Duplicate", systemImage: "plus.square.on.square")
+      }
+      .keyboardShortcut("d", modifiers: .command)
       Button {
         onOpenDetail(task)
       } label: {
@@ -3051,13 +3049,20 @@ enum TaskCardMetrics {
   static let radius: CGFloat = 14
   /// Leading X of the title column, measured from the card's inner edge.
   static let separatorInset = contentInset + Theme.checkboxTap + Theme.iconTextGap
-  /// How far the carded content shifts vs. an un-carded full-bleed row — added to
-  /// the group headers so their icon stays over the checkbox.
-  static var headerLeadingDelta: CGFloat { margin + contentInset - Theme.hPadding }
+  /// Leading X of a row's checkbox (and so the group header's icon, which is the
+  /// same `checkboxTap`-wide column) from the screen edge: the card margin plus
+  /// the in-card content inset. Headers park their icon here so it sits exactly
+  /// over the checkbox below.
+  static let headerLeading = margin + contentInset
+  /// Gap below each card so consecutive cards (a headerless loose / calendar card
+  /// above the next group) don't jam together. Headed groups add their header's
+  /// top padding on top of this.
+  static let groupGap = Theme.Spacing.sm
 }
 
 private struct TaskCardChrome: ViewModifier {
   let position: TaskCardPosition
+  var isSelected: Bool = false
 
   func body(content: Content) -> some View {
     let r = TaskCardMetrics.radius
@@ -3068,13 +3073,19 @@ private struct TaskCardChrome: ViewModifier {
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
         ZStack(alignment: .bottom) {
+          // The selected row's highlight IS the cell fill — edge-to-edge within
+          // the card, taking the card's own corners (only the first/last row
+          // round) — so it reads as "this row is selected", not a rounded capsule
+          // floating on top of the row.
           UnevenRoundedRectangle(
             topLeadingRadius: topR, bottomLeadingRadius: botR,
             bottomTrailingRadius: botR, topTrailingRadius: topR,
             style: .continuous
           )
-          .fill(Theme.cardSurface)
-          if position == .top || position == .middle {
+          .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+          // Hairline between rows, dropped against a selected cell (native lists
+          // hide the rule adjacent to the highlight).
+          if (position == .top || position == .middle) && !isSelected {
             Rectangle()
               .fill(Theme.border)
               .frame(height: 0.5)
@@ -3084,12 +3095,15 @@ private struct TaskCardChrome: ViewModifier {
       }
       // Card margin off the screen edge (content shifts in with it).
       .padding(.horizontal, TaskCardMetrics.margin)
+      // Only the last row of a card carries the gap, so the rows within a card
+      // stay flush (one continuous card) while groups separate.
+      .padding(.bottom, (position == .bottom || position == .solo) ? TaskCardMetrics.groupGap : 0)
   }
 }
 
 extension View {
-  func taskCardChrome(_ position: TaskCardPosition) -> some View {
-    modifier(TaskCardChrome(position: position))
+  func taskCardChrome(_ position: TaskCardPosition, isSelected: Bool = false) -> some View {
+    modifier(TaskCardChrome(position: position, isSelected: isSelected))
   }
 }
 
