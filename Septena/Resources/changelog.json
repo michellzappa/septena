@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1236,
+      "build": 1241,
       "date": "2026-06-28",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A faster, friendlier Tasks",
-          "detail": "Edit titles in place, add tasks from a quick-add line at the top or bottom of any list, wrap long titles, and undo completions with a longer grace window.",
+          "title": "Tasks reimagined with inline editing and quick capture",
+          "detail": "Rename and create tasks right in the list, drop a quick-add line at the top or bottom, and move tasks between areas and projects from the context menu.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
+          "title": "Recover deleted tasks for 30 days",
+          "detail": "A new Recently Deleted view keeps removed tasks for 30 days with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today",
-          "detail": "Upcoming calendar events now weave into Today and Upcoming, showing only what's still ahead in the day.",
+          "title": "Your calendar now lives alongside Today",
+          "detail": "System calendar events weave into Today and Upcoming, with hidden-calendar choices syncing across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Import tasks from Things",
-          "detail": "Bring your existing to-dos across by importing a Things database export.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring an existing Things database export straight into Septena.",
           "section": "tasks"
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": "The home tab is renamed to Today and pinned goals now appear as tiles on the dashboard.",
-          "section": null
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and Septena analyzes it on-device to log nutrition.",
+          "detail": "Snap a meal and have it analyzed on-device, with a small flourish when you break your fast.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training insights",
-          "detail": "See effort-weighted muscle volume, a unified daily-trend chart, and a weekly review after each session.",
+          "title": "Smarter training sessions",
+          "detail": "The rest timer is replaced by an auto-advance flow with a watch Live Activity and Smart Stack, plus effort-weighted muscle volume and a weekly post-session review.",
           "section": "training"
         },
         {
-          "title": "A clearer Next feed",
-          "detail": "Keyboard navigation, per-section show-in-Next toggles, intake-aware dose suggestions, and dismissals that sync across your devices.",
+          "title": "See and control exactly what telemetry is sent",
+          "detail": "Choose a graded analytics level from off to full, view the full ladder as a checklist, and review a log of recently sent, anonymized data.",
           "section": null
         },
         {
-          "title": "See exactly what's shared",
-          "detail": "Choose a graded telemetry level from off to full, view what's sent, and review a recent activity log — all anonymized.",
-          "section": null
-        },
-        {
-          "title": "Watch refinements",
-          "detail": "A time-of-day sky behind a paged Next feed, frosted action drawers for completing or deferring, expanded intake tiles, and a fasting face that morphs overnight.",
+          "title": "A refreshed watch experience",
+          "detail": "A time-of-day sky sits behind a paged Next feed with long-press action drawers, expanded intake tiles, and a fasting complication that morphs overnight.",
           "section": null
         }
       ]
