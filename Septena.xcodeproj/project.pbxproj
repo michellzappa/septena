@@ -70,6 +70,7 @@
 		14A026D5D1BAFF0B4943D0E0 /* GutBristolRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */; };
 		14AEC1B28FF545504CFC66C4 /* TrainingLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */; };
 		14E4E2DAB8E916A7F6AFDC57 /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
+		154A31BB19EE2EF7973C0314 /* PinnedGoalTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957DACAFD44791A424E3BD6C /* PinnedGoalTiles.swift */; };
 		159261A7A8BC89E45D403080 /* WeekDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71619B3F8898583F88154FB7 /* WeekDashboardScreen.swift */; };
 		15A711B2E528A620ADC513D2 /* DayDialHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3407AF16908C1033DF4DA6 /* DayDialHero.swift */; };
 		15EE3B56B18381CC683C9E5F /* ValuesPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8254C1AF91828DE8F75D78 /* ValuesPromptService.swift */; };
@@ -265,7 +266,6 @@
 		476CE65A1F2519FB454A1723 /* MacroComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BEA6580C3579079E772EDF /* MacroComplication.swift */; };
 		47834FE9B2FCA347333C4CC6 /* HeatmapLevels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5BA0A891EA19221B63484D /* HeatmapLevels.swift */; };
 		479568B5E9A3BB60A750924C /* TileWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1219E0D834281035101CA52F /* TileWidgetWire.swift */; };
-		47FAE63FBB16113DA3F43B1D /* PinnedGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABB24AC8039E641D0E3DD3D /* PinnedGoalsStrip.swift */; };
 		481ADE313FCCA227801BAD2D /* WeightUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E301A5710B7AA1F688D9F0 /* WeightUnit.swift */; };
 		4864ED3E9586783879087215 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */; };
 		4875215999FA27E79F1999AC /* ThingsImportScratchpad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA01876C9B4C2ACFFAA3B3E /* ThingsImportScratchpad.swift */; };
@@ -353,6 +353,7 @@
 		5C2CAF18F7F1BB26F040A597 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
 		5C2CD4D9D3DDF4D8E9CBBB2F /* SelectablePillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFFFB78909D8812C2A1C7D0 /* SelectablePillsView.swift */; };
 		5CB0D3A2E6ED546D4D3C6C6D /* OnDeviceReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A544624EC97D36270ACB0B /* OnDeviceReasoningProvider.swift */; };
+		5CBB46D5AA3B80051D768E58 /* PinnedGoalTiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957DACAFD44791A424E3BD6C /* PinnedGoalTiles.swift */; };
 		5CF5DB82EDA1AA776E5A5D8F /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B215154685D3F91F1884F5 /* HomepageDomain.swift */; };
 		5D34310A438D177D905D79C9 /* CommunitySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474D7FFD0D64FFFD949E53AD /* CommunitySignIn.swift */; };
 		5D923CE897D70AC9B5856743 /* CoachReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169846E5AAB2A89A91CD4290 /* CoachReply.swift */; };
@@ -536,7 +537,6 @@
 		93181199685C9F32D417D69D /* GutSymptomMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD54B4876728BD8A34F0E248 /* GutSymptomMapTests.swift */; };
 		933950D3383E7FC256812C82 /* WhatsNewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3451FCEADE7C79C827433D73 /* WhatsNewView.swift */; };
 		933FEAF27E7304E27A956B84 /* AddGroceryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50371A7532E006FCD529D414 /* AddGroceryPage.swift */; };
-		9378AE00FB62F18C8A35602C /* PinnedGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABB24AC8039E641D0E3DD3D /* PinnedGoalsStrip.swift */; };
 		93B6DBEE1BB15B57C44C9871 /* TrainingMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41EC8D4174F6931AC5BBEBB5 /* TrainingMetrics.swift */; };
 		93F61DC370438B6A146DE82A /* ThingsDateDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDD0F2C1A80067D2D24A9ED /* ThingsDateDecoder.swift */; };
 		94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
@@ -1058,7 +1058,6 @@
 		185686A2A4BF9FA8CE915F91 /* TrainingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingIntents.swift; sourceTree = "<group>"; };
 		19A9A612279267661C059968 /* MacrosWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacrosWidget.swift; sourceTree = "<group>"; };
 		1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRecord.swift; sourceTree = "<group>"; };
-		1ABB24AC8039E641D0E3DD3D /* PinnedGoalsStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedGoalsStrip.swift; sourceTree = "<group>"; };
 		1B0FAB25573797D6BF8C9482 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1B5BF16679C5BA62C066871C /* ActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityPlugin.swift; sourceTree = "<group>"; };
 		1B9B44B4FA68E33F4684051E /* HeatmapTileRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapTileRow.swift; sourceTree = "<group>"; };
@@ -1288,6 +1287,7 @@
 		91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsDestinationView.swift; sourceTree = "<group>"; };
 		93F4E9CCFCE85AEF36B4C6AF /* CommunityAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityAuth.swift; sourceTree = "<group>"; };
 		95444A1B0888099EA25F684A /* CoachDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachDetailView.swift; sourceTree = "<group>"; };
+		957DACAFD44791A424E3BD6C /* PinnedGoalTiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedGoalTiles.swift; sourceTree = "<group>"; };
 		95D72EAF704F67D254707B97 /* ReportHTMLRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportHTMLRenderer.swift; sourceTree = "<group>"; };
 		9859683174B5C2A84764D99C /* SleepDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDestinationView.swift; sourceTree = "<group>"; };
 		98C45208BFF39C4FE467347B /* GoalIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalIntents.swift; sourceTree = "<group>"; };
@@ -1508,7 +1508,7 @@
 				21A8FE1B8B5D5A1B17969276 /* GoalMetricProgressView.swift */,
 				40D9EAAB80FD7F9FAC57F20B /* GoalsView.swift */,
 				AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */,
-				1ABB24AC8039E641D0E3DD3D /* PinnedGoalsStrip.swift */,
+				957DACAFD44791A424E3BD6C /* PinnedGoalTiles.swift */,
 				56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */,
 				3B662C803101D7F26F47EBE6 /* TrainingTargetMigration.swift */,
 				1554FDB744A642E7CE56C962 /* Discovery */,
@@ -3106,7 +3106,7 @@
 				AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */,
 				4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */,
 				BCF563DB7153EF121B930068 /* PhotosBridge.swift in Sources */,
-				9378AE00FB62F18C8A35602C /* PinnedGoalsStrip.swift in Sources */,
+				154A31BB19EE2EF7973C0314 /* PinnedGoalTiles.swift in Sources */,
 				CB31EA476ED138FEC78FCE6B /* PlatformDelegates.swift in Sources */,
 				3C64ED1D0A9AC256265FE06B /* PlatformShims.swift in Sources */,
 				1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */,
@@ -3567,7 +3567,7 @@
 				07F54D0DB13468114771FD91 /* Outbox.swift in Sources */,
 				A1C7525645EBE54B283DC0D9 /* Persistence.swift in Sources */,
 				7F6213C67F6842241BA2CF09 /* PhotosBridge.swift in Sources */,
-				47FAE63FBB16113DA3F43B1D /* PinnedGoalsStrip.swift in Sources */,
+				5CBB46D5AA3B80051D768E58 /* PinnedGoalTiles.swift in Sources */,
 				B52F421956F45A0367348241 /* PlatformDelegates.swift in Sources */,
 				C1F56FDF315938C5A58E8A98 /* PlatformShims.swift in Sources */,
 				CF04EE095D677287C2041ACF /* ProjectRecord.swift in Sources */,

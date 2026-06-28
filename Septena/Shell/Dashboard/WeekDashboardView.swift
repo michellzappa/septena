@@ -52,6 +52,14 @@ struct WeekDashboardView: View {
   /// `\.usesPushNavigation`.
   @Environment(\.usesPushNavigation) private var usesPushNavigation
 
+  /// Live pinned goals — prepended to the section tile grid as first placements.
+  @Query(filter: #Predicate<GoalEntity> { $0.pinned },
+         sort: \GoalEntity.sortIndex) private var pinnedGoals: [GoalEntity]
+  @State private var editingGoal: Goal? = nil
+  @State private var goalEditSections: [SectionConfig] = []
+
+  private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
+
   /// Live width of the timeline's container, measured below. Drives the
   /// wide-layout treatment (cap the rail, span the full day) without
   /// leaning on `horizontalSizeClass` — so a resizable macOS window and a
@@ -283,10 +291,6 @@ struct WeekDashboardView: View {
   /// Everything below (or, in the split layout, beside) the day view: the
   /// discovery card, the tile grid, and the optional closing line.
   @ViewBuilder private var rightColumnBody: some View {
-    // The user's pinned goals, surfaced above everything else, rendered through
-    // the same layout renderer as the section tiles (so they match the current
-    // mode). Renders nothing until at least one goal is pinned.
-    PinnedGoalsStrip(layoutMode: currentLayoutMode, columns: columns)
     // Introduces the capabilities the welcome leaves out (Coach, Insights,
     // Apple Health) once the user is in the app. Self-gating: renders nothing
     // once everything's discovered or it's dismissed.
@@ -489,12 +493,10 @@ struct WeekDashboardView: View {
     }
   }
 
-  /// Week's tab-specific rows for the shared "…" `HomeMenu` (rendered above
-  /// its Settings item — see HomeChrome.swift). No top-right cluster: with an
-  /// empty nav title, items at both corners read as a separate bar spanning
-  /// the top, which the other tabs don't have. So the dashboard-layout
-  /// switcher and Insights live in the menu, and sync status isn't surfaced in
-  /// the chrome at all.
+  /// Week's page-local rows for the "···" overflow menu (`.pageChrome`'s
+  /// `localActions` — see docs/PAGE_CHROME_SPEC.md). The dashboard-layout
+  /// switcher and Insights live here; Settings is the constant gear, not a menu
+  /// row, and sync status isn't surfaced in the chrome.
   @ViewBuilder
   private var weekMenuExtra: some View {
     Picker(selection: Binding(
@@ -518,8 +520,6 @@ struct WeekDashboardView: View {
     } label: {
       Label("Insights", systemImage: "chart.dots.scatter")
     }
-    // Separate the dashboard rows from the shared Settings item below.
-    Divider()
   }
 
   /// Drives the `.navigationDestination` push. Mirrors `sheetDest` only
@@ -1128,8 +1128,8 @@ struct WeekDashboardView: View {
     // that every mode renders from `visibleDomainData` the dependency has to
     // live here rather than inside a per-section tile.
     let _ = quickLogStamp
-    // One shared renderer drives all four modes (and the pinned-goals strip),
-    // so they can't drift.
+    // One shared renderer drives all layout modes; pinned goals are prepended
+    // to `visibleDomainData` as first placements in the same grid.
     HomepageTileLayout(
       mode: currentLayoutMode,
       items: visibleDomainData,
@@ -1138,6 +1138,21 @@ struct WeekDashboardView: View {
     ) { item in
       quickAddMenu(for: item)
     }
+    .task(id: pinnedGoals.count) {
+      guard !pinnedGoals.isEmpty else { return }
+      goalEditSections = SettingsMirror.loadSections(context: modelContext)
+        .filter { $0.key != "goals" }
+    }
+    .sheet(item: $editingGoal) { goal in
+      EditGoalSheet(
+        goal: goal,
+        availableSections: goalEditSections,
+        theme: theme,
+        mutator: goalMutator,
+        onUpdate: { _ in },
+        onDelete: { _ in }
+      )
+    }
   }
 
   /// Domain data array in canonical order, filtered by server visibility
@@ -1145,9 +1160,13 @@ struct WeekDashboardView: View {
   /// Activity-on-Mac when HealthKit is unavailable). Future renderers
   /// (Heatmap, List) consume this same property.
   private var visibleDomainData: [HomepageDomainData] {
-    visibleDomains.flatMap {
+    let sectionTiles = visibleDomains.flatMap {
       DashboardTileBuilder.visibleItems(for: $0, ctx: tileContext, theme: theme)
     }
+    let pinned = pinnedGoals.map {
+      PinnedGoalTiles.domainData($0, theme: theme, context: modelContext)
+    }
+    return pinned + sectionTiles
   }
 
   private var tileContext: DashboardTileContext {
@@ -1243,9 +1262,10 @@ struct WeekDashboardView: View {
     case .openSheet(let dest):     open(dest)
     case .switchToTasksTab:        openTasksFromTile()
     case .openIntakeKind(let id):  openIntakeKind(id)
-    // Pinned goals own their own tap handling inside PinnedGoalsStrip; a
-    // section tile never emits this, so it's a no-op on the section router.
-    case .openGoal:                break
+    case .openGoal(let id):
+      if let entity = pinnedGoals.first(where: { $0.id == id }) {
+        editingGoal = Goal(entity)
+      }
     }
   }
 
@@ -1283,6 +1303,11 @@ struct WeekDashboardView: View {
     #endif
   }
 
+  private func unpinGoal(id: String) {
+    goalMutator.setPinned(id: id, pinned: false)
+    Haptics.tick()
+  }
+
   /// Single entry point for "user tapped the Tasks tile on the homepage."
   /// Every dashboard layout (Tiles direct tap, Dense + Heatmap via
   /// `DomainTapAction.switchToTasksTab`) routes through here so the
@@ -1309,7 +1334,11 @@ struct WeekDashboardView: View {
   /// row falls through to the per-domain menu.
   @ViewBuilder
   private func quickAddMenu(for item: HomepageDomainData) -> some View {
-    if item.domain == .intake,
+    if let goalID = PinnedGoalTiles.goalID(from: item) {
+      Button { unpinGoal(id: goalID) } label: {
+        Label("Unpin from dashboard", systemImage: "pin.slash")
+      }
+    } else if item.domain == .intake,
        let kindID = item.itemID?.split(separator: ":").last.map(String.init),
        let tile = intakeTiles.first(where: { $0.id == kindID }) {
       intakeQuickAddMenu(for: tile)
@@ -1359,16 +1388,21 @@ struct WeekDashboardView: View {
   /// order, so there's no hardcoded list to keep in sync.
   private var visibleDomains: [HomepageDomain] {
     let enabledKeys = settingsStore.sections.filter(\.isEnabled).map(\.key)
-    guard !enabledKeys.isEmpty else {
+    if !enabledKeys.isEmpty {
+      var seen = Set<HomepageDomain>()
+      return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
+        .filter { seen.insert($0).inserted }
+    }
+    // Mirror not yet in the store — read SwiftData directly. Once rows exist,
+    // an empty enabled set is intentional (user turned everything off).
+    let mirrored = SettingsMirror.loadSections(context: modelContext)
+    if mirrored.isEmpty {
       return SectionManifest.all
         .filter(\.supportsDashboard)
         .compactMap { HomepageDomain(rawValue: $0.key) }
     }
-    // Dedup: a domain renders once even if the section appears twice in the
-    // enabled set (a duplicate SectionEntity would otherwise double its tiles —
-    // and double *every* intake tracker, since intake expands per kind).
     var seen = Set<HomepageDomain>()
-    return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
+    return mirrored.filter(\.isEnabled).compactMap { HomepageDomain(rawValue: $0.key) }
       .filter { seen.insert($0).inserted }
   }
 

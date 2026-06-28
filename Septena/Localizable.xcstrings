@@ -2250,6 +2250,9 @@
     "Closing keeps the conversation but stops the user from replying. Internal notes are visible only to maintainers." : {
 
     },
+    "Coach" : {
+
+    },
     "Coaches" : {
 
     },
@@ -5874,9 +5877,6 @@
           }
         }
       }
-    },
-    "Pinned" : {
-
     },
     "Pins every reasoning step to one provider — for testing only. Leave Off in normal use." : {
 

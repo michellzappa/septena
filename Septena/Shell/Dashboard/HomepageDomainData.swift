@@ -51,8 +51,8 @@ enum DomainTapAction {
   /// Open one intake tracker's page directly (no switcher hop) — the
   /// per-kind tiles are peers of section tiles, so they deep-open like one.
   case openIntakeKind(String)
-  /// Open a pinned goal's editor. Emitted only by `PinnedGoalsStrip`, which
-  /// handles it itself; the section-tile tap router treats it as a no-op.
+  /// Open a pinned goal's editor — emitted by pinned goal tiles prepended to
+  /// the section grid in `WeekDashboardView`.
   case openGoal(String)
 }
 
@@ -159,11 +159,9 @@ extension HomepageDomainData {
   }
 }
 
-/// The single place the homepage maps a layout mode → a renderer. Both the
-/// section-tile grid (`WeekDashboardView.layoutBody`) and the pinned-goals
-/// strip render through this, so a pinned goal always looks like every other
-/// tile in whatever mode the user picked — heatmap when others are heatmaps,
-/// sparkline when others are sparklines. No bespoke per-surface renderer.
+/// The single place the homepage maps a layout mode → a renderer. Pinned goal
+/// tiles and section tiles both render through this so every placement matches
+/// the user's chosen mode.
 struct HomepageTileLayout<Menu: View>: View {
   let mode: HomepageLayoutMode
   let items: [HomepageDomainData]
