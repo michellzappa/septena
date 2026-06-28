@@ -149,34 +149,11 @@ final class SeptenaServices {
       // nutrition, mood, intake) stays in sync without each mutator opting in.
       WatchSnapshotPublisher.install(context: context)
 
-      // Backfill: ensure every SectionManifest entry has a local
-      // SectionEntity row so the central store is the source of truth
-      // for which sections exist and whether they're enabled. Each
-      // missing row is seeded with manifest-derived defaults
-      // (`defaultEnabled`); existing rows (including user toggles) are
-      // left alone.
-      // Order matters: backfill runs BEFORE seeding so newly inserted
-      // sections (with manifest-derived hasOnboarded values) aren't
-      // accidentally clobbered by the legacy migration.
-      PerfTrace.spanSync("start.seedSections") {
+      // Legacy `hasOnboarded` backfill only — manifest seeding waits for the
+      // first CloudKit pull in `absorbRemoteChanges()` so a reinstall never
+      // writes all-off placeholder rows over synced section state.
+      PerfTrace.spanSync("start.backfillSectionOnboarding") {
         SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
-        // A fresh account has zero SectionEntity rows before this loop. Seed
-        // everything OFF in that case so the first-run welcome starts from a
-        // blank slate (no pre-selected sections behind it); an account that
-        // already has rows seeds any newly-shipped section from its default.
-        let existingSectionCount =
-          (try? context.fetchCount(FetchDescriptor<SectionEntity>())) ?? 0
-        let isFreshAccount = existingSectionCount == 0
-        var seededAny = false
-        for manifest in SectionManifest.all {
-          if SettingsMirror.seedManifestSectionIfMissing(
-            manifest.key, context: context, freshAccount: isFreshAccount) {
-            seededAny = true
-          }
-        }
-        if seededAny {
-          NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
-        }
       }
       var batchTouchedTasks = false
       var batchTouchedStructure = false
@@ -1243,6 +1220,20 @@ final class SeptenaServices {
     guard !DemoSeedMode.isOn else { return }
     let context = LocalStore.shared.container.mainContext
     try? await ckEngine.fetchChanges()
+    // Seed any manifest keys still missing AFTER the pull. A genuinely fresh
+    // account (no section rows and no other account signals) seeds OFF for the
+    // welcome picker; reinstalls and new devices seed from manifest defaults
+    // so we never clobber synced enablement with pre-sync placeholders.
+    PerfTrace.spanSync("absorb.seedSections") {
+      let sectionCount =
+        (try? context.fetchCount(FetchDescriptor<SectionEntity>())) ?? 0
+      let freshAccount = sectionCount == 0
+        && !SettingsMirror.accountHasExistingContent(context: context)
+      if SettingsMirror.seedMissingManifestSections(context: context,
+                                                    freshAccount: freshAccount) {
+        NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+      }
+    }
     // Heal dangling project references now that the initial fetch has
     // landed (so we never stub a project that's merely mid-sync).
     await reconcileProjectGraph(context: context)

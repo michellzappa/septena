@@ -89,6 +89,13 @@ struct SeptenaApp: App {
         // SectionTheme / CKEngine / DayClock. Self-gating: a no-op once the
         // account has been onboarded.
         .welcomeGate()
+        // Keep the in-memory section cache aligned with the SwiftData mirror
+        // whenever life-data changes — including inbound CloudKit batches that
+        // land after the launch refresh (tab bar, dashboard tiles, Settings).
+        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+          settingsStore.reloadFromMirror(context: localStore.container.mainContext)
+          theme.paintFromCache()
+        }
         // The earned "support Septena" moment — shown at most once, only to a
         // well-established user, and only on a foreground after a milestone.
         // It's the support screen (sells nothing functional); marking it shown
@@ -145,6 +152,8 @@ struct SeptenaApp: App {
               // Republish the watch snapshot after pulling — this is also how
               // watch-originated completions get reflected back to the watch.
               await MainActor.run {
+                settingsStore.reloadFromMirror(context: localStore.container.mainContext)
+                theme.paintFromCache()
                 WatchSnapshotPublisher.schedule(context: localStore.container.mainContext)
                 // Surface milestones earned while away (background Withings
                 // ingest, logs from intents, another device's data syncing in).
@@ -267,16 +276,6 @@ struct SeptenaApp: App {
             await PerfTrace.span("app.absorbRemoteChanges") {
               await services.absorbRemoteChanges()
             }
-            // Spotlight "readability" backfill — donate tasks + the catalog
-            // entities (habits, supplements, chores, exercises, session types,
-            // grocery items/categories) to the on-device index after the pull
-            // (not the pre-sync mirror) so system search and, per Apple, Apple
-            // Intelligence / personal-context Siri can find them. `start()` then
-            // keeps the index live off `.septenaTasksChanged` /
-            // `.septenaDataChanged` (incl. section enable/disable purge). See
-            // docs/SPOTLIGHT_READABILITY_PLAN.md.
-            SpotlightIndexer.shared.start()
-            await SpotlightIndexer.shared.backfill()
             // 30-day auto-purge for Recently Deleted tasks (docs/RECENTLY_DELETED_SPEC.md).
             // Runs after the CloudKit pull so remote-synced deletions are included.
             let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
@@ -326,6 +325,23 @@ struct SeptenaApp: App {
             // welcome once their data syncs in) or push a local completion up.
             settingsStore.reconcileOnboarding(
               context: localStore.container.mainContext, engine: ckEngine)
+            // The first pull has now settled the onboarded-state: a reinstalling
+            // user's synced `onboardedAt` was adopted just above (gate resolves
+            // to "no welcome"), a genuinely fresh account stays unmarked (gate
+            // resolves to "show welcome"). Release the welcome gate. Set after
+            // the reconcile but BEFORE the Spotlight backfill below so indexing
+            // never delays the decision.
+            settingsStore.onboardingResolved = true
+            // Spotlight "readability" backfill — donate tasks + the catalog
+            // entities (habits, supplements, chores, exercises, session types,
+            // grocery items/categories) to the on-device index after the pull
+            // (not the pre-sync mirror) so system search and, per Apple, Apple
+            // Intelligence / personal-context Siri can find them. `start()` then
+            // keeps the index live off `.septenaTasksChanged` /
+            // `.septenaDataChanged` (incl. section enable/disable purge). See
+            // docs/SPOTLIGHT_READABILITY_PLAN.md.
+            SpotlightIndexer.shared.start()
+            await SpotlightIndexer.shared.backfill()
             // Seed the Claude gateway token on cold launch (no-op if Claude
             // isn't connected or a recent token is still valid).
             await ClaudeGatewayProvider.shared.refreshIfNeeded()

@@ -93,6 +93,60 @@ enum SettingsMirror {
   /// "set up" (no onboarding to run); a section seeded disabled awaits
   /// first-enable, at which point the toggle flow asks the plugin
   /// whether onboarding is required.
+  /// Whether the account shows any sign of prior use — synced settings, section
+  /// customizations, or life-data rows. A truly fresh account has none of these;
+  /// a reinstall / new device does once the first CloudKit pull lands (even if
+  /// section rows arrive in a later batch than tasks). Used to avoid treating
+  /// an empty local store as a blank-slate fresh account.
+  nonisolated static func accountHasExistingContent(context: ModelContext) -> Bool {
+    if let settings = loadSettings(context: context) {
+      if settings.onboardedAt != nil { return true }
+      if !(settings.sectionOrder?.isEmpty ?? true) { return true }
+      if !(settings.welcomeName?.isEmpty ?? true) { return true }
+    }
+    if let rows = try? context.fetch(FetchDescriptor<SectionEntity>()),
+       rows.contains(where: { $0.isEnabled || $0.hasOnboarded || !$0.color.isEmpty }) {
+      return true
+    }
+    func any<T: PersistentModel>(_ type: T.Type) -> Bool {
+      var d = FetchDescriptor<T>()
+      d.fetchLimit = 1
+      return ((try? context.fetchCount(d)) ?? 0) > 0
+    }
+    return any(TaskEntity.self)
+      || any(HabitDefinitionEntity.self)
+      || any(SupplementDefinitionEntity.self)
+      || any(GoalEntity.self)
+      || any(NutritionEntryEntity.self)
+      || any(ExerciseEntryEntity.self)
+      || any(ChoreDefinitionEntity.self)
+      || any(GutEventEntity.self)
+      || any(MoodEventEntity.self)
+      || any(SymptomEventEntity.self)
+      || any(MedicationDoseEventEntity.self)
+      || any(IntakeEventEntity.self)
+      || any(GroceryItemEntity.self)
+      || any(ActivityDayEntity.self)
+  }
+
+  /// Backfill every manifest key that has no local row yet. `freshAccount` is
+  /// only true for a genuinely new account (no CK rows and no other account
+  /// signals) — seeds everything OFF for the welcome picker. Every other case
+  /// (reinstall, new device, app update) seeds from manifest defaults so a
+  /// pre-pull empty store never poisons cross-device section parity.
+  @discardableResult
+  static func seedMissingManifestSections(context: ModelContext,
+                                          freshAccount: Bool) -> Bool {
+    var seededAny = false
+    for manifest in SectionManifest.all {
+      if seedManifestSectionIfMissing(manifest.key, context: context,
+                                     freshAccount: freshAccount) {
+        seededAny = true
+      }
+    }
+    return seededAny
+  }
+
   @discardableResult
   static func seedManifestSectionIfMissing(_ key: String,
                                            context: ModelContext,

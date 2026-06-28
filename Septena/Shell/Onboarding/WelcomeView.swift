@@ -16,27 +16,33 @@ import SwiftData
 // Why a blank slate rather than the manifest's `defaultEnabled` six: the
 // product intent is an intentional first run — the user chooses what their
 // "life operating system" tracks instead of inheriting a fixed default set
-// and trimming it. `SeptenaServices.start()` still seeds the default-enabled
-// rows; this screen simply overrides them with the user's choices.
+// and trimming it. Missing manifest rows are seeded after the first CloudKit
+// pull; this screen overrides them with the user's choices on a fresh account.
 
 // MARK: - Gate
 
 /// Decides whether to present `WelcomeView` over the app's root. Gated purely
-/// on the device-local `welcomeCompleted` flag so the welcome appears on the
-/// very first frame of a fresh install — no waiting on the network, nothing
-/// else shown first. Established accounts never reach here: `SettingsStore`
-/// sets the flag synchronously at launch when the local store already has the
-/// user's data (`adoptWelcomeFlagIfEstablished`), and a returning user's brand
-/// new device adopts the synced `onboardedAt` once it syncs in, dismissing the
-/// welcome (the rare pre-sync flash on that path is acceptable).
+/// on the device-local `welcomeCompleted` flag once the launch CloudKit pull
+/// has settled (`onboardingResolved`). Established accounts never reach here:
+/// `SettingsStore` sets the flag synchronously at launch when the local store
+/// already has the user's data (`adoptWelcomeFlagIfEstablished`), and a returning
+/// user's brand new device adopts the synced `onboardedAt` once it syncs in.
 private struct WelcomeGate: ViewModifier {
   @Environment(NavigationState.self) private var nav
+  @Environment(SettingsStore.self) private var settingsStore
   @AppStorage(SettingsKey.welcomeCompleted) private var completed = false
   /// Dev override (Settings ▸ About ▸ Advanced) — re-show the welcome on an
   /// established account for testing. Always false in normal use.
   @AppStorage(SettingsKey.welcomeForce) private var force = false
 
-  private var shouldPresent: Bool { force || !completed }
+  private var shouldPresent: Bool {
+    if force { return true }
+    // Wait until the launch pull settles the onboarded-state. A reinstall's
+    // local welcome flag is false but the synced `onboardedAt` arrives with
+    // the pull — presenting before then would overwrite section state.
+    guard settingsStore.onboardingResolved else { return false }
+    return !completed
+  }
 
   func body(content: Content) -> some View {
     content

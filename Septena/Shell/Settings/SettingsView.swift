@@ -347,6 +347,16 @@ final class SettingsStore {
   var chores: [ChoreItem] = []
   var serverLoading: Bool = false
 
+  /// True once the onboarded-state is *known* — set synchronously at init when
+  /// the device-local welcome flag is already settled, and by the launch path
+  /// once the first CloudKit pull has run (so a synced `onboardedAt` would have
+  /// been adopted). The welcome gate waits for this: on a reinstall the local
+  /// flag is false but the account is onboarded, and the marker only arrives
+  /// with the pull — presenting the welcome before then is the bug this fixes.
+  /// Genuinely fresh accounts still get the welcome, just after the (usually
+  /// brief) first pull instead of on a pre-sync frame.
+  var onboardingResolved: Bool = false
+
   /// Hydrate from the local mirror / disk cache during construction so the
   /// dashboard's first frame uses the user's saved section order and config
   /// instead of an empty array (which falls back to the `SectionManifest`
@@ -379,6 +389,7 @@ final class SettingsStore {
     let mirroredSections = SettingsMirror.loadSections(context: context)
     if !mirroredSections.isEmpty {
       sections = mirroredSections
+      ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
     } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
       sections = v
     }
@@ -414,6 +425,15 @@ final class SettingsStore {
     // the welcome on the first frame. The durable stamp + CloudKit push happens
     // in the launch task's `grandfatherOnboardingIfEstablished`.
     adoptWelcomeFlagIfEstablished(context: context)
+    // If the answer is already known locally — the flag was set previously, or
+    // adopted just above because the local store already holds the user's data —
+    // resolve now so a normal launch shows the gate's final decision with zero
+    // delay. Otherwise stay UNRESOLVED until the launch pull settles it: that's
+    // the reinstall path (empty local store, flag false, `onboardedAt` still
+    // syncing in), where showing the welcome would be wrong.
+    if UserDefaults.standard.bool(forKey: SettingsKey.welcomeCompleted) {
+      onboardingResolved = true
+    }
   }
 
   /// Synchronous, local-only welcome suppression for established accounts: if
@@ -423,9 +443,26 @@ final class SettingsStore {
   /// mutation, no network (safe to call from `paintFromCache` during init).
   func adoptWelcomeFlagIfEstablished(context: ModelContext) {
     guard !UserDefaults.standard.bool(forKey: SettingsKey.welcomeCompleted),
-          serverSettings?.onboardedAt == nil,
-          accountHasExistingContent(context: context) else { return }
+          SettingsMirror.loadSettings(context: context)?.onboardedAt == nil,
+          SettingsMirror.accountHasExistingContent(context: context) else { return }
     UserDefaults.standard.set(true, forKey: SettingsKey.welcomeCompleted)
+  }
+
+  /// Reload settings + sections from the SwiftData mirror. Called after every
+  /// CloudKit pull and on `.septenaDataChanged` so `sections` stays in parity
+  /// with `SectionEntity` rows (the tab bar, dashboard tiles, and Settings all
+  /// read this cache).
+  func reloadFromMirror(context: ModelContext) {
+    if let v = SettingsMirror.loadSettings(context: context) {
+      serverSettings = v
+      ResponseCache.save(v, forKey: CacheKey.serverSettings)
+      HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
+    }
+    let mirroredSections = SettingsMirror.loadSections(context: context)
+    sections = mirroredSections
+    if !mirroredSections.isEmpty {
+      ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
+    }
   }
 
   func moveSections(fromOffsets: IndexSet, toOffset: Int,
@@ -779,38 +816,14 @@ final class SettingsStore {
                                           engine: CKEngine?) {
     guard serverSettings?.onboardedAt == nil,
           !UserDefaults.standard.bool(forKey: SettingsKey.welcomeCompleted) else { return }
-    guard accountHasExistingContent(context: context) else { return }
+    guard SettingsMirror.accountHasExistingContent(context: context) else { return }
     markOnboardingComplete(now: now, context: context, engine: engine)
   }
 
-  /// Whether the account shows any sign of prior use — used only to decide
-  /// whether to grandfather past the welcome. A truly fresh account has none
-  /// of these; an established one trips on the first probe. Section
-  /// customization (a saved order) counts too, so a setup-but-never-logged
-  /// account isn't re-onboarded.
+  /// Whether the account shows any sign of prior use — delegates to the mirror
+  /// helper so reinstall / new-device probes match the post-pull seeding gate.
   private func accountHasExistingContent(context: ModelContext) -> Bool {
-    if !(serverSettings?.sectionOrder?.isEmpty ?? true) { return true }
-    if !(serverSettings?.welcomeName?.isEmpty ?? true) { return true }
-
-    func any<T: PersistentModel>(_ type: T.Type) -> Bool {
-      var d = FetchDescriptor<T>()
-      d.fetchLimit = 1
-      return ((try? context.fetchCount(d)) ?? 0) > 0
-    }
-    return any(TaskEntity.self)
-      || any(HabitDefinitionEntity.self)
-      || any(SupplementDefinitionEntity.self)
-      || any(GoalEntity.self)
-      || any(NutritionEntryEntity.self)
-      || any(ExerciseEntryEntity.self)
-      || any(ChoreDefinitionEntity.self)
-      || any(GutEventEntity.self)
-      || any(MoodEventEntity.self)
-      || any(SymptomEventEntity.self)
-      || any(MedicationDoseEventEntity.self)
-      || any(IntakeEventEntity.self)
-      || any(GroceryItemEntity.self)
-      || any(ActivityDayEntity.self)
+    SettingsMirror.accountHasExistingContent(context: context)
   }
 
   /// Apply the welcome screen's section selection to the synced
@@ -889,16 +902,7 @@ final class SettingsStore {
     // mirrored via SettingsEntity / SectionEntity; chores / beans /
     // strains / session-types ride on their own CK entities; macros
     // live in NSUbiquitousKeyValueStore.
-    if let mirroredSettings = SettingsMirror.loadSettings(context: context) {
-      serverSettings = mirroredSettings
-      ResponseCache.save(mirroredSettings, forKey: CacheKey.serverSettings)
-      HealthKitBridge.shared.syncSettings = mirroredSettings.hkSync ?? HKSyncSettings()
-    }
-    let mirroredSections = SettingsMirror.loadSections(context: context)
-    if !mirroredSections.isEmpty {
-      sections = mirroredSections
-      ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
-    }
+    reloadFromMirror(context: context)
 
     let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
