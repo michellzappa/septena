@@ -56,7 +56,9 @@ struct SidebarRootView: View {
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
     let agg = SidebarSeed.aggregate ?? {
-      let agg = Self.aggregate(tasks: LocalCache.allTasks(in: ctx))
+      let stats = TaskReads.dashboardStats(context: ctx)
+      var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx))
+      agg.counts = stats.counts
       SidebarSeed.aggregate = agg
       return agg
     }()
@@ -268,8 +270,13 @@ struct SidebarRootView: View {
   private func sidebarListContent() -> some View {
     #if os(iOS)
     List(selection: sidebarSelection) {
-      smartListSection
-      areaProjectSections
+      if usesSidebarRows {
+        smartListSection
+      }
+      // iPhone compact: tiles ride as the first section *header* (not a row
+      // inside the grouped card) so insetGrouped's section mask doesn't clip
+      // the outer corners of the 2×2 grid.
+      areaProjectSections(smartListTileHeader: !usesSidebarRows)
     }
     .modifier(IOSSidebarListChrome())
     #else
@@ -283,7 +290,7 @@ struct SidebarRootView: View {
     // read as broken: nothing else on macOS makes you double-click a sidebar.)
     List(selection: sidebarSelection) {
       smartListSection
-      areaProjectSections
+      areaProjectSections()
     }
     .listStyle(.sidebar)
     #endif
@@ -291,29 +298,16 @@ struct SidebarRootView: View {
 
   // MARK: - Smart lists section
   //
-  // iOS: the larger 2-up tile grid, hosted edge-to-edge in a borderless list
-  // row — the Reminders-home pattern (tiles on top, grouped lists below, one
-  // scroll). macOS: each smart list is its own native sidebar row.
+  // iOS compact: the 2-up tile grid is hosted as the first grouped section's
+  // *header* (see `smartListPhoneHeader`) so it scrolls with the list but
+  // isn't clipped by insetGrouped's section card. iPad / macOS: native rows.
 
   @ViewBuilder
   private var smartListSection: some View {
     #if os(iOS)
-    if usesSidebarRows {
-      Section {
-        ForEach(smartListSpecs, id: \.title) { spec in
-          smartListRow(for: spec)
-        }
-      }
-    } else {
-      Section {
-        smartListGrid
-          .listRowInsets(EdgeInsets())
-          .listRowBackground(Color.clear)
-          .listRowSeparator(.hidden)
-          // The tiles are a custom grid, not selectable List rows — they carry
-          // their own `isSelected` highlight and navigate via their Buttons, so
-          // keep `List(selection:)` from ever trying to select this row.
-          .selectionDisabled()
+    Section {
+      ForEach(smartListSpecs, id: \.title) { spec in
+        smartListRow(for: spec)
       }
     }
     #else
@@ -351,9 +345,19 @@ struct SidebarRootView: View {
   }
 
   #if os(iOS)
+  /// Section header for the iPhone compact Tasks home — sits above the first
+  /// area / project card, outside insetGrouped's rounded section mask.
+  private var smartListPhoneHeader: some View {
+    smartListGrid
+      .padding(.top, 4)
+      .padding(.bottom, 10)
+      .textCase(nil)
+  }
+  #endif
+
+  #if os(iOS)
   /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Completed). Padded to the shared page gutter so it lines up with
-  /// the grouped section cards below.
+  /// Completed). Horizontal gutter matches the insetGrouped section cards.
   private var smartListGrid: some View {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
                         GridItem(.flexible(), spacing: Theme.tileGap)],
@@ -369,10 +373,7 @@ struct SidebarRootView: View {
         .buttonStyle(InertButtonStyle())
       }
     }
-    // No extra horizontal padding: the borderless row (listRowInsets zeroed)
-    // already spans the grouped section-card width, so the tile pair's outer
-    // edges line up with the area / project cards below (the Reminders home).
-    .padding(.vertical, 4)
+    .padding(.horizontal, Theme.pageGutter)
   }
   #endif
 
@@ -643,15 +644,36 @@ struct SidebarRootView: View {
   // still renders as a one-row card, so every area reads as the same container.
 
   @ViewBuilder
-  private var areaProjectSections: some View {
+  private func areaProjectSections(smartListTileHeader: Bool = false) -> some View {
+    #if os(iOS)
+    if smartListTileHeader,
+       topLevelProjects.isEmpty, areas.isEmpty, recentlyDeletedCount == 0 {
+      Section {
+        Color.clear
+          .frame(height: 0)
+          .accessibilityHidden(true)
+          .listRowInsets(EdgeInsets())
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
+      } header: {
+        smartListPhoneHeader
+      }
+      .listSectionSeparator(.hidden)
+    }
+    #endif
+
     if !topLevelProjects.isEmpty {
       Section {
         ForEach(topLevelProjects) { project in
           compactRow { projectRow(project, parent: nil) }
         }
+      } header: {
+        #if os(iOS)
+        if smartListTileHeader { smartListPhoneHeader }
+        #endif
       }
     }
-    ForEach(areas) { area in
+    ForEach(Array(areas.enumerated()), id: \.element.id) { index, area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
       Section {
@@ -661,6 +683,12 @@ struct SidebarRootView: View {
             compactRow { projectRow(project, parent: area.id) }
           }
         }
+      } header: {
+        #if os(iOS)
+        if smartListTileHeader, topLevelProjects.isEmpty, index == 0 {
+          smartListPhoneHeader
+        }
+        #endif
       }
     }
     // Recently Deleted — always last, only shown when there are trashed tasks.
@@ -674,6 +702,12 @@ struct SidebarRootView: View {
                          count: recentlyDeletedCount)
           }
         }
+      } header: {
+        #if os(iOS)
+        if smartListTileHeader, topLevelProjects.isEmpty, areas.isEmpty {
+          smartListPhoneHeader
+        }
+        #endif
       }
     }
   }
@@ -932,20 +966,15 @@ struct SidebarRootView: View {
   // MARK: - Load
 
   private func load() async {
-    // CloudKit is the only backend and LocalCache is authoritative, so the
-    // old two-phase shape (cache paint, then a "server" pass over the SAME
-    // local store) read the full task table three times per reload — plus
-    // six more scans inside the old TaskReads.counts. Now: one structure
-    // memo read, one task pass for the roll-ups, one for the counts.
+    // CloudKit is the only backend and LocalCache is authoritative. One
+    // structure memo read, one live-task pass for roll-ups, one combined
+    // counts+history scan for smart-list badges.
     let structure = StructureCache.snapshot(in: modelContext)
     areas = TaskDestinations.orderedAreas(structure.areas)
     projects = TaskDestinations.orderedProjects(structure.projects)
-    let all = LocalCache.allTasks(in: modelContext).filter { $0.deletedAt == nil }
-    var agg = Self.aggregate(tasks: all)
-    // Per-smart-list counts come from the canonical filter semantics
-    // (LocalCache.convert via localCounts), not the aggregate's mirror.
-    // Per-project / per-area roll-ups stay from the local aggregate.
-    agg.counts = TaskReads.localCounts(context: modelContext)
+    let stats = TaskReads.dashboardStats(context: modelContext)
+    var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext))
+    agg.counts = stats.counts
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
     recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
@@ -1271,7 +1300,7 @@ struct SidebarAreaRow: View {
   /// Open task count rolled up across the area (loose + projects in it).
   var count: Int = 0
   /// Fold state — non-nil only when the area has projects (so a fold control
-  /// is meaningful). When nil the plain navigate chevron is shown instead.
+  /// is meaningful).
   var isCollapsed: Bool? = nil
   var onToggleCollapse: (() -> Void)? = nil
 
@@ -1287,9 +1316,6 @@ struct SidebarAreaRow: View {
         SidebarFoldChevron(isCollapsed: isCollapsed, action: onToggleCollapse)
       }
       SidebarCount(count: count)
-      if isCollapsed == nil {
-        SidebarRowChevron()
-      }
     }
     .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
@@ -1368,7 +1394,6 @@ struct SidebarProjectRow: View {
         .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
       SidebarCount(count: count)
-      SidebarRowChevron()
     }
     .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
@@ -1385,24 +1410,6 @@ enum SidebarRowTitleStyle {
     .primary
     #else
     Theme.inkPrimary
-    #endif
-  }
-}
-
-/// Trailing chevron used at the end of sidebar list rows. iOS Mail /
-/// Reminders / Settings put a disclosure indicator at the end of every
-/// navigable row, and the iPhone sidebar matches that. macOS sidebars
-/// (Mail.app, Reminders.app) don't draw chevrons — the persistent
-/// selection pill is the only "this row is the current screen" cue
-/// needed — so we render nothing there.
-struct SidebarRowChevron: View {
-  var body: some View {
-    #if os(iOS)
-    Image(systemName: "chevron.right")
-      .scaledFont(size: 12, weight: .semibold)
-      .foregroundStyle(.tertiary)
-    #else
-    EmptyView()
     #endif
   }
 }

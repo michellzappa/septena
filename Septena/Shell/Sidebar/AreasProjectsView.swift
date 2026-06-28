@@ -158,7 +158,6 @@ struct AreaDetailView: View {
         }
       }
     }
-    .background(Theme.paperBackground)
     .septenaInlineTitle()
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
@@ -358,7 +357,7 @@ struct ProjectDetailView: View {
   private static func cachedProgress(projectId: String,
                                      context: ModelContext) -> Double? {
     var done = 0, total = 0
-    for t in LocalCache.allTasks(in: context) where t.project == projectId {
+    for t in LocalCache.tasksWithProject(in: context) where t.project == projectId {
       switch t.status {
       case .done: done += 1; total += 1
       case .open: total += 1
@@ -398,7 +397,6 @@ struct ProjectDetailView: View {
         Hairline()
       }
     }
-    .background(Theme.paperBackground)
     .septenaInlineTitle()
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
