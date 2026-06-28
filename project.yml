@@ -64,6 +64,8 @@ targets:
     info:
       path: Septena/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
@@ -75,6 +77,10 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptenaSceneDelegate
         UIApplicationSupportsIndirectInputEvents: true
         UIBackgroundModes:
           - remote-notification
@@ -137,6 +143,8 @@ targets:
     info:
       path: Septena/Info-Mac.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
@@ -223,6 +231,8 @@ targets:
     info:
       path: SeptenaWatch/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.cloud
@@ -256,6 +266,8 @@ targets:
     info:
       path: SeptenaWatchComplication/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     configFiles:
@@ -279,6 +291,8 @@ targets:
     info:
       path: SeptenaLiveActivitiesExtension/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     configFiles:
@@ -331,6 +345,8 @@ targets:
     info:
       path: SeptenaWidgets/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     configFiles:
