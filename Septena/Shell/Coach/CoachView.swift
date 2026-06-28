@@ -44,24 +44,12 @@ struct CoachView: View {
       }
       #if os(iOS)
       .listStyle(.insetGrouped)
-      #else
+      #elseif os(macOS)
       .listStyle(.plain)
       .padding(.bottom, Theme.pageBottom)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       #endif
-      .scrollContentBackground(.hidden)
-      .homeTabScrollSurface()
-      // No title — the tab bar already labels this view, matching the Next
-      // landing (both home tabs rely on the tab label, not a nav-bar title).
-      .navigationTitle("")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
-      // (leading, constant) + "+" → new goal (Coach is a domain-view, so its
-      // "+" creates that domain's object). No "···" — Coach has no page-local
-      // rows beyond Settings.
-      .pageChrome(id: "coach", title: "Coach", add: .action { addGoal() })
+      .septenaTabPage(id: "coach", title: "Coach", add: .action { addGoal() })
       // A coach pushes as a full pane inside this stack — a real screen with a
       // back button — on every idiom. Lists belong with navigation stacks.
       .navigationDestination(for: CoachDomain.self) { domain in

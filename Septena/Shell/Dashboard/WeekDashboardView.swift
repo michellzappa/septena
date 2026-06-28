@@ -270,6 +270,16 @@ struct WeekDashboardView: View {
     #endif
   }
 
+  /// True where the iPad floating chrome bar reserves the top inset (iOS
+  /// regular), so the page's own `pageTop` would double it.
+  private var chromeBarReservesTop: Bool {
+    #if os(iOS)
+    hSize == .regular
+    #else
+    false
+    #endif
+  }
+
   /// Width of the left rail in the split iPhone layout — sized to seat the
   /// dial (diameter + its breathing room) without starving the tile column.
   private let heroRailWidth: CGFloat = 340
@@ -369,7 +379,11 @@ struct WeekDashboardView: View {
             rightColumnBody
           }
         }
-        .septenaSurface()
+        // On iPad the floating chrome bar already reserves the top space
+        // (`PageChromeMetrics.iPadBarHeight`), so the page's own `pageTop` is
+        // redundant there — drop it so Today's content sits at the same height
+        // as the list tabs. iPhone keeps it (no bar inset there).
+        .septenaSurface(top: chromeBarReservesTop ? 0 : Theme.pageTop)
         #if DEBUG
         // Hidden keyboard shortcuts: ⟨ / ⟩ (the comma/period keys) step the
         // homepage back/forward a day through the last week, driving

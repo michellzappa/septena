@@ -168,12 +168,49 @@ extension View {
                                 localActions: localActions, add: add,
                                 showsGlobal: showsGlobal))
   }
+
+  /// Standard treatment for a top-level tab page's scroll view: nav title,
+  /// scroll surface, soft top edge, and the unified chrome (`.pageChrome`, which
+  /// also reserves the iPad bar inset via contentMargins). Apply to the page's
+  /// OWN List/ScrollView so the scroll modifiers land on it. Page-specific bits
+  /// (Today's sky background, Next's list selection) stay on the page.
+  func septenaTabPage(
+    id: String, title: String,
+    localActions: @escaping () -> AnyView? = { nil },
+    add: PageAdd? = nil,
+    showsGlobal: Bool = true
+  ) -> some View {
+    self
+      .scrollContentBackground(.hidden)
+      .homeTabScrollSurface()
+      .scrollEdgeEffectStyle(.soft, for: .top)
+      .navigationTitle("")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .pageChrome(id: id, title: title, localActions: localActions,
+                  add: add, showsGlobal: showsGlobal)
+  }
+
+  /// iPad floating-bar top inset for scroll surfaces that don't publish chrome
+  /// themselves (e.g. Tasks split detail). The height lives in
+  /// `PageChromeMetrics.iPadBarHeight` only. Pass `ownTopPadding` when the
+  /// content already has top whitespace of its own (e.g. a first section header)
+  /// so the total lands at the same height as the plain list tabs.
+  func septenaTabInset(ownTopPadding: CGFloat = 0) -> some View {
+    #if os(iOS)
+    contentMargins(.top, max(0, PageChromeMetrics.iPadBarHeight - ownTopPadding),
+                   for: .scrollContent)
+    #else
+    self
+    #endif
+  }
 }
 
 private struct PageChromeModifier: ViewModifier {
   @Environment(NavigationState.self) private var nav
   #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(IPadChromeModel.self) private var iPadChrome
   #endif
 
@@ -194,19 +231,24 @@ private struct PageChromeModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     #if os(iOS)
-    if hSize == .regular {
+    // `usesPushNavigation` (resolved once at the app root), NOT the local
+    // `hSize`: inside the Tasks SIDEBAR column the size class is `.compact`
+    // (narrow column), which would wrongly route its chrome to the nav bar
+    // instead of the window overlay. `usesPushNavigation` is true on iPad
+    // regular regardless of column width.
+    if usesPushNavigation {
       // iPad: chrome is the window-level overlay bar (RootTabView.iPadTabless),
       // not nav-bar toolbar items — so it aligns to the content gutter and the
       // Tasks sidebar can't shift it. Publish this page's "···"/"+" for the
       // overlay to render; draw nothing in the (transparent) nav bar here.
       content
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        // Reserve the floating bar's height here (inside the page's own
-        // NavigationStack) so content rests below it; scroll content still
-        // scrolls *under* it. A container-level inset wouldn't reach here.
-        .safeAreaInset(edge: .top, spacing: 0) {
-          Color.clear.frame(height: PageChromeMetrics.iPadBarHeight)
-        }
+        // Reserve the floating bar's height as a scroll-content margin so content
+        // rests below it (and scrolls *under* it). `.contentMargins` is uniform
+        // across List/ScrollView regardless of each page's scroll-edge setup —
+        // `safeAreaInset` was inconsistent (Coach respected it, Next/Today fought
+        // it via `scrollEdgeEffectStyle`).
+        .contentMargins(.top, PageChromeMetrics.iPadBarHeight, for: .scrollContent)
         .onAppear { iPadChrome.set(id, localActions: localActions(), add: add) }
     } else {
       // iPhone: gear/···/+ live in the page's own nav bar (bottom tab bar stays).

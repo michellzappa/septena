@@ -327,32 +327,57 @@ struct RootTabView: View {
     let entry = iPadChrome.entry(tabSelection.current.chromeID)
     return ZStack {
       HStack(spacing: 0) {
-        // Left corner: ONE "···" menu — the page's own actions, then Settings
-        // (always the last row). Built inline (not via OverflowMenu) so the glyph
-        // sits in the SAME fixed frame as "+", making both glass circles equal in
-        // size. `.buttonStyle(.glass)` lets the system own the glass + the menu
-        // presentation (wrapping a Menu in `.glassCircle()` swallows the tap).
-        Menu {
-          if let actions = entry?.localActions {
-            actions
-            Divider()
+        HStack(spacing: 10) {
+          // Left corner: ONE "···" menu — the page's own actions, then Settings
+          // (always the last row). Built inline (not via OverflowMenu) so the glyph
+          // sits in the SAME fixed frame as "+", making both glass circles equal in
+          // size. `.buttonStyle(.glass)` lets the system own the glass + the menu
+          // presentation (wrapping a Menu in `.glassCircle()` swallows the tap).
+          Menu {
+            if let actions = entry?.localActions {
+              actions
+              Divider()
+            }
+            Button { nav.showSettings = true } label: {
+              Label("Settings", systemImage: "gearshape")
+            }
+          } label: {
+            cornerGlyph("ellipsis")
           }
-          Button { nav.showSettings = true } label: {
-            Label("Settings", systemImage: "gearshape")
-          }
-        } label: {
-          cornerGlyph("ellipsis")
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .accessibilityLabel("More")
-        Spacer(minLength: 0)
-        // Right corner: ONE "+" button — same fixed glyph frame → same circle.
-        if let add = entry?.add {
-          Button(action: resolveAdd(add)) { cornerGlyph("plus") }
+          .buttonStyle(.glass)
+          .buttonBorderShape(.circle)
+          .accessibilityLabel("More")
+          // Tasks has a split-view sidebar whose hide toggle lives IN the sidebar
+          // — so once hidden there's no way back. This standalone circle (Tasks
+          // only) toggles it, sitting beside "···" rather than folding into it.
+          if tabSelection.current == .tasks {
+            Button {
+              withAnimation(.snappy) {
+                nav.sidebarVisibility = nav.sidebarVisibility == .detailOnly ? .all : .detailOnly
+              }
+            } label: {
+              cornerGlyph("sidebar.left")
+            }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
-            .accessibilityLabel("Add")
+            .accessibilityLabel("Toggle Sidebar")
+          }
+        }
+        Spacer(minLength: 0)
+        HStack(spacing: 10) {
+          // The "reauth Claude" cue — self-hides unless the gateway token is
+          // stale; when it shows it's its OWN distinct glass circle just left of
+          // "+" (`.overlayCircle` frames + glasses itself, so the two never merge
+          // into one bubble). Lives here (not Today's nav bar, which the overlay
+          // occludes on iPad) so it pops up on whatever tab is open.
+          ClaudeReconnectCue(.overlayCircle)
+          // Right corner: ONE "+" button — same fixed glyph frame → same circle.
+          if let add = entry?.add {
+            Button(action: resolveAdd(add)) { cornerGlyph("plus") }
+              .buttonStyle(.glass)
+              .buttonBorderShape(.circle)
+              .accessibilityLabel("Add")
+          }
         }
       }
       TabSwitcher()

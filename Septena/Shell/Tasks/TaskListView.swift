@@ -2803,17 +2803,27 @@ struct TaskListNewTaskButton: View {
 private struct TaskListStandaloneChrome: ViewModifier {
   @Environment(NavigationState.self) private var nav
   #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   #endif
   let embedded: Bool
   let recentlyDeleted: Bool
 
   func body(content: Content) -> some View {
     #if os(iOS)
-    if embedded || hSize == .regular {
-      // iPad regular: the Tasks SIDEBAR publishes the whole window-level chrome
+    if usesPushNavigation {
+      // iPad regular: the Tasks SIDEBAR publishes the window-level chrome
       // (gear/···/+), so the detail must NOT also publish (it would clobber the
-      // sidebar's entry in IPadChromeModel). Embedded uses keep the parent's.
+      // sidebar's entry). It still needs to reserve the floating bar's height so
+      // the list doesn't sit under it. Embedded uses inherit the parent's.
+      if embedded {
+        content
+      } else {
+        // The list's first band header already adds ~18pt of top whitespace, so
+        // subtract it from the bar inset to land at the same height as the other
+        // tabs (the inter-group whitespace below stays intact).
+        content.septenaTabInset(ownTopPadding: 18)
+      }
+    } else if embedded {
       content
     } else {
       content.pageChrome(

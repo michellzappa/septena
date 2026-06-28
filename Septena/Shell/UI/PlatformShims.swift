@@ -534,13 +534,11 @@ extension View {
       .padding(.bottom, Theme.pageBottom)
   }
 
-  /// Grouped-gray canvas + top scroll-edge blur for home-tab List / ScrollView
-  /// roots. Pair with `.scrollContentBackground(.hidden)` on List surfaces.
-  /// No `.toolbarBackground` — Liquid Glass owns the bar material.
+  /// Grouped-gray canvas for home-tab List / ScrollView roots. Pair with
+  /// `.scrollContentBackground(.hidden)` on List surfaces and
+  /// `.scrollEdgeEffectStyle(.soft, for: .top)` (`.septenaTabPage` applies both).
   func homeTabScrollSurface() -> some View {
-    self
-      .background { Theme.groupedBackground.ignoresSafeArea() }
-      .scrollEdgeEffectStyle(.soft, for: .top)
+    background { Theme.groupedBackground.ignoresSafeArea() }
   }
 
   #if os(macOS)

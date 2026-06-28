@@ -374,7 +374,6 @@ struct NextView: View {
       }
     }
     .environment(promoteFlash)
-    .scrollContentBackground(.hidden)
     #if os(iOS)
     // Match the Tasks sidebar exactly: insetGrouped cells over the soft gray
     // grouped background (was Theme.paperBackground = white, which left the
@@ -382,7 +381,6 @@ struct NextView: View {
     // section rhythm so the two home tabs feel like one family.
     .listStyle(.insetGrouped)
     .listSectionSpacing(18)
-    .homeTabScrollSurface()
     #else
     // Plain list + per-row `taskCardChrome` — the same grouped-card surface
     // the Tasks tab paints via `SelectableScrollList`. Native `.inset` draws
@@ -391,13 +389,26 @@ struct NextView: View {
     .padding(.bottom, Theme.pageBottom)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background {
-      Theme.groupedBackground
-        .ignoresSafeArea()
+      Color.clear
         .contentShape(Rectangle())
         .onTapGesture { selection = [] }
     }
-    .scrollEdgeEffectStyle(.soft, for: .top)
     #endif
+    .septenaTabPage(
+      id: "next",
+      title: "Next",
+      localActions: {
+        AnyView(
+          Button {
+            nav.settingsDestination = .nextFeed
+            nav.showSettings = true
+          } label: {
+            Label("Next Settings", systemImage: "arrow.forward.circle")
+          }
+        )
+      },
+      add: .addInfo
+    )
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native

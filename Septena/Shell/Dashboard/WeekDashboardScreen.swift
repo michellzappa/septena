@@ -32,6 +32,9 @@ struct ComingSoonLayoutPlaceholder: View {
 }
 
 struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View>: View {
+  // On iPad the reconnect cue lives in the window-level chrome overlay (which
+  // would occlude a nav-bar copy here); only iPhone uses the nav-bar pill.
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   let currentDay: CurrentDay
   let onInitialLoad: () async -> Void
   let onTaskChange: () -> Void
@@ -71,21 +74,7 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
         }
         .ignoresSafeArea()
       }
-      .scrollEdgeEffectStyle(.soft, for: .top)
-      // Tab bar already labels this view. Keep the nav bar present so
-      // iOS's default scroll-edge effect kicks in (content fades to bg
-      // material as it scrolls under the top — same shape as the
-      // bottom tab bar). No .toolbarBackground override — the default
-      // transparent-until-scrolled state is exactly what we want.
-      .navigationTitle("")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
-      // (leading, constant), "···" → Week's dashboard-layout switcher + Insights,
-      // "+" → Add-Info picker (Today is a time-view, so its "+" logs into any
-      // section). The trailing ClaudeReconnectCue rides alongside below.
-      .pageChrome(
+      .septenaTabPage(
         id: "week",
         title: "Today",
         localActions: { AnyView(menuExtra()) },
@@ -97,8 +86,11 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
       // the token is stale (see ClaudeReconnectCue). macOS shows it inline.
       #if os(iOS)
       .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          ClaudeReconnectCue(.pill)
+        // iPhone only — iPad shows it in the chrome overlay (RootTabView).
+        if !usesPushNavigation {
+          ToolbarItem(placement: .topBarTrailing) {
+            ClaudeReconnectCue(.pill)
+          }
         }
       }
       #endif
