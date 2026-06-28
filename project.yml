@@ -371,6 +371,7 @@ targets:
       - path: SeptenaCore/ThingsImport/ThingsImportScratchpad.swift
       - path: SeptenaCore/ThingsImport/ThingsToSeptenaMapper.swift
       - path: SeptenaCore/WakingDay.swift
+      - path: SeptenaCore/TrainingSessionSpans.swift
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig

@@ -97,8 +97,8 @@ enum RhythmSnapshotBuilder {
       }
     }
 
-    // 4) Training as session pills (start → start+duration), gaps < 0.75h
-    //    merged — mirrors `RhythmData.trainingBands`.
+    // 4) Training as session pills — `TrainingSessionSpans` (shared with the
+    //    day timeline and `RhythmData.trainingBands`).
     if visible.contains("training") {
       bands = trainingBands(todayStart: todayStart, weekStart: weekStart,
                             windowDays: windowDays, colorHex: colorHex["training"],
@@ -128,31 +128,25 @@ enum RhythmSnapshotBuilder {
     let rows = (try? context.fetch(
       FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart })
     )) ?? []
+    let entries = rows.map {
+      TrainingSessionSpans.Entry(date: $0.date,
+                               concludedAt: $0.concludedAt,
+                               loggedAt: $0.loggedAt,
+                               durationMin: $0.durationMin,
+                               occurredAt: $0.occurredAt)
+    }
     let cal = Calendar.current
     var out: [RhythmWire.Band] = []
-    for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
+    for (dateStr, dayRows) in Dictionary(grouping: entries, by: \.date) {
       guard let d = ymd.date(from: dateStr) else { continue }
       let daysAgo = wakingDay.daysAgo(d.addingTimeInterval(43_200), todayKey: todayStart, calendar: cal)
       guard daysAgo >= 0, daysAgo < windowDays else { continue }
-      let spans = dayRows.compactMap { e -> (Double, Double)? in
-        guard e.occurredAt > .distantPast else { return nil }
-        let c = cal.dateComponents([.hour, .minute], from: e.occurredAt)
-        let startH = Double(c.hour ?? 0) + Double(c.minute ?? 0) / 60
-        return (startH, startH + (e.durationMin ?? 0) / 60)
-      }.sorted { $0.0 < $1.0 }
-      var merged: [(Double, Double)] = []
-      for s in spans {
-        if var last = merged.last, s.0 <= last.1 + 0.75 {
-          last.1 = max(last.1, s.1); merged[merged.count - 1] = last
-        } else {
-          merged.append(s)
-        }
-      }
-      for (i, m) in merged.enumerated() {
+      for (i, span) in TrainingSessionSpans.sessions(on: dateStr, entries: dayRows).enumerated() {
+        let clamped = TrainingSessionSpans.withMinimumWidth(span)
         out.append(RhythmWire.Band(
           id: "\(dateStr)-train-\(i)",
-          start: m.0 / 24,
-          end: min(max(m.1, m.0 + 0.05) / 24, 0.9999),
+          start: clamped.startHour / 24,
+          end: min(clamped.endHour / 24, 0.9999),
           daysAgo: daysAgo,
           colorHex: colorHex,
           opaque: true

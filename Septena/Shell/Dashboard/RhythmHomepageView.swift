@@ -248,7 +248,7 @@ enum RhythmData {
   }
   struct TaskRow: Sendable { let id: String; let completedAt: String }
   struct IntakeRow: Sendable { let id: String; let occurredAt: Date; let kindID: String }
-  struct TrainingRow: Sendable { let date: String; let occurredAt: Date; let durationMin: Double? }
+  typealias TrainingRow = TrainingSessionSpans.Entry
 
   /// The store-touching half of `load`: every window-bounded SwiftData fetch,
   /// run on a background context off the main thread. Pure value-in / value-out
@@ -282,7 +282,13 @@ enum RhythmData {
     if visible.contains("training") {
       let rows = (try? context.fetch(
         FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.occurredAt >= weekStart }))) ?? []
-      r.training = rows.map { TrainingRow(date: $0.date, occurredAt: $0.occurredAt, durationMin: $0.durationMin) }
+      r.training = rows.map {
+        TrainingRow(date: $0.date,
+                    concludedAt: $0.concludedAt,
+                    loggedAt: $0.loggedAt,
+                    durationMin: $0.durationMin,
+                    occurredAt: $0.occurredAt)
+      }
     }
     return r
   }
@@ -378,10 +384,8 @@ enum RhythmData {
     }
   }
 
-  /// Each day's training as a session pill (bedtime-style band), grouping the
-  /// day's exercise rows and merging gaps under 0.75h — the same session idea
-  /// `DayTimelineView` draws as a bar. Faded by recency like the other bands.
-  /// Rows are the window-bounded fetch from `fetchRows`.
+  /// Each day's training as a session band — `TrainingSessionSpans` is the
+  /// single source of truth shared with `DayTimelineView`. Faded by recency.
   private static func trainingBands(rows: [TrainingRow], todayStart: Date, windowDays: Int,
                                     color: Color?, wakingDay: WakingDay) -> [TimeOfDayWheel.Band] {
     guard let color else { return [] }
@@ -389,31 +393,14 @@ enum RhythmData {
     var out: [TimeOfDayWheel.Band] = []
     for (dateStr, dayRows) in Dictionary(grouping: rows, by: \.date) {
       guard let d = RhythmFmt.ymd.date(from: dateStr) else { continue }
-      // Noon of the civil date resolves to that date's own waking day (always
-      // after wake, before the next midnight) — same integer as the old
-      // calendar-day distance, but measured against the waking "today" key.
       let daysAgo = wakingDay.daysAgo(d.addingTimeInterval(43_200), todayKey: todayStart, calendar: cal)
       guard daysAgo >= 0, daysAgo < windowDays else { continue }
-      // Per-entry spans (start hour → start + duration), then merge near ones.
-      let spans = dayRows.compactMap { e -> (Double, Double)? in
-        guard e.occurredAt > .distantPast else { return nil }
-        let c = cal.dateComponents([.hour, .minute], from: e.occurredAt)
-        let startH = Double(c.hour ?? 0) + Double(c.minute ?? 0) / 60
-        return (startH, startH + (e.durationMin ?? 0) / 60)
-      }.sorted { $0.0 < $1.0 }
-      var merged: [(Double, Double)] = []
-      for s in spans {
-        if var last = merged.last, s.0 <= last.1 + 0.75 {
-          last.1 = max(last.1, s.1); merged[merged.count - 1] = last
-        } else {
-          merged.append(s)
-        }
-      }
-      for (i, m) in merged.enumerated() {
+      for (i, span) in TrainingSessionSpans.sessions(on: dateStr, entries: dayRows).enumerated() {
+        let clamped = TrainingSessionSpans.withMinimumWidth(span)
         out.append(TimeOfDayWheel.Band(
           id: "\(dateStr)-train-\(i)",
-          start: m.0 / 24,
-          end: min(max(m.1, m.0 + 0.05) / 24, 0.9999),
+          start: clamped.startHour / 24,
+          end: min(clamped.endHour / 24, 0.9999),
           daysAgo: daysAgo,
           color: color,
           opaque: true

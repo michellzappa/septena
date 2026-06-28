@@ -460,56 +460,20 @@ struct DayTimelineView: View, Equatable {
     return values.max() ?? 0
   }
 
-  /// One coherent workout = one pill. Each exercise entry contributes a
-  /// time span; spans that overlap or sit within `sessionGapHours` of each
-  /// other are merged into a single session bar. Keying on the exact start
-  /// minute (the old approach) split one workout into several pills the
-  /// moment its exercises were concluded at different minutes — e.g. a
-  /// cardio + strength block + cardio session became two or three bars.
-  private struct SessionSpan {
-    var start: Double
-    var end: Double
-  }
-
-  /// Gaps shorter than this between consecutive entries are treated as rests
-  /// within the same workout; a longer gap starts a new session pill.
-  private static let sessionGapHours = 0.75
-
   private var trainingSessions: [Bar] {
-    var spans: [SessionSpan] = []
-    for e in training where e.date == date {
-      guard let concluded = e.concludedAt else { continue }
-      // concludedAt is like "2026-05-17T07:42:11" — slice HH:MM.
-      let startHHMM = String(concluded.dropFirst(11).prefix(5))
-      guard let startH = parseHHMM(startHHMM) else { continue }
-      // `concludedAt` is local wall-clock, but `loggedAt` is stored in
-      // UTC ("…Z") — convert it to the user's zone before comparing the
-      // two, or the span's end (and thus the pill's length) skews by the
-      // UTC offset.
-      let loggedH = e.loggedAt.flatMap(localHour(fromISO:))
-      let cardioEnd = (e.durationMin ?? 0) > 0 ? startH + (e.durationMin ?? 0) / 60 : startH
-      let end = max(startH, cardioEnd, loggedH ?? startH)
-      spans.append(SessionSpan(start: startH, end: end))
+    let entries = training.map { e in
+      TrainingSessionSpans.Entry(date: e.date,
+                                 concludedAt: e.concludedAt,
+                                 loggedAt: e.loggedAt,
+                                 durationMin: e.durationMin)
     }
-
-    // Merge overlapping / near-adjacent spans into coherent sessions.
-    let sorted = spans.sorted { $0.start < $1.start }
-    var merged: [SessionSpan] = []
-    for s in sorted {
-      if var last = merged.last, s.start <= last.end + Self.sessionGapHours {
-        last.end = max(last.end, s.end)
-        merged[merged.count - 1] = last
-      } else {
-        merged.append(s)
-      }
-    }
-
     let trainingColor = theme.color(for: "training")
-    return merged.map { s in
-      Bar(startHour: s.start,
-          endHour: max(s.end, s.start + 0.05),
-          color: trainingColor,
-          thin: false)
+    return TrainingSessionSpans.sessions(on: date, entries: entries).map { s in
+      let clamped = TrainingSessionSpans.withMinimumWidth(s)
+      return Bar(startHour: clamped.startHour,
+                 endHour: clamped.endHour,
+                 color: trainingColor,
+                 thin: false)
     }
   }
 
@@ -604,17 +568,6 @@ struct DayTimelineView: View, Equatable {
   }
 
   // MARK: - Helpers
-
-  /// UTC ISO8601 timestamp ("…Z") → fractional hour-of-day in the user's
-  /// zone. Mirrors `timeOnly` in TrainingDestinationView: `loggedAt` is
-  /// stored in UTC but the timeline's start hours are local, so the two
-  /// must be put on the same clock before any max/compare.
-  private func localHour(fromISO ts: String) -> Double? {
-    guard let d = ISO8601DateFormatter().date(from: ts) else { return nil }
-    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-    guard let h = c.hour else { return nil }
-    return Double(h) + Double(c.minute ?? 0) / 60
-  }
 
   /// "HH:MM" → fractional hour. Returns nil on malformed input.
   private func parseHHMM(_ s: String) -> Double? {
