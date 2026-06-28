@@ -15,10 +15,9 @@ import SwiftUI
 //     used on macOS where the menu lives top-right, not in a leading bar.
 struct ClaudeReconnectCue: View {
   //   • `.overlayCircle` — like `.pill`, but for the iPad chrome OVERLAY (not a
-  //     toolbar): we draw our OWN glass circle (`.buttonStyle(.glass)` +
-  //     `.buttonBorderShape(.circle)`) and frame the glyph to the same 30pt box
-  //     the gear/···/+ use, so it reads as a distinct equal-sized circle beside
-  //     "+" instead of an odd small shape that blends into it.
+  //     toolbar): manual `glassCircle()` on a 30pt glyph frame (same size as
+  //     gear/···/+) so it reads as a distinct circle beside "+" instead of
+  //     fusing with sibling `.buttonStyle(.glass)` controls.
   enum Presentation { case pill, card, overlayCircle }
   let presentation: Presentation
   init(_ presentation: Presentation) { self.presentation = presentation }
@@ -79,11 +78,10 @@ struct ClaudeReconnectCue: View {
       pillGlyph
         .font(.title3.weight(.semibold))
         .frame(width: 30, height: 30)
+        .glassCircle(tint: Color.claudeAccent)
         .accessibilityLabel(justReconnected ? "Reconnected" : "Reconnect Claude")
     }
-    .buttonStyle(.glass)
-    .buttonBorderShape(.circle)
-    .tint(Color.claudeAccent)
+    .buttonStyle(.plain)
     .disabled(justReconnected)
   }
 

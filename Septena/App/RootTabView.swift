@@ -370,19 +370,24 @@ struct RootTabView: View {
           }
         }
         Spacer(minLength: 0)
-        HStack(spacing: 10) {
+        // Wide gap so the two `.glass` circles can't fuse into one Liquid-Glass
+        // blob on device (iOS 26 bridges adjacent glass that's close together;
+        // the simulator renders them separate, so this is sized for the device).
+        HStack(spacing: 22) {
           // The "reauth Claude" cue — self-hides unless the gateway token is
           // stale; when it shows it's its OWN distinct glass circle just left of
-          // "+" (`.overlayCircle` frames + glasses itself, so the two never merge
-          // into one bubble). Lives here (not Today's nav bar, which the overlay
-          // occludes on iPad) so it pops up on whatever tab is open.
+          // "+" (`.overlayCircle` frames + glasses itself). Lives here (not
+          // Today's nav bar, which the overlay occludes on iPad) so it pops up on
+          // whatever tab is open.
           ClaudeReconnectCue(.overlayCircle)
           // Right corner: ONE "+" button — same fixed glyph frame → same circle.
           if let add = entry?.add {
-            Button(action: resolveAdd(add)) { cornerGlyph("plus") }
-              .buttonStyle(.glass)
-              .buttonBorderShape(.circle)
-              .accessibilityLabel("Add")
+            Button(action: resolveAdd(add)) {
+              cornerGlyph("plus")
+                .glassCircle()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add")
           }
         }
       }
