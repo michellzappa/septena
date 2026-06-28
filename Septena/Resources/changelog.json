@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1215,
-      "date": "2026-06-27",
+      "build": 1222,
+      "date": "2026-06-28",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a photo of your meal and Septena analyzes it on-device to log macros.",
-          "section": "nutrition"
+          "title": "A faster, friendlier Tasks experience",
+          "detail": "Edit task titles in place, add tasks inline with a quick-add line, duplicate tasks, and move items between areas and projects right from the menu.",
+          "section": "tasks"
         },
         {
-          "title": "Rebuilt task list with inline editing",
-          "detail": "Create, rename, and organize tasks inline, with grouped section cards, wrapped long titles, and collapsible areas.",
+          "title": "Your calendar lives alongside your tasks",
+          "detail": "System calendar events now appear in Today and Upcoming so you can see your whole day in one place.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Removed tasks rest in a Recently Deleted view for 30 days so you can restore them, with a longer undo window on completions.",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Calendar events in your day",
-          "detail": "Your calendar events now appear alongside tasks in Today and Upcoming, with hidden-calendar choices synced across devices.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring an existing Things database export straight into Septena.",
           "section": "tasks"
         },
         {
-          "title": "Import tasks from Things",
-          "detail": "Bring your existing tasks over from a Things database export.",
-          "section": "tasks"
+          "title": "Snap a photo to log a meal",
+          "detail": "Capture meals photo-first with on-device analysis that estimates what you ate.",
+          "section": "nutrition"
         },
         {
-          "title": "Pin goals to your week",
-          "detail": "Keep the goals that matter most front and center on the week dashboard.",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep the goals that matter most front and center on the home screen.",
           "section": "goals"
         },
         {
-          "title": "Smarter training review",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
+          "title": "Smarter training reviews",
+          "detail": "Muscle volume is now effort-weighted, with a weekly review waiting at the end of each session.",
           "section": "training"
         },
         {
-          "title": "Richer Apple Watch experience",
-          "detail": "Long-press any Next row to complete, skip, or defer it, with a paged feed set against a live time-of-day sky.",
+          "title": "Choose exactly how much you share",
+          "detail": "New graded privacy levels let you pick Off, Minimal, Balanced, or Full analytics, and see precisely what's sent.",
           "section": null
         }
       ]
