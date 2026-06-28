@@ -200,8 +200,12 @@ struct NextWatchView: View {
                       // members skip via their day-event record.
                       if item.kind == "suggestion" { conn.skipSuggestion(item) }
                       else { conn.skipItem(item) }
-                    })
-        .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+                    },
+                    onDeferTomorrow: item.kind == "chore"
+                      ? { conn.deferChore(item, mode: "day") } : nil,
+                    onDeferWeekend: item.kind == "chore"
+                      ? { conn.deferChore(item, mode: "weekend") } : nil)
+        .listRowInsets(EdgeInsets(top: 2, leading: 3, bottom: 2, trailing: 3))
         .watchSkyRow()
       }
       pagerBottomSpacer
@@ -563,11 +567,12 @@ struct NextItemRow: View {
   let onComplete: () -> Void
   var onQuickLog: (() -> Void)? = nil
   // Secondary actions surfaced in the long-press drawer. Which ones show is
-  // per-kind (see RowActionDrawer): tasks get off-today / cancel, habits and
-  // supplements get skip; every completable row gets complete.
+  // per-kind (see RowActionDrawer).
   var onOffToday: (() -> Void)? = nil
   var onCancel: (() -> Void)? = nil
   var onSkip: (() -> Void)? = nil
+  var onDeferTomorrow: (() -> Void)? = nil
+  var onDeferWeekend: (() -> Void)? = nil
 
   @State private var showActions = false
   @State private var isPressing = false
@@ -602,12 +607,19 @@ struct NextItemRow: View {
       // the few points of text.
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      // Press feedback: the row lights while the finger is down (so a hold reads
-      // as "registering" before the drawer opens) and stays lit once tapped —
-      // `done` holds the highlight through the ~1.1s settle before the row fades.
+      // Each row sits on a persistent frosted pill — a light translucent rounded
+      // card the colorful sky still shows through (the Reminders / Things wrist
+      // pattern) so rows read as distinct without an opaque slab. We use a soft
+      // *white* tint, not `.ultraThinMaterial`: watchOS materials render near-
+      // black and read as a dark slab fighting the sky, where a white film lifts
+      // off a colorful background the way the system rows do. The tap-press /
+      // done highlight layers more white on top: the row lights while the finger
+      // is down (so a hold reads as "registering" before the drawer opens) and
+      // stays lit once tapped — `done` holds the highlight through the ~1.1s
+      // settle before the row fades.
       .background(
-        RoundedRectangle(cornerRadius: 9, style: .continuous)
-          .fill(Color.white.opacity(highlightOpacity))
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .fill(Color.white.opacity(0.16 + highlightOpacity))
       )
       .scaleEffect(isPressing ? 0.98 : 1)
       .animation(.easeOut(duration: 0.14), value: isPressing)
@@ -625,9 +637,11 @@ struct NextItemRow: View {
         RowActionDrawer(
           item: item,
           onComplete: onComplete,
-          onOffToday: { onOffToday?() },
-          onCancel: { onCancel?() },
-          onSkip: { onSkip?() })
+          onSkip: onSkip,
+          onRemoveFromToday: onOffToday,
+          onCancel: onCancel,
+          onDeferTomorrow: onDeferTomorrow,
+          onDeferWeekend: onDeferWeekend)
       }
   }
 
@@ -677,9 +691,11 @@ struct NextItemRow: View {
           .foregroundStyle(.secondary)
       }
     }
+    .padding(.horizontal, 4)
+    // Give the pill real height so it reads as a card, not a thin strip.
     // Subtitle-less rows would otherwise be noticeably shorter; pad them up
-    // partway toward the two-line height so the list reads more evenly.
-    .padding(.vertical, hasSubtitle ? 1 : 4)
+    // toward the two-line height so the list reads more evenly.
+    .padding(.vertical, hasSubtitle ? 6 : 10)
   }
 
   private var hasSubtitle: Bool {
@@ -713,57 +729,93 @@ struct NextItemRow: View {
 
 // MARK: - Row action drawer
 
-/// The long-press drawer for a completable row: the phone's secondary actions on
-/// the wrist, shown per-kind. Every kind offers Complete; tasks add Off today /
-/// Cancel, habits + supplements add Skip today, chores have only Complete. Each
-/// button fires its action and dismisses. "Cancel task" is labelled in full so
-/// it doesn't read as "dismiss the sheet".
+/// The long-press drawer for a Next row: mirrors the phone's per-kind context
+/// menus on the wrist. Suggestions get Skip today; tasks get Complete / Remove
+/// from Today / Cancel; habits and supplements get Mark done / Skip today;
+/// chores get Mark done / Defer to tomorrow / Defer to weekend.
 private struct RowActionDrawer: View {
   let item: NextItem
   let onComplete: () -> Void
-  let onOffToday: () -> Void
-  let onCancel: () -> Void
-  let onSkip: () -> Void
+  var onSkip: (() -> Void)? = nil
+  var onRemoveFromToday: (() -> Void)? = nil
+  var onCancel: (() -> Void)? = nil
+  var onDeferTomorrow: (() -> Void)? = nil
+  var onDeferWeekend: (() -> Void)? = nil
   @Environment(\.dismiss) private var dismiss
 
-  private var canSkip: Bool { item.kind == "habit" || item.kind == "supplement" }
-
   var body: some View {
-    List {
-      Section {
-        if item.kind == "suggestion" {
-          // A suggestion's only action — matches the phone's suggestion menu
-          // exactly (logging is the tap, not a menu item). `forward.end` is the
-          // same glyph the phone uses for "Skip today".
-          Button { onSkip(); dismiss() } label: {
-            Label("Skip today", systemImage: "forward.end")
-          }
-        } else {
-          Button { onComplete(); dismiss() } label: {
-            Label("Complete", systemImage: "checkmark.circle")
-          }
-          if canSkip {
-            Button { onSkip(); dismiss() } label: {
-              Label("Skip today", systemImage: "minus.circle")
+    NavigationStack {
+      List {
+        Section {
+          switch item.kind {
+          case "suggestion":
+            if let onSkip {
+              Button { onSkip(); dismiss() } label: {
+                Label("Skip today", systemImage: "forward.end")
+              }
+            }
+          case "task":
+            Button { onComplete(); dismiss() } label: {
+              Label("Complete", systemImage: "checkmark.circle")
+            }
+            if let onRemoveFromToday {
+              Button { onRemoveFromToday(); dismiss() } label: {
+                Label("Remove from Today", systemImage: "calendar.badge.minus")
+              }
+            }
+            if let onCancel {
+              Button(role: .destructive) { onCancel(); dismiss() } label: {
+                Label("Cancel task", systemImage: "xmark.circle")
+              }
+            }
+          case "habit":
+            Button { onComplete(); dismiss() } label: {
+              Label("Mark done", systemImage: "checkmark")
+            }
+            if let onSkip {
+              Button { onSkip(); dismiss() } label: {
+                Label("Skip today", systemImage: "forward.end")
+              }
+            }
+          case "supplement":
+            Button { onComplete(); dismiss() } label: {
+              Label("Mark taken", systemImage: "checkmark")
+            }
+            if let onSkip {
+              Button { onSkip(); dismiss() } label: {
+                Label("Skip today", systemImage: "forward.end")
+              }
+            }
+          case "chore":
+            Button { onComplete(); dismiss() } label: {
+              Label("Mark done", systemImage: "checkmark")
+            }
+            if let onDeferTomorrow {
+              Button { onDeferTomorrow(); dismiss() } label: {
+                Label("Defer to tomorrow", systemImage: "calendar.badge.plus")
+              }
+            }
+            if let onDeferWeekend {
+              Button { onDeferWeekend(); dismiss() } label: {
+                Label("Defer to weekend", systemImage: "calendar.badge.clock")
+              }
+            }
+          default:
+            if NextBlocks.isCompletable(kind: item.kind) {
+              Button { onComplete(); dismiss() } label: {
+                Label("Complete", systemImage: "checkmark.circle")
+              }
             }
           }
-          if item.kind == "task" {
-            Button { onOffToday(); dismiss() } label: {
-              Label("Off today", systemImage: "calendar.badge.minus")
-            }
-            Button(role: .destructive) { onCancel(); dismiss() } label: {
-              Label("Cancel task", systemImage: "xmark.circle")
-            }
-          }
+        } header: {
+          Text(item.title)
+            .textCase(nil)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
         }
-      } header: {
-        // Full task title, untruncated and in its natural case — the drawer's
-        // header names exactly which row you're acting on.
-        Text(item.title)
-          .textCase(nil)
-          .lineLimit(nil)
-          .fixedSize(horizontal: false, vertical: true)
       }
+      .navigationTitle("Actions")
+      .navigationBarTitleDisplayMode(.inline)
     }
   }
 }

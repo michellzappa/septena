@@ -71,15 +71,14 @@ struct WatchSkyWash: View {
 }
 
 extension View {
-  /// A row that floats directly on the sky — no fill behind it. Apple's HIG
-  /// reserves Liquid Glass for the *functional* layer (nav bars, toolbars,
-  /// controls, sheets) and warns that glassing the *content* layer — every list
-  /// row — overuses the material and reads wrong. So the first-party pattern for
-  /// content over a coloured canvas (Weather, Fitness, the Smart Stack) is the
-  /// opposite of a slab: clear the row background and let the text sit on the
-  /// background, with `watchSkyList()` dropping the list's own fill. The tap
-  /// highlight and the dimmed sky behind keep it legible; the glass lives in the
-  /// nav bar, where the system already puts it.
+  /// Clear the *system* list-row fill so the sky shows through the gaps between
+  /// rows; the row's own frosted pill (a translucent `.ultraThinMaterial` card,
+  /// set in `NextItemRow.actionRow`) is what gives each row its containment —
+  /// the Reminders / Things wrist pattern. (We tried bare backgroundless rows
+  /// first, per the HIG note that Liquid Glass is for the functional layer; on
+  /// the wrist they read as floating text with no row separation, so the pill
+  /// came back — kept translucent so the dimmed sky still tints through it.)
+  /// `watchSkyList()` drops the list's own fill so only the pills + sky show.
   func watchSkyRow() -> some View {
     listRowBackground(Color.clear)
   }

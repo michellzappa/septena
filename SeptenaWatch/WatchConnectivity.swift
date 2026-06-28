@@ -372,6 +372,19 @@ final class WatchConnectivity {
     }
   }
 
+  /// Defer a chore from its long-press drawer — mirrors the phone's
+  /// `deferChore(mode:from:)`: writes a `ChoreEvent` with action "defer" and the
+  /// computed `newDueDate`, then hides the row optimistically until reconcile.
+  func deferChore(_ item: NextItem, mode: String) {
+    guard item.kind == "chore" else { return }
+    finishSuggestion(item.id)
+    let date = today
+    Task {
+      do { try await saveChoreDefer(choreID: item.id, mode: mode, date: date) }
+      catch { }
+    }
+  }
+
   // MARK: - Quick-log (actionable suggestions)
 
   /// Log a `.choice`-input suggestion (hydration / gut) with the picked value.
@@ -631,6 +644,43 @@ final class WatchConnectivity {
     record["occurredAt"] = now
     record["sortKey"]    = "\(date)::\(eventID)"
     try await db.save(record)
+  }
+
+  /// Defer a chore — mirrors `ChecklistMutator.deferChore` / the phone's
+  /// `ChoreEventEntity` with action "defer".
+  private func saveChoreDefer(choreID: String, mode: String, date: String) async throws {
+    let eventID  = UUID().uuidString
+    let recordID = CKRecord.ID(recordName: "chore-event:\(eventID)", zoneID: ckZoneID)
+    let record   = CKRecord(recordType: "ChoreEvent", recordID: recordID)
+    let now = Date()
+    record["choreID"]    = choreID
+    record["action"]     = "defer"
+    record["date"]       = date
+    record["reason"]     = mode
+    if let newDue = Self.deferredDueDate(mode: mode, from: date) {
+      record["newDueDate"] = newDue
+    }
+    record["note"]       = ""
+    record["occurredAt"] = now
+    record["sortKey"]    = "\(date)::\(eventID)"
+    try await db.save(record)
+  }
+
+  /// Same weekend / tomorrow math as `ChecklistMutator.deferredDueDate` on iOS.
+  private static func deferredDueDate(mode: String, from date: String) -> String? {
+    guard let base = dateFmt.date(from: date) else { return nil }
+    let calendar = Calendar.current
+    switch mode {
+    case "day":
+      return calendar.date(byAdding: .day, value: 1, to: base).map { dateFmt.string(from: $0) }
+    case "weekend":
+      let weekday = calendar.component(.weekday, from: base)
+      let saturday = 7
+      let delta = ((saturday - weekday + 7) % 7 == 0) ? 7 : ((saturday - weekday + 7) % 7)
+      return calendar.date(byAdding: .day, value: delta, to: base).map { dateFmt.string(from: $0) }
+    default:
+      return nil
+    }
   }
 
   // MARK: - Task capture
