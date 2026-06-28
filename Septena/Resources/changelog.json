@@ -4,49 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1227,
+      "build": 1236,
       "date": "2026-06-28",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Edit and add tasks right in the list",
-          "detail": "Rename tasks in place, jot new ones from a quick-add line, and duplicate with a tap.",
-          "section": "tasks"
-        },
-        {
-          "title": "Your calendar now shows up in Today",
-          "detail": "Upcoming calendar events are woven into Today and Upcoming alongside your tasks.",
+          "title": "A faster, friendlier Tasks",
+          "detail": "Edit titles in place, add tasks from a quick-add line at the top or bottom of any list, wrap long titles, and undo completions with a longer grace window.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, so you can restore anything by mistake.",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring your existing tasks across from a Things database export.",
+          "title": "Your calendar in Today",
+          "detail": "Upcoming calendar events now weave into Today and Upcoming, showing only what's still ahead in the day.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Capture a meal from a photo and let on-device analysis estimate it.",
+          "title": "Import tasks from Things",
+          "detail": "Bring your existing to-dos across by importing a Things database export.",
+          "section": "tasks"
+        },
+        {
+          "title": "The Week tab is now Today",
+          "detail": "The home tab is renamed to Today and pinned goals now appear as tiles on the dashboard.",
+          "section": null
+        },
+        {
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and Septena analyzes it on-device to log nutrition.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength tracking",
-          "detail": "Muscle volume is now weighted by effort, with a weekly review after each session.",
+          "title": "Smarter training insights",
+          "detail": "See effort-weighted muscle volume, a unified daily-trend chart, and a weekly review after each session.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center on the week view.",
-          "section": "goals"
+          "title": "A clearer Next feed",
+          "detail": "Keyboard navigation, per-section show-in-Next toggles, intake-aware dose suggestions, and dismissals that sync across your devices.",
+          "section": null
         },
         {
-          "title": "Choose how much analytics you share",
-          "detail": "Pick from Off, Minimal, Balanced, or Full, see exactly what's sent, and review a log of recent activity.",
+          "title": "See exactly what's shared",
+          "detail": "Choose a graded telemetry level from off to full, view what's sent, and review a recent activity log — all anonymized.",
+          "section": null
+        },
+        {
+          "title": "Watch refinements",
+          "detail": "A time-of-day sky behind a paged Next feed, frosted action drawers for completing or deferring, expanded intake tiles, and a fasting face that morphs overnight.",
           "section": null
         }
       ]
