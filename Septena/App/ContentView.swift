@@ -56,8 +56,15 @@ struct ContentView: View {
     } detail: {
       NavigationStack {
         destination(for: route)
+          #if os(macOS)
+          // Carded task rows carry their own `pageGutter` margin — an extra
+          // detail-pane inset here double-padded the list and left a white
+          // `paperBackground` rim around the gray canvas.
+          .background(Theme.groupedBackground.ignoresSafeArea())
+          #else
           .padding(.horizontal, Theme.listLeadingInset)
-          .background(Theme.paperBackground)
+          .background(Theme.groupedBackground.ignoresSafeArea())
+          #endif
       }
     }
     .navigationSplitViewStyle(.balanced)

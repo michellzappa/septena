@@ -328,9 +328,9 @@ enum Theme {
   /// through the `rowVInset` environment key so it overrides `rowVPadding`
   /// only there; drawer/log rows keep their deliberate extra air.
   #if os(macOS)
-  static let rowVPaddingTight: CGFloat = 4
-  #else
   static let rowVPaddingTight: CGFloat = 6
+  #else
+  static let rowVPaddingTight: CGFloat = 10
   #endif
 
   /// Spacing scale shared across drawer chrome (SectionDrawer,

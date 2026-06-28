@@ -178,17 +178,15 @@ struct SelectableListRowBackground: View {
   }
 }
 
-/// Things-style selection for the custom scroll list (the task-list detail).
-/// Unlike the grouped-card fill above, it paints NOTHING when unselected — the
-/// row sits flat on the container's paper surface, so a *sectioned* white list
-/// reads as clean rows + whitespace (no per-row card, no full-bleed bar). A
-/// selected row gains an inset rounded neutral capsule, the Things highlight.
+/// Row background for the custom scroll list (the task-list detail). The
+/// grouped-card chrome (`TaskCardChrome`) now paints both the card surface AND
+/// the selected-cell fill — edge-to-edge within the card, with the card's own
+/// corners — so the row's own background stays clear. (It used to draw an inset
+/// rounded capsule here, which floated as a separate bar on top of the card.)
 struct ScrollRowSelectionBackground: View {
   let isSelected: Bool
   var body: some View {
-    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-      .fill(isSelected ? Theme.listSelectionFill : Color.clear)
-      .padding(.horizontal, isSelected ? 5 : 0)
+    Color.clear
   }
 }
 

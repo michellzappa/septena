@@ -607,8 +607,9 @@ struct NextOpenSection: View {
   private func block(for key: String) -> some View {
     switch key {
     case "tasks":
-      Section {
-        ForEach(tasksModel.openTasks) { task in
+      nextSection(header: { tasksSectionHeader(onAdd: onAddTask) }) {
+        let tasks = tasksModel.openTasks
+        ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
           let tag = NextRowTag.task(task.id)
           TodayTaskRow(task: task, model: tasksModel, mutator: taskMutator,
                        tint: theme.color(for: "tasks"),
@@ -631,49 +632,48 @@ struct NextOpenSection: View {
               onClickSelect(task.id)
             })
             #endif
-            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                            index: idx, count: tasks.count)
         }
-      } header: {
-        tasksSectionHeader(onAdd: onAddTask)
       }
 
     case "chores":
-      Section {
-        ForEach(model.openChores) { chore in
+      nextSection(header: { sectionHeader("Chores") }) {
+        let chores = model.openChores
+        ForEach(Array(chores.enumerated()), id: \.element.id) { idx, chore in
           let tag = NextRowTag.chore(chore.id)
           ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"),
                    isListSelected: selection.contains(tag))
-            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                            index: idx, count: chores.count)
         }
-      } header: {
-        sectionHeader("Chores")
       }
 
     case "habits":
-      Section {
-        ForEach(habitsNow) { habit in
+      nextSection(header: { bucketSectionHeader("Habits", showsCountdown: !lingerHabits) }) {
+        let habits = habitsNow
+        ForEach(Array(habits.enumerated()), id: \.element.id) { idx, habit in
           let tag = NextRowTag.habit(habit.id)
           HabitRow(habit: habit, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "habits"),
                    isListSelected: selection.contains(tag))
-            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                            index: idx, count: habits.count)
         }
-      } header: {
-        bucketSectionHeader("Habits", showsCountdown: !lingerHabits)
       }
 
     case "supplements":
-      Section {
-        ForEach(supplementsNow) { supp in
+      nextSection(header: { bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements) }) {
+        let supps = supplementsNow
+        ForEach(Array(supps.enumerated()), id: \.element.id) { idx, supp in
           let tag = NextRowTag.supplement(supp.id)
           SupplementRow(supplement: supp, model: model, checklistMutator: checklistMutator,
                         tint: theme.color(for: "supplements"),
                         isListSelected: selection.contains(tag))
-            .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+            .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                            index: idx, count: supps.count)
         }
-      } header: {
-        bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements)
       }
 
     default:
@@ -871,18 +871,18 @@ struct NextDoneSection: View {
     // get their home Edit + Delete menu (delegated up to `NextView`); the rest
     // of the log (tasks, the trio's done splits, training, wake) stays a
     // read-through record.
-    Section {
-      ForEach(events) { event in
+    nextSection(header: { Text("Done Today") }) {
+      let items = events
+      ForEach(Array(items.enumerated()), id: \.element.id) { idx, event in
         let tag = NextRowTag.done(event.id)
         DoneEventRow(
           event: event,
           onEdit: isEditable(event) ? { onEdit(event) } : nil,
           onDelete: isEditable(event) ? { onDelete(event) } : nil
         )
-        .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+        .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                        index: idx, count: items.count)
       }
-    } header: {
-      Text("Done Today")
     }
   }
 }
@@ -969,6 +969,19 @@ struct HabitRow: View {
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
+  /// Toggle + (on done) the shared `.stamp` celebration at the checkbox.
+  /// The haptic is the matched stamp, a touch fuller as the day's count grows.
+  private func commitToggle() {
+    let done = !habit.done
+    model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
+    guard done else { return }
+    let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
+    Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
+    if model.habitsAllCleared {
+      logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
+    }
+  }
+
   var body: some View {
     let inactive = habit.done || habit.skipped
     CheckableRow(
@@ -988,28 +1001,13 @@ struct HabitRow: View {
           Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
         }
       },
-      onToggle: {
-        // The optimistic flip + write lives on NextItemsModel. Streak
-        // milestone detection now happens at the mutator boundary
-        // (MilestoneEngine) and presents via the root MilestonePresenter —
-        // here only the everyday completion haptic remains.
-        let done = !habit.done
-        model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
-        if done {
-          // Everyday completion — the checkbox plays the shared `.stamp` feel
-          // (standardized across all checkable rows); here we play its matched
-          // haptic, a touch fuller as you work through this bucket of the day.
-          // Count includes the just-completed habit (model flipped it above).
-          let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
-          Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
-          // Cleared the whole day's habits — the canvas earns a burst.
-          if model.habitsAllCleared {
-            logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
-          }
-        }
-      }
+      onToggle: { commitToggle() }
     )
     .contextMenu {
+      Button { commitToggle() } label: {
+        Label(habit.done ? "Mark not done" : "Mark done",
+              systemImage: habit.done ? "arrow.uturn.left" : "checkmark")
+      }
       Button {
         model.skipHabit(habit, skipped: !habit.skipped, mutator: checklistMutator, motion: motion)
       } label: {
@@ -1176,6 +1174,15 @@ struct ChoreRow: View {
     )
     .contextMenu {
       if !isDone && deferLabel == nil {
+        Button {
+          model.completeChore(chore, mutator: checklistMutator, motion: motion)
+          Haptics.play(CheckFeel.stamp.hapticSpec())
+          if model.choresAllCleared {
+            logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))
+          }
+        } label: {
+          Label("Mark done", systemImage: "checkmark")
+        }
         if chore.daysOverdue < 0 {
           Button {
             model.bringChoreToToday(chore, mutator: checklistMutator)
@@ -1192,6 +1199,12 @@ struct ChoreRow: View {
           model.deferChore(chore, mode: "weekend", label: "Weekend", mutator: checklistMutator)
         } label: {
           Label("Defer to weekend", systemImage: "calendar.badge.clock")
+        }
+      } else if isDone {
+        Button {
+          model.uncompleteChore(chore, mutator: checklistMutator)
+        } label: {
+          Label("Mark not done", systemImage: "arrow.uturn.left")
         }
       }
       if let onDelete {
@@ -1218,16 +1231,25 @@ struct ChoreRow: View {
 // MARK: - Shared chrome
 
 extension View {
-  /// Cell treatment for a Next row inside the grouped `List`. The native cell
-  /// already supplies the white grouped "pill" background; we zero its content
-  /// margins so the row's own internal padding governs — `rowHInset` for the
-  /// horizontal inset (matched to the section header) and the row's baked-in
-  /// vertical padding — reproducing the old in-card density exactly. Selection
-  /// chrome matches the Tasks list (`selectableListRow`).
-  func septenaNextRow(tag: String, isSelected: Bool) -> some View {
+  /// Cell treatment for a Next row. iOS: native `insetGrouped` cells supply the
+  /// grouped pill; macOS: each row carries a slice of a Tasks-style grouped card
+  /// via `taskCardChrome` (rounded corners, page gutter, hairline separators).
+  func septenaNextRow(tag: String, isSelected: Bool,
+                      index: Int = 0, count: Int = 1) -> some View {
+    #if os(macOS)
+    self
+      .listRowInsets(EdgeInsets())
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .tag(tag)
+      .septenaSuppressListCellSelection()
+      .taskCardChrome(TaskCardPosition(index: index, count: count),
+                      isSelected: isSelected)
+    #else
     self
       .environment(\.rowHInset, Theme.Spacing.xl)
       .selectableListRow(tag: tag, isSelected: isSelected)
+    #endif
   }
 }
 
@@ -1264,10 +1286,53 @@ struct CompletionRateBadge: View {
   }
 }
 
-// Section headers for the Next List. Plain `Text` so the grouped `List` styles
-// them with its default header treatment (small, upper-cased, secondary) — the
-// same headers the Coach landing uses, so the two home tabs read identically.
-// The section accent still lives on each row's checkbox, so no leading glyph.
+// Section headers for the Next List. iOS: plain `Text` so the grouped `List`
+// styles them with its default header treatment. macOS: Tasks-style group
+// headers — semibold title parked over the card's checkbox column.
+@ViewBuilder
+func nextSectionHeader<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+  #if os(macOS)
+  content()
+    .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
+    .foregroundStyle(Theme.inkPrimary)
+    .textCase(nil)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.leading, TaskCardMetrics.headerLeading)
+    .padding(.trailing, TaskCardMetrics.margin)
+    .padding(.top, 24)
+    .padding(.bottom, 8)
+  #else
+  content()
+  #endif
+}
+
+/// Next `Section` wrapper. macOS `List` pins `Section` headers while scrolling;
+/// Tasks keeps headers in the scroll content (`SelectableScrollList`). On macOS
+/// we render the header as the first row of each section so it scrolls away with
+/// its card — the same rhythm as Tasks. iOS keeps native grouped section headers.
+@ViewBuilder
+func nextSection<Header: View, Content: View>(
+  @ViewBuilder header: () -> Header,
+  @ViewBuilder content: () -> Content
+) -> some View {
+  #if os(macOS)
+  Section {
+    nextSectionHeader(content: header)
+      .listRowInsets(EdgeInsets())
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .selectionDisabled()
+    content()
+  }
+  #else
+  Section {
+    content()
+  } header: {
+    nextSectionHeader(content: header)
+  }
+  #endif
+}
+
 @ViewBuilder
 private func sectionHeader(_ title: String) -> some View {
   Text(title)
@@ -1298,7 +1363,7 @@ private func tasksSectionHeader(onAdd: (() -> Void)?) -> some View {
       .accessibilityLabel("Add task")
     }
   } else {
-    sectionHeader("Tasks")
+    Text("Tasks")
   }
 }
 
@@ -1318,8 +1383,6 @@ private func bucketSectionHeader(_ sectionTitle: String,
   HStack(spacing: 8) {
     Text("\(DayBucket.label(forKey: bucket)) \(sectionTitle)")
     Spacer()
-    // Match the grouped List's default section-header size so the countdown
-    // reads as part of the header, not louder than it.
     if showsCountdown { BucketTimeLeft(bucket: bucket, font: .footnote.weight(.semibold)) }
   }
 }

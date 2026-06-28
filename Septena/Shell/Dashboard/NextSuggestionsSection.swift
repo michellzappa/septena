@@ -660,8 +660,8 @@ struct NextSuggestionsSection: View {
   var body: some View {
     let items = visible
     if !items.isEmpty {
-      Section {
-        ForEach(items) { suggestion in
+      nextSection(header: { Text("Suggested") }) {
+        ForEach(Array(items.enumerated()), id: \.element.id) { idx, suggestion in
           let tag = NextRowTag.suggestion(suggestion.id)
           NextSuggestionRow(
             suggestion: suggestion,
@@ -670,10 +670,9 @@ struct NextSuggestionsSection: View {
             tint: suggestion.kindColor.flatMap(AdaptiveColor.adaptive)
               ?? theme.color(for: suggestion.kind.sectionKey)
           )
-          .septenaNextRow(tag: tag, isSelected: selection.contains(tag))
+          .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                          index: idx, count: items.count)
         }
-      } header: {
-        Text("Suggested")
       }
     }
   }

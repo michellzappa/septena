@@ -215,9 +215,14 @@ struct SelectableScrollList<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
-      .onPreferenceChange(SelectableRowFrameKey.self) {
-        rowFrames = $0
-        fulfillPendingScroll(proxy: proxy)
+      .onPreferenceChange(SelectableRowFrameKey.self) { newFrames in
+        // Defer one run-loop turn — many rows report frames in the same layout
+        // pass; writing @State synchronously triggers "updated multiple times
+        // per frame" and can cascade extra layout.
+        Task { @MainActor in
+          rowFrames = newFrames
+          fulfillPendingScroll(proxy: proxy)
+        }
       }
       .background {
         GeometryReader { geo in
@@ -235,14 +240,17 @@ struct SelectableScrollList<Content: View>: View {
         guard request != nil else { return }
         fulfillPendingScroll(proxy: proxy)
       }
+      // Fill the detail pane edge-to-edge (same gray canvas as Next / Week).
       // Clicking the empty paper behind the rows clears the selection — the
       // LazyVStack only fills its content height, so taps below the last row
       // land here. Rows sit above and claim their own clicks first.
-      .background(
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .background {
         canvasFill
+          .ignoresSafeArea()
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
-      )
+      }
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,

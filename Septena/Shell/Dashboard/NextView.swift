@@ -340,6 +340,15 @@ struct NextView: View {
           Text("Nothing here yet")
             .font(.callout)
             .foregroundStyle(.secondary)
+            #if os(macOS)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .taskCardChrome(.solo)
+            #endif
+        } header: {
+          EmptyView()
         }
       }
 
@@ -375,12 +384,18 @@ struct NextView: View {
     .listSectionSpacing(18)
     .background(Theme.sidebarBackground)
     #else
-    .listStyle(.inset)
-    .background(
+    // Plain list + per-row `taskCardChrome` — the same grouped-card surface
+    // the Tasks tab paints via `SelectableScrollList`. Native `.inset` draws
+    // square section boxes; we own the card shape ourselves.
+    .listStyle(.plain)
+    .padding(.bottom, Theme.pageBottom)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background {
       Theme.groupedBackground
+        .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { selection = [] }
-    )
+    }
     #endif
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
