@@ -315,7 +315,13 @@ struct RootTabView: View {
     // `.pageChrome` → a top `safeAreaInset` of `PageChromeMetrics.iPadBarHeight`),
     // because a `safeAreaInset` here at the container doesn't propagate through
     // the tabs' NavigationStacks to their scroll content.
-    .overlay(alignment: .top) { iPadTopBar }
+    .overlay(alignment: .top) {
+      if iPadChrome.atRoot(for: tabSelection.current.chromeID) {
+        iPadTopBar
+          .transition(.move(edge: .top).combined(with: .opacity))
+      }
+    }
+    .animation(.snappy, value: iPadChrome.atRoot(for: tabSelection.current.chromeID))
     .onAppear { visitedTabs.insert(tabSelection.current) }
     .onChange(of: tabSelection.current) { _, tab in visitedTabs.insert(tab) }
   }

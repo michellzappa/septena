@@ -280,6 +280,12 @@ struct WeekDashboardView: View {
     #endif
   }
 
+  /// True when no section or intake page is pushed on iPad — drives hiding the
+  /// window-level chrome overlay below the Today tab root.
+  private var isNavigationAtRoot: Bool {
+    sheetDest == nil && intakeKindDest == nil
+  }
+
   /// Width of the left rail in the split iPhone layout — sized to seat the
   /// dial (diameter + its breathing room) without starving the tile column.
   private let heroRailWidth: CGFloat = 340
@@ -505,6 +511,7 @@ struct WeekDashboardView: View {
         .frame(width: 560, height: 600)
         #endif
     }
+    .iPadReportsNavDepth(id: "week", atRoot: isNavigationAtRoot)
   }
 
   /// Week's page-local rows for the "···" overflow menu (`.pageChrome`'s

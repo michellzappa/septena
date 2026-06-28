@@ -34,9 +34,10 @@ struct CoachView: View {
   @State private var coachPills: [CoachDomain: [CoachAreaPill]] = [:]
   @State private var editing: Goal? = nil
   @State private var activeExercise: AnyDiscoveryMiniApp? = nil
+  @State private var coachPath: [CoachDomain] = []
 
   var body: some View {
-    NavigationStack {
+    NavigationStack(path: $coachPath) {
       List {
         coachesSection
         exercisesSection
@@ -82,6 +83,7 @@ struct CoachView: View {
         activeExercise = nil
       }
     }
+    .iPadReportsNavDepth(id: "coach", atRoot: coachPath.isEmpty)
   }
 
   // MARK: - Sections

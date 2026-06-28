@@ -58,6 +58,7 @@ struct ContentView: View {
         .id(route.id)
     }
     .navigationSplitViewStyle(.balanced)
+    .iPadReportsNavDepth(id: "tasks", atRoot: true)
   }
 
   // Per-route .id is applied INSIDE destination(for:) — TaskListView is

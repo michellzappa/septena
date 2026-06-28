@@ -507,6 +507,7 @@ struct NextView: View {
         _ = await (a, b, c, d)
       }
     }
+    .iPadReportsNavDepth(id: "next", atRoot: true)
   }
 }
 

@@ -61,10 +61,18 @@ extension SeptenaTab {
 final class IPadChromeModel {
   struct Entry { var localActions: AnyView?; var add: PageAdd? }
   private var entries: [String: Entry] = [:]
+  /// Per-tab navigation depth — true when the tab's stack is at its root.
+  /// `RootTabView` hides the window-level chrome overlay when false.
+  private var atRootByID: [String: Bool] = [:]
+
   func set(_ id: String, localActions: AnyView?, add: PageAdd?) {
     entries[id] = Entry(localActions: localActions, add: add)
   }
   func entry(_ id: String) -> Entry? { entries[id] }
+
+  func setAtRoot(_ id: String, atRoot: Bool) { atRootByID[id] = atRoot }
+  /// Defaults true so tabs that haven't reported yet keep the overlay visible.
+  func atRoot(for id: String) -> Bool { atRootByID[id] ?? true }
 }
 
 /// The trailing "+" — same spot on every page. The caller decides what it adds.
@@ -205,7 +213,35 @@ extension View {
     self
     #endif
   }
+
+  /// Reports whether this tab is at its navigation root so `RootTabView` can
+  /// hide the window-level chrome overlay when a section/detail is pushed.
+  /// No-op off iOS.
+  func iPadReportsNavDepth(id: String, atRoot: Bool) -> some View {
+    #if os(iOS)
+    modifier(IPadNavDepthReporter(tabID: id, atRoot: atRoot))
+    #else
+    self
+    #endif
+  }
 }
+
+#if os(iOS)
+private struct IPadNavDepthReporter: ViewModifier {
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(IPadChromeModel.self) private var iPadChrome
+  let tabID: String
+  let atRoot: Bool
+
+  func body(content: Content) -> some View {
+    content
+      .onChange(of: atRoot, initial: true) { _, root in
+        guard usesPushNavigation else { return }
+        iPadChrome.setAtRoot(tabID, atRoot: root)
+      }
+  }
+}
+#endif
 
 private struct PageChromeModifier: ViewModifier {
   @Environment(NavigationState.self) private var nav
