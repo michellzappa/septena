@@ -53,11 +53,12 @@ struct RootTabView: View {
   #endif
   @State private var tabSelection = TabSelection()
   #if os(iOS)
-  @State private var homeToolbarExtras = HomeToolbarExtras()
-  // Chrome hoisted from the current `SeptenaPage` (iPad regular). Nil for tabs
-  // still on the legacy `homeToolbar`/`HomeToolbarExtras` path. Self-clears when
-  // the page leaves the tree (preference reverts to its nil default).
-  @State private var hoistedChrome: PageChromeBox?
+  // iPad tab-less container: which tabs have been visited (and so are kept
+  // alive). Seeded with the launch tab; grows as the user switches.
+  @State private var visitedTabs: Set<SeptenaTab> = [.week]
+  // Per-tab "···"/"+" published by each page's `.pageChrome`, rendered by the
+  // iPad top-bar overlay (so the chrome aligns to the content gutter).
+  @State private var iPadChrome = IPadChromeModel()
   #endif
 
   // "What's New" gate. We show the sheet once when the app's marketing version
@@ -68,10 +69,16 @@ struct RootTabView: View {
   @AppStorage(SettingsKey.lastSeenChangelogVersion) private var lastSeenChangelog = ""
   @State private var showWhatsNew = false
 
-  // Default to shown when a section row hasn't loaded yet, so a tab never
-  // flickers out during launch. Keyed by the manifest `key`, not the tab enum.
+  // Default to shown when the section row hasn't loaded into the store yet;
+  // fall back to the SwiftData mirror so a post-pull enablement isn't masked
+  // by a stale in-memory cache during launch.
   private var tasksEnabled: Bool {
-    settingsStore.sections.first { $0.key == "tasks" }?.isEnabled ?? true
+    if let row = settingsStore.sections.first(where: { $0.key == "tasks" }) {
+      return row.isEnabled
+    }
+    let mirrored = SettingsMirror.loadSections(
+      context: LocalStore.shared.container.mainContext)
+    return mirrored.first(where: { $0.key == "tasks" })?.isEnabled ?? true
   }
 
   var body: some View {
@@ -90,6 +97,9 @@ struct RootTabView: View {
       // value instead of each recomputing from the size class.
       .resolvesAdaptiveNavigation()
       .environment(tabSelection)
+      #if os(iOS)
+      .environment(iPadChrome)
+      #endif
       // Anonymous aggregate telemetry — one event when the user lands on
       // a tab. `.task(id:)` re-runs only when the value changes and is
       // cancelled on disappear, so back-nav within a tab doesn't double
@@ -207,12 +217,49 @@ struct RootTabView: View {
   // ⌘K (menu bar) and each destination's own "+" button.
   @ViewBuilder
   private var rootTabView: some View {
+    #if os(iOS)
+    // iPad regular: NO `TabView`. The iPadOS 26 floating tab bar can't be
+    // reliably hidden (`.toolbar(.hidden, for: .tabBar)` races and re-shows the
+    // bar under our switcher), so we don't create one — each tab's nav-bar
+    // switcher (`.pageChrome` → `.principal`) is the only switcher. iPhone keeps
+    // the system `TabView` (bottom bar); macOS keeps it (title-bar tabs).
+    if hSize == .regular {
+      iPadTabless
+    } else {
+      systemTabView
+    }
+    #else
+    systemTabView
+    #endif
+  }
+
+  /// The view backing each tab. Shared by the `TabView` (iPhone/macOS) and the
+  /// tab-less iPad container so the two stay in lockstep.
+  @ViewBuilder
+  private func tabContent(_ tab: SeptenaTab) -> some View {
+    switch tab {
+    case .week:  WeekDashboardView()
+    case .next:  NextDashboardView()
+    case .tasks: ContentView()
+    case .goals: CoachView()
+    }
+  }
+
+  /// Tabs in bar order, honoring the Tasks enabled-gate.
+  private var availableTabs: [SeptenaTab] {
+    var tabs: [SeptenaTab] = [.week, .next]
+    if tasksEnabled { tabs.append(.tasks) }
+    tabs.append(.goals)
+    return tabs
+  }
+
+  /// System `TabView` — the real tab bar (bottom on iPhone, title-bar on macOS).
+  private var systemTabView: some View {
     let tv = TabView(selection: Binding(get: { tabSelection.current },
                                         set: { tabSelection.current = $0 })) {
       WeekDashboardView()
         .tabItem {
-          // `DiscsMark` is a custom SF Symbol (Septena's seven-disc mark);
-          // the system tab bar sizes it like any built-in SF Symbol.
+          // `DiscsMark` is a custom SF Symbol (Septena's seven-disc mark).
           Label("Today", image: "DiscsMark")
         }
         .tag(SeptenaTab.week)
@@ -223,9 +270,7 @@ struct RootTabView: View {
 
       if tasksEnabled {
         ContentView()
-          .tabItem {
-            Label("Tasks", systemImage: "checkmark")
-          }
+          .tabItem { Label("Tasks", systemImage: "checkmark") }
           .tag(SeptenaTab.tasks)
       }
 
@@ -237,48 +282,99 @@ struct RootTabView: View {
         .tag(SeptenaTab.goals)
     }
     #if os(iOS)
-    Group {
-      if hSize == .regular {
-        tv
-          .environment(homeToolbarExtras)
-          .tabBarMinimizeBehavior(.onScrollDown)
-          // A `SeptenaPage` publishes its chrome here; `RootTabView` renders it
-          // at tab-bar height. Self-clearing — when the page leaves, the
-          // preference reverts to nil and we fall back to the legacy path for
-          // tabs not yet migrated to `SeptenaPage`.
-          .onPreferenceChange(PageChromeKey.self) { hoistedChrome = $0 }
-          .toolbar {
-            if let chrome = hoistedChrome {
-              ToolbarItem(placement: .topBarLeading) { PageGlobalButton() }
-              if let actions = chrome.localActions {
-                ToolbarItem(placement: .topBarTrailing) { OverflowMenu { actions } }
-              }
-              if let add = chrome.add {
-                ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: add) }
-              }
-            } else {
-              ToolbarItem(placement: .topBarLeading) {
-                HomeMenu { homeToolbarExtras.content }
-              }
-              if homeToolbarExtras.hasTrailing {
-                ToolbarItem(placement: .topBarTrailing) {
-                  homeToolbarExtras.trailingContent
-                }
-              }
-            }
-          }
-          .trainingTabAccessory(when: draftStore)
-      } else {
-        tv
-          .environment(homeToolbarExtras)
-          .tabBarMinimizeBehavior(.onScrollDown)
-          .trainingTabAccessory(when: draftStore)
-      }
-    }
+    return tv
+      .tabBarMinimizeBehavior(.onScrollDown)
+      .trainingTabAccessory(when: draftStore)
     #else
-    tv
+    return tv
     #endif
   }
+
+  #if os(iOS)
+  /// iPad regular: render the selected tab with NO `TabView`. Each tab is
+  /// created lazily on first visit and then kept alive (its `.task`/loads don't
+  /// re-run on every switch, matching `TabView`'s persistence), shown by
+  /// toggling opacity — so there's no tab bar to flicker and no re-fetch churn.
+  private var iPadTabless: some View {
+    ZStack {
+      ForEach(availableTabs, id: \.self) { tab in
+        if visitedTabs.contains(tab) {
+          tabContent(tab)
+            .opacity(tabSelection.current == tab ? 1 : 0)
+            .allowsHitTesting(tabSelection.current == tab)
+            .accessibilityHidden(tabSelection.current != tab)
+        }
+      }
+    }
+    // The whole top bar rides here at the WINDOW level — gear (leading) ·
+    // switcher (centered) · ···/+ (trailing) — not in any page's nav bar. So it
+    // aligns to `Theme.pageGutter` like the content, and the Tasks sidebar
+    // opening/closing (which resizes the detail pane) can't shift any of it.
+    //
+    // Floating bar. The space it occupies is reserved INSIDE each page (via
+    // `.pageChrome` → a top `safeAreaInset` of `PageChromeMetrics.iPadBarHeight`),
+    // because a `safeAreaInset` here at the container doesn't propagate through
+    // the tabs' NavigationStacks to their scroll content.
+    .overlay(alignment: .top) { iPadTopBar }
+    .onAppear { visitedTabs.insert(tabSelection.current) }
+    .onChange(of: tabSelection.current) { _, tab in visitedTabs.insert(tab) }
+  }
+
+  /// The iPad window-level chrome bar: gear · switcher · ···/+. Gear + switcher
+  /// are global; the "···"/"+" come from the current tab's `IPadChromeModel`
+  /// entry. Insets match the page content gutter so nothing hugs the edge.
+  private var iPadTopBar: some View {
+    let entry = iPadChrome.entry(tabSelection.current.chromeID)
+    return ZStack {
+      HStack(spacing: 0) {
+        // Left corner: ONE "···" menu — the page's own actions, then Settings
+        // (always the last row). Built inline (not via OverflowMenu) so the glyph
+        // sits in the SAME fixed frame as "+", making both glass circles equal in
+        // size. `.buttonStyle(.glass)` lets the system own the glass + the menu
+        // presentation (wrapping a Menu in `.glassCircle()` swallows the tap).
+        Menu {
+          if let actions = entry?.localActions {
+            actions
+            Divider()
+          }
+          Button { nav.showSettings = true } label: {
+            Label("Settings", systemImage: "gearshape")
+          }
+        } label: {
+          cornerGlyph("ellipsis")
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("More")
+        Spacer(minLength: 0)
+        // Right corner: ONE "+" button — same fixed glyph frame → same circle.
+        if let add = entry?.add {
+          Button(action: resolveAdd(add)) { cornerGlyph("plus") }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("Add")
+        }
+      }
+      TabSwitcher()
+    }
+    .padding(.horizontal, Theme.pageGutter)
+    .padding(.top, 8)
+  }
+
+  /// A corner-control glyph in a fixed square so both circles size identically.
+  private func cornerGlyph(_ systemName: String) -> some View {
+    Image(systemName: systemName)
+      .font(.title3.weight(.semibold))
+      .frame(width: 30, height: 30)
+  }
+
+  private func resolveAdd(_ add: PageAdd) -> () -> Void {
+    switch add {
+    case .addInfo:         return { nav.presentAddInfo() }
+    case .action(let run): return run
+    }
+  }
+  #endif
 }
 
 #if os(iOS)

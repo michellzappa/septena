@@ -72,47 +72,70 @@ Page-local only — **never Settings**. Examples (not exhaustive):
 "Section Settings" / "Task Settings" rows deep-link *into* the global Settings at
 a pane — that's fine; they're page-scoped shortcuts, not the global entry point.
 
-## The `SeptenaPage` primitive (target)
+## The `.pageChrome` primitive (built — `Septena/Shell/UI/SeptenaPage.swift`)
 
-One scaffold replaces `homeChrome`/`homeToolbar` (HomeChrome.swift),
-`SectionDrawer`'s toolbar (SectionDrawer.swift), and the bespoke Tasks chrome
-(TaskListView.swift toolbar block).
+Realized as a **View modifier**, not a wrapper struct, so it drops in exactly
+where `homeToolbar` was (no re-indenting large bodies) and composes onto the
+sidebar/detail of the Tasks split the same way. It replaced
+`homeChrome`/`homeToolbar`/`HomeToolbarExtras` (now deleted from
+HomeChrome.swift, which keeps only `OverflowMenu`).
 
 ```swift
-struct SeptenaPage<Content: View>: View {
-  let title: String
-  var localActions: () -> AnyView? = { nil }   // "···" rows; nil → menu hidden
-  var add: PageAdd? = nil                       // "+" ; nil → no add (rare)
-  var timeTravel: Binding<Date>? = nil          // optional calendar slot
-  var mode: Binding<DrawerMode>? = nil          // optional Log/Patterns toggle
-  let content: () -> Content
-  // Global gear slot is injected internally — callers cannot override it.
+extension View {
+  func pageChrome(
+    id: String,                                  // page identity (tab/section key)
+    title: String,                               // accessibility; content owns visible title
+    localActions: @escaping () -> AnyView? = { nil },  // "···" rows; nil → no "···"
+    add: PageAdd? = nil                          // "+" ; nil → no "+"
+  ) -> some View
 }
 
 enum PageAdd {
-  case domain(() -> Void)   // Tasks/Coach/section create
-  case addInfo              // time-views → AppModal.addInfo picker
+  case addInfo              // time-views → nav.presentAddInfo() picker
+  case action(() -> Void)   // domain-views → create that domain's object
 }
 ```
 
-Callers:
+The constant gear is injected by the modifier (`PageGlobalButton`), never by the
+caller. The three slots render in the page's **navigation bar** (its
+`NavigationStack` toolbar) on every platform and size class — `.topBarLeading`
+(gear) + `.topBarTrailing` (··· then +) on iOS, `.navigation` + `.primaryAction`
+on macOS.
+
+> **Chrome lives in the nav bar, NOT the tab bar.** Apple's HIG: "tab bars are
+> for moving between major areas of the app, not for triggering one-off actions."
+> iPadOS 26 exposes no API to put buttons in the tab bar — its only accessory
+> slot is the bottom shelf (`tabViewBottomAccessory`, used for the training pill).
+> Two earlier attempts to "lift" the chrome into the iPad tab bar (a
+> `PreferenceKey`, then a shared `@Observable` host, both feeding a `.toolbar` on
+> the `TabView`) **never rendered on iPad** and were removed. The nav-bar toolbar
+> is the supported, on-guidance home for these actions.
+
+**Tasks split (gear de-duplication).** Tasks is a two-column `NavigationSplitView`.
+The **sidebar** calls `.pageChrome(id:"tasks", localActions:{…})` (gear + "···").
+The **detail** `TaskListView` calls `.pageChrome(id:"tasks", add:.action{…},
+showsGlobal:)` — its "+" plus a gear *only when no sidebar is concurrently
+showing one*: `showsGlobal = (iOS && regular) ? false : true`. So iPad-regular
+shows one gear (sidebar), iPhone-pushed lists show their own gear, and macOS
+(whose sidebar toolbar has no gear) shows it on the detail. Navigating the detail
+to a Project unmounts its `.pageChrome` (embedded `TaskListView` opts out, keeping
+a plain local "+").
+
+Callers (actual):
 
 ```swift
-// Today
-SeptenaPage(title: "Today",
-            localActions: { AnyView(layoutSwitcher; insightsRow) },
-            add: .addInfo) { weekContent }
+// Next (time-view)
+NextView()…
+  .pageChrome(id: "next", title: "Next",
+              localActions: { AnyView(nextSettingsRow) }, add: .addInfo)
 
-// Tasks list
-SeptenaPage(title: filter.title,
-            localActions: { AnyView(newArea; newProject; taskSettings) },
-            add: .domain { nav.shouldStartCreating = true }) { list }
+// Coach (domain-view)
+List {…}…
+  .pageChrome(id: "coach", title: "Coach", add: .action { addGoal() })
 
-// A section
-SeptenaPage(title: section.label,
-            localActions: { AnyView(history; sectionSettings) },
-            add: .domain { quickAdd() },
-            timeTravel: $date, mode: $mode) { sectionBody }
+// Tasks sidebar contributes "···"; detail TaskListView contributes "+"
+sidebar… .pageChrome(id: "tasks", title: "Tasks", localActions: { AnyView(tasksMenuExtraRows) })
+detail…  .pageChrome(id: "tasks", title: "Tasks", add: .action { nav.shouldStartCreating = true })
 ```
 
 ## Platform handling (one path, not per-tab)
@@ -148,40 +171,38 @@ push-vs-sheet; `SeptenaPage` reads it from the environment, never recomputes.
 Tab set and gating logic (RootTabView.swift:69–81, 220–233) are **kept as-is**.
 The cleanup is chrome, not tab membership.
 
-## Migration plan (file by file)
+## Migration plan (status)
 
-1. **Add `SeptenaPage`** (new file, `Septena/Shell/UI/SeptenaPage.swift`) with the
-   three-slot toolbar + the `PreferenceKey` hoist. Gear → `nav.showSettings`.
-2. **Move the iPad hoist** off `HomeToolbarExtras` onto the `PreferenceKey`;
-   `RootTabView.rootTabView` (RootTabView.swift:235–258) reads the preference
-   instead of `homeToolbarExtras.content` / `.trailingContent` / `.hasTrailing`.
-   Delete `HomeToolbarExtras` (HomeChrome.swift:22–46) once no caller remains.
-3. **Retarget the home tabs:** Week/Next/Coach drop `.homeChrome` / `.homeToolbar`
-   and wrap their body in `SeptenaPage(...)`. Remove the Settings row from the old
-   `HomeMenu` (HomeChrome.swift:84–86) — Settings is now the gear only.
-4. **Fold `SectionDrawer`'s toolbar into `SeptenaPage`:** the drawer keeps its
-   masonry/columns/scroll body but stops drawing its own title/time-travel/+/···;
-   it renders inside `SeptenaPage`. (SectionDrawer.swift toolbar block.)
-5. **Retarget Tasks:** `TaskListView` toolbar block (TaskListView.swift:480–493,
-   2726–2741) and the phone `phoneMoreMenu` (SidebarView.swift:387–429) move into
-   `SeptenaPage` slots — gear (global), ··· (New Area/Project/Task Settings), +
-   (`shouldStartCreating`). Delete the bespoke `TaskListNewTaskButton` placement
-   logic and `TopLevelChromeModifier` shim where `SeptenaPage` subsumes it.
-6. **Delete `OverflowMenu`/`HomeMenu`'s Settings coupling** and keep `OverflowMenu`
-   purely as the "···" glyph for page-local menus.
-7. **Verify**: one `scripts/build.sh` per platform; check the gear opens Settings
-   on every tab and section, "···" never shows Settings, "+" matches the table
-   above on all 4 tabs and a sample section, on iPhone / iPad-regular / macOS.
+1. ✅ **`.pageChrome` built** (`Septena/Shell/UI/SeptenaPage.swift`) — three-slot
+   toolbar + self-clearing `PageChromeKey` hoist. Gear → `nav.showSettings`.
+2. ✅ **iPad hoist moved** off `HomeToolbarExtras` onto `PageChromeKey`;
+   `RootTabView.rootTabView` reads the preference. `HomeToolbarExtras` deleted.
+3. ✅ **Home tabs retargeted:** Week/Next/Coach use `.pageChrome`; Settings is the
+   gear, not a menu row. `HomeMenu` deleted.
+4. ⏳ **Fold `SectionDrawer`'s toolbar into `.pageChrome`** — drawer keeps its
+   masonry/columns/scroll body but stops drawing its own title/time-travel/+/···.
+   (Not started.)
+5. ✅ **Tasks retargeted:** sidebar (`sidebarSplit`/`sidebarPhone`) publishes
+   gear + "···"; `TaskListView` publishes gear + contextual "+", merged on iPad
+   regular. `phoneMoreMenu`, `homeToolbarTrailing`, and `usesLocalNewTaskToolbar`
+   removed; embedded `TaskListView` keeps its plain local "+".
+6. ✅ **`OverflowMenu` kept** as the "···" glyph; its Settings coupling (in the old
+   `HomeMenu`) is gone.
+7. ⏳ **Section sweep + device walk** — apply step 4 across sections, then verify
+   on iPhone / iPad-regular / macOS.
 
 ## Acceptance (100% coherent end to end)
 
-- [ ] Every page (4 tabs + every section) shows the **same gear** in the **same
-      leading slot**, opening Settings.
-- [ ] No "···" anywhere contains Settings; "···" is hidden when a page has no
-      local actions.
-- [ ] Every page has a "+" in the same trailing spot; time-views open Add-Info,
-      domain-views create their domain object.
-- [ ] iPad-regular chrome is hoisted by the scaffold's `PreferenceKey`, not
-      per-tab `onAppear`/`clearContent`; no stale-chrome path remains.
-- [ ] `homeChrome`, `HomeToolbarExtras`, and `SectionDrawer`'s private toolbar are
-      gone or reduced to `SeptenaPage` call sites.
+- [x] Every **tab** shows the same gear in the same leading slot, opening Settings.
+      (Sections: pending step 4.)
+- [x] No "···" on a migrated surface contains Settings; "···" is hidden when a
+      page has no local actions.
+- [x] Every tab has a "+" in the same trailing spot; time-views (Today/Next) open
+      Add-Info, domain-views (Tasks/Coach) create their domain object.
+- [x] Chrome renders in each page's navigation-bar toolbar on all platforms (NOT
+      the tab bar — unsupported by the API + off-HIG). Two tab-bar hoist attempts
+      (`PreferenceKey`, then a shared `@Observable` host) never rendered on iPad
+      and were removed.
+- [x] `homeChrome`/`homeToolbar`/`HomeToolbarExtras`/`HomeMenu` deleted.
+- [ ] `SectionDrawer`'s private toolbar folded into `.pageChrome` (step 4).
+- [ ] Device walk on all three layouts.

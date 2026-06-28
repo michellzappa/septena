@@ -9,33 +9,32 @@ struct NextDashboardView: View {
 
   var body: some View {
     NavigationStack {
-      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
-      // (leading, constant), "···" → page-local rows (here just the Next
-      // preferences deep-link), "+" → Add-Info picker (Next is a time-view, so
-      // its "+" logs into any section). The Next-Settings deep-link rides
-      // `NavigationState`: macOS opens the Settings window at that pane, iOS
-      // forwards it through the shared settings sheet (see RootTabView).
-      SeptenaPage(
-        id: "next",
-        title: "Next",
-        localActions: {
-          AnyView(
-            Button {
-              nav.settingsDestination = .nextFeed
-              nav.showSettings = true
-            } label: {
-              Label("Next Settings", systemImage: "arrow.forward.circle")
-            }
-          )
-        },
-        add: .addInfo
-      ) {
-        NextView()
-          .navigationTitle("")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      }
+      NextView()
+        .navigationTitle("")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
+        // (leading, constant), "···" → page-local rows (here just the Next
+        // preferences deep-link), "+" → Add-Info picker (Next is a time-view, so
+        // its "+" logs into any section). The Next-Settings deep-link rides
+        // `NavigationState`: macOS opens the Settings window at that pane, iOS
+        // forwards it through the shared settings sheet (see RootTabView).
+        .pageChrome(
+          id: "next",
+          title: "Next",
+          localActions: {
+            AnyView(
+              Button {
+                nav.settingsDestination = .nextFeed
+                nav.showSettings = true
+              } label: {
+                Label("Next Settings", systemImage: "arrow.forward.circle")
+              }
+            )
+          },
+          add: .addInfo
+        )
     }
   }
 }

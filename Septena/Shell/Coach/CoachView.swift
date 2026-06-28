@@ -57,10 +57,11 @@ struct CoachView: View {
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      // Shared home-landing chrome (top-left "…" → Settings), identical to
-      // Week / Next. No top-right "+" — goals are added from the Goals header,
-      // the section strips, or the coach.
-      .homeToolbar()
+      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
+      // (leading, constant) + "+" → new goal (Coach is a domain-view, so its
+      // "+" creates that domain's object). No "···" — Coach has no page-local
+      // rows beyond Settings.
+      .pageChrome(id: "coach", title: "Coach", add: .action { addGoal() })
       // A coach pushes as a full pane inside this stack — a real screen with a
       // back button — on every idiom. Lists belong with navigation stacks.
       .navigationDestination(for: CoachDomain.self) { domain in

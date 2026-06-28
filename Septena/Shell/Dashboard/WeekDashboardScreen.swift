@@ -81,10 +81,16 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
-      // Shared home-landing chrome across Week / Next / Coach: the top-left
-      // "…" menu, with Week's dashboard-layout switcher + Insights injected
-      // above the shared Settings row. See HomeChrome.swift.
-      .homeToolbar { menuExtra() }
+      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
+      // (leading, constant), "···" → Week's dashboard-layout switcher + Insights,
+      // "+" → Add-Info picker (Today is a time-view, so its "+" logs into any
+      // section). The trailing ClaudeReconnectCue rides alongside below.
+      .pageChrome(
+        id: "week",
+        title: "Today",
+        localActions: { AnyView(menuExtra()) },
+        add: .addInfo
+      )
       // iOS: float the "keep Claude connected" cue as a glass pill in the top
       // bar's TRAILING corner — opposite the leading "…" menu, so the system
       // doesn't fold the two into one shared glass bar. Renders nothing unless
