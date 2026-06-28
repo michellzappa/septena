@@ -4,49 +4,54 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1222,
+      "build": 1225,
       "date": "2026-06-28",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A faster, friendlier Tasks experience",
-          "detail": "Edit task titles in place, add tasks inline with a quick-add line, duplicate tasks, and move items between areas and projects right from the menu.",
+          "title": "Tasks gets inline editing and quick capture",
+          "detail": "Rename tasks in place, add new ones from a quick-add line, and navigate with a Things-style menu and native keyboard selection.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar lives alongside your tasks",
-          "detail": "System calendar events now appear in Today and Upcoming so you can see your whole day in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they auto-purge.",
+          "title": "Recover deleted tasks",
+          "detail": "A Recently Deleted view keeps removed tasks for 30 days with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
+          "detail": "Bring your existing tasks over from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Capture meals photo-first with on-device analysis that estimates what you ate.",
-          "section": "nutrition"
+          "title": "See your calendar alongside your tasks",
+          "detail": "Calendar events are woven into Today and Upcoming, with hidden-calendar choices synced across your devices.",
+          "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter most front and center on the home screen.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most front and center on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Smarter training reviews",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review waiting at the end of each session.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture analyzes food on-device to fill in the details.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Smarter training review",
+          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
           "section": "training"
         },
         {
-          "title": "Choose exactly how much you share",
-          "detail": "New graded privacy levels let you pick Off, Minimal, Balanced, or Full analytics, and see precisely what's sent.",
+          "title": "A calmer, clearer home and watch",
+          "detail": "The Week tab is now Today, the dashboard glows with a day-aligned sky, and the watch adds a time-of-day sky and quick action drawers for Next items.",
+          "section": null
+        },
+        {
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels let you pick exactly what telemetry is sent, with a log of what's recently been shared.",
           "section": null
         }
       ]
