@@ -68,16 +68,17 @@ public enum SuggestionBlocks {
             .init(value: "500", label: "500 ml", symbol: "waterbottle"),
           ])),
     // Gut — Bristol stool scale 1–7. The choice `value` is the Bristol type
-    // (parsed by the writer), not a `method`. Labels mirror the phone's.
+    // (parsed by the writer), not a `method`. Labels mirror the phone's;
+    // numbered circle glyphs match `GutQuickAddMenu`.
     .init(kind: "gut", sectionKey: "gut", recordType: "GutEvent",
           input: .choice([
-            .init(value: "1", label: "Hard pellets"),
-            .init(value: "2", label: "Lumpy sausage"),
-            .init(value: "3", label: "Cracked sausage"),
-            .init(value: "4", label: "Smooth sausage"),
-            .init(value: "5", label: "Soft blobs"),
-            .init(value: "6", label: "Fluffy mush"),
-            .init(value: "7", label: "Liquid"),
+            .init(value: "1", label: "Hard pellets",  symbol: "1.circle.fill"),
+            .init(value: "2", label: "Lumpy sausage", symbol: "2.circle.fill"),
+            .init(value: "3", label: "Cracked sausage", symbol: "3.circle.fill"),
+            .init(value: "4", label: "Smooth sausage", symbol: "4.circle.fill"),
+            .init(value: "5", label: "Soft blobs",    symbol: "5.circle.fill"),
+            .init(value: "6", label: "Fluffy mush",   symbol: "6.circle.fill"),
+            .init(value: "7", label: "Liquid",        symbol: "7.circle.fill"),
           ])),
   ]
 
