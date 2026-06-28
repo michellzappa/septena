@@ -9,25 +9,33 @@ struct NextDashboardView: View {
 
   var body: some View {
     NavigationStack {
-      NextView()
-        .navigationTitle("")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        // Shared home-landing chrome: the top-left "…" menu, identical to
-        // Week / Coach. The `extra` row sits above the shared Settings item
-        // and deep-links to the Next preferences pane (suggestions,
-        // carry-over, which sections appear). The deep-link rides
-        // `NavigationState`: macOS opens the Settings window at that pane,
-        // iOS forwards it through the shared settings sheet (see RootTabView).
-        .homeToolbar {
-          Button {
-            nav.settingsDestination = .nextFeed
-            nav.showSettings = true
-          } label: {
-            Label("Next Settings", systemImage: "arrow.forward.circle")
-          }
-        }
+      // Unified three-slot chrome (docs/PAGE_CHROME_SPEC.md): gear → Settings
+      // (leading, constant), "···" → page-local rows (here just the Next
+      // preferences deep-link), "+" → Add-Info picker (Next is a time-view, so
+      // its "+" logs into any section). The Next-Settings deep-link rides
+      // `NavigationState`: macOS opens the Settings window at that pane, iOS
+      // forwards it through the shared settings sheet (see RootTabView).
+      SeptenaPage(
+        id: "next",
+        title: "Next",
+        localActions: {
+          AnyView(
+            Button {
+              nav.settingsDestination = .nextFeed
+              nav.showSettings = true
+            } label: {
+              Label("Next Settings", systemImage: "arrow.forward.circle")
+            }
+          )
+        },
+        add: .addInfo
+      ) {
+        NextView()
+          .navigationTitle("")
+          #if os(iOS)
+          .navigationBarTitleDisplayMode(.inline)
+          #endif
+      }
     }
   }
 }

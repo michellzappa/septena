@@ -215,7 +215,7 @@ struct SidebarRootView: View {
   /// column. System `.sidebar` list style — full-bleed top/leading/trailing,
   /// no insetGrouped "floating card" margins (Notes / Reminders on macOS).
   @ViewBuilder
-  private var sidebarSplit: some View {
+  private var sidebarSplit: some View { 
     sidebarListContent()
     .navigationTitle("")
     #if os(iOS)

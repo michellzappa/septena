@@ -222,6 +222,7 @@
 		3C51EABA92695B18A7853BC1 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
 		3C64ED1D0A9AC256265FE06B /* PlatformShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13011C553B04F0ACEFD189CD /* PlatformShims.swift */; };
 		3C8E65D49011ED7E8DD53C02 /* ReportPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 249C2A79DAE34C3D802523B3 /* ReportPublisher.swift */; };
+		3CBCA87BAF3A8DC687932B3B /* SeptenaPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */; };
 		3CF5A02B1EFE2628F8E3E243 /* AddTaskIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5961822BB83BCF87B27E11AD /* AddTaskIntent.swift */; };
 		3D19536CFB66987D6D5C7642 /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5B49A0D20B2ECD672137900F /* Info-Mac.plist */; };
 		3D3A14FB3652E280CC1E091F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23D4FD6096AAAF4FF35B1824 /* Assets.xcassets */; };
@@ -769,6 +770,7 @@
 		D3D801AE0714FA3E8696508A /* SectionTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03DC46C772E45B60ECB7343 /* SectionTheme.swift */; };
 		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		D4F38C66817C3036A92F03C7 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
+		D5107E3C346DA99A8FDF6F2E /* SeptenaPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */; };
 		D520448E97327EB6F37A8559 /* MedicationsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71DC3593DE47124290BBA69 /* MedicationsDestinationView.swift */; };
 		D593377255FBA78C5C2F3EE6 /* VirtueFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */; };
 		D66CAAFEED0B729D35E3C062 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
@@ -1089,6 +1091,7 @@
 		27B4DF2D4A21D88AD4B3A964 /* VolumeUnit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeUnit.swift; sourceTree = "<group>"; };
 		283D02F47FC57BD00F27178E /* VirtueSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueSummarizer.swift; sourceTree = "<group>"; };
 		28AD8E60186F9AAF8C1E52A3 /* SupplementsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsPlugin.swift; sourceTree = "<group>"; };
+		28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaPage.swift; sourceTree = "<group>"; };
 		296A39809598381550C2AC11 /* WolfActivityRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WolfActivityRing.swift; sourceTree = "<group>"; };
 		2B3AFBAC2D7BFC759ACA6108 /* GroceriesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
 		2B3E066DC1C51CBAEDA71AB9 /* SectionTileWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTileWidget.swift; sourceTree = "<group>"; };
@@ -2240,6 +2243,7 @@
 				13011C553B04F0ACEFD189CD /* PlatformShims.swift */,
 				C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */,
 				D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */,
+				28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */,
 				3795310A060A418D32730BFA /* SkyAtmosphere.swift */,
 				AE9CF6ECBC428C4253E69AC4 /* SkyTopWash.swift */,
 				2085456E2239FA343DA34D32 /* SolarClock.swift */,
@@ -3144,6 +3148,7 @@
 				2233D19F321BC3DFA2A8177B /* SectionsSettingsPane.swift in Sources */,
 				2FD061F015DCEC73E647FAC4 /* SelectablePillsView.swift in Sources */,
 				BC23D66280BE0D0D0A1393A7 /* SelectableScrollList.swift in Sources */,
+				3CBCA87BAF3A8DC687932B3B /* SeptenaPage.swift in Sources */,
 				813E354BF63CCF41776EADCA /* SeptenaSceneDelegate.swift in Sources */,
 				288822C1F37C59515A97A967 /* SeptenaServices.swift in Sources */,
 				5C1DB4D50F0926B699CC918F /* SeptenaShortcuts.swift in Sources */,
@@ -3604,6 +3609,7 @@
 				875C220D9A4002A1B0A65F83 /* SectionsSettingsPane.swift in Sources */,
 				5C2CD4D9D3DDF4D8E9CBBB2F /* SelectablePillsView.swift in Sources */,
 				17D6C8BA0763862CEF2095C3 /* SelectableScrollList.swift in Sources */,
+				D5107E3C346DA99A8FDF6F2E /* SeptenaPage.swift in Sources */,
 				02C0FDC8E22EF595A294A4ED /* SeptenaSceneDelegate.swift in Sources */,
 				D70A3B473E3ACD222FD15870 /* SeptenaServices.swift in Sources */,
 				3BF4D032768C2945BD5739AF /* SeptenaShortcuts.swift in Sources */,

@@ -54,6 +54,10 @@ struct RootTabView: View {
   @State private var tabSelection = TabSelection()
   #if os(iOS)
   @State private var homeToolbarExtras = HomeToolbarExtras()
+  // Chrome hoisted from the current `SeptenaPage` (iPad regular). Nil for tabs
+  // still on the legacy `homeToolbar`/`HomeToolbarExtras` path. Self-clears when
+  // the page leaves the tree (preference reverts to its nil default).
+  @State private var hoistedChrome: PageChromeBox?
   #endif
 
   // "What's New" gate. We show the sheet once when the app's marketing version
@@ -238,13 +242,28 @@ struct RootTabView: View {
         tv
           .environment(homeToolbarExtras)
           .tabBarMinimizeBehavior(.onScrollDown)
+          // A `SeptenaPage` publishes its chrome here; `RootTabView` renders it
+          // at tab-bar height. Self-clearing — when the page leaves, the
+          // preference reverts to nil and we fall back to the legacy path for
+          // tabs not yet migrated to `SeptenaPage`.
+          .onPreferenceChange(PageChromeKey.self) { hoistedChrome = $0 }
           .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-              HomeMenu { homeToolbarExtras.content }
-            }
-            if homeToolbarExtras.hasTrailing {
-              ToolbarItem(placement: .topBarTrailing) {
-                homeToolbarExtras.trailingContent
+            if let chrome = hoistedChrome {
+              ToolbarItem(placement: .topBarLeading) { PageGlobalButton() }
+              if let actions = chrome.localActions {
+                ToolbarItem(placement: .topBarTrailing) { OverflowMenu { actions } }
+              }
+              if let add = chrome.add {
+                ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: add) }
+              }
+            } else {
+              ToolbarItem(placement: .topBarLeading) {
+                HomeMenu { homeToolbarExtras.content }
+              }
+              if homeToolbarExtras.hasTrailing {
+                ToolbarItem(placement: .topBarTrailing) {
+                  homeToolbarExtras.trailingContent
+                }
               }
             }
           }
