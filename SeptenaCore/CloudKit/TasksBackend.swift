@@ -24,7 +24,8 @@ protocol TasksBackend: AnyObject {
               today: Bool,
               notes: String?,
               source: String,
-              deferPush: Bool) -> SeptenaTask
+              deferPush: Bool,
+              atBottom: Bool) -> SeptenaTask
 
   func update(id: String, title: String?, notes: String?)
   /// Mark an agent-created row as seen (clears the freshness cue). Idempotent.
@@ -216,13 +217,17 @@ final class CloudKitTasksBackend: TasksBackend {
   func create(title: String, area: String?, project: String?,
               scheduled: Date?, deadline: Date?, today: Bool,
               notes: String?, source: String = TaskSource.app,
-              deferPush: Bool = false) -> SeptenaTask {
+              deferPush: Bool = false,
+              atBottom: Bool = false) -> SeptenaTask {
     let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
-    // New tasks land at the top of the list. An explicit position (synced)
-    // rather than relying on the createdAt fallback, so other devices place
-    // it at the top too instead of at the bottom (newest createdAt).
+    // An explicit position (synced) rather than relying on the createdAt
+    // fallback. App/MCP captures default to the top; the Tasks foot quick-add
+    // passes `atBottom` so inline captures land above the "New task" row.
+    let position = atBottom
+      ? TaskOrder.bottomPosition(in: context)
+      : TaskOrder.topPosition(in: context)
     let entity = TaskEntity(
       id: id,
       title: title,
@@ -235,7 +240,7 @@ final class CloudKitTasksBackend: TasksBackend {
       area: effectiveArea,
       project: project,
       notes: (notes?.isEmpty == false) ? notes : nil,
-      position: TaskOrder.topPosition(in: context),
+      position: position,
       pendingSync: true,
       source: source,                    // "app" (native) or "mcp" (agent proposal)
       // Mirror the gateway's label for agent rows so MCP-authored tasks read as

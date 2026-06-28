@@ -190,6 +190,10 @@ struct SelectableScrollList<Content: View>: View {
   var onToggle: (String) -> Void = { _ in }
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
+  /// Monotonic tick — parent increments to force-scroll to `scrollToID`.
+  var scrollToTick: Int = 0
+  /// Row id to scroll into view when `scrollToTick` changes.
+  var scrollToID: String? = nil
   /// Canvas fill behind the rows. Paper (white) for flat single-group lists;
   /// the gray grouped background for sectioned lists whose rows sit in cards,
   /// so the cards lift off the canvas (matching the sidebar / Next homes).
@@ -220,6 +224,7 @@ struct SelectableScrollList<Content: View>: View {
         // pass; writing @State synchronously triggers "updated multiple times
         // per frame" and can cascade extra layout.
         Task { @MainActor in
+          guard !rowFrames.isApproximatelyEqual(to: newFrames) else { return }
           rowFrames = newFrames
           fulfillPendingScroll(proxy: proxy)
         }
@@ -239,6 +244,10 @@ struct SelectableScrollList<Content: View>: View {
       .onChange(of: scrollRequest) { _, request in
         guard request != nil else { return }
         fulfillPendingScroll(proxy: proxy)
+      }
+      .onChange(of: scrollToTick) { _, _ in
+        guard scrollToTick > 0, let id = scrollToID else { return }
+        scrollRequest = SelectableScrollRequest(id: id, scrollDown: true, force: true)
       }
       // Fill the detail pane edge-to-edge on macOS (click-to-clear on empty
       // paper). On iOS let the ScrollView size naturally so content scrolls
@@ -455,6 +464,22 @@ struct SelectableScrollList<Content: View>: View {
     return .fullyVisible
   }
 
+}
+
+private extension Dictionary where Key == String, Value == CGRect {
+  /// Layout noise from LazyVStack re-measure often re-reports the same frames;
+  /// skip @State writes when nothing moved (reduces preference churn).
+  func isApproximatelyEqual(to other: [String: CGRect]) -> Bool {
+    guard count == other.count else { return false }
+    for (key, frame) in self {
+      guard let otherFrame = other[key] else { return false }
+      if abs(frame.minX - otherFrame.minX) > 0.5 { return false }
+      if abs(frame.minY - otherFrame.minY) > 0.5 { return false }
+      if abs(frame.width - otherFrame.width) > 0.5 { return false }
+      if abs(frame.height - otherFrame.height) > 0.5 { return false }
+    }
+    return true
+  }
 }
 
 #if os(macOS)

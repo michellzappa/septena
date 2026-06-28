@@ -172,6 +172,11 @@ struct TaskListView: View {
   /// One-shot amber flash when a task is pinned to Today (row wash + checkbox pulse).
   @State private var promoteFlash = PromoteFlashStore()
 
+  /// Scroll anchor for the foot (or empty-list top) "New task" quick-add row.
+  private static let quickAddScrollID = "task-quick-add"
+  @State private var scrollToTargetID: String?
+  @State private var scrollToTargetTick = 0
+
   /// Unified selection — the single source of truth for the keyboard cursor
   /// and multi-select batch operations, bound straight to `List(selection:)`
   /// on both platforms. macOS: native click / ⌘-click / ⇧-click / ↑↓.
@@ -477,20 +482,22 @@ struct TaskListView: View {
     // keyboard nav now all live inside `SelectableScrollList`.)
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
-    #if os(iOS)
-    .homeToolbarTrailing(when: !embedded && hSize == .regular && filter != .recentlyDeleted) {
-      TaskListNewTaskButton()
-    }
-    #endif
     .toolbar {
-      // No + button in the Recently Deleted view — you can't create trashed tasks.
-      // iPad regular: + lives in the TabView toolbar (tab-bar height).
-      if filter != .recentlyDeleted && usesLocalNewTaskToolbar {
+      // Embedded (Project/Area detail) keeps a local "+"; standalone tabs get
+      // the unified chrome's "+" via `.pageChrome` below instead (so it can
+      // merge with the sidebar's "···" on iPad regular and ride the tab bar).
+      // No "+" in Recently Deleted — you can't create trashed tasks.
+      if embedded && filter != .recentlyDeleted {
         ToolbarItem(placement: .primaryAction) {
           TaskListNewTaskButton()
         }
       }
     }
+    // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
+    // constant gear (→ Settings) and a contextual "+" (new task). On iPad
+    // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
+    // a pushed list shows gear + "+" in its own nav bar.
+    .modifier(TaskListStandaloneChrome(embedded: embedded, recentlyDeleted: filter == .recentlyDeleted))
     // (Keyboard navigation — ↑↓ traversal, Return/Space/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `startCreate()`.)
@@ -523,10 +530,14 @@ struct TaskListView: View {
     // batch — including pushes from other devices and the foreground
     // bootstrap fetch. Without this, the list only refreshes when the
     // view re-appears (i.e. you have to navigate away and back).
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+    // Debounced: a single mutation can fan out several `.septenaTasksChanged`
+    // posts (local save + CK batch + Spotlight). Coalesce like the sidebar.
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
+      .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
       Task { await load() }
     }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
+    .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
+      .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
       Task { await load() }
     }
     // EventKit fires this when calendar data changes (an event added/edited in
@@ -569,16 +580,16 @@ struct TaskListView: View {
       if !editing { selection.removeAll() }
     }
     // Consume the global "start a new task" trigger (⌘N / + / sidebar menu) by
-    // opening the focused new-task composer, scoped to the current list.
+    // scrolling to the foot quick-add row (or opening the composer on Upcoming).
     .onChange(of: nav.shouldStartCreating) { _, _ in
       guard nav.shouldStartCreating else { return }
       nav.shouldStartCreating = false
-      startCreate()
+      focusQuickAdd()
     }
     .onAppear {
       if nav.shouldStartCreating {
         nav.shouldStartCreating = false
-        startCreate()
+        focusQuickAdd()
       }
     }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
@@ -617,7 +628,8 @@ struct TaskListView: View {
 
   /// Spawn a new task in this list's context and open the Things-style inline
   /// editor on it. Creatable lists insert a local `deferPush` draft (no CloudKit
-  /// push until the title commits); Upcoming falls back to the drawer composer.
+  /// push until the title commits) at the foot of the list; Upcoming falls back
+  /// to the drawer composer.
   private func startCreate() {
     guard filter != .recentlyDeleted else { return }
     guard allowsInlineCreate else {
@@ -631,13 +643,36 @@ struct TaskListView: View {
     inlineFocus = nil
     editingTitleId = nil
     let seed = TaskDraft(filter: filter)
-    let task = seed.create(via: mutator, deferPush: true)
+    let task = seed.create(via: mutator, deferPush: true, atBottom: true)
     draftEditIds.insert(task.id)
     withAnimation(.snappy(duration: 0.22)) {
-      items.insert(task, at: 0)
+      items.append(task)
       beginEdit(task)
     }
+    scrollToTargetID = task.id
+    scrollToTargetTick += 1
     AddInfoSection.tasks.notifyTilesChanged()
+  }
+
+  /// ⌘N / + / sidebar "New To-Do" — scroll to the visible "New task" quick-add
+  /// row instead of spawning a draft at the top of the list. Upcoming (no foot
+  /// line) and other non-inline lists fall through to `startCreate()`.
+  private func focusQuickAdd() {
+    guard filter != .recentlyDeleted else { return }
+    guard allowsInlineCreate, hasVisibleQuickAddTrigger else {
+      startCreate()
+      return
+    }
+    scrollToTargetID = Self.quickAddScrollID
+    scrollToTargetTick += 1
+  }
+
+  /// Whether a tappable "New task" quick-add row is on screen (foot of a
+  /// populated list, the top row on an empty creatable list, or the Inbox card
+  /// on Today).
+  private var hasVisibleQuickAddTrigger: Bool {
+    showsQuickAddAtTop || showsQuickAddAtFoot || attachesQuickAddToVisibleCard
+      || (filter == .today && allowsInlineCreate && !inboxCollapsed)
   }
 
   // MARK: - Inline editing
@@ -646,8 +681,7 @@ struct TaskListView: View {
   /// Recently Deleted are read-only histories. Upcoming is excluded too: it's a
   /// multi-day grouped grid with no single target day, so a foot-of-list line
   /// would just dump every capture onto "tomorrow" regardless of context — use
-  /// the `+`/⌘N composer there (it lets you pick the day). Today hosts no foot
-  /// line either; its captures go through the composer as well.
+  /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
     case .logbook, .recentlyDeleted, .upcoming: return false
@@ -759,15 +793,17 @@ struct TaskListView: View {
       onActivate: activateRow,
       onToggle: toggleRow,
       onClear: { clearSelection() },
+      scrollToTick: scrollToTargetTick,
+      scrollToID: scrollToTargetID,
       canvasFill: listCanvasFill
     ) {
       taskListHeader
       taskListRows
       // The quick-add line lives in the Inbox section on Today (see
-      // `triageSection`); every other creatable list gets it at the foot once
-      // there's content. When the list is empty, the line sits above the empty
-      // state in the header so the first action is right under the title.
-      if showsQuickAddAtFoot { quickAddRow }
+      // `triageSection`). Single-card lists (project / area / triage) tuck it
+      // inside the open-task card via `cardedRows(appendQuickAdd:)`. Grouped
+      // lists (Anytime) get a foot solo card here instead.
+      if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
       projectLoggedSection()
       taskListFooter
     }
@@ -813,16 +849,6 @@ struct TaskListView: View {
     #endif
   }
 
-  /// iPad regular lifts the + button to the TabView toolbar; phone and macOS
-  /// keep it in the local navigation bar.
-  private var usesLocalNewTaskToolbar: Bool {
-    #if os(iOS)
-    embedded || hSize != .regular
-    #else
-    true
-    #endif
-  }
-
   /// Return / double-click(Mac) / tap(touch) on a row → open it for editing.
   private func activateRow(_ id: String) {
     guard let task = currentTask(id: id) else { return }
@@ -842,14 +868,29 @@ struct TaskListView: View {
       && doneToday.isEmpty && triageItems.isEmpty && !isLoading
   }
 
-  /// Inline quick-add under the title when a creatable list is empty.
+  /// Inline quick-add under the title when a creatable list is empty. Today
+  /// hosts capture in the Inbox section instead (see `triageSection`).
   private var showsQuickAddAtTop: Bool {
     filter != .today && allowsInlineCreate && showsEmptyTaskList
   }
 
-  /// Things-style foot quick-add once the list has content.
+  /// Things-style foot quick-add once the list has content. Today captures
+  /// through the Inbox card, not at the foot of the full day list.
   private var showsQuickAddAtFoot: Bool {
     filter != .today && allowsInlineCreate && !showsEmptyTaskList
+  }
+
+  /// Project / area / triage pages render one open-task card — the foot
+  /// quick-add belongs inside it, not on the gray canvas below.
+  private var attachesQuickAddToVisibleCard: Bool {
+    showsQuickAddAtFoot && usesSingleOpenTaskCard
+  }
+
+  private var usesSingleOpenTaskCard: Bool {
+    switch filter {
+    case .project, .area, .triage: return true
+    default:                        return false
+    }
   }
 
   @ViewBuilder
@@ -857,7 +898,7 @@ struct TaskListView: View {
     titleRow
     newTodosBannerRow
     remindersRow
-    if showsQuickAddAtTop { quickAddRow }
+    if showsQuickAddAtTop { quickAddTopRow }
     emptyStateRow
   }
 
@@ -871,16 +912,19 @@ struct TaskListView: View {
   private var triageSection: some View {
     // "Inbox" on Today = agent proposals (triageItems, today==false) + loose
     // manually-added tasks (today==true, no project/area). Both are unclassified
-    // work — the Inbox header should appear for either source.
+    // work — the Inbox header should appear for either source. The quick-add line
+    // always lives at the foot of this card (capture drops into the band).
     if filter == .today {
       let looseToday = (items + review).filter {
         $0.project == nil && $0.area == nil && ($0.status == .open || settle.isSettling($0.id))
       }
       let allInbox = triageItems + looseToday
-      if !allInbox.isEmpty {
+      if allowsInlineCreate || !allInbox.isEmpty {
         Section {
           if !inboxCollapsed {
-            cardedRows(allInbox, quickMenu: { _ in true })
+            cardedRows(allInbox,
+                       quickMenu: { _ in true },
+                       appendQuickAdd: allowsInlineCreate)
           }
         } header: {
           inboxHeader(count: allInbox.count)
@@ -1040,7 +1084,9 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
-    if showsEmptyTaskList {
+    // Today with an empty day still shows the Inbox card + quick-add — no
+    // redundant "Nothing here yet" under it.
+    if showsEmptyTaskList && !(filter == .today && allowsInlineCreate) {
       if filter == .recentlyDeleted {
         ContentUnavailableView(
           "No Recently Deleted Tasks",
@@ -1072,7 +1118,9 @@ struct TaskListView: View {
   }
 
   private var visibleRows: some View {
-    cardedRows(visibleItems, quickMenu: { showsFilingChip(for: $0) })
+    cardedRows(visibleItems,
+               quickMenu: { showsFilingChip(for: $0) },
+               appendQuickAdd: attachesQuickAddToVisibleCard)
   }
 
   /// Things-style footer on project pages: a quiet link that expands completed
@@ -1689,20 +1737,35 @@ struct TaskListView: View {
     .contextMenu { taskContextMenu(for: task) }
   }
 
-  /// The always-present quick-add line at the foot of a single-context list (the
-  /// Reminders empty bottom row). A single click / tap focuses it; Return
-  /// commits and re-focuses for rapid back-to-back entry. Today hosts the same
-  /// line inside its Inbox section instead (see `triageSection`).
+  /// Foot quick-add for grouped lists (Anytime) — its own card on the canvas.
   @ViewBuilder
-  private var quickAddRow: some View {
+  private var quickAddFootCard: some View {
     if allowsInlineCreate {
-      quickAddLine().asListRow()
+      quickAddLine()
+        .asListRow()
+        .taskCardChrome(.solo)
     }
   }
 
-  /// Tappable footer row — opens the same inline editor as ⌘N / +.
+  /// Header quick-add when a creatable list is empty (sits above the empty state).
+  @ViewBuilder
+  private var quickAddTopRow: some View {
+    if allowsInlineCreate {
+      if usesSingleOpenTaskCard {
+        quickAddLine()
+          .asListRow()
+          .taskCardChrome(.solo)
+      } else {
+        quickAddLine().asListRow()
+      }
+    }
+  }
+
+  /// Tappable footer row — opens the same inline editor as a tap on the row
+  /// after scrolling here via ⌘N / +.
   private func quickAddLine() -> some View {
     QuickAddTriggerRow(action: startCreate)
+      .id(Self.quickAddScrollID)
   }
 
   /// Single source of truth for per-row actions. Used by the per-row
@@ -1977,13 +2040,20 @@ struct TaskListView: View {
   /// in place inside the card rather than floating as a separate box.
   @ViewBuilder
   private func cardedRows(_ tasks: [SeptenaTask],
-                          quickMenu: ((SeptenaTask) -> Bool)? = nil) -> some View {
+                          quickMenu: ((SeptenaTask) -> Bool)? = nil,
+                          appendQuickAdd: Bool = false) -> some View {
+    let cardCount = tasks.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .taskCardChrome(TaskCardPosition(index: idx, count: tasks.count),
+        .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
                         // The open editor keeps the plain card surface (a clean
                         // editing field), not the gray selection fill.
                         isSelected: selection.contains(task.id) && expandedEditId != task.id)
+    }
+    if appendQuickAdd {
+      quickAddLine()
+        .asListRow()
+        .taskCardChrome(TaskCardPosition(index: tasks.count, count: cardCount))
     }
   }
 
@@ -2675,15 +2745,11 @@ struct TaskListView: View {
 
 /// Compact tappable target for area / project section headers inside a list.
 /// Wraps just the title (and optional chevron) so the click target matches the
-/// visible text rather than the whole row width. macOS: subtle fill via
-/// `.onHover`; iPadOS pointer / Pencil: native `.hoverEffect` highlight.
+/// visible text rather than the whole row width. Background wash on hover only.
 private struct GroupHeaderLabel: View {
   let title: String
   let hasChevron: Bool
   let action: () -> Void
-  #if os(macOS)
-  @State private var hovered = false
-  #endif
 
   var body: some View {
     Button(action: action) {
@@ -2699,12 +2765,6 @@ private struct GroupHeaderLabel: View {
       }
       .padding(.horizontal, 6)
       .padding(.vertical, 2)
-      #if os(macOS)
-      .background(
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .fill(hovered ? Color.primary.opacity(0.06) : Color.clear)
-      )
-      #endif
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
@@ -2713,11 +2773,7 @@ private struct GroupHeaderLabel: View {
     // Tab traverse only task rows. Without this, the header Button steals a
     // focus stop between every group.
     .focusable(false)
-    #if os(macOS)
-    .onHover { hovered = $0 }
-    #else
     .inlineHover(cornerRadius: 6)
-    #endif
   }
 }
 
@@ -2737,6 +2793,47 @@ struct TaskListNewTaskButton: View {
     .buttonStyle(.glassProminent)
     .tint(theme.color(for: "tasks"))
     .accessibilityLabel("New Task")
+  }
+}
+
+/// Standalone TaskListView (its own tab pane) gets the unified page chrome:
+/// the constant gear (→ Settings) plus a contextual "+" (new task) that merges
+/// with the sidebar's "···" on iPad regular. Embedded uses (Project/Area detail
+/// wraps) inherit the parent's chrome and opt out — they keep a plain local "+".
+private struct TaskListStandaloneChrome: ViewModifier {
+  @Environment(NavigationState.self) private var nav
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var hSize
+  #endif
+  let embedded: Bool
+  let recentlyDeleted: Bool
+
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    if embedded || hSize == .regular {
+      // iPad regular: the Tasks SIDEBAR publishes the whole window-level chrome
+      // (gear/···/+), so the detail must NOT also publish (it would clobber the
+      // sidebar's entry in IPadChromeModel). Embedded uses keep the parent's.
+      content
+    } else {
+      content.pageChrome(
+        id: "tasks",
+        title: "Tasks",
+        add: recentlyDeleted ? nil : .action { nav.shouldStartCreating = true }
+      )
+    }
+    #else
+    if embedded {
+      content
+    } else {
+      // macOS: the sidebar toolbar has no gear, so the detail provides it.
+      content.pageChrome(
+        id: "tasks",
+        title: "Tasks",
+        add: recentlyDeleted ? nil : .action { nav.shouldStartCreating = true }
+      )
+    }
+    #endif
   }
 }
 
@@ -3099,11 +3196,16 @@ enum TaskCardMetrics {
 private struct TaskCardChrome: ViewModifier {
   let position: TaskCardPosition
   var isSelected: Bool = false
+  @State private var hovered = false
 
   func body(content: Content) -> some View {
     let r = TaskCardMetrics.radius
     let topR = (position == .top || position == .solo) ? r : 0
     let botR = (position == .bottom || position == .solo) ? r : 0
+    let shape = UnevenRoundedRectangle(
+      topLeadingRadius: topR, bottomLeadingRadius: botR,
+      bottomTrailingRadius: botR, topTrailingRadius: topR,
+      style: .continuous)
     content
       // Row content rides at the card's inner inset (matches DrawerSection rows).
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
@@ -3113,12 +3215,12 @@ private struct TaskCardChrome: ViewModifier {
           // the card, taking the card's own corners (only the first/last row
           // round) — so it reads as "this row is selected", not a rounded capsule
           // floating on top of the row.
-          UnevenRoundedRectangle(
-            topLeadingRadius: topR, bottomLeadingRadius: botR,
-            bottomTrailingRadius: botR, topTrailingRadius: topR,
-            style: .continuous
-          )
-          .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+          shape
+            .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+          // Pointer hover — background wash only, suppressed while selected.
+          if hovered && !isSelected {
+            shape.fill(Color.primary.opacity(0.06))
+          }
           // Hairline between rows, dropped against a selected cell (native lists
           // hide the rule adjacent to the highlight).
           if (position == .top || position == .middle) && !isSelected {
@@ -3134,6 +3236,7 @@ private struct TaskCardChrome: ViewModifier {
       // Only the last row of a card carries the gap, so the rows within a card
       // stay flush (one continuous card) while groups separate.
       .padding(.bottom, (position == .bottom || position == .solo) ? TaskCardMetrics.groupGap : 0)
+      .onHover { hovered = $0 }
   }
 }
 

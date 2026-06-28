@@ -1672,6 +1672,18 @@ enum TaskOrder {
       .min()
     return (minKey ?? 0) - gap
   }
+
+  /// A position that sorts below every live task — used by the foot-of-list
+  /// quick-add line so a capture lands where the user typed, not at the top.
+  @MainActor
+  static func bottomPosition(in context: ModelContext) -> Double {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let maxKey = rows
+      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
+      .map { key($0) }
+      .max()
+    return (maxKey ?? 0) + gap
+  }
 }
 
 extension Project {
