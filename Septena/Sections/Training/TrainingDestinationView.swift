@@ -6,49 +6,6 @@ import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
-#if os(iOS)
-import UserNotifications
-
-/// Local notification for the rest-timer "go again" alert — fires while the
-/// app is suspended (the Live Activity countdown handles the on-screen case).
-/// Single in-flight request, replaced/cancelled as sets are logged. Stays
-/// quiet if the user hasn't granted notifications; only prompts the first time
-/// (status `.notDetermined`).
-enum RestNotifier {
-  private static let id = "training.rest"
-
-  static func schedule(after seconds: TimeInterval) {
-    let center = UNUserNotificationCenter.current()
-    center.getNotificationSettings { settings in
-      let fire = {
-        let content = UNMutableNotificationContent()
-        content.title = String(localized: "Rest complete")
-        content.body = String(localized: "Time for your next set.")
-        content.sound = .default
-        let trigger = UNTimeIntervalNotificationTrigger(
-          timeInterval: max(1, seconds), repeats: false)
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
-      }
-      switch settings.authorizationStatus {
-      case .authorized, .provisional, .ephemeral:
-        fire()
-      case .notDetermined:
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-          if granted { fire() }
-        }
-      default:
-        break   // denied — the Live Activity countdown still shows
-      }
-    }
-  }
-
-  static func cancel() {
-    UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [id])
-  }
-}
-#endif
-
 // Training mini-app — historical log of exercise entries grouped by
 // session (date + session-type pair). Uses the new LogRow since entries
 // aren't checklist items; they're records of what already happened.
@@ -1523,21 +1480,24 @@ final class TrainingDraftStore {
   /// Currently active draft. Nil when no session is in flight.
   var draft: DraftSession?
 
-  /// Rest-timer preference (seconds; 0 = off). Read from UserDefaults so it
-  /// stays in sync with the `@AppStorage` Settings control.
-  static let restSecondsKey = "training.restSeconds"
-  static let defaultRestSeconds = 120
-  private var restSeconds: Int {
-    (UserDefaults.standard.object(forKey: Self.restSecondsKey) as? Int) ?? Self.defaultRestSeconds
-  }
-  /// Fires when the current rest expires → clears the countdown + buzzes.
-  private var restClearTask: Task<Void, Never>?
+  /// After logging a set, open the next pending exercise automatically.
+  /// Device-local presentation pref — default on (historical behavior).
+  static let autoAdvanceKey = "training.autoAdvanceNextExercise"
+  static let defaultAutoAdvance = true
 
   init() {
     if let data = UserDefaults.standard.data(forKey: Self.key),
-       let decoded = try? JSONDecoder().decode(DraftSession.self, from: data) {
+       var decoded = try? JSONDecoder().decode(DraftSession.self, from: data) {
+      Self.backfillDoneOrderIfNeeded(&decoded)
       draft = decoded
     }
+  }
+
+  /// Older persisted drafts have no `doneOrder`; seed it from routine order
+  /// of already-done entries so resumed sessions list correctly.
+  private static func backfillDoneOrderIfNeeded(_ d: inout DraftSession) {
+    guard d.doneOrder.isEmpty else { return }
+    d.doneOrder = d.entries.filter { $0.status == .done }.map(\.exercise)
   }
 
   // MARK: - Persistence
@@ -1650,6 +1610,7 @@ final class TrainingDraftStore {
         if (d.entries[i].reps ?? "").isEmpty, let v = l.reps { d.entries[i].reps = v }
       }
     }
+    Self.backfillDoneOrderIfNeeded(&d)
     draft = d
     persist()
   }
@@ -1756,7 +1717,6 @@ final class TrainingDraftStore {
   }
 
   func discard(endLiveActivity: Bool = true) {
-    cancelRest()
     #if os(iOS)
     if endLiveActivity {
       TrainingLiveActivityCoordinator.shared.end(from: draft, immediate: true)
@@ -1764,46 +1724,6 @@ final class TrainingDraftStore {
     #endif
     draft = nil
     persist()
-  }
-
-  // MARK: - Rest timer
-  //
-  // A between-sets countdown surfaced in the Dynamic Island / Live Activity so
-  // the phone can go back in the bag. Started when a *strength* set is logged
-  // (cardio/mobility have no rest), cleared on the next set, finish, or expiry.
-  // The visible countdown is the Live Activity's own `Text(timerInterval:)`;
-  // the at-zero buzz is a local notification (works while suspended) plus an
-  // in-app success haptic when the app is foreground at expiry.
-
-  private func startRest() {
-    let secs = restSeconds
-    guard secs > 0 else { return }
-    let end = Date().addingTimeInterval(TimeInterval(secs))
-    update { $0.restEndsAt = end }   // pushes the Live Activity with the countdown
-    #if os(iOS)
-    RestNotifier.schedule(after: TimeInterval(secs))
-    #endif
-    restClearTask?.cancel()
-    restClearTask = Task { @MainActor [weak self] in
-      try? await Task.sleep(for: .seconds(Double(secs)))
-      guard !Task.isCancelled, let self else { return }
-      // Only clear if this is still the rest we started (a newer set would
-      // have rescheduled with a later deadline).
-      guard let cur = self.draft?.restEndsAt, cur <= Date().addingTimeInterval(0.5) else { return }
-      self.update { $0.restEndsAt = nil }
-      Haptics.success()
-    }
-  }
-
-  func cancelRest() {
-    restClearTask?.cancel()
-    restClearTask = nil
-    #if os(iOS)
-    RestNotifier.cancel()
-    #endif
-    if draft?.restEndsAt != nil {
-      update { $0.restEndsAt = nil }
-    }
   }
 
   // MARK: - Mutate
@@ -1852,7 +1772,10 @@ final class TrainingDraftStore {
       return
     }
 
-    update { $0.entries[index].status = .saving }
+    update {
+      $0.noteExerciseCompleted(entry.exercise)
+      $0.entries[index].status = .saving
+    }
     let saved = mutator.addEntry(
       date: d.date,
       time: d.time,
@@ -1871,11 +1794,6 @@ final class TrainingDraftStore {
     update {
       $0.entries[index].status = .done
       $0.entries[index].savedFile = saved.id
-    }
-    // A logged strength set starts the between-sets rest; cardio/mobility
-    // don't rest, and edits (the savedFile branch above) return before here.
-    if !entry.isCardio && !entry.isMobility {
-      startRest()
     }
   }
 
@@ -1929,11 +1847,13 @@ final class TrainingDraftStore {
   func switchExercise(at index: Int, to name: String, context: ModelContext) {
     update {
       guard $0.entries.indices.contains(index) else { return }
+      let old = $0.entries[index].exercise
       let key = exerciseKey(name)
       let clash = $0.entries.enumerated().contains { i, e in
         i != index && exerciseKey(e.exercise) == key
       }
       guard !clash else { return }
+      $0.doneOrder.removeAll { $0 == old }
       $0.entries[index] = makePrefilledEntry(name, into: &$0, context: context)
     }
   }
@@ -1977,11 +1897,13 @@ final class TrainingDraftStore {
   /// keeps the slot greyed on the list for later.
   func removeEntry(at index: Int, mutator: TrainingMutator) {
     guard let d = draft, d.entries.indices.contains(index) else { return }
+    let exercise = d.entries[index].exercise
     if let savedID = d.entries[index].savedFile {
       mutator.deleteEntry(id: savedID)
     }
     update {
       guard $0.entries.indices.contains(index) else { return }
+      $0.doneOrder.removeAll { $0 == exercise }
       $0.entries.remove(at: index)
     }
   }
@@ -2191,7 +2113,7 @@ struct TrainingSessionView: View {
           .listRowSeparator(.hidden)
           .listRowBackground(Color.clear)
           .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-        ForEach(orderedEntries(d), id: \.exercise) { e in
+        ForEach(d.entriesForActiveList, id: \.exercise) { e in
           // `index` must be the entry's real slot in `draft.entries`
           // (store mutations key off it), even though the rows render
           // in completed-first order.
@@ -2344,21 +2266,6 @@ struct TrainingSessionView: View {
     store.start(type: type, context: modelContext)
   }
 
-  /// Entries reordered so finished sets (done / mid-save) float to the top,
-  /// leaving everything still to do clustered at the bottom of the list —
-  /// glance at the bottom to see what's left. Pending and skipped rows keep
-  /// their routine order below the done block. A stable secondary sort on the
-  /// original index keeps each group's internal order steady (Swift's sort
-  /// isn't stable on its own).
-  private func orderedEntries(_ d: DraftSession) -> [DraftEntry] {
-    func settled(_ s: DraftEntry.Status) -> Bool { s == .done || s == .saving }
-    return d.entries.enumerated().sorted { a, b in
-      let sa = settled(a.element.status), sb = settled(b.element.status)
-      if sa != sb { return sa }
-      return a.offset < b.offset
-    }.map(\.element)
-  }
-
   private func finish() {
     // Snapshot the draft *before* discarding — the completion sheet
     // needs its entries, started-at, and PR baselines. Routine kind
@@ -2392,12 +2299,6 @@ struct TrainingSessionView: View {
   }
 }
 
-// MARK: - Rest timer bar
-
-/// Pinned-bottom rest countdown that appears after a resistance set is
-/// logged. Drives off an absolute end-time so backgrounding doesn't drift
-/// it; a success haptic fires and the bar clears itself at zero. ±15s and
-/// Skip give quick manual control.
 // MARK: - Editor selection token
 
 /// Identifies which exercise's editor drawer is open (tap-to-drill). Keyed by
@@ -2587,6 +2488,7 @@ struct TrainingExerciseRow: View {
 struct TrainingExerciseEditor: View {
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.modelContext) private var modelContext
+  @AppStorage(TrainingDraftStore.autoAdvanceKey) private var autoAdvanceNext = TrainingDraftStore.defaultAutoAdvance
 
   let exercise: String
   let accent: Color
@@ -2773,10 +2675,10 @@ struct TrainingExerciseEditor: View {
   }
 
   /// After logging: a fresh completion advances to the next still-pending
-  /// exercise (its `.saving`/`.done` status excludes it from the search);
-  /// re-saving an already-logged one just closes the drawer.
+  /// exercise when auto-advance is on; re-saving an already-logged one just
+  /// closes the drawer either way.
   private func handleLogged(wasDone: Bool) {
-    if wasDone {
+    if wasDone || !autoAdvanceNext {
       selection = nil
       return
     }

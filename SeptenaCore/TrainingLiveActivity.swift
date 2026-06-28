@@ -13,9 +13,6 @@ struct TrainingActivityAttributes: ActivityAttributes {
     /// resolves it when building the state. Stored data stays kg.
     var lifted: Int
     var liftedUnit: String
-    /// Rest-timer deadline. When in the future the widget shows a countdown
-    /// (instead of session-elapsed); nil / past means not resting.
-    var restEndsAt: Date?
   }
 
   var sessionID: String

@@ -89,8 +89,7 @@ final class TrainingLiveActivityCoordinator {
           nextExercise: nil,
           cardioMinutes: 0,
           lifted: 0,
-          liftedUnit: WeightUnit.current.suffix,
-          restEndsAt: nil
+          liftedUnit: WeightUnit.current.suffix
         ),
         staleDate: nil
       )
@@ -113,10 +112,7 @@ final class TrainingLiveActivityCoordinator {
       nextExercise: draft.nextPendingIndex.map { draft.entries[$0].exercise.liveActivityDisplayName },
       cardioMinutes: Int(draft.completedCardioMinutes.rounded()),
       lifted: Int(unit.display(draft.completedLiftedKg).rounded()),
-      liftedUnit: unit.suffix,
-      // Only forward a still-future deadline so a stale draft never opens the
-      // Live Activity already "resting".
-      restEndsAt: draft.restEndsAt.flatMap { $0 > Date() ? $0 : nil }
+      liftedUnit: unit.suffix
     )
   }
 }

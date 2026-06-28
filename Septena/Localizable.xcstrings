@@ -1404,7 +1404,7 @@
         }
       }
     },
-    "After each strength set, a countdown runs in the Dynamic Island so the phone can go back in your bag — with an alert when it's time to lift again." : {
+    "After saving a set, open the next pending exercise automatically. Turn off to stay on the session list." : {
 
     },
     "Afternoon" : {
@@ -6280,9 +6280,6 @@
     "Research" : {
 
     },
-    "Rest timer" : {
-
-    },
     "Restless" : {
       "localizations" : {
         "pt-BR" : {
@@ -6664,6 +6661,9 @@
           }
         }
       }
+    },
+    "Session" : {
+
     },
     "SESSION COMPLETE" : {
       "localizations" : {

@@ -24,5 +24,9 @@
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.septena.cloud</string>
+	<key>WKSupportsLiveActivityLaunchAttributeTypes</key>
+	<array>
+		<string>TrainingActivityAttributes</string>
+	</array>
 </dict>
 </plist>

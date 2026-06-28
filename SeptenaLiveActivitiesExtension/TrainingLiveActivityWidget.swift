@@ -12,9 +12,7 @@ struct SeptenaLiveActivitiesBundle: WidgetBundle {
 struct TrainingLiveActivityWidget: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: TrainingActivityAttributes.self) { context in
-      TrainingLockScreenView(context: context)
-        .padding(16)
-        .widgetURL(URL(string: "septena://training/active"))
+      TrainingActivityRootView(context: context)
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
@@ -28,19 +26,14 @@ struct TrainingLiveActivityWidget: Widget {
           }
         }
         DynamicIslandExpandedRegion(.trailing) {
-          sessionTimer(context.state, startedAt: context.attributes.startedAt,
-                       font: .caption)
+          sessionTimer(startedAt: context.attributes.startedAt, font: .caption)
         }
         DynamicIslandExpandedRegion(.bottom) {
           VStack(alignment: .leading, spacing: 6) {
             ProgressView(value: Double(context.state.doneCount),
                          total: Double(max(context.state.totalCount, 1)))
-            if isResting(context.state) {
-              Text("Resting")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
-            } else if let next = context.state.nextExercise {
-              Text("Next: \(next)")
+            if let exercise = activeExerciseName(context.state) {
+              Text(exercise)
                 .font(.caption)
                 .lineLimit(1)
             }
@@ -48,17 +41,70 @@ struct TrainingLiveActivityWidget: Widget {
         }
       } compactLeading: {
         Image(systemName: context.attributes.sessionIcon)
-          .foregroundStyle(isResting(context.state) ? .orange : .primary)
       } compactTrailing: {
-        sessionTimer(context.state, startedAt: context.attributes.startedAt,
-                     font: .caption2)
+        sessionTimer(startedAt: context.attributes.startedAt, font: .caption2)
           .frame(maxWidth: 44)
       } minimal: {
         Image(systemName: context.attributes.sessionIcon)
-          .foregroundStyle(isResting(context.state) ? .orange : .primary)
       }
       .widgetURL(URL(string: "septena://training/active"))
     }
+    .supplementalActivityFamilies([.small])
+  }
+}
+
+/// Routes lock-screen (`.medium`) vs watch Smart Stack (`.small`) layouts.
+private struct TrainingActivityRootView: View {
+  @Environment(\.activityFamily) private var activityFamily
+  let context: ActivityViewContext<TrainingActivityAttributes>
+
+  var body: some View {
+    Group {
+      switch activityFamily {
+      case .small:
+        TrainingWatchStackView(context: context)
+      default:
+        TrainingLockScreenView(context: context)
+          .padding(16)
+      }
+    }
+    .widgetURL(URL(string: "septena://training/active"))
+  }
+}
+
+/// watchOS Smart Stack / app-switcher card — compact, exercise-forward.
+private struct TrainingWatchStackView: View {
+  let context: ActivityViewContext<TrainingActivityAttributes>
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 8) {
+      Image(systemName: context.attributes.sessionIcon)
+        .font(.body.weight(.semibold))
+        .foregroundStyle(.secondary)
+
+      VStack(alignment: .leading, spacing: 1) {
+        Text(headline)
+          .font(.headline)
+          .lineLimit(1)
+        HStack(spacing: 4) {
+          if context.state.totalCount > 1 {
+            Text(progressText(context.state))
+            Text("·")
+          }
+          sessionTimer(startedAt: context.attributes.startedAt, font: .caption2)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+      }
+
+      Spacer(minLength: 0)
+    }
+  }
+
+  /// Pending exercise name when in flight; session label when wrapping up.
+  private var headline: String {
+    activeExerciseName(context.state) ?? context.attributes.sessionLabel
   }
 }
 
@@ -75,16 +121,15 @@ private struct TrainingLockScreenView: View {
           Text(context.attributes.sessionLabel)
             .font(.headline)
             .lineLimit(1)
-          if let next = context.state.nextExercise {
-            Text("Next: \(next)")
+          if let exercise = activeExerciseName(context.state) {
+            Text(exercise)
               .font(.subheadline)
               .foregroundStyle(.secondary)
               .lineLimit(1)
           }
         }
         Spacer(minLength: 8)
-        sessionTimer(context.state, startedAt: context.attributes.startedAt,
-                     font: .headline)
+        sessionTimer(startedAt: context.attributes.startedAt, font: .headline)
       }
 
       ProgressView(value: Double(context.state.doneCount),
@@ -110,28 +155,17 @@ private struct TrainingLockScreenView: View {
   }
 }
 
+private func activeExerciseName(_ state: TrainingActivityAttributes.ContentState) -> String? {
+  guard let name = state.nextExercise, !name.isEmpty else { return nil }
+  return name
+}
+
 private func progressText(_ state: TrainingActivityAttributes.ContentState) -> String {
   "\(state.doneCount)/\(max(state.totalCount, 1))"
 }
 
-private func isResting(_ state: TrainingActivityAttributes.ContentState) -> Bool {
-  (state.restEndsAt ?? .distantPast) > Date()
-}
-
-/// While resting, an orange countdown to the rest deadline; otherwise the
-/// session-elapsed clock. Both use `Text(timerInterval:)` so the system ticks
-/// them without app updates.
-@ViewBuilder
-private func sessionTimer(_ state: TrainingActivityAttributes.ContentState,
-                          startedAt: Date, font: Font) -> some View {
-  if let rest = state.restEndsAt, rest > Date() {
-    Text(timerInterval: Date.now...rest, countsDown: true)
-      .font(font.monospacedDigit())
-      .foregroundStyle(.orange)
-      .lineLimit(1)
-  } else {
-    Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
-      .font(font.monospacedDigit())
-      .lineLimit(1)
-  }
+private func sessionTimer(startedAt: Date, font: Font) -> some View {
+  Text(timerInterval: startedAt...Date.distantFuture, countsDown: false)
+    .font(font.monospacedDigit())
+    .lineLimit(1)
 }

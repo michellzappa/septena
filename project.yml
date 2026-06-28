@@ -236,6 +236,10 @@ targets:
         CFBundleDisplayName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.cloud
+        # Tap a training Live Activity card on the wrist → open the Watch app
+        # (routes to the training summary via `NextWatchView.onOpenURL`).
+        WKSupportsLiveActivityLaunchAttributeTypes:
+          - TrainingActivityAttributes
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig

@@ -2046,12 +2046,10 @@ struct DraftSession: Codable, Hashable {
   /// captured at start() and frozen for the workout. Drives the compact
   /// "last 3" table inside each card's expanded editor.
   var recentByExercise: [String: [RecentExerciseEntry]] = [:]
-  /// When the current between-sets rest ends, or nil when not resting.
-  /// Set on logging a strength set, cleared on expiry / next set / finish.
-  /// Transient: persisted with the draft (local UserDefaults only) so a
-  /// relaunch mid-rest restores the countdown; a stale past value reads as
-  /// "not resting" everywhere it's consumed.
-  var restEndsAt: Date? = nil
+  /// Exercise slugs in the order they were first marked done — drives the
+  /// active-session list so the first completed set stays at the top even
+  /// when the user works out of routine order or moves slots.
+  var doneOrder: [String] = []
 
   /// Index of the next pending entry, or nil if everything's done/skipped.
   var nextPendingIndex: Int? {
@@ -2075,6 +2073,31 @@ struct DraftSession: Codable, Hashable {
     let anyCardio   = active.contains { $0.isCardio }
     let anyStrength = active.contains { !$0.isCardio && !$0.isMobility }
     return (anyCardio && anyStrength) ? .mixed : .strength
+  }
+
+  /// Record the first completion of `exercise` for active-list ordering.
+  mutating func noteExerciseCompleted(_ exercise: String) {
+    guard !doneOrder.contains(exercise) else { return }
+    doneOrder.append(exercise)
+  }
+
+  /// Entries ordered for the active-session logger: finished sets at the top
+  /// in completion order (first logged first), pending/skipped below in
+  /// routine order.
+  var entriesForActiveList: [DraftEntry] {
+    func settled(_ s: DraftEntry.Status) -> Bool { s == .done || s == .saving }
+    let completionRank = Dictionary(
+      uniqueKeysWithValues: doneOrder.enumerated().map { ($0.element, $0.offset) })
+    return entries.enumerated().sorted { a, b in
+      let sa = settled(a.element.status), sb = settled(b.element.status)
+      if sa != sb { return sa }
+      if sa {
+        let ra = completionRank[a.element.exercise] ?? Int.max
+        let rb = completionRank[b.element.exercise] ?? Int.max
+        if ra != rb { return ra < rb }
+      }
+      return a.offset < b.offset
+    }.map(\.element)
   }
 }
 

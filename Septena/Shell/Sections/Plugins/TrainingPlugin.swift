@@ -248,7 +248,7 @@ enum TrainingPlugin: SectionPlugin {
 
 private struct TrainingDetailContent: View {
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
-  @AppStorage(TrainingDraftStore.restSecondsKey) private var restSeconds = TrainingDraftStore.defaultRestSeconds
+  @AppStorage(TrainingDraftStore.autoAdvanceKey) private var autoAdvanceNext = TrainingDraftStore.defaultAutoAdvance
 
   var body: some View {
     Section("Training") {
@@ -271,26 +271,13 @@ private struct TrainingDetailContent: View {
       Text("Effort scale")
     }
     Section {
-      Stepper(value: $restSeconds, in: 0...300, step: 15) {
-        HStack {
-          Text("Rest timer")
-          Spacer()
-          Text(restSeconds == 0 ? "Off" : restLabel(restSeconds))
-            .foregroundStyle(.secondary)
-            .monospacedDigit()
-        }
-      }
-      Text("After each strength set, a countdown runs in the Dynamic Island so the phone can go back in your bag — with an alert when it's time to lift again.")
+      Toggle("Auto-advance to next exercise", isOn: $autoAdvanceNext)
+      Text("After saving a set, open the next pending exercise automatically. Turn off to stay on the session list.")
         .font(.caption)
         .foregroundStyle(.secondary)
     } header: {
-      Text("Rest timer")
+      Text("Session")
     }
-  }
-
-  /// "90s" under a minute, "2:00" / "2:30" above.
-  private func restLabel(_ s: Int) -> String {
-    s < 60 ? "\(s)s" : "\(s / 60):\(String(format: "%02d", s % 60))"
   }
 }
 
