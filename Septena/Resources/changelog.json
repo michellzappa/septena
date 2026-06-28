@@ -4,54 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1225,
+      "build": 1227,
       "date": "2026-06-28",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Tasks gets inline editing and quick capture",
-          "detail": "Rename tasks in place, add new ones from a quick-add line, and navigate with a Things-style menu and native keyboard selection.",
+          "title": "Edit and add tasks right in the list",
+          "detail": "Rename tasks in place, jot new ones from a quick-add line, and duplicate with a tap.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "A Recently Deleted view keeps removed tasks for 30 days with one-tap restore before they auto-purge.",
+          "title": "Your calendar now shows up in Today",
+          "detail": "Upcoming calendar events are woven into Today and Upcoming alongside your tasks.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, so you can restore anything by mistake.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring your existing tasks over from a Things database export.",
+          "detail": "Bring your existing tasks across from a Things database export.",
           "section": "tasks"
-        },
-        {
-          "title": "See your calendar alongside your tasks",
-          "detail": "Calendar events are woven into Today and Upcoming, with hidden-calendar choices synced across your devices.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center on the week dashboard.",
-          "section": "goals"
         },
         {
           "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture analyzes food on-device to fill in the details.",
+          "detail": "Capture a meal from a photo and let on-device analysis estimate it.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training review",
-          "detail": "Muscle volume is now effort-weighted, with a weekly review after each session and a unified daily-trend chart.",
+          "title": "Smarter strength tracking",
+          "detail": "Muscle volume is now weighted by effort, with a weekly review after each session.",
           "section": "training"
         },
         {
-          "title": "A calmer, clearer home and watch",
-          "detail": "The Week tab is now Today, the dashboard glows with a day-aligned sky, and the watch adds a time-of-day sky and quick action drawers for Next items.",
-          "section": null
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most front and center on the week view.",
+          "section": "goals"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels let you pick exactly what telemetry is sent, with a log of what's recently been shared.",
+          "title": "Choose how much analytics you share",
+          "detail": "Pick from Off, Minimal, Balanced, or Full, see exactly what's sent, and review a log of recent activity.",
           "section": null
         }
       ]
