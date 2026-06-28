@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 // Sky wash — the front door's top gradient is the *real* current sky.
 //
@@ -32,25 +29,6 @@ import UIKit
 struct SkyTopWash: View {
   @Environment(DayClock.self) private var clock
   @Environment(\.colorScheme) private var colorScheme
-
-  /// Only iPad reserves the unpaintable top band (the iPadOS top system chrome)
-  /// that needs the soft top-fade seam, so the wash melts to the page
-  /// background there instead of cutting a sky-coloured line under it. iPhone
-  /// (any orientation) and Mac let the wash bleed to the very top edge, so they
-  /// want a hard `.white` top stop — gradient all the way up.
-  ///
-  /// Keyed off the device *idiom*, not the horizontal size class: the reserved
-  /// band is physical to iPad and present at every width, whereas size class
-  /// gets it wrong both ways — an iPhone in landscape ("widescreen") reports
-  /// `.regular` and would wrongly fade, while an iPad in a narrow split-view
-  /// reports `.compact` and would wrongly bleed sky under its top chrome.
-  private var needsTopFadeSeam: Bool {
-    #if os(iOS)
-    return UIDevice.current.userInterfaceIdiom == .pad
-    #else
-    return false
-    #endif
-  }
 
   @State private var stops: [SkyAtmosphere.Stop] = []
 
@@ -128,14 +106,8 @@ struct SkyTopWash: View {
     //      fully clear by the band's foot across the WHOLE width, so it can
     //      never end in a hard edge regardless of window proportions.
     // Held full through the dial (real colour for the glass donut to refract),
-    // gone by the foot. `archDepth` controls how curvy. The top edge is
-    // platform-dependent (see `needsTopFadeSeam`): iPhone + Mac hold full
-    // colour to the very top so the wash bleeds to the screen edge, but iPad
-    // reserves an unpaintable band at the top of the window (above every tab's
-    // content area — not the status bar, which can be hidden and the band
-    // remains). The wash can't reach into it, so a hard top edge would read as
-    // a crisp line where the band meets the sky. Ramping the iPad wash up from
-    // clear over its top ~8% turns that seam into a soft fade instead.
+    // gone by the foot. `archDepth` controls how curvy. Full colour to the top
+    // edge so the wash bleeds to the screen edge on every platform.
     .mask(
       EllipticalGradient(
         stops: [
@@ -150,12 +122,8 @@ struct SkyTopWash: View {
     )
     .mask(
       LinearGradient(stops: [
-        // iPad eases up from clear over the top ~8% to soften the seam against
-        // its reserved top band; iPhone + Mac hold full colour to the top edge.
-        needsTopFadeSeam ? .init(color: .clear, location: 0)
-                         : .init(color: .white, location: 0),
-        needsTopFadeSeam ? .init(color: .white.opacity(0.55), location: 0.035)
-                         : .init(color: .white, location: 0.035),
+        .init(color: .white, location: 0),
+        .init(color: .white, location: 0.035),
         .init(color: .white, location: 0.08),
         .init(color: .white, location: 0.80),
         .init(color: .white.opacity(0.5), location: 0.92),
