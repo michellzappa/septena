@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1254,
+      "build": 1257,
       "date": "2026-06-29",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Tasks gets calendar, a Today tab, and faster editing",
-          "detail": "Your calendar events now weave into Today and Upcoming, the Week tab is renamed Today, and you can rename tasks in place and add new ones from a quick-add line.",
+          "title": "A faster way to work with tasks",
+          "detail": "Edit task titles inline, add tasks from a quick-add line, and undo deletes, moves, and defers from a confirmation toast.",
           "section": "tasks"
         },
         {
-          "title": "Undo task changes and recover deleted tasks",
-          "detail": "Delete, move, and defer now show an undo toast, and a Recently Deleted view keeps tasks for 30 days so you can restore them.",
+          "title": "Recently Deleted tasks with restore",
+          "detail": "Deleted tasks now wait 30 days in a Recently Deleted view where you can restore them before they auto-purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events appear alongside tasks, with hidden-calendar choices synced across your devices.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
+          "detail": "Bring an existing task list over from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Pinned goals show up as tiles on the home dashboard so your targets stay in view.",
-          "section": "goals"
-        },
-        {
-          "title": "Smoother training sessions with a weekly muscle review",
-          "detail": "Sessions auto-advance between sets with a watch Live Activity, and a post-session review summarizes effort-weighted muscle volume for the week.",
-          "section": "training"
-        },
-        {
-          "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture analyzes your food on-device.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and have it analyzed on-device, with a flourish when you break a fast.",
           "section": "nutrition"
         },
         {
-          "title": "Personalize your intake trackers with emoji",
-          "detail": "Add your own emoji to tracker methods and varieties, with a sensible symbol guessed when none is set.",
-          "section": "intake"
+          "title": "Smoother training sessions",
+          "detail": "Start a session by intent or Control Center, flow set-to-set with auto-advance and a watch Live Activity, and get an effort-weighted weekly muscle review.",
+          "section": "training"
         },
         {
-          "title": "Choose how much telemetry you share",
-          "detail": "A graded privacy ladder (off, minimal, balanced, full) lets you see exactly what's sent and review a log of recent events.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals you care about as tiles right on the week dashboard.",
+          "section": "goals"
+        },
+        {
+          "title": "Choose exactly what telemetry you share",
+          "detail": "A graded analytics setting (off to full) lets you see what's sent and review a log of recent activity.",
           "section": null
         }
       ]
