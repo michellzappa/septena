@@ -28,8 +28,10 @@ enum LogCommitStyle: Equatable {
   case flourish(motion: CommitMotion, accent: Color, intensity: Double,
                 caption: String? = nil, voteEyebrow: Bool = true)
   /// Habit-streak milestone — radiating rings with the streak number
-  /// popping in. Fired when a streak crosses a milestone rung.
-  case ignition(accent: Color, streak: Int)
+  /// popping in. Fired when a streak crosses a milestone rung. `subject` is
+  /// the habit (or scope) name so the card reads as "Meditate · 30 days",
+  /// not a bare number.
+  case ignition(accent: Color, streak: Int, subject: String)
   /// Generalized milestone moment — same ignition choreography with a
   /// headline + caption instead of a streak count. Fired for training PRs
   /// and goal target/held rungs (see MilestonePresenter).
@@ -130,8 +132,8 @@ struct LogCommitStyleView: View {
                      intensity: intensity, trigger: trigger,
                      dialAnchor: motion == .arc ? dialAnchor : nil,
                      caption: caption, voteEyebrow: voteEyebrow)
-    case .ignition(let accent, let streak):
-      IgnitionView(accent: accent, streak: streak, trigger: trigger)
+    case .ignition(let accent, let streak, let subject):
+      IgnitionView(accent: accent, streak: streak, subject: subject, trigger: trigger)
     case .milestone(let accent, let headline, let caption):
       IgnitionView(accent: accent, headline: headline, caption: caption,
                    trigger: trigger)
@@ -158,18 +160,27 @@ struct IgnitionView: View {
   let accent: Color
   let headline: String
   let caption: String
+  /// What the streak is for — habit name, etc. Shown above the number.
+  let subject: String?
   let trigger: Int
 
   /// Streak convenience — the original habit-milestone form.
-  init(accent: Color, streak: Int, trigger: Int) {
+  init(accent: Color, streak: Int, subject: String, trigger: Int) {
     self.init(accent: accent, headline: "\(streak)", caption: "DAY STREAK",
-              trigger: trigger)
+              subject: subject, trigger: trigger)
   }
 
   init(accent: Color, headline: String, caption: String, trigger: Int) {
+    self.init(accent: accent, headline: headline, caption: caption,
+              subject: nil, trigger: trigger)
+  }
+
+  init(accent: Color, headline: String, caption: String,
+       subject: String?, trigger: Int) {
     self.accent = accent
     self.headline = headline
     self.caption = caption
+    self.subject = subject
     self.trigger = trigger
   }
 
@@ -187,7 +198,16 @@ struct IgnitionView: View {
           .frame(width: 150, height: 150)
           .scaleEffect(ringScale + CGFloat(i) * 0.35)
       }
-      VStack(spacing: 2) {
+      VStack(spacing: 4) {
+        if let subject, !subject.isEmpty {
+          Text(subject)
+            .font(.septenaBadge)
+            .textCase(.uppercase)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(accent)
+            .lineLimit(2)
+            .padding(.horizontal, 24)
+        }
         Text(headline)
           .scaledFont(size: 64, weight: .bold, design: .rounded, relativeTo: .largeTitle)
           .monospacedDigit()

@@ -2122,7 +2122,7 @@ struct MotionGalleryPane: View {
   @ViewBuilder
   private var flourishOverlay: some View {
     if current == .ignition {
-      IgnitionView(accent: accent, streak: streak, trigger: trigger)
+      IgnitionView(accent: accent, streak: streak, subject: "Habit", trigger: trigger)
         .allowsHitTesting(false)
     } else if let motion = current.motion {
       // The gallery exists to feel motions on demand, so it bypasses the

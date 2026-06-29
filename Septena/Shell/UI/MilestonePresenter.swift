@@ -41,7 +41,8 @@ enum MilestonePresenter {
     let accent = theme.color(for: sectionKey(scope: m.scope))
     switch m.kind {
     case "streak":
-      return .ignition(accent: accent, streak: Int(m.value))
+      return .ignition(accent: accent, streak: Int(m.value),
+                       subject: streakSubject(for: m))
     case "pr":
       return .milestone(accent: accent, headline: MilestoneUnits.headline(m),
                         caption: caption(for: m))
@@ -71,6 +72,13 @@ enum MilestonePresenter {
     case "streak": return 2
     default: return 1
     }
+  }
+
+  /// Habit (or scope) name for a streak card — the part before the colon in
+  /// labels like "Meditate: 30-day streak".
+  private static func streakSubject(for m: GoalMilestoneEntity) -> String {
+    guard let colon = m.label.firstIndex(of: ":") else { return m.label }
+    return String(m.label[..<colon]).trimmingCharacters(in: .whitespaces)
   }
 
   /// Short all-caps caption under the headline number. The full sentence
