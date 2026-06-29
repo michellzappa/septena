@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1250,
+      "build": 1254,
       "date": "2026-06-29",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Tasks gets inline editing and quick capture",
-          "detail": "Create and rename tasks in place, drop a quick-add line at the foot of any list, and import from a Things export.",
+          "title": "Tasks gets calendar, a Today tab, and faster editing",
+          "detail": "Your calendar events now weave into Today and Upcoming, the Week tab is renamed Today, and you can rename tasks in place and add new ones from a quick-add line.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar now appears in Tasks",
-          "detail": "System calendar events weave into Today and Upcoming, with hidden-calendar choices synced across your devices.",
+          "title": "Undo task changes and recover deleted tasks",
+          "detail": "Delete, move, and defer now show an undo toast, and a Recently Deleted view keeps tasks for 30 days so you can restore them.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted tasks with restore",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, with undo before they auto-purge.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring an existing Things database export straight into Septena.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and Septena analyzes it on-device to log your nutrition.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most front and center as week-dashboard tiles.",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Pinned goals show up as tiles on the home dashboard so your targets stay in view.",
           "section": "goals"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Start a session by voice, follow an auto-advancing flow with a watch Live Activity, and review effort-weighted muscle volume each week.",
+          "title": "Smoother training sessions with a weekly muscle review",
+          "detail": "Sessions auto-advance between sets with a watch Live Activity, and a post-session review summarizes effort-weighted muscle volume for the week.",
           "section": "training"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded telemetry levels from off to full, with a clear view of exactly what's sent and a log of recent activity.",
-          "section": null
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture analyzes your food on-device.",
+          "section": "nutrition"
         },
         {
-          "title": "A more capable Apple Watch",
-          "detail": "Long-press action drawers, a time-of-day sky behind the Next feed, interactive intake nudges, and a fasting complication that morphs overnight.",
+          "title": "Personalize your intake trackers with emoji",
+          "detail": "Add your own emoji to tracker methods and varieties, with a sensible symbol guessed when none is set.",
+          "section": "intake"
+        },
+        {
+          "title": "Choose how much telemetry you share",
+          "detail": "A graded privacy ladder (off, minimal, balanced, full) lets you see exactly what's sent and review a log of recent events.",
           "section": null
         }
       ]
