@@ -211,6 +211,103 @@ final class PromoteFlashStore {
   }
 }
 
+// MARK: - Transient snackbar toast
+//
+// Bottom glass-capsule confirmations (delete / move / defer) with an optional
+// Undo. Host surfaces own a `SeptenaToastStore` @State, inject it via
+// `.septenaToastStore(_)` on the root, and attach `.septenaToastOverlay(store:)`
+// once. The overlay takes the store directly — `@Environment` can't see values
+// injected on the modified content beneath an outer modifier.
+
+struct SeptenaToast: Identifiable {
+  let id = UUID()
+  var message: String
+  var duration: Double = 7
+  var undo: (() -> Void)?
+}
+
+@MainActor
+@Observable
+final class SeptenaToastStore {
+  var current: SeptenaToast?
+
+  func show(_ message: String, undo: (() -> Void)? = nil, duration: Double = 7) {
+    current = SeptenaToast(message: message, duration: duration, undo: undo)
+  }
+
+  func dismiss() {
+    current = nil
+  }
+}
+
+private struct SeptenaToastStoreKey: EnvironmentKey {
+  static let defaultValue: SeptenaToastStore? = nil
+}
+
+extension EnvironmentValues {
+  var septenaToast: SeptenaToastStore? {
+    get { self[SeptenaToastStoreKey.self] }
+    set { self[SeptenaToastStoreKey.self] = newValue }
+  }
+}
+
+extension View {
+  /// Publish a toast store to descendant views (e.g. `TaskRowActions`).
+  func septenaToastStore(_ store: SeptenaToastStore) -> some View {
+    environment(\.septenaToast, store)
+  }
+}
+
+private struct SeptenaToastOverlay: ViewModifier {
+  let store: SeptenaToastStore
+
+  func body(content: Content) -> some View {
+    content
+      .overlay(alignment: .bottom) { snackbar }
+      .animation(.snappy, value: store.current?.id)
+      .task(id: store.current?.id) {
+        guard let seconds = store.current?.duration else { return }
+        try? await Task.sleep(for: .seconds(seconds))
+        guard !Task.isCancelled else { return }
+        store.dismiss()
+      }
+  }
+
+  @ViewBuilder
+  private var snackbar: some View {
+    if let toast = store.current {
+      HStack(spacing: 12) {
+        Text(toast.message)
+          .font(.callout)
+          .foregroundStyle(.primary)
+          .lineLimit(1)
+        if let undo = toast.undo {
+          Spacer(minLength: 0)
+          Button("Undo") {
+            undo()
+            store.dismiss()
+          }
+          .font(.callout.weight(.semibold))
+          .tint(.accentColor)
+        }
+      }
+      .padding(.horizontal, 20)
+      .padding(.vertical, 14)
+      .glassCapsule()
+      .padding(.horizontal, 20)
+      .padding(.bottom, 16)
+      .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+  }
+}
+
+extension View {
+  /// Attach the shared bottom snackbar for `store` (see `TaskListView`, `NextView`).
+  func septenaToastOverlay(store: SeptenaToastStore) -> some View {
+    modifier(SeptenaToastOverlay(store: store))
+  }
+}
+
 // MARK: - Dynamic-Type-aware tap targets
 //
 // Apple HIG asks for 44×44 pt minimums on iOS and ~24 pt on macOS. WCAG 2.2

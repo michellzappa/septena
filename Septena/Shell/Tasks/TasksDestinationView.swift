@@ -24,6 +24,7 @@ struct TasksDestinationView: View {
   /// Drives the "linger → fade" beat after a check (see `SettleStore`).
   @State private var settle = SettleStore()
   @State private var promoteFlash = PromoteFlashStore()
+  @State private var toastStore = SeptenaToastStore()
 
   /// Open tasks routed into Today (pinned, or scheduled / deadline ≤ today).
   /// Mirrors `LocalCache.tasks(in:filter:.today)`; held in @State so we can
@@ -85,6 +86,8 @@ struct TasksDestinationView: View {
     })
     .tint(accent)
     .environment(promoteFlash)
+    .septenaToastStore(toastStore)
+    .septenaToastOverlay(store: toastStore)
     .task { reload() }
     // A remote completion (another device checked a Today row) would otherwise
     // only surface on the next reopen, with the row silently gone. Ghost-check

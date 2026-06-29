@@ -1577,6 +1577,7 @@ struct TaskRowActions: ViewModifier {
   @State private var repeatTargetId: String?
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
+  @Environment(\.septenaToast) private var toastStore
 
   func body(content: Content) -> some View {
     content
@@ -1612,7 +1613,7 @@ struct TaskRowActions: ViewModifier {
           moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
           onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) }; onChange?() },
-          onDelete: { _ in Haptics.warning(); mutator.delete(id: task.id); onChange?() }
+          onDelete: { _ in applyDelete(task) }
         )
       }
       .modifier(TaskListModalPresenter(
@@ -1649,6 +1650,7 @@ struct TaskRowActions: ViewModifier {
         } else {
           mutator.moveToToday(id: id, today: false)
           mutator.schedule(id: id, date: d)
+          toastStore?.show("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
         }
       } else {
         mutator.schedule(id: id, date: nil)
@@ -1681,6 +1683,8 @@ struct TaskRowActions: ViewModifier {
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
     Haptics.tick()
+    let prevArea = task.area
+    let prevProject = task.project
     if projectId != nil {
       mutator.moveToProject(id: id, project: projectId)
     } else {
@@ -1689,6 +1693,30 @@ struct TaskRowActions: ViewModifier {
     }
     mutator.acknowledge(id: id)
     onChange?()
+    let destName =
+      projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
+      ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
+      ?? "No Project"
+    toastStore?.show("Moved to \(destName)") {
+      if let prevProject {
+        mutator.moveToProject(id: id, project: prevProject)
+      } else {
+        mutator.moveToArea(id: id, area: prevArea)
+        mutator.moveToProject(id: id, project: nil)
+      }
+      onChange?()
+    }
+  }
+
+  private func applyDelete(_ task: SeptenaTask) {
+    Haptics.warning()
+    let title = task.title
+    mutator.delete(id: task.id)
+    onChange?()
+    toastStore?.show(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
+      mutator.restore(id: task.id)
+      onChange?()
+    }
   }
 }
 

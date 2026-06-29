@@ -1682,6 +1682,22 @@ enum SeptenaDate {
   /// gateway, which defaults event times to second precision.
   static var nowHHMMSS: String { secondsTimeFormatter.string(from: Date()) }
 
+  /// Human label for a future scheduled day — "Today", "Tomorrow", weekday
+  /// within the next week, else a short date. Used by task defer toasts and
+  /// upcoming group headers.
+  static func scheduleHeaderLabel(for date: Date) -> String {
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    let target = cal.startOfDay(for: date)
+    let days = cal.dateComponents([.day], from: today, to: target).day ?? 0
+    if days == 0 { return String(localized: "Today", comment: "Relative date") }
+    if days == 1 { return String(localized: "Tomorrow", comment: "Relative date") }
+    let df = DateFormatter()
+    df.locale = .current
+    df.dateFormat = (days < 7) ? "EEEE" : "EEE, MMM d"
+    return df.string(from: date)
+  }
+
   /// Human label for a "yyyy-MM-dd" string: "Today", "Yesterday", the
   /// weekday name within the last week, else "MMM d". Returns the raw
   /// string unchanged if it can't be parsed. Single home for the

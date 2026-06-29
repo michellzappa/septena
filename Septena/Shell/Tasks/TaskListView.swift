@@ -172,6 +172,7 @@ struct TaskListView: View {
   @State private var settle = SettleStore()
   /// One-shot amber flash when a task is pinned to Today (row wash + checkbox pulse).
   @State private var promoteFlash = PromoteFlashStore()
+  @State private var toastStore = SeptenaToastStore()
 
   /// Scroll anchor for the foot (or empty-list top) "New task" quick-add row.
   private static let quickAddScrollID = "task-quick-add"
@@ -357,22 +358,10 @@ struct TaskListView: View {
   @State private var newTodosDismissed: Bool =
     UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
 
-  // Transient bottom snackbar — a confirmation (delete / move / defer) with an
-  // optional Undo. The lifecycle is driven by a `.task(id:)` on the overlay so
-  // SwiftUI owns the dismiss timer (a manually-held `Task` could be orphaned by
-  // a body re-evaluation, which is why an earlier version flickered out early).
-  @State private var toast: TaskToast?
-
-  private struct TaskToast: Identifiable {
-    let id = UUID()
-    var message: String
-    var duration: Double = 7
-    var undo: (() -> Void)?
-  }
-
   var body: some View {
-    let base = taskList
+    let content = taskList
       .environment(promoteFlash)
+      .septenaToastStore(toastStore)
       .modifier(TaskListModalPresenter(
         whenSheet: $whenSheet,
         showingMoveSheet: $showingMoveSheet,
@@ -389,18 +378,7 @@ struct TaskListView: View {
         applyMove: applyMove,
         applyRecurrence: applyRecurrence
       ))
-    let withSnackbar = base.overlay(alignment: .bottom) {
-      deleteSnackbar
-    }
-    .animation(.snappy, value: toast?.id)
-    // SwiftUI-owned dismiss timer: re-runs whenever the toast id changes
-    // (new toast restarts the clock; Undo / nil cancels the pending sleep).
-    .task(id: toast?.id) {
-      guard let seconds = toast?.duration else { return }
-      try? await Task.sleep(for: .seconds(seconds))
-      guard !Task.isCancelled else { return }
-      toast = nil
-    }
+    let withSnackbar = content.septenaToastOverlay(store: toastStore)
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
     // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
@@ -441,37 +419,6 @@ struct TaskListView: View {
         }
       }
     #endif
-  }
-
-  @ViewBuilder
-  private var deleteSnackbar: some View {
-    if let toast {
-      HStack(spacing: 12) {
-        Text(toast.message)
-          .font(.callout)
-          .foregroundStyle(.primary)
-          .lineLimit(1)
-        if let undo = toast.undo {
-          Spacer(minLength: 0)
-          Button("Undo") {
-            undo()
-            self.toast = nil
-          }
-          .font(.callout.weight(.semibold))
-          .tint(.accentColor)
-        }
-      }
-      .padding(.horizontal, 20)
-      .padding(.vertical, 14)
-      // The de-facto-standard toast surface: an iOS 26 Liquid Glass capsule
-      // (the same look Apple Mail / Mimestream use), via our single glass
-      // choke point — `.thinMaterial` capsule on macOS. There is no first-party
-      // Toast view to adopt, so this matches the system aesthetic instead.
-      .glassCapsule()
-      .padding(.horizontal, 20)
-      .padding(.bottom, 16)
-      .transition(.move(edge: .bottom).combined(with: .opacity))
-    }
   }
 
   private var taskList: some View {
@@ -1466,10 +1413,10 @@ struct TaskListView: View {
     }
   }
 
-  /// Present the bottom snackbar. The `.task(id:)` on the overlay owns the
+  /// Present the bottom snackbar. The overlay's `.task(id:)` owns the
   /// auto-dismiss; this just sets the payload (a fresh id restarts the clock).
   private func showToast(_ message: String, undo: (() -> Void)? = nil) {
-    toast = TaskToast(message: message, undo: undo)
+    toastStore.show(message, undo: undo)
   }
 
   /// Persist title/notes from the Details pane. No-op when both fields
@@ -1912,6 +1859,9 @@ struct TaskListView: View {
   private func applySuggestion(task: SeptenaTask,
                                suggestion: SuggestionEngine.Suggestion) {
     Haptics.tick()
+    // Capture the prior filing BEFORE the move so Undo can put it back.
+    let prevArea = task.area
+    let prevProject = task.project
     recordImplicitRejectionIfMismatch(task: task,
                                       chosenKind: suggestion.kind,
                                       chosenId: suggestion.id)
@@ -1925,6 +1875,16 @@ struct TaskListView: View {
     // Filing is engagement — clears the agent cue so the row leaves the Inbox.
     mutator.acknowledge(id: task.id)
     Task { await load() }
+
+    showToast("Moved to \(suggestion.title)") {
+      if let prevProject {
+        mutator.moveToProject(id: task.id, project: prevProject)
+      } else {
+        mutator.moveToArea(id: task.id, area: prevArea)
+        mutator.moveToProject(id: task.id, project: nil)
+      }
+      Task { await load() }
+    }
   }
 
   /// The one-tap "file here" suggestion — Inbox loose captures and area-direct
@@ -2323,16 +2283,7 @@ struct TaskListView: View {
 
   private func dateHeaderLabel(_ ymd: String) -> String {
     guard let date = SeptenaDate.parse(ymd) else { return ymd }
-    let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
-    let target = cal.startOfDay(for: date)
-    let days = cal.dateComponents([.day], from: today, to: target).day ?? 0
-    if days == 0 { return "Today" }
-    if days == 1 { return "Tomorrow" }
-    let df = DateFormatter()
-    df.locale = .current
-    df.dateFormat = (days < 7) ? "EEEE" : "EEE, MMM d"
-    return df.string(from: date)
+    return SeptenaDate.scheduleHeaderLabel(for: date)
   }
 
   // MARK: - Keyboard accessory (iOS)
@@ -2361,7 +2312,7 @@ struct TaskListView: View {
           mutator.schedule(id: id, date: d)
           // Deferring drops the row off Today; confirm where it landed. No
           // Undo — re-opening the When picker is the natural reversal.
-          showToast("Deferred to \(dateHeaderLabel(SeptenaDate.format(d) ?? ""))")
+          showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
         }
       } else {
         mutator.schedule(id: id, date: nil)

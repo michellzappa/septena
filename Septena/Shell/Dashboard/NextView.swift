@@ -33,6 +33,7 @@ struct NextView: View {
   /// `NextRowTag` kind-prefixed id so the cursor maps back to an action.
   @State private var selection: Set<String> = []
   @State private var promoteFlash = PromoteFlashStore()
+  @State private var toastStore = SeptenaToastStore()
 
   /// Tapping a task row (or its "Edit Task" menu item) opens the composer in
   /// edit mode — the same card the Tasks tab uses, which embeds the agent
@@ -374,6 +375,7 @@ struct NextView: View {
       }
     }
     .environment(promoteFlash)
+    .septenaToastStore(toastStore)
     #if os(iOS)
     // Match the Tasks sidebar exactly: insetGrouped cells over the soft gray
     // grouped background (was Theme.paperBackground = white, which left the
@@ -430,6 +432,7 @@ struct NextView: View {
     .focusedSceneValue(\.nextListActions, publishedNextListActions)
     #endif
     .septenaInlineTitle()
+    .septenaToastOverlay(store: toastStore)
     // Host the task composer at the page root so its inspector docks to the
     // whole Next page (iPad/macOS) and sheets on iPhone — the same adaptive
     // drawer the Tasks tab uses. Edit mode embeds the agent conversation.
