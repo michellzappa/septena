@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1245,
-      "date": "2026-06-28",
+      "build": 1247,
+      "date": "2026-06-29",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A completely rebuilt Tasks experience",
-          "detail": "Edit titles in place, quick-add from a foot line, duplicate tasks, and a confirmation toast with a longer undo window.",
+          "title": "Faster task capture and editing",
+          "detail": "Rename and create tasks inline, add to the foot of a list, duplicate, and enjoy a longer undo window — plus a Recently Deleted view that restores tasks for 30 days.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Removed tasks rest in a Recently Deleted view for 30 days so you can restore them before they auto-purge.",
+          "title": "Your calendar woven into Today",
+          "detail": "Calendar events now appear alongside your tasks in Today and Upcoming, showing only what's still ahead.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar now appears in Tasks",
-          "detail": "Events from your system calendar are woven into Today and Upcoming, with hidden-calendar choices synced across your devices.",
+          "title": "Import tasks from Things",
+          "detail": "Bring your existing to-dos over from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and let on-device analysis fill in the details.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Smarter training sessions",
-          "detail": "An auto-advance flow replaces the rest timer, effort-weighted muscle volume drives a post-session weekly review, and a watch Live Activity keeps you moving.",
+          "title": "Smoother training sessions",
+          "detail": "Sets auto-advance instead of running a rest timer, with a Live Activity on the watch Smart Stack and a new Start Training Session shortcut for cold launches.",
           "section": "training"
         },
         {
+          "title": "See your muscle balance",
+          "detail": "Effort-weighted muscle volume and a post-session weekly review show where your training is landing.",
+          "section": "training"
+        },
+        {
+          "title": "Snap a photo of your meal",
+          "detail": "Photo-first meal capture analyzes what you ate on-device.",
+          "section": "nutrition"
+        },
+        {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter front and center as tiles on the week dashboard.",
+          "detail": "Keep the goals that matter front and center as dashboard tiles.",
           "section": "goals"
         },
         {
-          "title": "A more capable Apple Watch",
-          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers to complete or skip, and expanded intake tiles with a meal picker.",
-          "section": null
-        },
-        {
-          "title": "You choose what's shared",
-          "detail": "Graded analytics levels from off to full, plus a clear view of exactly what telemetry is sent and a recently-sent log.",
-          "section": null
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": "A day-aligned sky wash sets the tone on the home dashboard.",
+          "title": "Choose exactly what you share",
+          "detail": "Graded telemetry levels let you see what's sent and review a log of recent activity, with anonymized opt-out.",
           "section": null
         }
       ]
