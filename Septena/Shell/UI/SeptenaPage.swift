@@ -59,14 +59,21 @@ extension SeptenaTab {
 @MainActor
 @Observable
 final class IPadChromeModel {
-  struct Entry { var localActions: AnyView?; var add: PageAdd? }
+  struct Entry {
+    var localActions: AnyView?
+    var add: PageAdd?
+    /// When false the overlay hides the "···" control entirely (Tasks subpages).
+    var showsOverflowMenu: Bool = true
+  }
   private var entries: [String: Entry] = [:]
   /// Per-tab navigation depth — true when the tab's stack is at its root.
   /// `RootTabView` hides the window-level chrome overlay when false.
   private var atRootByID: [String: Bool] = [:]
 
-  func set(_ id: String, localActions: AnyView?, add: PageAdd?) {
-    entries[id] = Entry(localActions: localActions, add: add)
+  func set(_ id: String, localActions: AnyView?, add: PageAdd?,
+           showsOverflowMenu: Bool = true) {
+    entries[id] = Entry(localActions: localActions, add: add,
+                        showsOverflowMenu: showsOverflowMenu)
   }
   func entry(_ id: String) -> Entry? { entries[id] }
 
@@ -111,6 +118,23 @@ struct TabSwitcher: View {
   }
 
   var body: some View {
+    #if os(iOS)
+    // iOS 26 Liquid Glass segmented bar: one `GlassEffectContainer` + track
+    // `.glassEffect`, per-segment `glassEffectID` for morphing, and a tinted
+    // underlay (not an opaque fill) for the sliding selection.
+    GlassEffectContainer {
+      segmentButtons
+        .padding(4)
+        .glassSegmentTrack()
+    }
+    #else
+    segmentButtons
+      .padding(4)
+      .glassSegmentTrack()
+    #endif
+  }
+
+  private var segmentButtons: some View {
     HStack(spacing: 2) {
       ForEach(tabs, id: \.tab) { item in
         let selected = tabSelection.current == item.tab
@@ -122,28 +146,15 @@ struct TabSwitcher: View {
             .foregroundStyle(selected ? AnyShapeStyle(theme.accent) : AnyShapeStyle(.secondary))
             .padding(.horizontal, 18)
             .padding(.vertical, 9)
-            .background {
-              if selected {
-                // The active-tab "bubble": a raised capsule that slides between
-                // segments (matchedGeometry), mirroring the system tab bar's
-                // selection indicator. Opaque so it reads clearly over the glass
-                // bar; the soft shadow lifts it.
-                Capsule()
-                  .fill(.background)
-                  .shadow(color: .black.opacity(0.16), radius: 4, y: 1)
-                  .matchedGeometryEffect(id: "activeBubble", in: bubble)
-              }
-            }
+            .glassSegmentSelectionUnderlay(isSelected: selected, tint: theme.accent, in: bubble)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        #if os(iOS)
+        .glassEffectID(item.tab, in: bubble)
+        #endif
       }
     }
-    .padding(4)
-    // Real Liquid Glass on iOS / thin material on macOS — the same floating
-    // capsule the system tab bar used, so the switcher reads as the tab bar it
-    // replaces, just on the actions row.
-    .glassCapsule()
   }
 }
 
@@ -265,6 +276,23 @@ private struct PageChromeModifier: ViewModifier {
     }
   }
 
+  #if os(iOS)
+  /// Tasks "···" (New Area / Project) vs detail surfaces — see `NavigationState`.
+  private var tasksShowsIndexOverflow: Bool {
+    id == "tasks" && nav.tasksShowsIndexOverflow(usesPushNavigation: usesPushNavigation)
+  }
+
+  private func publishIPadChrome() {
+    let showOverflow = id != "tasks" || tasksShowsIndexOverflow
+    iPadChrome.set(
+      id,
+      localActions: showOverflow ? localActions() : nil,
+      add: add,
+      showsOverflowMenu: showOverflow
+    )
+  }
+  #endif
+
   func body(content: Content) -> some View {
     #if os(iOS)
     // `usesPushNavigation` (resolved once at the app root), NOT the local
@@ -285,9 +313,10 @@ private struct PageChromeModifier: ViewModifier {
         // `safeAreaInset` was inconsistent (Coach respected it, Next/Today fought
         // it via `scrollEdgeEffectStyle`).
         .contentMargins(.top, PageChromeMetrics.iPadBarHeight, for: .scrollContent)
-        .onAppear { iPadChrome.set(id, localActions: localActions(), add: add) }
+        .onAppear { publishIPadChrome() }
+        .onChange(of: nav.path.last?.id) { _, _ in publishIPadChrome() }
     } else {
-      // iPhone: gear/···/+ live in the page's own nav bar (bottom tab bar stays).
+      // iPhone: ···/+ live in the page's own nav bar (bottom tab bar stays).
       content
         .toolbar { chromeToolbar }
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
@@ -300,14 +329,16 @@ private struct PageChromeModifier: ViewModifier {
   @ToolbarContentBuilder
   private var chromeToolbar: some ToolbarContent {
     #if os(iOS)
-    if showsGlobal {
-      ToolbarItem(placement: .topBarLeading) { overflowMenu }
+    if showsGlobal || id == "tasks" {
+      ToolbarItem(placement: .topBarLeading) { iosLeadingChrome }
     }
     if let run = addClosure {
       ToolbarItem(placement: .topBarTrailing) { PageAddButton(perform: run) }
     }
     #else
-    if showsGlobal {
+    if id == "tasks" {
+      ToolbarItem(placement: .navigation) { macTasksLeadingChrome }
+    } else if showsGlobal {
       ToolbarItem(placement: .navigation) { overflowMenu }
     }
     if let run = addClosure {
@@ -328,4 +359,41 @@ private struct PageChromeModifier: ViewModifier {
       }
     }
   }
+
+  /// iPhone Tasks: Quick Find beside "···" on the index; search-only on subpages.
+  /// Other tabs: overflow menu only.
+  #if os(iOS)
+  @ViewBuilder
+  private var iosLeadingChrome: some View {
+    if id == "tasks" {
+      HStack(spacing: 16) {
+        QuickFindToolbarButton()
+        if tasksShowsIndexOverflow {
+          overflowMenu
+        }
+      }
+    } else if showsGlobal {
+      overflowMenu
+    }
+  }
+  #endif
+
+  #if os(macOS)
+  /// macOS Tasks: sidebar publishes "···" only; detail adds Quick Find beside
+  /// Settings (or beside index "···" when `localActions` is set).
+  @ViewBuilder
+  private var macTasksLeadingChrome: some View {
+    HStack(spacing: 12) {
+      if localActions() == nil {
+        QuickFindToolbarButton()
+          .help("Quick Find (⌘K)")
+      }
+      if localActions() != nil {
+        overflowMenu
+      } else if showsGlobal {
+        overflowMenu
+      }
+    }
+  }
+  #endif
 }

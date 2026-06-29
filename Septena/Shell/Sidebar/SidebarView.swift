@@ -221,7 +221,10 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    .toolbar { sidebarSplitToolbar }
+    // iPad: the window-level overlay (`RootTabView`) owns the sole sidebar
+    // show/hide control — drop the system's auto-injected toggle so it doesn't
+    // duplicate beside Quick Find in this column's nav bar.
+    .toolbar(removing: .sidebarToggle)
     // Unified chrome (docs/PAGE_CHROME_SPEC.md). On iPad the chrome is the
     // window-level overlay bar, so the Tasks SIDEBAR publishes the whole Tasks
     // entry — "···" (New Area/Project/Task Settings) AND "+" (new task via the
@@ -248,23 +251,20 @@ struct SidebarRootView: View {
     .navigationBarTitleDisplayMode(.inline)
     #endif
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): gear (→ Settings, leading,
-    // constant) + "···" (New Area/Project/Task Settings). The "+" lives on the
-    // task list you push into, not the sidebar index. Quick Find stays the
-    // top-right magnifyingglass (its own toolbar item).
+    // constant) + "···" (New Area/Project/Task Settings). Quick Find lives in
+    // the same leading cluster via `.pageChrome` (iPhone) / the overlay (iPad).
+    // The "+" lives on the task list you push into, not the sidebar index.
     .pageChrome(id: "tasks", title: "Tasks", localActions: { AnyView(tasksMenuExtraRows) })
-    .toolbar { phoneToolbar }
     .modifier(sidebarBehavior)
   }
 
-  /// macOS layout: full-bleed scroll list. Creation actions live in the
-  /// sidebar column's toolbar (Liquid Glass pills on macOS 26 Tahoe);
-  /// Settings is the discreet last item in the toolbar's overflow.
+  /// macOS layout: full-bleed scroll list — chrome matches iPad (··· + search via
+  /// `.pageChrome`, not a separate sidebar toolbar). Detail pane owns "+".
   @ViewBuilder
   private var sidebarMac: some View {
     sidebarListContent()
-    // No explicit background — NavigationSplitView renders its sidebar
-    // column with the system Liquid Glass material on macOS 26 (Tahoe).
-    .toolbar { macToolbar }
+    .pageChrome(id: "tasks", title: "Tasks",
+                localActions: { AnyView(tasksMenuExtraRows) })
     .modifier(sidebarBehavior)
   }
 
@@ -380,23 +380,6 @@ struct SidebarRootView: View {
   }
   #endif
 
-  @ToolbarContentBuilder
-  private var sidebarSplitToolbar: some ToolbarContent {
-    ToolbarItem(placement: .primaryAction) { searchButton(accessibilityLabel: "Search") }
-  }
-
-  @ToolbarContentBuilder
-  private var phoneToolbar: some ToolbarContent {
-    // gear + "···" come from `.pageChrome`; this is just Quick Find.
-    ToolbarItem(placement: .primaryAction) { searchButton(accessibilityLabel: "Search") }
-  }
-
-  @ToolbarContentBuilder
-  private var macToolbar: some ToolbarContent {
-    ToolbarItem(placement: .primaryAction) { macCreateMenu }
-    ToolbarItem(placement: .primaryAction) { searchButton(help: "Quick Find (⌘K)") }
-  }
-
   @ViewBuilder
   private var tasksMenuExtraRows: some View {
     Button {
@@ -421,34 +404,6 @@ struct SidebarRootView: View {
     } label: {
       Label("Task Settings", systemImage: "checklist")
     }
-  }
-
-  private var macCreateMenu: some View {
-    Menu {
-      Button {
-        newAreaName = ""
-        showingNewArea = true
-      } label: {
-        Label("New Area", systemImage: "square.stack.3d.up")
-      }
-      Button {
-        showingNewProject = true
-      } label: {
-        Label("New Project", systemImage: "number")
-      }
-    } label: {
-      Image(systemName: "plus")
-    }
-    .menuStyle(.button)
-    .help("New Area or Project")
-  }
-
-  private func searchButton(accessibilityLabel: String? = nil,
-                            help: String? = nil) -> some View {
-    Button { nav.showQuickFind = true } label: {
-      Image(systemName: "magnifyingglass")
-    }
-    .modifier(SidebarButtonLabelModifier(accessibilityLabel: accessibilityLabel, help: help))
   }
 
   private var sidebarBehavior: some ViewModifier {
@@ -1267,28 +1222,6 @@ private struct SidebarBehaviorModifier: ViewModifier {
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
         reload()
       }
-  }
-}
-
-private struct SidebarButtonLabelModifier: ViewModifier {
-  let accessibilityLabel: String?
-  let help: String?
-
-  func body(content: Content) -> some View {
-    if let accessibilityLabel {
-      if let help {
-        content
-          .accessibilityLabel(accessibilityLabel)
-          .help(help)
-      } else {
-        content
-          .accessibilityLabel(accessibilityLabel)
-      }
-    } else if let help {
-      content.help(help)
-    } else {
-      content
-    }
   }
 }
 

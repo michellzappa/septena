@@ -581,6 +581,45 @@ extension View {
     #endif
   }
 
+  /// Liquid-glass track for a segmented bar (iPad tab switcher). Layers the
+  /// Discovery underlay beneath `.glassEffect` so the track darkens against
+  /// scrolling content — bare `glassCapsule()` alone reads too faint. Pair
+  /// with `GlassEffectContainer`, per-segment `glassEffectID`, and
+  /// `glassSegmentSelectionUnderlay` on the active segment.
+  @ViewBuilder
+  func glassSegmentTrack() -> some View {
+    #if os(iOS)
+    self
+      .background(Color.secondary.opacity(0.10), in: Capsule())
+      .glassEffect(.regular.interactive(), in: .capsule)
+    #else
+    self.background(.thinMaterial, in: Capsule())
+    #endif
+  }
+
+  /// Sliding active-segment tint inside `glassSegmentTrack()`. iOS 26 pattern:
+  /// a faint accent wash *under* the track glass (Discovery / segmented-picker
+  /// style) — not an opaque fill on top. The single outer `.glassEffect`
+  /// carries the Liquid Glass look; this underlay darkens the selected slot.
+  func glassSegmentSelectionUnderlay(
+    isSelected: Bool,
+    tint: Color,
+    in namespace: Namespace.ID,
+    id: String = "glassSegmentSelection"
+  ) -> some View {
+    background {
+      if isSelected {
+        Capsule()
+          #if os(iOS)
+          .fill(tint.opacity(0.18))
+          #else
+          .fill(Theme.listSelectionFill)
+          #endif
+          .matchedGeometryEffect(id: id, in: namespace)
+      }
+    }
+  }
+
   /// Liquid-glass fill for a floating *circular* control (toolbar glyph
   /// buttons). A self-contained glass circle — using this instead of
   /// `.buttonStyle(.glass)` keeps the control from being folded into the

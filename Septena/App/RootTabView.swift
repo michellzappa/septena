@@ -334,28 +334,32 @@ struct RootTabView: View {
     return ZStack {
       HStack(spacing: 0) {
         HStack(spacing: 10) {
-          // Left corner: ONE "···" menu — the page's own actions, then Settings
-          // (always the last row). Built inline (not via OverflowMenu) so the glyph
-          // sits in the SAME fixed frame as "+", making both glass circles equal in
-          // size. `.buttonStyle(.glass)` lets the system own the glass + the menu
-          // presentation (wrapping a Menu in `.glassCircle()` swallows the tap).
-          Menu {
-            if let actions = entry?.localActions {
-              actions
-              Divider()
+          // Left cluster: "···" (when the page publishes index actions), Quick Find
+          // on Tasks, and the Tasks-only sidebar toggle — "+" stays trailing.
+          if entry?.showsOverflowMenu != false {
+            Menu {
+              if let actions = entry?.localActions {
+                actions
+                Divider()
+              }
+              Button { nav.showSettings = true } label: {
+                Label("Settings", systemImage: "gearshape")
+              }
+            } label: {
+              cornerGlyph("ellipsis")
             }
-            Button { nav.showSettings = true } label: {
-              Label("Settings", systemImage: "gearshape")
-            }
-          } label: {
-            cornerGlyph("ellipsis")
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("More")
           }
-          .buttonStyle(.glass)
-          .buttonBorderShape(.circle)
-          .accessibilityLabel("More")
-          // Tasks has a split-view sidebar whose hide toggle lives IN the sidebar
-          // — so once hidden there's no way back. This standalone circle (Tasks
-          // only) toggles it, sitting beside "···" rather than folding into it.
+          if tabSelection.current == .tasks {
+            glassCornerButton("magnifyingglass", label: "Search") {
+              nav.showQuickFind = true
+            }
+          }
+          // Tasks only: the sole sidebar show/hide control on iPad — lives in
+          // the global overlay (not the split's auto toolbar toggle, which we
+          // strip via `.toolbar(removing: .sidebarToggle)` on both columns).
           if tabSelection.current == .tasks {
             Button {
               withAnimation(.snappy) {
@@ -370,24 +374,17 @@ struct RootTabView: View {
           }
         }
         Spacer(minLength: 0)
-        // Wide gap so the two `.glass` circles can't fuse into one Liquid-Glass
-        // blob on device (iOS 26 bridges adjacent glass that's close together;
-        // the simulator renders them separate, so this is sized for the device).
+        // Each trailing control gets its own `GlassEffectContainer` so sibling
+        // `.buttonStyle(.glass)` circles don't fuse on device (spacing alone
+        // doesn't stop iOS 26 from unioning them).
         HStack(spacing: 22) {
-          // The "reauth Claude" cue — self-hides unless the gateway token is
-          // stale; when it shows it's its OWN distinct glass circle just left of
-          // "+" (`.overlayCircle` frames + glasses itself). Lives here (not
-          // Today's nav bar, which the overlay occludes on iPad) so it pops up on
-          // whatever tab is open.
-          ClaudeReconnectCue(.overlayCircle)
-          // Right corner: ONE "+" button — same fixed glyph frame → same circle.
+          GlassEffectContainer {
+            ClaudeReconnectCue(.overlayCircle)
+          }
           if let add = entry?.add {
-            Button(action: resolveAdd(add)) {
-              cornerGlyph("plus")
-                .glassCircle()
+            GlassEffectContainer {
+              glassCornerButton("plus", label: "Add", action: resolveAdd(add))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add")
           }
         }
       }
@@ -402,6 +399,17 @@ struct RootTabView: View {
     Image(systemName: systemName)
       .font(.title3.weight(.semibold))
       .frame(width: 30, height: 30)
+  }
+
+  /// iPad overlay corner control — `.buttonStyle(.glass)` so the system draws the
+  /// same-size circle as the "···" menu (manual `glassCircle()` on 30pt hugged
+  /// the glyph and read half-sized).
+  private func glassCornerButton(_ systemName: String, label: String,
+                                 action: @escaping () -> Void) -> some View {
+    Button(action: action) { cornerGlyph(systemName) }
+      .buttonStyle(.glass)
+      .buttonBorderShape(.circle)
+      .accessibilityLabel(label)
   }
 
   private func resolveAdd(_ add: PageAdd) -> () -> Void {

@@ -56,6 +56,10 @@ struct ContentView: View {
     } detail: {
       destination(for: route)
         .id(route.id)
+        #if os(iOS)
+        // Same as the sidebar column: one global overlay toggle on iPad Tasks.
+        .toolbar(removing: .sidebarToggle)
+        #endif
     }
     .navigationSplitViewStyle(.balanced)
     .iPadReportsNavDepth(id: "tasks", atRoot: true)

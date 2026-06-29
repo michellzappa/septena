@@ -250,6 +250,19 @@ private func persistTasksSidebarVisibility(_ visibility: NavigationSplitViewVisi
   UserDefaults.standard.set(raw, forKey: SettingsKey.tasksSidebarVisibility)
 }
 
+extension NavigationState {
+  /// Whether the Tasks tab should show the index "···" menu (New Area / Project /
+  /// Task Settings). Hidden on pushed lists (iPhone) and area/project detail.
+  func tasksShowsIndexOverflow(usesPushNavigation: Bool) -> Bool {
+    if !usesPushNavigation { return path.isEmpty }
+    guard let route = path.last else { return true }
+    switch route {
+    case .project, .area: return false
+    case .filter, .next: return true
+    }
+  }
+}
+
 /// Every app-global modal sheet, as one value. Replaces the former bag of
 /// `show*` booleans + `pendingSection`/`addInfoRequestedSection` payloads, so
 /// the tab root mounts one `.sheet(item:)` rather than seven near-identical

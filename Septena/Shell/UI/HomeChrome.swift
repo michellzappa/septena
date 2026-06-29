@@ -11,10 +11,6 @@ import SwiftUI
 // Settings with page-local rows in one menu. That model was replaced by
 // `.pageChrome` (see docs/PAGE_CHROME_SPEC.md); only `OverflowMenu` survives.
 
-/// The standard toolbar overflow ("···") menu. Owns the glyph and the "More"
-/// accessibility label so every overflow menu across the app reads the same.
-/// `systemImage` only varies for menus that show a transient state in the slot
-/// (e.g. an hourglass while busy).
 struct OverflowMenu<Content: View>: View {
   private let systemImage: String
   private let content: Content
@@ -33,5 +29,18 @@ struct OverflowMenu<Content: View>: View {
       Image(systemName: systemImage)
     }
     .accessibilityLabel("More")
+  }
+}
+
+/// Opens the app-global Quick Find palette (`nav.showQuickFind`). Shared by
+/// Tasks chrome on iPhone (nav-bar leading) and iPad (overlay leading cluster).
+struct QuickFindToolbarButton: View {
+  @Environment(NavigationState.self) private var nav
+
+  var body: some View {
+    Button { nav.showQuickFind = true } label: {
+      Image(systemName: "magnifyingglass")
+    }
+    .accessibilityLabel("Search")
   }
 }

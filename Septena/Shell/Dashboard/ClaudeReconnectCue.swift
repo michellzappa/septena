@@ -15,9 +15,9 @@ import SwiftUI
 //     used on macOS where the menu lives top-right, not in a leading bar.
 struct ClaudeReconnectCue: View {
   //   • `.overlayCircle` — like `.pill`, but for the iPad chrome OVERLAY (not a
-  //     toolbar): manual `glassCircle()` on a 30pt glyph frame (same size as
-  //     gear/···/+) so it reads as a distinct circle beside "+" instead of
-  //     fusing with sibling `.buttonStyle(.glass)` controls.
+  //     toolbar): `.buttonStyle(.glass)` on the same 30pt glyph frame as ···/+.
+  //     Parent wraps this in its own `GlassEffectContainer` so it won't fuse
+  //     with the adjacent "+" circle on device.
   enum Presentation { case pill, card, overlayCircle }
   let presentation: Presentation
   init(_ presentation: Presentation) { self.presentation = presentation }
@@ -69,19 +69,18 @@ struct ClaudeReconnectCue: View {
     .disabled(justReconnected)
   }
 
-  // Standalone glass circle for the iPad chrome overlay — a self-contained
-  // `.glass` button (the system draws the glass; the 30pt glyph frame matches
-  // the gear/···/+ so all the bar's circles are one size and read as separate
-  // bubbles, never merged).
+  // Standalone glass circle for the iPad chrome overlay — system `.glass` button
+  // style (same diameter as the "···" menu), not manual `glassCircle()`.
   private var overlayCircleButton: some View {
     Button(action: tap) {
       pillGlyph
         .font(.title3.weight(.semibold))
         .frame(width: 30, height: 30)
-        .glassCircle(tint: Color.claudeAccent)
         .accessibilityLabel(justReconnected ? "Reconnected" : "Reconnect Claude")
     }
-    .buttonStyle(.plain)
+    .buttonStyle(.glass)
+    .buttonBorderShape(.circle)
+    .tint(Color.claudeAccent)
     .disabled(justReconnected)
   }
 

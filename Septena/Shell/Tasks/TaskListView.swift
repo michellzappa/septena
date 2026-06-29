@@ -22,6 +22,7 @@ struct TaskListView: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   /// App-root celebration layer — only used by the day-cleared `.arc`
   /// (see `TaskCelebration`). Optional: hosts outside the root env keep
   /// the haptic and skip the visual.
@@ -483,15 +484,21 @@ struct TaskListView: View {
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
     .toolbar {
-      // Embedded (Project/Area detail) keeps a local "+"; standalone tabs get
-      // the unified chrome's "+" via `.pageChrome` below instead (so it can
-      // merge with the sidebar's "···" on iPad regular and ride the tab bar).
-      // No "+" in Recently Deleted — you can't create trashed tasks.
+      // Embedded (Project/Area detail) keeps a local "+" on iPhone only; on iPad
+      // the window overlay's "+" is always the source of truth.
+      #if os(iOS)
+      if embedded && filter != .recentlyDeleted && !usesPushNavigation {
+        ToolbarItem(placement: .primaryAction) {
+          TaskListNewTaskButton()
+        }
+      }
+      #else
       if embedded && filter != .recentlyDeleted {
         ToolbarItem(placement: .primaryAction) {
           TaskListNewTaskButton()
         }
       }
+      #endif
     }
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
