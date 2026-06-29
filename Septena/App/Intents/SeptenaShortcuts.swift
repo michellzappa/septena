@@ -8,7 +8,7 @@ import AppIntents
 /// intents + entities; their voice phrases are declared together here.
 ///
 /// HARD CAP: Apple allows a maximum of 10 AppShortcuts per app (build-
-/// enforced — exceeding it fails the metadata export). We have 17 intents, so
+/// enforced — exceeding it fails the metadata export). We have 18 intents, so
 /// this list is the 10 that get a built-in, zero-config "Hey Siri" phrase.
 ///
 /// This is NOT a capability limit. EVERY intent is Siri-callable — the other
@@ -122,6 +122,21 @@ struct SeptenaShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Log Mood",
       systemImageName: "face.smiling"
+    )
+    // 11 — Start a training session (open-app, stateful). Session types are a
+    // dynamic catalog, so the phrase can't name a specific routine — Siri
+    // prompts for which (or the user wires a per-type personal Shortcut /
+    // automation: "Yoga" → this intent with sessionType = Yoga).
+    AppShortcut(
+      intent: StartTrainingSessionIntent(),
+      phrases: [
+        "Start a workout in \(.applicationName)",
+        "Start a training session in \(.applicationName)",
+        "Start a session in \(.applicationName)",
+        "Begin a workout in \(.applicationName)",
+      ],
+      shortTitle: "Start Session",
+      systemImageName: "figure.run"
     )
   }
 }

@@ -195,6 +195,7 @@ struct SeptenaApp: App {
           }
           AppDelegate.navigation = navigation
           _ = OpenNewTaskRouting.consumePending(into: navigation)
+          _ = TrainingStartRouting.consumePending(into: navigation)
           // Apply the user's Quick Actions selection to UIApplication's
           // dynamic shortcut list so the Home Screen long-press menu
           // matches what they picked in Settings.
@@ -248,6 +249,7 @@ struct SeptenaApp: App {
           MacAppDelegate.ckEngine = ckEngine
           MacAppDelegate.navigation = navigation
           _ = OpenNewTaskRouting.consumePending(into: navigation)
+          _ = TrainingStartRouting.consumePending(into: navigation)
           // Resume the local MCP server if the user left it enabled. Mutators
           // are bound now (start() above), so it's safe to serve writes.
           if UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled) {

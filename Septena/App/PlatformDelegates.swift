@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
   static weak var navigation: NavigationState?
   /// Cold-launch stash for Control Center / deep-link new-task routing.
   static var pendingOpenNewTask = false
+  /// Cold-launch stash for "start a training session" routing — the chosen
+  /// session-type id (e.g. "yoga"). Drained by the app's `.task` once
+  /// NavigationState is alive. nil → no pending start.
+  static var pendingTrainingStart: String?
   /// Set by SeptenaApp once the CloudKit engine exists. Silent CK pushes
   /// route through here to `engine.handleRemoteNotification`. Weak so
   /// app teardown doesn't leak.
@@ -168,6 +172,9 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
   static weak var ckEngine: CKEngine?
   static weak var navigation: NavigationState?
   static var pendingOpenNewTask = false
+  /// Cold-launch stash for "start a training session" routing — the chosen
+  /// session-type id. Drained by the app's `.task` once NavigationState is alive.
+  static var pendingTrainingStart: String?
 
   /// Set true only by "Quit Completely" before calling `terminate`, so the
   /// soft-quit interception below knows to let the process actually die.

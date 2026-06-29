@@ -400,6 +400,7 @@
 		69B47DFE8D824BE6EDE19A50 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
 		69D5457C2DA3BF62EA5A2A31 /* TasksWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */; };
 		6AE92DC393E450B35F86BD8C /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
+		6B0C226EE9E08A90D2F454EC /* TrainingStartRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138A5B2922BA2BDAA9C58D4E /* TrainingStartRouting.swift */; };
 		6B3C51BC822675123EE51792 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ACB6256DD75D93215BDFD3C /* RootTabView.swift */; };
 		6BACD91316B05430F78C3C70 /* TasksWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */; };
 		6BFF38FAC331BB81E2072E0F /* ConversationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E344068B6FEE62E7F0C23E3 /* ConversationCard.swift */; };
@@ -916,6 +917,7 @@
 		FC7818C6AC28D1D064D52C5C /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422B1072AC84061389BB5BA5 /* MirrorReader.swift */; };
 		FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		FD34B7723DDB02C9A9492D1F /* MacroWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAEECC11E3355B23E650226 /* MacroWidgetWire.swift */; };
+		FD69F3DE22450EE8BA4659B5 /* TrainingStartRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 138A5B2922BA2BDAA9C58D4E /* TrainingStartRouting.swift */; };
 		FD78F45875BF6FB39FBB90AF /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33EB22A93C55573C49CFB21B /* MoodCatalog.swift */; };
 		FDD4E2807DBBB981F1F6C321 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
 		FE60E163CE072B5A9553BA41 /* VirtuePromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005258280CCE97383284B57E /* VirtuePromptService.swift */; };
@@ -1045,6 +1047,7 @@
 		12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodDestinationView.swift; sourceTree = "<group>"; };
 		13011C553B04F0ACEFD189CD /* PlatformShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformShims.swift; sourceTree = "<group>"; };
 		136C8433FB649CD81132B054 /* HabitsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsPlugin.swift; sourceTree = "<group>"; };
+		138A5B2922BA2BDAA9C58D4E /* TrainingStartRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingStartRouting.swift; sourceTree = "<group>"; };
 		145180F69E6D297B9BDA40F5 /* AddTaskControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskControl.swift; sourceTree = "<group>"; };
 		1560C3834D971AA2F057822A /* SymptomDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymptomDetailView.swift; sourceTree = "<group>"; };
 		1579AAD843D0FB304BAF4A6C /* MealCameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCameraPicker.swift; sourceTree = "<group>"; };
@@ -1772,6 +1775,7 @@
 				F6962898B56CBFB87E5417A5 /* SeptenaSceneDelegate.swift */,
 				5CB6A01D91E7B3ED63B6BFDE /* ShortcutAction.swift */,
 				3D97027452B1A57DBEAF13DE /* TrainingLiveActivityCoordinator.swift */,
+				138A5B2922BA2BDAA9C58D4E /* TrainingStartRouting.swift */,
 				A17A6C44F7BE4CCDA2085224 /* TrainingTabAccessory.swift */,
 				246B25FF61B6C93AEC9B94D3 /* Intents */,
 			);
@@ -3231,6 +3235,7 @@
 				F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */,
 				9E8994F78DFE201A05147CE2 /* TrainingQuickAddMenu.swift in Sources */,
 				28801CB1F4F44B10D17A4221 /* TrainingSessionSpans.swift in Sources */,
+				FD69F3DE22450EE8BA4659B5 /* TrainingStartRouting.swift in Sources */,
 				32946FB8F8ED833AE1EEA490 /* TrainingTabAccessory.swift in Sources */,
 				E312ED09BD952509BF011895 /* TrainingTargetMigration.swift in Sources */,
 				40A48B907339E705C7B4F2ED /* ValuesFlowView.swift in Sources */,
@@ -3692,6 +3697,7 @@
 				E7A21358615235C62A3149B5 /* TrainingPlugin.swift in Sources */,
 				533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */,
 				571320AE35B554F8707E5D76 /* TrainingSessionSpans.swift in Sources */,
+				6B0C226EE9E08A90D2F454EC /* TrainingStartRouting.swift in Sources */,
 				1BBBC5F2298045DC6FD22C2F /* TrainingTabAccessory.swift in Sources */,
 				46B3BA591D78F8D643DA7E43 /* TrainingTargetMigration.swift in Sources */,
 				FA7DB874B35156F613E9DDAE /* ValuesFlowView.swift in Sources */,

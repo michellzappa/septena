@@ -216,3 +216,39 @@ struct LogTrainingIntent: SectionLogIntent {
     return f.string(from: Date())
   }
 }
+
+/// Start (or resume) a training session of a chosen type — the Shortcuts /
+/// Siri / automation counterpart to the dashboard's in-app "Start: Upper"
+/// smart shortcuts. Opens the app on the live logger.
+///
+/// Unlike `LogTrainingIntent` (which writes a single set headlessly), starting
+/// a session is a stateful, UI-bound action: it stands up an in-progress
+/// `DraftSession` + Live Activity and presents the logger. So it sets
+/// `openAppWhenRun` and hands off through `TrainingStartRouting` to the same
+/// `pendingTrainingType` path the dashboard menu uses — the draft itself is
+/// built by `TrainingSessionView` on appear, not here. If a session is already
+/// in progress, that surfaces it (resume) rather than discarding it.
+struct StartTrainingSessionIntent: SectionLogIntent {
+  static let sectionKey = "training"
+  static let title: LocalizedStringResource = "Start Training Session"
+  static let description = IntentDescription(
+    "Open Septena and start a training session of a chosen type.")
+  static var openAppWhenRun: Bool = true
+
+  @Parameter(title: "Session Type")
+  var sessionType: TrainingSessionTypeChoice
+
+  static var parameterSummary: some ParameterSummary {
+    Summary("Start a \(\.$sessionType) session")
+  }
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    // Boot + refuse if Training is turned off (spoken reason via SectionDisabledError).
+    try await requireSection()
+    // Warm app: applies immediately. Cold launch (app not yet mounted): stashes
+    // for the scene's `.task` to drain once NavigationState exists.
+    TrainingStartRouting.dispatch(typeId: sessionType.id)
+    return .result()
+  }
+}
