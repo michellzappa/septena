@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1247,
+      "build": 1250,
       "date": "2026-06-29",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Faster task capture and editing",
-          "detail": "Rename and create tasks inline, add to the foot of a list, duplicate, and enjoy a longer undo window — plus a Recently Deleted view that restores tasks for 30 days.",
+          "title": "Tasks gets inline editing and quick capture",
+          "detail": "Create and rename tasks in place, drop a quick-add line at the foot of any list, and import from a Things export.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar woven into Today",
-          "detail": "Calendar events now appear alongside your tasks in Today and Upcoming, showing only what's still ahead.",
+          "title": "Your calendar now appears in Tasks",
+          "detail": "System calendar events weave into Today and Upcoming, with hidden-calendar choices synced across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Import tasks from Things",
-          "detail": "Bring your existing to-dos over from a Things database export.",
+          "title": "Recently Deleted tasks with restore",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, with undo before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Smoother training sessions",
-          "detail": "Sets auto-advance instead of running a rest timer, with a Live Activity on the watch Smart Stack and a new Start Training Session shortcut for cold launches.",
-          "section": "training"
-        },
-        {
-          "title": "See your muscle balance",
-          "detail": "Effort-weighted muscle volume and a post-session weekly review show where your training is landing.",
-          "section": "training"
-        },
-        {
-          "title": "Snap a photo of your meal",
-          "detail": "Photo-first meal capture analyzes what you ate on-device.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and Septena analyzes it on-device to log your nutrition.",
           "section": "nutrition"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter front and center as dashboard tiles.",
+          "detail": "Keep the goals that matter most front and center as week-dashboard tiles.",
           "section": "goals"
         },
         {
-          "title": "Choose exactly what you share",
-          "detail": "Graded telemetry levels let you see what's sent and review a log of recent activity, with anonymized opt-out.",
+          "title": "Smarter training sessions",
+          "detail": "Start a session by voice, follow an auto-advancing flow with a watch Live Activity, and review effort-weighted muscle volume each week.",
+          "section": "training"
+        },
+        {
+          "title": "Choose how much you share",
+          "detail": "Graded telemetry levels from off to full, with a clear view of exactly what's sent and a log of recent activity.",
+          "section": null
+        },
+        {
+          "title": "A more capable Apple Watch",
+          "detail": "Long-press action drawers, a time-of-day sky behind the Next feed, interactive intake nudges, and a fasting complication that morphs overnight.",
           "section": null
         }
       ]
