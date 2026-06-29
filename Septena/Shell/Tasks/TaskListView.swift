@@ -254,35 +254,38 @@ struct TaskListView: View {
     calendarFoldedOn = calendarCollapsed ? "" : SeptenaDate.today
   }
 
-  /// Project ids whose completed-task foldout is expanded. Collapsed by default;
-  /// persisted across relaunches (Things-style per-list memory).
-  @AppStorage("septena.tasks.projectLoggedExpanded") private var projectLoggedExpandedData: Data = Data()
-  private var projectLoggedExpandedIds: Set<String> {
-    (try? JSONDecoder().decode(Set<String>.self, from: projectLoggedExpandedData)) ?? []
+  /// Project / area ids whose completed-task foldout is expanded. Collapsed by
+  /// default; persisted across relaunches (Things-style per-list memory).
+  @AppStorage("septena.tasks.projectLoggedExpanded") private var scopeLoggedExpandedData: Data = Data()
+  private var scopeLoggedExpandedIds: Set<String> {
+    (try? JSONDecoder().decode(Set<String>.self, from: scopeLoggedExpandedData)) ?? []
   }
-  private var projectFilterId: String? {
-    if case .project(let id) = filter { return id }
-    return nil
+  private var scopeLoggedFilterId: String? {
+    switch filter {
+    case .project(let id), .area(let id): return id
+    default: return nil
+    }
   }
-  private var isProjectLoggedExpanded: Bool {
-    guard let id = projectFilterId else { return false }
-    return projectLoggedExpandedIds.contains(id)
+  private var isScopeLoggedExpanded: Bool {
+    guard let id = scopeLoggedFilterId else { return false }
+    return scopeLoggedExpandedIds.contains(id)
   }
-  /// Completed tasks for the current project page — done only, not settling
-  /// (settling rows stay in the open list until they fade), newest first.
-  private var loggedProjectItems: [SeptenaTask] {
-    guard case .project = filter else { return [] }
-    return items
-      .filter { $0.status == .done && !settle.isSettling($0.id) }
-      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+  /// Completed tasks for the current project or area page — done only, not
+  /// settling (settling rows stay in the open list until they fade), newest first.
+  /// Area pages honour `excludeProjectedTasks` so only area-direct work appears.
+  private var loggedScopeItems: [SeptenaTask] {
+    guard scopeLoggedFilterId != nil else { return [] }
+    var result = items.filter { $0.status == .done && !settle.isSettling($0.id) }
+    if excludeProjectedTasks { result = result.filter { $0.project == nil } }
+    return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
   }
-  private func toggleProjectLoggedExpanded() {
-    guard let id = projectFilterId else { return }
+  private func toggleScopeLoggedExpanded() {
+    guard let id = scopeLoggedFilterId else { return }
     Haptics.tick()
-    var set = projectLoggedExpandedIds
+    var set = scopeLoggedExpandedIds
     if set.contains(id) { set.remove(id) } else { set.insert(id) }
     withAnimation(.easeInOut(duration: 0.2)) {
-      projectLoggedExpandedData = (try? JSONEncoder().encode(set)) ?? Data()
+      scopeLoggedExpandedData = (try? JSONEncoder().encode(set)) ?? Data()
     }
   }
 
@@ -758,7 +761,7 @@ struct TaskListView: View {
       // inside the open-task card via `cardedRows(appendQuickAdd:)`. Grouped
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
-      projectLoggedSection()
+      scopeLoggedSection()
       taskListFooter
     }
     // Commit a rename the moment its field loses the cursor — the iOS analog of
@@ -1077,34 +1080,34 @@ struct TaskListView: View {
                appendQuickAdd: attachesQuickAddToVisibleCard)
   }
 
-  /// Things-style footer on project pages: a quiet link that expands completed
-  /// tasks for this project. Reuses `row(_:)` so checkboxes and context menus
-  /// match the open list.
+  /// Things-style footer on project / area pages: a quiet link that expands
+  /// completed tasks for this list. Reuses `row(_:)` so checkboxes and context
+  /// menus match the open list.
   @ViewBuilder
-  private func projectLoggedSection() -> some View {
-    if case .project = filter, !loggedProjectItems.isEmpty {
-      projectLoggedToggleRow
-      if isProjectLoggedExpanded {
-        cardedRows(loggedProjectItems)
+  private func scopeLoggedSection() -> some View {
+    if scopeLoggedFilterId != nil, !loggedScopeItems.isEmpty {
+      scopeLoggedToggleRow
+      if isScopeLoggedExpanded {
+        cardedRows(loggedScopeItems)
       }
     }
   }
 
-  private var projectLoggedToggleLabel: String {
-    let count = loggedProjectItems.count
-    if isProjectLoggedExpanded {
+  private var scopeLoggedToggleLabel: String {
+    let count = loggedScopeItems.count
+    if isScopeLoggedExpanded {
       return String(localized: "Hide \(count) logged items",
-                    comment: "Project footer — collapse completed tasks (plural)")
+                    comment: "Project/area footer — collapse completed tasks (plural)")
     }
     return String(localized: "Show \(count) logged items",
-                  comment: "Project footer — expand completed tasks (plural)")
+                  comment: "Project/area footer — expand completed tasks (plural)")
   }
 
-  private var projectLoggedToggleRow: some View {
+  private var scopeLoggedToggleRow: some View {
     Button {
-      toggleProjectLoggedExpanded()
+      toggleScopeLoggedExpanded()
     } label: {
-      Text(projectLoggedToggleLabel)
+      Text(scopeLoggedToggleLabel)
         .font(.septenaMeta)
         .monospacedDigit()
         .foregroundStyle(Theme.inkSecondary)
@@ -1113,7 +1116,7 @@ struct TaskListView: View {
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle())
     .asListRow()
   }
 
@@ -1185,10 +1188,10 @@ struct TaskListView: View {
       return review.map(\.id) + orderedFromGroupedOpen(pool: items)
     case .upcoming:
       return review.map(\.id) + upcomingBuckets().flatMap { $0.tasks.map(\.id) }
-    case .project:
+    case .project, .area:
       var ids = review.map(\.id) + visibleItems.map(\.id)
-      if isProjectLoggedExpanded {
-        ids.append(contentsOf: loggedProjectItems.map(\.id))
+      if isScopeLoggedExpanded {
+        ids.append(contentsOf: loggedScopeItems.map(\.id))
       }
       return ids
     default:
