@@ -96,6 +96,7 @@ struct TasksDestinationView: View {
     // remote edits still fold in on reopen as before.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       absorbRemoteCompletions()
+      mergeTaskFieldsFromCache()
     }
     // Host the composer here so it stacks on top of the drawer sheet and
     // dismisses back to it.
@@ -324,6 +325,30 @@ struct TasksDestinationView: View {
     for id in triageDone {
       ghostInboxCompletion(id: id, completedAt: completedAt(for: id, in: freshTriage))
     }
+  }
+
+  /// Refresh title/notes on visible rows from the local mirror without a full
+  /// reload — preserves in-flight completion settle beats while folding in
+  /// renames (and notes edits) from the Tasks tab or another surface.
+  private func mergeTaskFieldsFromCache() {
+    let freshByID = Dictionary(
+      (LocalCache.tasks(in: modelContext, filter: .triage)
+       + LocalCache.tasks(in: modelContext, filter: .today)
+       + LocalCache.tasks(in: modelContext, filter: .logbook))
+        .map { ($0.id, $0) },
+      uniquingKeysWith: { a, _ in a }
+    )
+    func merge(_ list: inout [SeptenaTask]) {
+      for i in list.indices {
+        guard !settle.isSettling(list[i].id),
+              let fresh = freshByID[list[i].id] else { continue }
+        list[i].title = fresh.title
+        list[i].notes = fresh.notes
+      }
+    }
+    merge(&triageTasks)
+    merge(&openTasks)
+    merge(&doneTasks)
   }
 
   /// IDs from `prior` that are now completed in `fresh` or vanished from the

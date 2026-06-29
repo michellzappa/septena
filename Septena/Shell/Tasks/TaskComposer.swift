@@ -263,9 +263,9 @@ struct TaskComposerCard: View {
       .padding(.leading, inline ? Theme.checkboxTap + Theme.iconTextGap : 0)
     }
     .padding(.horizontal, inline ? rowHInset : 16)
-    // Inline: a touch of internal top/bottom inset so the title isn't glued to
-    // the card edge (the card's own 24pt margin is the EXTERNAL gap to siblings).
-    .padding(.vertical, inline ? rowVInset + 12 : 16)
+    // Inline: same top/bottom inset as closed task rows (`rowVInset` from the
+    // list). The card chrome supplies the external gap to sibling rows.
+    .padding(.vertical, inline ? rowVInset : 16)
     // Tab / Shift-Tab cycle the whole form; Space / Return open a focused pill
     // or fire a focused action. Attached here so it catches the keypress
     // whenever any pill / action (a focusable descendant) holds the cursor; the

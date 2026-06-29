@@ -560,7 +560,10 @@ struct TaskListView: View {
           areas: areas,
           projects: projects,
           accent: theme.color(for: "tasks"),
-          onDone: { Task { await load() } }
+          onDone: {
+            if case .edit(let task) = mode { repatchTask(id: task.id) }
+            Task { await load() }
+          }
         )
       }
     }
@@ -713,6 +716,7 @@ struct TaskListView: View {
     let trimmed = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     if !trimmed.isEmpty && trimmed != task.title {
       mutator.update(id: task.id, title: trimmed)
+      patchLocally(id: task.id, title: trimmed)
       Task { await load() }
     }
     endRename()
@@ -1433,6 +1437,7 @@ struct TaskListView: View {
        (current.notes ?? "") == notes {
       return
     }
+    patchLocally(id: id, title: trimmed, notes: notes)
     mutator.update(id: id, title: trimmed, notes: notes)
     Task { await load() }
   }
@@ -1519,6 +1524,7 @@ struct TaskListView: View {
       showsTodayIndicator: filter != .today,
       onDone: {
         if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
+        repatchTask(id: task.id)
         Task { await load() }
       }
     )
@@ -1526,9 +1532,8 @@ struct TaskListView: View {
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
     // the card surface + margin (and sets `rowHInset`), so the editor simply
     // expands the row IN PLACE inside the group card instead of floating as a
-    // separate rounded box. Just vertical breathing room so the taller editing
-    // cell reads as the focused row.
-    .padding(.vertical, Theme.Spacing.sm)
+    // separate rounded box. Vertical inset lives in `TaskComposerCard` (same
+    // `rowVInset` as closed rows).
     .id(task.id)
     .transition(.opacity)
     #if os(macOS)
@@ -2416,7 +2421,31 @@ struct TaskListView: View {
     func drop(_ list: inout [SeptenaTask]) {
       list.removeAll { $0.id == id }
     }
-    drop(&items); drop(&review); drop(&doneToday)
+    drop(&items); drop(&review); drop(&doneToday); drop(&triageStorage)
+  }
+
+  /// Mutate title/notes on a visible row immediately — the same pattern as
+  /// `flipStatus` / `removeLocally`. The mutator + async `load()` still run,
+  /// but the closed row must repaint on the very next frame after the inline
+  /// editor folds, not after a round-trip through `LocalCache`.
+  private func patchLocally(id: String, title: String? = nil, notes: String? = nil) {
+    func apply(_ list: inout [SeptenaTask]) {
+      guard let i = list.firstIndex(where: { $0.id == id }) else { return }
+      if let title { list[i].title = title }
+      if let notes { list[i].notes = notes.isEmpty ? nil : notes }
+    }
+    apply(&items); apply(&review); apply(&doneToday); apply(&triageStorage)
+  }
+
+  /// Re-read one task from the local mirror and patch the visible buckets.
+  /// Called from composer `onDone` after `persist()` has saved.
+  private func repatchTask(id: String) {
+    var descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.id == id }
+    )
+    descriptor.fetchLimit = 1
+    guard let entity = try? modelContext.fetch(descriptor).first else { return }
+    patchLocally(id: id, title: entity.title, notes: entity.notes)
   }
 
   // MARK: - Load
