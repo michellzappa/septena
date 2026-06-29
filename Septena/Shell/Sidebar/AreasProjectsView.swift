@@ -311,6 +311,7 @@ struct ProjectDetailView: View {
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
 
   @State private var draftName: String
   @State private var draftNotes: String
@@ -398,38 +399,7 @@ struct ProjectDetailView: View {
       }
     }
     .septenaInlineTitle()
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        OverflowMenu {
-          Button {
-            showingRepoEditor = true
-          } label: {
-            Label("Repo…", systemImage: "chevron.left.forwardslash.chevron.right")
-          }
-          Button {
-            showingMoveToArea = true
-          } label: {
-            Label("Move to Area…", systemImage: "folder")
-          }
-          Button {
-            setStatus(.done)
-          } label: {
-            Label("Mark Done", systemImage: "checkmark.circle")
-          }
-          Button {
-            setStatus(.cancelled)
-          } label: {
-            Label("Cancel Project", systemImage: "xmark.circle")
-          }
-          Divider()
-          Button(role: .destructive) {
-            showingDeleteConfirm = true
-          } label: {
-            Label("Delete Project", systemImage: "trash")
-          }
-        }
-      }
-    }
+    .toolbar { projectDetailToolbar }
     .sheet(isPresented: $showingMoveToArea) {
       AreaPickerSheet(areas: areas, currentAreaId: project.area) { newAreaId in
         moveToArea(newAreaId)
@@ -471,6 +441,52 @@ struct ProjectDetailView: View {
       Task {
         await loadAreas()
         await rehydrateNotes()
+      }
+    }
+  }
+
+  /// Project actions overflow. On iPad regular the window-level chrome owns the
+  /// trailing buttons (a detail-page nav-bar "···" would float behind the global
+  /// "+"), so the overflow renders only in the iPhone compact nav bar and on
+  /// macOS. iPad reaches the same actions via the project's sidebar context menu.
+  @ToolbarContentBuilder
+  private var projectDetailToolbar: some ToolbarContent {
+    #if os(iOS)
+    if !usesPushNavigation {
+      ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
+    }
+    #else
+    ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
+    #endif
+  }
+
+  private var projectOverflowMenu: some View {
+    OverflowMenu {
+      Button {
+        showingRepoEditor = true
+      } label: {
+        Label("Repo…", systemImage: "chevron.left.forwardslash.chevron.right")
+      }
+      Button {
+        showingMoveToArea = true
+      } label: {
+        Label("Move to Area…", systemImage: "folder")
+      }
+      Button {
+        setStatus(.done)
+      } label: {
+        Label("Mark Done", systemImage: "checkmark.circle")
+      }
+      Button {
+        setStatus(.cancelled)
+      } label: {
+        Label("Cancel Project", systemImage: "xmark.circle")
+      }
+      Divider()
+      Button(role: .destructive) {
+        showingDeleteConfirm = true
+      } label: {
+        Label("Delete Project", systemImage: "trash")
       }
     }
   }

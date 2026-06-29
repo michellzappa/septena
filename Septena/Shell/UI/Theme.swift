@@ -44,6 +44,19 @@ enum Theme {
     #endif
   }()
 
+  /// iPad split-view sidebar column — a slightly recessed gray so the column
+  /// reads as a distinct panel against the detail pane (which uses the lighter
+  /// grouped background). iPhone uses `sidebarBackground` (the sidebar IS the
+  /// screen there, so there's no detail to separate from). macOS keeps its
+  /// translucent sidebar material.
+  static let sidebarPanelBackground: Color = {
+    #if os(macOS)
+    return Color(nsColor: .underPageBackgroundColor)
+    #else
+    return Color(.systemGray5)
+    #endif
+  }()
+
   /// Card surface. Used for sheets and any container that needs to lift
   /// off the canvas. Plain rows should NOT use this — they sit on the
   /// list background directly, Reminders-style.

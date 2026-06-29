@@ -179,6 +179,25 @@ struct SidebarRootView: View {
     }
   }
 
+  /// Mark a project done / cancelled from the sidebar context menu — the iPad
+  /// home for these lifecycle actions (the detail page's nav-bar overflow is
+  /// suppressed on iPad so it can't collide with the global chrome). If the
+  /// project being closed is the one open in the detail, bounce to Today.
+  private func setProjectStatus(_ project: Project, to status: ProjectStatus) {
+    Haptics.tick()
+    if status != .active, case .project(let p) = nav.path.last, p.id == project.id {
+      nav.path = [.filter(.today)]
+    }
+    Task {
+      do {
+        try await projectsMutator.setStatus(id: project.id, status: status)
+        await load()
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
   private func deleteProject(_ project: Project) {
     Haptics.warning()
     // If the user was viewing the project that just got deleted, bounce them
@@ -212,11 +231,13 @@ struct SidebarRootView: View {
   }
 
   /// iPad regular / foldable widescreen: the NavigationSplitView sidebar
-  /// column. System `.sidebar` list style — full-bleed top/leading/trailing,
-  /// no insetGrouped "floating card" margins (Notes / Reminders on macOS).
+  /// column. Same insetGrouped "bubble card" home as iPhone (the surface the
+  /// user preferred), but on a slightly recessed `sidebarPanelBackground` so the
+  /// column reads as a distinct panel against the detail pane.
   @ViewBuilder
-  private var sidebarSplit: some View { 
+  private var sidebarSplit: some View {
     sidebarListContent()
+    .background(Theme.sidebarPanelBackground)
     .navigationTitle("")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
@@ -276,14 +297,20 @@ struct SidebarRootView: View {
   /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
   private func sidebarListContent() -> some View {
     #if os(iOS)
+    // iPhone + iPad share the Reminders-style home: the 2×2 smart-list grid is
+    // the first row of the scroll (so it scrolls *with* the area / project cards
+    // below the top chrome — not a separate pinned bar), then the grouped cards.
+    // A clear row background + zero row insets keep the tiles full-width with no
+    // visible section card around them.
     List(selection: sidebarSelection) {
-      if usesSidebarRows {
-        smartListSection
+      Section {
+        smartListGrid
+          .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 8, trailing: 0))
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
       }
-      // iPhone compact: tiles ride as the first section *header* (not a row
-      // inside the grouped card) so insetGrouped's section mask doesn't clip
-      // the outer corners of the 2×2 grid.
-      areaProjectSections(smartListTileHeader: !usesSidebarRows)
+      .listSectionSpacing(6)
+      areaProjectSections()
     }
     .modifier(IOSSidebarListChrome())
     #else
@@ -305,9 +332,8 @@ struct SidebarRootView: View {
 
   // MARK: - Smart lists section
   //
-  // iOS compact: the 2-up tile grid is hosted as the first grouped section's
-  // *header* (see `smartListPhoneHeader`) so it scrolls with the list but
-  // isn't clipped by insetGrouped's section card. iPad / macOS: native rows.
+  // iOS (iPhone + iPad): the 2-up tile grid is its own borderless section at the
+  // top (see `smartListGridSection`). macOS: native source-list rows.
 
   @ViewBuilder
   private var smartListSection: some View {
@@ -320,16 +346,6 @@ struct SidebarRootView: View {
         #endif
       }
     }
-  }
-
-  /// macOS and iPad regular use native sidebar rows; iPhone compact keeps the
-  /// 2-up tile grid on the grouped home screen.
-  private var usesSidebarRows: Bool {
-    #if os(macOS)
-    true
-    #else
-    usesPushNavigation
-    #endif
   }
 
   @ViewBuilder
@@ -348,19 +364,9 @@ struct SidebarRootView: View {
   }
 
   #if os(iOS)
-  /// Section header for the iPhone compact Tasks home — sits above the first
-  /// area / project card, outside insetGrouped's rounded section mask.
-  private var smartListPhoneHeader: some View {
-    smartListGrid
-      .padding(.top, 4)
-      .padding(.bottom, 10)
-      .textCase(nil)
-  }
-  #endif
-
-  #if os(iOS)
   /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Completed). Horizontal gutter matches the insetGrouped section cards.
+  /// Logbook). Hosted as the first (clear, zero-inset) row of the sidebar List,
+  /// so it scrolls with the cards below and spans the same card width.
   private var smartListGrid: some View {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
                         GridItem(.flexible(), spacing: Theme.tileGap)],
@@ -376,7 +382,6 @@ struct SidebarRootView: View {
         .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: 12))
       }
     }
-    .padding(.horizontal, Theme.pageGutter)
   }
   #endif
 
@@ -603,59 +608,32 @@ struct SidebarRootView: View {
   // still renders as a one-row card, so every area reads as the same container.
 
   @ViewBuilder
-  private func areaProjectSections(smartListTileHeader: Bool = false) -> some View {
-    #if os(iOS)
-    if smartListTileHeader,
-       topLevelProjects.isEmpty, areas.isEmpty, recentlyDeletedCount == 0 {
-      Section {
-        Color.clear
-          .frame(height: 0)
-          .accessibilityHidden(true)
-          .listRowInsets(EdgeInsets())
-          .listRowBackground(Color.clear)
-          .listRowSeparator(.hidden)
-      } header: {
-        smartListPhoneHeader
-      }
-      .listSectionSeparator(.hidden)
-    }
-    #endif
-
+  private func areaProjectSections() -> some View {
     if !topLevelProjects.isEmpty {
       Section {
         ForEach(topLevelProjects) { project in
-          compactProjectRow(nested: false) { projectRow(project, parent: nil) }
+          compactRow(route: .project(project)) { projectRow(project, parent: nil) }
         }
-      } header: {
-        #if os(iOS)
-        if smartListTileHeader { smartListPhoneHeader }
-        #endif
       }
     }
-    ForEach(Array(areas.enumerated()), id: \.element.id) { index, area in
+    ForEach(areas, id: \.id) { area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
       Section {
-        compactAreaRow(hasProjects: !areaProjects.isEmpty, collapsed: collapsed) {
+        compactRow(route: .area(area)) {
           areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed)
         }
         if !collapsed {
           ForEach(areaProjects) { project in
-            compactProjectRow(nested: true) { projectRow(project, parent: area.id) }
+            compactRow(route: .project(project)) { projectRow(project, parent: area.id) }
           }
         }
-      } header: {
-        #if os(iOS)
-        if smartListTileHeader, topLevelProjects.isEmpty, index == 0 {
-          smartListPhoneHeader
-        }
-        #endif
       }
     }
     // Recently Deleted — always last, only shown when there are trashed tasks.
     if recentlyDeletedCount > 0 {
       Section {
-        compactRow {
+        compactRow(route: .filter(.recentlyDeleted)) {
           navRow(.filter(.recentlyDeleted)) {
             SmartListRow(icon: "trash",
                          iconColor: .secondary,
@@ -663,73 +641,39 @@ struct SidebarRootView: View {
                          count: recentlyDeletedCount)
           }
         }
-      } header: {
-        #if os(iOS)
-        if smartListTileHeader, topLevelProjects.isEmpty, areas.isEmpty {
-          smartListPhoneHeader
-        }
-        #endif
       }
     }
   }
 
   /// Tightens a sidebar list row to Reminders-like density. The row views carry
   /// their own height (`Theme.sidebar*RowHeight`), so the List's default vertical
-  /// inset otherwise stacks on top and makes rows too tall — we zero it. iPhone
-  /// compact keeps a 16pt leading inset for insetGrouped cards; iPad regular
-  /// (`.sidebar` inside NavigationSplitView) uses zero insets like macOS.
+  /// inset otherwise stacks on top and makes rows too tall — we zero it and keep
+  /// a 16pt horizontal inset for the insetGrouped cards. iPhone + iPad share this
+  /// rhythm (iPad used to run a tighter `.sidebar` source-list metric set).
   @ViewBuilder
-  private func compactRow<V: View>(@ViewBuilder _ row: () -> V) -> some View {
+  private func compactRow<V: View>(route: Route? = nil,
+                                   @ViewBuilder _ row: () -> V) -> some View {
     #if os(iOS)
-    if usesPushNavigation {
-      row().listRowInsets(EdgeInsets())
-    } else {
-      row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-    }
+    row()
+      .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+      // Explicit row fill: in the sidebar column the insetGrouped default cell
+      // fill is suppressed, so without this the gray canvas shows through and
+      // the cards read gray instead of white. When this row's destination is
+      // the one open in the detail pane it gets a faint accent wash — the iPad
+      // "active area/project" indicator (the native selection highlight can't
+      // show once we set an explicit row background).
+      .listRowBackground(rowFill(for: route))
     #else
     row()
     #endif
   }
 
-  /// Area header row on iPad split: when projects are expanded underneath, tuck
-  /// the bottom inset so the first project reads as nested under the area.
-  @ViewBuilder
-  private func compactAreaRow<V: View>(hasProjects: Bool,
-                                       collapsed: Bool,
-                                       @ViewBuilder _ row: () -> V) -> some View {
-    #if os(iOS)
-    if usesPushNavigation {
-      let tuck = hasProjects && !collapsed
-      row()
-        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: tuck ? SidebarSplitMetrics.areaProjectTuck : 0, trailing: 0))
-    } else {
-      row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-    }
-    #else
-    row()
-    #endif
+  #if os(iOS)
+  private func rowFill(for route: Route?) -> Color {
+    if let route, isSelected(route) { return Color.accentColor.opacity(0.12) }
+    return Theme.cardSurface
   }
-
-  /// Project rows stack tighter than areas on iPad split — negative vertical
-  /// insets collapse the List's default inter-row breathing room.
-  @ViewBuilder
-  private func compactProjectRow<V: View>(nested: Bool,
-                                          @ViewBuilder _ row: () -> V) -> some View {
-    #if os(iOS)
-    if usesPushNavigation {
-      row()
-        .listRowInsets(EdgeInsets(top: SidebarSplitMetrics.projectRowInsetY,
-                                  leading: nested ? 12 : 0,
-                                  bottom: SidebarSplitMetrics.projectRowInsetY,
-                                  trailing: 0))
-        .listRowSeparator(.hidden)
-    } else {
-      row().listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-    }
-    #else
-    row()
-    #endif
-  }
+  #endif
 
   /// The area's own row — tappable to its detail, with rename / reorder / delete
   /// in the context menu (and, on macOS, a task drop target). Sits at the top of
@@ -826,6 +770,17 @@ struct SidebarRootView: View {
       }
     } label: {
       Label("Move to Area", systemImage: "folder")
+    }
+    Divider()
+    Button {
+      setProjectStatus(project, to: .done)
+    } label: {
+      Label("Mark Done", systemImage: "checkmark.circle")
+    }
+    Button {
+      setProjectStatus(project, to: .cancelled)
+    } label: {
+      Label("Cancel Project", systemImage: "xmark.circle")
     }
     Divider()
     Button(role: .destructive) {
@@ -1064,45 +1019,15 @@ struct SidebarRootView: View {
 /// identically — never restyle a count inline.
 struct SidebarCount: View {
   let count: Int
-  #if os(iOS)
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-  #endif
 
   var body: some View {
     if count > 0 {
       Text("\(count)")
-        .scaledFont(size: fontSize, weight: .regular)
+        .scaledFont(size: 12, weight: .regular)
         .foregroundStyle(Theme.inkSecondary.opacity(0.6))
     }
   }
-
-  #if os(iOS)
-  private var fontSize: CGFloat {
-    usesPushNavigation ? 14 : 12
-  }
-  #else
-  private var fontSize: CGFloat { 12 }
-  #endif
 }
-
-#if os(iOS)
-/// macOS sidebar row metrics reused on iPad regular (split-view source list).
-private enum SidebarSplitMetrics {
-  static let rowHeight: CGFloat = 24
-  static let smartRowHeight: CGFloat = 22
-  static let projectRowHeight: CGFloat = 20
-  static let iconSize: CGFloat = 21
-  static let rowSpacing: CGFloat = 7
-  static let projectRowSpacing: CGFloat = 4
-  static let areaTitleSize: CGFloat = 16
-  static let titleSize: CGFloat = 16
-  static let projectTitleSize: CGFloat = 15
-  /// Negative vertical insets on project rows — collapses List cell padding.
-  static let projectRowInsetY: CGFloat = -9
-  /// Area bottom tuck when projects are expanded underneath.
-  static let areaProjectTuck: CGFloat = -8
-}
-#endif
 
 struct SmartListRow: View {
   let icon: String
@@ -1112,73 +1037,38 @@ struct SmartListRow: View {
   let title: String
   /// Muted gray count — neutral signal for total rows on this list.
   var count: Int? = nil
-  #if os(iOS)
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-  #endif
 
   var body: some View {
-    HStack(spacing: rowSpacing) {
-      ColoredGlyph(icon: icon, color: iconColor, size: iconSize)
+    HStack(spacing: Theme.sidebarRowSpacing) {
+      ColoredGlyph(icon: icon, color: iconColor, size: Theme.sidebarIconSize + 4)
       Text(title)
-        .scaledFont(size: titleSize)
+        .scaledFont(size: Theme.sidebarAreaTitleSize)
         // `.primary` (not a fixed Theme ink) so the native `.sidebar`
         // selection inverts the title to white over the focused accent.
         .foregroundStyle(.primary)
       Spacer()
       if let n = count { SidebarCount(count: n) }
     }
-    .frame(height: smartRowHeight)
+    .frame(height: Theme.sidebarSmartRowHeight)
     .contentShape(Rectangle())
-    #if os(iOS)
-    .rowHover(cornerRadius: 10)
-    #endif
   }
-
-  #if os(iOS)
-  private var rowSpacing: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.rowSpacing : Theme.sidebarRowSpacing
-  }
-  private var iconSize: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.iconSize : Theme.sidebarIconSize + 4
-  }
-  private var titleSize: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.areaTitleSize : Theme.sidebarAreaTitleSize
-  }
-  private var smartRowHeight: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.smartRowHeight : Theme.sidebarSmartRowHeight
-  }
-  #else
-  private var rowSpacing: CGFloat { Theme.sidebarRowSpacing }
-  private var iconSize: CGFloat { Theme.sidebarIconSize + 4 }
-  private var titleSize: CGFloat { Theme.sidebarAreaTitleSize }
-  private var smartRowHeight: CGFloat { Theme.sidebarSmartRowHeight }
-  #endif
 }
 
 #if os(iOS)
-/// iPhone compact keeps insetGrouped tiles; iPad regular uses the system
-/// sidebar source list inside NavigationSplitView (Notes-style full bleed).
+/// iPhone + iPad share the insetGrouped "bubble card" Tasks home — the same
+/// tiles-over-grouped-cards rhythm. (iPad used to render the `.sidebar` source
+/// list; it now matches iPhone.)
 private struct IOSSidebarListChrome: ViewModifier {
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-
   func body(content: Content) -> some View {
-    if usesPushNavigation {
-      content
-        .listStyle(.sidebar)
-        // Default sidebar inter-section gaps read loose on iPad; compact matches
-        // macOS / the tightened iPhone insetGrouped rhythm.
-        .listSectionSpacing(.compact)
-    } else {
-      content
-        .listStyle(.insetGrouped)
-        // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
-        // `sidebarPhone`) shows through, matching the app's surface rhythm.
-        .scrollContentBackground(.hidden)
-        // insetGrouped's default inter-section gap (~35pt) leaves too much air
-        // above the first area and between area cards; tighten it for a denser,
-        // more Reminders-like rhythm.
-        .listSectionSpacing(18)
-    }
+    content
+      .listStyle(.insetGrouped)
+      // Hide the system grouped fill so `Theme.sidebarBackground` (applied by
+      // `sidebarPhone` / `sidebarSplit`) shows through, matching the app surface.
+      .scrollContentBackground(.hidden)
+      // insetGrouped's default inter-section gap (~35pt) leaves too much air
+      // above the first area and between area cards; tighten it for a denser,
+      // more Reminders-like rhythm.
+      .listSectionSpacing(18)
   }
 }
 #endif
@@ -1234,10 +1124,11 @@ struct SmartListTile: View {
   let title: String
   /// Total rows on the list — big bold number top-right.
   var count: Int? = nil
-  /// When true, the tile renders with a tinted outline + slight fill so the
-  /// iPad sidebar shows which smart list the detail pane is currently on.
-  /// iPhone never sees a selected tile (tapping pushes onto the stack), but
-  /// it costs nothing to honor here.
+  /// When true, the tile keeps its white fill but gains a tinted outline so the
+  /// iPad sidebar shows which smart list the detail pane is currently on —
+  /// white-card look preserved (matching iPhone), selection shown by the border,
+  /// not a gray fill. iPhone never sees a selected tile (tapping pushes onto the
+  /// stack).
   var isSelected: Bool = false
 
   var body: some View {
@@ -1270,7 +1161,11 @@ struct SmartListTile: View {
     .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .fill(isSelected ? iconColor.opacity(0.18) : Theme.cardSurface)
+        .fill(Theme.cardSurface)
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .strokeBorder(iconColor, lineWidth: isSelected ? 2 : 0)
     )
   }
 
@@ -1341,16 +1236,13 @@ struct SidebarAreaRow: View {
   /// is meaningful).
   var isCollapsed: Bool? = nil
   var onToggleCollapse: (() -> Void)? = nil
-  #if os(iOS)
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-  #endif
 
   var body: some View {
-    HStack(spacing: rowSpacing) {
+    HStack(spacing: Theme.sidebarRowSpacing) {
       AreaIcon(emoji: emoji)
-        .frame(width: iconColumnWidth, alignment: .center)
+        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .scaledFont(size: titleSize, weight: .semibold)
+        .scaledFont(size: Theme.sidebarAreaTitleSize, weight: .semibold)
         .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
       if let isCollapsed, let onToggleCollapse {
@@ -1358,32 +1250,9 @@ struct SidebarAreaRow: View {
       }
       SidebarCount(count: count)
     }
-    .frame(height: rowHeight)
+    .frame(height: Theme.sidebarRowHeight)
     .contentShape(Rectangle())
-    #if os(iOS)
-    .rowHover(cornerRadius: 10)
-    #endif
   }
-
-  #if os(iOS)
-  private var rowSpacing: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.rowSpacing : Theme.sidebarRowSpacing
-  }
-  private var iconColumnWidth: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.iconSize : Theme.sidebarIconSize + 4
-  }
-  private var titleSize: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.areaTitleSize : Theme.sidebarAreaTitleSize
-  }
-  private var rowHeight: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.rowHeight : Theme.sidebarRowHeight
-  }
-  #else
-  private var rowSpacing: CGFloat { Theme.sidebarRowSpacing }
-  private var iconColumnWidth: CGFloat { Theme.sidebarIconSize + 4 }
-  private var titleSize: CGFloat { Theme.sidebarAreaTitleSize }
-  private var rowHeight: CGFloat { Theme.sidebarRowHeight }
-  #endif
 }
 
 /// Trailing fold control on an area row: a chevron that points right when the
@@ -1448,52 +1317,22 @@ struct SidebarProjectRow: View {
   var tint: Color = Theme.iconMuted
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
-  #if os(iOS)
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-  #endif
 
   var body: some View {
-    HStack(spacing: rowSpacing) {
+    HStack(spacing: Theme.sidebarRowSpacing) {
       ProjectProgressIcon(progress: progress,
                           tint: tint,
-                          diameter: progressIconDiameter)
-        .frame(width: iconColumnWidth, alignment: .center)
+                          diameter: nil)
+        .frame(width: Theme.sidebarIconSize + 4, alignment: .center)
       Text(name)
-        .scaledFont(size: titleSize, weight: Theme.sidebarTitleWeight)
+        .scaledFont(size: Theme.sidebarTitleSize, weight: Theme.sidebarTitleWeight)
         .foregroundStyle(SidebarRowTitleStyle.color)
       Spacer()
       SidebarCount(count: count)
     }
-    .frame(height: rowHeight)
+    .frame(height: Theme.sidebarProjectRowHeight)
     .contentShape(Rectangle())
-    #if os(iOS)
-    .rowHover(cornerRadius: 10)
-    #endif
   }
-
-  #if os(iOS)
-  private var rowSpacing: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.projectRowSpacing : Theme.sidebarRowSpacing
-  }
-  private var iconColumnWidth: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.iconSize : Theme.sidebarIconSize + 4
-  }
-  private var titleSize: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.projectTitleSize : Theme.sidebarTitleSize
-  }
-  private var rowHeight: CGFloat {
-    usesPushNavigation ? SidebarSplitMetrics.projectRowHeight : Theme.sidebarProjectRowHeight
-  }
-  private var progressIconDiameter: CGFloat? {
-    usesPushNavigation ? 13 : nil
-  }
-  #else
-  private var rowSpacing: CGFloat { Theme.sidebarRowSpacing }
-  private var iconColumnWidth: CGFloat { Theme.sidebarIconSize + 4 }
-  private var titleSize: CGFloat { Theme.sidebarTitleSize }
-  private var rowHeight: CGFloat { Theme.sidebarProjectRowHeight }
-  private var progressIconDiameter: CGFloat? { nil }
-  #endif
 }
 
 /// The sidebar row title color. macOS uses `.primary` so the native `.sidebar`
