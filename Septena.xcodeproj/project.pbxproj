@@ -388,6 +388,7 @@
 		6639EDEDC2C4CCC132BD3202 /* DefaultExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC732C2F50FC1EC9308BA218 /* DefaultExerciseLibrary.swift */; };
 		663BAAAC80CAA6852CE37D65 /* AIPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */; };
 		66CB4234E92109F1EF858416 /* GoalIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C45208BFF39C4FE467347B /* GoalIntents.swift */; };
+		673C23299E842BE87F3D3D31 /* AddInfoPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737DB8DAAF3F0ED112C03BEB /* AddInfoPalette.swift */; };
 		679E3A7A8A85A1E17D323983 /* WeightCadence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2416C5A216AEE7F3DBA82BB /* WeightCadence.swift */; };
 		6869AE3BBFA2EEFE56E50257 /* GroceryStockHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CB56EDF55AC8C4125E54DE /* GroceryStockHistory.swift */; };
 		688DF9C7BC0CB50A51BF1191 /* NutritionQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */; };
@@ -648,6 +649,7 @@
 		B2392A52F6D29B6BE1E64B02 /* CoachDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8CB429512008D4925614A9 /* CoachDomain.swift */; };
 		B2D48CC2CC0FAE236C1EB7F5 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B215154685D3F91F1884F5 /* HomepageDomain.swift */; };
 		B2E14AA11D3195E8F27276BB /* WatchSky.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCA995E74F8AF991CB006F9 /* WatchSky.swift */; };
+		B2FECCD17F5EB7EF228BF8C4 /* AddInfoPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 737DB8DAAF3F0ED112C03BEB /* AddInfoPalette.swift */; };
 		B30799862FEA58C9BB9874C3 /* IntakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D41E004025226ADBE31D93 /* IntakePlugin.swift */; };
 		B381B4AFB3CF25BE405853CC /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */; };
 		B3FA261BE4DD11C7753A19E6 /* DailyMessageFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB724A6C69A3232DBF569FB8 /* DailyMessageFooter.swift */; };
@@ -1227,6 +1229,7 @@
 		7184022A465622EEE08AD3CA /* NutritionRingsBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRingsBuilder.swift; sourceTree = "<group>"; };
 		71BD49CCB43AB0603D015D48 /* IntegrationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsSettingsPane.swift; sourceTree = "<group>"; };
 		729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeOfDayWheel.swift; sourceTree = "<group>"; };
+		737DB8DAAF3F0ED112C03BEB /* AddInfoPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoPalette.swift; sourceTree = "<group>"; };
 		7431ACB92D29DD715935B49F /* MealPhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPhotoAnalyzer.swift; sourceTree = "<group>"; };
 		75738AAA1F8AD9EA26EF0D3B /* RhythmWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmWidgetSnapshot.swift; sourceTree = "<group>"; };
 		75A7338B84E54DF44893A020 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -2265,6 +2268,7 @@
 		C9EE93C7BC0CAE81262184F2 /* AddInfo */ = {
 			isa = PBXGroup;
 			children = (
+				737DB8DAAF3F0ED112C03BEB /* AddInfoPalette.swift */,
 				0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */,
 				FD5AAD8DD0E25AF940E3237C /* AddInfoRow.swift */,
 				8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */,
@@ -2873,6 +2877,7 @@
 				ED0AA58CABA5CF7F1EEA51BC /* AddGroceryPage.swift in Sources */,
 				616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */,
 				F97689E39AD64A5101DB4296 /* AddHabitPage.swift in Sources */,
+				B2FECCD17F5EB7EF228BF8C4 /* AddInfoPalette.swift in Sources */,
 				0A871A3A42EE54FEC6B17A0A /* AddInfoRouter.swift in Sources */,
 				1B693725E48BCC5939FE1196 /* AddInfoRow.swift in Sources */,
 				9487FE0DD2DC6FC6F602F4F8 /* AddInfoSection.swift in Sources */,
@@ -3335,6 +3340,7 @@
 				933FEAF27E7304E27A956B84 /* AddGroceryPage.swift in Sources */,
 				8D494DC3944E6DF820478280 /* AddGutPage.swift in Sources */,
 				F85E889C41CE2E31C1502315 /* AddHabitPage.swift in Sources */,
+				673C23299E842BE87F3D3D31 /* AddInfoPalette.swift in Sources */,
 				490A398C3B11F900B233B2F3 /* AddInfoRouter.swift in Sources */,
 				D2ED87D701557BCC94446AC6 /* AddInfoRow.swift in Sources */,
 				7FE5815A1FDDD537C1337A6E /* AddInfoSection.swift in Sources */,

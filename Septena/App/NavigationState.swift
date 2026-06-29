@@ -227,6 +227,11 @@ final class NavigationState {
     presentedModal = .addInfo(section: section)
   }
 
+  /// Present one intake tracker's page from the global Add Info palette.
+  func presentIntakeKind(_ id: String) {
+    presentedModal = .intakeKind(id: id)
+  }
+
   /// Present the Quick-Action / deep-link section sheet for a manifest key.
   func presentSection(key: String) {
     presentedModal = .section(key: key)
@@ -271,6 +276,7 @@ enum AppModal: Identifiable, Hashable {
   case quickFind
   case addInfo(section: AddInfoSection?)
   case section(key: String)
+  case intakeKind(id: String)
   case trainingSession
   case moodCheckin
   case keyboardShortcuts
@@ -280,6 +286,7 @@ enum AppModal: Identifiable, Hashable {
     case .quickFind:          return "quickFind"
     case .addInfo:            return "addInfo"
     case .section(let key):   return "section.\(key)"
+    case .intakeKind(let id): return "intakeKind.\(id)"
     case .trainingSession:    return "trainingSession"
     case .moodCheckin:        return "moodCheckin"
     case .keyboardShortcuts:  return "keyboardShortcuts"

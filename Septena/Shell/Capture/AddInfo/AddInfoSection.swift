@@ -1,15 +1,9 @@
 import SwiftUI
 
-// Single source of truth for the Add Info palette. Mirrors the webapp's
-// `lib/quick-log-registry.tsx` — every quick-add destination in one enum,
-// each case its own page view. Three verbs (▶ Start, ◉ Log, + Add) cluster
-// the actions for scannability in the root list.
-
-enum AddInfoVerb: Hashable {
-  case start         // multi-step session (Training)
-  case log           // record something that happened
-  case add           // queue onto a future-facing list
-}
+// Single source of truth for the Add Info palette's section pages. Each case
+// that has a dedicated search/create page in AddInfoSheet maps 1:1 here.
+// The root palette list itself is built by `AddInfoPalette` from the user's
+// dashboard tile order (all sections + per-kind intake rows).
 
 enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   case training, nutrition
@@ -28,26 +22,6 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
     case .gut:         return "Log Gut"
     case .tasks:       return "Add Task"
     case .groceries:   return "Add Grocery"
-    }
-  }
-
-  var verb: AddInfoVerb {
-    switch self {
-    case .training:                                                       return .start
-    case .habits, .supplements, .chores, .gut:                            return .log
-    case .nutrition, .tasks, .groceries:                                  return .add
-    }
-  }
-
-  /// Verb glyph shown as the row's leading icon. Three verbs, three
-  /// icons, 1:1 — mirrors the webapp's quick-log registry. We deliberately
-  /// don't carry per-section SF Symbols: picking a glyph per section is an
-  /// Android/web pattern and made the iOS port feel off.
-  var verbSystemImage: String {
-    switch verb {
-    case .start: return "play.fill"
-    case .log:   return "checkmark"
-    case .add:   return "plus"
     }
   }
 
@@ -79,14 +53,6 @@ enum AddInfoSection: String, CaseIterable, Identifiable, Hashable {
   func accent(theme: SectionTheme) -> Color {
     theme.color(for: rawValue)
   }
-
-  /// Stable order for the root Actions group. Mirrors the webapp's
-  /// homepage-tile order (training first, capture-style add at the end).
-  static let actionOrder: [AddInfoSection] = [
-    .training, .nutrition,
-    .habits, .supplements, .chores, .gut,
-    .tasks, .groceries,
-  ]
 
   /// Broadcast that this section's tile state has changed (quick-add
   /// committed, item toggled, etc.). The Week dashboard listens and

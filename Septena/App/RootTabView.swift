@@ -198,6 +198,11 @@ struct RootTabView: View {
         }
       }
       .septenaModalSheet(macWidth: 560, macHeight: 600)
+    case .intakeKind(let id):
+      NavigationStack {
+        IntakeKindPageView(kindID: id)
+      }
+      .septenaModalSheet(macWidth: 560, macHeight: 600)
     case .trainingSession:
       TrainingSessionView()
         .septenaModalSheet(macWidth: 560, macHeight: 600)

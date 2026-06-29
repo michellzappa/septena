@@ -68,20 +68,35 @@ struct AddInfoSheet: View {
 // MARK: - Root list
 
 private struct RootView: View {
+  @Environment(\.dismiss) private var dismiss
+  @Environment(\.modelContext) private var modelContext
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(NavigationState.self) private var nav
   @Bindable var router: AddInfoRouter
+
+  @State private var intakeTiles: [IntakeTileDTO] = []
+
+  private var entries: [AddInfoPaletteEntry] {
+    AddInfoPalette.entries(
+      sections: settingsStore.sections,
+      intakeTiles: intakeTiles,
+      mirroredFallback: SettingsMirror.loadSections(context: modelContext)
+    )
+  }
 
   var body: some View {
     List {
-      Section("Actions") {
-        ForEach(AddInfoSection.actionOrder) { section in
+      Section("Log or add") {
+        ForEach(entries) { entry in
           Button {
-            router.push(section)
+            select(entry)
           } label: {
             AddInfoRow(
-              title: section.title,
-              systemImage: section.verbSystemImage,
-              tint: section.accent(theme: theme),
+              title: entry.title,
+              systemImage: entry.iconSymbol,
+              tint: AddInfoPalette.accent(for: entry, theme: theme),
               accessory: .chevron
             )
           }
@@ -94,5 +109,26 @@ private struct RootView: View {
     #else
     .listStyle(.inset)
     #endif
+    .task { loadIntakeTiles() }
+  }
+
+  private func loadIntakeTiles() {
+    intakeTiles = IntakeReader.loadTiles(context: modelContext, date: clock.today)
+  }
+
+  private func select(_ entry: AddInfoPaletteEntry) {
+    switch entry.destination {
+    case .addInfoPage(let section):
+      router.push(section)
+    case .moodCheckin:
+      dismiss()
+      nav.showMoodCheckin = true
+    case .presentSection(let key):
+      dismiss()
+      nav.presentSection(key: key)
+    case .intakeKind(let id):
+      dismiss()
+      nav.presentIntakeKind(id)
+    }
   }
 }

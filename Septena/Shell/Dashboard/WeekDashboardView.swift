@@ -1408,23 +1408,10 @@ struct WeekDashboardView: View {
   /// sections — the manifest is the single source of truth for section
   /// order, so there's no hardcoded list to keep in sync.
   private var visibleDomains: [HomepageDomain] {
-    let enabledKeys = settingsStore.sections.filter(\.isEnabled).map(\.key)
-    if !enabledKeys.isEmpty {
-      var seen = Set<HomepageDomain>()
-      return enabledKeys.compactMap { HomepageDomain(rawValue: $0) }
-        .filter { seen.insert($0).inserted }
-    }
-    // Mirror not yet in the store — read SwiftData directly. Once rows exist,
-    // an empty enabled set is intentional (user turned everything off).
-    let mirrored = SettingsMirror.loadSections(context: modelContext)
-    if mirrored.isEmpty {
-      return SectionManifest.all
-        .filter(\.supportsDashboard)
-        .compactMap { HomepageDomain(rawValue: $0.key) }
-    }
-    var seen = Set<HomepageDomain>()
-    return mirrored.filter(\.isEnabled).compactMap { HomepageDomain(rawValue: $0.key) }
-      .filter { seen.insert($0).inserted }
+    AddInfoPalette.visibleDashboardDomains(
+      sections: settingsStore.sections,
+      mirroredFallback: SettingsMirror.loadSections(context: modelContext)
+    )
   }
 
 
