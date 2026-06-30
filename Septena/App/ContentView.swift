@@ -63,6 +63,18 @@ struct ContentView: View {
     }
     .navigationSplitViewStyle(.balanced)
     .iPadReportsNavDepth(id: "tasks", atRoot: true)
+    // Split surfaces always show a detail pane, so the sidebar must always
+    // have a row selected — seed Today when the path is still empty (launch,
+    // or compact → regular resize) and never let it clear back to none.
+    .onAppear { ensureSplitTasksSelection() }
+    .onChange(of: nav.path) { _, newPath in
+      if newPath.isEmpty { nav.path = [.filter(.today)] }
+    }
+  }
+
+  /// Keep `nav.path` aligned with the detail fallback on iPad regular / macOS.
+  private func ensureSplitTasksSelection() {
+    if nav.path.isEmpty { nav.path = [.filter(.today)] }
   }
 
   // Per-route .id is applied INSIDE destination(for:) — TaskListView is

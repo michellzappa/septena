@@ -246,15 +246,6 @@ struct SidebarRootView: View {
     // show/hide control — drop the system's auto-injected toggle so it doesn't
     // duplicate beside Quick Find in this column's nav bar.
     .toolbar(removing: .sidebarToggle)
-    // Unified chrome (docs/PAGE_CHROME_SPEC.md). On iPad the chrome is the
-    // window-level overlay bar, so the Tasks SIDEBAR publishes the whole Tasks
-    // entry — "···" (New Area/Project/Task Settings) AND "+" (new task via the
-    // global `shouldStartCreating` flag the detail's list observes). The detail
-    // doesn't publish on iPad (would clobber this), so the "+" stays put when the
-    // sidebar toggles.
-    .pageChrome(id: "tasks", title: "Tasks",
-                localActions: { AnyView(tasksMenuExtraRows) },
-                add: .action { nav.shouldStartCreating = true })
     .modifier(sidebarBehavior)
   }
 
@@ -271,11 +262,6 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    // Unified chrome (docs/PAGE_CHROME_SPEC.md): gear (→ Settings, leading,
-    // constant) + "···" (New Area/Project/Task Settings). Quick Find lives in
-    // the same leading cluster via `.pageChrome` (iPhone) / the overlay (iPad).
-    // The "+" lives on the task list you push into, not the sidebar index.
-    .pageChrome(id: "tasks", title: "Tasks", localActions: { AnyView(tasksMenuExtraRows) })
     .modifier(sidebarBehavior)
   }
 
@@ -284,8 +270,6 @@ struct SidebarRootView: View {
   @ViewBuilder
   private var sidebarMac: some View {
     sidebarListContent()
-    .pageChrome(id: "tasks", title: "Tasks",
-                localActions: { AnyView(tasksMenuExtraRows) })
     .modifier(sidebarBehavior)
   }
 
@@ -296,38 +280,46 @@ struct SidebarRootView: View {
   /// hand-built `sectionCard` / `inCardDivider` / bare-VStack scaffolding this
   /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
   private func sidebarListContent() -> some View {
-    #if os(iOS)
-    // iPhone + iPad share the Reminders-style home: the 2×2 smart-list grid is
-    // the first row of the scroll (so it scrolls *with* the area / project cards
-    // below the top chrome — not a separate pinned bar), then the grouped cards.
-    // A clear row background + zero row insets keep the tiles full-width with no
-    // visible section card around them.
-    List(selection: sidebarSelection) {
-      Section {
-        smartListGrid
-          .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 8, trailing: 0))
-          .listRowBackground(Color.clear)
-          .listRowSeparator(.hidden)
+    Group {
+      #if os(iOS)
+      // iPhone + iPad share the Reminders-style home: the 2×2 smart-list grid is
+      // the first row of the scroll (so it scrolls *with* the area / project cards
+      // below the top chrome — not a separate pinned bar), then the grouped cards.
+      // Host the grid as the first section's *header* (not its own section) —
+      // insetGrouped paints every row inside a white rounded card whose corners
+      // fight each tile's 12pt radius, and a separate section adds a full
+      // inter-section gap before the first area card.
+      List(selection: sidebarSelection) {
+        areaProjectSections(includesSmartListGrid: true)
       }
-      .listSectionSpacing(6)
-      areaProjectSections()
+      .environment(\.defaultMinListHeaderHeight, 0)
+      .modifier(IOSSidebarListChrome())
+      .septenaNeutralListSelection()
+      .pageChrome(
+        id: "tasks",
+        title: "Tasks",
+        localActions: { AnyView(tasksMenuExtraRows) },
+        add: usesPushNavigation ? .action { nav.shouldStartCreating = true } : nil
+      )
+      #else
+      // macOS: native `.sidebar` `List(selection:)` for arrow-key traversal,
+      // but row highlight is our neutral fill (see `compactRow`) — not the
+      // system accent capsule / ring.
+      List(selection: sidebarSelection) {
+        smartListSection
+        areaProjectSections()
+      }
+      .listStyle(.sidebar)
+      .septenaNeutralListSelection()
+      .pageChrome(
+        id: "tasks",
+        title: "Tasks",
+        localActions: { AnyView(tasksMenuExtraRows) }
+      )
+      #endif
     }
-    .modifier(IOSSidebarListChrome())
-    #else
-    // macOS uses the native `.sidebar` `List(selection:)` — the standard
-    // source-list selection (Mail / Finder / Notes / Reminders): accent while
-    // the list is focused, the system's unemphasized gray when the detail pane
-    // takes focus, plus ↑↓ row traversal for free. The selection binding drives
-    // navigation directly (`sidebarSelection`), so a *single* click / arrow key
-    // opens the row — matching every system source list. (It used to be a
-    // decoupled `macSelection` that only opened on double-click/Return, which
-    // read as broken: nothing else on macOS makes you double-click a sidebar.)
-    List(selection: sidebarSelection) {
-      smartListSection
-      areaProjectSections()
-    }
-    .listStyle(.sidebar)
-    #endif
+    .onAppear { reconcileSidebarSelection() }
+    .onChange(of: usesPushNavigation) { _, _ in reconcileSidebarSelection() }
   }
 
   // MARK: - Smart lists section
@@ -342,7 +334,7 @@ struct SidebarRootView: View {
         #if os(iOS)
         compactRow { smartListRow(for: spec) }
         #else
-        smartListRow(for: spec)
+        compactRow(route: spec.route) { smartListRow(for: spec) }
         #endif
       }
     }
@@ -365,8 +357,8 @@ struct SidebarRootView: View {
 
   #if os(iOS)
   /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Logbook). Hosted as the first (clear, zero-inset) row of the sidebar List,
-  /// so it scrolls with the cards below and spans the same card width.
+  /// Logbook). Rendered as a List section header (not a row) so insetGrouped
+  /// doesn't wrap the block in its own rounded card.
   private var smartListGrid: some View {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
                         GridItem(.flexible(), spacing: Theme.tileGap)],
@@ -379,9 +371,18 @@ struct SidebarRootView: View {
                         count: spec.count,
                         isSelected: isSelected(spec.route))
         }
-        .buttonStyle(PlainHoverRowButtonStyle(cornerRadius: 12))
+        .buttonStyle(InertButtonStyle())
       }
     }
+  }
+
+  /// Header placement adds the grouped row-text inset (`compactRow` uses 16pt)
+  /// on top of the card width — bleed that off so tile edges line up with the
+  /// grouped cards below. Tuck the first area card up under the bottom row.
+  private var smartListGridHeader: some View {
+    smartListGrid
+      .padding(.horizontal, -Theme.Spacing.xl)
+      .padding(.bottom, -Theme.Spacing.xs)
   }
   #endif
 
@@ -551,15 +552,42 @@ struct SidebarRootView: View {
   /// it back to a `Route` and routes through `selectRoute`, so selection and
   /// navigation stay one action. Id-based so a reloaded project/area struct
   /// (same id, changed fields) can't drop the highlight.
+  ///
+  /// On push surfaces (iPad regular / macOS) a detail pane is always visible,
+  /// so selection never reads as nil — Today is the default home, and a route
+  /// that fell off the sidebar (archived project, deleted area) bounces there.
   private var sidebarSelection: Binding<String?> {
     Binding(
-      get: { nav.path.last?.id },
+      get: {
+        if usesPushNavigation { return effectiveSidebarRoute.id }
+        return nav.path.last?.id
+      },
       set: { id in
         if let id, let route = selectableRoutes.first(where: { $0.id == id }) {
           selectRoute(route)
+        } else if usesPushNavigation {
+          selectRoute(.filter(.today))
         }
       }
     )
+  }
+
+  /// The route the sidebar should treat as selected on split surfaces. Mirrors
+  /// `ContentView`'s detail fallback and re-validates against the live
+  /// `selectableRoutes` list so a stale project/area can't leave no row lit.
+  private var effectiveSidebarRoute: Route {
+    if let last = nav.path.last,
+       selectableRoutes.contains(where: { $0.sameDestination(as: last) }) {
+      return last
+    }
+    return .filter(.today)
+  }
+
+  /// Sync `nav.path` when the split surface needs a guaranteed selection.
+  private func reconcileSidebarSelection() {
+    guard usesPushNavigation else { return }
+    let route = effectiveSidebarRoute
+    if nav.path.last?.id != route.id { nav.path = [route] }
   }
 
   private func selectRoute(_ route: Route) {
@@ -573,30 +601,21 @@ struct SidebarRootView: View {
   /// highlight the Today tile while the user is looking at the overview. A
   /// regular-width split (iPad, macOS, or an unfolded foldable) always has a
   /// detail pane showing, so Today is a sensible default.
-  ///
-  /// Keyed off `usesPushNavigation` — the same push-vs-sheet rule the rest of
-  /// the shell uses — never the device idiom. A foldable iPhone reports the
-  /// `.phone` idiom even when unfolded into a regular-width display, so an
-  /// idiom check would wrongly suppress the default highlight on the big screen.
-  ///
-  /// iOS only: the macOS sidebar uses native `List(selection:)` bound to
-  /// `sidebarSelection` for its highlight, so this hand-rolled "current route"
-  /// check is only needed by the iPhone smart-list tiles.
-  #if os(iOS)
-  private var selectedRoute: Route? {
-    if !usesPushNavigation {
-      return nav.path.last
-    }
+  private var highlightedRoute: Route? {
+    #if os(iOS)
+    if !usesPushNavigation { return nav.path.last }
     return nav.path.last ?? .filter(.today)
+    #else
+    return effectiveSidebarRoute
+    #endif
   }
 
   /// Stable-id comparison via `Route.sameDestination` — default `Route`
   /// equality compares the whole `Project` / `Area` struct, which breaks the
   /// highlight as soon as the sidebar reloads an entity with any changed field.
   private func isSelected(_ route: Route) -> Bool {
-    selectedRoute?.sameDestination(as: route) ?? false
+    highlightedRoute?.sameDestination(as: route) ?? false
   }
-  #endif
 
   // MARK: - Areas and projects
   //
@@ -608,15 +627,19 @@ struct SidebarRootView: View {
   // still renders as a one-row card, so every area reads as the same container.
 
   @ViewBuilder
-  private func areaProjectSections() -> some View {
+  private func areaProjectSections(includesSmartListGrid: Bool = false) -> some View {
     if !topLevelProjects.isEmpty {
       Section {
         ForEach(topLevelProjects) { project in
           compactRow(route: .project(project)) { projectRow(project, parent: nil) }
         }
+      } header: {
+        #if os(iOS)
+        if includesSmartListGrid { smartListGridHeader }
+        #endif
       }
     }
-    ForEach(areas, id: \.id) { area in
+    ForEach(Array(areas.enumerated()), id: \.element.id) { index, area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
       Section {
@@ -628,8 +651,19 @@ struct SidebarRootView: View {
             compactRow(route: .project(project)) { projectRow(project, parent: area.id) }
           }
         }
+      } header: {
+        #if os(iOS)
+        if includesSmartListGrid, topLevelProjects.isEmpty, index == 0 {
+          smartListGridHeader
+        }
+        #endif
       }
     }
+    #if os(iOS)
+    if includesSmartListGrid, topLevelProjects.isEmpty, areas.isEmpty {
+      Section { } header: { smartListGridHeader }
+    }
+    #endif
     // Recently Deleted — always last, only shown when there are trashed tasks.
     if recentlyDeletedCount > 0 {
       Section {
@@ -653,27 +687,17 @@ struct SidebarRootView: View {
   @ViewBuilder
   private func compactRow<V: View>(route: Route? = nil,
                                    @ViewBuilder _ row: () -> V) -> some View {
-    #if os(iOS)
+    let selected = route.map { isSelected($0) } ?? false
     row()
+      #if os(iOS)
       .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-      // Explicit row fill: in the sidebar column the insetGrouped default cell
-      // fill is suppressed, so without this the gray canvas shows through and
-      // the cards read gray instead of white. When this row's destination is
-      // the one open in the detail pane it gets a faint accent wash — the iPad
-      // "active area/project" indicator (the native selection highlight can't
-      // show once we set an explicit row background).
-      .listRowBackground(rowFill(for: route))
-    #else
-    row()
-    #endif
+      #endif
+      // Custom neutral fill only — suppress UIKit/AppKit's accent capsule /
+      // selection ring so rows don't grow or glow on tap (same pattern as the
+      // task-list detail).
+      .listRowBackground(SelectableListRowBackground(isSelected: selected))
+      .septenaSuppressListCellSelection()
   }
-
-  #if os(iOS)
-  private func rowFill(for route: Route?) -> Color {
-    if let route, isSelected(route) { return Color.accentColor.opacity(0.12) }
-    return Theme.cardSurface
-  }
-  #endif
 
   /// The area's own row — tappable to its detail, with rename / reorder / delete
   /// in the context menu (and, on macOS, a task drop target). Sits at the top of
@@ -934,6 +958,7 @@ struct SidebarRootView: View {
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
     recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
+    reconcileSidebarSelection()
   }
 
   fileprivate struct Aggregate {
@@ -1068,7 +1093,7 @@ private struct IOSSidebarListChrome: ViewModifier {
       // insetGrouped's default inter-section gap (~35pt) leaves too much air
       // above the first area and between area cards; tighten it for a denser,
       // more Reminders-like rhythm.
-      .listSectionSpacing(18)
+      .listSectionSpacing(14)
   }
 }
 #endif
@@ -1124,10 +1149,8 @@ struct SmartListTile: View {
   let title: String
   /// Total rows on the list — big bold number top-right.
   var count: Int? = nil
-  /// When true, the tile keeps its white fill but gains a tinted outline so the
-  /// iPad sidebar shows which smart list the detail pane is currently on —
-  /// white-card look preserved (matching iPhone), selection shown by the border,
-  /// not a gray fill. iPhone never sees a selected tile (tapping pushes onto the
+  /// When true, the tile gets the same neutral selection fill as list rows —
+  /// no outline ring. iPhone never sees a selected tile (tapping pushes onto the
   /// stack).
   var isSelected: Bool = false
 
@@ -1161,11 +1184,7 @@ struct SmartListTile: View {
     .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
       RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .fill(Theme.cardSurface)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
-        .strokeBorder(iconColor, lineWidth: isSelected ? 2 : 0)
+        .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
     )
   }
 
