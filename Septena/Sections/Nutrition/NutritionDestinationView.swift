@@ -124,7 +124,7 @@ struct NutritionDestinationView: View {
 
   private var today: String { SeptenaDate.today }
 
-  private var isViewingToday: Bool { viewingDate == today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var accent: Color { theme.color(for: "nutrition") }
 
@@ -265,7 +265,7 @@ struct NutritionDestinationView: View {
     let since = sinceDate(daysBack: 365)
     let r = await MirrorReader.shared.read { ctx in
       (entries: ChecklistMirror.loadNutritionEntries(context: ctx, since: since),
-       stats: ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90),
+       stats: ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90, today: viewingDate),
        settings: SettingsMirror.loadSettings(context: ctx))
     }
     entries = r.entries

@@ -20,7 +20,7 @@ struct GutDestinationView: View {
   /// The day the drawer is viewing. Bound to `SectionDrawer`'s
   /// `currentDate` slot so the user can step prev/next from the date
   /// strip and `reload()` re-fetches for that day. Defaults to today.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   // Gut is an editable dual section: Log = the day's movements; Patterns = the
   // 30-day rhythm wheel. Default Log; remembered per section.
   @State private var mode: DrawerMode = .remembered(for: "gut", default: .log)
@@ -32,7 +32,7 @@ struct GutDestinationView: View {
   private var accent: Color { theme.color(for: "gut") }
 
   /// The rhythm wheel is a today-only affordance (a past-day view is odd).
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "gut",
@@ -64,6 +64,11 @@ struct GutDestinationView: View {
       rhythmSection
     })
     .tint(accent)
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task { await reload() }
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["gut"]) { await reload() }
     // Adaptive: sheet on iPhone, docked inspector on iPad/macOS so editing

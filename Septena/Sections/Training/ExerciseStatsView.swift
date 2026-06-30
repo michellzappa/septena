@@ -14,6 +14,7 @@ struct ExerciseStatsView: View {
 
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @State private var detail = LogDetail()
   @State private var showEdit = false
 
@@ -41,14 +42,16 @@ struct ExerciseStatsView: View {
   }
 
   private func reload() {
-    detail = Self.build(entity: entity, context: modelContext, accent: accent)
+    detail = Self.build(entity: entity, context: modelContext, accent: accent,
+                        today: clock.today)
   }
 
   // MARK: - Build
 
   static func build(entity: ExerciseDefinitionEntity,
                     context: ModelContext,
-                    accent: Color) -> LogDetail {
+                    accent: Color,
+                    today: String) -> LogDetail {
     let key = exerciseKey(entity.name)
     let all = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       sortBy: [SortDescriptor(\.date, order: .reverse),
@@ -65,7 +68,7 @@ struct ExerciseStatsView: View {
 
     // Tiles: last performed · sessions in 30d · headline PR.
     let last = dates.last
-    let last30 = sessionsInLast30(dates)
+    let last30 = sessionsInLast30(dates, today: today)
     d.tiles = [
       LogStat(value: last.map(LogDetailFormat.relativeDay) ?? "—", caption: "Last done"),
       LogStat(value: "\(last30)", caption: "last 30 days",
@@ -83,7 +86,8 @@ struct ExerciseStatsView: View {
       default:         return .oneRepMax
       }
     }()
-    let series = TrainingMetrics.progressSeries(for: entity.name, metric: metric, in: context)
+    let series = TrainingMetrics.progressSeries(for: entity.name, metric: metric,
+                                                in: context, today: today)
     if series.points.count >= 2 {
       d.chart = LogChartContent(
         title: TrainingProgressFormat.title(metric),
@@ -145,10 +149,10 @@ struct ExerciseStatsView: View {
 
   // MARK: - Helpers
 
-  private static func sessionsInLast30(_ dates: [String]) -> Int {
-    guard let today = SeptenaDate.parse(SeptenaDate.today) else { return 0 }
-    let cutoff = Calendar.current.date(byAdding: .day, value: -29, to: today)
-      .flatMap(SeptenaDate.format) ?? SeptenaDate.today
+  private static func sessionsInLast30(_ dates: [String], today: String) -> Int {
+    guard let todayDate = SeptenaDate.parse(today) else { return 0 }
+    let cutoff = Calendar.current.date(byAdding: .day, value: -29, to: todayDate)
+      .flatMap(SeptenaDate.format) ?? today
     return dates.filter { $0 >= cutoff }.count
   }
 

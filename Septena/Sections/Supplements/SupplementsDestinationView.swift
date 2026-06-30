@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SupplementsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
 
@@ -16,7 +17,7 @@ struct SupplementsDestinationView: View {
   @State private var creating = false
   /// Day the drawer's date strip is pointing at; toggles write to this
   /// day when browsing the past via the date strip.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   /// Past-day state for `viewingDate`. Loaded when not viewing today.
   @State private var pastDay: SupplementsDayResponse? = nil
   /// Per-supplement 30-day completion rate (id → percent), shown in each row's
@@ -34,7 +35,7 @@ struct SupplementsDestinationView: View {
   @State private var mode: DrawerMode = .remembered(for: "supplements", default: .log)
   @State private var history: [CompletionDay] = []
 
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var accent: Color { theme.color(for: "supplements") }
 
@@ -59,11 +60,21 @@ struct SupplementsDestinationView: View {
     // data-change-driven (past day, completion rates, history heatmap) rides the
     // shared `.sectionReload` wire so there's no separate `.onReceive` to drift.
     .task {
-      model.paintFromCache()
-      await model.load()
+      if viewingDate.isEmpty { viewingDate = clock.today }
+      model.paintFromCache(today: clock.today)
+      await model.load(today: clock.today)
+    }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task {
+        await model.load(today: clock.today)
+        await reloadPastDay()
+        await loadRates()
+        await loadHistory()
+      }
     }
     .sectionReload(on: viewingDate, onDataChange: true, forSections: ["supplements"],
-                   mirrorReload: { await model.load() }) {
+                   mirrorReload: { await model.load(today: clock.today) }) {
       await reloadPastDay()
       await loadRates()
       await loadHistory()
@@ -94,7 +105,7 @@ struct SupplementsDestinationView: View {
     .adaptiveDetail(isPresented: $creating) {
       EditSupplementSheet(
         original: nil,
-        onDone: { _ in Task { await model.load() } }
+        onDone: { _ in Task { await model.load(today: clock.today) } }
       )
     }
   }
@@ -282,13 +293,13 @@ struct SupplementsDestinationView: View {
   /// Route the 30-day rate query through the background reader rather than the
   /// view's main context, so it can't hitch the push transition. Mirrors Habits.
   private func loadRates() async {
-    rates = await MirrorReader.shared.read { ChecklistMirror.supplementCompletionRates(context: $0) }
+    rates = await MirrorReader.shared.read { ChecklistMirror.supplementCompletionRates(context: $0, days: 30, today: clock.today) }
   }
 
   /// Whole-stack daily adherence for the Patterns heatmap (trailing ~17 weeks).
   private func loadHistory() async {
     let resp = await MirrorReader.shared.read {
-      ChecklistMirror.loadSupplementsHistory(context: $0, days: 119)
+      ChecklistMirror.loadSupplementsHistory(context: $0, days: 119, today: clock.today)
     }
     history = resp.daily.map { CompletionDay(date: $0.date, done: $0.done, total: $0.total) }
   }

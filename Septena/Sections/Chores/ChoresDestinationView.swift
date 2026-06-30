@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ChoresDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
 
   @State private var model = NextItemsModel()
@@ -88,11 +89,17 @@ struct ChoresDestinationView: View {
     // shared `.sectionReload` wire (appear + scoped data-change) so there's no
     // separate `.onReceive` to drift. Chores has no time travel, so no `on:`.
     .task {
-      model.paintFromCache()
-      await model.load()
+      model.paintFromCache(today: clock.today)
+      await model.load(today: clock.today)
+    }
+    .onChange(of: clock.today) { _, _ in
+      Task {
+        await model.load(today: clock.today)
+        await loadHistory()
+      }
     }
     .sectionReload(onDataChange: true, forSections: ["chores"],
-                   mirrorReload: { await model.load() }) { await loadHistory() }
+                   mirrorReload: { await model.load(today: clock.today) }) { await loadHistory() }
     // Tapping a chore opens its detail "infobox" (history + learned cadence);
     // the row's own checkbox still completes it. From the detail, "Edit" swaps
     // to the editor for the same chore.
@@ -115,7 +122,7 @@ struct ChoresDestinationView: View {
     .adaptiveDetail(isPresented: $creating) {
       EditChoreSheet(
         original: nil,
-        onDone: { _ in Task { await model.load() } }
+        onDone: { _ in Task { await model.load(today: clock.today) } }
       )
     }
   }
@@ -183,7 +190,7 @@ struct ChoresDestinationView: View {
   /// Daily completed/total for the Patterns heatmap (trailing ~17 weeks).
   private func loadHistory() async {
     let resp = await MirrorReader.shared.read {
-      ChecklistMirror.loadChoresHistory(context: $0, days: 119)
+      ChecklistMirror.loadChoresHistory(context: $0, days: 119, today: clock.today)
     }
     history = resp.daily.map { CompletionDay(date: $0.date, done: $0.completed, total: $0.total) }
   }

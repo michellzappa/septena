@@ -3,13 +3,14 @@ import SwiftUI
 
 struct MedicationsDestinationView: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   @Query(sort: \MedicationDefinitionEntity.sortIndex)
   private var definitions: [MedicationDefinitionEntity]
   @Query(sort: \MedicationDoseEventEntity.occurredAt, order: .reverse)
   private var doses: [MedicationDoseEventEntity]
 
-  @State private var viewingDate = SeptenaDate.today
+  @State private var viewingDate = ""
   @State private var editing: MedicationDoseEventEntity?
   @State private var creating = false
   /// Medication whose per-item detail (adherence heatmap + history) is open.
@@ -23,6 +24,8 @@ struct MedicationsDestinationView: View {
 
   private var accent: Color { theme.color(for: "medications") }
   private var mutator: MedicationsMutator { SeptenaServices.shared.medicationsMutator }
+
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var activeDefinitions: [MedicationDefinitionEntity] {
     definitions.filter { !$0.archived }
@@ -43,7 +46,7 @@ struct MedicationsDestinationView: View {
     var takenByDate: [String: Int] = [:]
     for d in doses where d.status == "taken" { takenByDate[d.date, default: 0] += 1 }
     let target = dailyDoseTarget
-    return CompletionDateRange.lastNDates(119).map { iso in
+    return CompletionDateRange.lastNDates(119, now: clock.now).map { iso in
       let done = takenByDate[iso] ?? 0
       let total = target > 0 ? target : done
       return CompletionDay(date: iso, done: min(done, max(total, 0)), total: total)
@@ -62,7 +65,7 @@ struct MedicationsDestinationView: View {
                   log: {
       DrawerSection("Doses", padding: .none) {
         if dayDoses.isEmpty {
-          DrawerEmptyLogLine(isToday: viewingDate == SeptenaDate.today)
+          DrawerEmptyLogLine(isToday: isViewingToday)
         } else {
           ForEach(dayDoses) { dose in
             LogEntryRow(
@@ -82,6 +85,10 @@ struct MedicationsDestinationView: View {
       byMedicationSection
     })
     .tint(accent)
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["medications"]) {}
     .drawerDetail(edit: $editing, create: $creating) { dose in

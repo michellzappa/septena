@@ -8,6 +8,7 @@ import SwiftUI
 
 struct HabitsDestinationView: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   // Optional: this view is also hosted inside the Home-Screen-Quick-Action
@@ -23,7 +24,7 @@ struct HabitsDestinationView: View {
   /// Day the drawer's date strip is pointing at. Drives summary +
   /// bucket list, and which day toggles write to when browsing the past
   /// via the date strip — time-travel mode IS the backfill UX.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   /// Past-day habit state for `viewingDate`. Loaded when
   /// `viewingDate != today` so we don't drag NextItemsModel off the
   /// "today" track.
@@ -44,7 +45,7 @@ struct HabitsDestinationView: View {
   @State private var mode: DrawerMode = .remembered(for: "habits", default: .log)
   @State private var history: [CompletionDay] = []
 
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   /// Server section key; accent comes from the user's Septena config so the
   /// hue matches the webapp / sidebar / Next tab without hard-coding.
@@ -79,11 +80,21 @@ struct HabitsDestinationView: View {
     // data-change-driven (past day, completion rates, history heatmap) rides the
     // shared `.sectionReload` wire so there's no separate `.onReceive` to drift.
     .task {
-      model.paintFromCache()
-      await model.load()
+      if viewingDate.isEmpty { viewingDate = clock.today }
+      model.paintFromCache(today: clock.today)
+      await model.load(today: clock.today)
+    }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task {
+        await model.load(today: clock.today)
+        await reloadPastDay()
+        await loadRates()
+        await loadHistory()
+      }
     }
     .sectionReload(on: viewingDate, onDataChange: true, forSections: ["habits"],
-                   mirrorReload: { await model.load() }) {
+                   mirrorReload: { await model.load(today: clock.today) }) {
       await reloadPastDay()
       await loadRates()
       await loadHistory()
@@ -115,7 +126,7 @@ struct HabitsDestinationView: View {
     .adaptiveDetail(isPresented: $creating) {
       EditHabitSheet(
         original: nil,
-        onDone: { _ in Task { await model.load() } }
+        onDone: { _ in Task { await model.load(today: clock.today) } }
       )
     }
   }
@@ -183,13 +194,13 @@ struct HabitsDestinationView: View {
   /// the largest checklist table — so route it through the background reader
   /// instead of the view's main context, or it hitches the push transition.
   private func loadRates() async {
-    rates = await MirrorReader.shared.read { ChecklistMirror.habitCompletionRates(context: $0) }
+    rates = await MirrorReader.shared.read { ChecklistMirror.habitCompletionRates(context: $0, days: 30, today: clock.today) }
   }
 
   /// Whole-stack daily completion for the Patterns heatmap (trailing ~17 weeks).
   private func loadHistory() async {
     let resp = await MirrorReader.shared.read {
-      ChecklistMirror.loadHabitsHistory(context: $0, days: 119)
+      ChecklistMirror.loadHabitsHistory(context: $0, days: 119, today: clock.today)
     }
     history = resp.daily.map { CompletionDay(date: $0.date, done: $0.done, total: $0.total) }
   }

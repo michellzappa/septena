@@ -80,7 +80,7 @@ struct AddTrainingPage: View {
   }
 
   private func load() async {
-    let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext)
+    let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext, today: SeptenaDate.today, now: Date())
     suggested = resp.suggested
     daysAgo = resp.daysAgo
     sessionTypes = ChecklistMirror.loadSessionTypes(context: modelContext) ?? []

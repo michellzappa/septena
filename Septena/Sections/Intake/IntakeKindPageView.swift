@@ -22,7 +22,7 @@ struct IntakeKindPageView: View {
   /// Event dates over the trailing ~17 weeks for the frequency heatmap.
   @State private var freqDates: [String] = []
   @State private var loading = true
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   @State private var editing: IntakeEntryDTO? = nil
   @State private var creatingMethod: PresetMethod? = nil
   /// Blank full editor opened by the quick-log sheet's "New entry…" row — the
@@ -97,6 +97,11 @@ struct IntakeKindPageView: View {
       rhythmSection
     })
     .tint(accent)
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task { await reload() }
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["intake"]) { await reload() }
     .sheet(isPresented: $managing) {
@@ -191,7 +196,7 @@ struct IntakeKindPageView: View {
   }
 
   private var nowInstant: Date {
-    SeptenaDate.parse(viewingDate).map { _ in Date() } ?? Date()
+    isViewingToday ? clock.now : (SeptenaDate.parse(viewingDate) ?? clock.now)
   }
 
   // MARK: Rows
@@ -202,7 +207,7 @@ struct IntakeKindPageView: View {
   // by recency (shared `TimeOfDayWheel`, same as the old consumable
   // drawers). Shown with enough events to read a pattern.
 
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var todayStart: Date {
     SeptenaDate.parse(clock.today).map { Calendar.current.startOfDay(for: $0) }

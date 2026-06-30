@@ -33,14 +33,14 @@ struct MoodDestinationView: View {
   @State private var loading = true
   /// Day the drawer's date strip is pointing at. In Log mode the list
   /// follows this date; Patterns is cross-day and ignores it.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   // Mood is an editable dual section: Log = the day's check-ins; Patterns =
   // 30-day quadrant breakdown + 7-day rhythm wheel. Default Log; remembered.
   @State private var mode: DrawerMode = .remembered(for: "mood", default: .log)
   /// Whether the one-shot empty-state nudge has run for this appearance.
   @State private var didNudge = false
 
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   var body: some View {
     SectionDrawer(sectionKey: "mood",
@@ -61,6 +61,11 @@ struct MoodDestinationView: View {
       }
     })
     .tint(accent)
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task { await reload() }
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["mood"]) { await reload() }
     .adaptiveDetail(isPresented: $addingNew, onDismiss: {

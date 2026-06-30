@@ -5,13 +5,14 @@ import SwiftUI
 struct SymptomsDestinationView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   @Query(sort: \SymptomDefinitionEntity.sortIndex)
   private var definitions: [SymptomDefinitionEntity]
   @Query(sort: \SymptomEventEntity.occurredAt, order: .reverse)
   private var events: [SymptomEventEntity]
 
-  @State private var viewingDate = SeptenaDate.today
+  @State private var viewingDate = ""
   @State private var editing: SymptomEventEntity?
   @State private var creating = false
   /// Symptom whose per-symptom detail (severity heatmap + history) is open.
@@ -26,6 +27,8 @@ struct SymptomsDestinationView: View {
 
   private var accent: Color { theme.color(for: "symptoms") }
   private var mutator: SymptomsMutator { SeptenaServices.shared.symptomsMutator }
+
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var activeDefinitions: [SymptomDefinitionEntity] {
     definitions.filter { !$0.archived }
@@ -43,7 +46,7 @@ struct SymptomsDestinationView: View {
                   log: {
       DrawerSection("Log", padding: .none) {
         if dayEvents.isEmpty {
-          DrawerEmptyLogLine(isToday: viewingDate == SeptenaDate.today)
+          DrawerEmptyLogLine(isToday: isViewingToday)
         } else {
           ForEach(dayEvents) { event in
             LogEntryRow(
@@ -72,6 +75,10 @@ struct SymptomsDestinationView: View {
       }
     })
     .tint(accent)
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+    }
     .sectionReload(on: viewingDate, onDataChange: true,
                    forSections: ["symptoms"]) {}
     .drawerDetail(edit: $editing, create: $creating) { event in
@@ -134,7 +141,7 @@ struct SymptomsDestinationView: View {
   private var severityDays: [SeverityDay] {
     var peakByDate: [String: Int] = [:]
     for e in events { peakByDate[e.date] = max(peakByDate[e.date] ?? 0, e.severity) }
-    return CompletionDateRange.lastNDates(30).map {
+    return CompletionDateRange.lastNDates(30, now: clock.now).map {
       SeverityDay(date: $0, peak: peakByDate[$0] ?? 0)
     }
   }
@@ -162,7 +169,7 @@ struct SymptomsDestinationView: View {
   /// Trailing-30-day timing wheel — when symptoms tend to strike. The shared
   /// `TimeOfDayWheel` filters to its window, so passing every event is fine.
   private var wheelEvents: [TimeOfDayWheel.Event] {
-    let todayStart = Calendar.current.startOfDay(for: Date())
+    let todayStart = Calendar.current.startOfDay(for: clock.now)
     return events.compactMap {
       TimeOfDayWheel.Event(id: $0.id, occurredAt: $0.occurredAt,
                            todayStart: todayStart, windowDays: 30)
@@ -170,7 +177,7 @@ struct SymptomsDestinationView: View {
   }
 
   private var nowFraction: Double {
-    let c = Calendar.current.dateComponents([.hour, .minute], from: Date())
+    let c = Calendar.current.dateComponents([.hour, .minute], from: clock.now)
     return (Double(c.hour ?? 0) * 60 + Double(c.minute ?? 0)) / 1440
   }
 

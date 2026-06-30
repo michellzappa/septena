@@ -179,6 +179,7 @@ struct CorrelationEngine {
   static func runEverything(
     context: ModelContext,
     ouraNights: [OuraNight],
+    today: Date,
     days: Int = 365
   ) async -> Result {
     if let cached = cachedResult(days: days) { return cached }
@@ -186,7 +187,7 @@ struct CorrelationEngine {
     // Snapshot the stamp BEFORE extracting, so a write that lands mid-run
     // invalidates this result instead of being silently absorbed into it.
     let stampAtStart = dataStamp
-    let extraction = extract(context: context, ouraNights: ouraNights, days: days)
+    let extraction = extract(context: context, ouraNights: ouraNights, days: days, today: today)
     SeptenaLog.info("[Insights] extracted days=\(extraction.features.count) habits=\(extraction.habits.count) supplements=\(extraction.supplements.count)")
 
     // The universe is "everything you actively track," not a curated list.
@@ -432,12 +433,13 @@ struct CorrelationEngine {
   private static func extract(
     context: ModelContext,
     ouraNights: [OuraNight],
-    days: Int
+    days: Int,
+    today: Date
   ) -> Extraction {
     let calendar = Calendar.current
     let fmt = isoFormatter
-    let today = calendar.startOfDay(for: Date())
-    guard let cutoff = calendar.date(byAdding: .day, value: -(days - 1), to: today) else {
+    let todayStart = calendar.startOfDay(for: today)
+    guard let cutoff = calendar.date(byAdding: .day, value: -(days - 1), to: todayStart) else {
       return Extraction(features: [:], habits: [], supplements: [])
     }
     let cutoffStr = fmt.string(from: cutoff)

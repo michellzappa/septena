@@ -84,6 +84,6 @@ struct AddChorePage: View {
 
   private func load() async {
     // Chores are CloudKit-authoritative — read directly from the local mirror.
-    chores = ChecklistMirror.loadChores(context: LocalStore.shared.container.mainContext)
+    chores = ChecklistMirror.loadChores(context: LocalStore.shared.container.mainContext, today: SeptenaDate.today)
   }
 }

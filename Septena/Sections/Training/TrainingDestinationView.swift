@@ -13,6 +13,7 @@ import AppKit
 
 struct TrainingDestinationView: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+  @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
@@ -35,7 +36,7 @@ struct TrainingDestinationView: View {
   /// default) the drawer shows the charts + this week's sessions; on a past
   /// day it drops the dashboard and shows just that day's session log.
   /// Mirrors `NutritionDestinationView.viewingDate`.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   // Training is an editable dual section: Log = active draft + session list
   // (time-travelable); Patterns = the cardio / strength / muscle / progression
   // dashboard. Default Log; remembered per section.
@@ -45,7 +46,7 @@ struct TrainingDestinationView: View {
 
   private var accent: Color { theme.color(for: "training") }
 
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   /// How many trailing days of sessions the default view shows. A rolling
   /// 14-day window (not the calendar week) so last week's sessions stay
@@ -157,8 +158,13 @@ struct TrainingDestinationView: View {
     })
     .tint(accent)
     .task {
+      if viewingDate.isEmpty { viewingDate = clock.today }
       paintFromCache()
-      draftStore.refreshCatalog(context: modelContext)
+      draftStore.refreshCatalog(context: modelContext, today: clock.today, now: clock.now)
+    }
+    .onChange(of: clock.today) { _, newToday in
+      if isViewingToday { viewingDate = newToday }
+      Task { await load() }
     }
     .sectionReload(on: viewingDate, onDataChange: true, forSections: ["training"]) {
       await load()
@@ -355,7 +361,7 @@ struct TrainingDestinationView: View {
     // context so opening the Training pane doesn't hitch on the main thread.
     let r = await MirrorReader.shared.read { ctx in
       (entries: ChecklistMirror.loadTrainingEntries(context: ctx, since: since),
-       cardio: ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 30))
+       cardio: ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: 30, today: clock.today))
     }
     entries = r.entries
     ResponseCache.save(r.entries, forKey: CacheKey.entries)
@@ -1520,9 +1526,9 @@ final class TrainingDraftStore {
   /// ≥3 upper-group exercises, "cardio" needs ≥30 Z2 min and no strength,
   /// etc.) — far richer than what we'd derive from the flat `session`
   /// field client-side. So we just read it directly.
-  func refreshCatalog(context: ModelContext) {
+  func refreshCatalog(context: ModelContext, today: String, now: Date) {
     sessionTypes = ChecklistMirror.loadSessionTypes(context: context)
-    let s = ChecklistMirror.loadSuggestedWorkout(context: context)
+    let s = ChecklistMirror.loadSuggestedWorkout(context: context, today: today, now: now)
     daysAgo = s.daysAgo
     suggested = s.suggested?.type
     exerciseNameByKey = CanonicalExerciseName.catalogMap(context: context)
@@ -1938,6 +1944,7 @@ final class TrainingDraftStore {
 
 struct TrainingSessionView: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
+  @Environment(DayClock.self) private var clock
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
   @Environment(TrainingDraftStore.self) private var store
@@ -2003,7 +2010,7 @@ struct TrainingSessionView: View {
       // changed from `.mixed` to `.cardio`) still renders strength
       // inputs because the `start(type:)` lookup matches the old
       // config. SwiftData fetches are cheap.
-      store.refreshCatalog(context: modelContext)
+      store.refreshCatalog(context: modelContext, today: clock.today, now: clock.now)
       // Bring any persisted draft up to date against the current
       // prefill / muscle-inference / routine-kind rules. Safe to
       // call when no draft exists (no-ops); fills empty weights /
@@ -2319,6 +2326,7 @@ struct EditingExercise: Identifiable, Equatable {
 struct TrainingExerciseRow: View {
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.modelContext) private var modelContext
+  @Environment(DayClock.self) private var clock
 
   let index: Int
   let entry: DraftEntry
@@ -2398,7 +2406,7 @@ struct TrainingExerciseRow: View {
 
   private func loadSpark() {
     spark = TrainingMetrics.progressSeries(
-      for: entry.exercise, metric: progressMetric, in: modelContext)
+      for: entry.exercise, metric: progressMetric, in: modelContext, today: clock.today)
   }
 
   @ViewBuilder
@@ -2704,6 +2712,7 @@ struct TrainingExerciseEditorBody: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }
   @Environment(TrainingDraftStore.self) private var store
   @Environment(\.modelContext) private var modelContext
+  @Environment(DayClock.self) private var clock
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
 
   let index: Int
@@ -2876,7 +2885,7 @@ struct TrainingExerciseEditorBody: View {
   private func loadProgress() {
     guard progress == nil else { return }
     progress = TrainingMetrics.progressSeries(
-      for: entry.exercise, metric: progressMetric, in: modelContext)
+      for: entry.exercise, metric: progressMetric, in: modelContext, today: clock.today)
   }
 
   /// True when there's anything to draw in the history panel — a 2+ point
