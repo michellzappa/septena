@@ -20,6 +20,7 @@ struct SidebarRootView: View {
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
+  @Environment(DayClock.self) private var clock
   /// Push-navigation surface (iPad regular / macOS) vs. compact stack (iPhone /
   /// slide-over) — the single rule, resolved at the app root, that decides
   /// whether the sidebar drives a persistent detail pane. Selection is native
@@ -56,7 +57,9 @@ struct SidebarRootView: View {
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
     let agg = SidebarSeed.aggregate ?? {
-      let stats = TaskReads.dashboardStats(context: ctx)
+      let stats = TaskReads.dashboardStats(today: SeptenaDate.today,
+                                           now: Date(),
+                                           context: ctx)
       var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx))
       agg.counts = stats.counts
       SidebarSeed.aggregate = agg
@@ -952,7 +955,9 @@ struct SidebarRootView: View {
     let structure = StructureCache.snapshot(in: modelContext)
     areas = TaskDestinations.orderedAreas(structure.areas)
     projects = TaskDestinations.orderedProjects(structure.projects)
-    let stats = TaskReads.dashboardStats(context: modelContext)
+    let stats = TaskReads.dashboardStats(today: clock.today,
+                                         now: clock.now,
+                                         context: modelContext)
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext))
     agg.counts = stats.counts
     apply(aggregate: agg)

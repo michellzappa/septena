@@ -777,6 +777,11 @@ struct TaskRow: View {
   var onTap: (() -> Void)? = nil
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
+  @Environment(DayClock.self) private var clock
+
+  private var todayAnchor: Date {
+    Calendar.current.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
 
   private var isInactive: Bool {
     task.status == .done || task.status == .cancelled
@@ -874,7 +879,7 @@ struct TaskRow: View {
   ///   • no `due`, scheduled, not a Today surface → muted calendar + date.
   @ViewBuilder private var trailingDate: some View {
     let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
+    let today = todayAnchor
     // Completed tasks show WHEN they were done (the Completed view reads as a
     // dated archive); the date prefix strips the time off `completedAt`.
     if task.status == .done, let done = task.completedAt.flatMap({ SeptenaDate.parse(String($0.prefix(10))) }) {
@@ -963,6 +968,7 @@ enum WeekStripRange {
 /// within the coming week never opens a full calendar.
 struct WeekStrip: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   /// Currently-selected day (start-of-day), or nil for none.
   let selected: Date?
   /// Window the strip spans. Defaults to `.upcoming` so existing
@@ -975,8 +981,12 @@ struct WeekStrip: View {
     let f = DateFormatter(); f.dateFormat = "EEEEE"; return f   // single letter
   }()
 
+  private var anchorDay: Date {
+    Self.cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
+
   private var days: [Date] {
-    let today = Self.cal.startOfDay(for: Date())
+    let today = anchorDay
     switch range {
     case .upcoming:
       return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
@@ -989,7 +999,7 @@ struct WeekStrip: View {
     HStack(spacing: 6) {
       ForEach(days, id: \.self) { d in
         let isSelected = selected.map { Self.cal.isDate($0, inSameDayAs: d) } ?? false
-        let isToday = Self.cal.isDateInToday(d)
+        let isToday = Self.cal.isDate(d, inSameDayAs: anchorDay)
         Button {
           Haptics.pick()
           onPick(Self.cal.startOfDay(for: d))
@@ -1031,6 +1041,7 @@ struct WeekStrip: View {
 /// clear semantics differ between the two — layout is identical.
 struct DatePickerSheet: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   let title: String
   let initialDate: Date?
   let setLabel: String        // e.g. "Set Date" / "Set Deadline"
@@ -1041,6 +1052,11 @@ struct DatePickerSheet: View {
   @Environment(\.a11yMotion) private var motion
   @State private var date: Date
   @State private var showingCalendar: Bool
+  @State private var configuredStrip = false
+
+  private var anchorDay: Date {
+    Calendar.current.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
 
   /// Fitted sheet height. Content is fixed (the "Pick a Date…" row and the
   /// compact-field row share a height), so the sheet need not open half-screen.
@@ -1061,18 +1077,19 @@ struct DatePickerSheet: View {
     self.updateLabel = updateLabel
     self.clearLabel = clearLabel
     self.onPick = onPick
-    let seed = initialDate ?? Calendar.current.startOfDay(for: Date())
-    _date = State(initialValue: seed)
-    // Open the calendar up-front only when the existing date sits
-    // outside the strip — the strip already covers the next 7 days.
-    let today = Calendar.current.startOfDay(for: Date())
-    let inStripRange: Bool = {
-      guard let initialDate else { return true }
-      let day = Calendar.current.startOfDay(for: initialDate)
-      let days = Calendar.current.dateComponents([.day], from: today, to: day).day ?? 0
-      return days >= 0 && days < 7
-    }()
-    _showingCalendar = State(initialValue: !inStripRange)
+    _date = State(initialValue: initialDate ?? Date())
+    _showingCalendar = State(initialValue: false)
+  }
+
+  private func configureStripIfNeeded() {
+    guard !configuredStrip else { return }
+    configuredStrip = true
+    let today = anchorDay
+    if initialDate == nil { date = today }
+    guard let initialDate else { return }
+    let day = Calendar.current.startOfDay(for: initialDate)
+    let days = Calendar.current.dateComponents([.day], from: today, to: day).day ?? 0
+    showingCalendar = !(days >= 0 && days < 7)
   }
 
   var body: some View {
@@ -1084,6 +1101,7 @@ struct DatePickerSheet: View {
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 6)
         .padding(.bottom, 8)
+        .onAppear { configureStripIfNeeded() }
 
         Hairline()
 

@@ -911,7 +911,7 @@ final class SettingsStore {
 
     let macs: MacrosConfig? = NutritionPrefs.loadMacrosConfig()
     let st: [SessionTypeConfig]? = ChecklistMirror.loadSessionTypes(context: context)
-    let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context)
+    let ch: [ChoreItem]? = ChecklistMirror.loadChores(context: context, today: SeptenaDate.today)
     if let macs { macros = macs; ResponseCache.save(macs, forKey: CacheKey.macros) }
     if let st { sessionTypes = st; ResponseCache.save(st, forKey: CacheKey.sessionTypes) }
     if let ch { chores = ch; ResponseCache.save(ch, forKey: CacheKey.chores) }

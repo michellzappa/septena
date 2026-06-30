@@ -74,6 +74,7 @@ func markdownAttributed(_ raw: String) -> AttributedString {
 
 struct AreaDetailView: View {
   let area: Area
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   @Environment(\.horizontalSizeClass) private var hSize
@@ -224,6 +225,7 @@ struct AreaDetailView: View {
     if !cachedProjects.isEmpty { projects = cachedProjects }
 
     async let allInArea = TaskReads.list(view: "all", area: area.id,
+                                         today: clock.today, now: clock.now,
                                          context: modelContext)
     areas = LocalCache.areas(in: modelContext)
     projects = LocalCache.projects(in: modelContext)
@@ -308,6 +310,7 @@ struct AreaDetailView: View {
 
 struct ProjectDetailView: View {
   let project: Project
+  @Environment(DayClock.self) private var clock
   @Environment(ProjectsMutator.self) private var projectsMutator
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -540,6 +543,7 @@ struct ProjectDetailView: View {
     }
     do {
       let all = await TaskReads.list(view: "all", project: project.id,
+                                     today: clock.today, now: clock.now,
                                      context: modelContext).items
       var done = 0, total = 0
       for t in all {

@@ -19,6 +19,7 @@ struct TasksDestinationView: View {
   /// App-root celebration layer — only used by the day-cleared `.arc`
   /// (see `TaskCelebration`). Optional and nil-safe.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(DayClock.self) private var clock
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
 
@@ -90,6 +91,7 @@ struct TasksDestinationView: View {
     .septenaToastStore(toastStore)
     .septenaToastOverlay(store: toastStore)
     .task { reload() }
+    .onChange(of: clock.today) { _, _ in reload() }
     // A remote completion (another device checked a Today row) would otherwise
     // only surface on the next reopen, with the row silently gone. Ghost-check
     // it live instead — see `absorbRemoteCompletions`. We deliberately don't
@@ -220,9 +222,9 @@ struct TasksDestinationView: View {
       todayOpen.sort(by: SeptenaTask.compareNextPageOrder)
     }
     openTasks = todayOpen
-    let today = SeptenaDate.today
+    let today = clock.today
     let completed = LocalCache.tasks(in: modelContext, filter: .logbook)
-    history = Self.dailyCounts(completed)
+    history = Self.dailyCounts(completed, today: today)
     guard showCompleted else { doneTasks = []; return }
     doneTasks = completed
       .filter { ($0.completedAt ?? "").hasPrefix(today) }
@@ -232,7 +234,7 @@ struct TasksDestinationView: View {
   /// Collapse the logbook into a contiguous daily series of completed-task
   /// counts, oldest → today, for the Patterns heatmap. Days with no completions
   /// are filled with zero so streak math reads gaps correctly.
-  private static func dailyCounts(_ completed: [SeptenaTask]) -> [TaskCompletionDay] {
+  private static func dailyCounts(_ completed: [SeptenaTask], today: String) -> [TaskCompletionDay] {
     var counts: [String: Int] = [:]
     for task in completed {
       guard let day = task.completedAt?.prefix(10), day.count == 10 else { continue }
@@ -244,7 +246,7 @@ struct TasksDestinationView: View {
     let cal = Calendar.current
     var series: [TaskCompletionDay] = []
     var cursor = cal.startOfDay(for: start)
-    let end = cal.startOfDay(for: Date())
+    let end = SeptenaDate.startOfDay(for: today) ?? Date()
     while cursor <= end {
       if let iso = SeptenaDate.format(cursor) {
         series.append(TaskCompletionDay(date: iso, count: counts[iso] ?? 0))
@@ -288,7 +290,7 @@ struct TasksDestinationView: View {
       motion.run(Theme.Motion.settle) {
         if let i = openTasks.firstIndex(where: { $0.id == task.id }) {
           openTasks[i].status = .done
-          openTasks[i].completedAt = SeptenaDate.today + "T00:00:00"
+          openTasks[i].completedAt = clock.today + "T00:00:00"
         }
       }
       settle.schedule(task.id) {
@@ -381,7 +383,7 @@ struct TasksDestinationView: View {
   }
 
   private func completedAt(for id: String, in fresh: [SeptenaTask]) -> String {
-    fresh.first(where: { $0.id == id })?.completedAt ?? SeptenaDate.today + "T00:00:00"
+    fresh.first(where: { $0.id == id })?.completedAt ?? clock.today + "T00:00:00"
   }
 
   private func prependDone(_ task: SeptenaTask) {
@@ -432,7 +434,7 @@ struct TasksDestinationView: View {
     mutator.complete(id: task.id)
     var done = task
     done.status = .done
-    done.completedAt = SeptenaDate.today + "T00:00:00"
+    done.completedAt = clock.today + "T00:00:00"
     motion.run(Theme.Motion.settle) {
       triageTasks.removeAll { $0.id == task.id }
       if showCompleted { doneTasks.insert(done, at: 0) }

@@ -27,6 +27,7 @@ struct AddTaskPage: View {
   @Environment(NavigationState.self) private var nav
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var todays: [SeptenaTask] = []
@@ -142,6 +143,8 @@ struct AddTaskPage: View {
   private func loadTodays() async {
     let resp = await TaskReads.list(
       view: "today",
+      today: clock.today,
+      now: clock.now,
       context: LocalStore.shared.container.mainContext
     )
     todays = resp.items.filter { $0.status == .open }

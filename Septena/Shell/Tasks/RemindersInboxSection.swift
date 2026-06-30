@@ -10,6 +10,7 @@ struct RemindersInboxSection: View {
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
+  @Environment(DayClock.self) private var clock
   /// Parent calls this after a successful import so the inbox below refreshes.
   let onImported: () -> Void
   /// Whether to surface the setup CTAs (grant access / pick a list / denied
@@ -200,7 +201,7 @@ struct RemindersInboxSection: View {
   }
 
   private func isOverdue(_ d: Date) -> Bool {
-    let today = Calendar.current.startOfDay(for: Date())
+    let today = SeptenaDate.startOfDay(for: clock.today) ?? Calendar.current.startOfDay(for: clock.now)
     return Calendar.current.startOfDay(for: d) <= today
   }
 

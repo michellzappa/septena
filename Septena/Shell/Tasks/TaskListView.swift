@@ -28,6 +28,7 @@ struct TaskListView: View {
   /// the haptic and skip the visual.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
+  @Environment(DayClock.self) private var clock
   let filter: TaskFilter
   /// True when this view is laid out *inside* another detail screen
   /// (Project / Area detail). Suppresses the screen title and top-bar chrome
@@ -149,7 +150,7 @@ struct TaskListView: View {
   /// (scheduled == today) or that are merely due today don't count as "new"
   /// because the user just placed them; the banner shouldn't nag about those.
   private var rolledInReview: [SeptenaTask] {
-    let today = SeptenaDate.today
+    let today = clock.today
     return review.filter { task in
       guard let s = task.scheduled, !s.isEmpty else { return false }
       return String(s.prefix(10)) < today
@@ -216,6 +217,14 @@ struct TaskListView: View {
   /// Keeps the empty-list top quick-add anchored while its draft is open (the
   /// list stops being "empty" the moment the draft exists).
   @State private var quickAddDraftAtTop = false
+  /// Which Today group owns an in-flight capture draft — Inbox foot line vs a
+  /// specific area / project section opened from its header "+".
+  private enum QuickAddGroupTarget: Equatable {
+    case inbox
+    case area(String)
+    case project(String)
+  }
+  @State private var quickAddGroupTarget: QuickAddGroupTarget?
   /// Shared namespace for the title hero-glide: the closed row's title and the
   /// open inline editor's title field carry the same `matchedGeometryEffect` id,
   /// so on expand/collapse the title moves between the two positions instead of
@@ -358,8 +367,7 @@ struct TaskListView: View {
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
   // per-day via UserDefaults (local only); reappears the next morning.
   // Cross-device same-day dismissal sync is in the backlog.
-  @State private var newTodosDismissed: Bool =
-    UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate") == SeptenaDate.today
+  @State private var newTodosDismissed: Bool = false
 
   var body: some View {
     let content = taskList
@@ -520,6 +528,10 @@ struct TaskListView: View {
     // Flipping the opt-in in Settings should land immediately — fetch on, clear
     // off — without waiting for the next load.
     .onChange(of: showCalendarEvents) { _, _ in refreshCalendarEvents() }
+    .onChange(of: clock.today) { _, _ in
+      guard filter == .today else { return }
+      Task { await load() }
+    }
     // Filter swaps reuse this same view (no .id(route) at the App level for
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear
@@ -532,6 +544,7 @@ struct TaskListView: View {
       draftEditIds = []
       quickAddDraftId = nil
       quickAddDraftAtTop = false
+      quickAddGroupTarget = nil
       // Drop any inline edit/quick-add in flight — the buffers belong to the
       // list we're leaving, not the one we're switching to.
       editingTitleId = nil
@@ -606,7 +619,7 @@ struct TaskListView: View {
   /// editor on it. Creatable lists insert a local `deferPush` draft (no CloudKit
   /// push until the title commits) at the foot of the list; Upcoming falls back
   /// to the drawer composer.
-  private func startCreate() {
+  private func startCreate(areaId: String? = nil, projectId: String? = nil) {
     guard filter != .recentlyDeleted else { return }
     guard allowsInlineCreate else {
       withAnimation(.snappy(duration: 0.25)) {
@@ -618,7 +631,18 @@ struct TaskListView: View {
     if expandedEditId != nil { collapseEdit() }
     inlineFocus = nil
     editingTitleId = nil
-    let seed = TaskDraft(filter: filter)
+    var seed = TaskDraft(filter: filter)
+    if let projectId {
+      seed.projectId = projectId
+      quickAddGroupTarget = .project(projectId)
+    } else if let areaId {
+      seed.areaId = areaId
+      quickAddGroupTarget = .area(areaId)
+    } else if filter == .today {
+      quickAddGroupTarget = .inbox
+    } else {
+      quickAddGroupTarget = nil
+    }
     let task = seed.create(via: mutator, deferPush: true, atBottom: true)
     draftEditIds.insert(task.id)
     quickAddDraftAtTop = showsQuickAddAtTop
@@ -734,6 +758,33 @@ struct TaskListView: View {
     guard quickAddDraftId == id else { return }
     quickAddDraftId = nil
     quickAddDraftAtTop = false
+    quickAddGroupTarget = nil
+  }
+
+  /// True on grouped Today when area / project headers should expose a "+".
+  private var showsGroupedHeaderQuickAdd: Bool {
+    filter == .today && todayGroupByList && allowsInlineCreate
+  }
+
+  /// Inbox foot quick-add: always visible on Today; only hosts the editor when
+  /// the capture draft targets Inbox (not a section opened from a header "+").
+  private var showsQuickAddInInbox: Bool {
+    filter == .today && allowsInlineCreate
+  }
+
+  private var quickAddInInboxShowsEditor: Bool {
+    guard quickAddDraftId != nil else { return false }
+    return quickAddGroupTarget == nil || quickAddGroupTarget == .inbox
+  }
+
+  private func showsQuickAddInArea(_ areaId: String) -> Bool {
+    guard case .area(let id)? = quickAddGroupTarget else { return false }
+    return id == areaId
+  }
+
+  private func showsQuickAddInProject(_ projectId: String) -> Bool {
+    guard case .project(let id)? = quickAddGroupTarget else { return false }
+    return id == projectId
   }
 
   /// Commit a rename whose field just lost the cursor (keyboard dismissed,
@@ -796,7 +847,8 @@ struct TaskListView: View {
       scrollToTick: scrollToTargetTick,
       scrollToID: scrollToTargetID,
       canvasFill: listCanvasFill,
-      iPadTabBarInsetOwnPadding: iPadTabBarInsetOwnPadding
+      iPadTabBarInsetOwnPadding: iPadTabBarInsetOwnPadding,
+      wideContentGutter: TaskCardMetrics.margin
     ) {
       taskListHeader
       taskListRows
@@ -940,7 +992,8 @@ struct TaskListView: View {
           if !inboxCollapsed {
             cardedRows(allInbox,
                        quickMenu: { filingSuggestions[$0.id] != nil },
-                       appendQuickAdd: allowsInlineCreate)
+                       appendQuickAdd: showsQuickAddInInbox,
+                       quickAddShowsEditor: quickAddInInboxShowsEditor)
           }
         } header: {
           inboxHeader(count: allInbox.count)
@@ -1796,12 +1849,13 @@ struct TaskListView: View {
   /// Foot/top capture slot — a tappable "New task" row until tapped, then the
   /// same inline editor the trigger would have opened (one row, not two).
   @ViewBuilder
-  private func quickAddLine() -> some View {
-    if let task = quickAddCaptureTask, expandedEditId == task.id {
+  private func quickAddLine(showsEditor: Bool = true) -> some View {
+    if showsEditor,
+       let task = quickAddCaptureTask, expandedEditId == task.id {
       taskRow(task)
         .id(Self.quickAddScrollID)
     } else {
-      QuickAddTriggerRow(action: startCreate)
+      QuickAddTriggerRow(action: { startCreate() })
         .id(Self.quickAddScrollID)
     }
   }
@@ -2071,23 +2125,31 @@ struct TaskListView: View {
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
-          cardedRows(areaTasks)
+          cardedRows(areaTasks,
+                     appendQuickAdd: showsQuickAddInArea(area.id),
+                     quickAddShowsEditor: true)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
                       areaEmoji: area.emoji,
-                      onTap: { nav.path = [.area(area)] })
+                      onTap: { nav.path = [.area(area)] },
+                      onAdd: showsGroupedHeaderQuickAdd
+                        ? { startCreate(areaId: area.id) } : nil)
         }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
-            cardedRows(tasks)
+            cardedRows(tasks,
+                       appendQuickAdd: showsQuickAddInProject(project.id),
+                       quickAddShowsEditor: true)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
                         projectProgress: progressByProject[project.id],
-                        onTap: { nav.path = [.project(project)] })
+                        onTap: { nav.path = [.project(project)] },
+                        onAdd: showsGroupedHeaderQuickAdd
+                          ? { startCreate(projectId: project.id) } : nil)
           }
         }
       }
@@ -2097,12 +2159,16 @@ struct TaskListView: View {
     ForEach(projects.filter { $0.area == nil }) { project in
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
-          cardedRows(tasks)
+          cardedRows(tasks,
+                     appendQuickAdd: showsQuickAddInProject(project.id),
+                     quickAddShowsEditor: true)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
                       projectProgress: progressByProject[project.id],
-                      onTap: { nav.path = [.project(project)] })
+                      onTap: { nav.path = [.project(project)] },
+                      onAdd: showsGroupedHeaderQuickAdd
+                        ? { startCreate(projectId: project.id) } : nil)
         }
       }
     }
@@ -2117,7 +2183,8 @@ struct TaskListView: View {
   @ViewBuilder
   private func cardedRows(_ tasks: [SeptenaTask],
                           quickMenu: ((SeptenaTask) -> Bool)? = nil,
-                          appendQuickAdd: Bool = false) -> some View {
+                          appendQuickAdd: Bool = false,
+                          quickAddShowsEditor: Bool = true) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
@@ -2128,7 +2195,7 @@ struct TaskListView: View {
                         isSelected: selection.contains(task.id) && expandedEditId != task.id)
     }
     if appendQuickAdd {
-      quickAddLine()
+      quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
         .taskCardChrome(TaskCardPosition(index: rows.count, count: cardCount))
     }
@@ -2172,9 +2239,10 @@ struct TaskListView: View {
                            title: String,
                            areaEmoji: String? = nil,
                            projectProgress: Double? = nil,
-                           onTap: (() -> Void)? = nil) -> some View {
+                           onTap: (() -> Void)? = nil,
+                           onAdd: (() -> Void)? = nil) -> some View {
     groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
-                    projectProgress: projectProgress, onTap: onTap)
+                    projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
       .textCase(nil)
       .selectionDisabled()
   }
@@ -2182,7 +2250,8 @@ struct TaskListView: View {
   private func groupHeaderBody(icon: String?, title: String,
                                areaEmoji: String? = nil,
                                projectProgress: Double? = nil,
-                               onTap: (() -> Void)? = nil) -> some View {
+                               onTap: (() -> Void)? = nil,
+                               onAdd: (() -> Void)? = nil) -> some View {
     // Same icon column width and same icon→text gap as task rows so
     // every icon sits at one X and every text starts at one X.
     #if os(macOS)
@@ -2226,6 +2295,18 @@ struct TaskListView: View {
             .foregroundStyle(Theme.inkPrimary)
         }
         Spacer()
+        if let onAdd {
+          Button {
+            Haptics.tick()
+            onAdd()
+          } label: {
+            Image(systemName: "plus.circle")
+              .scaledFont(size: 16, weight: .semibold)
+              .foregroundStyle(theme.color(for: "tasks"))
+          }
+          .buttonStyle(.borderless)
+          .accessibilityLabel("Add task to \(title)")
+        }
       }
       // Park the header's icon column at the same X as the row checkbox below it
       // (card margin + in-card content inset); trailing matches the card margin.
@@ -2275,7 +2356,7 @@ struct TaskListView: View {
   /// yields one per day it spans, so it repeats down the list like in Calendar.
   private func upcomingDayKeys(for event: EKEvent) -> [String] {
     let cal = Calendar.current
-    let today = cal.startOfDay(for: Date())
+    let today = SeptenaDate.startOfDay(for: clock.today) ?? cal.startOfDay(for: clock.now)
     guard let start = event.startDate,
           let windowEnd = cal.date(byAdding: .day, value: 30, to: today) else { return [] }
     // All-day end dates land on the next day's midnight (exclusive); pull back a
@@ -2341,7 +2422,7 @@ struct TaskListView: View {
   /// gets a row — Things-style. Days are sorted ascending (event-only days can
   /// land anywhere among task days, so first-seen order no longer suffices).
   private func upcomingBuckets() -> [DateBucket] {
-    let today = SeptenaDate.today
+    let today = clock.today
     var tasksByDay: [String: [SeptenaTask]] = [:]
     for task in items {
       // Drop finished rows (completed or cancelled) except those still
@@ -2734,7 +2815,7 @@ struct TaskListView: View {
     // Refresh dismissed state — banner reappears next day automatically.
     if filter == .today {
       let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
-      newTodosDismissed = (last == SeptenaDate.today)
+      newTodosDismissed = (last == clock.today)
     }
     refreshCalendarEvents()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
@@ -2781,7 +2862,7 @@ struct TaskListView: View {
       Spacer()
       Button {
         Haptics.tick()
-        UserDefaults.standard.set(SeptenaDate.today, forKey: "septena.newTodos.dismissedDate")
+        UserDefaults.standard.set(clock.today, forKey: "septena.newTodos.dismissedDate")
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
         Text("OK")

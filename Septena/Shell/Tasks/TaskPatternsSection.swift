@@ -17,6 +17,7 @@ struct TaskCompletionDay: Hashable {
 }
 
 struct TaskPatternsSection: View {
+  @Environment(DayClock.self) private var clock
   let accent: Color
   /// Daily series, chronological (oldest → newest), ending today.
   let days: [TaskCompletionDay]
@@ -58,7 +59,7 @@ struct TaskPatternsSection: View {
             stat("\(currentStreak)", "day streak")
           }
           ConsistencyHeatmap(
-            endDate: Date(),
+            endDate: clock.now,
             firstDataDate: firstDataDate,
             accent: accent,
             getDay: { iso in

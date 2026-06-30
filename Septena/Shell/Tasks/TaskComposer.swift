@@ -947,9 +947,12 @@ private struct AttributePill: View {
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
   let accent: Color
+  @Environment(DayClock.self) private var clock
 
   private var cal: Calendar { Calendar.current }
-  private var today: Date { cal.startOfDay(for: Date()) }
+  private var today: Date {
+    cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
   private var tomorrow: Date { cal.date(byAdding: .day, value: 1, to: today) ?? today }
   /// Next Saturday.
   private var weekend: Date {
@@ -1021,9 +1024,12 @@ private struct InlineWhenPanel: View {
 private struct InlineDatePanel: View {
   @Binding var date: Date?
   let accent: Color
+  @Environment(DayClock.self) private var clock
 
   private var bound: Binding<Date> {
-    Binding(get: { date ?? Calendar.current.startOfDay(for: Date()) },
+    let anchor = Calendar.current.startOfDay(
+      for: SeptenaDate.parse(clock.today) ?? clock.now)
+    return Binding(get: { date ?? anchor },
             set: { date = Calendar.current.startOfDay(for: $0) })
   }
 
