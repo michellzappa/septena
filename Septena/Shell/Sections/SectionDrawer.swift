@@ -364,6 +364,7 @@ struct SectionDrawer<Content: View>: View {
   @ViewBuilder var content: () -> Content
 
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   /// Solid (default) vs glass surfaces, injected by the presentation host
   /// (`sectionDrawerPresentation()`) so the iPhone sheet reads `.glass` while
   /// the iPad/macOS pane stays `.solid`.
@@ -410,12 +411,12 @@ struct SectionDrawer<Content: View>: View {
   }
 
   /// True when the destination has a date strip pointing at a past day.
-  /// Signals to destinations (via the shared `SeptenaDate.today` comparison
+  /// Signals to destinations (via the shared `clock.today` comparison
   /// they can do themselves) that histograms / heatmaps should be hidden —
   /// past days are a read-only log review, not a dashboard.
   private var isTimeTraveling: Bool {
     guard let currentDate else { return false }
-    return currentDate.wrappedValue != SeptenaDate.today
+    return currentDate.wrappedValue != clock.today
   }
 
   /// True while the drawer is showing its Patterns (visualization) mode, when a
@@ -447,7 +448,7 @@ struct SectionDrawer<Content: View>: View {
           let day = SeptenaDate.parse(currentDate.wrappedValue),
           let moved = Calendar.current.date(byAdding: .day, value: delta, to: day)
     else { return }
-    let today = Calendar.current.startOfDay(for: Date())
+    let today = Calendar.current.startOfDay(for: clock.now)
     let clamped = min(Calendar.current.startOfDay(for: moved), today)
     if let str = SeptenaDate.format(clamped), str != currentDate.wrappedValue {
       withAnimation(.snappy) { currentDate.wrappedValue = str }
@@ -459,8 +460,8 @@ struct SectionDrawer<Content: View>: View {
   /// so it also pulls a dual section out of Patterns first.
   private func backToToday() {
     if let mode, mode.wrappedValue == .patterns { mode.wrappedValue = .log }
-    guard let currentDate, currentDate.wrappedValue != SeptenaDate.today else { return }
-    withAnimation(.snappy) { currentDate.wrappedValue = SeptenaDate.today }
+    guard let currentDate, currentDate.wrappedValue != clock.today else { return }
+    withAnimation(.snappy) { currentDate.wrappedValue = clock.today }
   }
 
   #if os(iOS)

@@ -15,6 +15,8 @@ struct ModuleTile: View {
   var history: HistoryRow? = nil
   var centeredHistory: CenteredHistoryRow? = nil
 
+  @Environment(DayClock.self) private var clock
+
   struct Stat: Hashable {
     let label: String          // "SESSIONS"
     let value: String          // "5/7" or "115"
@@ -64,8 +66,8 @@ struct ModuleTile: View {
         header
         if !stats.isEmpty { statsGrid }
         if let progress { ProgressRow(progress: progress, accent: accent) }
-        if let history { HistoryView(row: history, accent: accent) }
-        if let centeredHistory { CenteredHistoryView(row: centeredHistory, accent: accent) }
+        if let history { HistoryView(row: history, accent: accent, now: clock.now) }
+        if let centeredHistory { CenteredHistoryView(row: centeredHistory, accent: accent, now: clock.now) }
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 16)
@@ -213,6 +215,7 @@ private struct ProgressRow: View {
 private struct HistoryView: View {
   let row: ModuleTile.HistoryRow
   let accent: Color
+  let now: Date
 
   private static let narrowWeekdayFormatter: DateFormatter = {
     let fmt = DateFormatter()
@@ -236,7 +239,7 @@ private struct HistoryView: View {
       Histogram(values: values,
                 accent: accent,
                 emphasizedIndex: row.todayIndex ?? (values.count - 1),
-                dayLabels: row.showDayLabels ? Self.weekdayLabels(count: values.count) : nil,
+                dayLabels: row.showDayLabels ? weekdayLabels(count: values.count) : nil,
                 ceiling: row.ceiling,
                 secondaryValues: secondary)
         .frame(height: row.showDayLabels ? 72 : 56)
@@ -251,11 +254,11 @@ private struct HistoryView: View {
   /// Last N weekday initials ending at today — e.g. for 7 values it's
   /// the last 7 days oldest→newest. Single-letter labels (M T W T F S S)
   /// keep the tile compact; we accept that the two T's and two S's collide.
-  private static func weekdayLabels(count: Int) -> [String] {
+  private func weekdayLabels(count: Int) -> [String] {
     let cal = Calendar.current
-    let fmt = narrowWeekdayFormatter
+    let fmt = Self.narrowWeekdayFormatter
     return (0..<count).reversed().compactMap { offset in
-      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -offset, to: now).map(fmt.string(from:))
     }
   }
 }
@@ -263,6 +266,7 @@ private struct HistoryView: View {
 private struct CenteredHistoryView: View {
   let row: ModuleTile.CenteredHistoryRow
   let accent: Color
+  let now: Date
 
   private static let narrowWeekdayFormatter: DateFormatter = {
     let fmt = DateFormatter(); fmt.dateFormat = "EEEEE"
@@ -290,7 +294,7 @@ private struct CenteredHistoryView: View {
     let cal = Calendar.current
     let fmt = Self.narrowWeekdayFormatter
     return (0..<count).reversed().compactMap { offset in
-      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -offset, to: now).map(fmt.string(from:))
     }
   }
 }
@@ -502,6 +506,7 @@ struct DomainTile: View {
   private let stats: [TileStatWire]
   #if !WIDGET_EXTENSION
   private let appHistory: HistorySeries?
+  @Environment(DayClock.self) private var clock
   #endif
   private let wireHistory: HistoryWire?
   private let useHover: Bool
@@ -574,7 +579,7 @@ struct DomainTile: View {
 
       #if !WIDGET_EXTENSION
       if let history = appHistory {
-        TileHistogram(history: history, accent: accent)
+        TileHistogram(history: history, accent: accent, now: clock.now)
           .frame(height: 58)
       } else if let history = wireHistory {
         TileWireHistogram(history: history, accent: accent)
@@ -625,6 +630,7 @@ private struct DomainTileChrome: ViewModifier {
 private struct TileHistogram: View {
   let history: HistorySeries
   let accent: Color
+  let now: Date
 
   var body: some View {
     switch history {
@@ -633,7 +639,7 @@ private struct TileHistogram: View {
       Histogram(values: v,
                 accent: accent,
                 emphasizedIndex: v.count - 1,
-                dayLabels: Self.weekdayLabels(count: v.count))
+                dayLabels: weekdayLabels(count: v.count))
 
     case .dailyTrend(let daily):
       // Tiles mode is a 7-day histogram — collapse to the trailing week's
@@ -642,13 +648,13 @@ private struct TileHistogram: View {
       Histogram(values: v,
                 accent: accent,
                 emphasizedIndex: v.count - 1,
-                dayLabels: Self.weekdayLabels(count: v.count))
+                dayLabels: weekdayLabels(count: v.count))
 
     case .centered(let values, _):
       let v = Self.last7Optional(values)
       CenteredBarChart(values: v,
                        accent: accent,
-                       dayLabels: Self.weekdayLabels(count: v.count))
+                       dayLabels: weekdayLabels(count: v.count))
     }
   }
 
@@ -670,11 +676,11 @@ private struct TileHistogram: View {
   }()
 
   /// Last `count` weekday initials ending at today, oldest → newest.
-  private static func weekdayLabels(count: Int) -> [String] {
+  private func weekdayLabels(count: Int) -> [String] {
     let cal = Calendar.current
-    let fmt = narrowWeekdayFormatter
+    let fmt = Self.narrowWeekdayFormatter
     return (0..<count).reversed().compactMap { offset in
-      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -offset, to: now).map(fmt.string(from:))
     }
   }
 }

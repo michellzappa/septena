@@ -16,6 +16,8 @@ struct EventFrequencySection: View {
   /// Optional keep-logging nudge shown when there's no history yet.
   var emptyText: String? = nil
 
+  @Environment(DayClock.self) private var clock
+
   private var countByDate: [String: Int] {
     dates.reduce(into: [:]) { $0[$1, default: 0] += 1 }
   }
@@ -25,7 +27,7 @@ struct EventFrequencySection: View {
     if !dates.isEmpty {
       DrawerSection(title) {
         ConsistencyHeatmap(
-          endDate: Date(),
+          endDate: clock.now,
           firstDataDate: firstDate,
           accent: accent,
           getDay: { iso in

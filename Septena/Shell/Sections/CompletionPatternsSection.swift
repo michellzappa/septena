@@ -16,10 +16,10 @@ import SwiftUI
 /// `ChecklistMirror` history read that already returns one row per day).
 enum CompletionDateRange {
   /// The trailing `n` ISO dates ending today, oldest → newest.
-  static func lastNDates(_ n: Int) -> [String] {
+  static func lastNDates(_ n: Int, now: Date) -> [String] {
     let cal = Calendar.current
     return (0..<n).reversed().compactMap { off in
-      cal.date(byAdding: .day, value: -off, to: Date()).flatMap(SeptenaDate.format)
+      cal.date(byAdding: .day, value: -off, to: now).flatMap(SeptenaDate.format)
     }
   }
 }
@@ -40,6 +40,8 @@ struct CompletionPatternsSection: View {
   /// Daily series, chronological (oldest → newest), ending today.
   let days: [CompletionDay]
   var loading: Bool = false
+
+  @Environment(DayClock.self) private var clock
 
   private var byDate: [String: CompletionDay] {
     Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
@@ -64,7 +66,7 @@ struct CompletionPatternsSection: View {
   /// the shared streak definition so it matches the per-item view.
   private var fullStreak: Int {
     let fullDates = days.filter { $0.total > 0 && $0.done >= $0.total }.map(\.date)
-    return ConsistencyStats.make(dates: fullDates).currentStreak
+    return ConsistencyStats.make(dates: fullDates, today: clock.today).currentStreak
   }
 
   var body: some View {
@@ -76,7 +78,7 @@ struct CompletionPatternsSection: View {
             stat("\(fullStreak)", fullStreak == 1 ? "day streak" : "day streak")
           }
           ConsistencyHeatmap(
-            endDate: Date(),
+            endDate: clock.now,
             firstDataDate: firstDataDate,
             accent: accent,
             getDay: { iso in

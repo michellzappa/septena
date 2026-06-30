@@ -94,6 +94,8 @@ struct LogDetailBody: View {
   let detail: LogDetail
   let accent: Color
 
+  @Environment(DayClock.self) private var clock
+
   var body: some View {
     ScrollView {
       VStack(spacing: Theme.Spacing.xxl) {
@@ -163,7 +165,7 @@ struct LogDetailBody: View {
   private func heatmap(_ hm: LogHeatmap, title: String) -> some View {
     ChartCard(title: title, detail: hm.detail) {
       ConsistencyHeatmap(
-        endDate: Date(),
+        endDate: clock.now,
         firstDataDate: hm.firstDate,
         accent: accent,
         getDay: { iso in HeatmapDay(level: hm.level(iso), label: iso) }

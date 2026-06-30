@@ -32,9 +32,11 @@ struct DayBucketHeader: View {
   /// plain header look used by Mood and the past-day lists.
   var disclosed: Bool? = nil
 
+  @Environment(DayClock.self) private var clock
+
   private var parsed: DayBucket? { DayBucket(rawValue: bucket) }
   private var isCurrent: Bool {
-    parsed.map { $0 == DayBucket.current } ?? false
+    parsed.map { $0 == DayBucket.from(date: clock.now) } ?? false
   }
 
   var body: some View {
@@ -84,6 +86,8 @@ struct BucketTimeLeft: View {
   let bucket: String
   var font: Font = .septenaSectionTitle
 
+  @Environment(DayClock.self) private var clock
+
   var body: some View {
     TimelineView(.periodic(from: .now, by: 60)) { ctx in
       let parts = formatted(remaining: cutoff().timeIntervalSince(ctx.date))
@@ -99,7 +103,7 @@ struct BucketTimeLeft: View {
   /// of the app uses (noon, 5pm, midnight by default).
   private func cutoff() -> Date {
     let cal = Calendar.current
-    let now = Date()
+    let now = clock.now
     let hour = (DayBucket(rawValue: bucket) ?? .evening).endHour
     if hour >= 24 {
       return cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now))!
