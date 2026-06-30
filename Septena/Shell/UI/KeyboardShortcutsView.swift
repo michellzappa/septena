@@ -48,6 +48,8 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
+      KeyboardShortcut2(keys: ["⌘", "R"], label: "Edit Details…"),
+      KeyboardShortcut2(keys: ["⌘", "D"], label: "Duplicate"),
       KeyboardShortcut2(keys: ["⌘", "T"], label: "Toggle Today"),
       KeyboardShortcut2(keys: ["⌘", "K"], label: "Mark as complete"),
       KeyboardShortcut2(keys: ["⌘", "S"], label: "When…"),
