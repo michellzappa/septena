@@ -181,6 +181,10 @@ enum Theme {
     #endif
   }()
 
+  /// Opacity of the primary-color wash painted under a pointer / Apple Pencil
+  /// hover. Shared by task-card rows, grouped-list cells, and macOS tiles.
+  static let pointerHoverOpacity = 0.012
+
   /// Title ink on the gray list-selection capsule. Must NOT be `Color.primary`
   /// — UITableView's selected-cell traits flip primary to white.
   static let listSelectedInk: Color = {

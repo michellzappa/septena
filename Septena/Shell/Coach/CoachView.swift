@@ -100,6 +100,8 @@ struct CoachView: View {
         .badge(pills.reduce(0) { $0 + $1.count })
         #if os(macOS)
         .septenaHomeListRow(index: idx, count: domains.count)
+        #else
+        .pointerListRow()
         #endif
       }
     } header: {
@@ -129,6 +131,8 @@ struct CoachView: View {
           .buttonStyle(.plain)
           #if os(macOS)
           .septenaHomeListRow(index: idx, count: exercises.count)
+          #else
+          .pointerListRow()
           #endif
         }
       } else {
@@ -162,6 +166,8 @@ struct CoachView: View {
         }
         #if os(macOS)
         .septenaHomeListRow(index: idx, count: max(goals.count, 1))
+        #else
+        .pointerListRow()
         #endif
       }
       if goals.isEmpty {
@@ -170,6 +176,8 @@ struct CoachView: View {
           .foregroundStyle(.secondary)
           #if os(macOS)
           .septenaHomeListRow(index: 0, count: 1)
+          #else
+          .pointerListRow()
           #endif
       }
     } header: {

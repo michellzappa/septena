@@ -140,14 +140,18 @@ extension View {
   /// paints accent blue by default; pair with `septenaSuppressListCellSelection`.
   @ViewBuilder
   func selectableListRow(tag: String, isSelected: Bool) -> some View {
+    modifier(SelectableListRowChrome(tag: tag, isSelected: isSelected))
+  }
+
+  /// Pointer-hover wash for a native grouped-list cell. Used by Coach rows on
+  /// iOS; macOS list rows own hover via `taskCardChrome` / `septenaHomeListRow`.
+  @ViewBuilder
+  func pointerListRow(isSelected: Bool = false) -> some View {
+    #if os(iOS)
+    modifier(PointerListRowChrome(isSelected: isSelected))
+    #else
     self
-      // Native hairline separators (was `.hidden`) so the rows read as one
-      // continuous grouped card, the same as the Tasks sidebar — not a stack
-      // of individually-rounded pills.
-      .listRowBackground(SelectableListRowBackground(isSelected: isSelected))
-      .listRowInsets(EdgeInsets())
-      .tag(tag)
-      .septenaSuppressListCellSelection()
+    #endif
   }
 
   /// Disable the platform's accent selection fill so `listRowBackground` is the
@@ -170,11 +174,63 @@ extension View {
 /// every row read as its own pill with curved gaps between them. `cardSurface`
 /// is the elevated grouped-cell color that lifts off the gray canvas; selected
 /// rows tint with the neutral selection fill, edge to edge.
+private struct PointerListRowBackground: View {
+  let isSelected: Bool
+  let hovered: Bool
+
+  var body: some View {
+    ZStack {
+      Rectangle()
+        .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+      if hovered && !isSelected {
+        Rectangle()
+          .fill(Color.primary.opacity(Theme.pointerHoverOpacity))
+      }
+    }
+  }
+}
+
+/// Next `List(selection:)` row — grouped fill, tag, selection suppression, and
+/// pointer-hover wash.
+private struct SelectableListRowChrome: ViewModifier {
+  let tag: String
+  let isSelected: Bool
+  @State private var hovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .listRowBackground(PointerListRowBackground(isSelected: isSelected,
+                                                  hovered: hovered))
+      .listRowInsets(EdgeInsets())
+      .tag(tag)
+      .septenaSuppressListCellSelection()
+      .onHover { hovered = $0 }
+  }
+}
+
+/// Coach / auxiliary grouped-list row — same hover as Next, without selection.
+private struct PointerListRowChrome: ViewModifier {
+  let isSelected: Bool
+  @State private var hovered = false
+
+  func body(content: Content) -> some View {
+    content
+      .listRowBackground(PointerListRowBackground(isSelected: isSelected,
+                                                  hovered: hovered))
+      .listRowInsets(EdgeInsets())
+      .septenaSuppressListCellSelection()
+      .onHover { hovered = $0 }
+  }
+}
+
+/// Legacy grouped-list row fill — `hovered` defaults false for call sites that
+/// don't wire pointer tracking (e.g. the Tasks sidebar).
 struct SelectableListRowBackground: View {
   let isSelected: Bool
+  var hovered: Bool = false
+
   var body: some View {
-    Rectangle()
-      .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
+    PointerListRowBackground(isSelected: isSelected, hovered: hovered)
   }
 }
 
@@ -659,11 +715,11 @@ extension View {
   }
 }
 
-/// Subtle pointer-hover background wash — no scale/lift, just a 6% primary
+/// Subtle pointer-hover background wash — no scale/lift, just a faint primary
 /// tint. Works on macOS trackpad and iPadOS pointer / Apple Pencil hover.
 private struct PointerHoverWash<S: Shape>: ViewModifier {
   let shape: S
-  var opacity: Double = 0.06
+  var opacity: Double = Theme.pointerHoverOpacity
   @State private var hovered = false
 
   func body(content: Content) -> some View {
@@ -675,22 +731,37 @@ private struct PointerHoverWash<S: Shape>: ViewModifier {
   }
 }
 
+/// Dashboard tile affordance — macOS: faint wash; iOS/iPadOS: system highlight
+/// lift for pointer / Apple Pencil hover (no darken).
+private struct TilePointerAffordance<S: Shape>: ViewModifier {
+  let shape: S
+
+  func body(content: Content) -> some View {
+    #if os(iOS)
+    content.hoverEffect(.highlight)
+    #else
+    content.modifier(PointerHoverWash(shape: shape))
+    #endif
+  }
+}
+
 extension View {
   /// Universal pointer / Apple-Pencil-hover for tappable custom surfaces
   /// (dashboard tiles, cards, log rows). System controls get hover for free;
   /// `.buttonStyle(.plain)` opts out, so tappable-but-plain surfaces must
-  /// request it back. Background wash only — no scale or lift.
+  /// request it back. macOS: faint background wash; iOS: system highlight lift.
   ///
   /// Scope: rectangular tappable *surfaces* (tiles / cards / full-width rows),
   /// not inline text buttons or chevrons — use `inlineHover` for those.
   func tileHover(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-    return modifier(PointerHoverWash(shape: shape))
+    return modifier(TilePointerAffordance(shape: shape))
   }
 
-  /// Alias for list rows — same affordance as `tileHover`, canonical row radius.
+  /// Alias for list rows — faint wash at the row radius (not the tile highlight).
   func rowHover(cornerRadius: CGFloat = Theme.cornerRadiusSmall) -> some View {
-    tileHover(cornerRadius: cornerRadius)
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    return modifier(PointerHoverWash(shape: shape))
   }
 
   /// Pointer hover for compact plain buttons (menu triggers, chevrons, filing
