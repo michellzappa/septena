@@ -1417,7 +1417,7 @@
         }
       }
     },
-    "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off." : {
+    "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list sorts overdue and due-first, then pinned tasks." : {
 
     },
     "AI & MCP" : {
@@ -3671,6 +3671,9 @@
         }
       }
     },
+    "Group by area and project" : {
+
+    },
     "Guided local-AI reflections that turn into real goals." : {
       "localizations" : {
         "pt-BR" : {
@@ -5576,6 +5579,9 @@
 
     },
     "Off shows each item only during its slot. Tasks and chores have no time of day, so they always stay until done." : {
+
+    },
+    "Off shows one flat list under Inbox with each task's list as a subtitle." : {
 
     },
     "OK" : {

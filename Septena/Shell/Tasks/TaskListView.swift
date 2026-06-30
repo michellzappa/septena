@@ -43,6 +43,9 @@ struct TaskListView: View {
   let embeddedHeader: () -> AnyView
 
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  /// Things-style grouped Today (area / project sections) vs a single flat
+  /// list under Inbox with list subtitles and due-first ordering.
+  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
   /// Opt-in: weave the day's calendar events into Today and Upcoming (Things-
   /// style). Only ever populated for those two filters, and only when calendar
   /// access is already granted (Settings → Integrations) — see `load()`.
@@ -969,7 +972,11 @@ struct TaskListView: View {
     case .today:
       todayCalendarSection
       triageSection
-      groupedOpenItems
+      if todayGroupByList {
+        groupedOpenItems
+      } else {
+        ungroupedOpenItems
+      }
     case .unscheduled:
       reviewRows
       groupedOpenItems
@@ -1183,11 +1190,20 @@ struct TaskListView: View {
     switch filter {
     case .today:
       // Inbox section = agent proposals + loose today tasks, rendered above
-      // area/project groups. Pass only the classified tasks to orderedFromGroupedOpen.
+      // the main list. Classified tasks follow — grouped or flat per setting.
       let todayPool = items + review
       let looseToday = todayPool.filter { $0.project == nil && $0.area == nil }
       let classified = todayPool.filter { $0.project != nil || $0.area != nil }
-      return triageItems.map(\.id) + looseToday.map(\.id) + orderedFromGroupedOpen(pool: classified)
+      let classifiedIds: [String]
+      if todayGroupByList {
+        classifiedIds = orderedFromGroupedOpen(pool: classified)
+      } else {
+        classifiedIds = classified
+          .filter { $0.status == .open || settle.isSettling($0.id) }
+          .sorted(by: SeptenaTask.compareNextPageOrder)
+          .map(\.id)
+      }
+      return triageItems.map(\.id) + looseToday.map(\.id) + classifiedIds
     case .unscheduled:
       return review.map(\.id) + orderedFromGroupedOpen(pool: items)
     case .upcoming:
@@ -1621,14 +1637,16 @@ struct TaskListView: View {
     // group. Upcoming groups by date, so the chip stays.
     let suppressProject: Bool = {
       switch filter {
-      case .project, .unscheduled, .today: return true
-      default:                             return false
+      case .project, .unscheduled: return true
+      case .today:                 return todayGroupByList
+      default:                      return false
       }
     }()
     let suppressArea: Bool = {
       switch filter {
-      case .project, .area, .unscheduled, .today: return true
-      default:                                    return false
+      case .project, .area, .unscheduled: return true
+      case .today:                        return todayGroupByList
+      default:                           return false
       }
     }()
     return TaskRow(
@@ -1942,7 +1960,19 @@ struct TaskListView: View {
       .padding(.bottom, 6)
   }
 
-  // MARK: - Unscheduled grouping (by project / area)
+  // MARK: - Today open tasks (grouped vs flat)
+
+  /// Classified Today tasks (assigned to an area or project) as one untitled
+  /// card — Inbox stays above; each row shows its list as a subtitle.
+  @ViewBuilder
+  private var ungroupedOpenItems: some View {
+    let base = items + review
+    let pool = base.filter { $0.status == .open || settle.isSettling($0.id) }
+    let classified = pool
+      .filter { $0.project != nil || $0.area != nil }
+      .sorted(by: SeptenaTask.compareNextPageOrder)
+    cardedRows(classified)
+  }
 
   /// Renders `items` clustered by their project (preferred) or area, using
   /// real SwiftUI sections so group titles are headers, not selectable rows.

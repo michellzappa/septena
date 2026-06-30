@@ -20,6 +20,7 @@ struct TasksDestinationView: View {
   /// (see `TaskCelebration`). Optional and nil-safe.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
+  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`).
   @State private var settle = SettleStore()
@@ -214,7 +215,11 @@ struct TasksDestinationView: View {
     // `.today` filter already excludes band members (`convert`), so a row that
     // satisfies both predicates lands only in the band — Today stays clean.
     triageTasks = LocalCache.tasks(in: modelContext, filter: .triage)
-    openTasks = LocalCache.tasks(in: modelContext, filter: .today)
+    var todayOpen = LocalCache.tasks(in: modelContext, filter: .today)
+    if !todayGroupByList {
+      todayOpen.sort(by: SeptenaTask.compareNextPageOrder)
+    }
+    openTasks = todayOpen
     let today = SeptenaDate.today
     let completed = LocalCache.tasks(in: modelContext, filter: .logbook)
     history = Self.dailyCounts(completed)

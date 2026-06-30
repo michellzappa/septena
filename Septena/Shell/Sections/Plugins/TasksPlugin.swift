@@ -184,6 +184,7 @@ private struct TasksDetailContent: View {
 
   @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
   @AppStorage(SettingsKey.tasksOpenIn)        private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
   @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = true
@@ -237,10 +238,17 @@ private struct TasksDetailContent: View {
             .font(.caption).foregroundStyle(.secondary)
         }
       }
+      Toggle(isOn: $todayGroupByList) {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Group by area and project")
+          Text("Off shows one flat list under Inbox with each task's list as a subtitle.")
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
     } header: {
       Text("Today")
     } footer: {
-      Text("Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off.")
+      Text("Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list sorts overdue and due-first, then pinned tasks.")
     }
     Section {
       Toggle(isOn: showInNextBinding) {

@@ -37,6 +37,11 @@ enum SettingsKey {
   /// pending nudge on the next reconcile.
   static let notificationsEnabled = "septena.notify.enabled"
   static let todayShowCompleted = "septena.today.showCompleted"
+  /// Whether Today groups open tasks under area / project headers. Absent → on
+  /// (grouped). Off → a single flat list under Inbox with list name as each
+  /// row's subtitle, sorted by due urgency (`SeptenaTask.compareNextPageOrder`).
+  /// Read by `TaskListView` and `TasksDestinationView`.
+  static let todayGroupByList = "septena.today.groupByList"
   /// Device-local mirror of `AppSettings.onboardedAt`: true once the
   /// first-run welcome has been completed (here or, after sync, on another
   /// device). The welcome gate reads this for an instant, offline-safe
