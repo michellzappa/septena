@@ -20,6 +20,7 @@ struct ReportsSettingsPane: View {
   @Environment(SettingsStore.self) private var store
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
+  @Environment(DayClock.self) private var clock
 
   @State private var draft: ReportBundle?          // builder sheet
   @State private var preview: ReportPreview?       // preview sheet
@@ -184,7 +185,7 @@ struct ReportsSettingsPane: View {
     for key in keys {
       let related = goals.filter { $0.sections.contains(key) }
       let rg: [ReportGoal] = related.map { g in
-        guard let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx) else {
+        guard let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx, now: clock.now) else {
           return ReportGoal(text: g.text, detail: "", fraction: nil, hit: false)
         }
         let cur = fmtNum(p.current), tgt = fmtNum(p.target), u = p.unitLabel

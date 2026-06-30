@@ -167,7 +167,7 @@ struct GoalMetricProgress {
 
 @MainActor
 enum GoalMetricEvaluator {
-  static func evaluate(goal: Goal, context: ModelContext) -> GoalMetricProgress? {
+  static func evaluate(goal: Goal, context: ModelContext, now: Date) -> GoalMetricProgress? {
     guard let key = goal.metricKey,
           let comparator = goal.metricComparator,
           let target = goal.metricTarget,
@@ -179,7 +179,7 @@ enum GoalMetricEvaluator {
     // the user has any Withings data). Bubble nil up so the UI hides
     // the progress bar rather than rendering 0 — which for an `lte`
     // target would misleadingly read as "hit."
-    guard let current = plugin.evaluateAim(metric: metric, context: context) else {
+    guard let current = plugin.evaluateAim(metric: metric, context: context, now: now) else {
       return nil
     }
     return GoalMetricProgress(current: current,
@@ -197,11 +197,11 @@ enum GoalMetricEvaluator {
 enum GoalMetricWindow {
   /// Inclusive YYYY-MM-DD bounds for a window. Use with entities whose
   /// `date` is a string column.
-  static func dateStringRange(for window: String) -> (String, String)? {
+  static func dateStringRange(for window: String, now: Date) -> (String, String)? {
     let fmt = DateFormatter()
     fmt.dateFormat = "yyyy-MM-dd"
     fmt.locale = Locale(identifier: "en_US_POSIX")
-    guard let (start, end) = dateRange(for: window) else { return nil }
+    guard let (start, end) = dateRange(for: window, now: now) else { return nil }
     let cal = Calendar.current
     let lastDay = cal.date(byAdding: .day, value: -1, to: end) ?? end
     return (fmt.string(from: start), fmt.string(from: lastDay))
@@ -210,9 +210,8 @@ enum GoalMetricWindow {
   /// Half-open Date window [start, end). The week boundary follows the user's
   /// locale (`Calendar.current.firstWeekday`) so goal weeks line up with the
   /// week-start they see everywhere else (heatmaps, charts).
-  static func dateRange(for window: String) -> (Date, Date)? {
+  static func dateRange(for window: String, now: Date) -> (Date, Date)? {
     let cal = Calendar.current
-    let now = Date()
     switch window {
     case "today":
       let start = cal.startOfDay(for: now)

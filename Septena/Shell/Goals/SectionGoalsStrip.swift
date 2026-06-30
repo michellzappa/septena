@@ -104,6 +104,7 @@ struct SectionGoalsStrip: View {
 /// neighbouring section cards.
 private struct SectionGoalRow: View {
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
   let goal: Goal
   let theme: SectionTheme
 
@@ -114,7 +115,7 @@ private struct SectionGoalRow: View {
   private var isPlaceholder: Bool { goal.text == "New goal" }
 
   private var progress: GoalMetricProgress? {
-    GoalMetricEvaluator.evaluate(goal: goal, context: context)
+    GoalMetricEvaluator.evaluate(goal: goal, context: context, now: clock.now)
   }
 
   var body: some View {

@@ -24,7 +24,9 @@ enum PinnedGoalTiles {
 
   static func domainData(_ entity: GoalEntity,
                          theme: SectionTheme,
-                         context: ModelContext) -> HomepageDomainData {
+                         context: ModelContext,
+                         today: String,
+                         now: Date) -> HomepageDomainData {
     let goal = Goal(entity)
     let sectionKey = goal.metricKey.flatMap { GoalMetricCatalog.sectionKey(for: $0) }
       ?? goal.sections.first
@@ -37,7 +39,7 @@ enum PinnedGoalTiles {
     var headline = title
     var stats: [DomainStat] = []
     var progress: DomainProgress? = nil
-    if let p = GoalMetricEvaluator.evaluate(goal: goal, context: context) {
+    if let p = GoalMetricEvaluator.evaluate(goal: goal, context: context, now: now) {
       let cur = trimmed(p.current)
       let tgt = trimmed(p.target)
       headline = "\(cur) / \(tgt) \(p.unitLabel)"
@@ -55,19 +57,21 @@ enum PinnedGoalTiles {
       headline: headline,
       headlineStats: stats,
       progress: progress,
-      history: habitHistory(for: goal, context: context),
+      history: habitHistory(for: goal, context: context, today: today, now: now),
       tap: .openGoal(goal.id)
     )
   }
 
-  private static func habitHistory(for goal: Goal, context: ModelContext) -> HistorySeries? {
+  private static func habitHistory(for goal: Goal, context: ModelContext,
+                                   today: String, now: Date) -> HistorySeries? {
     guard let key = goal.metricKey,
           key.hasPrefix("habits."), key.hasSuffix(".done_week") else { return nil }
     let habitID = String(key.dropFirst("habits.".count).dropLast(".done_week".count))
     let done = Set(ChecklistMirror.habitCompletionDates(context: context, habitID: habitID))
     let cal = Calendar.current
+    let anchor = SeptenaDate.startOfDay(for: today) ?? now
     let series: [Int] = stride(from: historyDays - 1, through: 0, by: -1).map { back in
-      let day = cal.date(byAdding: .day, value: -back, to: Date()) ?? Date()
+      let day = cal.date(byAdding: .day, value: -back, to: anchor) ?? anchor
       return done.contains(ymd.string(from: day)) ? 1 : 0
     }
     return .bars(series)

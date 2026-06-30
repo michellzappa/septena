@@ -229,6 +229,7 @@ private extension View {
 
 struct GoalTile: View {
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
   let goal: Goal
   let theme: SectionTheme
 
@@ -249,7 +250,7 @@ struct GoalTile: View {
   }
 
   private var progress: GoalMetricProgress? {
-    GoalMetricEvaluator.evaluate(goal: goal, context: context)
+    GoalMetricEvaluator.evaluate(goal: goal, context: context, now: clock.now)
   }
 
   var body: some View {
