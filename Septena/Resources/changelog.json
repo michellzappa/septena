@@ -4,19 +4,19 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1285,
+      "build": 1289,
       "date": "2026-06-30",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "A reimagined Tasks experience",
-          "detail": "Edit titles inline, quick-add from anywhere, group Today by area and project, and add tasks from a global entry point and Control Center.",
+          "detail": "Inline editing, a foot quick-add line, undo toasts for delete, move, and defer, group Today by area and project, and a refreshed Today tab (formerly Week).",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with undo",
-          "detail": "Removed tasks rest in a Recently Deleted view for 30 days with one-tap restore, and edits and moves can be undone with a toast.",
+          "title": "Recently Deleted with restore",
+          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can bring them back before they purge.",
           "section": "tasks"
         },
         {
@@ -31,32 +31,22 @@
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and have it analyzed on-device, plus a small flourish when you break your fast.",
+          "detail": "Snap a meal and let on-device analysis estimate it, plus a small flourish when you break a fast.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume and a weekly review after each session, a Start Training Session shortcut, and an auto-advancing flow with a watch Live Activity.",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, an auto-advancing rest flow with a watch Live Activity, and a Start Training Session shortcut.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your week",
-          "detail": "Keep the goals that matter most front and center as dashboard tiles.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Surface the goals that matter as tiles on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Clearer control over your privacy",
-          "detail": "Choose a graded analytics level from off to full, see exactly what's sent, and review a log of recent telemetry.",
-          "section": null
-        },
-        {
-          "title": "A richer Apple Watch",
-          "detail": "A vertically-paged Next feed over a time-of-day sky, long-press action drawers, and expanded intake tiles on the wrist.",
-          "section": null
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": null,
+          "title": "Clearer privacy controls",
+          "detail": "Choose a graded telemetry level (off, minimal, balanced, or full) and see exactly what was recently sent.",
           "section": null
         }
       ]
