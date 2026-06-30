@@ -10,27 +10,12 @@ import SwiftUI
 @Observable
 private final class MenuBarTodayLoader {
   var items: [SeptenaTask] = []
-  @ObservationIgnored private var observer: NSObjectProtocol?
 
-  init() {
-    // First fetch happens when the menu is opened for the first time
-    // (which is when @State instantiates this loader).
-    Task { await refresh() }
-    // Stay in sync with the rest of the app — every mutation posts this.
-    observer = NotificationCenter.default.addObserver(
-      forName: .septenaTasksChanged, object: nil, queue: .main
-    ) { [weak self] _ in
-      Task { @MainActor [weak self] in await self?.refresh() }
-    }
-  }
-
-  deinit {
-    if let observer { NotificationCenter.default.removeObserver(observer) }
-  }
-
-  func refresh() async {
+  func refresh(today: String, now: Date) async {
     let resp = await TaskReads.list(
       view: "today",
+      today: today,
+      now: now,
       context: LocalStore.shared.container.mainContext
     )
     // Mirror the Today screen: pinned-today (`items`) plus scheduled/due
@@ -47,6 +32,7 @@ private final class MenuBarTodayLoader {
 /// reached via "New To-Do" which activates the window into draft mode.
 struct MenuBarMenu: View {
   @State private var loader = MenuBarTodayLoader()
+  @Environment(DayClock.self) private var clock
   @AppStorage(MCPDefaultsKey.enabled) private var mcpEnabled = false
   @AppStorage(MCPDefaultsKey.keepAlive) private var mcpKeepAlive = false
   @Environment(\.openWindow) private var openWindow
@@ -55,41 +41,52 @@ struct MenuBarMenu: View {
   /// serving after quit" is opted in; otherwise it quits normally.
   private var softQuit: Bool { mcpEnabled && mcpKeepAlive }
 
+  private func reloadMenuBarToday() {
+    Task { await loader.refresh(today: clock.today, now: clock.now) }
+  }
+
   var body: some View {
-    Button("New To-Do") { startQuickAdd() }
-      .keyboardShortcut("n")
+    Group {
+      Button("New To-Do") { startQuickAdd() }
+        .keyboardShortcut("n")
 
-    Divider()
+      Divider()
 
-    if loader.items.isEmpty {
-      Text("Nothing on Today")
-    } else {
-      Text("Today")
-      ForEach(loader.items) { task in
-        Button(task.title) { activateMainWindow() }
+      if loader.items.isEmpty {
+        Text("Nothing on Today")
+      } else {
+        Text("Today")
+        ForEach(loader.items) { task in
+          Button(task.title) { activateMainWindow() }
+        }
+      }
+
+      // Live MCP server state, shown only while the server is enabled. Reading
+      // `LocalMCPStatus.shared` properties here registers Observation tracking,
+      // so the line updates when the server starts/stops or serves a request.
+      if mcpEnabled {
+        Divider()
+        Text(mcpStatusText)
+      }
+
+      Divider()
+
+      Button("Open Septena") { activateMainWindow() }
+      // ⌘Q soft-quits to the menu bar only when soft-quit is on (NSApp.terminate
+      // routes through MacAppDelegate.applicationShouldTerminate); otherwise it
+      // quits normally. "Quit Completely" always exits.
+      Button(softQuit ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
+        .keyboardShortcut("q")
+      if softQuit {
+        Button("Quit Completely") { MacAppLifecycle.quitCompletely() }
+          .keyboardShortcut("q", modifiers: [.command, .option])
       }
     }
-
-    // Live MCP server state, shown only while the server is enabled. Reading
-    // `LocalMCPStatus.shared` properties here registers Observation tracking,
-    // so the line updates when the server starts/stops or serves a request.
-    if mcpEnabled {
-      Divider()
-      Text(mcpStatusText)
+    .task { await loader.refresh(today: clock.today, now: clock.now) }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      reloadMenuBarToday()
     }
-
-    Divider()
-
-    Button("Open Septena") { activateMainWindow() }
-    // ⌘Q soft-quits to the menu bar only when soft-quit is on (NSApp.terminate
-    // routes through MacAppDelegate.applicationShouldTerminate); otherwise it
-    // quits normally. "Quit Completely" always exits.
-    Button(softQuit ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
-      .keyboardShortcut("q")
-    if softQuit {
-      Button("Quit Completely") { MacAppLifecycle.quitCompletely() }
-        .keyboardShortcut("q", modifiers: [.command, .option])
-    }
+    .onChange(of: clock.today) { _, _ in reloadMenuBarToday() }
   }
 
   private var mcpStatusText: String {
@@ -115,7 +112,7 @@ struct MenuBarMenu: View {
     } else {
       openWindow(id: "main")
     }
-    Task { await loader.refresh() }
+    Task { await loader.refresh(today: clock.today, now: clock.now) }
   }
 }
 #endif

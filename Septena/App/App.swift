@@ -154,7 +154,8 @@ struct SeptenaApp: App {
               await MainActor.run {
                 settingsStore.reloadFromMirror(context: localStore.container.mainContext)
                 theme.paintFromCache()
-                WatchSnapshotPublisher.schedule(context: localStore.container.mainContext)
+                WatchSnapshotPublisher.schedule(context: localStore.container.mainContext,
+                                                date: dayClock.today, now: dayClock.now)
                 // Surface milestones earned while away (background Withings
                 // ingest, logs from intents, another device's data syncing in).
                 if MilestonePresenter.presentPending(
