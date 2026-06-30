@@ -166,10 +166,8 @@ struct TaskComposerCard: View {
       // the inline editor this IS the save path — folding the row autosaves.
       .onDisappear { persistOnce() }
       .onChange(of: draft.title) { _, newValue in
-        // The title wraps (axis: .vertical) so long titles show in full instead
-        // of truncating — but it stays single-line in spirit: a Return inserts a
-        // newline, which we treat as "save". Strip it and commit (or just tidy it
-        // away when there's nothing to save yet).
+        // Return inserts a newline, which we treat as "save". Strip it and commit
+        // (or just tidy it away when there's nothing to save yet).
         if newValue.contains("\n") {
           draft.title = newValue.replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -302,9 +300,11 @@ struct TaskComposerCard: View {
           .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
           .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
         }
-        titleField
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
+        VStack(alignment: .leading, spacing: 4) {
+          titleField
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       }
     } else {
       titleField
@@ -317,11 +317,14 @@ struct TaskComposerCard: View {
   }
 
   private var titleField: some View {
-    TextField("What needs doing?", text: $draft.title, axis: .vertical)
+    // Single-line field (no `axis: .vertical`) so the title sits on the same
+    // baseline as the closed row — a vertical-axis field reserves blank space
+    // above the cursor/placeholder and reads as a few px too low.
+    TextField("", text: $draft.title)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
       .focused($focus, equals: .title)
-      .lineLimit(1...4)
+      .lineLimit(1)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
       .onSubmit { if draft.canSave { commit() } }
