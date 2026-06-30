@@ -19,6 +19,7 @@ struct CoachDetailView: View {
 
   @Environment(\.modelContext) private var context
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
@@ -242,7 +243,8 @@ struct CoachDetailView: View {
   private func refresh() {
     availableSections = SettingsMirror.loadSections(context: context)
       .filter { $0.key != "goals" }
-    pills = CoachContextBuilder.availability(for: domain, window: .default, context: context)
+    pills = CoachContextBuilder.availability(for: domain, window: .default,
+                                             context: context, now: clock.now)
     voice = CoachVoiceStore.load(domain)
   }
 
@@ -281,6 +283,7 @@ struct CoachDetailView: View {
 /// kept local so the two surfaces can diverge without coupling.
 private struct CoachGoalRow: View {
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
   let goal: Goal
   let theme: SectionTheme
 
@@ -291,7 +294,7 @@ private struct CoachGoalRow: View {
   private var isPlaceholder: Bool { goal.text == "New goal" }
 
   private var progress: GoalMetricProgress? {
-    GoalMetricEvaluator.evaluate(goal: goal, context: context)
+    GoalMetricEvaluator.evaluate(goal: goal, context: context, now: clock.now)
   }
 
   var body: some View {

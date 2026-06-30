@@ -17,6 +17,7 @@ struct CoachChatView: View {
   let onFinish: ([DraftGoal]) -> Void
 
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
   @State private var session: CoachSession?
   @State private var window: CoachWindow = .default
   /// Section keys the user tapped to mute — excluded from the coach's
@@ -102,7 +103,8 @@ struct CoachChatView: View {
   /// window re-reads the data, so the conversation resets with fresh facts
   /// and pills — the model can't be left citing a window it can't see.
   private func rebuild() {
-    session = CoachSession(domain: domain, window: window, context: context, excluding: mutedKeys)
+    session = CoachSession(domain: domain, window: window, context: context,
+                           excluding: mutedKeys, now: clock.now)
     draft = ""
   }
 

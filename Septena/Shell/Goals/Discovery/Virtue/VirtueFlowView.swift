@@ -36,9 +36,9 @@ final class VirtueViewModel {
 
   private let service = VirtuePromptService()
 
-  func run(context: ModelContext) async {
+  func run(context: ModelContext, now: Date) async {
     phase = .gathering
-    let summary = VirtueSummarizer.summarize(context: context)
+    let summary = VirtueSummarizer.summarize(context: context, now: now)
     self.summary = summary
 
     guard OnDeviceAI.isAvailable else {
@@ -62,6 +62,7 @@ final class VirtueViewModel {
 
 struct VirtueFlowView: View {
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
 
   let onFinish: ([DraftGoal]) -> Void
 
@@ -122,7 +123,7 @@ struct VirtueFlowView: View {
                              accent: VirtueMiniApp.accent) {
         step = 1
         Haptics.aiGeneration()
-        Task { await model.run(context: context) }
+        Task { await model.run(context: context, now: clock.now) }
       }
     }
     .padding()

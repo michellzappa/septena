@@ -39,13 +39,16 @@ final class CoachSession {
 
   private let backend: CoachBackend
 
-  init(domain: CoachDomain, window: CoachWindow, context: ModelContext, excluding: Set<String> = []) {
+  init(domain: CoachDomain, window: CoachWindow, context: ModelContext,
+       excluding: Set<String> = [], now: Date) {
     self.domain = domain
     self.window = window
     // Pills enumerate the WHOLE preset (so muted sections still show, ready
     // to re-enable); the snapshot excludes the muted ones from the model.
-    self.pills = CoachContextBuilder.availability(for: domain, window: window, context: context)
-    let facts = CoachContextBuilder.snapshot(for: domain, window: window, context: context, excluding: excluding)
+    self.pills = CoachContextBuilder.availability(for: domain, window: window,
+                                                  context: context, now: now)
+    let facts = CoachContextBuilder.snapshot(for: domain, window: window,
+                                             context: context, excluding: excluding, now: now)
     // The user's per-coach voice (tone dials + custom note) is dialed into the
     // persona; the shared discipline floor is unaffected.
     let voice = CoachVoiceStore.load(domain)

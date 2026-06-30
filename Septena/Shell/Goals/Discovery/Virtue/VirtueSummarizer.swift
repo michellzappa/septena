@@ -150,7 +150,7 @@ struct VirtueWeekSummary {
 enum VirtueSummarizer {
   /// Read the trailing-7-day window from the local store and route it
   /// into per-virtue evidence. Pure read — never mutates.
-  static func summarize(context: ModelContext, now: Date = Date()) -> VirtueWeekSummary {
+  static func summarize(context: ModelContext, now: Date) -> VirtueWeekSummary {
     let cal = Calendar.current
     let today = cal.startOfDay(for: now)
     let startDay = cal.date(byAdding: .day, value: -6, to: today) ?? today

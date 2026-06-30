@@ -55,7 +55,7 @@ enum CoachContextBuilder {
   /// prompt. `excluding` drops sections the user toggled off — the model
   /// only sees what's in scope, so it can't reference muted data.
   static func snapshot(for domain: CoachDomain, window: CoachWindow,
-                       context: ModelContext, excluding: Set<String> = [], now: Date = Date()) -> String {
+                       context: ModelContext, excluding: Set<String> = [], now: Date) -> String {
     let r = range(window, now)
     let keys = (domain.sectionKeys ?? supportedKeys).filter { !excluding.contains($0) }
 
@@ -78,7 +78,7 @@ enum CoachContextBuilder {
 
     // Goals related to the in-scope sections — so the coach reflects against
     // the person's actual targets, not just raw numbers.
-    let goals = goalLines(relatedTo: Set(keys), context)
+    let goals = goalLines(relatedTo: Set(keys), context, now: now)
     if !goals.isEmpty {
       blocks.append("""
         GOALS — targets the person SET for themselves (aspirations, NOT logged events). \
@@ -104,14 +104,14 @@ enum CoachContextBuilder {
 
   // MARK: - Goals
 
-  private static func goalLines(relatedTo keys: Set<String>, _ ctx: ModelContext) -> [String] {
+  private static func goalLines(relatedTo keys: Set<String>, _ ctx: ModelContext, now: Date) -> [String] {
     let goals = LocalCache.goals(in: ctx).filter { g in
       g.sections.contains(where: keys.contains)
         || (g.metricKey.flatMap { GoalMetricCatalog.sectionKey(for: $0) }.map(keys.contains) == true)
     }
     guard !goals.isEmpty else { return [] }
     return goals.prefix(8).map { g in
-      if let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx) {
+      if let p = GoalMetricEvaluator.evaluate(goal: g, context: ctx, now: now) {
         return "- \"\(g.text)\" — \(goalCaption(p))"
       }
       return "- \"\(g.text)\""
@@ -285,7 +285,7 @@ enum CoachContextBuilder {
   /// counts and icons — what the chat's data pills show. Sections with zero
   /// entries are omitted (we only show what we can "see").
   static func availability(for domain: CoachDomain, window: CoachWindow,
-                           context: ModelContext, now: Date = Date()) -> [CoachDataPill] {
+                           context: ModelContext, now: Date) -> [CoachDataPill] {
     let r = range(window, now)
     let keys = domain.sectionKeys ?? supportedKeys
     return keys.compactMap { key in
