@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1263,
+      "build": 1271,
       "date": "2026-06-30",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A reimagined Tasks experience",
-          "detail": "Inline editing and quick-add, group Today by area and project, undo toasts for delete/move/defer, and a unified sidebar across iPhone, iPad, and Mac.",
+          "title": "Today, redesigned",
+          "detail": "The Week tab is now Today — a calmer view that weaves in your calendar agenda, groups tasks by area and project, and lets you add and edit tasks inline.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with restore",
-          "detail": "Removed tasks rest in a Recently Deleted view for 30 days so you can undo a mistake before they auto-purge.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore them, with quick undo for delete, move, and defer.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
-          "section": "tasks"
-        },
-        {
-          "title": "Your calendar in Today",
-          "detail": "System calendar events now weave into Today and Upcoming, with per-device control over which calendars appear.",
+          "detail": "Bring your existing tasks across from a Things database export.",
           "section": "tasks"
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and have it analyzed on-device to log nutrition faster.",
+          "detail": "Snap a meal and let on-device analysis estimate what's on the plate.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly muscle review, an auto-advancing rest flow, and a Live Activity on your watch and Smart Stack.",
+          "title": "A smarter training session flow",
+          "detail": "Rest timers give way to an auto-advancing session with a Live Activity and watch Smart Stack, plus effort-weighted muscle volume and a weekly review afterward.",
           "section": "training"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter in view as tiles on the week dashboard.",
+          "detail": "Keep the goals that matter front and center as tiles on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Graded privacy controls",
-          "detail": "Choose how much anonymized analytics you share across Off, Minimal, Balanced, and Full, and see exactly what was recently sent.",
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels let you pick off, minimal, balanced, or full, and see exactly what's been sent.",
           "section": null
         },
         {
-          "title": "A faster, friendlier watch",
-          "detail": "Long-press action drawers, expanded intake tiles and meal picker, and a time-of-day sky behind your paged Next feed.",
-          "section": null
-        },
-        {
-          "title": "Keyboard navigation in Next",
-          "detail": "Move through the Next feed with native selection and the keyboard, and choose which sections appear there.",
+          "title": "A more capable Next feed",
+          "detail": "Browse Next with full keyboard navigation, fold away today's completed items, and tune it with a dedicated settings pane and per-section toggles.",
           "section": null
         }
       ]
