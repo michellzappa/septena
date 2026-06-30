@@ -211,8 +211,9 @@ enum TrainingPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    let entries = TrainingMetrics.entriesThisWeek(context: context)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    let today = SeptenaDate.format(Calendar.current.startOfDay(for: now)) ?? SeptenaDate.today
+    let entries = TrainingMetrics.entriesThisWeek(context: context, today: today)
     switch metric.key {
     case TrainingMetrics.hardSetsKey:      return TrainingMetrics.hardSets(entries)
     case TrainingMetrics.cardioMinutesKey: return TrainingMetrics.cardioMinutes(entries)

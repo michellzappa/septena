@@ -119,8 +119,8 @@ enum SymptomsPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
     let rows = (try? context.fetch(FetchDescriptor<SymptomEventEntity>(
       predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }

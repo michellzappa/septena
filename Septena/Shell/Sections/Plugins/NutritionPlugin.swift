@@ -209,10 +209,10 @@ enum NutritionPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     // Nutrition uses `loggedAt: Date` (not a string date column), so we
     // filter with a Date range rather than the YYYY-MM-DD string helper.
-    guard let (start, end) = GoalMetricWindow.dateRange(for: metric.window)
+    guard let (start, end) = GoalMetricWindow.dateRange(for: metric.window, now: now)
     else { return 0 }
     let descriptor = FetchDescriptor<NutritionEntryEntity>(
       predicate: #Predicate { $0.loggedAt >= start && $0.loggedAt < end }

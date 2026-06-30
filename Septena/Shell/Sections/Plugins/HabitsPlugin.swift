@@ -159,8 +159,8 @@ enum HabitsPlugin: SectionPlugin {
     return metrics
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
     // Per-habit weekly completion: distinct days this week where THIS habit
     // was marked done. (Prefix+suffix match, so it can't collide with the two

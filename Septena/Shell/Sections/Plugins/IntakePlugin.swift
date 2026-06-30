@@ -206,7 +206,7 @@ enum IntakePlugin: SectionPlugin {
     }
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     // key = "intake.<kindID>.<suffix>"; kind ids are opaque (ik-<uuid>, no dots).
     let parts = metric.key.split(separator: ".")
     guard parts.count >= 3, parts[0] == "intake" else { return nil }
@@ -215,7 +215,7 @@ enum IntakePlugin: SectionPlugin {
 
     switch suffix {
     case "count", "count_week", "sum_amount", "sum_amount_week":
-      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window) else { return 0 }
+      guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now) else { return 0 }
       let rows = (try? context.fetch(FetchDescriptor<IntakeEventEntity>(
         predicate: #Predicate { $0.kindID == kindID && $0.date >= startStr && $0.date <= endStr }
       ))) ?? []
@@ -231,7 +231,7 @@ enum IntakePlugin: SectionPlugin {
       let cal = Calendar.current
       let days = cal.dateComponents([.day],
                                     from: cal.startOfDay(for: last.occurredAt),
-                                    to: cal.startOfDay(for: Date())).day ?? 0
+                                    to: cal.startOfDay(for: now)).day ?? 0
       return Double(max(0, days))
 
     default:

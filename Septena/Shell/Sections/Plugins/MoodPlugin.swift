@@ -62,8 +62,8 @@ enum MoodPlugin: SectionPlugin {
 
   // MARK: - Settings detail pane
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
     switch metric.key {
     case "mood.entry_count_today", "mood.entry_count_week":

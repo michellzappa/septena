@@ -131,7 +131,7 @@ enum HydrationPlugin: SectionPlugin {
     let target = UserDefaults.standard.object(forKey: "hydration.dailyTargetMl") as? Int ?? 2000
     guard target > 0 else { return nil }
 
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? ""
     let entries = (try? context.fetch(FetchDescriptor<NutritionEntryEntity>())) ?? []
     let dayMl = entries
       .filter { SeptenaDate.format($0.loggedAt) == today }
@@ -165,7 +165,7 @@ private struct HydrationDestinationView: View {
   /// The day the drawer is viewing. Bound to `SectionDrawer.currentDate`
   /// so the user can step prev/next through past days; `reload()`
   /// re-fetches for the selected day. Defaults to today.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
 
   private var accent: Color { theme.color(for: "hydration") }
   private var mutator: NutritionMutator { SeptenaServices.shared.nutritionMutator }
@@ -173,7 +173,7 @@ private struct HydrationDestinationView: View {
   /// On a past day the quick-add presets, the live progress summary, and
   /// the target stepper are suppressed — those are "today" affordances.
   /// A past day is a read-only review of that day's logged glasses.
-  private var isViewingToday: Bool { viewingDate == SeptenaDate.today }
+  private var isViewingToday: Bool { viewingDate == clock.today }
 
   private var progressFraction: Double {
     guard targetMl > 0 else { return 0 }
@@ -195,16 +195,12 @@ private struct HydrationDestinationView: View {
       }
     }
     .tint(accent)
-    .task { reload() }
-    .onChange(of: viewingDate) { _, _ in reload() }
-    // Roll the viewing pointer forward at midnight only if the user was
-    // already on "today"; otherwise leave their selection put.
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
+    .sectionReload(on: viewingDate, onDataChange: true,
+                   forSections: ["hydration"]) { reload() }
     .onChange(of: clock.today) { _, newToday in
       if isViewingToday { viewingDate = newToday }
       reload()
-    }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-      if note.affectsSection("hydration") { reload() }
     }
     .sheet(isPresented: $showCustom) {
       CustomAmountSheet(accent: accent) { ml in

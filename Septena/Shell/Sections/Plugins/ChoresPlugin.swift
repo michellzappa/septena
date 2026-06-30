@@ -104,8 +104,8 @@ enum ChoresPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
     switch metric.key {
     case "chores.completed_week":
@@ -138,7 +138,7 @@ enum ChoresPlugin: SectionPlugin {
     guard descriptorID == "chores.overdue" else { return nil }
     // Reuse the same overdue definition the Next feed and Today pill use,
     // most-overdue first.
-    let overdue = ChecklistMirror.loadChores(context: context)
+    let overdue = ChecklistMirror.loadChores(context: context, today: SeptenaDate.today)
       .filter { $0.daysOverdue > 0 }
       .sorted { $0.daysOverdue > $1.daysOverdue }
     guard let top = overdue.first else { return nil }   // nothing overdue → suppress

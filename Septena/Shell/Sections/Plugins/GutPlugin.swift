@@ -106,8 +106,8 @@ enum GutPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
-    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window)
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
+    guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
     switch metric.key {
     case "gut.event_count":

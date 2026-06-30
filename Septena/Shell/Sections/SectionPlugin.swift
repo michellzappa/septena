@@ -87,7 +87,7 @@ protocol SectionPlugin {
   /// Return `nil` for an unknown key — the dispatcher treats that as a
   /// 0 reading rather than crashing. Implementations should switch on
   /// the metric's key string.
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double?
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double?
 
   /// Recommended starter goals this section offers a brand-new user — shown in
   /// the first-run "Set your starting targets" step and seeded for existing
@@ -365,7 +365,7 @@ extension SectionPlugin {
   static func aimMetrics(context: ModelContext) -> [GoalMetric] { aimMetrics }
 
   /// Default: no evaluator. Pairs with the empty default `aimMetrics`.
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? { nil }
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? { nil }
 
   /// Default: no suggested starter goals. Sections opt in by returning a few.
   static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] { [] }

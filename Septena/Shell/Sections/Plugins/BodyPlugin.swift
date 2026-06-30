@@ -63,7 +63,7 @@ enum BodyPlugin: SectionPlugin {
     ]
   }
 
-  static func evaluateAim(metric: GoalMetric, context: ModelContext) -> Double? {
+  static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     switch metric.key {
     case "body.weight":      return latest(context: context) { $0.weightKg }
     case "body.fat_pct":     return latest(context: context) { $0.fatPct }
