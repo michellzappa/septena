@@ -52,13 +52,13 @@ enum WatchSnapshotPublisher {
   /// wasted. Mutation paths and app-foreground route here instead of calling
   /// `publish` directly.
   @MainActor
-  static func schedule(context: ModelContext, date: String = SeptenaDate.today) {
+  static func schedule(context: ModelContext, date: String, now: Date) {
     pending?.cancel()
     pending = Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(1200))
       guard !Task.isCancelled else { return }
       pending = nil
-      publish(context: context, date: date)
+      publish(context: context, date: date, now: now)
     }
   }
 
@@ -93,12 +93,12 @@ enum WatchSnapshotPublisher {
     ) { note in
       // Only sections that feed the snapshot; unscoped posts (nil) always pass.
       guard note.affectsAnySection(of: snapshotSections) else { return }
-      MainActor.assumeIsolated { schedule(context: context) }
+      MainActor.assumeIsolated { schedule(context: context, date: SeptenaDate.today, now: Date()) }
     }
     let tasks = center.addObserver(
       forName: .septenaTasksChanged, object: nil, queue: .main
     ) { _ in
-      MainActor.assumeIsolated { schedule(context: context) }
+      MainActor.assumeIsolated { schedule(context: context, date: SeptenaDate.today, now: Date()) }
     }
     // Republish on the midnight rollover too. The snapshot carries day-keyed
     // values (today's intake tally, macro rings, the Next feed's today bucket),
@@ -109,7 +109,7 @@ enum WatchSnapshotPublisher {
     let dayChange = center.addObserver(
       forName: .NSCalendarDayChanged, object: nil, queue: .main
     ) { _ in
-      MainActor.assumeIsolated { schedule(context: context) }
+      MainActor.assumeIsolated { schedule(context: context, date: SeptenaDate.today, now: Date()) }
     }
     observers = [data, tasks, dayChange]
     #endif
@@ -119,11 +119,11 @@ enum WatchSnapshotPublisher {
   /// a failed write is retried by the next mutation / foreground. Prefer
   /// `schedule` from mutation paths so rapid edits don't each pay the full cost.
   @MainActor
-  static func publish(context: ModelContext, date: String = SeptenaDate.today) {
+  static func publish(context: ModelContext, date: String, now: Date) {
     // The full Next feed (suggestions + tasks/chores/habits/supplements in the
     // user's saved section order) comes from the one shared builder, so the
     // watch snapshot can never diverge from the app's Next list.
-    let items = NextFeed.flat(context: context, date: date)
+    let items = NextFeed.flat(context: context, date: date, now: now)
     // Carry this phone's current bucket cutoffs in the payload so the watch
     // applies the same morning/afternoon/evening boundaries. The watch has its
     // own separate app-group container — the phone's DayBucket.saveCutoffs()
@@ -198,7 +198,7 @@ enum WatchSnapshotPublisher {
     // This week's training (trailing 7 days) vs targets, for the watch's
     // training-ring complication. Present whenever a target exists (they always
     // have built-in defaults), so it mirrors the macro rings' availability.
-    let trainingRings = buildTrainingRings(context: context)
+    let trainingRings = buildTrainingRings(context: context, today: date)
     // The fasting context (last-meal anchor + target), if the user tracks fasting
     // and has a recent meal — the watch decides fed-vs-fasting itself from this
     // and morphs the macro complication into a fasting face when due. Nil when
@@ -218,7 +218,8 @@ enum WatchSnapshotPublisher {
     // Built only when the rings rode along (same data presence), so a page that
     // shows nothing carries no list either.
     let recentNutrition = nutritionRings != nil ? buildRecentNutrition(context: context) : []
-    let recentTraining = trainingRings != nil ? buildRecentTraining(context: context) : []
+    let recentTraining = trainingRings != nil
+      ? buildRecentTraining(context: context, today: date) : []
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      morningCutoff: cutoffs.morningEnd,
                                      afternoonCutoff: cutoffs.afternoonEnd,
@@ -364,8 +365,8 @@ enum WatchSnapshotPublisher {
   /// The newest few logged training entries (this trailing week, newest first),
   /// listed under the rings on the watch's training summary page.
   @MainActor
-  private static func buildRecentTraining(context: ModelContext) -> [RecentLogWire] {
-    let entries = TrainingMetrics.entriesThisWeek(context: context)
+  private static func buildRecentTraining(context: ModelContext, today: String) -> [RecentLogWire] {
+    let entries = TrainingMetrics.entriesThisWeek(context: context, today: today)
       .sorted { $0.occurredAt > $1.occurredAt }
       .prefix(recentLogCap)
     return entries.map { e in
@@ -414,12 +415,12 @@ enum WatchSnapshotPublisher {
   /// Present whenever there's progress or a target (targets always have built-in
   /// defaults), so it stays available like the macro rings.
   @MainActor
-  private static func buildTrainingRings(context: ModelContext) -> TrainingRingsWire? {
+  private static func buildTrainingRings(context: ModelContext, today: String) -> TrainingRingsWire? {
     // Values + targets both come from `TrainingMetrics` so the wrist matches the
     // in-app strength/cardio cards and the Goals bars exactly. Each target
     // prefers a real goal (hard_sets_week / cardio_minutes_week / session_count)
     // and falls back to the built-in default when the user set none.
-    let entries = TrainingMetrics.entriesThisWeek(context: context)
+    let entries = TrainingMetrics.entriesThisWeek(context: context, today: today)
     let band    = TrainingMetrics.hardSetsBand(context: context)
 
     let rings = [

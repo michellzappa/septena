@@ -65,6 +65,10 @@ final class WatchConnectivity {
   /// presence then.
   var enabledSections: Set<String> = []
   var bucket: String = ""
+  /// The phone's `date` from the last fetched snapshot — preferred over wall
+  /// clock for day-scoped reads/writes so the wrist stays aligned with the
+  /// phone's notion of "today" until the next republish.
+  private var snapshotDate: String?
   var isLoading = false
   var errorMessage: String?
   /// Items tapped this session — held visible (struck through) for a beat
@@ -106,7 +110,9 @@ final class WatchConnectivity {
     return f
   }()
 
-  private var today: String { Self.dateFmt.string(from: Date()) }
+  private var today: String {
+    snapshotDate ?? Self.dateFmt.string(from: Date())
+  }
 
   // Bucket selection is shared with the phone via `DayBucket` so the two
   // never disagree about which habits are due now.
@@ -197,6 +203,7 @@ final class WatchConnectivity {
         .filter { !doneLocal.contains($0.id) }
 
       self.items         = filtered
+      self.snapshotDate  = response.date
       self.sectionColors = response.sectionColors ?? [:]
       self.intakeKinds   = response.intakeKinds ?? []
       self.topMeals      = response.topMeals ?? []
