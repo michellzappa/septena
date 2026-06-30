@@ -41,8 +41,8 @@ struct NutritionDestinationView: View {
   /// brand-new meal by hand is rare (usually done via MCP), so it's demoted
   /// to a corner button inside this sheet.
   @State private var searchingMeals = false
-  /// Photo-first meal capture — opens the meal form auto-launching the camera
-  /// (or photo picker where there's no camera).
+  /// Photo meal capture — opens the meal form with a camera affordance (never
+  /// auto-launches the camera on appear).
   @State private var scanning = false
   @State private var photoPickerEntry: NutritionEntry? = nil
   @State private var photoPickerItem: PhotosPickerItem? = nil

@@ -6,10 +6,11 @@ import SwiftUI
 // Three entry points + a recommendation section ("New meal…" is the full-input
 // escape every section's quick-add ends with):
 //
-//   1. Scan a meal… → photo-first: opens the meal form and auto-presents the
-//                     photo picker. The photo is analyzed (Vision OCR / barcode
-//                     now, on-device multimodal on iOS 27) and pre-fills the
-//                     macros + foods, which the user confirms.
+//   1. Scan a meal… → opens the meal form with a camera affordance in the
+//                     Photo section (camera / library on tap — never auto-opens).
+//                     The photo is analyzed (Vision OCR / barcode now, on-device
+//                     multimodal on iOS 27) and pre-fills the macros + foods,
+//                     which the user confirms.
 //
 //   2. Search…  → focused search modal across the full meal history.
 //                 The right path when "I know I've eaten this before

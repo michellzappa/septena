@@ -7,12 +7,12 @@ import PhotosUI
 // from the Nutrition QuickAdd menu's "New meal…" item.
 
 struct NewNutritionEntrySheet: View {
-  /// Photo-first mode: auto-present the photo picker on appear so the first
-  /// thing the user does is choose a meal photo, which analyzes and pre-fills
-  /// the form. Driven by the QuickAdd "Scan a meal…" entry point.
+  /// Opened from a "Scan a meal…" entry point — surfaces a camera affordance in
+  /// the Photo section, but never auto-launches the camera on appear.
   var autoStartScan: Bool = false
 
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @State private var time: Date = Date()
   @State private var emoji: String = ""
@@ -37,7 +37,6 @@ struct NewNutritionEntrySheet: View {
   @State private var analysisNote: String? = nil
   @State private var scanPickerPresented = false
   @State private var cameraPresented = false
-  @State private var didAutoScan = false
 
   var body: some View {
     AdaptiveEditScaffold(
@@ -49,18 +48,6 @@ struct NewNutritionEntrySheet: View {
         .onChange(of: photoItem) { _, new in
           guard let new else { return }
           Task { await handlePicked(new) }
-        }
-        // Photo-first launch: once, right after the form appears, open the
-        // camera so "Scan a meal…" lands the user straight on a shot. Where
-        // there's no camera (Simulator / Mac) fall back to the library picker.
-        .task {
-          guard autoStartScan, !didAutoScan else { return }
-          didAutoScan = true
-          if MealCamera.isAvailable {
-            cameraPresented = true
-          } else {
-            scanPickerPresented = true
-          }
         }
         .photosPicker(
           isPresented: $scanPickerPresented,
@@ -100,6 +87,12 @@ struct NewNutritionEntrySheet: View {
           HStack(spacing: 12) {
             MealPhotoThumbnail(assetID: photoAssetID, size: 56)
             VStack(alignment: .leading, spacing: 2) {
+              if autoStartScan {
+                Button { presentScanCapture() } label: {
+                  Label(photoAssetID == nil ? "Take photo…" : "Retake photo",
+                        systemImage: "camera.viewfinder")
+                }
+              }
               PhotosPicker(
                 selection: $photoItem,
                 matching: .images,
@@ -144,6 +137,14 @@ struct NewNutritionEntrySheet: View {
           macroField("Water (\(VolumeUnit.current.suffix))", text: $waterMl)
         }
       }
+  }
+
+  private func presentScanCapture() {
+    if MealCamera.isAvailable {
+      cameraPresented = true
+    } else {
+      scanPickerPresented = true
+    }
   }
 
   // Record the asset, then analyze the photo into a draft and pre-fill any
@@ -245,6 +246,7 @@ struct NewNutritionEntrySheet: View {
 
     NutritionPlugin.commitMeal(
       loggedAt: time,
+      today: clock.today,
       accent: theme.color(for: "nutrition"),
       announce: "Logged \(foods.first ?? "meal").",
       logCommit: logCommit
