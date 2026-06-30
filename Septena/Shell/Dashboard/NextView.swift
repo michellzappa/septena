@@ -25,6 +25,8 @@ struct NextView: View {
   @State private var tasksModel = TodayTasksModel()
   @State private var suggestionsModel = NextSuggestionsModel()
   @State private var doneModel = NextDoneModel()
+  /// Done Today log fold — collapsed by default; persists across relaunches.
+  @AppStorage("septena.next.doneTodayCollapsed") private var doneTodayCollapsed = true
 
   /// The keyboard cursor / native row highlight — bound straight to
   /// `List(selection:)` so ↑↓ traverse every tagged row across all sections,
@@ -116,7 +118,7 @@ struct NextView: View {
       }
     }
 
-    if hasAnyDone {
+    if hasAnyDone, !doneTodayCollapsed {
       tags += NextDoneEvents.merged(model: model, passive: doneModel.events,
                                     lingeringTaskIDs: tasksModel.lingeringDoneTaskIDs)
         .map { NextRowTag.done($0.id) }
@@ -374,6 +376,7 @@ struct NextView: View {
       if hasAnyDone {
         NextDoneSection(model: model, passive: doneModel.events,
                         lingeringTaskIDs: tasksModel.lingeringDoneTaskIDs,
+                        isCollapsed: $doneTodayCollapsed,
                         selection: selection,
                         onEdit: beginEditDone, onDelete: deleteDone)
       }

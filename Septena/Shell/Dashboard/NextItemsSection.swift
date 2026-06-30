@@ -877,6 +877,8 @@ struct NextDoneSection: View {
   var passive: [DoneEvent]
   /// Tasks still in the open-list settle beat — withheld from the log until fade.
   var lingeringTaskIDs: Set<String> = []
+  /// Fold state for the Done Today log — persisted by the caller via AppStorage.
+  @Binding var isCollapsed: Bool
   /// Page-level `List(selection:)` — drives row highlight + keyboard cursor.
   var selection: Set<String> = []
   /// Open the editor for an editable done-row (mood / gut / nutrition). The
@@ -906,18 +908,27 @@ struct NextDoneSection: View {
     // Pure list `Section` — no presentation modifiers. Mood / gut / nutrition
     // get their home Edit + Delete menu (delegated up to `NextView`); the rest
     // of the log (tasks, the trio's done splits, training, wake) stays a
-    // read-through record.
-    nextSection(header: { Text("Done Today") }) {
-      let items = events
-      ForEach(Array(items.enumerated()), id: \.element.id) { idx, event in
-        let tag = NextRowTag.done(event.id)
-        DoneEventRow(
-          event: event,
-          onEdit: isEditable(event) ? { onEdit(event) } : nil,
-          onDelete: isEditable(event) ? { onDelete(event) } : nil
-        )
-        .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
-                        index: idx, count: items.count)
+    // read-through record. The log folds away behind its header (chevron +
+    // count) so the open work stays in focus.
+    let items = events
+    nextSection(header: {
+      nextFoldableSectionHeader(title: "Done Today", count: items.count,
+                                isCollapsed: isCollapsed) {
+        Haptics.tick()
+        withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.toggle() }
+      }
+    }) {
+      if !isCollapsed {
+        ForEach(Array(items.enumerated()), id: \.element.id) { idx, event in
+          let tag = NextRowTag.done(event.id)
+          DoneEventRow(
+            event: event,
+            onEdit: isEditable(event) ? { onEdit(event) } : nil,
+            onDelete: isEditable(event) ? { onDelete(event) } : nil
+          )
+          .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
+                          index: idx, count: items.count)
+        }
       }
     }
   }
@@ -1325,6 +1336,36 @@ struct CompletionRateBadge: View {
 // Section headers for the Next List. iOS: plain `Text` so the grouped `List`
 // styles them with its default header treatment. macOS: Tasks-style group
 // headers — semibold title parked over the card's checkbox column.
+/// Foldable Next section header — title, live count, and a disclosure chevron.
+/// Tapping anywhere toggles the section. Matches `DayBucketHeader`'s chevron
+/// rotation (right when collapsed, down when expanded) and the Tasks tab's
+/// `foldableSectionHeader` gesture.
+@ViewBuilder
+func nextFoldableSectionHeader(title: String, count: Int, isCollapsed: Bool,
+                               onToggle: @escaping () -> Void) -> some View {
+  Button(action: onToggle) {
+    HStack(spacing: 8) {
+      Text(title)
+      if count > 0 {
+        Text("\(count)")
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+      }
+      Spacer()
+      Image(systemName: "chevron.right")
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.tertiary)
+        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+    }
+    .contentShape(Rectangle())
+  }
+  .buttonStyle(.plain)
+  #if os(macOS)
+  .selectionDisabled()
+  #endif
+  .accessibilityHint(isCollapsed ? "Expand" : "Collapse")
+}
+
 @ViewBuilder
 func nextSectionHeader<Content: View>(@ViewBuilder content: () -> Content) -> some View {
   #if os(macOS)
