@@ -4,50 +4,70 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1257,
-      "date": "2026-06-29",
+      "build": 1260,
+      "date": "2026-06-30",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A faster way to work with tasks",
-          "detail": "Edit task titles inline, add tasks from a quick-add line, and undo deletes, moves, and defers from a confirmation toast.",
+          "title": "A faster, more forgiving way to manage tasks",
+          "detail": "Edit task titles in place, add tasks from a quick-add line, and undo a delete, move, or defer from a confirmation toast.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted tasks with restore",
-          "detail": "Deleted tasks now wait 30 days in a Recently Deleted view where you can restore them before they auto-purge.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Removed tasks rest in a Recently Deleted view for 30 days with one-tap restore before they purge.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events appear alongside tasks, with hidden-calendar choices synced across your devices.",
+          "title": "Group Today by area and project",
+          "detail": "A new toggle organizes your day into area and project sections, with a flat list as the fallback.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar events appear in Today and Upcoming",
+          "detail": "Opt in to weave read-only system-calendar events into the task agenda, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring an existing task list over from a Things database export.",
+          "detail": "Bring an existing Things database export straight into Septena.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and have it analyzed on-device, with a flourish when you break a fast.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Smoother training sessions",
-          "detail": "Start a session by intent or Control Center, flow set-to-set with auto-advance and a watch Live Activity, and get an effort-weighted weekly muscle review.",
-          "section": "training"
+          "title": "The Week tab is now Today",
+          "detail": "A clearer name for your daily home, with a redesigned dashboard and a day-aligned sky wash behind it.",
+          "section": null
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals you care about as tiles right on the week dashboard.",
+          "detail": "Pinned goals now render as their own dashboard tiles so the targets you care about stay in view.",
           "section": "goals"
         },
         {
-          "title": "Choose exactly what telemetry you share",
-          "detail": "A graded analytics setting (off to full) lets you see what's sent and review a log of recent activity.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and let on-device analysis estimate it for you.",
+          "section": "nutrition"
+        },
+        {
+          "title": "A smoother training session flow",
+          "detail": "Rest timers auto-advance between sets, a Live Activity keeps the session on your Lock Screen and watch, and a post-session review shows effort-weighted muscle volume for the week.",
+          "section": "training"
+        },
+        {
+          "title": "See and control exactly what telemetry is shared",
+          "detail": "Graded analytics levels (off, minimal, balanced, full), a plain-language ladder of what's sent, and a recently-sent log.",
           "section": null
+        },
+        {
+          "title": "A richer watch experience",
+          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers to complete or skip, and expanded intake tiles and summaries.",
+          "section": null
+        },
+        {
+          "title": "Personalize your intake trackers with emoji",
+          "detail": "Add your own emoji to tracker methods and varieties, with a guessed symbol as a fallback.",
+          "section": "intake"
         }
       ]
     },
