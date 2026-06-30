@@ -573,65 +573,13 @@ extension View {
   }
 }
 
-private struct ScrollContentWidthKey: PreferenceKey {
-  static var defaultValue: CGFloat = 0
-  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-    value = nextValue()
-  }
-}
-
-private struct SeptenaWideContentMarginsModifier: ViewModifier {
-  @Environment(\.usesPushNavigation) private var usesPushNavigation
-  let contentGutter: CGFloat
-  @State private var containerWidth: CGFloat = 0
-
-  private var active: Bool {
-    #if os(macOS)
-    true
-    #else
-    usesPushNavigation
-    #endif
-  }
-
-  private var columnMaxWidth: CGFloat? {
-    guard containerWidth > 0 else { return nil }
-    return WideContentMetrics.columnMaxWidth(
-      containerWidth: containerWidth, contentGutter: contentGutter)
-  }
-
-  func body(content: Content) -> some View {
-    if active {
-      content
-        // Measure the full proposed width *before* capping — must sit ahead of
-        // `.frame(maxWidth:)` so we read the pane, not the already-narrow column.
-        .background {
-          GeometryReader { geo in
-            Color.clear.preference(key: ScrollContentWidthKey.self, value: geo.size.width)
-          }
-        }
-        .onPreferenceChange(ScrollContentWidthKey.self) { width in
-          guard width > 0, abs(containerWidth - width) > 0.5 else { return }
-          containerWidth = width
-        }
-        // Cap + center. Uses frame (not `contentMargins`) so this composes with
-        // `.pageChrome`'s top `contentMargins` — two `.scrollContent` margin
-        // modifiers override each other and only Tasks (no tab chrome on the
-        // scroll view) kept its horizontal inset.
-        .frame(maxWidth: columnMaxWidth)
-        .frame(maxWidth: .infinity)
-    } else {
-      content
-    }
-  }
-}
-
 extension View {
   /// Shared page geometry for the four top-level surfaces (Week, Next,
   /// Tasks sidebar, Coach). Applied to the root content stack inside the
   /// surface's ScrollView — the single choke point for how a tab meets the
   /// screen edges, so the four can't drift apart:
   ///   • `Theme.pageGutter` leading/trailing on iPhone (wide panes use
-  ///     `.septenaWideContentMargins()` on the scroll view instead),
+  ///     `.septenaTabScrollInsets` on the scroll view instead),
   ///   • `Theme.pageTop` below the nav bar (pass `top: 0` when the
   ///     surface's sections pad their own tops, e.g. the Next feed),
   ///   • `Theme.pageBottom` scroll-past air above the tab bar.
@@ -654,7 +602,7 @@ extension View {
   /// iPhone compact is unchanged. Pass `contentGutter` when rows already
   /// carry an outer margin (Tasks cards, macOS grouped rows).
   func septenaWideContentMargins(contentGutter: CGFloat = 0) -> some View {
-    modifier(SeptenaWideContentMarginsModifier(contentGutter: contentGutter))
+    septenaTabScrollInsets(top: 0, contentGutter: contentGutter)
   }
 
   /// Grouped-gray canvas for home-tab List / ScrollView roots. Pair with

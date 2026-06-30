@@ -50,11 +50,11 @@ struct CoachView: View {
       .padding(.bottom, Theme.pageBottom)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       #endif
-      .septenaTabPage(id: "coach", title: "Coach", add: .action { addGoal() })
       #if os(macOS)
-      .septenaWideContentMargins(contentGutter: TaskCardMetrics.margin)
+      .septenaTabPage(id: "coach", title: "Coach", add: .action { addGoal() },
+                      wideContentGutter: TaskCardMetrics.margin)
       #else
-      .septenaWideContentMargins()
+      .septenaTabPage(id: "coach", title: "Coach", add: .action { addGoal() })
       #endif
       .navigationDestination(for: CoachDomain.self) { domain in
         CoachDetailView(domain: domain)

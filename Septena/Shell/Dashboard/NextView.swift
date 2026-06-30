@@ -403,6 +403,24 @@ struct NextView: View {
         .onTapGesture { selection = [] }
     }
     #endif
+    #if os(macOS)
+    .septenaTabPage(
+      id: "next",
+      title: "Next",
+      localActions: {
+        AnyView(
+          Button {
+            nav.settingsDestination = .nextFeed
+            nav.showSettings = true
+          } label: {
+            Label("Next Settings", systemImage: "arrow.forward.circle")
+          }
+        )
+      },
+      add: .addInfo,
+      wideContentGutter: TaskCardMetrics.margin
+    )
+    #else
     .septenaTabPage(
       id: "next",
       title: "Next",
@@ -418,10 +436,6 @@ struct NextView: View {
       },
       add: .addInfo
     )
-    #if os(macOS)
-    .septenaWideContentMargins(contentGutter: TaskCardMetrics.margin)
-    #else
-    .septenaWideContentMargins()
     #endif
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses

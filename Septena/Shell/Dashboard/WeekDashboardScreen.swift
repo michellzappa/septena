@@ -91,17 +91,10 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
         id: "week",
         title: "Today",
         localActions: { AnyView(menuExtra()) },
-        add: .addInfo
+        add: .addInfo,
+        scrollTopInset: usesPushNavigation
+          ? DialHeroMetrics.breathingRoom(chromeBarAbove: true) : nil
       )
-      #if os(iOS)
-      // Tighter than the default iPad chrome inset — `DialHeroMetrics` keeps
-      // the scroll margin matched to the gap below the dial.
-      .contentMargins(
-        .top,
-        usesPushNavigation ? DialHeroMetrics.breathingRoom(chromeBarAbove: true) : 0,
-        for: .scrollContent
-      )
-      #endif
       // iOS: float the "keep Claude connected" cue as a glass pill in the top
       // bar's TRAILING corner — opposite the leading "…" menu, so the system
       // doesn't fold the two into one shared glass bar. Renders nothing unless

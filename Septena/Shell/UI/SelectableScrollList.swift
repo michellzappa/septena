@@ -226,7 +226,11 @@ struct SelectableScrollList<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
       }
       #if os(iOS)
-      .modifier(SelectableScrollTabInset(ownPadding: iPadTabBarInsetOwnPadding))
+      .septenaTabScrollInsets(
+        top: max(0, PageChromeMetrics.iPadBarHeight - (iPadTabBarInsetOwnPadding ?? 0)),
+        contentGutter: wideContentGutter)
+      #else
+      .septenaTabScrollInsets(top: 0, contentGutter: wideContentGutter)
       #endif
       .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
       .onPreferenceChange(SelectableRowFrameKey.self) { newFrames in
@@ -274,7 +278,6 @@ struct SelectableScrollList<Content: View>: View {
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
       }
-      .septenaWideContentMargins(contentGutter: wideContentGutter)
       .scrollEdgeEffectStyle(.soft, for: .top)
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
@@ -507,21 +510,5 @@ private func currentEventModifiers() -> EventModifiers {
   if flags.contains(.option) { modifiers.insert(.option) }
   if flags.contains(.control) { modifiers.insert(.control) }
   return modifiers
-}
-#endif
-
-#if os(iOS)
-/// Applies the iPad floating-bar inset on the `ScrollView` itself — the only
-/// place `.contentMargins(for: .scrollContent)` reliably takes effect.
-private struct SelectableScrollTabInset: ViewModifier {
-  let ownPadding: CGFloat?
-
-  func body(content: Content) -> some View {
-    if let ownPadding {
-      content.septenaTabInset(ownTopPadding: ownPadding)
-    } else {
-      content
-    }
-  }
 }
 #endif

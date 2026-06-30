@@ -475,6 +475,13 @@ enum WideContentMetrics {
     let target = maxReadableWidth + 2 * contentGutter
     return min(target, capped)
   }
+
+  /// Horizontal `contentMargins` inset — centers a column of `columnMaxWidth`.
+  static func horizontalContentMargin(containerWidth: CGFloat,
+                                      contentGutter: CGFloat = 0) -> CGFloat {
+    let column = columnMaxWidth(containerWidth: containerWidth, contentGutter: contentGutter)
+    return max(0, (containerWidth - column) / 2)
+  }
 }
 
 extension Color {

@@ -158,7 +158,73 @@ struct TabSwitcher: View {
   }
 }
 
+// MARK: - Tab scroll insets (top chrome + wide horizontal)
+
+private struct TabScrollContentWidthKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
+  }
+}
+
+/// One `contentMargins(.all, EdgeInsets, for: .scrollContent)` call for the
+/// home-tab scroll surfaces. Apple documents that multiple `.scrollContent`
+/// margin modifiers override each other — separate top vs horizontal calls
+/// were wiping each other out, and `.frame(maxWidth:)` doesn't inset `List`
+/// content. See `contentMargins(_:_:for:)` EdgeInsets overload.
+private struct TabScrollContentInsetsModifier: ViewModifier {
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
+  let top: CGFloat
+  let contentGutter: CGFloat
+  @State private var containerWidth: CGFloat = 0
+
+  private var appliesWideHorizontal: Bool {
+    #if os(macOS)
+    true
+    #else
+    usesPushNavigation
+    #endif
+  }
+
+  private var scrollInsets: EdgeInsets {
+    let horizontal: CGFloat
+    if appliesWideHorizontal, containerWidth > 0 {
+      horizontal = WideContentMetrics.horizontalContentMargin(
+        containerWidth: containerWidth, contentGutter: contentGutter)
+    } else {
+      horizontal = 0
+    }
+    let topInset = appliesWideHorizontal ? top : 0
+    return EdgeInsets(top: topInset, leading: horizontal, bottom: 0, trailing: horizontal)
+  }
+
+  func body(content: Content) -> some View {
+    if appliesWideHorizontal || top > 0 {
+      content
+        .background {
+          GeometryReader { geo in
+            Color.clear.preference(key: TabScrollContentWidthKey.self,
+                                   value: geo.size.width)
+          }
+        }
+        .onPreferenceChange(TabScrollContentWidthKey.self) { width in
+          guard width > 0, abs(containerWidth - width) > 0.5 else { return }
+          containerWidth = width
+        }
+        .contentMargins(.all, scrollInsets, for: .scrollContent)
+    } else {
+      content
+    }
+  }
+}
+
 extension View {
+  /// Top chrome + wide horizontal breathing room on the scroll view / list itself.
+  /// Pass `contentGutter` when rows already carry an outer margin (Tasks cards).
+  func septenaTabScrollInsets(top: CGFloat, contentGutter: CGFloat = 0) -> some View {
+    modifier(TabScrollContentInsetsModifier(top: top, contentGutter: contentGutter))
+  }
+
   /// Attach the unified three-slot page chrome to this page's navigation bar.
   /// Drop-in replacement for the old `homeToolbar`: it owns the constant gear
   /// (global → Settings), the page-local "···" (hidden when `localActions` is
@@ -181,11 +247,15 @@ extension View {
     title: String,
     localActions: @escaping () -> AnyView? = { nil },
     add: PageAdd? = nil,
-    showsGlobal: Bool = true
+    showsGlobal: Bool = true,
+    scrollTopInset: CGFloat? = nil,
+    wideContentGutter: CGFloat = 0
   ) -> some View {
     modifier(PageChromeModifier(id: id, title: title,
                                 localActions: localActions, add: add,
-                                showsGlobal: showsGlobal))
+                                showsGlobal: showsGlobal,
+                                scrollTopInset: scrollTopInset,
+                                wideContentGutter: wideContentGutter))
   }
 
   /// Standard treatment for a top-level tab page's scroll view: nav title,
@@ -197,7 +267,9 @@ extension View {
     id: String, title: String,
     localActions: @escaping () -> AnyView? = { nil },
     add: PageAdd? = nil,
-    showsGlobal: Bool = true
+    showsGlobal: Bool = true,
+    scrollTopInset: CGFloat? = nil,
+    wideContentGutter: CGFloat = 0
   ) -> some View {
     self
       .scrollContentBackground(.hidden)
@@ -208,18 +280,18 @@ extension View {
       .navigationBarTitleDisplayMode(.inline)
       #endif
       .pageChrome(id: id, title: title, localActions: localActions,
-                  add: add, showsGlobal: showsGlobal)
+                  add: add, showsGlobal: showsGlobal,
+                  scrollTopInset: scrollTopInset,
+                  wideContentGutter: wideContentGutter)
   }
 
   /// iPad floating-bar top inset for scroll surfaces that don't publish chrome
-  /// themselves (e.g. Tasks split detail). The height lives in
-  /// `PageChromeMetrics.iPadBarHeight` only. Pass `ownTopPadding` when the
-  /// content already has top whitespace of its own (e.g. a first section header)
-  /// so the total lands at the same height as the plain list tabs.
+  /// themselves (e.g. Tasks split detail). Prefer `.septenaTabScrollInsets` when
+  /// both top and wide horizontal margins are needed.
   func septenaTabInset(ownTopPadding: CGFloat = 0) -> some View {
     #if os(iOS)
-    contentMargins(.top, max(0, PageChromeMetrics.iPadBarHeight - ownTopPadding),
-                   for: .scrollContent)
+    septenaTabScrollInsets(
+      top: max(0, PageChromeMetrics.iPadBarHeight - ownTopPadding))
     #else
     self
     #endif
@@ -266,6 +338,8 @@ private struct PageChromeModifier: ViewModifier {
   let localActions: () -> AnyView?
   let add: PageAdd?
   let showsGlobal: Bool
+  let scrollTopInset: CGFloat?
+  let wideContentGutter: CGFloat
 
   /// Resolve `PageAdd` to a concrete closure (the Add-Info picker needs `nav`).
   private var addClosure: (() -> Void)? {
@@ -307,12 +381,9 @@ private struct PageChromeModifier: ViewModifier {
       // overlay to render; draw nothing in the (transparent) nav bar here.
       content
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-        // Reserve the floating bar's height as a scroll-content margin so content
-        // rests below it (and scrolls *under* it). `.contentMargins` is uniform
-        // across List/ScrollView regardless of each page's scroll-edge setup —
-        // `safeAreaInset` was inconsistent (Coach respected it, Next/Today fought
-        // it via `scrollEdgeEffectStyle`).
-        .contentMargins(.top, PageChromeMetrics.iPadBarHeight, for: .scrollContent)
+        .septenaTabScrollInsets(
+          top: scrollTopInset ?? PageChromeMetrics.iPadBarHeight,
+          contentGutter: wideContentGutter)
         .onAppear { publishIPadChrome() }
         .onChange(of: nav.path.last?.id) { _, _ in publishIPadChrome() }
     } else {
@@ -322,7 +393,9 @@ private struct PageChromeModifier: ViewModifier {
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
     }
     #else
-    content.toolbar { chromeToolbar }
+    content
+      .toolbar { chromeToolbar }
+      .septenaTabScrollInsets(top: 0, contentGutter: wideContentGutter)
     #endif
   }
 

@@ -402,7 +402,6 @@ struct WeekDashboardView: View {
         // as the list tabs. iPhone keeps a tightened `pageTop`.
         .septenaSurface(top: chromeBarReservesTop ? 0 : dialBreathingRoom,
                         includesHorizontal: !usesPushNavigation)
-        .septenaWideContentMargins()
         #if DEBUG
         // Hidden keyboard shortcuts: ⟨ / ⟩ (the comma/period keys) step the
         // homepage back/forward a day through the last week, driving
