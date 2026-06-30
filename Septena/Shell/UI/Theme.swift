@@ -459,6 +459,24 @@ extension Font {
   static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
 }
 
+/// Wide-pane horizontal breathing room for the four home tabs.
+/// Caps and centers the content column on iPad / macOS so lists and tiles
+/// don't run edge-to-edge when the sidebar is hidden or the window is wide.
+enum WideContentMetrics {
+  static let maxReadableWidth: CGFloat = 640
+
+  /// Max width for the content column — always at least `pageGutter` off each
+  /// edge. Pass `contentGutter` when rows already carry an outer margin
+  /// (Tasks cards, macOS grouped rows) so the inner text column still lands
+  /// near `maxReadableWidth`.
+  static func columnMaxWidth(containerWidth: CGFloat, contentGutter: CGFloat = 0) -> CGFloat {
+    let floor = Theme.pageGutter
+    let capped = containerWidth - 2 * floor
+    let target = maxReadableWidth + 2 * contentGutter
+    return min(target, capped)
+  }
+}
+
 extension Color {
   /// Anthropic's "Claude" coral/salmon (#F5856B). Used to tint Claude-specific
   /// surfaces like the reconnect banner.

@@ -1,6 +1,19 @@
 import SwiftUI
 import EventKit
 
+/// Breathing room above and below the Today tab's glass dial — kept in sync
+/// between the scroll inset (`WeekDashboardScreen`) and the grid gap
+/// (`WeekDashboardView`).
+enum DialHeroMetrics {
+  /// Scales the baseline chrome / `pageTop` inset (1 = full, 0.7 = ~30% tighter).
+  static let breathingScale: CGFloat = 0.7
+
+  static func breathingRoom(chromeBarAbove: Bool) -> CGFloat {
+    let base = chromeBarAbove ? PageChromeMetrics.iPadBarHeight : Theme.pageTop
+    return base * breathingScale
+  }
+}
+
 /// Empty-state shown when the user has selected a layout mode whose
 /// renderer hasn't been built yet. Mirrors the system
 /// `ContentUnavailableView` shape but stays plain `VStack` so the same
@@ -80,6 +93,15 @@ struct WeekDashboardScreen<CurrentDay: Equatable, MenuExtra: View, Content: View
         localActions: { AnyView(menuExtra()) },
         add: .addInfo
       )
+      #if os(iOS)
+      // Tighter than the default iPad chrome inset — `DialHeroMetrics` keeps
+      // the scroll margin matched to the gap below the dial.
+      .contentMargins(
+        .top,
+        usesPushNavigation ? DialHeroMetrics.breathingRoom(chromeBarAbove: true) : 0,
+        for: .scrollContent
+      )
+      #endif
       // iOS: float the "keep Claude connected" cue as a glass pill in the top
       // bar's TRAILING corner — opposite the leading "…" menu, so the system
       // doesn't fold the two into one shared glass bar. Renders nothing unless

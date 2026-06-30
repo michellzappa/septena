@@ -203,6 +203,8 @@ struct SelectableScrollList<Content: View>: View {
   /// modifiers don't propagate `.contentMargins`). Pass the top padding the
   /// first row already contributes so the total matches the other tabs.
   var iPadTabBarInsetOwnPadding: CGFloat? = nil
+  /// When rows carry an outer card margin, pass it so wide-pane insets include it.
+  var wideContentGutter: CGFloat = 0
   @ViewBuilder var content: () -> Content
 
   @FocusState private var focused: Bool
@@ -223,7 +225,9 @@ struct SelectableScrollList<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
+      #if os(iOS)
       .modifier(SelectableScrollTabInset(ownPadding: iPadTabBarInsetOwnPadding))
+      #endif
       .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
       .onPreferenceChange(SelectableRowFrameKey.self) { newFrames in
         // Defer one run-loop turn — many rows report frames in the same layout
@@ -270,6 +274,7 @@ struct SelectableScrollList<Content: View>: View {
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
       }
+      .septenaWideContentMargins(contentGutter: wideContentGutter)
       .scrollEdgeEffectStyle(.soft, for: .top)
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
