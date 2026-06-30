@@ -72,6 +72,11 @@ final class TodayTasksModel {
     let kept = Set(merged.map(\.id))
     merged.append(contentsOf: fresh.filter { !kept.contains($0.id) })  // newly arrived
     tasks = merged
+    // Urgency sort on sync only — never while a row is mid-settle (that would
+    // hop it). Completion keeps its in-list index; `openTasks` is a filter.
+    if actedTasks.isEmpty {
+      tasks.sort(by: SeptenaTask.compareNextPageOrder)
+    }
   }
 
   func load() async {
@@ -89,20 +94,12 @@ final class TodayTasksModel {
 
   /// Open Today tasks, plus any toggled this session (so a just-completed
   /// row lingers struck through instead of vanishing under the finger).
-  /// Open rows sort by visible due date; settling rows park at the end.
+  /// Order is whatever `tasks` holds — never re-sorted here, so a check
+  /// can't hop the row (the Tasks tab uses the same in-place settle rule).
   var openTasks: [SeptenaTask] {
-    let visible = tasks.filter {
+    tasks.filter {
       $0.status == .open || actedTasks.contains($0.id) || settle.isSettling($0.id)
     }
-    let isSettling: (SeptenaTask) -> Bool = {
-      $0.status == .done && (self.actedTasks.contains($0.id) || self.settle.isSettling($0.id))
-    }
-    let open = visible
-      .filter { !isSettling($0) }
-      .sorted(by: SeptenaTask.compareNextPageOrder)
-    let settling = visible.filter { isSettling($0) }
-    guard !settling.isEmpty else { return open }
-    return open + settling
   }
 
   /// Task ids still in the open-list settle beat (struck through, not yet faded).
