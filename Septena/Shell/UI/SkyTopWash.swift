@@ -30,7 +30,16 @@ struct SkyTopWash: View {
   @Environment(DayClock.self) private var clock
   @Environment(\.colorScheme) private var colorScheme
 
-  @State private var stops: [SkyAtmosphere.Stop] = []
+  /// Seed synchronously so the wash is visible on the first frame — the
+  /// `.task` refines off-thread when the sun moves buckets. `Date()` here
+  /// (not `DayClock`) is fine: it's a one-frame placeholder until `.task`
+  /// runs with `clock.now`.
+  @State private var stops: [SkyAtmosphere.Stop] = SkyAtmosphere.render(
+    elevation: SolarClock.elevation(now: Date())
+  )
+  /// Tracks which elevation bucket `stops` reflects — animation runs only on
+  /// bucket transitions (sun moving through the day), never on first paint.
+  @State private var lastRenderedBucket: Int?
 
   /// How far below the band the fade's elliptical centre sits, in frame
   /// heights. The fade's iso-opacity arcs are ellipses around that point, so a
@@ -203,19 +212,13 @@ struct SkyTopWash: View {
   }
 
   var body: some View {
-    Group {
-      if stops.isEmpty {
-        Color.clear
-      } else {
-        ZStack {
-          washLayer
-          // A light star field over the wash — ONLY at night (faded in by
-          // `nightness` through dusk) and ONLY in dark mode. By day or in light
-          // mode it isn't in the tree at all, so there's no animation cost.
-          if colorScheme == .dark, nightness > 0.01 {
-            starfield
-          }
-        }
+    ZStack {
+      washLayer
+      // A light star field over the wash — ONLY at night (faded in by
+      // `nightness` through dusk) and ONLY in dark mode. By day or in light
+      // mode it isn't in the tree at all, so there's no animation cost.
+      if colorScheme == .dark, nightness > 0.01 {
+        starfield
       }
     }
     .allowsHitTesting(false)
@@ -225,11 +228,17 @@ struct SkyTopWash: View {
       // elevation, no fudge. Single scattering only, so it genuinely darkens
       // to near-black through deep night and warms at the real horizon;
       // that's the atmosphere, not a stylization.
+      let bucket = elevationBucket
       let elevation = SolarClock.elevation(now: clock.now)
       let computed = await Task.detached(priority: .utility) {
         SkyAtmosphere.render(elevation: elevation)
       }.value
-      withAnimation(.easeInOut(duration: 1.2)) { stops = computed }
+      if let last = lastRenderedBucket, last != bucket {
+        withAnimation(.easeInOut(duration: 1.2)) { stops = computed }
+      } else {
+        stops = computed
+      }
+      lastRenderedBucket = bucket
     }
   }
 }
