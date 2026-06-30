@@ -198,6 +198,11 @@ struct SelectableScrollList<Content: View>: View {
   /// the gray grouped background for sectioned lists whose rows sit in cards,
   /// so the cards lift off the canvas (matching the sidebar / Next homes).
   var canvasFill: Color = Theme.paperBackground
+  /// When set, reserves the iPad floating chrome bar directly on this
+  /// `ScrollView`'s scroll content (must land on the scroll view — wrapping
+  /// modifiers don't propagate `.contentMargins`). Pass the top padding the
+  /// first row already contributes so the total matches the other tabs.
+  var iPadTabBarInsetOwnPadding: CGFloat? = nil
   @ViewBuilder var content: () -> Content
 
   @FocusState private var focused: Bool
@@ -218,6 +223,7 @@ struct SelectableScrollList<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
+      .modifier(SelectableScrollTabInset(ownPadding: iPadTabBarInsetOwnPadding))
       .coordinateSpace(name: SelectableScrollListMetrics.coordinateSpace)
       .onPreferenceChange(SelectableRowFrameKey.self) { newFrames in
         // Defer one run-loop turn — many rows report frames in the same layout
@@ -496,5 +502,21 @@ private func currentEventModifiers() -> EventModifiers {
   if flags.contains(.option) { modifiers.insert(.option) }
   if flags.contains(.control) { modifiers.insert(.control) }
   return modifiers
+}
+#endif
+
+#if os(iOS)
+/// Applies the iPad floating-bar inset on the `ScrollView` itself — the only
+/// place `.contentMargins(for: .scrollContent)` reliably takes effect.
+private struct SelectableScrollTabInset: ViewModifier {
+  let ownPadding: CGFloat?
+
+  func body(content: Content) -> some View {
+    if let ownPadding {
+      content.septenaTabInset(ownTopPadding: ownPadding)
+    } else {
+      content
+    }
+  }
 }
 #endif
