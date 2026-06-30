@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 /// The single source of truth for the "Next" feed's *membership and order*.
@@ -49,13 +50,13 @@ enum NextFeed {
   /// `subtitle`) so a consumer can filter to the current time-of-day bucket
   /// on-device and the list stays valid all day.
   @MainActor
-  static func flat(context: ModelContext, date: String) -> [NextItem] {
+  static func flat(context: ModelContext, date: String, now: Date) -> [NextItem] {
     var entries: [NextEntry] = []
 
     // Suggestions always lead — they're not a section and don't participate
     // in the saved order.
     entries.append(contentsOf:
-      NextSuggestionsModel.visibleSuggestions(context: context).map(NextEntry.suggestion))
+      NextSuggestionsModel.visibleSuggestions(context: context, now: now).map(NextEntry.suggestion))
 
     // Today's open tasks, tagged with their project/area under the title.
     let areaTitle = Dictionary(LocalCache.areas(in: context).map { ($0.id, $0.title) },

@@ -68,7 +68,7 @@ private func parseHM(_ hm: String, dayOffset: Int, now: Date, calendar: Calendar
 public func computeFastingState(
   inputs: FastingStateInputs?,
   config: FastingConfig = FastingConfig(),
-  now: Date = Date(),
+  now: Date,
   calendar: Calendar = .current
 ) -> FastingState {
   guard let inputs else { return .fed }

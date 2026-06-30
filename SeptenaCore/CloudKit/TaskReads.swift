@@ -30,12 +30,15 @@ enum TaskReads {
                    area: String? = nil,
                    project: String? = nil,
                    days: Int = 90,
+                   today: String,
+                   now: Date,
                    context: ModelContext) async -> TasksListResponse {
     // See note on `counts(...)` — same off-main race applies. Force
     // MainActor execution so SwiftData reads never hit the cooperative
     // executor.
     return await MainActor.run {
-      localList(view: view, area: area, project: project, days: days, context: context)
+      localList(view: view, area: area, project: project, days: days,
+                today: today, now: now, context: context)
     }
   }
 
@@ -46,8 +49,10 @@ enum TaskReads {
                         area: String?,
                         project: String?,
                         days: Int,
+                        today: String,
+                        now: Date,
                         context: ModelContext) -> TasksListResponse {
-    let todayIso = SeptenaDate.today
+    let todayIso = today
 
     // Area/project scoping bypasses the view string — they're always
     // "give me every live task with this area/project."
@@ -101,7 +106,7 @@ enum TaskReads {
 
     case "logbook":
       // Filter to last `days` based on completedAt.
-      let cutoff = cutoffDate(daysAgo: days)
+      let cutoff = cutoffDate(daysAgo: days, now: now)
       let all = LocalCache.tasks(in: context, filter: .logbook)
       let items = all.filter { t in
         guard let stamp = t.completedAt else { return false }
@@ -134,26 +139,24 @@ enum TaskReads {
     var history: TasksHistory
   }
 
-  static func counts(context: ModelContext) async -> TasksCounts {
+  static func counts(context: ModelContext, today: String, now: Date) async -> TasksCounts {
     // Force the SwiftData reads onto the main thread regardless of
     // caller's executor. The enum-level @MainActor annotation isn't
     // enough because ModelContext isn't Sendable — when passed across
     // an `async let` boundary, the runtime can run this body off-main,
     // which crashes SwiftData (mainContext is not thread-safe). See
     // malloc double-free repro 2026-05-21 (TaskReads.localCount path).
-    return await MainActor.run { dashboardStats(context: context).counts }
+    return await MainActor.run { dashboardStats(days: 7, today: today, now: now, context: context).counts }
   }
 
-  static func localCounts(context: ModelContext) -> TasksCounts {
-    dashboardStats(context: context).counts
+  static func localCounts(context: ModelContext, today: String, now: Date) -> TasksCounts {
+    dashboardStats(days: 7, today: today, now: now, context: context).counts
   }
 
   /// One fetch + one loop for smart-list counts and the 7-day done histogram.
   /// Replaces separate `localCounts` + `tasksHistory` full-table scans.
-  static func dashboardStats(days: Int = 7, context: ModelContext) -> DashboardStats {
-    let today = SeptenaDate.today
+  static func dashboardStats(days: Int = 7, today: String, now: Date, context: ModelContext) -> DashboardStats {
     let cal = Calendar.current
-    let now = Date()
     var dayKeys: [String] = []
     let dayFormatter = DateFormatter()
     dayFormatter.dateFormat = "yyyy-MM-dd"
@@ -233,16 +236,16 @@ enum TaskReads {
   /// day), and cancelled tasks per day for the last `days` days ending
   /// today. The Tasks tile histogram only consumes `daily[*].done` —
   /// `made` and `deferred` are best-effort and `cancelled` is exact.
-  static func tasksHistory(days: Int = 7, context: ModelContext) -> TasksHistory {
-    dashboardStats(days: days, context: context).history
+  static func tasksHistory(days: Int = 7, today: String, now: Date, context: ModelContext) -> TasksHistory {
+    dashboardStats(days: days, today: today, now: now, context: context).history
   }
 
   // MARK: - helpers
 
   /// Logbook cutoff stamp at YYYY-MM-DDTHH:MM:SS — matches what the
   /// server stores in `completed_at`, so direct string compare works.
-  private static func cutoffDate(daysAgo: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+  private static func cutoffDate(daysAgo: Int, now: Date) -> String {
+    let d = Calendar.current.date(byAdding: .day, value: -daysAgo, to: now) ?? now
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
     f.locale = Locale(identifier: "en_US_POSIX")

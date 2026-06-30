@@ -11,7 +11,7 @@ enum HeatmapLevels {
 
   /// Pre-computed ISO-date → 0…4 level map for the grid's `getDay`
   /// closure. Shared by `HeatmapDomainRow` and `HeatmapDomainCard`.
-  static func buildLevelMap(from history: HistoryWire?, windowDays: Int) -> [String: Int] {
+  static func buildLevelMap(from history: HistoryWire?, windowDays: Int, today: Date) -> [String: Int] {
     var levels = levels(for: history)
     guard !levels.isEmpty else { return [:] }
     if levels.count > windowDays {
@@ -22,11 +22,11 @@ enum HeatmapLevels {
     }
     let cal = Calendar.current
     let fmt = ymdFormatter
-    let today = cal.startOfDay(for: Date())
+    let todayStart = cal.startOfDay(for: today)
     var map: [String: Int] = [:]
     for (i, level) in levels.enumerated() {
       let daysBack = levels.count - 1 - i
-      if let d = cal.date(byAdding: .day, value: -daysBack, to: today) {
+      if let d = cal.date(byAdding: .day, value: -daysBack, to: todayStart) {
         map[fmt.string(from: d)] = level
       }
     }

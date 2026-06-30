@@ -174,8 +174,7 @@ enum ChecklistMirror {
   /// Mirrors the shape of `/api/habits/history?days=N`. Total is the current
   /// definition count (we don't track per-day membership history, since the
   /// dashboard only cares about the success-rate trend, not headcount drift).
-  static func loadHabitsHistory(context: ModelContext, days: Int) -> HabitHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadHabitsHistory(context: ModelContext, days: Int, today: String) -> HabitHistoryResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return HabitHistoryResponse(daily: [], total: 0)
     }
@@ -282,8 +281,7 @@ enum ChecklistMirror {
   /// (grouped client-side) so a checklist can show every row's rate without a
   /// fetch per row. Habits with no done days in the window are simply absent
   /// (treat as 0). Same denominator as the detail view's "last 30 days".
-  static func habitCompletionRates(context: ModelContext, days: Int = 30) -> [String: Int] {
-    let today = SeptenaDate.today
+  static func habitCompletionRates(context: ModelContext, days: Int, today: String) -> [String: Int] {
     guard let todayDate = SeptenaDate.parse(today) else { return [:] }
     let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate)
       .flatMap(SeptenaDate.format) ?? today
@@ -297,8 +295,7 @@ enum ChecklistMirror {
 
   /// Per-supplement completion rate over the trailing `days` window — the
   /// supplement counterpart to `habitCompletionRates`.
-  static func supplementCompletionRates(context: ModelContext, days: Int = 30) -> [String: Int] {
-    let today = SeptenaDate.today
+  static func supplementCompletionRates(context: ModelContext, days: Int, today: String) -> [String: Int] {
     guard let todayDate = SeptenaDate.parse(today) else { return [:] }
     let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate)
       .flatMap(SeptenaDate.format) ?? today
@@ -310,8 +307,7 @@ enum ChecklistMirror {
     return perSupp.mapValues { Int(round(Double($0) * 100 / Double(days))) }
   }
 
-  static func loadSupplementsHistory(context: ModelContext, days: Int) -> SupplementHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadSupplementsHistory(context: ModelContext, days: Int, today: String) -> SupplementHistoryResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return SupplementHistoryResponse(daily: [], total: 0)
     }
@@ -338,8 +334,7 @@ enum ChecklistMirror {
     return SupplementHistoryResponse(daily: daily, total: grandTotal)
   }
 
-  static func loadChoresHistory(context: ModelContext, days: Int) -> ChoreHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadChoresHistory(context: ModelContext, days: Int, today: String) -> ChoreHistoryResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return ChoreHistoryResponse(daily: [], total: 0)
     }
@@ -506,7 +501,7 @@ enum ChecklistMirror {
     try? context.save()
   }
 
-  static func loadChores(context: ModelContext) -> [ChoreItem] {
+  static func loadChores(context: ModelContext, today: String) -> [ChoreItem] {
     let canonicalDefs = (try? context.fetch(FetchDescriptor<ChoreDefinitionEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
     ))) ?? []
@@ -515,7 +510,7 @@ enum ChecklistMirror {
         sortBy: [SortDescriptor(\.sortKey)]
       ))) ?? []
       let eventsByChore = Dictionary(grouping: events, by: \.choreID)
-      return canonicalDefs.map { choreItem($0, events: eventsByChore[$0.id] ?? []) }
+      return canonicalDefs.map { choreItem($0, events: eventsByChore[$0.id] ?? [], today: today) }
     }
     let rows = (try? context.fetch(FetchDescriptor<ChoreSnapshotEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
@@ -610,8 +605,7 @@ enum ChecklistMirror {
     ])
   }
 
-  private static func choreItem(_ def: ChoreDefinitionEntity, events: [ChoreEventEntity]) -> ChoreItem {
-    let today = SeptenaDate.today
+  private static func choreItem(_ def: ChoreDefinitionEntity, events: [ChoreEventEntity], today: String) -> ChoreItem {
     var dueDate = today
     var lastCompleted: String?
     var lastCompletedTime: String?
@@ -734,8 +728,7 @@ enum ChecklistMirror {
   }
 
   /// Daily aggregated history from local SwiftData, for the heatmap.
-  static func loadGutHistory(context: ModelContext, days: Int) -> GutHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadGutHistory(context: ModelContext, days: Int, today: String) -> GutHistoryResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return GutHistoryResponse(daily: [])
     }
@@ -1019,8 +1012,7 @@ enum ChecklistMirror {
     }
   }
 
-  static func loadTrainingCardioHistory(context: ModelContext, days: Int) -> CardioHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadTrainingCardioHistory(context: ModelContext, days: Int, today: String) -> CardioHistoryResponse {
     // `targetWeeklyMin` is the ~150 min/week default placeholder (this runs on
     // MirrorReader's background context); the view overlays the goal-aware
     // target via `TrainingMetrics.cardioMinutesTarget` at render.
@@ -1207,14 +1199,14 @@ enum ChecklistMirror {
   // days-since per type; suggest the one longest unworked, respecting a
   // 2-day rest from the most recent session.
 
-  static func loadSuggestedWorkout(context: ModelContext) -> SuggestedWorkoutResponse {
+  static func loadSuggestedWorkout(context: ModelContext, today: String, now: Date) -> SuggestedWorkoutResponse {
     // Bound to a trailing year — we only need the *last* occurrence of each
     // session type to compute "days since." Anything older than a year already
     // reads as "never trained → priority", so the pick is unchanged while the
     // fetch stops scanning all lifetime history on every dashboard load.
     let cutoffStr = SeptenaDate.format(
-      Calendar.current.date(byAdding: .day, value: -365, to: Date()) ?? Date()
-    ) ?? SeptenaDate.today
+      Calendar.current.date(byAdding: .day, value: -365, to: now) ?? now
+    ) ?? today
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       predicate: #Predicate { $0.date >= cutoffStr },
       sortBy: [SortDescriptor(\.date)]
@@ -1230,7 +1222,6 @@ enum ChecklistMirror {
       Set(rows.map(\.sessionType).filter { !$0.isEmpty })
     }
 
-    let today = SeptenaDate.today
     guard let todayDate = SeptenaDate.parse(today) else {
       return SuggestedWorkoutResponse.make(suggested: nil, daysAgo: [:])
     }
@@ -1327,7 +1318,6 @@ enum ChecklistMirror {
   }
 
   static func loadNutritionEntries(context: ModelContext, since: String? = nil) -> [NutritionEntry] {
-    let today = SeptenaDate.today
     var descriptor = FetchDescriptor<NutritionEntryEntity>(
       sortBy: [SortDescriptor(\.loggedAt, order: .reverse)]
     )
@@ -1339,8 +1329,8 @@ enum ChecklistMirror {
     return entities.map { makeNutritionEntry($0) }
   }
 
-  static func loadNutritionToday(context: ModelContext) -> [NutritionEntry] {
-    loadNutritionEntries(context: context, since: SeptenaDate.today)
+  static func loadNutritionToday(context: ModelContext, today: String) -> [NutritionEntry] {
+    loadNutritionEntries(context: context, since: today)
   }
 
   /// Daily water totals (ml) for the trailing `days`, oldest → newest,
@@ -1353,8 +1343,7 @@ enum ChecklistMirror {
   /// counts toward the day's hydration without showing as a separate
   /// hydration row. Computed directly off `NutritionEntryEntity` (not the
   /// day-summary cache) so a freshly-bootstrapped device still reports.
-  static func loadHydrationDailyMl(context: ModelContext, days: Int) -> [Int] {
-    let today = SeptenaDate.today
+  static func loadHydrationDailyMl(context: ModelContext, days: Int, today: String) -> [Int] {
     guard days > 0, let todayDate = SeptenaDate.parse(today) else { return [] }
     let cal = Calendar.current
     // Oldest → newest list of ISO day strings spanning the window.
@@ -1374,8 +1363,7 @@ enum ChecklistMirror {
     return dayKeys.map { mlByDate[$0] ?? 0 }
   }
 
-  static func loadNutritionSummaries(context: ModelContext, days: Int) -> [NutritionDailySummaryEntity] {
-    let today = SeptenaDate.today
+  static func loadNutritionSummaries(context: ModelContext, days: Int, today: String) -> [NutritionDailySummaryEntity] {
     guard let todayDate = SeptenaDate.parse(today) else { return [] }
     let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
     let startStr = SeptenaDate.format(start) ?? today
@@ -1389,8 +1377,7 @@ enum ChecklistMirror {
   /// Computes directly off `NutritionEntryEntity` rather than the day
   /// summaries — summaries are a CK-sync cache and may be missing or stale
   /// on a freshly bootstrapped device.
-  static func buildNutritionStatsResponse(context: ModelContext, days: Int = 90) -> NutritionStatsResponse {
-    let today = SeptenaDate.today
+  static func buildNutritionStatsResponse(context: ModelContext, days: Int, today: String) -> NutritionStatsResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return NutritionStatsResponse(daily: [], fasting: nil,
                                     todayMealCount: nil, todayLatestMeal: nil)
@@ -1544,7 +1531,7 @@ enum ChecklistMirror {
     // Chores: due today (daysOverdue >= 0) and not yet completed. Sort
     // most-overdue first so the dashboard's "you're behind" signal stays
     // visible at the top.
-    let chores = loadChores(context: context)
+    let chores = loadChores(context: context, today: date)
       .filter { $0.daysOverdue >= 0 }
       .filter { c in
         // Hide chores already checked off today.
@@ -1638,8 +1625,7 @@ enum ChecklistMirror {
                            logCount: entries.count, byBucket: byBucket)
   }
 
-  static func loadMoodHistory(context: ModelContext, days: Int) -> MoodHistoryResponse {
-    let today = SeptenaDate.today
+  static func loadMoodHistory(context: ModelContext, days: Int, today: String) -> MoodHistoryResponse {
     guard let todayDate = SeptenaDate.parse(today) else {
       return MoodHistoryResponse(daily: [])
     }

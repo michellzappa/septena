@@ -1455,7 +1455,7 @@ final class ChecklistMutator {
                                     sortIndex: nextChoreSortIndex())
     context.insert(def)
     commitChoreDefinition(def, op: "create")
-    return ChecklistMirror.loadChores(context: context).first(where: { $0.id == id })
+    return ChecklistMirror.loadChores(context: context, today: SeptenaDate.today).first(where: { $0.id == id })
       ?? ChoreItem(fromFallbackID: id, name: name, emoji: normalized(emoji),
                    dueDate: SeptenaDate.today, lastCompleted: nil,
                    lastCompletedTime: nil, daysOverdue: 0,

@@ -1680,6 +1680,11 @@ enum SeptenaDate {
     return formatter.date(from: String(s.prefix(10)))
   }
 
+  /// Start of the calendar day for an ISO `yyyy-MM-dd` string in the current time zone.
+  static func startOfDay(for today: String) -> Date? {
+    parse(today).map { Calendar.current.startOfDay(for: $0) }
+  }
+
   static func format(_ d: Date?) -> String? {
     guard let d else { return nil }
     return formatter.string(from: d)

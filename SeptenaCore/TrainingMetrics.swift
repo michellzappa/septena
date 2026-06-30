@@ -32,15 +32,15 @@ enum TrainingMetrics {
   // MARK: Values
 
   /// Trailing-7-day cutoff (today + previous 6), as a YYYY-MM-DD string.
-  static func weekCutoff() -> String {
-    SeptenaDate.format(Calendar.current.date(byAdding: .day, value: -6, to: Date()))
-      ?? SeptenaDate.today
+  static func weekCutoff(today: String) -> String {
+    let anchor = SeptenaDate.startOfDay(for: today) ?? Date()
+    return SeptenaDate.format(Calendar.current.date(byAdding: .day, value: -6, to: anchor))
+      ?? today
   }
 
   /// This week's entries (trailing 7 days, inclusive of today).
-  static func entriesThisWeek(context: ModelContext) -> [ExerciseEntryEntity] {
-    let cutoff = weekCutoff()
-    let today  = SeptenaDate.today
+  static func entriesThisWeek(context: ModelContext, today: String) -> [ExerciseEntryEntity] {
+    let cutoff = weekCutoff(today: today)
     return (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
       predicate: #Predicate { $0.date >= cutoff && $0.date <= today }
     ))) ?? []
@@ -157,11 +157,13 @@ extension TrainingMetrics {
   static func progressSeries(for exercise: String,
                              metric: TrainingProgressMetric,
                              in context: ModelContext,
+                             today: String,
                              daysBack: Int = 90) -> TrainingProgressSeries {
     let key = exerciseKey(exercise)
+    let anchor = SeptenaDate.startOfDay(for: today) ?? Date()
     let cutoff = SeptenaDate.format(
-      Calendar.current.date(byAdding: .day, value: -(daysBack - 1), to: Date())
-    ) ?? SeptenaDate.today
+      Calendar.current.date(byAdding: .day, value: -(daysBack - 1), to: anchor)
+    ) ?? today
     // Predicate trims by date (indexed string compare); the exercise key is
     // computed, so match it in the post-fetch filter.
     let rows = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(

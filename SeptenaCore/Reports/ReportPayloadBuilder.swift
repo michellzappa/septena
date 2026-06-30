@@ -74,7 +74,7 @@ public enum ReportPayloadBuilder {
   // MARK: - Sections
 
   private static func habits(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.loadHabitsHistory(context: ctx, days: days)
+    let resp = ChecklistMirror.loadHabitsHistory(context: ctx, days: days, today: SeptenaDate.today)
     let pts = resp.daily.map { ReportPoint(label: $0.date, value: Double($0.percent)) }
     let tracked = resp.daily.filter { $0.total > 0 }
     let avg = tracked.isEmpty ? 0 : tracked.map { Double($0.percent) }.reduce(0, +) / Double(tracked.count)
@@ -91,7 +91,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func supplements(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.loadSupplementsHistory(context: ctx, days: days)
+    let resp = ChecklistMirror.loadSupplementsHistory(context: ctx, days: days, today: SeptenaDate.today)
     let pts = resp.daily.map { ReportPoint(label: $0.date, value: Double($0.percent)) }
     let tracked = resp.daily.filter { $0.total > 0 }
     let avg = tracked.isEmpty ? 0 : tracked.map { Double($0.percent) }.reduce(0, +) / Double(tracked.count)
@@ -105,7 +105,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func chores(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.loadChoresHistory(context: ctx, days: days)
+    let resp = ChecklistMirror.loadChoresHistory(context: ctx, days: days, today: SeptenaDate.today)
     let pts = resp.daily.map { ReportPoint(label: $0.date, value: Double($0.completed)) }
     let totalDone = resp.daily.map { $0.completed }.reduce(0, +)
     let active = resp.daily.filter { $0.completed > 0 }
@@ -119,7 +119,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func gut(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.loadGutHistory(context: ctx, days: days)
+    let resp = ChecklistMirror.loadGutHistory(context: ctx, days: days, today: SeptenaDate.today)
     let withData = resp.daily.filter { $0.movements > 0 }
     let totalMoves = resp.daily.map { $0.movements }.reduce(0, +)
     let avgPerDay = withData.isEmpty ? 0 : Double(totalMoves) / Double(withData.count)
@@ -146,7 +146,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func training(_ label: String, _ color: String, _ days: Int, _ weightUnit: String, _ ctx: ModelContext) -> ReportSection {
-    let cardio = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: days)
+    let cardio = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: days, today: SeptenaDate.today)
     let since = isoDaysAgo(days)
     let entries = ChecklistMirror.loadTrainingEntries(context: ctx, since: since)
     let sessionDates = Set(entries.map { $0.date })
@@ -252,7 +252,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func nutrition(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: days)
+    let resp = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: days, today: SeptenaDate.today)
     let withData = resp.daily.filter { $0.kcal > 0 }
     func avg(_ f: (NutritionDailyPoint) -> Double?) -> Double {
       let v = withData.compactMap(f); return v.isEmpty ? 0 : v.reduce(0, +) / Double(v.count)
@@ -291,7 +291,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func mood(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let resp = ChecklistMirror.loadMoodHistory(context: ctx, days: days)
+    let resp = ChecklistMirror.loadMoodHistory(context: ctx, days: days, today: SeptenaDate.today)
     let logged = resp.daily.filter { $0.logs > 0 }
     let totalLogs = resp.daily.map { $0.logs }.reduce(0, +)
     var stats = [
@@ -457,7 +457,7 @@ public enum ReportPayloadBuilder {
   }
 
   private static func hydration(_ label: String, _ color: String, _ days: Int, _ ctx: ModelContext) -> ReportSection {
-    let ml = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days)  // oldest→newest, length days
+    let ml = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days, today: SeptenaDate.today)  // oldest→newest, length days
     let base = SeptenaDate.parse(SeptenaDate.today) ?? Date()
     let active = ml.filter { $0 > 0 }
     let avg = active.isEmpty ? 0 : active.reduce(0,+) / active.count

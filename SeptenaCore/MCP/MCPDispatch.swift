@@ -731,7 +731,7 @@ enum MCPDispatch {
   // MARK: - Chores
 
   private static func choresList() -> Any {
-    ["chores": ChecklistMirror.loadChores(context: ctx).map {
+    ["chores": ChecklistMirror.loadChores(context: ctx, today: SeptenaDate.today).map {
       ["id": $0.id, "name": $0.name, "emoji": $0.emoji ?? "",
        "dueDate": $0.dueDate ?? "", "lastCompleted": $0.lastCompleted ?? "",
        "daysOverdue": $0.daysOverdue, "cadenceDays": $0.cadenceDays ?? 0]

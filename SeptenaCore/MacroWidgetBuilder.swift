@@ -20,7 +20,7 @@ enum MacroWidgetBuilder {
     // Oldest fasting window needs the prior day's last meal — fetch one extra day.
     guard let since = ymdDaysBack(from: date, days: 7) else { return nil }
     let entries = ChecklistMirror.loadNutritionEntries(context: context, since: since)
-    let stats = ChecklistMirror.buildNutritionStatsResponse(context: context, days: 8)
+    let stats = ChecklistMirror.buildNutritionStatsResponse(context: context, days: 8, today: date)
     let goals = LocalCache.goals(in: context)
     let legacy = NutritionPrefs.loadMacrosConfig()
     let tilePrefs = MacroCatalog.reconcile(
