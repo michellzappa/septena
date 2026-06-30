@@ -288,14 +288,19 @@ struct SidebarRootView: View {
       // iPhone + iPad share the Reminders-style home: the 2×2 smart-list grid is
       // the first row of the scroll (so it scrolls *with* the area / project cards
       // below the top chrome — not a separate pinned bar), then the grouped cards.
-      // Host the grid as the first section's *header* (not its own section) —
-      // insetGrouped paints every row inside a white rounded card whose corners
-      // fight each tile's 12pt radius, and a separate section adds a full
-      // inter-section gap before the first area card.
+      // A clear, zero-inset row spans the same width as the grouped cards below;
+      // hosting it as a section *header* inset the grid by the row-text padding
+      // and the negative-bleed hack couldn't fully cancel that on iPhone.
       List(selection: sidebarSelection) {
-        areaProjectSections(includesSmartListGrid: true)
+        Section {
+          smartListGrid
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
+        .listSectionSeparator(.hidden)
+        areaProjectSections()
       }
-      .environment(\.defaultMinListHeaderHeight, 0)
       .modifier(IOSSidebarListChrome())
       .septenaNeutralListSelection()
       .pageChrome(
@@ -360,12 +365,12 @@ struct SidebarRootView: View {
 
   #if os(iOS)
   /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Logbook). Rendered as a List section header (not a row) so insetGrouped
-  /// doesn't wrap the block in its own rounded card.
+  /// Logbook). Hosted as the first (clear, zero-inset) row of the sidebar List,
+  /// so it scrolls with the cards below and spans the same card width.
   private var smartListGrid: some View {
-    LazyVGrid(columns: [GridItem(.flexible(), spacing: Theme.tileGap),
-                        GridItem(.flexible(), spacing: Theme.tileGap)],
-              spacing: Theme.tileGap) {
+    LazyVGrid(columns: [GridItem(.flexible(), spacing: IOSSidebarListMetrics.sectionSpacing),
+                        GridItem(.flexible(), spacing: IOSSidebarListMetrics.sectionSpacing)],
+              spacing: IOSSidebarListMetrics.sectionSpacing) {
       ForEach(smartListSpecs, id: \.title) { spec in
         Button { selectRoute(spec.route) } label: {
           SmartListTile(icon: spec.icon,
@@ -377,15 +382,7 @@ struct SidebarRootView: View {
         .buttonStyle(InertButtonStyle())
       }
     }
-  }
-
-  /// Header placement adds the grouped row-text inset (`compactRow` uses 16pt)
-  /// on top of the card width — bleed that off so tile edges line up with the
-  /// grouped cards below. Tuck the first area card up under the bottom row.
-  private var smartListGridHeader: some View {
-    smartListGrid
-      .padding(.horizontal, -Theme.Spacing.xl)
-      .padding(.bottom, -Theme.Spacing.xs)
+    .frame(maxWidth: .infinity)
   }
   #endif
 
@@ -630,19 +627,15 @@ struct SidebarRootView: View {
   // still renders as a one-row card, so every area reads as the same container.
 
   @ViewBuilder
-  private func areaProjectSections(includesSmartListGrid: Bool = false) -> some View {
+  private func areaProjectSections() -> some View {
     if !topLevelProjects.isEmpty {
       Section {
         ForEach(topLevelProjects) { project in
           compactRow(route: .project(project)) { projectRow(project, parent: nil) }
         }
-      } header: {
-        #if os(iOS)
-        if includesSmartListGrid { smartListGridHeader }
-        #endif
       }
     }
-    ForEach(Array(areas.enumerated()), id: \.element.id) { index, area in
+    ForEach(areas, id: \.id) { area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
       Section {
@@ -654,19 +647,8 @@ struct SidebarRootView: View {
             compactRow(route: .project(project)) { projectRow(project, parent: area.id) }
           }
         }
-      } header: {
-        #if os(iOS)
-        if includesSmartListGrid, topLevelProjects.isEmpty, index == 0 {
-          smartListGridHeader
-        }
-        #endif
       }
     }
-    #if os(iOS)
-    if includesSmartListGrid, topLevelProjects.isEmpty, areas.isEmpty {
-      Section { } header: { smartListGridHeader }
-    }
-    #endif
     // Recently Deleted — always last, only shown when there are trashed tasks.
     if recentlyDeletedCount > 0 {
       Section {
@@ -1084,6 +1066,12 @@ struct SmartListRow: View {
 }
 
 #if os(iOS)
+/// Shared rhythm for the iOS Tasks sidebar: tile gutters, inter-row gaps in
+/// the 2×2 grid, and the gap between the grid and the grouped cards below.
+private enum IOSSidebarListMetrics {
+  static let sectionSpacing: CGFloat = 14
+}
+
 /// iPhone + iPad share the insetGrouped "bubble card" Tasks home — the same
 /// tiles-over-grouped-cards rhythm. (iPad used to render the `.sidebar` source
 /// list; it now matches iPhone.)
@@ -1097,7 +1085,7 @@ private struct IOSSidebarListChrome: ViewModifier {
       // insetGrouped's default inter-section gap (~35pt) leaves too much air
       // above the first area and between area cards; tighten it for a denser,
       // more Reminders-like rhythm.
-      .listSectionSpacing(14)
+      .listSectionSpacing(IOSSidebarListMetrics.sectionSpacing)
   }
 }
 #endif
@@ -1187,7 +1175,7 @@ struct SmartListTile: View {
     .padding(.vertical, 10)
     .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
     .background(
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
+      RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
         .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
     )
   }
