@@ -13,15 +13,14 @@ import SwiftData
 //                 section strips use. Goals still strip into their own section
 //                 drawers too (dual-homed).
 //
-// Was a three-band grid of bordered tiles; now a system List so the landing
-// reads the same as the grouped drawers it pushes into. The internal section
-// key stays "goals" — only the surface and label became "Coach". Coaches push
-// within this NavigationStack (lists pair with a stack); exercises and goals
-// present modally.
+// Layout matches the Next home tab: grouped `List`, shared section headers, and
+// the same row chrome (`pointerListRow` / `taskCardChrome`) so the two tabs read
+// as one family on every idiom.
 
 struct CoachView: View {
   @Environment(\.modelContext) private var context
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   private var goalMutator: GoalMutator { SeptenaServices.shared.goalMutator }
 
@@ -45,23 +44,23 @@ struct CoachView: View {
       }
       #if os(iOS)
       .listStyle(.insetGrouped)
-      #elseif os(macOS)
+      .listSectionSpacing(18)
+      #else
       .listStyle(.plain)
       .padding(.bottom, Theme.pageBottom)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       #endif
       .septenaTabPage(id: "coach", title: "Coach", add: .action { addGoal() })
-      // A coach pushes as a full pane inside this stack — a real screen with a
-      // back button — on every idiom. Lists belong with navigation stacks.
+      #if os(macOS)
+      .septenaWideContentMargins(contentGutter: TaskCardMetrics.margin)
+      #else
+      .septenaWideContentMargins()
+      #endif
       .navigationDestination(for: CoachDomain.self) { domain in
         CoachDetailView(domain: domain)
       }
       .task { refresh() }
       .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-        // refresh() walks every coach domain's availability (unbounded
-        // per-section fetches), so only re-run when a section a coach actually
-        // reads — or a goal — changed. A scoped post for an unrelated section
-        // (e.g. groceries) no longer rebuilds the hub.
         guard note.affectsAnySection(of: Self.coachScope) else { return }
         refresh()
       }
@@ -90,32 +89,27 @@ struct CoachView: View {
 
   private var coachesSection: some View {
     let domains = CoachDomain.allCases
-    return Section {
+    return coachSection(
+      header: { Text("Coaches") },
+      footer: { Text("On-device coaches that reflect your logged data back to you.") }
+    ) {
       ForEach(Array(domains.enumerated()), id: \.element.id) { idx, domain in
         let pills = coachPills[domain] ?? []
         NavigationLink(value: domain) {
           CoachLandingRow(domain: domain, pills: pills)
         }
-        // 0 hides the badge, so this doubles as "entries in the window".
         .badge(pills.reduce(0) { $0 + $1.count })
-        #if os(macOS)
-        .septenaHomeListRow(index: idx, count: domains.count)
-        #else
-        .pointerListRow()
-        #endif
+        .septenaCoachRow(index: idx, count: domains.count)
       }
-    } header: {
-      Text("Coaches")
-    } footer: {
-      Text("On-device coaches that reflect your logged data back to you.")
     }
   }
 
-  // Section stays visible without Apple Intelligence — a placeholder explains
-  // why the exercises aren't offered instead of the rows silently vanishing.
   @ViewBuilder
   private var exercisesSection: some View {
-    Section {
+    coachSection(
+      header: { Text("Exercises") },
+      footer: { Text("Guided reflections that turn into goals.") }
+    ) {
       if OnDeviceAI.isAvailable {
         let exercises = DiscoveryRegistry.all
         ForEach(Array(exercises.enumerated()), id: \.element.id) { idx, exercise in
@@ -129,72 +123,41 @@ struct CoachView: View {
                           accent: exercise.accent)
           }
           .buttonStyle(.plain)
-          #if os(macOS)
-          .septenaHomeListRow(index: idx, count: exercises.count)
-          #else
-          .pointerListRow()
-          #endif
+          .septenaCoachRow(index: idx, count: exercises.count)
         }
       } else {
-        AppleIntelligenceUnavailableCard()
-          #if os(iOS)
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-          #else
-          .septenaHomeListRow(index: 0, count: 1)
-          #endif
+        CoachUnavailableRow()
+          .septenaCoachRow(index: 0, count: 1)
       }
-    } header: {
-      Text("Exercises")
-    } footer: {
-      Text("Guided reflections that turn into goals.")
     }
   }
 
   @ViewBuilder
   private var goalsSection: some View {
-    Section {
-      ForEach(Array(goals.enumerated()), id: \.element.id) { idx, goal in
-        Button { editing = goal } label: {
-          GoalListRow(goal: goal, theme: theme)
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-          Button(role: .destructive) { deleteGoal(goal) } label: {
-            Label("Delete", systemImage: "trash")
-          }
-        }
-        #if os(macOS)
-        .septenaHomeListRow(index: idx, count: max(goals.count, 1))
-        #else
-        .pointerListRow()
-        #endif
-      }
+    coachSection(
+      header: { CoachGoalsSectionHeader(onAdd: addGoal) },
+      footer: { Text("Free-text intentions; tag them so a coach picks them up.") }
+    ) {
       if goals.isEmpty {
         Text("No goals yet. Tag a goal with sections so your coaches have context for what you're working toward.")
-          .font(.subheadline)
+          .font(.callout)
           .foregroundStyle(.secondary)
-          #if os(macOS)
-          .septenaHomeListRow(index: 0, count: 1)
-          #else
-          .pointerListRow()
-          #endif
-      }
-    } header: {
-      HStack {
-        Text("Goals")
-        Spacer()
-        Button(action: addGoal) {
-          Label("Add", systemImage: "plus")
-            .font(.subheadline.weight(.medium))
-            .textCase(nil)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .septenaCoachRow(index: 0, count: 1)
+      } else {
+        ForEach(Array(goals.enumerated()), id: \.element.id) { idx, goal in
+          Button { editing = goal } label: {
+            GoalListRow(goal: goal, theme: theme)
+          }
+          .buttonStyle(.plain)
+          .contextMenu {
+            Button(role: .destructive) { deleteGoal(goal) } label: {
+              Label("Delete", systemImage: "trash")
+            }
+          }
+          .septenaCoachRow(index: idx, count: goals.count)
         }
-        .buttonStyle(.plain)
-        .tint(theme.color(for: "goals"))
-        .keyboardShortcut("n", modifiers: .command)
       }
-    } footer: {
-      Text("Free-text intentions; tag them so a coach picks them up.")
     }
   }
 
@@ -206,7 +169,8 @@ struct CoachView: View {
       .filter { $0.key != "goals" }
     var next: [CoachDomain: [CoachAreaPill]] = [:]
     for domain in CoachDomain.allCases {
-      let pills = CoachContextBuilder.availability(for: domain, window: .default, context: context)
+      let pills = CoachContextBuilder.availability(for: domain, window: .default,
+                                                   context: context, now: clock.now)
       guard !pills.isEmpty else { continue }
       next[domain] = pills.map {
         CoachAreaPill(id: $0.id, label: $0.label, systemImage: $0.systemImage,
@@ -230,12 +194,76 @@ struct CoachView: View {
   }
 }
 
+// MARK: - Section chrome
+
+/// Coach `Section` wrapper — same header rhythm as the Next feed (`nextSection`),
+/// with an optional footer for the explanatory copy under each band.
+@ViewBuilder
+private func coachSection<Header: View, Footer: View, Content: View>(
+  @ViewBuilder header: () -> Header,
+  @ViewBuilder footer: () -> Footer,
+  @ViewBuilder content: () -> Content
+) -> some View {
+  #if os(macOS)
+  Section {
+    nextSectionHeader(content: header)
+      .listRowInsets(EdgeInsets())
+      .listRowSeparator(.hidden)
+      .listRowBackground(Color.clear)
+      .selectionDisabled()
+    content()
+  } footer: {
+    footer()
+  }
+  #else
+  Section {
+    content()
+  } header: {
+    nextSectionHeader(content: header)
+  } footer: {
+    footer()
+  }
+  #endif
+}
+
+private struct CoachGoalsSectionHeader: View {
+  @Environment(SectionTheme.self) private var theme
+  let onAdd: () -> Void
+
+  var body: some View {
+    HStack {
+      Text("Goals")
+      Spacer()
+      Button(action: onAdd) {
+        Image(systemName: "plus.circle")
+          .font(.footnote.weight(.semibold))
+      }
+      .buttonStyle(.borderless)
+      .textCase(nil)
+      .tint(theme.color(for: "goals"))
+      .accessibilityLabel("Add goal")
+      .keyboardShortcut("n", modifiers: .command)
+    }
+  }
+}
+
+// MARK: - Row chrome
+
+private extension View {
+  /// Cell treatment for a Coach row — mirrors `septenaNextRow` without selection.
+  func septenaCoachRow(index: Int, count: Int) -> some View {
+    #if os(macOS)
+    septenaHomeListRow(index: index, count: count)
+    #else
+    environment(\.rowHInset, Theme.Spacing.xl)
+      .pointerListRow()
+    #endif
+  }
+}
+
 // MARK: - Rows
 
-/// The accent-washed icon chip every row on this page uses — coaches,
-/// exercises, and goals — so background size and glyph size stay identical
-/// across the three. The small counterpart to the old CoachTile's 38pt chip,
-/// sized for a list row.
+/// Accent-washed icon chip — shared leading glyph for every row on this page.
 private struct CoachIconChip: View {
   let systemImage: String
   let accent: Color
@@ -244,42 +272,74 @@ private struct CoachIconChip: View {
     Image(systemName: systemImage)
       .font(.callout.weight(.semibold))
       .foregroundStyle(accent)
-      .frame(width: 29, height: 29)
+      .frame(width: 28, height: 28)
       .background(accent.opacity(0.14),
                   in: RoundedRectangle(cornerRadius: 7, style: .continuous))
   }
 }
 
-/// A coach row: icon chip + title over either its weekly area breakdown (when
-/// there's data) or its blurb (when there isn't). The trailing entry count is
-/// the NavigationLink's `.badge`.
+/// Shared row anatomy: chip · title/subtitle · optional trailing. Matches the
+/// Next list's `HStack` + `rowHInset` pattern (not `Label`, which sizes icons
+/// inconsistently on macOS).
+private struct CoachRowLayout<Trailing: View>: View {
+  let systemImage: String
+  let accent: Color
+  let title: String
+  var subtitle: String? = nil
+  var subtitleLineLimit: Int = 1
+  var titleSecondary: Bool = false
+  @ViewBuilder var trailing: () -> Trailing
+
+  @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      CoachIconChip(systemImage: systemImage, accent: accent)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(titleSecondary ? Theme.inkSecondary : Theme.inkPrimary)
+          .lineLimit(2)
+        if let subtitle, !subtitle.isEmpty {
+          Text(subtitle)
+            .font(.septenaMeta)
+            .foregroundStyle(Theme.inkSecondary)
+            .lineLimit(subtitleLineLimit)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+
+      trailing()
+    }
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, rowVInset)
+    .contentShape(Rectangle())
+  }
+}
+
 private struct CoachLandingRow: View {
   let domain: CoachDomain
   let pills: [CoachAreaPill]
 
-  /// "Training 5 · Activity 3" — capped so a wide coach (food, whole-life)
-  /// keeps to one line.
   private var summary: String {
     pills.prefix(3).map { "\($0.label) \($0.count)" }.joined(separator: " · ")
   }
 
   var body: some View {
-    Label {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(domain.title)
-        Text(pills.isEmpty ? domain.blurb : summary)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-      }
-    } icon: {
-      CoachIconChip(systemImage: domain.systemImage, accent: domain.accent)
+    CoachRowLayout(
+      systemImage: domain.systemImage,
+      accent: domain.accent,
+      title: domain.title,
+      subtitle: pills.isEmpty ? domain.blurb : summary
+    ) {
+      EmptyView()
     }
   }
 }
 
-/// A plain icon-chip row (no chevron — it presents a modal, not a push). Used
-/// for the exercises.
 private struct CoachLabelRow: View {
   let systemImage: String
   let title: String
@@ -287,31 +347,57 @@ private struct CoachLabelRow: View {
   let accent: Color
 
   var body: some View {
-    Label {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title).foregroundStyle(.primary)
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(2)
-      }
-    } icon: {
-      CoachIconChip(systemImage: systemImage, accent: accent)
+    CoachRowLayout(
+      systemImage: systemImage,
+      accent: accent,
+      title: title,
+      subtitle: subtitle,
+      subtitleLineLimit: 2
+    ) {
+      EmptyView()
     }
   }
 }
 
-/// A goal row: a target glyph in the goal's section accent, its title, any
-/// metric progress, and the sections it's tagged with. The list supplies the
-/// card; the row carries no border of its own (unlike the old GoalTile).
+/// Stand-in when Apple Intelligence isn't available — same row shape as the
+/// exercise rows (not a nested card that fights `taskCardChrome`).
+private struct CoachUnavailableRow: View {
+  private var detail: String {
+    OnDeviceAI.unavailableReason ?? "On-device intelligence is unavailable right now."
+  }
+
+  private var subtitle: String {
+    switch OnDeviceAI.status {
+    case .notEnabled, .modelNotReady, .unknown:
+      return "\(detail) Details in Settings ▸ AI."
+    case .deviceNotEligible, .available:
+      return detail
+    }
+  }
+
+  var body: some View {
+    CoachRowLayout(
+      systemImage: "apple.intelligence",
+      accent: .secondary,
+      title: "Needs Apple Intelligence",
+      subtitle: subtitle,
+      subtitleLineLimit: 3
+    ) {
+      EmptyView()
+    }
+  }
+}
+
 private struct GoalListRow: View {
   @Environment(\.modelContext) private var context
+  @Environment(DayClock.self) private var clock
+  @Environment(\.rowHInset) private var rowHInset
+  @Environment(\.rowVInset) private var rowVInset
   let goal: Goal
   let theme: SectionTheme
 
   private var isPlaceholder: Bool { goal.text == "New goal" }
 
-  /// First line is the title; the rest is the goal's description body.
   private var title: String {
     goal.text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
       .first.map(String.init) ?? goal.text
@@ -321,8 +407,6 @@ private struct GoalListRow: View {
     goal.sections.first.map { theme.color(for: $0) } ?? .secondary
   }
 
-  /// The primary (first) section's glyph, so a goal reads as what it's about;
-  /// untagged goals fall back to the generic target.
   private var icon: String {
     goal.sections.first.map { theme.icon(for: $0) } ?? "target"
   }
@@ -332,28 +416,34 @@ private struct GoalListRow: View {
   }
 
   private var progress: GoalMetricProgress? {
-    GoalMetricEvaluator.evaluate(goal: goal, context: context)
+    GoalMetricEvaluator.evaluate(goal: goal, context: context, now: clock.now)
   }
 
   var body: some View {
-    Label {
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      CoachIconChip(systemImage: icon, accent: accent)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+
       VStack(alignment: .leading, spacing: 4) {
         Text(isPlaceholder ? "New goal" : title)
-          .foregroundStyle(isPlaceholder ? .secondary : .primary)
+          .font(.septenaTaskTitle)
+          .foregroundStyle(isPlaceholder ? Theme.inkSecondary : Theme.inkPrimary)
           .lineLimit(2)
         if let progress {
           GoalMetricProgressView(progress: progress, accent: accent)
         }
         if !goal.sections.isEmpty {
           Text(sectionSummary)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.septenaMeta)
+            .foregroundStyle(Theme.inkSecondary)
             .lineLimit(1)
         }
       }
-    } icon: {
-      CoachIconChip(systemImage: icon, accent: accent)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, rowVInset)
+    .contentShape(Rectangle())
   }
 }
 
