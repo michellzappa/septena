@@ -448,16 +448,29 @@ final class CloudKitTasksBackend: TasksBackend {
 
   func moveToArea(id: String, area: String?) {
     guard let entity = fetch(id: id) else { return }
+    // Filing a triage-band row ratifies it — pin Today so it lands in the
+    // committed list instead of vanishing off the Today surface (see
+    // `TaskEntity.isInTriageBand`, docs/TRIAGE_BAND_SPEC.md).
+    let ratifying = area != nil && entity.isInTriageBand
     entity.area = area
     if area != nil { entity.project = nil }
+    if ratifying {
+      entity.today = true
+      entity.todaySetOn = SeptenaDate.today
+    }
     entity.pendingSync = true
     commitAndPush(entity, op: "moveToArea")
   }
 
   func moveToProject(id: String, project: String?) {
     guard let entity = fetch(id: id) else { return }
+    let ratifying = project != nil && entity.isInTriageBand
     entity.project = project
     if project != nil { entity.area = nil }
+    if ratifying {
+      entity.today = true
+      entity.todaySetOn = SeptenaDate.today
+    }
     entity.pendingSync = true
     commitAndPush(entity, op: "moveToProject")
   }

@@ -1690,6 +1690,7 @@ struct TaskRowActions: ViewModifier {
     Haptics.tick()
     let prevArea = task.area
     let prevProject = task.project
+    let wasInTriage = task.isInTriageBand
     if projectId != nil {
       mutator.moveToProject(id: id, project: projectId)
     } else {
@@ -1709,6 +1710,7 @@ struct TaskRowActions: ViewModifier {
         mutator.moveToArea(id: id, area: prevArea)
         mutator.moveToProject(id: id, project: nil)
       }
+      if wasInTriage { mutator.moveToToday(id: id, today: false) }
       onChange?()
     }
   }
