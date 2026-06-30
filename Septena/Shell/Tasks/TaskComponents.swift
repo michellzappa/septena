@@ -896,12 +896,17 @@ struct TaskRow: View {
         }
         .foregroundStyle(Theme.inkSecondary)
       }
-    } else if showsTodayIndicator, let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
-      HStack(spacing: 4) {
-        Image(systemName: "calendar").scaledFont(size: 11)
-        Text(Self.shortDate(scheduled)).font(.septenaMeta)
+    } else if let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
+      let schedDay = cal.startOfDay(for: scheduled)
+      // On Today / Next, past/today When dates are noise (the row is already
+      // on Today) — but a future When date should still read (sort + label).
+      if showsTodayIndicator || schedDay > today {
+        HStack(spacing: 4) {
+          Image(systemName: "calendar").scaledFont(size: 11)
+          Text(Self.shortDate(scheduled)).font(.septenaMeta)
+        }
+        .foregroundStyle(Theme.inkSecondary)
       }
-      .foregroundStyle(Theme.inkSecondary)
     }
     // Language v2: an on-Today task seen on an off-Today surface is signalled by
     // the amber checkbox (see `boxStrokeColor`), not a right-edge "Today" chip.

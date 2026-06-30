@@ -188,6 +188,35 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return false
   }
 
+  /// Sort rank for Today-surface lists (Next ▸ Tasks Today, Tasks tab Today).
+  /// Mirrors what the row trailing actually shows on Next — deadline drives
+  /// the red Today / flag labels; past When dates are hidden there, so they
+  /// must not sort as due-today. Groups: deadline today/overdue → tomorrow →
+  /// later → visually undated (pins + rolled-in When with no deadline).
+  func nextPageOrderRank(todayISO: String = SeptenaDate.today) -> (tier: Int, date: String) {
+    let tomorrow = SeptenaDate.offsetDays(1, from: todayISO)
+
+    if let d = deadline, d <= todayISO { return (0, d) }
+
+    if let d = deadline, let tomorrow, d == tomorrow { return (1, d) }
+    if deadline == nil, let s = scheduled, let tomorrow, s == tomorrow { return (1, s) }
+
+    if let d = deadline, d > todayISO { return (2, d) }
+    if deadline == nil, let s = scheduled, s > todayISO { return (2, s) }
+
+    return (3, todaySetOn ?? created ?? todayISO)
+  }
+
+  /// Sort comparator for Today-surface task lists on Next and the Tasks tab.
+  static func compareNextPageOrder(_ a: SeptenaTask, _ b: SeptenaTask) -> Bool {
+    let ta = a.nextPageOrderRank()
+    let tb = b.nextPageOrderRank()
+    if ta.tier != tb.tier { return ta.tier < tb.tier }
+    if ta.date != tb.date { return ta.date < tb.date }
+    if a.position != b.position { return a.position < b.position }
+    return a.id < b.id
+  }
+
   /// Whether this open task sits in the **triage band** — the *unratified*
   /// layer that renders above Today (see `docs/TRIAGE_BAND_SPEC.md`). The
   /// divider is ratification, not date: two captured-but-not-committed
@@ -1673,6 +1702,13 @@ enum SeptenaDate {
   }
 
   static var today: String { formatter.string(from: Date()) }
+
+  /// ISO date `n` calendar days after `iso` (negative = before).
+  static func offsetDays(_ n: Int, from iso: String) -> String? {
+    guard let d = parse(iso),
+          let shifted = Calendar.current.date(byAdding: .day, value: n, to: d) else { return nil }
+    return format(shifted)
+  }
 
   /// Wall-clock "HH:mm" right now.
   static var nowHHMM: String { timeFormatter.string(from: Date()) }

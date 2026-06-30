@@ -117,7 +117,8 @@ struct NextView: View {
     }
 
     if hasAnyDone {
-      tags += NextDoneEvents.merged(model: model, passive: doneModel.events)
+      tags += NextDoneEvents.merged(model: model, passive: doneModel.events,
+                                    lingeringTaskIDs: tasksModel.lingeringDoneTaskIDs)
         .map { NextRowTag.done($0.id) }
     }
     return tags
@@ -134,7 +135,9 @@ struct NextView: View {
   private static let editableDoneKeys: Set<String> = ["mood", "gut", "nutrition"]
 
   private func doneEvent(id: String) -> DoneEvent? {
-    NextDoneEvents.merged(model: model, passive: doneModel.events).first { $0.id == id }
+    NextDoneEvents.merged(model: model, passive: doneModel.events,
+                          lingeringTaskIDs: tasksModel.lingeringDoneTaskIDs)
+      .first { $0.id == id }
   }
 
   /// Drives the composer drawer from either a quick-add (`creating`) or a row
@@ -370,6 +373,7 @@ struct NextView: View {
       // here newest-first) plus passive logs (caffeine, meals, mood, …).
       if hasAnyDone {
         NextDoneSection(model: model, passive: doneModel.events,
+                        lingeringTaskIDs: tasksModel.lingeringDoneTaskIDs,
                         selection: selection,
                         onEdit: beginEditDone, onDelete: deleteDone)
       }

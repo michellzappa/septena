@@ -32,10 +32,10 @@ enum NextRowTag {
 
 // MARK: - Today tasks (inline on Next)
 //
-// Mirrors NextItemsModel for the Tasks slice — Next renders today's open
-// tasks as the first list above chores / habits / supplements. Full task
-// editing still lives in the Tasks tab; this surface is a read-through
-// checklist (tap to complete, tap again to uncomplete).
+// Mirrors NextItemsModel for the Tasks slice — Next renders open Today tasks
+// in due-date order above chores / habits / supplements. Full task editing still
+// lives in the Tasks tab; this surface is a read-through checklist (tap to
+// complete, tap again to uncomplete).
 
 @MainActor
 @Observable
@@ -54,17 +54,19 @@ final class TodayTasksModel {
   }
 
   func refreshFromCache() {
-    let fresh = LocalCache.tasks(in: LocalStore.shared.container.mainContext,
-                                 filter: .today)
+    let context = LocalStore.shared.container.mainContext
+    let fresh = LocalCache.tasks(in: context, filter: .today)
+    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     // The `.today` query excludes done tasks, so a plain re-read would yank a
     // just-completed row out from under the settle beat — and this runs on
     // every `.septenaTasksChanged` (see NextView), which a completion posts.
     // Preserve session-acted rows the query now hides, in their current
     // position, so they linger struck through then fade rather than hop/vanish.
-    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     var merged = tasks.compactMap { old -> SeptenaTask? in
       if let f = freshByID[old.id] { return f }        // still open → refreshed copy
-      if actedTasks.contains(old.id) { return old }    // lingering → keep in place
+      // Linger beat — both guards must win over the fresh read, because
+      // `.septenaTasksChanged` can fire before the acted set is stamped.
+      if actedTasks.contains(old.id) || settle.isSettling(old.id) { return old }
       return nil                                       // gone
     }
     let kept = Set(merged.map(\.id))
@@ -85,10 +87,33 @@ final class TodayTasksModel {
     hasLoaded = true
   }
 
-  /// Open today tasks, plus any toggled this session (so a just-completed
+  /// Open Today tasks, plus any toggled this session (so a just-completed
   /// row lingers struck through instead of vanishing under the finger).
+  /// Open rows sort by visible due date; settling rows park at the end.
   var openTasks: [SeptenaTask] {
-    tasks.filter { actedTasks.contains($0.id) || $0.status == .open }
+    let visible = tasks.filter {
+      $0.status == .open || actedTasks.contains($0.id) || settle.isSettling($0.id)
+    }
+    let isSettling: (SeptenaTask) -> Bool = {
+      $0.status == .done && (self.actedTasks.contains($0.id) || self.settle.isSettling($0.id))
+    }
+    let open = visible
+      .filter { !isSettling($0) }
+      .sorted(by: SeptenaTask.compareNextPageOrder)
+    let settling = visible.filter { isSettling($0) }
+    guard !settling.isEmpty else { return open }
+    return open + settling
+  }
+
+  /// Task ids still in the open-list settle beat (struck through, not yet faded).
+  /// The Done Today log filters these out so a row doesn't duplicate into the
+  /// timeline until the linger ends — same contract as `actedChores` → `doneChores`.
+  var lingeringDoneTaskIDs: Set<String> {
+    Set(tasks.compactMap { t in
+      guard t.status == .done,
+            actedTasks.contains(t.id) || settle.isSettling(t.id) else { return nil }
+      return t.id
+    })
   }
 
   func toggle(_ task: SeptenaTask, mutator: TaskMutator, motion: A11yMotion) {
@@ -96,28 +121,33 @@ final class TodayTasksModel {
     // cache query excludes done tasks (Persistence `LocalCache.tasks(.today)`),
     // so a `refreshFromCache()` here would drop the just-completed row before
     // it could linger. Keeping it in `tasks` (struck through, held visible by
-    // `actedTasks`) is what lets it settle then fade.
+    // `actedTasks` + `settle`) is what lets it settle then fade.
+    //
+    // Order matches `TaskListView.toggle` / `TasksDestinationView.toggle`:
+    // stamp the linger window and flip local state first; call the mutator
+    // last so the `.septenaTasksChanged` refresh can't yank the row.
     guard let i = tasks.firstIndex(where: { $0.id == task.id }) else { return }
     if task.status == .done {
       Haptics.tap()
-      mutator.uncomplete(id: task.id)
       settle.cancel(task.id)
-      tasks[i].status = .open
-      actedTasks.insert(task.id)
+      motion.run(Theme.Motion.settle) {
+        tasks[i].status = .open
+        _ = actedTasks.remove(task.id)
+      }
+      mutator.uncomplete(id: task.id)
     } else {
       // Done-side haptic is owned by the caller (TodayTaskRow), which fires
       // the context-scaled `TaskCelebration` haptic after this returns.
-      mutator.complete(id: task.id)
-      tasks[i].status = .done
       actedTasks.insert(task.id)
-      // Linger struck through, then fade out of the open list. Next has no
-      // tasks-done section, so a settled task simply drifts away.
       settle.schedule(task.id) { [weak self] in
+        guard let self else { return }
         motion.run(Theme.Motion.settle) {
-          self?.settle.endSettle(task.id)
-          _ = self?.actedTasks.remove(task.id)
+          self.settle.endSettle(task.id)
+          _ = self.actedTasks.remove(task.id)
         }
       }
+      motion.run(Theme.Motion.settle) { tasks[i].status = .done }
+      mutator.complete(id: task.id)
     }
   }
 }
@@ -169,8 +199,8 @@ struct TodayTaskRow: View {
         // Every row here is a Today task; if the check left nothing open
         // (the just-checked row lingers as done), today's list is clear.
         if completing {
-          let cleared = !model.openTasks.contains { $0.status == .open }
-          TaskCelebration.completed(isToday: true, clearedToday: cleared,
+          let clearedToday = !model.openTasks.contains { $0.status == .open && $0.isOnToday }
+          TaskCelebration.completed(isToday: task.isOnToday, clearedToday: clearedToday,
                                     accent: tint, logCommit: logCommit)
         }
       },
@@ -634,6 +664,7 @@ struct NextOpenSection: View {
             #endif
             .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
                             index: idx, count: tasks.count)
+            .transition(.opacity)
         }
       }
 
@@ -701,8 +732,13 @@ struct NextOpenSection: View {
 /// `NextView`'s keyboard-order walk so ↑↓ traverse the full timeline.
 @MainActor
 enum NextDoneEvents {
-  static func merged(model: NextItemsModel, passive: [DoneEvent]) -> [DoneEvent] {
-    var out = passive
+  static func merged(model: NextItemsModel, passive: [DoneEvent],
+                     lingeringTaskIDs: Set<String> = []) -> [DoneEvent] {
+    var out = passive.filter { event in
+      guard event.sectionKey == "tasks", event.id.hasPrefix("task-") else { return true }
+      let taskID = String(event.id.dropFirst("task-".count))
+      return !lingeringTaskIDs.contains(taskID)
+    }
     for c in model.doneChores {
       out.append(.init(id: "chore-\(c.id)", hour: c.lastCompletedTime.flatMap(DoneEvent.hour(from:)) ?? -1,
                        time: c.lastCompletedTime, label: c.name, detail: nil,
@@ -842,6 +878,8 @@ struct NextDoneSection: View {
   /// Today's passive logs (intake / gut / mood / meals /
   /// training / completed tasks).
   var passive: [DoneEvent]
+  /// Tasks still in the open-list settle beat — withheld from the log until fade.
+  var lingeringTaskIDs: Set<String> = []
   /// Page-level `List(selection:)` — drives row highlight + keyboard cursor.
   var selection: Set<String> = []
   /// Open the editor for an editable done-row (mood / gut / nutrition). The
@@ -863,7 +901,8 @@ struct NextDoneSection: View {
   /// Merge the trio's live done splits with the passive logs into one
   /// newest-first stream.
   private var events: [DoneEvent] {
-    NextDoneEvents.merged(model: model, passive: passive)
+    NextDoneEvents.merged(model: model, passive: passive,
+                          lingeringTaskIDs: lingeringTaskIDs)
   }
 
   var body: some View {
@@ -1352,7 +1391,7 @@ private func sectionHeader(_ title: String) -> some View {
 private func tasksSectionHeader(onAdd: (() -> Void)?) -> some View {
   if let onAdd {
     HStack {
-      Text("Tasks")
+      Text("Tasks Today")
       Spacer()
       Button(action: onAdd) {
         Image(systemName: "plus.circle")
@@ -1363,7 +1402,7 @@ private func tasksSectionHeader(onAdd: (() -> Void)?) -> some View {
       .accessibilityLabel("Add task")
     }
   } else {
-    Text("Tasks")
+    Text("Tasks Today")
   }
 }
 
