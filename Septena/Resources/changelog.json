@@ -4,49 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1289,
+      "build": 1291,
       "date": "2026-06-30",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A reimagined Tasks experience",
-          "detail": "Inline editing, a foot quick-add line, undo toasts for delete, move, and defer, group Today by area and project, and a refreshed Today tab (formerly Week).",
+          "title": "Tasks, rebuilt",
+          "detail": "Edit task titles inline, capture with a quick-add line, group Today by area and project, and undo deletes, moves, and defers from a toast.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with restore",
-          "detail": "Deleted tasks now wait in a Recently Deleted view for 30 days so you can bring them back before they purge.",
+          "title": "Your calendar in Today",
+          "detail": "System calendar events now weave into Today and Upcoming so your whole day is in one place.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar, woven into Today",
-          "detail": "System calendar events appear in Today and Upcoming, with hidden-calendar choices synced across your devices.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
+          "detail": "Bring your existing tasks over from a Things database export.",
           "section": "tasks"
         },
         {
+          "title": "The Week tab is now Today",
+          "detail": "The home tab is renamed to Today and centers its content on wider screens.",
+          "section": null
+        },
+        {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and let on-device analysis estimate it, plus a small flourish when you break a fast.",
+          "detail": "Snap a meal and have it analyzed on-device, with a gentle caption when you break your fast.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a post-session weekly review, an auto-advancing rest flow with a watch Live Activity, and a Start Training Session shortcut.",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, an auto-advance flow with a rest timer on your watch, and a Start Training Session shortcut.",
           "section": "training"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Surface the goals that matter as tiles on the week dashboard.",
+          "detail": "Surface the goals that matter most as tiles right on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Clearer privacy controls",
-          "detail": "Choose a graded telemetry level (off, minimal, balanced, or full) and see exactly what was recently sent.",
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels let you pick Off, Minimal, Balanced, or Full, and see exactly what's been sent.",
+          "section": null
+        },
+        {
+          "title": "A richer watch",
+          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers, expanded intake tiles, and a fasting complication that morphs through the night.",
           "section": null
         }
       ]
