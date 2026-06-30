@@ -79,11 +79,11 @@ final class TodayTasksModel {
     }
   }
 
-  func load() async {
+  func load(today: String, now: Date) async {
     let context = LocalStore.shared.container.mainContext
     // CloudKit-mode read: TaskReads.list returns LocalCache directly,
     // so we just need to ensure the mirror is fresh, then repaint.
-    _ = await TaskReads.list(view: "today", context: context)
+    _ = await TaskReads.list(view: "today", today: today, now: now, context: context)
     // Clear session state BEFORE repainting so the merge in refreshFromCache
     // doesn't preserve now-stale lingering rows — load() is authoritative.
     actedTasks = []
@@ -246,10 +246,16 @@ final class NextItemsModel {
   /// empty state never flashes during the initial load.
   var hasLoaded: Bool = false
 
-  // Computed (not captured at init) so mutation bodies always tag the
-  // current day. The owning view also calls `load()` from
-  // `.onChange(of: clock.today)` to refetch day-scoped data on rollover.
-  private var today: String { SeptenaDate.today }
+  // Updated by the owning view from `clock.today` on load / rollover.
+  private var cachedToday: String = ""
+  private var cachedNow: Date = Date()
+
+  private var today: String { cachedToday }
+  private var nowHHMM: String { EventTimestamp.hhmm(from: cachedNow) }
+
+  private func stampNow(_ now: Date?) {
+    if let now { cachedNow = now }
+  }
 
   // MARK: - Open / Done splits (the source of truth for both subviews)
   //
@@ -331,7 +337,9 @@ final class NextItemsModel {
   /// decode) — never the SwiftData mirror — so the synchronous first frame
   /// can't hitch the push transition. The authoritative mirror read happens
   /// off-main in `load()`, which also refreshes these blobs.
-  func paintFromCache() {
+  func paintFromCache(today: String, now: Date? = nil) {
+    cachedToday = today
+    stampNow(now)
     if let v = ResponseCache.load([HabitDayItem].self, forKey: CacheKey.habits) { habits = v }
     if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
     if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) { supplements = v }
@@ -340,7 +348,9 @@ final class NextItemsModel {
     hasLoaded = true
   }
 
-  func load() async {
+  func load(today: String, now: Date? = nil) async {
+    cachedToday = today
+    stampNow(now)
     // Habits / Supplements / Chores are CloudKit-authoritative — read
     // directly from the local SwiftData mirror. CKEngine keeps it fresh
     // via fetchChanges() + silent pushes; no FastAPI fallback needed.
@@ -351,7 +361,7 @@ final class NextItemsModel {
     let snap = await MirrorReader.shared.read { ctx in
       (habits: ChecklistMirror.loadHabitsDay(context: ctx, date: day),
        supplements: ChecklistMirror.loadSupplementsDay(context: ctx, date: day),
-       chores: ChecklistMirror.loadChores(context: ctx))
+       chores: ChecklistMirror.loadChores(context: ctx, today: day))
     }
 
     if let hRes = snap.habits {
@@ -387,7 +397,9 @@ final class NextItemsModel {
 
   // MARK: - Mutations (optimistic local flips, server-side write)
 
-  func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
+  func toggleHabit(_ habit: HabitDayItem, mutator: ChecklistMutator, motion: A11yMotion,
+                   now: Date? = nil) {
+    stampNow(now)
     let next = !habit.done
     // Done-side haptic is owned by the caller (HabitRow), which can reach
     // the environment and branch milestone (.ignition) vs everyday (the
@@ -397,7 +409,7 @@ final class NextItemsModel {
     if let i = habits.firstIndex(where: { $0.id == habit.id }) {
       habits[i].done = next
       if next { habits[i].skipped = false }
-      habits[i].time = next ? SeptenaDate.nowHHMM : nil
+      habits[i].time = next ? nowHHMM : nil
     }
     actedHabits.insert(habit.id)
     mutator.toggleHabit(id: habit.id, date: today, done: next)
@@ -419,7 +431,9 @@ final class NextItemsModel {
     settleActed(habit.id, in: \.actedHabits, done: skipped, motion: motion)
   }
 
-  func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator, motion: A11yMotion) {
+  func toggleSupplement(_ supp: SupplementDayItem, mutator: ChecklistMutator, motion: A11yMotion,
+                        now: Date? = nil) {
+    stampNow(now)
     let next = !supp.done
     // Taken-side haptic is owned by the caller (SupplementRow) — the
     // checkbox plays the shared `.stamp` feel; undo stays a light tap here.
@@ -427,7 +441,7 @@ final class NextItemsModel {
     if let i = supplements.firstIndex(where: { $0.id == supp.id }) {
       supplements[i].done = next
       if next { supplements[i].skipped = false }
-      supplements[i].time = next ? SeptenaDate.nowHHMM : nil
+      supplements[i].time = next ? nowHHMM : nil
     }
     actedSupplements.insert(supp.id)
     mutator.toggleSupplement(id: supp.id, date: today, done: next)
@@ -449,7 +463,9 @@ final class NextItemsModel {
     settleActed(supp.id, in: \.actedSupplements, done: skipped, motion: motion)
   }
 
-  func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion) {
+  func completeChore(_ chore: ChoreItem, mutator: ChecklistMutator, motion: A11yMotion,
+                     now: Date? = nil) {
+    stampNow(now)
     // Completion haptic is owned by the caller (ChoreRow) — the checkbox
     // plays the shared `.stamp` feel.
     completedChores.insert(chore.id)
@@ -457,7 +473,7 @@ final class NextItemsModel {
     deferredChores.removeValue(forKey: chore.id)
     if let i = chores.firstIndex(where: { $0.id == chore.id }) {
       chores[i].lastCompleted = today
-      chores[i].lastCompletedTime = SeptenaDate.nowHHMM
+      chores[i].lastCompletedTime = nowHHMM
     }
     mutator.completeChore(id: chore.id, date: today)
     // Linger struck through, then fade into Done. We clear `actedChores` (the
@@ -787,20 +803,21 @@ final class NextDoneModel {
   private(set) var events: [DoneEvent] = []
   var hasLoaded = false
 
-  func load() async {
-    let date = SeptenaDate.today
+  func load(today: String, now: Date) async {
+    let date = today
     let mirror = await MirrorReader.shared.read { ctx in
       NextDoneModel.collect(ctx: ctx, date: date)
     }
-    let tasks = await Self.collectTasks(date: date)
+    let tasks = await Self.collectTasks(date: date, now: now)
     events = (mirror + tasks).sorted { $0.hour > $1.hour }
     hasLoaded = true
   }
 
   @MainActor
-  private static func collectTasks(date: String) async -> [DoneEvent] {
+  private static func collectTasks(date: String, now: Date) async -> [DoneEvent] {
     let ctx = LocalStore.shared.container.mainContext
-    let resp = await TaskReads.list(view: "logbook", days: 1, context: ctx)
+    let resp = await TaskReads.list(view: "logbook", days: 1,
+                                    today: date, now: now, context: ctx)
     return resp.items.compactMap { t -> DoneEvent? in
       guard t.status == .done, let ts = t.completedAt,
             ts.hasPrefix(date), ts.count >= 16 else { return nil }
@@ -838,7 +855,7 @@ final class NextDoneModel {
                        sectionKey: "mood", moodQuadrant: e.quadrant))
     }
 
-    for e in ChecklistMirror.loadNutritionToday(context: ctx) {
+    for e in ChecklistMirror.loadNutritionToday(context: ctx, today: date) {
       let label = e.foods.first ?? e.emoji ?? "Meal"
       out.append(.init(id: "nut-\(e.id)", hour: DoneEvent.hour(from: e.time) ?? -1,
                        time: e.time, label: label, detail: "\(Int(e.kcal)) kcal",
@@ -1015,12 +1032,13 @@ struct HabitRow: View {
   // Optional — HabitRow renders in multiple hosts (Next tab, Habits sheet);
   // not all inherit the root env. nil → celebration no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(DayClock.self) private var clock
 
   /// Toggle + (on done) the shared `.stamp` celebration at the checkbox.
   /// The haptic is the matched stamp, a touch fuller as the day's count grows.
   private func commitToggle() {
     let done = !habit.done
-    model.toggleHabit(habit, mutator: checklistMutator, motion: motion)
+    model.toggleHabit(habit, mutator: checklistMutator, motion: motion, now: clock.now)
     guard done else { return }
     let doneInBucket = model.habits.filter { $0.bucket == habit.bucket && $0.done }.count
     Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(doneInBucket) * 0.1))
@@ -1090,6 +1108,7 @@ struct SupplementRow: View {
   // Optional — SupplementRow renders in multiple hosts; not all inherit the
   // root env. nil → the clear-out burst no-ops, toggle still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(DayClock.self) private var clock
 
   /// Toggle + (on taken) the shared `.stamp` celebration at the checkbox
   /// (standardized across all checkable rows). The haptic is the matched
@@ -1097,7 +1116,7 @@ struct SupplementRow: View {
   /// handled inside the model.
   private func commitToggle() {
     let taken = !supplement.done
-    model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion)
+    model.toggleSupplement(supplement, mutator: checklistMutator, motion: motion, now: clock.now)
     guard taken else { return }
     let count = model.supplements.filter { $0.done }.count
     Haptics.play(CheckFeel.stamp.hapticSpec(intensity: 0.8 + Double(count) * 0.08))
@@ -1172,6 +1191,7 @@ struct ChoreRow: View {
   // Optional — ChoreRow renders in multiple hosts; not all inherit the root
   // env. nil → the clear-out burst no-ops, completion still runs.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
+  @Environment(DayClock.self) private var clock
 
   var body: some View {
     let isDone = model.completedChores.contains(chore.id)
@@ -1206,7 +1226,7 @@ struct ChoreRow: View {
         if isDone {
           model.uncompleteChore(chore, mutator: checklistMutator)
         } else {
-          model.completeChore(chore, mutator: checklistMutator, motion: motion)
+          model.completeChore(chore, mutator: checklistMutator, motion: motion, now: clock.now)
           // Filed away — the checkbox plays the shared `.stamp` feel
           // (standardized across all checkable rows); this is its matched
           // haptic. Done is binary, so no intensity scaling.
@@ -1222,7 +1242,7 @@ struct ChoreRow: View {
     .contextMenu {
       if !isDone && deferLabel == nil {
         Button {
-          model.completeChore(chore, mutator: checklistMutator, motion: motion)
+          model.completeChore(chore, mutator: checklistMutator, motion: motion, now: clock.now)
           Haptics.play(CheckFeel.stamp.hapticSpec())
           if model.choresAllCleared {
             logCommit?.fire(.flourish(motion: .burst, accent: tint, intensity: 1))

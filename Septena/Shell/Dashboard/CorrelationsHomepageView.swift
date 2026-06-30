@@ -8,6 +8,7 @@ import SwiftData
 struct CorrelationsHomepageView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
 
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
@@ -430,6 +431,7 @@ struct CorrelationsHomepageView: View {
     let r = await CorrelationEngine.runEverything(
       context: modelContext,
       ouraNights: oura,
+      today: clock.now,
       days: windowDays
     )
     setLoadingStage("Rendering \(r.evaluated.count) insights...")

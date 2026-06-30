@@ -150,9 +150,11 @@ struct DayTimelineView: View, Equatable {
   private var headerDate: String {
     guard let d = Self.ymdFormatter.date(from: date) else { return date }
     let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
+    if date == clock.today { return "Today" }
+    if let yesterday = SeptenaDate.offsetDays(-1, from: clock.today), date == yesterday {
+      return "Yesterday"
+    }
+    let days = cal.dateComponents([.day], from: d, to: clock.now).day ?? 0
     if days < 7 {
       return Self.weekdayFormatter.string(from: d)
     }

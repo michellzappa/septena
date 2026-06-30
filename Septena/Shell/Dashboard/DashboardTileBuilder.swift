@@ -49,7 +49,7 @@ struct DashboardTileContext {
   }
 
   func sinceDate(daysBack: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: clockNow) ?? clockNow
     return DashboardTileBuilder.ymdFormatter.string(from: d)
   }
 }
@@ -77,7 +77,7 @@ enum DashboardTileBuilder {
   }
 
   static func buildCatalog(ctx: DashboardTileContext, theme: SectionTheme, visibleDomains: [HomepageDomain]) -> TileWidgetCatalog {
-    let now = Date()
+    let now = ctx.clockNow
     var sections: [TileSectionOption] = []
     var tiles: [String: TileWidgetWire] = [:]
     for domain in visibleDomains {
@@ -108,12 +108,12 @@ enum DashboardTileBuilder {
       recentTraining: [ExerciseEntry],
       sessionTypes: [SessionTypeConfig],
       github: GitHubContributions,
-      bodyRows: [WithingsRow]
+      bodyRows: [WithingsRow],
+      now: Date
     ) -> DashboardTileDerived {
       var d = DashboardTileDerived()
       let cal = Calendar.current
       let fmt = DashboardTileBuilder.ymdFormatter
-      let now = Date()
       func dayKeys(_ n: Int) -> [String] {
         (0..<n).reversed().compactMap {
           cal.date(byAdding: .day, value: -$0, to: now).map(fmt.string(from:))
@@ -391,7 +391,7 @@ enum DashboardTileBuilder {
       }
 
       func choresDomainData() -> HomepageDomainData {
-        let todayISO = SeptenaDate.today
+        let todayISO = ctx.clockToday
         let serverDoneIDs = Set(ctx.dailies.chores
                                   .filter { $0.lastCompleted == todayISO }
                                   .map(\.id))
@@ -474,7 +474,7 @@ enum DashboardTileBuilder {
 
       func nutritionDomainData() -> HomepageDomainData {
         let accent = theme.color(for: "nutrition")
-        let state = currentFastingState(now: Date())
+        let state = currentFastingState(now: ctx.clockNow)
         let metric = NutritionHeatmapMetric(rawValue: ctx.nutritionHeatmapMetricRaw) ?? .protein
 
         // History series: the heatmap metric preference picks which series
@@ -650,7 +650,7 @@ enum DashboardTileBuilder {
         )
       }
       func symptomsDomainData() -> HomepageDomainData {
-        let today = SeptenaDate.today
+        let today = ctx.clockToday
         let rows = fetchSymptoms(from: lastNDays(DashboardTileBuilder.historyDays).first ?? today, to: today)
         let todayRows = rows.filter { $0.date == today }
         let peak = todayRows.map(\.severity).max() ?? 0
@@ -690,7 +690,7 @@ enum DashboardTileBuilder {
       }
 
       func medicationsDomainData() -> HomepageDomainData {
-        let today = SeptenaDate.today
+        let today = ctx.clockToday
         let active = fetchMedicationDefinitions().filter { !$0.archived }
         let rows = fetchMedicationDoses(from: lastNDays(DashboardTileBuilder.historyDays).first ?? today, to: today)
         let todayRows = rows.filter { $0.date == today }
@@ -790,7 +790,7 @@ enum DashboardTileBuilder {
         let rows = fetchActivityDays(from: dates.first ?? "", to: dates.last ?? "")
         guard bridge.isAvailable || !rows.isEmpty else { return nil }
         let byDate = Dictionary(rows.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
-        let today = dates.last ?? SeptenaDate.today
+        let today = dates.last ?? ctx.clockToday
         let todayRow = byDate[today]
         let steps = bridge.isAvailable ? bridge.stepsToday           : (todayRow?.stepCount ?? 0)
         let kcal  = bridge.isAvailable ? bridge.activeKcalToday      : (todayRow?.activeKcal ?? 0)
@@ -810,8 +810,9 @@ enum DashboardTileBuilder {
       func lastNDays(_ n: Int) -> [String] {
         let cal = Calendar.current
         let fmt = DashboardTileBuilder.ymdFormatter
+        let anchor = SeptenaDate.startOfDay(for: ctx.clockToday) ?? ctx.clockNow
         return (0..<n).reversed().compactMap { offset in
-          cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+          cal.date(byAdding: .day, value: -offset, to: anchor).map(fmt.string(from:))
         }
       }
 

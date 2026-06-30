@@ -278,20 +278,21 @@ final class NextSuggestionsModel {
   /// scoped per-date so yesterday's skips don't follow you forward.
   var skipped: Set<String> = []
 
-  private var today: String { SeptenaDate.today }
+  private var cachedToday: String = ""
 
-  func paintFromCache() {
+  func paintFromCache(today: String) {
+    cachedToday = today
     skipped = Self.loadSkips(date: today)
     hasLoaded = true
   }
 
-  func load() async {
+  func load(now: Date) async {
     // Run the history scan + scorer on the MirrorReader's background actor so
     // the read (14–30 days of nutrition/training/intake/mood) never hitches the
     // Next tab. `computeAll` is `nonisolated` so it can execute off the main
     // actor; `[NextSuggestion]` is `Sendable` so it crosses back cleanly.
-    let now = Date()
-    let todayDate = today
+    let todayDate = SeptenaDate.format(now) ?? cachedToday
+    cachedToday = todayDate
     let (computed, remoteSkips) = await MirrorReader.shared.read { ctx -> ([NextSuggestion], Set<String>) in
       let suggestions = Self.computeAll(context: ctx, now: now)
       let remote = Set(SettingsMirror.loadSettings(context: ctx)?.nextSkips?[todayDate] ?? [])
@@ -310,14 +311,14 @@ final class NextSuggestionsModel {
   /// Gather ~14–30 days of history + today's state from the local mirror and
   /// run the pure scorer. Shared by the Next view and the watch snapshot
   /// publisher so both surface the identical suggestions.
-  nonisolated static func computeAll(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
-    let today = SeptenaDate.today
-    let since14 = daysAgoISO(14)
-    let since30 = daysAgoISO(30)
+  nonisolated static func computeAll(context ctx: ModelContext, now: Date) -> [NextSuggestion] {
+    let today = SeptenaDate.format(now) ?? ""
+    let since14 = daysAgoISO(14, now: now)
+    let since30 = daysAgoISO(30, now: now)
 
     let nut = ChecklistMirror.loadNutritionEntries(context: ctx, since: since14)
     let tr: [ExerciseEntry]? = ChecklistMirror.loadTrainingEntries(context: ctx, since: since30)
-    let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx)
+    let sw: SuggestedWorkoutResponse? = ChecklistMirror.loadSuggestedWorkout(context: ctx, today: today, now: now)
     let st: AppSettings? = SettingsMirror.loadSettings(context: ctx)
 
     // Mood is a per-daypart check-in (morning / afternoon / evening), not a
@@ -360,7 +361,7 @@ final class NextSuggestionsModel {
     let kinds = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>())) ?? [])
       .filter { $0.archivedAt == nil }
     guard !kinds.isEmpty else { return [] }
-    let since14 = daysAgoISO(14)
+    let since14 = daysAgoISO(14, now: now)
     let recent = (try? ctx.fetch(FetchDescriptor<IntakeEventEntity>(
       predicate: #Predicate { $0.date >= since14 }))) ?? []
     guard !recent.isEmpty else { return [] }
@@ -451,14 +452,15 @@ final class NextSuggestionsModel {
   }
 
   /// Suggestions minus the ones the user skipped today — what actually renders.
-  static func visibleSuggestions(context ctx: ModelContext, now: Date = Date()) -> [NextSuggestion] {
-    let skips = loadSkips(date: SeptenaDate.today)
+  static func visibleSuggestions(context ctx: ModelContext, now: Date) -> [NextSuggestion] {
+    let today = SeptenaDate.format(now) ?? ""
+    let skips = loadSkips(date: today)
     return computeAll(context: ctx, now: now).filter { !skips.contains($0.id) }
   }
 
   func toggleSkip(_ id: String, context: ModelContext) {
     Haptics.tick()
-    let date = today
+    let date = cachedToday
     let key = Self.skipKey(date: date)
     var arr = UserDefaults.standard.stringArray(forKey: key) ?? []
     if let i = arr.firstIndex(of: id) {
@@ -494,9 +496,9 @@ final class NextSuggestionsModel {
 
   // MARK: Date helpers
 
-  nonisolated private static func daysAgoISO(_ days: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-    return SeptenaDate.format(d) ?? SeptenaDate.today
+  nonisolated private static func daysAgoISO(_ days: Int, now: Date) -> String {
+    let d = Calendar.current.date(byAdding: .day, value: -days, to: now) ?? now
+    return SeptenaDate.format(d) ?? ""
   }
 
   // MARK: Compute (pure, takes everything it needs)

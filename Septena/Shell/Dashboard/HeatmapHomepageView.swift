@@ -22,6 +22,7 @@ import SwiftUI
 /// and the deep-dive grid feel like one component family — same 0…4
 /// color ramp, same Differentiate-Without-Color overlay.
 struct HeatmapHomepageView<MenuContent: View>: View {
+  @Environment(DayClock.self) private var clock
   let items: [HomepageDomainData]
   let onTap: (DomainTapAction) -> Void
   /// Long-press / right-click quickadd menu per domain — same plumbing
@@ -102,6 +103,7 @@ private struct HeatmapContainerWidthKey: PreferenceKey {
 /// Card variant used in the multi-column iPad grid. Icon + title + headline
 /// stack above the heatmap so the grid cells stay square-ish and readable.
 private struct HeatmapDomainCard: View {
+  @Environment(DayClock.self) private var clock
   let data: HomepageDomainData
 
   private let windowDays: Int = 90
@@ -123,7 +125,7 @@ private struct HeatmapDomainCard: View {
         .lineLimit(2)
         .fixedSize(horizontal: false, vertical: true)
       ConsistencyHeatmap(
-        endDate: Date(),
+        endDate: clock.now,
         firstDataDate: firstDataDate,
         accent: data.accent,
         getDay: { iso in
@@ -143,11 +145,13 @@ private struct HeatmapDomainCard: View {
   }
 
   private var firstDataDate: Date? {
-    Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: Date())
+    Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: clock.now)
   }
 
   private var levelByIso: [String: Int] {
-    HeatmapLevels.buildLevelMap(from: data.history?.wire, windowDays: windowDays)
+    let today = SeptenaDate.parse(clock.today) ?? Date()
+    return HeatmapLevels.buildLevelMap(from: data.history?.wire, windowDays: windowDays,
+                                       today: today)
   }
 }
 

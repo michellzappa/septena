@@ -222,7 +222,8 @@ struct WeekDashboardView: View {
       recentTraining: ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) ?? [],
       sessionTypes: [],
       github: ResponseCache.load(GitHubContributions.self, forKey: CacheKey.github) ?? .empty,
-      bodyRows: ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) ?? []))
+      bodyRows: ResponseCache.load([WithingsRow].self, forKey: CacheKey.bodyRows) ?? [],
+      now: Date()))
   }
 
   /// iPhone compact: two columns. iPad regular & macOS: adaptive —
@@ -278,6 +279,11 @@ struct WeekDashboardView: View {
     #else
     false
     #endif
+  }
+
+  /// Balanced breathing room above (chrome / `pageTop`) and below the dial.
+  private var dialBreathingRoom: CGFloat {
+    DialHeroMetrics.breathingRoom(chromeBarAbove: chromeBarReservesTop)
   }
 
   /// True when no section or intake page is pushed on iPad — drives hiding the
@@ -380,16 +386,23 @@ struct WeekDashboardView: View {
               }
             }
           } else {
-            // The day view — today at a glance, circular or linear.
-            dayView
-            rightColumnBody
+            // Stack the dial above the grid with a gap that matches the chrome
+            // inset above — iPad's 74pt bar vs the old uniform sectionSpacing
+            // left the donut visually high in the sky wash.
+            VStack(spacing: 0) {
+              dayView
+              rightColumnBody
+                .padding(.top, dialBreathingRoom)
+            }
           }
         }
         // On iPad the floating chrome bar already reserves the top space
         // (`PageChromeMetrics.iPadBarHeight`), so the page's own `pageTop` is
         // redundant there — drop it so Today's content sits at the same height
-        // as the list tabs. iPhone keeps it (no bar inset there).
-        .septenaSurface(top: chromeBarReservesTop ? 0 : Theme.pageTop)
+        // as the list tabs. iPhone keeps a tightened `pageTop`.
+        .septenaSurface(top: chromeBarReservesTop ? 0 : dialBreathingRoom,
+                        includesHorizontal: !usesPushNavigation)
+        .septenaWideContentMargins()
         #if DEBUG
         // Hidden keyboard shortcuts: ⟨ / ⟩ (the comma/period keys) step the
         // homepage back/forward a day through the last week, driving
@@ -748,12 +761,14 @@ struct WeekDashboardView: View {
     await PerfTrace.span("dash.loadAll") {
       let snap = await PerfTrace.span("dash.reader.read") {
         await reader.read(Self.mirrorSections,
-                          today: SeptenaDate.today,
+                          today: clock.today,
                           days: Self.historyDays)
       }
       apply(snap, Self.mirrorSections)
       await PerfTrace.span("dash.refreshTasks") { await refreshTasks() }
-      await PerfTrace.span("dash.dailies.load") { await dailies.load() }
+      await PerfTrace.span("dash.dailies.load") {
+        await dailies.load(today: clock.today, now: clock.now)
+      }
       loadMenuExtras()
     }
     #if os(iOS)
@@ -853,7 +868,7 @@ struct WeekDashboardView: View {
     let mirror = sections.intersection(Self.mirrorSections)
     if !mirror.isEmpty {
       let snap = await reader.read(mirror,
-                                   today: SeptenaDate.today,
+                                   today: clock.today,
                                    days: Self.historyDays)
       apply(snap, mirror)
     }
@@ -863,7 +878,7 @@ struct WeekDashboardView: View {
     // The "today" items model mirrors habits/supplements/chores — keep it
     // in step when any of those reloaded.
     if !sections.isDisjoint(with: [.habits, .chores, .supplements]) {
-      await dailies.load()
+      await dailies.load(today: clock.today, now: clock.now)
     }
   }
 
@@ -875,9 +890,12 @@ struct WeekDashboardView: View {
   private func refreshTasks() async {
     let ctx = LocalStore.shared.container.mainContext
     async let statsTask = Task { @MainActor in
-      TaskReads.dashboardStats(days: Self.historyDays, context: ctx)
+      TaskReads.dashboardStats(days: Self.historyDays, today: clock.today,
+                               now: clock.now, context: ctx)
     }.value
-    async let listTask = TaskReads.list(view: "logbook", days: 1, context: ctx)
+    async let listTask = TaskReads.list(view: "logbook", days: 1,
+                                        today: clock.today, now: clock.now,
+                                        context: ctx)
     let (stats, listResult) = await (statsTask, listTask)
     taskCounts = stats.counts
     ResponseCache.save(stats.counts, forKey: CacheKey.taskCounts)
@@ -936,7 +954,7 @@ struct WeekDashboardView: View {
   /// tiles' first paint (the menus need it only when opened).
   private func loadMenuExtras() {
     Task {
-      let m = await reader.menuExtras(today: SeptenaDate.today)
+      let m = await reader.menuExtras(today: clock.today, now: clock.now)
       nutritionHistory = m.nutritionHistory
       trainingSessionTypes = m.trainingSessionTypes
       trainingSuggestedId = m.trainingSuggestedId
@@ -1021,7 +1039,8 @@ struct WeekDashboardView: View {
   }
 
   private func sinceDate(daysBack: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+    let anchor = SeptenaDate.startOfDay(for: clock.today) ?? clock.now
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: anchor) ?? anchor
     return Self.ymdFormatter.string(from: d)
   }
 
@@ -1185,7 +1204,8 @@ struct WeekDashboardView: View {
       DashboardTileBuilder.visibleItems(for: $0, ctx: tileContext, theme: theme)
     }
     let pinned = pinnedGoals.map {
-      PinnedGoalTiles.domainData($0, theme: theme, context: modelContext)
+      PinnedGoalTiles.domainData($0, theme: theme, context: modelContext,
+                                 today: clock.today, now: clock.now)
     }
     return pinned + sectionTiles
   }
@@ -1252,7 +1272,8 @@ struct WeekDashboardView: View {
       recentTraining: recentTraining,
       sessionTypes: trainingSessionTypes,
       github: githubContributions,
-      bodyRows: bodyRows)
+      bodyRows: bodyRows,
+      now: clock.now)
   }
 
   func domainData(for domain: HomepageDomain) -> HomepageDomainData? {
@@ -1436,8 +1457,8 @@ struct WeekDashboardView: View {
     guard !active.isEmpty else { return [] }
     let byID = Dictionary(uniqueKeysWithValues: active.map { ($0.id, $0) })
 
-    let recent = fetchSymptoms(from: lastNDays(30).first ?? SeptenaDate.today,
-                               to: SeptenaDate.today)
+    let recent = fetchSymptoms(from: lastNDays(30).first ?? clock.today,
+                               to: clock.today)
       .sorted { $0.occurredAt > $1.occurredAt }
     var seen = Set<String>()
     var ordered: [SymptomDefinitionEntity] = []
@@ -1463,8 +1484,8 @@ struct WeekDashboardView: View {
                       announce: "Logged symptom.", logCommit: logCommit) {
       SeptenaServices.shared.symptomsMutator.addEvent(
         symptomID: symptomID,
-        date: SeptenaDate.today,
-        time: SeptenaDate.nowHHMM,
+        date: clock.today,
+        time: EventTimestamp.hhmm(from: clock.now),
         severity: severity)
     }
     quickLogStamp += 1
@@ -1516,7 +1537,7 @@ struct WeekDashboardView: View {
   /// bucketed med shows once its window arrives). As-needed meds are always
   /// available. Mirrors the Supplements quick-add's "due now" semantics.
   private func medicationQuickItems() -> [MedicationQuickItem] {
-    let today = SeptenaDate.today
+    let today = clock.today
     let active = fetchMedicationDefinitions().filter { !$0.archived }
     guard !active.isEmpty else { return [] }
     let todayDoses = fetchMedicationDoses(from: today, to: today)
@@ -1549,8 +1570,8 @@ struct WeekDashboardView: View {
                       announce: "Logged medication dose.", logCommit: logCommit) {
       SeptenaServices.shared.medicationsMutator.addDose(
         medicationID: item.id,
-        date: SeptenaDate.today,
-        time: SeptenaDate.nowHHMM,
+        date: clock.today,
+        time: EventTimestamp.hhmm(from: clock.now),
         status: "taken",
         doseValue: def?.defaultDoseValue,
         doseUnit: def?.defaultDoseUnit)
@@ -1583,6 +1604,7 @@ struct WeekDashboardView: View {
   private var todayOpenTasks: [SeptenaTask] {
     let resp = TaskReads.localList(
       view: "today", area: nil, project: nil, days: 1,
+      today: clock.today, now: clock.now,
       context: LocalStore.shared.container.mainContext
     )
     return resp.items.filter { $0.status != .done }
@@ -1654,8 +1676,9 @@ struct WeekDashboardView: View {
   private func lastNDays(_ n: Int) -> [String] {
     let cal = Calendar.current
     let fmt = Self.ymdFormatter
+    let anchor = SeptenaDate.startOfDay(for: clock.today) ?? clock.now
     return (0..<n).reversed().compactMap { offset in
-      cal.date(byAdding: .day, value: -offset, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -offset, to: anchor).map(fmt.string(from:))
     }
   }
 
@@ -1800,7 +1823,7 @@ struct WeekDashboardView: View {
     SectionLog.newLog(section: "gut", accent: theme.color(for: "gut"),
                       logCommit: logCommit) {
       SeptenaServices.shared.gutMutator.addEntry(
-        date: SeptenaDate.today, time: SeptenaDate.nowHHMM, bristol: bristol)
+        date: clock.today, time: EventTimestamp.hhmm(from: clock.now), bristol: bristol)
       GutBristolRecorder.record(bristol)
       AddInfoSection.gut.notifyTilesChanged()
     }

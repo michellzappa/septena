@@ -5,6 +5,9 @@ struct HeatmapTileRow: View {
   let display: TileDisplayData
   var useHover: Bool = false
   var windowDays: Int = 90
+  #if !WIDGET_EXTENSION
+  @Environment(DayClock.self) private var dayClock
+  #endif
 
   var body: some View {
     #if WIDGET_EXTENSION
@@ -74,7 +77,7 @@ struct HeatmapTileRow: View {
 
   private var heatmap: some View {
     ConsistencyHeatmap(
-      endDate: Date(),
+      endDate: heatmapEndDate,
       firstDataDate: firstDataDate,
       accent: display.accent,
       getDay: { iso in
@@ -86,12 +89,25 @@ struct HeatmapTileRow: View {
     )
   }
 
+  private var heatmapEndDate: Date {
+    #if WIDGET_EXTENSION
+    Date()
+    #else
+    dayClock.now
+    #endif
+  }
+
   private var firstDataDate: Date? {
-    Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: Date())
+    Calendar.current.date(byAdding: .day, value: -(windowDays - 1), to: heatmapEndDate)
   }
 
   private var levelByIso: [String: Int] {
-    HeatmapLevels.buildLevelMap(from: display.history, windowDays: windowDays)
+    #if WIDGET_EXTENSION
+    HeatmapLevels.buildLevelMap(from: display.history, windowDays: windowDays, today: Date())
+    #else
+    HeatmapLevels.buildLevelMap(from: display.history, windowDays: windowDays,
+                                today: dayClock.now)
+    #endif
   }
 }
 

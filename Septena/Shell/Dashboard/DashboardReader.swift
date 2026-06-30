@@ -96,25 +96,25 @@ actor DashboardReader {
     var s = Snapshot()
     let ctx = modelContext
     if sections.contains(.habits) {
-      s.habitHistory = ChecklistMirror.loadHabitsHistory(context: ctx, days: days).daily.map { $0.done }
+      s.habitHistory = ChecklistMirror.loadHabitsHistory(context: ctx, days: days, today: today).daily.map { $0.done }
     }
     if sections.contains(.chores) {
-      s.choreHistory = ChecklistMirror.loadChoresHistory(context: ctx, days: days).daily.map { $0.completed }
+      s.choreHistory = ChecklistMirror.loadChoresHistory(context: ctx, days: days, today: today).daily.map { $0.completed }
     }
     if sections.contains(.supplements) {
-      s.supplementHistory = ChecklistMirror.loadSupplementsHistory(context: ctx, days: days).daily.map { $0.done }
+      s.supplementHistory = ChecklistMirror.loadSupplementsHistory(context: ctx, days: days, today: today).daily.map { $0.done }
     }
     if sections.contains(.training) {
-      s.cardio = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: days)
-      s.trainingEntries = ChecklistMirror.loadTrainingEntries(context: ctx, since: Self.sinceString(daysBack: days))
+      s.cardio = ChecklistMirror.loadTrainingCardioHistory(context: ctx, days: days, today: today)
+      s.trainingEntries = ChecklistMirror.loadTrainingEntries(context: ctx, since: Self.sinceString(daysBack: days, today: today))
     }
     // Tasks are intentionally absent: `TaskReads` → `LocalCache` is
     // `@MainActor` (the core persistence layer's contract), so the view
     // reads them on the main actor via `refreshTasks()`. Everything here
     // goes through `context.fetch` directly and is safe off-main.
     if sections.contains(.nutrition) {
-      s.nutritionStats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: days)
-      s.todayNutrition = ChecklistMirror.loadNutritionToday(context: ctx)
+      s.nutritionStats = ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: days, today: today)
+      s.todayNutrition = ChecklistMirror.loadNutritionToday(context: ctx, today: today)
       s.nutritionTarget = NutritionPrefs.loadMacrosConfig()
       s.macroColors = SettingsMirror.loadSettings(context: ctx)?.nutrition?.macroColors
     }
@@ -123,32 +123,33 @@ actor DashboardReader {
     }
     if sections.contains(.gut) {
       s.gutToday = ChecklistMirror.loadGutDay(context: ctx, date: today)
-      s.gutHistory = ChecklistMirror.loadGutHistory(context: ctx, days: days).daily
+      s.gutHistory = ChecklistMirror.loadGutHistory(context: ctx, days: days, today: today).daily
     }
     if sections.contains(.mood) {
       s.moodToday = ChecklistMirror.loadMoodDay(context: ctx, date: today)
-      s.moodHistory = ChecklistMirror.loadMoodHistory(context: ctx, days: days).daily
+      s.moodHistory = ChecklistMirror.loadMoodHistory(context: ctx, days: days, today: today).daily
     }
     if sections.contains(.hydration) {
-      s.hydrationHistory = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days)
+      s.hydrationHistory = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days, today: today)
     }
     return s
   }
 
   /// Second-wave QuickAdd menu data. Reads the recommendation inputs (meal
   /// history, training catalog) on the actor's context.
-  func menuExtras(today: String) -> MenuExtras {
+  func menuExtras(today: String, now: Date) -> MenuExtras {
     var m = MenuExtras()
     let ctx = modelContext
 
     // Nutrition: 30-day meal history feeds menu recommendations + search.
+    let anchor = SeptenaDate.startOfDay(for: today) ?? now
     let since = SeptenaDate.format(
-      Calendar.current.date(byAdding: .day, value: -30, to: Date())
+      Calendar.current.date(byAdding: .day, value: -30, to: anchor)
     ) ?? today
     m.nutritionHistory = ChecklistMirror.loadNutritionEntries(context: ctx, since: since)
     // Training: session catalog + suggested + recency.
     m.trainingSessionTypes = ChecklistMirror.loadSessionTypes(context: ctx)
-    let resp = ChecklistMirror.loadSuggestedWorkout(context: ctx)
+    let resp = ChecklistMirror.loadSuggestedWorkout(context: ctx, today: today, now: now)
     m.trainingSuggestedId = resp.suggested?.type
     m.trainingDaysAgo = resp.daysAgo
     return m
@@ -156,8 +157,9 @@ actor DashboardReader {
 
   /// `yyyy-MM-dd` for `daysBack` days ago — the string boundary the
   /// training mirror reads filter on.
-  private static func sinceString(daysBack: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+  private static func sinceString(daysBack: Int, today: String) -> String {
+    let anchor = SeptenaDate.startOfDay(for: today) ?? Date()
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: anchor) ?? anchor
     let f = DateFormatter()
     f.dateFormat = "yyyy-MM-dd"
     return f.string(from: d)

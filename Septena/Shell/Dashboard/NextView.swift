@@ -181,13 +181,13 @@ struct NextView: View {
     guard let id = doneEntityID(e) else { return }
     switch e.sectionKey {
     case "mood":
-      editingMood = ChecklistMirror.loadMoodDay(context: modelContext, date: SeptenaDate.today)
+      editingMood = ChecklistMirror.loadMoodDay(context: modelContext, date: clock.today)
         .entries.first { $0.id == id }
     case "gut":
-      editingGut = ChecklistMirror.loadGutDay(context: modelContext, date: SeptenaDate.today)
+      editingGut = ChecklistMirror.loadGutDay(context: modelContext, date: clock.today)
         .entries.first { $0.id == id }
     case "nutrition":
-      editingNutrition = ChecklistMirror.loadNutritionToday(context: modelContext)
+      editingNutrition = ChecklistMirror.loadNutritionToday(context: modelContext, today: clock.today)
         .first { $0.id == id }
     default: break
     }
@@ -418,6 +418,11 @@ struct NextView: View {
       },
       add: .addInfo
     )
+    #if os(macOS)
+    .septenaWideContentMargins(contentGutter: TaskCardMetrics.margin)
+    #else
+    .septenaWideContentMargins()
+    #endif
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
@@ -447,7 +452,7 @@ struct NextView: View {
       if let mode = composerMode {
         TaskComposerCard(mode: mode, areas: areas, projects: projects,
                          accent: theme.color(for: "tasks"),
-                         onDone: { Task { await tasksModel.load() } })
+                         onDone: { Task { await tasksModel.load(today: clock.today, now: clock.now) } })
       }
     }
     // "Done Today" editors hosted on the List container (NOT inside the
@@ -455,10 +460,10 @@ struct NextView: View {
     // iPhone, a docked inspector on iPad/macOS; the feed refreshes from each
     // mutator's change notification, so onSave/onDone are no-ops.
     .adaptiveDetail(item: $editingMood) { entry in
-      EditMoodEntrySheet(date: SeptenaDate.today, original: entry, onSave: {})
+      EditMoodEntrySheet(date: clock.today, original: entry, onSave: {})
     }
     .adaptiveDetail(item: $editingGut) { entry in
-      EditGutEntrySheet(date: SeptenaDate.today, original: entry, onSave: { _ in })
+      EditGutEntrySheet(date: clock.today, original: entry, onSave: { _ in })
     }
     .adaptiveDetail(item: $editingNutrition) { entry in
       EditNutritionEntrySheet(original: entry, onDone: {})
@@ -466,13 +471,13 @@ struct NextView: View {
     .task {
       areas = LocalCache.areas(in: modelContext)
       projects = LocalCache.projects(in: modelContext)
-      model.paintFromCache()
+      model.paintFromCache(today: clock.today)
       tasksModel.paintFromCache()
-      suggestionsModel.paintFromCache()
-      async let a: () = model.load()
-      async let b: () = tasksModel.load()
-      async let c: () = suggestionsModel.load()
-      async let d: () = doneModel.load()
+      suggestionsModel.paintFromCache(today: clock.today)
+      async let a: () = model.load(today: clock.today)
+      async let b: () = tasksModel.load(today: clock.today, now: clock.now)
+      async let c: () = suggestionsModel.load(now: clock.now)
+      async let d: () = doneModel.load(today: clock.today, now: clock.now)
       _ = await (a, b, c, d)
     }
     // Repaint when other surfaces (Tasks tab, menu bar, outbox drain)
@@ -480,7 +485,7 @@ struct NextView: View {
     // lands in the Done Today log, so reload that too.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       tasksModel.refreshFromCache()
-      Task { await doneModel.load() }
+      Task { await doneModel.load(today: clock.today, now: clock.now) }
     }
     // Passive logs (mood check-in, caffeine, meals, …) post scoped
     // `.septenaDataChanged` via their mutators — reload suggestions / done
@@ -490,9 +495,9 @@ struct NextView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
       if note.isCloudKitBatch {
         Task {
-          async let a: () = model.load()
-          async let b: () = suggestionsModel.load()
-          async let c: () = doneModel.load()
+          async let a: () = model.load(today: clock.today)
+          async let b: () = suggestionsModel.load(now: clock.now)
+          async let c: () = doneModel.load(today: clock.today, now: clock.now)
           _ = await (a, b, c)
         }
         return
@@ -501,8 +506,8 @@ struct NextView: View {
       let forDone = note.affectsAnySection(of: Self.doneLogKeys)
       guard forSuggestions || forDone else { return }
       Task {
-        if forSuggestions { await suggestionsModel.load() }
-        if forDone { await doneModel.load() }
+        if forSuggestions { await suggestionsModel.load(now: clock.now) }
+        if forDone { await doneModel.load(today: clock.today, now: clock.now) }
       }
     }
     // Day rollover (midnight crossed while the app was alive, or session
@@ -510,10 +515,10 @@ struct NextView: View {
     // the new day's bucket and completion state.
     .onChange(of: clock.today) { _, _ in
       Task {
-        async let a: () = model.load()
-        async let b: () = tasksModel.load()
-        async let c: () = suggestionsModel.load()
-        async let d: () = doneModel.load()
+        async let a: () = model.load(today: clock.today)
+        async let b: () = tasksModel.load(today: clock.today, now: clock.now)
+        async let c: () = suggestionsModel.load(now: clock.now)
+        async let d: () = doneModel.load(today: clock.today, now: clock.now)
         _ = await (a, b, c, d)
       }
     }
