@@ -76,7 +76,8 @@ struct MoodDestinationView: View {
       // and the drawer stays put.
       if loggedFromDrawer { loggedFromDrawer = false; dismiss() }
     }) {
-      AddMoodPage(onLogged: { loggedFromDrawer = true; Task { await reload() } })
+      AddMoodPage(anchorTime: clock.now, date: viewingDate,
+                  onLogged: { loggedFromDrawer = true; Task { await reload() } })
     }
     .adaptiveDetail(item: $editing) { entry in
       EditMoodEntrySheet(date: viewingDate,
@@ -199,7 +200,7 @@ struct MoodDestinationView: View {
     let wantsMonth = isViewingToday
     let result = await MirrorReader.shared.read { ctx in
       (day: ChecklistMirror.loadMoodDay(context: ctx, date: date),
-       month: wantsMonth ? Self.loadMonthEntries(context: ctx) : nil)
+       month: wantsMonth ? Self.loadMonthEntries(context: ctx, today: clock.today) : nil)
     }
     today = result.day
     if let month = result.month {
@@ -216,8 +217,7 @@ struct MoodDestinationView: View {
                                        isEmpty: today?.entries.isEmpty ?? true)
   }
 
-  private static func loadMonthEntries(context: ModelContext) -> [MoodEntry] {
-    let today = SeptenaDate.today
+  private static func loadMonthEntries(context: ModelContext, today: String) -> [MoodEntry] {
     guard let todayDate = SeptenaDate.parse(today) else { return [] }
     let start = Calendar.current.date(byAdding: .day, value: -29, to: todayDate) ?? todayDate
     let startStr = SeptenaDate.format(start) ?? today

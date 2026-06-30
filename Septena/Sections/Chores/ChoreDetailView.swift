@@ -14,6 +14,7 @@ struct ChoreDetailView: View {
   let onEdit: () -> Void
 
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   private var accent: Color { theme.color(for: "chores") }
 
   var body: some View {
@@ -22,13 +23,14 @@ struct ChoreDetailView: View {
       accent: accent,
       load: { ctx in
         Self.detail(chore: chore,
-                    dates: ChecklistMirror.choreCompletionDates(context: ctx, choreID: chore.id))
+                    dates: ChecklistMirror.choreCompletionDates(context: ctx, choreID: chore.id),
+                    today: clock.today)
       },
       onEdit: onEdit
     )
   }
 
-  static func detail(chore: ChoreItem, dates: [String]) -> LogDetail {
+  static func detail(chore: ChoreItem, dates: [String], today: String) -> LogDetail {
     let cadence = Cadence.acrossDays(dates: dates)
     let learnedDays = cadence?.medianGap
     let confident = cadence?.isConfident ?? false
@@ -41,8 +43,8 @@ struct ChoreDetailView: View {
       : "Done \(dates.count) \(dates.count == 1 ? "time" : "times")"
 
     d.tiles = [
-      LogStat(value: lastCompleted.map(LogDetailFormat.relativeDay) ?? "—", caption: "Last done"),
-      LogStat(value: chore.dueDate.map(LogDetailFormat.relativeDay) ?? "—",
+      LogStat(value: lastCompleted.map { LogDetailFormat.relativeDay($0, today: today) } ?? "—", caption: "Last done"),
+      LogStat(value: chore.dueDate.map { LogDetailFormat.relativeDay($0, today: today) } ?? "—",
               caption: "Next due",
               tone: chore.daysOverdue > 0 ? .warn : .normal),
     ]
@@ -58,7 +60,7 @@ struct ChoreDetailView: View {
                                           value: "about every \(cadenceLabel(learned))",
                                           muted: !confident))
       if confident, let predicted = learnedNextDue(last: lastCompleted, gap: learned) {
-        cadenceCard.note = "At your real pace, expect this again \(LogDetailFormat.relativeDay(predicted))."
+        cadenceCard.note = "At your real pace, expect this again \(LogDetailFormat.relativeDay(predicted, today: today))."
       } else if !confident {
         cadenceCard.note = "Learning your rhythm — a couple more completions and Septena will predict the next one."
       }
@@ -73,7 +75,7 @@ struct ChoreDetailView: View {
                              level: { HeatmapLevel.done(done.contains($0)) })
     }
     d.recent = dates.reversed().prefix(12).map {
-      LogRecent(title: LogDetailFormat.longDay($0), trailing: LogDetailFormat.relativeDay($0))
+      LogRecent(title: LogDetailFormat.longDay($0), trailing: LogDetailFormat.relativeDay($0, today: today))
     }
     return d
   }

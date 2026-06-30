@@ -136,9 +136,10 @@ enum ChoresPlugin: SectionPlugin {
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? {
     guard descriptorID == "chores.overdue" else { return nil }
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     // Reuse the same overdue definition the Next feed and Today pill use,
     // most-overdue first.
-    let overdue = ChecklistMirror.loadChores(context: context, today: SeptenaDate.today)
+    let overdue = ChecklistMirror.loadChores(context: context, today: today)
       .filter { $0.daysOverdue > 0 }
       .sorted { $0.daysOverdue > $1.daysOverdue }
     guard let top = overdue.first else { return nil }   // nothing overdue → suppress
@@ -151,7 +152,7 @@ enum ChoresPlugin: SectionPlugin {
       return (e.date, EventTimestamp.hhmm(from: e.occurredAt))
     }
     let minute = NextScoring.learnedLateMinute(dateTimes: dateTimes,
-                                               today: SeptenaDate.today,
+                                               today: today,
                                                fallback: 18 * 60)
     let n = overdue.count
     let body = n == 1

@@ -21,6 +21,7 @@ private func visibleBuckets(_ all: [String]) -> [String] {
 
 struct AddHabitPage: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -91,7 +92,7 @@ struct AddHabitPage: View {
   }
 
   private func toggle(_ item: HabitDayItem) {
-    checklistMutator.toggleHabit(id: item.id, date: SeptenaDate.today, done: true)
+    checklistMutator.toggleHabit(id: item.id, date: clock.today, done: true)
     AddInfoSection.habits.notifyTilesChanged()
     Haptics.tick()
     dismiss()
@@ -110,6 +111,6 @@ struct AddHabitPage: View {
   private func load() async {
     let context = LocalStore.shared.container.mainContext
     // Habits are CloudKit-authoritative — read directly from the local mirror.
-    day = ChecklistMirror.loadHabitsDay(context: context, date: SeptenaDate.today)
+    day = ChecklistMirror.loadHabitsDay(context: context, date: clock.today)
   }
 }

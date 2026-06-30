@@ -107,7 +107,7 @@ enum MoodPlugin: SectionPlugin {
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? {
     guard descriptorID == "mood.checkin" else { return nil }
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     let bucket = DayBucket.from(date: now)
     let day = ChecklistMirror.loadMoodDay(context: context, date: today)
     // Already checked in for the daypart we're in → nothing to nudge.

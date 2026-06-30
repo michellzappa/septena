@@ -31,11 +31,12 @@ enum NutritionPlugin: SectionPlugin {
   /// past-day backfill is a correction, not a moment.
   @MainActor
   static func commitMeal(loggedAt: Date,
+                         today: String,
                          accent: Color,
                          announce: String? = nil,
                          logCommit: LogCommitCenter?,
                          write: () -> Void) {
-    if breaksFast(at: loggedAt) {
+    if breaksFast(at: loggedAt, today: today) {
       SectionLog.newLog(section: "nutrition", accent: accent,
                         announce: announce, canvas: true,
                         canvasCaption: String(localized: "Broke fast",
@@ -50,10 +51,10 @@ enum NutritionPlugin: SectionPlugin {
   /// True when `loggedAt` is today and no real meal (non-water entry)
   /// exists earlier that day in the local mirror.
   @MainActor
-  private static func breaksFast(at loggedAt: Date) -> Bool {
+  private static func breaksFast(at loggedAt: Date, today: String) -> Bool {
     let cal = Calendar.current
-    guard let today = SeptenaDate.parse(SeptenaDate.today),
-          cal.isDate(loggedAt, inSameDayAs: today) else { return false }
+    guard let todayDate = SeptenaDate.parse(today),
+          cal.isDate(loggedAt, inSameDayAs: todayDate) else { return false }
     let dayStart = cal.startOfDay(for: loggedAt)
     guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return false }
     let descriptor = FetchDescriptor<NutritionEntryEntity>(

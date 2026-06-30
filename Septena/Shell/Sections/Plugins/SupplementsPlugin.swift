@@ -150,7 +150,7 @@ enum SupplementsPlugin: SectionPlugin {
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? {
     guard descriptorID == "supplements.incomplete" else { return nil }
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     guard let day = ChecklistMirror.loadSupplementsDay(context: context, date: today) else { return nil }
 
     let pending = day.items.filter { !$0.done }

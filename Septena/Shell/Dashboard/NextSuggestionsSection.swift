@@ -688,6 +688,7 @@ private struct NextSuggestionRow: View {
 
   @Environment(\.modelContext) private var modelContext
   @Environment(\.rowHInset) private var rowHInset
+  @Environment(DayClock.self) private var clock
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   var body: some View {
@@ -767,7 +768,7 @@ private struct NextSuggestionRow: View {
   private func commitIntake(_ value: String) {
     guard let kindID = suggestion.intakeKindID else { return }
     Haptics.tap()
-    IntakeNudgeLog.commit(kindID: kindID, value: value, logCommit: logCommit)
+    IntakeNudgeLog.commit(kindID: kindID, value: value, today: clock.today, logCommit: logCommit)
     // Optimistically hide this nudge; the dataChanged recompute reconciles
     // (a still-due "next" nudge has its own id and can reappear).
     model.toggleSkip(suggestion.id, context: modelContext)
@@ -799,7 +800,7 @@ private struct NextSuggestionRow: View {
 /// (intake is a high-frequency log, kept off the canvas like the page itself).
 @MainActor
 private enum IntakeNudgeLog {
-  static func commit(kindID: String, value: String, logCommit: LogCommitCenter?) {
+  static func commit(kindID: String, value: String, today: String, logCommit: LogCommitCenter?) {
     let ctx = LocalStore.shared.container.mainContext
     guard let kind = ((try? ctx.fetch(FetchDescriptor<IntakeKindEntity>(
       predicate: #Predicate { $0.id == kindID }))) ?? []).first else { return }
@@ -809,7 +810,7 @@ private enum IntakeNudgeLog {
     let amount = showsAmount ? method?.defaultAmount : nil
     SectionLog.quietLog(announce: "Logged \(kind.name).") {
       _ = SeptenaServices.shared.intakeMutator.addEntry(
-        kindID: kindID, date: SeptenaDate.today,
+        kindID: kindID, date: today,
         time: SeptenaDate.nowHHMM, method: token, amount: amount, count: count)
     }
   }

@@ -40,6 +40,7 @@ struct RootTabView: View {
   // `.appFunction` whose only Enabled toggle is reached *through* the Coach
   // tab, so gating the tab on it would strand the user with no way back.
   @Environment(SettingsStore.self) private var settingsStore
+  @Environment(DayClock.self) private var clock
   // Gates the in-flight training pill below the tab bar. Read here (not
   // just inside the accessory) so the `.tabViewBottomAccessory` modifier
   // is attached only mid-workout — an empty accessory content still draws
@@ -207,7 +208,7 @@ struct RootTabView: View {
       TrainingSessionView()
         .septenaModalSheet(macWidth: 560, macHeight: 600)
     case .moodCheckin:
-      AddMoodPage()
+      AddMoodPage(anchorTime: clock.now, date: clock.today)
         .septenaModalSheet(macWidth: 560, macHeight: 600)
     case .keyboardShortcuts:
       KeyboardShortcutsView()

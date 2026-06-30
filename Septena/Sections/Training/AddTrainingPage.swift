@@ -7,6 +7,7 @@ import SwiftUI
 
 struct AddTrainingPage: View {
   @Environment(\.modelContext) private var modelContext
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -80,7 +81,7 @@ struct AddTrainingPage: View {
   }
 
   private func load() async {
-    let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext, today: SeptenaDate.today, now: Date())
+    let resp = ChecklistMirror.loadSuggestedWorkout(context: modelContext, today: clock.today, now: clock.now)
     suggested = resp.suggested
     daysAgo = resp.daysAgo
     sessionTypes = ChecklistMirror.loadSessionTypes(context: modelContext) ?? []

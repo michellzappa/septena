@@ -12,6 +12,7 @@ struct BackfillChoresSheet: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
 
   let date: String
@@ -84,7 +85,7 @@ struct BackfillChoresSheet: View {
   }
 
   private func reload() {
-    chores = ChecklistMirror.loadChores(context: modelContext, today: SeptenaDate.today)
+    chores = ChecklistMirror.loadChores(context: modelContext, today: clock.today)
     // Fetch all `complete` events for the picked date, indexed by choreID.
     // Filtering client-side is fine — chore events table is small (one row
     // per (chore, day) and most chores fire weekly at most).

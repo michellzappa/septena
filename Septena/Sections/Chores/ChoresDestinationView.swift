@@ -53,9 +53,9 @@ struct ChoresDestinationView: View {
   /// still lingering struck-through up in Today, and caps at a handful so it
   /// stays a glance rather than a second copy of the full list.
   private var recentlyDone: [ChoreItem] {
-    let cutoff = SeptenaDate.parse(SeptenaDate.today)
+    let cutoff = SeptenaDate.parse(clock.today)
       .flatMap { Calendar.current.date(byAdding: .day, value: -6, to: $0) }
-      .flatMap(SeptenaDate.format) ?? SeptenaDate.today  // today + previous 6 = trailing 7
+      .flatMap(SeptenaDate.format) ?? clock.today  // today + previous 6 = trailing 7
     let lingering = Set(today.map(\.id))
     return model.chores
       .filter { chore in
@@ -134,7 +134,7 @@ struct ChoresDestinationView: View {
   private var recentlyDoneSection: some View {
     let rows = recentlyDone.map { chore -> BreakdownRow in
       let detail = chore.lastCompleted.map { iso -> String in
-        let day = LogDetailFormat.relativeDay(iso)
+        let day = LogDetailFormat.relativeDay(iso, today: clock.today)
         if let t = chore.lastCompletedTime, !t.isEmpty { return "\(day) · \(t)" }
         return day
       }
@@ -158,7 +158,7 @@ struct ChoresDestinationView: View {
       .map { chore in
         BreakdownRow(id: chore.id,
                      title: chore.emoji.map { "\($0) \(chore.name)" } ?? chore.name,
-                     detail: chore.lastCompleted.map { "last done \(LogDetailFormat.relativeDay($0))" }
+                     detail: chore.lastCompleted.map { "last done \(LogDetailFormat.relativeDay($0, today: clock.today))" }
                        ?? "not done yet")
       }
     return SectionBreakdownList(

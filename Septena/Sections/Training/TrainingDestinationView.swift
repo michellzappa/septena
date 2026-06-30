@@ -753,7 +753,7 @@ struct TrainingDestinationView: View {
     let cal = Calendar.current
     let fmt = Self.ymdFormatter
     // Anchor to this week's start (week-start per the user's locale).
-    let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+    let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: clock.now)
     guard let thisWeekStart = cal.date(from: comps) else { return [] }
     var weeks: [Date] = []
     for off in (0..<8).reversed() {
@@ -867,7 +867,7 @@ struct TrainingDestinationView: View {
     let fmt = Self.ymdFormatter
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
-      cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -off, to: clock.now).map(fmt.string(from:))
     }
   }
 
@@ -1201,7 +1201,7 @@ struct TrainingDestinationView: View {
     return (strength: [metaS] + strength, cardio: [metaC] + cardio)
   }
 
-  private var today: String { SeptenaDate.today }
+  private var today: String { clock.today }
 
   private enum MetricKind { case weight, duration, pace, volume, cardioTotal }
 
@@ -1392,9 +1392,11 @@ struct TrainingDestinationView: View {
   private func friendlyDate(_ iso: String) -> String {
     guard let d = Self.ymdLocalFormatter.date(from: iso) else { return iso }
     let cal = Calendar.current
-    if cal.isDateInToday(d)     { return "Today" }
-    if cal.isDateInYesterday(d) { return "Yesterday" }
-    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
+    if iso == clock.today { return "Today" }
+    if let todayDate = SeptenaDate.parse(clock.today),
+       let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: todayDate),
+       iso == SeptenaDate.format(yesterday) { return "Yesterday" }
+    let days = cal.dateComponents([.day], from: d, to: clock.now).day ?? 0
     if days < 7 {
       return Self.weekdayFormatter.string(from: d)
     }
@@ -1402,7 +1404,7 @@ struct TrainingDestinationView: View {
   }
 
   private func sinceDate(daysBack: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: clock.now) ?? clock.now
     return Self.ymdFormatter.string(from: d)
   }
 
@@ -1674,7 +1676,7 @@ final class TrainingDraftStore {
     return out
   }
 
-  func start(type: SessionTypeConfig, context: ModelContext) {
+  func start(type: SessionTypeConfig, context: ModelContext, today: String) {
     let exercises = type.exercises
     let last = ChecklistMirror.loadLastEntries(context: context, exercises: exercises)
     // Per-exercise category, with the routine's `kind` as fallback for
@@ -1703,7 +1705,7 @@ final class TrainingDraftStore {
     let isoF = ISO8601DateFormatter()
     isoF.formatOptions = [.withInternetDateTime]
     draft = DraftSession(
-      date: SeptenaDate.today,
+      date: today,
       time: timeF.string(from: now),
       sessionType: type.id,
       label: type.label,
@@ -2029,7 +2031,7 @@ struct TrainingSessionView: View {
            $0.label.caseInsensitiveCompare(pending) == .orderedSame
          }) {
         nav.pendingTrainingType = nil
-        store.start(type: match, context: modelContext)
+        store.start(type: match, context: modelContext, today: clock.today)
       }
     }
     .sheet(item: $completionStats) { stats in
@@ -2270,7 +2272,7 @@ struct TrainingSessionView: View {
   // MARK: - Actions
 
   private func start(_ type: SessionTypeConfig) {
-    store.start(type: type, context: modelContext)
+    store.start(type: type, context: modelContext, today: clock.today)
   }
 
   private func finish() {

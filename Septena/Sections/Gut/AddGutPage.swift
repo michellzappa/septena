@@ -21,6 +21,7 @@ private let bristolScale: [BristolEntry] = [
 
 struct AddGutPage: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(\.dismiss) private var dismiss
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Bindable var router: AddInfoRouter
@@ -63,7 +64,7 @@ struct AddGutPage: View {
       announce: "Logged type \(item.id).",
       logCommit: logCommit
     ) {
-      gut.addEntry(date: SeptenaDate.today, time: SeptenaDate.nowHHMM, bristol: item.id)
+      gut.addEntry(date: clock.today, time: SeptenaDate.nowHHMM, bristol: item.id)
       GutBristolRecorder.record(item.id)
       AddInfoSection.gut.notifyTilesChanged()
     }

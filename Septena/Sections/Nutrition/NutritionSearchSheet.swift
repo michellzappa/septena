@@ -14,6 +14,7 @@ import SwiftUI
 
 struct NutritionSearchSheet: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(\.dismiss) private var dismiss
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
@@ -126,6 +127,7 @@ struct NutritionSearchSheet: View {
   private func duplicate(_ entry: NutritionEntry) {
     NutritionPlugin.commitMeal(
       loggedAt: .now,
+      today: clock.today,
       accent: AddInfoSection.nutrition.accent(theme: theme),
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit

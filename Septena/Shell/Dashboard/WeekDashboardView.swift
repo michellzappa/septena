@@ -1837,7 +1837,7 @@ struct WeekDashboardView: View {
   @ViewBuilder private var nutritionQuickAddMenu: some View {
     NutritionQuickAddMenu(
       recommendations: NutritionRecommendations.topRecommended(
-        from: nutritionHistory, limit: 3),
+        from: nutritionHistory, now: clock.now, limit: 3),
       onSearch: { nutritionSheet = .search },
       onScan: { nutritionSheet = .scan },
       onInput: { nutritionSheet = .newEntry },
@@ -1849,6 +1849,7 @@ struct WeekDashboardView: View {
   private func commitNutritionDuplicate(_ entry: NutritionEntry) {
     NutritionPlugin.commitMeal(
       loggedAt: .now,
+      today: clock.today,
       accent: theme.color(for: "nutrition"),
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit

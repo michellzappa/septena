@@ -60,7 +60,7 @@ struct SidebarRootView: View {
       let stats = TaskReads.dashboardStats(today: SeptenaDate.today,
                                            now: Date(),
                                            context: ctx)
-      var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx))
+      var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx), today: SeptenaDate.today)
       agg.counts = stats.counts
       SidebarSeed.aggregate = agg
       return agg
@@ -958,7 +958,7 @@ struct SidebarRootView: View {
     let stats = TaskReads.dashboardStats(today: clock.today,
                                          now: clock.now,
                                          context: modelContext)
-    var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext))
+    var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
@@ -975,7 +975,7 @@ struct SidebarRootView: View {
 
   /// Single-pass roll-up over a task list. Called once per load (and once
   /// per process by init, when the SidebarSeed memo is still empty).
-  private static func aggregate(tasks: [SeptenaTask]) -> Aggregate {
+  private static func aggregate(tasks: [SeptenaTask], today: String) -> Aggregate {
     // Project progress = done / (done + open). Cancelled doesn't count
     // toward either side of the ratio.
     var done: [String: Int] = [:]
@@ -985,7 +985,6 @@ struct SidebarRootView: View {
     // their own rows, so rolling them up would double-count.
     var areaDirectOpen: [String: Int] = [:]
     var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
-    let today = SeptenaDate.today
     for t in tasks {
       if t.status == .open { open += 1 }
       if let pid = t.project {

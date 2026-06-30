@@ -414,7 +414,7 @@ struct CorrelationsHomepageView: View {
     log("start windowDays=\(windowDays)")
     // Same-day reopen with no data changes: serve the engine's memoized
     // result — no Oura fetch, no stats run, the drawer paints instantly.
-    if let cached = CorrelationEngine.cachedResult(days: windowDays) {
+    if let cached = CorrelationEngine.cachedResult(days: windowDays, today: clock.today) {
       log("cache hit evaluated=\(cached.evaluated.count) insufficient=\(cached.insufficient.count)")
       apply(cached)
       loading = false

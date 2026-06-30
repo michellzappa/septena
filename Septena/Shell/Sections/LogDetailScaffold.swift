@@ -299,11 +299,11 @@ struct LogDetailScaffold: View {
 
 enum LogDetailFormat {
   /// "Today" / "Yesterday" / "Tomorrow" / "3 days ago" / "in 2 days" / "Jun 3",
-  /// computed against `SeptenaDate.today` so it tracks time travel.
-  static func relativeDay(_ iso: String) -> String {
+  /// computed against the app's current day (`today` ISO string).
+  static func relativeDay(_ iso: String, today: String) -> String {
     guard let date = SeptenaDate.parse(iso),
-          let today = SeptenaDate.parse(SeptenaDate.today) else { return iso }
-    let days = Calendar.current.dateComponents([.day], from: today, to: date).day ?? 0
+          let todayDate = SeptenaDate.parse(today) else { return iso }
+    let days = Calendar.current.dateComponents([.day], from: todayDate, to: date).day ?? 0
     switch days {
     case 0: return "Today"
     case 1: return "Tomorrow"

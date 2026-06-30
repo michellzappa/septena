@@ -70,7 +70,7 @@ struct ExerciseStatsView: View {
     let last = dates.last
     let last30 = sessionsInLast30(dates, today: today)
     d.tiles = [
-      LogStat(value: last.map(LogDetailFormat.relativeDay) ?? "—", caption: "Last done"),
+      LogStat(value: last.map { LogDetailFormat.relativeDay($0, today: today) } ?? "—", caption: "Last done"),
       LogStat(value: "\(last30)", caption: "last 30 days",
               tone: last30 > 0 ? .accent : .normal),
       LogStat(value: headlinePR(baseline), caption: prCaption(baseline)),

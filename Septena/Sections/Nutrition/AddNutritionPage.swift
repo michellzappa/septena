@@ -12,6 +12,7 @@ private struct MealCandidate: Identifiable {
 
 struct AddNutritionPage: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
@@ -105,6 +106,7 @@ struct AddNutritionPage: View {
   private func duplicate(_ entry: NutritionEntry) {
     NutritionPlugin.commitMeal(
       loggedAt: .now,
+      today: clock.today,
       accent: AddInfoSection.nutrition.accent(theme: theme),
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit

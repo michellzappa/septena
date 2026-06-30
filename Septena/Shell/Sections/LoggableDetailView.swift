@@ -26,6 +26,8 @@ struct LoggableDetailView: View {
   /// Routes the toolbar "Edit" to the parent's existing edit sheet.
   let onEdit: () -> Void
 
+  @Environment(DayClock.self) private var clock
+
   var body: some View {
     LogDetailScaffold(
       title: title,
@@ -34,7 +36,8 @@ struct LoggableDetailView: View {
         Self.detail(dates: fetch(ctx),
                     skipped: skippedFetch?(ctx) ?? [],
                     emoji: emoji,
-                    doneVerb: doneVerb)
+                    doneVerb: doneVerb,
+                    today: clock.today)
       },
       onEdit: onEdit
     )
@@ -44,7 +47,7 @@ struct LoggableDetailView: View {
   /// dates. Streak / rate stats count dones only; the recent list and heatmap
   /// surface skips alongside them.
   static func detail(dates: [String], skipped: [String] = [],
-                     emoji: String?, doneVerb: String) -> LogDetail {
+                     emoji: String?, doneVerb: String, today: String) -> LogDetail {
     let stats = ConsistencyStats.make(dates: dates)
     var d = LogDetail()
     d.emoji = emoji
@@ -72,17 +75,17 @@ struct LoggableDetailView: View {
     // happened) so the *gaps* are visible — each day reads done / skipped /
     // missed. Clamped to start no earlier than the first recorded day, so days
     // before the item had any history don't read as false misses.
-    d.recent = recentTimeline(done: done, skipped: skips)
+    d.recent = recentTimeline(done: done, skipped: skips, today: today)
     return d
   }
 
   /// Last ~14 days, today first, each marked done/skipped/missed. Stops at the
   /// earliest recorded day so pre-history days aren't shown as missed.
   private static func recentTimeline(done: Set<String>, skipped: Set<String>,
-                                     window: Int = 14) -> [LogRecent] {
+                                     today: String, window: Int = 14) -> [LogRecent] {
     let cal = Calendar.current
-    guard let today = SeptenaDate.parse(SeptenaDate.today),
-          let todayOrd = cal.ordinality(of: .day, in: .era, for: today) else { return [] }
+    guard let todayDate = SeptenaDate.parse(today),
+          let todayOrd = cal.ordinality(of: .day, in: .era, for: todayDate) else { return [] }
     let firstOrd = (done.union(skipped))
       .compactMap { SeptenaDate.parse($0).flatMap { cal.ordinality(of: .day, in: .era, for: $0) } }
       .min()
@@ -92,14 +95,14 @@ struct LoggableDetailView: View {
     var rows: [LogRecent] = []
     var offset = 0
     while todayOrd - offset >= lowerBound {
-      guard let date = cal.date(byAdding: .day, value: -offset, to: today),
+      guard let date = cal.date(byAdding: .day, value: -offset, to: todayDate),
             let iso = SeptenaDate.format(date) else { break }
       let status: LogRecent.Status = done.contains(iso) ? .done
         : skipped.contains(iso) ? .skipped : .missed
       let label: String? = status == .done ? "Done" : status == .skipped ? "Skipped" : "Missed"
       rows.append(LogRecent(title: LogDetailFormat.longDay(iso),
                             detail: label,
-                            trailing: LogDetailFormat.relativeDay(iso),
+                            trailing: LogDetailFormat.relativeDay(iso, today: today),
                             status: status))
       offset += 1
     }

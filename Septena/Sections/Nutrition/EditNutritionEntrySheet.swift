@@ -16,6 +16,7 @@ import AppKit
 
 struct EditNutritionEntrySheet: View {
   @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
 
   let original: NutritionEntry?
@@ -237,6 +238,7 @@ struct EditNutritionEntrySheet: View {
     } else {
       NutritionPlugin.commitMeal(
         loggedAt: time,
+        today: clock.today,
         accent: theme.color(for: "nutrition"),
         announce: "Logged \(foods.first ?? "meal").",
         logCommit: logCommit

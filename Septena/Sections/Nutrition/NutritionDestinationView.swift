@@ -53,7 +53,7 @@ struct NutritionDestinationView: View {
   /// 7-day charts stay anchored to *actual* today (live dashboard) —
   /// browsing back through history is for reviewing logged meals, not
   /// for retro-targeting macros.
-  @State private var viewingDate: String = SeptenaDate.today
+  @State private var viewingDate: String = ""
   // Nutrition is an editable dual section: Log = the meal log (time-travelable);
   // Patterns = macro trend tiles + the meal rhythm wheel. Default Log; remembered.
   @State private var mode: DrawerMode = .remembered(for: "nutrition", default: .log)
@@ -122,7 +122,7 @@ struct NutritionDestinationView: View {
   private var kcalColor: Color    { color(for: "kcal") }
   private var fastingColor: Color { color(for: "fasting") }
 
-  private var today: String { SeptenaDate.today }
+  private var today: String { clock.today }
 
   private var isViewingToday: Bool { viewingDate == clock.today }
 
@@ -224,6 +224,7 @@ struct NutritionDestinationView: View {
       // looking at "today" — otherwise leave their selection alone.
       if isViewingToday { viewingDate = newToday }
     }
+    .task { if viewingDate.isEmpty { viewingDate = clock.today } }
     .sectionReload(on: clock.today, onDataChange: true,
                    forSections: ["nutrition"]) { await reload() }
     .drawerDetail(edit: $editing, create: $creating) { entry in
@@ -304,6 +305,7 @@ struct NutritionDestinationView: View {
   private func logAgainNow(_ entry: NutritionEntry) {
     NutritionPlugin.commitMeal(
       loggedAt: .now,
+      today: clock.today,
       accent: accent,
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
@@ -665,7 +667,7 @@ struct NutritionDestinationView: View {
     let fmt = Self.ymdFormatter
     let cal = Calendar.current
     return (0..<7).reversed().compactMap { off in
-      cal.date(byAdding: .day, value: -off, to: Date()).map(fmt.string(from:))
+      cal.date(byAdding: .day, value: -off, to: clock.now).map(fmt.string(from:))
     }
   }
 
@@ -904,7 +906,7 @@ struct NutritionDestinationView: View {
     let cal = Calendar.current
     if cal.isDateInToday(d)     { return "Today" }
     if cal.isDateInYesterday(d) { return "Yesterday" }
-    let days = cal.dateComponents([.day], from: d, to: Date()).day ?? 0
+    let days = cal.dateComponents([.day], from: d, to: clock.now).day ?? 0
     if days < 7 {
       return Self.weekdayFormatter.string(from: d)
     }
@@ -932,7 +934,7 @@ struct NutritionDestinationView: View {
   // MARK: - Loading
 
   private func sinceDate(daysBack: Int) -> String {
-    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
+    let d = Calendar.current.date(byAdding: .day, value: -daysBack, to: clock.now) ?? clock.now
     return Self.ymdFormatter.string(from: d)
   }
 }

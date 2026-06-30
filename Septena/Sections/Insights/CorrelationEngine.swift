@@ -64,10 +64,10 @@ struct CorrelationEngine {
   /// the Oura fetch AND the stats run on a same-day reopen. Nil after any
   /// data change, day rollover, or for a window that wasn't the last one run.
   @MainActor
-  static func cachedResult(days: Int) -> Result? {
+  static func cachedResult(days: Int, today: String) -> Result? {
     installStampObserversIfNeeded()
     guard let c = cache, c.days == days,
-          c.today == SeptenaDate.today, c.stamp == dataStamp else { return nil }
+          c.today == today, c.stamp == dataStamp else { return nil }
     return c.result
   }
 
@@ -182,7 +182,8 @@ struct CorrelationEngine {
     today: Date,
     days: Int = 365
   ) async -> Result {
-    if let cached = cachedResult(days: days) { return cached }
+    let todayISO = SeptenaDate.format(today) ?? ""
+    if let cached = cachedResult(days: days, today: todayISO) { return cached }
     SeptenaLog.info("[Insights] engine start days=\(days) ouraNights=\(ouraNights.count)")
     // Snapshot the stamp BEFORE extracting, so a write that lands mid-run
     // invalidates this result instead of being silently absorbed into it.
@@ -246,7 +247,7 @@ struct CorrelationEngine {
     }.value
     SeptenaLog.info("[Insights] stats done evaluated=\(result.evaluated.count) insufficient=\(result.insufficient.count)")
 
-    cache = (days: days, today: SeptenaDate.today,
+    cache = (days: days, today: todayISO,
              stamp: stampAtStart, result: result)
     return result
   }

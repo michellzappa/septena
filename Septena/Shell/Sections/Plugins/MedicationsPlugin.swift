@@ -152,7 +152,7 @@ enum MedicationsPlugin: SectionPlugin {
                                    context: ModelContext,
                                    now: Date) -> NotificationPlan? {
     guard descriptorID == "medications.followup" else { return nil }
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     let defs = (try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
       predicate: #Predicate { $0.archived == false }
     ))) ?? []

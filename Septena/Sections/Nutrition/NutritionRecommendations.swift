@@ -19,7 +19,7 @@ import Foundation
 enum NutritionRecommendations {
 
   static func topRecommended(from entries: [NutritionEntry],
-                             now: Date = .now,
+                             now: Date,
                              limit: Int = 3) -> [NutritionEntry] {
     let cal = Calendar.current
     let currentHour = cal.component(.hour, from: now)
@@ -61,7 +61,7 @@ enum NutritionRecommendations {
     }
 
     // Score and sort.
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? ""
     let scored = buckets.values.map { (b: Bucket) -> (NutritionEntry, Double) in
       let timeScore = Double(b.timeMatchCount) * 2.0
       let freqScore = log(Double(b.count) + 1.0)

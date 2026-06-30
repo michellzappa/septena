@@ -5,6 +5,7 @@ import SwiftUI
 
 struct AddChorePage: View {
   @Environment(ChecklistMutator.self) private var checklistMutator
+  @Environment(DayClock.self) private var clock
   @Environment(SectionTheme.self) private var theme
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
@@ -66,7 +67,7 @@ struct AddChorePage: View {
   }
 
   private func complete(_ chore: ChoreItem) {
-    checklistMutator.completeChore(id: chore.id, date: SeptenaDate.today)
+    checklistMutator.completeChore(id: chore.id, date: clock.today)
     AddInfoSection.chores.notifyTilesChanged()
     Haptics.tick()
     dismiss()
@@ -84,6 +85,6 @@ struct AddChorePage: View {
 
   private func load() async {
     // Chores are CloudKit-authoritative — read directly from the local mirror.
-    chores = ChecklistMirror.loadChores(context: LocalStore.shared.container.mainContext, today: SeptenaDate.today)
+    chores = ChecklistMirror.loadChores(context: LocalStore.shared.container.mainContext, today: clock.today)
   }
 }

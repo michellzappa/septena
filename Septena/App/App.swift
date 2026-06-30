@@ -284,7 +284,7 @@ struct SeptenaApp: App {
             let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
             taskMutator.purgeExpired(before: thirtyDaysAgo)
             await theme.refresh()
-            await settingsStore.refresh()
+            await settingsStore.refresh(today: dayClock.today)
             // Bridge the welcome name between the CloudKit-synced settings
             // payload and the local @AppStorage key WelcomeHeader reads:
             // adopt an inbound name from another device, or push a

@@ -231,8 +231,8 @@ enum HabitsPlugin: SectionPlugin {
     if descriptorID == "habits.streakRung" {
       return streakRungPlan(context: context, now: now)
     }
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     guard descriptorID == "habits.incomplete" else { return nil }
-    let today = SeptenaDate.today
     guard let day = ChecklistMirror.loadHabitsDay(context: context, date: today) else { return nil }
 
     let pending = day.grouped.values.flatMap { $0 }.filter { !$0.done && !$0.skipped }
@@ -259,7 +259,7 @@ enum HabitsPlugin: SectionPlugin {
   /// biggest rung wins — "one day from 100" beats "one day from 7".
   private static func streakRungPlan(context: ModelContext,
                                      now: Date) -> NotificationPlan? {
-    let today = SeptenaDate.today
+    let today = SeptenaDate.format(now) ?? SeptenaDate.today
     guard let day = ChecklistMirror.loadHabitsDay(context: context, date: today) else { return nil }
     let pending = day.grouped.values.flatMap { $0 }.filter { !$0.done && !$0.skipped }
     guard !pending.isEmpty else { return nil }
