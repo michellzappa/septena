@@ -27,9 +27,11 @@ enum AreaCloudKitSchema {
     // Optional user-assigned glyph. Rides the first reserved string slot so
     // the record type isn't bumped — an additive promotion in Prod.
     static let emoji = "reservedString1"
+    /// JSON-encoded `AreaAttachment`. Rides the second reserved string slot —
+    /// additive in Prod, no record-type bump. See [AreaAttachment.swift].
+    static let attachment = "reservedString2"
 
     // Reserved for foreseeable additions without bumping the record type.
-    static let reservedString2 = "reservedString2"
     static let reservedDate1 = "reservedDate1"
     static let reservedInt1 = "reservedInt1"
   }
@@ -46,6 +48,7 @@ extension AreaEntity: CloudKitSystemFieldsBacked {
     record[AreaCloudKitSchema.Field.title] = title
     record[AreaCloudKitSchema.Field.context] = context
     record[AreaCloudKitSchema.Field.emoji] = emoji
+    record[AreaCloudKitSchema.Field.attachment] = attachmentJSON
     return record
   }
 }
@@ -57,6 +60,7 @@ extension AreaEntity {
     if let v = record[AreaCloudKitSchema.Field.title] as? String { title = v }
     context = optionalAreaString(record[AreaCloudKitSchema.Field.context])
     emoji = optionalAreaString(record[AreaCloudKitSchema.Field.emoji])
+    attachmentJSON = optionalAreaString(record[AreaCloudKitSchema.Field.attachment])
     captureCloudKitSystemFields(from: record)
   }
 

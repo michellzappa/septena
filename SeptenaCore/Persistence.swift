@@ -215,6 +215,9 @@ final class ProjectEntity {
   var notes: String?
   var context: String?
   var githubRepo: String?
+  /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
+  /// reserved CloudKit string slot. See [AreaAttachment.swift].
+  var attachmentJSON: String?
   var lastSyncedAt: Date
   var updatedAt: String?
   var deletedAt: String?
@@ -232,6 +235,7 @@ final class ProjectEntity {
        notes: String? = nil,
        context: String? = nil,
        githubRepo: String? = nil,
+       attachmentJSON: String? = nil,
        lastSyncedAt: Date = .distantPast,
        updatedAt: String? = nil,
        deletedAt: String? = nil,
@@ -245,6 +249,7 @@ final class ProjectEntity {
     self.notes = notes
     self.context = context
     self.githubRepo = githubRepo
+    self.attachmentJSON = attachmentJSON
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -254,6 +259,15 @@ final class ProjectEntity {
   var status: ProjectStatus {
     get { ProjectStatus(rawValue: statusRaw) ?? .active }
     set { statusRaw = newValue.rawValue }
+  }
+
+  /// The decoded attachment, with a read-fallback that coerces a legacy
+  /// `githubRepo` pointer into a `.git` attachment so existing projects light
+  /// up without a migration pass.
+  var attachment: AreaAttachment? {
+    if let a = AreaAttachment.decode(attachmentJSON) { return a }
+    if let repo = githubRepo, !repo.isEmpty { return AreaAttachment(kind: .git, ref: repo) }
+    return nil
   }
 }
 
@@ -266,22 +280,30 @@ final class AreaEntity {
   /// dot wherever the area appears (sidebar, headers, pickers) — a Tier-3
   /// emoji in design-system terms. Nil ⇒ fall back to the dot.
   var emoji: String?
+  /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
+  /// reserved CloudKit string slot. See [AreaAttachment.swift].
+  var attachmentJSON: String?
   var lastSyncedAt: Date
   var updatedAt: String?
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
+       attachmentJSON: String? = nil,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
     self.title = title
     self.context = context
     self.emoji = emoji
+    self.attachmentJSON = attachmentJSON
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
   }
+
+  /// The decoded attachment (no legacy fallback — areas never had `githubRepo`).
+  var attachment: AreaAttachment? { AreaAttachment.decode(attachmentJSON) }
 }
 
 @Model
@@ -1700,6 +1722,7 @@ extension Project {
               notes: e.notes,
               context: e.context,
               githubRepo: e.githubRepo,
+              attachment: e.attachment,
               updatedAt: e.updatedAt,
               deletedAt: e.deletedAt)
   }
@@ -1708,6 +1731,7 @@ extension Project {
 extension Area {
   init(_ e: AreaEntity) {
     self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
+              attachment: e.attachment,
               updatedAt: e.updatedAt)
   }
 }

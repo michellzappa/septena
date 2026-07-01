@@ -13,6 +13,7 @@ protocol ProjectsBackend: AnyObject {
   func setStatus(id: String, status: ProjectStatus) async throws
   func setArea(id: String, area: String?) async throws
   func setGithubRepo(id: String, repo: String?) async throws
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
 }
 
@@ -63,6 +64,9 @@ final class ProjectsMutator: ProjectsBackend {
   }
   func setGithubRepo(id: String, repo: String?) async throws {
     try await requireBackend().setGithubRepo(id: id, repo: repo)
+  }
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
+    try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
   func delete(id: String) async throws {
     // Cascade: clear the project link on every task that referenced this
@@ -184,6 +188,18 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     guard let entity = fetch(id: id) else { return }
     entity.githubRepo = (repo?.isEmpty == true) ? nil : repo
     commitAndPush(entity, op: "setGithubRepo")
+  }
+
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
+    guard let entity = fetch(id: id) else { return }
+    let normalized = attachment?.normalized
+    entity.attachmentJSON = normalized?.encodedString()
+    // Keep the legacy `githubRepo` pointer mirrored while agentic tooling
+    // still reads it: populate it for a `.git` attachment, clear it otherwise
+    // so the entity-level read-fallback can't resurrect a stale repo after the
+    // user switches kinds or detaches.
+    entity.githubRepo = (normalized?.kind == .git) ? normalized?.ref : nil
+    commitAndPush(entity, op: "setAttachment")
   }
 
   func delete(id: String) async throws {

@@ -1456,6 +1456,9 @@
         }
       }
     },
+    "All-day events" : {
+
+    },
     "Already added" : {
       "localizations" : {
         "pt-BR" : {
@@ -1713,6 +1716,9 @@
           }
         }
       }
+    },
+    "Attach…" : {
+
     },
     "auto-refresh in %@" : {
       "localizations" : {
@@ -2482,6 +2488,9 @@
           }
         }
       }
+    },
+    "Couldn't load — tap to check the URL" : {
+
     },
     "Count" : {
 

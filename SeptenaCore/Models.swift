@@ -343,11 +343,15 @@ struct Project: Identifiable, Codable, Hashable {
   /// Optional "owner/repo" pointer. Source of truth for agentic tooling that
   /// needs to know which GitHub repo a project's tasks live against.
   var githubRepo: String?
+  /// The one read-only context feed (repo / calendar / feed). See
+  /// [AreaAttachment.swift]. Carries the legacy `githubRepo` as a `.git`
+  /// attachment via the entity-level read-fallback.
+  var attachment: AreaAttachment?
   var updatedAt: String?
   var deletedAt: String?
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, area, created, notes, context
+    case id, title, status, area, created, notes, context, attachment
     case completedAt = "completed_at"
     case githubRepo = "github_repo"
     case updatedAt = "updated_at"
@@ -357,10 +361,12 @@ struct Project: Identifiable, Codable, Hashable {
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, githubRepo: String? = nil,
+       attachment: AreaAttachment? = nil,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.githubRepo = githubRepo
+    self.attachment = attachment
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
 
@@ -375,6 +381,7 @@ struct Project: Identifiable, Codable, Hashable {
     notes = try c.decodeIfPresent(String.self, forKey: .notes)
     context = try c.decodeIfPresent(String.self, forKey: .context)
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
+    attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
   }
@@ -388,6 +395,9 @@ struct Area: Identifiable, Codable, Hashable {
   var context: String?
   /// Optional user-assigned glyph; nil ⇒ the area renders its filler dot.
   var emoji: String?
+  /// The one read-only context feed (repo / calendar / feed). See
+  /// [AreaAttachment.swift].
+  var attachment: AreaAttachment?
   var updatedAt: String?
   // Areas are stored on the server as a single wholesale-replace array,
   // so there's no per-row tombstone. Removed areas just stop appearing
@@ -395,8 +405,10 @@ struct Area: Identifiable, Codable, Hashable {
   // and projects. No `deletedAt` field by design.
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
+       attachment: AreaAttachment? = nil,
        updatedAt: String? = nil) {
     self.id = id; self.title = title; self.context = context; self.emoji = emoji
+    self.attachment = attachment
     self.updatedAt = updatedAt
   }
 
@@ -406,11 +418,12 @@ struct Area: Identifiable, Codable, Hashable {
     title = try c.decodeIfPresent(String.self, forKey: .title) ?? id
     context = try c.decodeIfPresent(String.self, forKey: .context)
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
+    attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, context, emoji
+    case id, title, context, emoji, attachment
     case updatedAt = "updated_at"
   }
 }

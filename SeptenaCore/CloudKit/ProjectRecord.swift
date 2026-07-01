@@ -30,9 +30,11 @@ enum ProjectCloudKitSchema {
     static let notesText = "notesText"
     static let context = "context"
     static let githubRepo = "githubRepo"
+    /// JSON-encoded `AreaAttachment`. Rides the first reserved string slot —
+    /// additive in Prod, no record-type bump. See [AreaAttachment.swift].
+    static let attachment = "reservedString1"
 
     // Reserved.
-    static let reservedString1 = "reservedString1"
     static let reservedString2 = "reservedString2"
     static let reservedDate1 = "reservedDate1"
     static let reservedInt1 = "reservedInt1"
@@ -54,6 +56,7 @@ extension ProjectEntity: CloudKitSystemFieldsBacked {
     record[ProjectCloudKitSchema.Field.completedAt] = completedAt
     record[ProjectCloudKitSchema.Field.context] = context
     record[ProjectCloudKitSchema.Field.githubRepo] = githubRepo
+    record[ProjectCloudKitSchema.Field.attachment] = attachmentJSON
     // Write plaintext under a new field name. The old `notes` field is
     // permanently ENCRYPTED_STRING in the CK schema, so attempting to
     // write a STRING there fails even after a zone reset.
@@ -73,6 +76,7 @@ extension ProjectEntity {
     completedAt = optionalProjectString(record[ProjectCloudKitSchema.Field.completedAt])
     context = optionalProjectString(record[ProjectCloudKitSchema.Field.context])
     githubRepo = optionalProjectString(record[ProjectCloudKitSchema.Field.githubRepo])
+    attachmentJSON = optionalProjectString(record[ProjectCloudKitSchema.Field.attachment])
     notes = optionalProjectString(record[ProjectCloudKitSchema.Field.notesText])
       ?? optionalProjectString(record.encryptedValues[ProjectCloudKitSchema.Field.encryptedNotes])
     captureCloudKitSystemFields(from: record)

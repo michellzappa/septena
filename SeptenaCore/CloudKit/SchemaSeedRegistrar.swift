@@ -69,17 +69,22 @@ enum SchemaSeedRegistrar {
     let seeds: [CKRecord] = [
       seed(AreaCloudKitSchema.recordType, "seed-area", strings: [
         AreaCloudKitSchema.Field.context,
+        AreaCloudKitSchema.Field.attachment,
       ]),
       seed(ProjectCloudKitSchema.recordType, "seed-project", strings: [
         ProjectCloudKitSchema.Field.completedAt,
         ProjectCloudKitSchema.Field.context,
         ProjectCloudKitSchema.Field.githubRepo,
+        ProjectCloudKitSchema.Field.attachment,
       ]),
       seed(SessionTypeCloudKitSchema.recordType, "seed-sessiontype", strings: [
         SessionTypeCloudKitSchema.Field.kind,
       ]),
       seed(NutritionEntryCloudKitSchema.recordType, "seed-nutrition-entry",
-        strings: [NutritionEntryCloudKitSchema.Field.mealType],
+        strings: [
+          NutritionEntryCloudKitSchema.Field.mealType,
+          NutritionEntryCloudKitSchema.Field.ingredients,
+        ],
         doubles: [
           NutritionEntryCloudKitSchema.Field.sugarG,
           NutritionEntryCloudKitSchema.Field.saturatedFatG,
@@ -112,10 +117,10 @@ enum SchemaSeedRegistrar {
 
     return """
     Registered missing Development-schema fields on \(saveResults.count) record types:
-    • Area.context
-    • Project.completedAt, .context, .githubRepo
+    • Area.context, .attachment (reservedString2)
+    • Project.completedAt, .context, .githubRepo, .attachment (reservedString1)
     • SessionType.kind
-    • NutritionEntry.mealType, .sugarG, .saturatedFatG, .alcoholG, .sodiumMg, .cholesterolMg, .potassiumMg
+    • NutritionEntry.mealType, .ingredients, .sugarG, .saturatedFatG, .alcoholG, .sodiumMg, .cholesterolMg, .potassiumMg
     • NutritionDaySum.sugarG, .saturatedFatG, .alcoholG, .sodiumMg, .cholesterolMg, .potassiumMg
     Temp zone 'schema-seed-temp' deleted. Verify in CloudKit Console → Schema, then Deploy to Production.
     """

@@ -63,6 +63,7 @@ promoted to Prod unless the Console already shows them):
 | 10 | **New field** `reservedString1` (carries an area's optional user emoji — first actual write of this reserved slot) | `Area` | `reservedString1` | String |
 | 11 | **New record type** `Quote` (whole type, 4 fields — user-added + Readwise-imported daily-message lines for the optional dashboard footer) | `Quote` | all | — |
 | 12 | **New record types** for the generalized **Intake** section (replaces retired caffeine/cannabis types — consumables purge 2026-06-12) | `IntakeKind`, `IntakeItem`, `IntakeEvent` | all | — |
+| 13 | **New field** `reservedString1` on `Project` + `reservedString2` on `Area` — carry the JSON-encoded `AreaAttachment` (the one read-only context feed: repo/calendar/feed pointer). First write of these reserved slots. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -92,6 +93,7 @@ view regardless.
 - [ ] `MedicationDefinition` and `MedicationDoseEvent` record types exist with all fields
 - [ ] `IntakeKind`, `IntakeItem`, `IntakeEvent` record types exist with all fields (Intake section)
 - [ ] `SupplementDefinition.bucket : String` present
+- [ ] `Project.reservedString1 : String` + `Area.reservedString2 : String` present (JSON `AreaAttachment` — the one read-only context feed)
 - [ ] No type was promoted with a **different** field type than this manifest (additive
       mistakes can't be undone — if types diverge, the field is permanently wrong in Prod)
 
@@ -191,7 +193,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `title` | String | `String` | No | |
 | `context` | String | `String?` | Yes | |
 | `reservedString1` | String | `String?` (`emoji`) | Yes | user-assigned glyph; replaces the area dot in UI |
-| `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `reservedString2` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
+| `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### Project  — recordName `project:{id}`
 | Field | CK type | Swift | Nullable | Notes |
@@ -204,8 +207,9 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `notes` | Bytes (ENCRYPTED_STRING) | `String?` | read-only | legacy; decode fallback only |
 | `notesText` | String | `String?` (`notes`) | Yes | plaintext replacement |
 | `context` | String | `String?` | Yes | |
-| `githubRepo` | String | `String?` | Yes | |
-| `reservedString1`, `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `githubRepo` | String | `String?` | Yes | legacy repo pointer; mirrored from a `.git` `AreaAttachment`, else nil |
+| `reservedString1` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
+| `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
 
 #### Section  — recordName `section:{id}`
 | Field | CK type | Swift | Nullable | Notes |

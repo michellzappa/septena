@@ -37,6 +37,7 @@ protocol AreasBackend: AnyObject {
   func rename(id: String, to title: String) async throws
   func setContext(id: String, context: String?) async throws
   func setEmoji(id: String, emoji: String?) async throws
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
 }
 
@@ -77,6 +78,9 @@ final class AreasMutator: AreasBackend {
   }
   func setEmoji(id: String, emoji: String?) async throws {
     try await requireBackend().setEmoji(id: id, emoji: emoji)
+  }
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
+    try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
   func delete(id: String) async throws {
     try await requireBackend().delete(id: id)
@@ -176,6 +180,12 @@ final class CloudKitAreasBackend: AreasBackend {
     guard let entity = fetch(id: id) else { return }
     entity.emoji = (emoji?.isEmpty == true) ? nil : emoji
     commitAndPush(entity, op: "setEmoji")
+  }
+
+  func setAttachment(id: String, attachment: AreaAttachment?) async throws {
+    guard let entity = fetch(id: id) else { return }
+    entity.attachmentJSON = attachment?.normalized?.encodedString()
+    commitAndPush(entity, op: "setAttachment")
   }
 
   func delete(id: String) async throws {
