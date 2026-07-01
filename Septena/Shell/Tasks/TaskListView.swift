@@ -760,7 +760,7 @@ struct TaskListView: View {
   /// click on empty paper, which would otherwise have cleared the selection a
   /// beat before this runs). The one exception: if the user closed by selecting
   /// a DIFFERENT row, we respect that new selection instead of yanking it back.
-  private func collapseEdit(purgingDrafts: Bool = true) {
+  private func collapseEdit() {
     let closingId = expandedEditId
     if let closingId { clearQuickAddCaptureSlot(for: closingId) }
     withAnimation(.snappy(duration: 0.22)) {
@@ -769,11 +769,10 @@ struct TaskListView: View {
         selection = [closingId]
       }
     }
-    guard purgingDrafts, let closingId, draftEditIds.contains(closingId) else { return }
-    let id = closingId
-    draftEditIds.remove(id)
-    // Defer one beat so the editor's `.onDisappear` autosave lands first.
-    DispatchQueue.main.async { purgeDraftIfEmpty(id: id) }
+    // Dropping an untouched inline-create draft is owned by the editor's
+    // `onVanish` (fired right after its autosave on teardown) — never a timed
+    // guess here, which used to front-run the animation-delayed autosave and
+    // purge a task the user had just typed.
   }
 
   /// Drop an inline-create placeholder that never received a title.
@@ -1800,6 +1799,15 @@ struct TaskListView: View {
         clearQuickAddCaptureSlot(for: task.id)
         repatchTask(id: task.id)
         Task { await load() }
+      },
+      // Fired after the editor's autosave has run on teardown: if this was an
+      // inline-create draft the autosave left untouched (no title), drop it now.
+      // Deterministically ordered after the save (same `.onDisappear`), so a
+      // typed-then-tapped-away task is committed, not purged.
+      onVanish: {
+        guard draftEditIds.contains(task.id) else { return }
+        draftEditIds.remove(task.id)
+        purgeDraftIfEmpty(id: task.id)
       }
     )
     .frame(maxWidth: .infinity, alignment: .leading)

@@ -64,6 +64,11 @@ struct TaskComposerCard: View {
   /// Fired after a successful create/edit (or a terminal action) so the list
   /// reloads. Closing is owned by the scaffold / `.adaptiveDetail`, not here.
   let onDone: () -> Void
+  /// Inline-only teardown hook, fired in `.onDisappear` *after* the autosave
+  /// funnel has run. The host uses it to drop an untouched inline-create draft
+  /// — but only once the save has definitely had its chance, so a just-typed
+  /// title can never be purged out from under the (animation-delayed) autosave.
+  var onVanish: (() -> Void)? = nil
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
@@ -115,7 +120,8 @@ struct TaskComposerCard: View {
        titleMatchID: String? = nil, checkboxMatchID: String? = nil,
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
        showsTodayIndicator: Bool = true,
-       onDone: @escaping () -> Void) {
+       onDone: @escaping () -> Void,
+       onVanish: (() -> Void)? = nil) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
@@ -129,6 +135,7 @@ struct TaskComposerCard: View {
     self.heroMatchIsSource = heroMatchIsSource
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
+    self.onVanish = onVanish
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -164,7 +171,9 @@ struct TaskComposerCard: View {
       // guard so this no-ops and the draft is dropped. The belt to the Cancel
       // suspenders: the only path that loses work is a confirmed Discard. For
       // the inline editor this IS the save path — folding the row autosaves.
-      .onDisappear { persistOnce() }
+      // Save first, THEN let the host decide about an untouched draft — both in
+      // the one teardown event so purge can never front-run the autosave.
+      .onDisappear { persistOnce(); onVanish?() }
       .onChange(of: draft.title) { _, newValue in
         // Return inserts a newline, which we treat as "save". Strip it and commit
         // (or just tidy it away when there's nothing to save yet).
