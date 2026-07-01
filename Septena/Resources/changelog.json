@@ -4,54 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1302,
+      "build": 1306,
       "date": "2026-07-01",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Tasks, reimagined",
-          "detail": "Rename and edit inline, quick-add at the top or bottom of any list, select multiple tasks for bulk actions, and undo deletes, moves, and defers from a toast.",
+          "title": "A faster, more capable Tasks",
+          "detail": "Multi-select bulk actions, inline quick-add, copy and filing suggestions, group-by-area, and calendar events woven into Today and Upcoming.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar, woven into Today",
-          "detail": "See today's remaining events alongside your tasks, with your choice of hidden calendars kept in sync across devices.",
+          "title": "Recover deleted tasks",
+          "detail": "A Recently Deleted view restores tasks for 30 days, with instant undo toasts for delete, move, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore anything before it's purged.",
+          "title": "Import from Things",
+          "detail": "Bring your tasks over from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring an existing Things database export straight into Septena.",
-          "section": "tasks"
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": null,
-          "section": null
-        },
-        {
-          "title": "Photo-first meal logging",
-          "detail": "Snap a meal and let on-device analysis fill in the details, with an optional ingredient breakdown.",
+          "title": "Photo-first meals with ingredient breakdown",
+          "detail": "Capture a meal from a photo with on-device analysis, and add an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as dashboard tiles.",
-          "section": "goals"
-        },
-        {
           "title": "Smarter training sessions",
-          "detail": "Guided auto-advance between sets with a watch Live Activity, a post-session weekly muscle review, and a Start Training Session shortcut.",
+          "detail": "Effort-weighted muscle volume, a post-session weekly review, an auto-advancing set flow, and a watch Live Activity.",
           "section": "training"
         },
         {
+          "title": "A calmer, more useful Next feed",
+          "detail": "Goal-backed habits stay put after completion, keyboard navigation lands, and dismissed suggestions sync across devices.",
+          "section": null
+        },
+        {
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter in view as dashboard tiles.",
+          "section": "goals"
+        },
+        {
           "title": "Choose how much you share",
-          "detail": "A graded privacy control lets you pick your analytics level and see exactly what's been sent.",
+          "detail": "Graded analytics levels let you pick exactly what telemetry is sent, with a log of what left your device.",
           "section": null
         }
       ]
