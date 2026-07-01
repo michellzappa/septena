@@ -4,29 +4,24 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1293,
+      "build": 1302,
       "date": "2026-07-01",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Time travel across every section",
-          "detail": "A single day-clock now drives dashboards, sections, goals, and detail views so day-rollover and time travel stay consistent everywhere.",
-          "section": null
-        },
-        {
-          "title": "Reworked Today for Tasks",
-          "detail": "Today gains a quiet calendar agenda, filing chips, inline quick-add, group-by-area-and-project, and a tenure dial on the checkbox showing how long a task has waited.",
+          "title": "Tasks, reimagined",
+          "detail": "Rename and edit inline, quick-add at the top or bottom of any list, select multiple tasks for bulk actions, and undo deletes, moves, and defers from a toast.",
           "section": "tasks"
         },
         {
-          "title": "Faster, more forgiving task editing",
-          "detail": "Inline rename and quick-add, a longer undo window, confirmation toasts with undo for delete/move/defer, and inline move-to-area or project menus.",
+          "title": "Your calendar, woven into Today",
+          "detail": "See today's remaining events alongside your tasks, with your choice of hidden calendars kept in sync across devices.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks land in a Recently Deleted view with restore and 30-day auto-purge, synced across your devices.",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore anything before it's purged.",
           "section": "tasks"
         },
         {
@@ -35,53 +30,28 @@
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and get on-device analysis, with a clearer tap affordance instead of an auto-launching camera.",
+          "title": "The Week tab is now Today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Photo-first meal logging",
+          "detail": "Snap a meal and let on-device analysis fill in the details, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Pin goals to your week",
-          "detail": "Pinned goals now render as tiles on the week dashboard.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most in view as dashboard tiles.",
           "section": "goals"
         },
         {
-          "title": "Redesigned Coach hub",
-          "detail": "The Coach view is now a grouped list that matches the Next feed.",
-          "section": null
-        },
-        {
-          "title": "Smarter Next feed",
-          "detail": "Native selection and keyboard navigation, dismissed suggestions synced across devices, a per-section show-in-Next toggle, and a foldable Done Today log.",
-          "section": null
-        },
-        {
-          "title": "Training session upgrades",
-          "detail": "Start a session from an intent or Control Center, follow an auto-advancing flow with a watch Live Activity, and review effort-weighted muscle volume after each session.",
+          "title": "Smarter training sessions",
+          "detail": "Guided auto-advance between sets with a watch Live Activity, a post-session weekly muscle review, and a Start Training Session shortcut.",
           "section": "training"
         },
         {
-          "title": "Richer watch capture",
-          "detail": "A per-kind action drawer, interactive intake nudges, expanded intake tiles and meal picker, and a time-of-day sky behind the paged Next feed.",
-          "section": null
-        },
-        {
-          "title": "See and control what telemetry is sent",
-          "detail": "Graded analytics levels from off to full, a checklist of exactly what's collected, and a log of what was recently sent.",
-          "section": null
-        },
-        {
-          "title": "Unified iPad and Mac chrome",
-          "detail": "Consistent page chrome with Quick Find, a single sidebar toggle, centered wide-content columns, and pointer-hover highlights on tappable cards.",
-          "section": null
-        },
-        {
-          "title": "Custom emoji on intake trackers",
-          "detail": "Set your own emoji on tracker methods and varieties, with a guessed symbol as a fallback.",
-          "section": "intake"
-        },
-        {
-          "title": "Week tab is now Today",
-          "detail": "The home tab is renamed to Today and centers its content on wide screens.",
+          "title": "Choose how much you share",
+          "detail": "A graded privacy control lets you pick your analytics level and see exactly what's been sent.",
           "section": null
         }
       ]
