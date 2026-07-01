@@ -1570,9 +1570,8 @@ private struct SidebarSheets: ViewModifier {
 // MARK: - Task drop into sidebar (macOS)
 
 #if os(macOS)
-/// Drop target for a task dragged from `TaskListView` (which publishes its
-/// id via `.draggable(task.id)`) onto a sidebar area / project / smart-list
-/// row. Pairs with the source via the Transferable `String` payload.
+/// Drop target for tasks dragged from `TaskListView` onto a sidebar area /
+/// project / smart-list row. Pairs with the source via `TaskDragIDs`.
 private struct SidebarTaskDrop: ViewModifier {
   enum Kind {
     case area(String)
@@ -1600,7 +1599,8 @@ private struct SidebarTaskDrop: ViewModifier {
           .fill(Color.accentColor.opacity(isTargeted ? 0.18 : 0))
           .animation(.easeOut(duration: 0.12), value: isTargeted)
       )
-      .dropDestination(for: String.self) { ids, _ in
+      .dropDestination(for: TaskDragIDs.self) { payloads, _ in
+        let ids = payloads.flatMap(\.ids)
         guard !ids.isEmpty else { return false }
         for id in ids { rehome(id) }
         return true

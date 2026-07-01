@@ -1,4 +1,20 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Task drag payload (macOS sidebar drop)
+
+/// Drag payload for re-homing one or more tasks onto a sidebar destination.
+struct TaskDragIDs: Codable, Hashable, Transferable {
+  let ids: [String]
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: .septenaTaskDragIDs)
+  }
+}
+
+extension UTType {
+  static let septenaTaskDragIDs = UTType(exportedAs: "com.septena.task-drag-ids")
+}
 
 // MARK: - Checkbox feel
 //
@@ -1327,6 +1343,8 @@ struct MovePickerSheet: View {
   let projects: [Project]
   var currentAreaId: String? = nil
   var currentProjectId: String? = nil
+  /// When moving multiple tasks, hides the single-row highlight and retitles the sheet.
+  var bulkCount: Int = 1
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
   @Environment(\.dismiss) private var dismiss
   @Environment(\.modelContext) private var modelContext
@@ -1342,7 +1360,7 @@ struct MovePickerSheet: View {
           // Inbox first — drop both area and project.
           if matches("Inbox") {
             row(.inbox, title: "Inbox",
-                selected: currentAreaId == nil && currentProjectId == nil) {
+                selected: showCurrentSelection && currentAreaId == nil && currentProjectId == nil) {
               onPick(nil, nil); dismiss()
             }
           }
@@ -1350,7 +1368,7 @@ struct MovePickerSheet: View {
           // Top-level projects (no area)
           ForEach(filteredTopProjects) { p in
             row(.project, title: p.title, projectId: p.id,
-                selected: p.id == currentProjectId) {
+                selected: showCurrentSelection && p.id == currentProjectId) {
               onPick(nil, p.id); dismiss()
             }
           }
@@ -1359,12 +1377,12 @@ struct MovePickerSheet: View {
           // the sidebar's hierarchy.
           ForEach(filteredAreas) { area in
             row(.area, title: area.title, emoji: area.emoji,
-                selected: currentProjectId == nil && area.id == currentAreaId) {
+                selected: showCurrentSelection && currentProjectId == nil && area.id == currentAreaId) {
               onPick(area.id, nil); dismiss()
             }
             ForEach(projectsIn(area.id)) { p in
               row(.project, title: p.title, projectId: p.id,
-                  selected: p.id == currentProjectId, indent: true) {
+                  selected: showCurrentSelection && p.id == currentProjectId, indent: true) {
                 onPick(area.id, p.id); dismiss()
               }
             }
@@ -1375,7 +1393,7 @@ struct MovePickerSheet: View {
       .background(Theme.paperBackground)
       .task { loadProgress() }
       .septenaAlwaysVisibleSearch(text: $query)
-      .navigationTitle("Move")
+      .navigationTitle(bulkCount > 1 ? "Move \(bulkCount) Tasks" : "Move")
       .septenaInlineTitle()
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
@@ -1387,6 +1405,8 @@ struct MovePickerSheet: View {
   }
 
   // MARK: - Filtering
+
+  private var showCurrentSelection: Bool { bulkCount == 1 }
 
   private var q: String { query.lowercased() }
 
@@ -1569,8 +1589,8 @@ struct Hairline: View {
 
 /// The full task context menu + its picker sheets, bundled into one modifier so
 /// any surface (the Tasks list, the Next feed) attaches the *same* menu — Edit
-/// Details…, Duplicate, Move to / Remove from Today, When…, Deadline…, Move…,
-/// Repeat…, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
+/// Details…, Copy, Duplicate, Move to / Remove from Today, When…, Deadline…,
+/// Move…, Repeat…, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
 /// `TaskListModalPresenter`, both shared with `TaskListView`, so the two
 /// surfaces can't drift. Which picker is open is owned per-row.
 ///
@@ -1595,7 +1615,7 @@ struct TaskRowActions: ViewModifier {
 
   @State private var whenSheet: TaskListView.WhenSheet?
   @State private var showingMoveSheet = false
-  @State private var moveTargetId: String?
+  @State private var moveTargetIds: [String] = []
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
@@ -1609,6 +1629,12 @@ struct TaskRowActions: ViewModifier {
           target: .single(task),
           filter: filter,
           rankedSuggestions: nil,
+          onCopy: { target in
+            let titles = target.tasks.map(\.title)
+            guard !titles.isEmpty else { return }
+            SeptenaPasteboard.copy(titles.joined(separator: "\n"))
+            Haptics.tick()
+          },
           onDuplicate: { _ in duplicateTask(task) },
           onOpenDetail: { onOpenDetail?($0) },
           onApplySuggestion: { _, _ in },
@@ -1628,10 +1654,19 @@ struct TaskRowActions: ViewModifier {
             }
             onChange?()
           },
-          onOpenWhen: { _ in whenSheet = .init(taskId: task.id, kind: .scheduled) },
-          onOpenDeadline: { _ in whenSheet = .init(taskId: task.id, kind: .deadline) },
-          onOpenMove: { _ in moveTargetId = task.id; showingMoveSheet = true },
-          onMoveTo: { _, areaId, projectId in applyMove(id: task.id, areaId: areaId, projectId: projectId) },
+          onOpenWhen: { target in
+            whenSheet = .init(taskIds: target.ids, kind: .scheduled)
+          },
+          onOpenDeadline: { target in
+            whenSheet = .init(taskIds: target.ids, kind: .deadline)
+          },
+          onOpenMove: { target in
+            moveTargetIds = target.ids
+            showingMoveSheet = true
+          },
+          onMoveTo: { target, areaId, projectId in
+            for id in target.ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
+          },
           moveAreas: areas,
           moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
@@ -1642,7 +1677,7 @@ struct TaskRowActions: ViewModifier {
       .modifier(TaskListModalPresenter(
         whenSheet: $whenSheet,
         showingMoveSheet: $showingMoveSheet,
-        moveTargetId: $moveTargetId,
+        moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
         areas: areas,
@@ -1651,8 +1686,12 @@ struct TaskRowActions: ViewModifier {
         currentScheduled: { _ in task.scheduled.flatMap(SeptenaDate.parse) },
         currentDeadline: { _ in task.deadline.flatMap(SeptenaDate.parse) },
         currentRecurrence: { _ in task.recurrence },
-        applyWhen: applyWhen,
-        applyMove: applyMove,
+        applyWhen: { ids, kind, date in
+          for id in ids { applyWhen(id: id, kind: kind, date: date) }
+        },
+        applyMove: { ids, areaId, projectId in
+          for id in ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
+        },
         applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule); onChange?() }
       ))
   }

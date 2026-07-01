@@ -304,19 +304,19 @@ struct TaskListView: View {
   @State private var whenSheet: WhenSheet?
   enum WhenKind { case deadline, scheduled }
   struct WhenSheet: Identifiable {
-    let id: String   // composite of taskId + kind so reopening a kind re-presents cleanly
-    let taskId: String
+    let id: String
+    let taskIds: [String]
     let kind: WhenKind
-    init(taskId: String, kind: WhenKind) {
-      self.taskId = taskId
+    init(taskIds: [String], kind: WhenKind) {
+      self.taskIds = taskIds
       self.kind = kind
-      self.id = "\(taskId)|\(kind == .deadline ? "due" : "sched")"
+      self.id = "\(taskIds.joined(separator: ","))|\(kind == .deadline ? "due" : "sched")"
     }
   }
 
   // Move picker
   @State private var showingMoveSheet = false
-  @State private var moveTargetId: String?
+  @State private var moveTargetIds: [String] = []
 
   // Repeat picker
   @State private var showingRepeatSheet = false
@@ -333,19 +333,58 @@ struct TaskListView: View {
     #endif
   }
 
-  /// What `rowActionsMenu` operates on — always a single task now (the per-row
-  /// context menu). Kept as a one-case enum so the menu builder's call sites
-  /// stay stable.
+  /// What `rowActionsMenu` operates on — a single row or the current multi-
+  /// selection when the interacted row is part of it.
   // Internal (not fileprivate) so the shared `TaskRowActions` modifier — used
   // on the Next surface — can drive the same `TaskListRowContextMenu`.
   enum ActionTarget {
     case single(SeptenaTask)
-    var ids: [String] {
+    case bulk([SeptenaTask])
+
+    var tasks: [SeptenaTask] {
       switch self {
-      case .single(let t): return [t.id]
+      case .single(let t): return [t]
+      case .bulk(let ts): return ts
       }
     }
-    var isBulk: Bool { false }
+
+    var ids: [String] { tasks.map(\.id) }
+
+    var isBulk: Bool {
+      if case .bulk = self { return true }
+      return false
+    }
+
+    var count: Int { tasks.count }
+  }
+
+  private var selectionScope: ListSelectionScope<String> {
+    ListSelectionScope(selection: selection, orderedIDs: keyboardOrderedTaskIds)
+  }
+
+  private func orderedActionIDs() -> [String] {
+    selectionScope.actionIDs
+  }
+
+  private func actionTarget(for task: SeptenaTask) -> ActionTarget {
+    if let resolved = SelectionActionTarget.resolve(
+      interactedID: task.id,
+      scope: selectionScope,
+      item: { currentTask(id: $0) }
+    ) {
+      switch resolved {
+      case .single(let t): return .single(t)
+      case .bulk(let ts): return .bulk(ts)
+      }
+    }
+    return .single(task)
+  }
+
+  private func dragPayload(for task: SeptenaTask) -> TaskDragIDs {
+    if selection.contains(task.id), selection.count > 1 {
+      return TaskDragIDs(ids: orderedActionIDs())
+    }
+    return TaskDragIDs(ids: [task.id])
   }
 
 
@@ -376,7 +415,7 @@ struct TaskListView: View {
       .modifier(TaskListModalPresenter(
         whenSheet: $whenSheet,
         showingMoveSheet: $showingMoveSheet,
-        moveTargetId: $moveTargetId,
+        moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
         areas: areas,
@@ -385,8 +424,8 @@ struct TaskListView: View {
         currentScheduled: currentScheduled,
         currentDeadline: currentDeadline,
         currentRecurrence: currentRecurrence,
-        applyWhen: applyWhen,
-        applyMove: applyMove,
+        applyWhen: applyWhenToSelection,
+        applyMove: applyMoveToSelection,
         applyRecurrence: applyRecurrence
       ))
     let withSnackbar = content.septenaToastOverlay(store: toastStore)
@@ -402,15 +441,16 @@ struct TaskListView: View {
     #if os(macOS)
     return withSnackbar.focusedSceneValue(\.taskActions, TaskActions(
       newTask: { nav.shouldStartCreating = true },
-      toggleToday: toggleTodayForSelected,
-      openWhen: openWhenForSelected,
-      openDeadline: openDeadlineForSelected,
-      openMove: openMoveForSelected,
+      toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
+      openWhen: selection.isEmpty ? nil : openWhenForSelected,
+      openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
+      openMove: selection.isEmpty ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
-      duplicate: duplicateSelectedAction
+      duplicate: duplicateSelectedAction,
+      copy: copySelectedAction
     ))
     #else
     // `focusedSceneValue` spins the iPad focus arbiter (see comment above).
@@ -422,6 +462,8 @@ struct TaskListView: View {
           Group {
             Button("", action: editSelected)
               .keyboardShortcut(TaskRowShortcuts.editDetails)
+            Button("", action: copySelected)
+              .keyboardShortcut(TaskRowShortcuts.copy)
             Button("", action: duplicateSelected)
               .keyboardShortcut(TaskRowShortcuts.duplicate)
             Button("", action: toggleSelected)
@@ -479,7 +521,7 @@ struct TaskListView: View {
     .modifier(TaskListStandaloneChrome(embedded: embedded, recentlyDeleted: filter == .recentlyDeleted))
     // (Keyboard navigation — ↑↓ traversal, Return/Space/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
-    // open the composer via `shouldStartCreating` → `startCreate()`.)
+    // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
     // Only attach top-level nav chrome on the standalone tab versions.
     // Embedded uses (Project / Area detail wraps) inherit chrome from parent
     // — adding modifiers here would create duplicate back buttons.
@@ -566,16 +608,17 @@ struct TaskListView: View {
       if !editing { selection.removeAll() }
     }
     // Consume the global "start a new task" trigger (⌘N / + / sidebar menu) by
-    // scrolling to the foot quick-add row (or opening the composer on Upcoming).
+    // opening the contextual inline quick-add (Inbox on Today, foot line on
+    // project/area, composer on Upcoming).
     .onChange(of: nav.shouldStartCreating) { _, _ in
       guard nav.shouldStartCreating else { return }
       nav.shouldStartCreating = false
-      focusQuickAdd()
+      openContextualQuickAdd()
     }
     .onAppear {
       if nav.shouldStartCreating {
         nav.shouldStartCreating = false
-        focusQuickAdd()
+        openContextualQuickAdd()
       }
     }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
@@ -656,25 +699,24 @@ struct TaskListView: View {
     AddInfoSection.tasks.notifyTilesChanged()
   }
 
-  /// ⌘N / + / sidebar "New To-Do" — scroll to the visible "New task" quick-add
-  /// row instead of spawning a draft at the top of the list. Upcoming (no foot
-  /// line) and other non-inline lists fall through to `startCreate()`.
-  private func focusQuickAdd() {
+  /// ⌘N / + / sidebar "New To-Do" — open the list's contextual "New task"
+  /// capture row (Inbox on Today, foot line on project/area/unscheduled, composer
+  /// on Upcoming). Re-tapping while a capture is already open scrolls back to it.
+  private func openContextualQuickAdd() {
     guard filter != .recentlyDeleted else { return }
-    guard allowsInlineCreate, hasVisibleQuickAddTrigger else {
-      startCreate()
+    if quickAddDraftId != nil {
+      scrollToTargetID = Self.quickAddScrollID
+      scrollToTargetTick += 1
       return
     }
-    scrollToTargetID = Self.quickAddScrollID
-    scrollToTargetTick += 1
-  }
-
-  /// Whether a tappable "New task" quick-add row is on screen (foot of a
-  /// populated list, the top row on an empty creatable list, or the Inbox card
-  /// on Today).
-  private var hasVisibleQuickAddTrigger: Bool {
-    showsQuickAddAtTop || showsQuickAddAtFoot || attachesQuickAddToVisibleCard
-      || (filter == .today && allowsInlineCreate && !inboxCollapsed)
+    if filter == .today && inboxCollapsed {
+      withAnimation(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+    }
+    switch filter {
+    case .area(let id):    startCreate(areaId: id)
+    case .project(let id): startCreate(projectId: id)
+    default:               startCreate()
+    }
   }
 
   // MARK: - Inline editing
@@ -883,6 +925,37 @@ struct TaskListView: View {
       else { clearSelection() }
     }
     #endif
+    #if os(macOS)
+    .onCopyCommand {
+      guard usesSelectionModel else { return [] }
+      let ids = orderedActionIDs()
+      guard !ids.isEmpty else { return [] }
+      let text = ids.compactMap { currentTask(id: $0)?.title }.joined(separator: "\n")
+      guard !text.isEmpty else { return [] }
+      return [NSItemProvider(object: text as NSString)]
+    }
+    #endif
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      if usesSelectionModel, selectionScope.isMulti, filter != .recentlyDeleted {
+        taskBatchActionBar
+      }
+    }
+  }
+
+  private var taskBatchActionBar: some View {
+    HStack(spacing: 16) {
+      Text("\(selectionScope.count) selected")
+        .font(.septenaMeta)
+        .foregroundStyle(Theme.inkSecondary)
+      Spacer(minLength: 0)
+      Button("Copy") { copyTasks(orderedActionIDs()) }
+      Button("Move") { openMoveForSelected() }
+      Button("Complete") { toggleSelected() }
+      Button("Delete", role: .destructive) { deleteSelected() }
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.vertical, 10)
+    .background(.bar)
   }
 
   /// True while a field/editor owns the keyboard — the composer drawer, an
@@ -917,16 +990,25 @@ struct TaskListView: View {
   }
 
   /// Return / double-click(Mac) / tap(touch) on a row → open it for editing.
+  /// Multi-select has no single primary action, so Return no-ops there.
   private func activateRow(_ id: String) {
+    guard selection.count <= 1 else { return }
     guard let task = currentTask(id: id) else { return }
     beginEdit(task)
   }
 
-  /// Space on the cursor row → toggle complete (the keyboard analog of the
-  /// checkbox).
+  /// Space on the cursor row → toggle complete (all selected rows when multi).
   private func toggleRow(_ id: String) {
-    guard let task = currentTask(id: id) else { return }
-    toggle(task)
+    let ids = orderedActionIDsForKeyboard(fallback: id)
+    for sid in ids {
+      guard let task = currentTask(id: sid) else { continue }
+      toggle(task)
+    }
+  }
+
+  private func orderedActionIDsForKeyboard(fallback: String) -> [String] {
+    let scoped = orderedActionIDs()
+    return scoped.isEmpty ? [fallback] : scoped
   }
 
   /// True once this filter's data has loaded and there are no rows to show.
@@ -1057,9 +1139,10 @@ struct TaskListView: View {
         // No hairline — the band's rows sit in a card now, so a rule here would
         // read as the orphaned underline the flat list used to have.
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(PlainHoverRowButtonStyle())
     .textCase(nil)
     .selectionDisabled()
   }
@@ -1351,6 +1434,7 @@ struct TaskListView: View {
     guard expandedEditId == nil, editingTitleId == nil, inlineFocus == nil,
           !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
           !nav.showQuickFind,
+          selection.count == 1,
           let id = selection.first(where: { currentTask(id: $0) != nil }),
           let task = currentTask(id: id), task.status != .done
     else { return nil }
@@ -1365,41 +1449,63 @@ struct TaskListView: View {
     guard expandedEditId == nil, editingTitleId == nil, inlineFocus == nil,
           !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
           !nav.showQuickFind, filter != .recentlyDeleted,
-          let id = selection.first(where: { currentTask(id: $0) != nil })
+          !orderedActionIDs().isEmpty
     else { return nil }
-    return { duplicate(id: id) }
+    return { duplicate(orderedActionIDs()) }
+  }
+
+  private var copySelectedAction: (() -> Void)? {
+    guard expandedEditId == nil, editingTitleId == nil, inlineFocus == nil,
+          !composerIsOpen, whenSheet == nil, !showingMoveSheet, !showingRepeatSheet,
+          !nav.showQuickFind, filter != .recentlyDeleted,
+          !orderedActionIDs().isEmpty
+    else { return nil }
+    return { copyTasks(orderedActionIDs()) }
   }
   #endif
 
-  /// Clone a task into a brand-new one (new id) carrying the same title, filing
-  /// (area/project), notes, schedule, deadline, today flag and recurrence. The
-  /// copy always lands open even if the source was completed, and becomes the
-  /// new selection so the user can immediately rename / reschedule it.
-  private func duplicate(id: String) {
-    guard let task = currentTask(id: id) else { return }
+  private func copyTasks(_ ids: [String]) {
+    let titles = ids.compactMap { currentTask(id: $0)?.title }
+    guard !titles.isEmpty else { return }
+    SeptenaPasteboard.copy(titles.joined(separator: "\n"))
     Haptics.tick()
-    let copy = mutator.create(
-      title: task.title,
-      area: task.area,
-      project: task.project,
-      scheduled: SeptenaDate.parse(task.scheduled),
-      deadline: SeptenaDate.parse(task.deadline),
-      today: task.today,
-      notes: task.notes
-    )
-    if let rule = task.recurrence {
-      mutator.setRecurrence(id: copy.id, recurrence: rule)
+  }
+
+  /// Clone task(s) into brand-new ones (new ids) carrying the same fields.
+  private func duplicate(_ ids: [String]) {
+    guard !ids.isEmpty else { return }
+    Haptics.tick()
+    var lastCopyId: String?
+    for id in ids {
+      guard let task = currentTask(id: id) else { continue }
+      let copy = mutator.create(
+        title: task.title,
+        area: task.area,
+        project: task.project,
+        scheduled: SeptenaDate.parse(task.scheduled),
+        deadline: SeptenaDate.parse(task.deadline),
+        today: task.today,
+        notes: task.notes
+      )
+      if let rule = task.recurrence {
+        mutator.setRecurrence(id: copy.id, recurrence: rule)
+      }
+      lastCopyId = copy.id
     }
+    guard let lastCopyId else { return }
     Task {
       await load()
-      selectOnly(copy.id)
+      selectOnly(lastCopyId)
     }
   }
 
   private func toggleSelected() {
-    guard let id = effectiveSelectionId(),
-          let t = currentTask(id: id) else { return }
-    toggle(t)
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    for id in ids {
+      guard let t = currentTask(id: id) else { continue }
+      toggle(t)
+    }
   }
 
   /// Resolve the row a single-target keyboard shortcut should act on: a
@@ -1416,12 +1522,16 @@ struct TaskListView: View {
   /// ⌘T — flip the task's "today" flag. Same action as the context-menu
   /// entry, just keyboard-driven on the currently selected row.
   private func toggleTodayForSelected() {
-    guard let id = effectiveSelectionId(),
-          let t = currentTask(id: id) else { return }
-    if t.isOnToday { applyRemoveFromToday([t.id]) }
-    else {
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    let tasks = ids.compactMap { currentTask(id: $0) }
+    guard !tasks.isEmpty else { return }
+    if tasks.allSatisfy(\.isOnToday) {
+      applyRemoveFromToday(ids)
+    } else {
       Haptics.tick()
-      promoteToToday([t.id])
+      promoteToToday(ids.filter { !(currentTask(id: $0)?.isOnToday ?? false) })
+      for id in ids { mutator.acknowledge(id: id) }
       Task { await load() }
     }
   }
@@ -1455,27 +1565,30 @@ struct TaskListView: View {
 
   /// ⌘S — open the When (schedule) picker for the focused row.
   private func openWhenForSelected() {
-    guard let id = effectiveSelectionId() else { return }
-    whenSheet = WhenSheet(taskId: id, kind: .scheduled)
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    whenSheet = WhenSheet(taskIds: ids, kind: .scheduled)
   }
 
-  /// ⌘⇧D — open the Deadline picker for the focused row.
+  /// ⌘⇧D — open the Deadline picker for the focused row(s).
   private func openDeadlineForSelected() {
-    guard let id = effectiveSelectionId() else { return }
-    whenSheet = WhenSheet(taskId: id, kind: .deadline)
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    whenSheet = WhenSheet(taskIds: ids, kind: .deadline)
   }
 
-  /// ⌘M — open the Move destination picker for the focused row.
+  /// ⌘M — open the Move destination picker for the focused row(s).
   private func openMoveForSelected() {
-    guard filter != .recentlyDeleted,
-          let id = effectiveSelectionId() else { return }
-    moveTargetId = id
+    guard filter != .recentlyDeleted else { return }
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    moveTargetIds = ids
     showingMoveSheet = true
   }
 
-  /// ⌘⌫ — delete every selected row (or the effective single row).
+  /// ⌘⌫ — delete every selected row.
   private func deleteSelected() {
-    let ids = selection.isEmpty ? [effectiveSelectionId()].compactMap { $0 } : Array(selection)
+    let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     Haptics.warning()
     clearSelection()
@@ -1484,17 +1597,21 @@ struct TaskListView: View {
 
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
   private func clearScheduleForSelected() {
-    guard let id = effectiveSelectionId() else { return }
-    applyWhen(id: id, kind: .scheduled, date: nil)
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    for id in ids {
+      applyWhen(id: id, kind: .scheduled, date: nil)
+    }
   }
 
-  /// ⌘D — duplicate the focused row. macOS gates this through
-  /// `duplicateSelectedAction` (explicit selection); the iPad hidden button
-  /// resolves the effective row, matching how Move behaves there.
+  private func copySelected() {
+    copyTasks(orderedActionIDs())
+  }
+
+  /// ⌘D — duplicate the focused row(s).
   private func duplicateSelected() {
-    guard filter != .recentlyDeleted,
-          let id = effectiveSelectionId() else { return }
-    duplicate(id: id)
+    guard filter != .recentlyDeleted else { return }
+    duplicate(orderedActionIDs())
   }
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
@@ -1559,51 +1676,82 @@ struct TaskListView: View {
     Task { await load() }
   }
 
-  private func applyMove(id: String, areaId: String?, projectId: String?) {
-    Haptics.tick()
-    // Capture the prior filing BEFORE the move so Undo can put it back.
-    let task = currentTask(id: id)
-    let prevArea = task?.area
-    let prevProject = task?.project
-    let wasInTriage = task?.isInTriageBand ?? false
-    if let task {
-      let chosenKind: SuggestionEngine.Suggestion.Kind? =
-        projectId != nil ? .project : (areaId != nil ? .area : nil)
-      let chosenId = projectId ?? areaId
-      recordImplicitRejectionIfMismatch(task: task,
-                                        chosenKind: chosenKind,
-                                        chosenId: chosenId)
-    }
-    // Project takes precedence — Septena derives area from project on save.
+  private struct MoveSnapshot {
+    let id: String
+    let prevArea: String?
+    let prevProject: String?
+    let wasInTriage: Bool
+  }
+
+  private func applyMoveCore(id: String, areaId: String?, projectId: String?) -> MoveSnapshot? {
+    guard let task = currentTask(id: id) else { return nil }
+    let prevArea = task.area
+    let prevProject = task.project
+    let wasInTriage = task.isInTriageBand
+    let chosenKind: SuggestionEngine.Suggestion.Kind? =
+      projectId != nil ? .project : (areaId != nil ? .area : nil)
+    let chosenId = projectId ?? areaId
+    recordImplicitRejectionIfMismatch(task: task,
+                                      chosenKind: chosenKind,
+                                      chosenId: chosenId)
     if projectId != nil {
       mutator.moveToProject(id: id, project: projectId)
     } else {
       mutator.moveToArea(id: id, area: areaId)
       mutator.moveToProject(id: id, project: nil)
     }
-    // Filing is engagement — clear the agent cue so a moved proposal leaves the
-    // Inbox. No-op for non-agent / already-seen rows.
     mutator.acknowledge(id: id)
     if filter == .today, wasInTriage { promoteFlash.flash(id) }
-    Task { await load() }
+    return MoveSnapshot(id: id, prevArea: prevArea, prevProject: prevProject, wasInTriage: wasInTriage)
+  }
 
-    // The inline move submenus relocate a row with no visible trace ("where did
-    // it go?"). Name the destination and offer a one-tap Undo back to the prior
-    // area/project — the same move primitives, run in reverse.
-    let destName =
-      projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
+  private func undoMove(_ snapshots: [MoveSnapshot]) {
+    for snap in snapshots {
+      if let prevProject = snap.prevProject {
+        mutator.moveToProject(id: snap.id, project: prevProject)
+      } else {
+        mutator.moveToArea(id: snap.id, area: snap.prevArea)
+        mutator.moveToProject(id: snap.id, project: nil)
+      }
+      if snap.wasInTriage { mutator.moveToToday(id: snap.id, today: false) }
+    }
+    Task { await load() }
+  }
+
+  private func destinationName(areaId: String?, projectId: String?) -> String {
+    projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
       ?? "No Project"
-    showToast("Moved to \(destName)") {
-      if let prevProject {
-        mutator.moveToProject(id: id, project: prevProject)
-      } else {
-        mutator.moveToArea(id: id, area: prevArea)
-        mutator.moveToProject(id: id, project: nil)
-      }
-      if wasInTriage { mutator.moveToToday(id: id, today: false) }
-      Task { await load() }
-    }
+  }
+
+  private func applyMove(id: String, areaId: String?, projectId: String?) {
+    Haptics.tick()
+    guard let snap = applyMoveCore(id: id, areaId: areaId, projectId: projectId) else { return }
+    Task { await load() }
+    let destName = destinationName(areaId: areaId, projectId: projectId)
+    showToast("Moved to \(destName)") { undoMove([snap]) }
+  }
+
+  private func applyMove(_ ids: [String], areaId: String?, projectId: String?) {
+    guard !ids.isEmpty else { return }
+    Haptics.tick()
+    let snaps = ids.compactMap { applyMoveCore(id: $0, areaId: areaId, projectId: projectId) }
+    guard !snaps.isEmpty else { return }
+    Task { await load() }
+    let destName = destinationName(areaId: areaId, projectId: projectId)
+    let message = snaps.count == 1
+      ? "Moved to \(destName)"
+      : "Moved \(snaps.count) tasks to \(destName)"
+    showToast(message) { undoMove(snaps) }
+  }
+
+  private func applyMoveToSelection(_ ids: [String], areaId: String?, projectId: String?) {
+    applyMove(ids, areaId: areaId, projectId: projectId)
+  }
+
+  private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
+    guard !ids.isEmpty else { return }
+    for id in ids { applyWhen(id: id, kind: kind, date: date) }
   }
 
   // MARK: - Row
@@ -1683,13 +1831,23 @@ struct TaskListView: View {
     // it. `.draggable` pairs with the sidebar's `.dropDestination(for:)`; the
     // explicit preview is a compact title pill.
     #if os(macOS)
-    .draggable(task.id) {
-      Text(task.title)
-        .scaledFont(size: 13)
-        .lineLimit(1)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    .draggable(dragPayload(for: task)) {
+      let payload = dragPayload(for: task)
+      if payload.ids.count > 1 {
+        Text("\(payload.ids.count) tasks")
+          .scaledFont(size: 13, weight: .medium)
+          .lineLimit(1)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+      } else {
+        Text(task.title)
+          .scaledFont(size: 13)
+          .lineLimit(1)
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+      }
     }
     #endif
   }
@@ -1893,9 +2051,8 @@ struct TaskListView: View {
         target: target,
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
-        onDuplicate: { target in
-          if case .single(let t) = target { duplicate(id: t.id) }
-        },
+        onCopy: { target in copyTasks(target.ids) },
+        onDuplicate: { target in duplicate(target.ids) },
         onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
         onMoveToToday: { ids, today in
@@ -1909,19 +2066,18 @@ struct TaskListView: View {
           }
         },
         onOpenWhen: { target in
-          if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .scheduled) }
+          whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
         },
         onOpenDeadline: { target in
-          if case .single(let t) = target { whenSheet = WhenSheet(taskId: t.id, kind: .deadline) }
+          whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
         },
         onOpenMove: { target in
-          if case .single(let t) = target { moveTargetId = t.id; showingMoveSheet = true }
+          moveTargetIds = target.ids
+          showingMoveSheet = true
         },
         onMoveTo: { target, areaId, projectId in
-          if case .single(let t) = target {
-            Haptics.pick()
-            applyMove(id: t.id, areaId: areaId, projectId: projectId)
-          }
+          Haptics.pick()
+          applyMove(target.ids, areaId: areaId, projectId: projectId)
         },
         moveAreas: areas,
         moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
@@ -1942,30 +2098,38 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func taskContextMenu(for task: SeptenaTask) -> some View {
-    rowActionsMenu(target: .single(task))
+    rowActionsMenu(target: actionTarget(for: task))
   }
 
   /// Ranked filing picks for one open task — single source for the context
   /// menu's "Suggested" section and the one-tap row chip (chip uses `.first`).
+  /// Only two flows: Inbox → area/project, and area-direct → child project.
+  /// Tasks already filed into a project are never repositioned.
   private func filingRankedSuggestions(for task: SeptenaTask) -> [SuggestionEngine.Suggestion]? {
     guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
     guard task.status == .open else { return nil }
     guard filter != .logbook && filter != .recentlyDeleted else { return nil }
-    // Today's triage band keeps its richer pre-ranked list (computed in `load()`).
-    if filter == .today, let top = suggestionEngine.topSuggestion(for: task.id) {
-      let ranked = suggestionEngine.suggestions[task.id] ?? [top]
-      return suggestionAlreadyMatches(task, ranked.first) ? nil : ranked
+    guard task.project == nil else { return nil }
+
+    // Inbox (triage band): inbox → area or project.
+    if task.isInTriageBand {
+      if let top = suggestionEngine.topSuggestion(for: task.id) {
+        let ranked = suggestionEngine.suggestions[task.id] ?? [top]
+        return suggestionAlreadyMatches(task, ranked.first) ? nil : ranked
+      }
+      guard let s = suggestionEngine.suggest(forText: task.title) else { return nil }
+      return suggestionAlreadyMatches(task, s) ? nil : [s]
     }
-    // Area page: only child projects of this area.
-    if case .area(let areaId) = filter {
+
+    // Area page: area-direct → child project only.
+    if case .area(let areaId) = filter, task.area == areaId {
       let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
       let ranked = suggestionEngine.rankedSuggestions(forText: task.title, scope: scope)
       guard let top = ranked.first else { return nil }
       return suggestionAlreadyMatches(task, top) ? nil : ranked
     }
-    // Any other view: classify on demand — skip "move to where it already lives."
-    guard let s = suggestionEngine.suggest(forText: task.title) else { return nil }
-    return suggestionAlreadyMatches(task, s) ? nil : [s]
+
+    return nil
   }
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
@@ -2756,10 +2920,9 @@ struct TaskListView: View {
     // Refresh the inbox suggestion engine from local data. LocalCache
     // returns every status, so the engine sees the full corpus for
     // ranking.
-    // Today's triage band gets the richer per-task ranked suggestions; every
-    // other view (except the all-done Logbook) still trains the model so a
-    // row's context menu can suggest a destination on demand via
-    // `suggest(forText:)`.
+    // Today's triage band gets the richer per-task ranked suggestions; area
+    // pages train the model on load so area-direct rows can classify into
+    // child projects on demand. Other views never surface filing picks.
     if filter == .today {
       // Re-read the Inbox and merge back any just-checked row that's still
       // settling (the `.triage` query drops done tasks), so an accepted
@@ -3018,7 +3181,7 @@ private struct TopLevelChromeModifier: ViewModifier {
 struct TaskListModalPresenter: ViewModifier {
   @Binding var whenSheet: TaskListView.WhenSheet?
   @Binding var showingMoveSheet: Bool
-  @Binding var moveTargetId: String?
+  @Binding var moveTargetIds: [String]
   @Binding var showingRepeatSheet: Bool
   @Binding var repeatTargetId: String?
 
@@ -3028,36 +3191,38 @@ struct TaskListModalPresenter: ViewModifier {
   let currentScheduled: (String?) -> Date?
   let currentDeadline: (String?) -> Date?
   let currentRecurrence: (String?) -> Recurrence?
-  let applyWhen: (String, TaskListView.WhenKind, Date?) -> Void
-  let applyMove: (String, String?, String?) -> Void
+  let applyWhen: ([String], TaskListView.WhenKind, Date?) -> Void
+  let applyMove: ([String], String?, String?) -> Void
   let applyRecurrence: (String, Recurrence?) -> Void
 
   func body(content: Content) -> some View {
     content
       .sheet(item: $whenSheet) { sheet in
+        let firstId = sheet.taskIds.first
+        let bulk = sheet.taskIds.count > 1
         switch sheet.kind {
         case .scheduled:
           DatePickerSheet(
-            title: "When",
-            initialDate: currentScheduled(sheet.taskId),
+            title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
+            initialDate: currentScheduled(firstId),
             setLabel: "Set Date",
             updateLabel: "Update Date",
             clearLabel: "No Date"
           ) { date in
-            applyWhen(sheet.taskId, .scheduled, date)
+            applyWhen(sheet.taskIds, .scheduled, date)
           }
           .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
           .presentationCornerRadius(Theme.cornerRadius)
         case .deadline:
           DatePickerSheet(
-            title: "Deadline",
-            initialDate: currentDeadline(sheet.taskId),
+            title: bulk ? "Deadline (\(sheet.taskIds.count) tasks)" : "Deadline",
+            initialDate: currentDeadline(firstId),
             setLabel: "Set Deadline",
             updateLabel: "Update Deadline",
             clearLabel: "Remove Deadline"
           ) { date in
-            applyWhen(sheet.taskId, .deadline, date)
+            applyWhen(sheet.taskIds, .deadline, date)
           }
           .presentationDetents([.height(DatePickerSheet.sheetHeight), .large])
           .presentationBackground(.thinMaterial)
@@ -3065,17 +3230,20 @@ struct TaskListModalPresenter: ViewModifier {
         }
       }
       .sheet(isPresented: $showingMoveSheet) {
-        let target = currentTask(moveTargetId)
+        let firstId = moveTargetIds.first
+        let target = currentTask(firstId)
         MovePickerSheet(
           areas: areas,
           projects: projects,
           currentAreaId: target?.area,
-          currentProjectId: target?.project
+          currentProjectId: target?.project,
+          bulkCount: moveTargetIds.count
         ) { areaId, projectId in
-          if let id = moveTargetId {
-            applyMove(id, areaId, projectId)
+          let ids = moveTargetIds
+          if !ids.isEmpty {
+            applyMove(ids, areaId, projectId)
           }
-          moveTargetId = nil
+          moveTargetIds = []
         }
         .presentationDetents([.large, .medium])
         .presentationBackground(.thinMaterial)
@@ -3101,6 +3269,7 @@ struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?
+  let onCopy: (TaskListView.ActionTarget) -> Void
   let onDuplicate: (TaskListView.ActionTarget) -> Void
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
@@ -3120,6 +3289,8 @@ struct TaskListRowContextMenu: View {
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
 
+  private var count: Int { target.count }
+
   var body: some View {
     if case let .single(task) = target {
       Button {
@@ -3128,6 +3299,21 @@ struct TaskListRowContextMenu: View {
         Label("Edit Details…", systemImage: "info.circle")
       }
       .keyboardShortcut(TaskRowShortcuts.editDetails)
+
+      Button {
+        onCopy(target)
+      } label: {
+        Label("Copy", systemImage: "doc.on.doc")
+      }
+
+      Divider()
+    } else if target.isBulk {
+      Button {
+        onCopy(target)
+      } label: {
+        Label("Copy \(count) Titles", systemImage: "doc.on.doc")
+      }
+
       Divider()
     }
 
@@ -3146,18 +3332,18 @@ struct TaskListRowContextMenu: View {
       Divider()
     }
 
-    if singleTodayFlag == true {
+    if todayAction == .remove {
       Button {
         onMoveToToday(target.ids, false)
       } label: {
-        Label("Remove from Today", systemImage: "sun.min")
+        Label(todayRemoveLabel, systemImage: "sun.min")
       }
       .keyboardShortcut(TaskRowShortcuts.toggleToday)
-    } else if singleTodayFlag == false && filter != .today {
+    } else if todayAction == .add {
       Button {
         onMoveToToday(target.ids, true)
       } label: {
-        Label("Move to Today", systemImage: "sun.max.fill")
+        Label(todayAddLabel, systemImage: "sun.max.fill")
       }
       .keyboardShortcut(TaskRowShortcuts.toggleToday)
     }
@@ -3165,14 +3351,14 @@ struct TaskListRowContextMenu: View {
     Button {
       onOpenWhen(target)
     } label: {
-      Label("When…", systemImage: "calendar")
+      Label(whenLabel, systemImage: "calendar")
     }
     .keyboardShortcut(TaskRowShortcuts.when)
 
     Button {
       onOpenDeadline(target)
     } label: {
-      Label("Deadline…", systemImage: "flag")
+      Label(deadlineLabel, systemImage: "flag")
     }
     .keyboardShortcut(TaskRowShortcuts.deadline)
 
@@ -3210,7 +3396,7 @@ struct TaskListRowContextMenu: View {
         Label("More…", systemImage: "ellipsis")
       }
     } label: {
-      Label("Move", systemImage: "folder")
+      Label(moveLabel, systemImage: "folder")
     }
     .keyboardShortcut(TaskRowShortcuts.move)
 
@@ -3222,21 +3408,19 @@ struct TaskListRowContextMenu: View {
       }
     }
 
-    if case .single = target {
-      Button {
-        onDuplicate(target)
-      } label: {
-        Label("Duplicate", systemImage: "plus.square.on.square")
-      }
-      .keyboardShortcut(TaskRowShortcuts.duplicate)
+    Button {
+      onDuplicate(target)
+    } label: {
+      Label(duplicateLabel, systemImage: "plus.square.on.square")
     }
+    .keyboardShortcut(TaskRowShortcuts.duplicate)
 
     Divider()
 
     Button {
       onCancel(target.ids)
     } label: {
-      Label("Cancel Task", systemImage: "xmark.circle")
+      Label(cancelLabel, systemImage: "xmark.circle")
     }
 
     Divider()
@@ -3244,18 +3428,56 @@ struct TaskListRowContextMenu: View {
     Button(role: .destructive) {
       onDelete(target)
     } label: {
-      Label("Delete", systemImage: "trash")
+      Label(deleteLabel, systemImage: "trash")
     }
     .keyboardShortcut(TaskRowShortcuts.delete)
   }
 
-  // Drives the "Move to / Remove from Today" label. Reads `isOnToday`, not the
-  // raw `today` pin, so a task that's in Today via a scheduled/deadline date
-  // (unpinned) is correctly offered "Remove from Today" rather than a no-op
-  // "Move to Today."
-  private var singleTodayFlag: Bool? {
-    if case let .single(task) = target { return task.isOnToday }
-    return nil
+  private enum TodayAction { case add, remove }
+
+  private var todayAction: TodayAction? {
+    switch target {
+    case .single(let task):
+      if task.isOnToday { return .remove }
+      if filter != .today { return .add }
+      return nil
+    case .bulk(let tasks):
+      if tasks.allSatisfy(\.isOnToday) { return .remove }
+      if filter != .today, tasks.contains(where: { !$0.isOnToday }) { return .add }
+      return nil
+    }
+  }
+
+  private var todayAddLabel: String {
+    count > 1 ? "Move \(count) to Today" : "Move to Today"
+  }
+
+  private var todayRemoveLabel: String {
+    count > 1 ? "Remove \(count) from Today" : "Remove from Today"
+  }
+
+  private var whenLabel: String {
+    count > 1 ? "When… (\(count) tasks)" : "When…"
+  }
+
+  private var deadlineLabel: String {
+    count > 1 ? "Deadline… (\(count) tasks)" : "Deadline…"
+  }
+
+  private var moveLabel: String {
+    count > 1 ? "Move \(count) Tasks" : "Move"
+  }
+
+  private var duplicateLabel: String {
+    count > 1 ? "Duplicate \(count) Tasks" : "Duplicate"
+  }
+
+  private var cancelLabel: String {
+    count > 1 ? "Cancel \(count) Tasks" : "Cancel Task"
+  }
+
+  private var deleteLabel: String {
+    count > 1 ? "Delete \(count) Tasks" : "Delete"
   }
 }
 
@@ -3270,26 +3492,17 @@ struct TaskListRowContextMenu: View {
 
 struct TaskActions {
   var newTask: () -> Void
-  var toggleToday: () -> Void
-  var openWhen: () -> Void
-  var openDeadline: () -> Void
-  var openMove: () -> Void
-  /// Toggles done/open on the selected row — same handler as Space.
-  /// Nil-gated by selection so ⌘K can't fire on an empty list.
+  var toggleToday: (() -> Void)?
+  var openWhen: (() -> Void)?
+  var openDeadline: (() -> Void)?
+  var openMove: (() -> Void)?
+  /// Toggles done/open on the selected row(s) — same handler as Space.
   var toggleComplete: (() -> Void)?
-  /// Nil when nothing is selected — disables the menu item rather than
-  /// letting ⌘⌫ silently grab the first row.
   var delete: (() -> Void)?
-  /// Same gating as `delete` — ⌘. shouldn't act on an unintended row.
   var clearSchedule: (() -> Void)?
-  /// ⌘R → open the inline editor. Nil (→ menu item disabled) when a text
-  /// field/sheet is active or no open row is selected.
   var editDetails: (() -> Void)?
-  /// ⌘D → duplicate the selected row: a brand-new task (new id) carrying the
-  /// same title, filing (area/project), notes, schedule, deadline, today flag
-  /// and recurrence. Nil (→ menu item disabled) when nothing's selected or an
-  /// editor/sheet is active.
   var duplicate: (() -> Void)?
+  var copy: (() -> Void)?
 }
 
 private struct TaskActionsKey: FocusedValueKey {

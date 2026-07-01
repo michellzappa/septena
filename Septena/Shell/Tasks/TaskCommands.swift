@@ -4,6 +4,7 @@ import SwiftUI
 /// menu bar, the row context menu, and iPad hidden shortcut buttons.
 enum TaskRowShortcuts {
   static let editDetails = KeyboardShortcut("r", modifiers: .command)
+  static let copy = KeyboardShortcut("c", modifiers: .command)
   static let duplicate = KeyboardShortcut("d", modifiers: .command)
   static let markComplete = KeyboardShortcut("k", modifiers: .command)
   static let toggleToday = KeyboardShortcut("t", modifiers: .command)
@@ -38,6 +39,10 @@ struct TaskCommandsMenu: View {
       .keyboardShortcut(TaskRowShortcuts.editDetails)
       .disabled(actions?.editDetails == nil)
 
+    Button("Copy") { actions?.copy?() }
+      .keyboardShortcut(TaskRowShortcuts.copy)
+      .disabled(actions?.copy == nil)
+
     Button("Duplicate") { actions?.duplicate?() }
       .keyboardShortcut(TaskRowShortcuts.duplicate)
       .disabled(actions?.duplicate == nil)
@@ -46,21 +51,21 @@ struct TaskCommandsMenu: View {
       .keyboardShortcut(TaskRowShortcuts.markComplete)
       .disabled(markComplete == nil)
 
-    Button("Toggle Today") { actions?.toggleToday() }
+    Button("Toggle Today") { actions?.toggleToday?() }
       .keyboardShortcut(TaskRowShortcuts.toggleToday)
-      .disabled(actions == nil)
+      .disabled(actions?.toggleToday == nil)
 
-    Button("When…") { actions?.openWhen() }
+    Button("When…") { actions?.openWhen?() }
       .keyboardShortcut(TaskRowShortcuts.when)
-      .disabled(actions == nil)
+      .disabled(actions?.openWhen == nil)
 
-    Button("Deadline…") { actions?.openDeadline() }
+    Button("Deadline…") { actions?.openDeadline?() }
       .keyboardShortcut(TaskRowShortcuts.deadline)
-      .disabled(actions == nil)
+      .disabled(actions?.openDeadline == nil)
 
-    Button("Move…") { actions?.openMove() }
+    Button("Move…") { actions?.openMove?() }
       .keyboardShortcut(TaskRowShortcuts.move)
-      .disabled(actions == nil)
+      .disabled(actions?.openMove == nil)
 
     Divider()
 

@@ -389,7 +389,6 @@
       }
     },
     "%@ selected" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -418,6 +417,9 @@
           }
         }
       }
+    },
+    "%@ tasks" : {
+
     },
     "%@ will sound **%@**. The facts discipline — cite real numbers, never invent data — always applies." : {
       "localizations" : {

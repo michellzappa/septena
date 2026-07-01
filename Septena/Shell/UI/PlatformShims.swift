@@ -1,7 +1,23 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 #if os(macOS)
 import AppKit
 #endif
+
+/// Cross-platform string pasteboard — shared by context menus and settings copy actions.
+enum SeptenaPasteboard {
+  static func copy(_ text: String) {
+    #if canImport(UIKit)
+    UIPasteboard.general.string = text
+    #elseif canImport(AppKit)
+    let pb = NSPasteboard.general
+    pb.clearContents()
+    pb.setString(text, forType: .string)
+    #endif
+  }
+}
 
 // Tiny cross-platform shims so view files can call the same modifiers on
 // both iOS and macOS. UIKit-only nav-bar modifiers are no-ops on Mac.

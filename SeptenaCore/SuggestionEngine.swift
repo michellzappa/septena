@@ -101,7 +101,7 @@ final class SuggestionEngine {
     guard let model = preparedModel, !model.keys.isEmpty else { suggestions = [:]; return }
 
     var next: [String: [Suggestion]] = [:]
-    for t in inbox {
+    for t in inbox where t.project == nil {
       let out = classify(taskTokens: tokenize(composite(t.title, t.notes)),
                          model: model, scope: .all)
       if !out.isEmpty { next[t.id] = out }
