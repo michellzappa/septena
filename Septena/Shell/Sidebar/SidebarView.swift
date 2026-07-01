@@ -495,11 +495,14 @@ struct SidebarRootView: View {
   }
 
   private func smartListColor(_ route: Route) -> Color {
+    // Only Today earns an accent — it's the bucket you act on. Upcoming /
+    // Anytime / Logbook are neutral filing locations, not warnings, so they
+    // recede to one quiet gray and let icon + label + count do the signalling.
+    // (Was red/orange/gray — those saturated hues read as urgency the later/
+    // no-date buckets don't actually carry.)
     switch route {
-    case .filter(.upcoming):    return .red
-    case .filter(.unscheduled): return .orange
-    case .filter(.logbook):     return .gray
-    default:                    return Theme.todayAccent   // Today
+    case .filter(.today): return Theme.todayAccent
+    default:              return .secondary
     }
   }
 
