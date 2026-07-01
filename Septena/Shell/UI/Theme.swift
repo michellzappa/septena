@@ -271,6 +271,18 @@ enum Theme {
   #else
   static let checkboxTap: CGFloat = 28
   #endif
+  /// Visible checkbox box — the glyph inside the `checkboxTap` column.
+  #if os(macOS)
+  static let checkboxBoxSize: CGFloat = 14
+  #else
+  static let checkboxBoxSize: CGFloat = 18
+  #endif
+  /// Small outward nudge that compensates for the checkbox box being centered in
+  /// its wider tap column — ~⅓ of the centering slack, so the glyph reads level
+  /// with the header icons / calendar time that share the column rather than a
+  /// touch more inset. The overall tuck toward the card edge lives in
+  /// `TaskCardMetrics.contentInset`, not here.
+  static var checkboxLeadingNudge: CGFloat { (checkboxTap - checkboxBoxSize) / 6 }
   /// Diameter of the progress ring shown on the area page's project rows.
   /// Sized to match the `TaskCheckbox` glyph that appears in task rows
   /// below, so the icon column reads as one consistent dot size.
@@ -306,6 +318,9 @@ enum Theme {
   // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
   // so Today/Tasks group headers read at the same size as Next.
   static let groupHeaderFontSize: CGFloat = 17
+  /// Trailing quick-add glyph in a section/group header — one step under the
+  /// title so the pair reads as a single control row (see `HeaderQuickAddButton`).
+  static let headerQuickAddGlyphSize: CGFloat = groupHeaderFontSize - 4
   #else
   static let hPadding: CGFloat = 20
   static let rowHeight: CGFloat = 36
@@ -327,6 +342,9 @@ enum Theme {
   // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
   // so Today/Tasks group headers read at the same size as Next.
   static let groupHeaderFontSize: CGFloat = 20
+  /// Trailing quick-add glyph in a section/group header — one step under the
+  /// title so the pair reads as a single control row (see `HeaderQuickAddButton`).
+  static let headerQuickAddGlyphSize: CGFloat = groupHeaderFontSize - 4
   #endif
 
   /// Vertical padding inside a task / log row. Single source of truth so

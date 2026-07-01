@@ -285,6 +285,7 @@ struct TaskCheckbox: View {
 
   var body: some View {
     checkboxButton
+      .offset(x: -Theme.checkboxLeadingNudge)
     // Keep the checkbox OUT of the keyboard focus ring. On macOS a focusable
     // button inside a selected List row gets activated by Space — which silently
     // completed tasks. Completion is the checkbox-click or ⌘K; never a stray

@@ -670,11 +670,10 @@ struct NextOpenSection: View {
   private func block(for key: String) -> some View {
     switch key {
     case "tasks":
-      nextSection(header: {
+      groupedListSection(header: {
         ListSectionHeaderTitle(title: "Tasks Today",
                                onAdd: onAddTask,
-                               addAccessibilityLabel: "Add task",
-                               accent: theme.color(for: "tasks"))
+                               addAccessibilityLabel: "Add task")
       }) {
         let tasks = tasksModel.openTasks
         ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
@@ -707,7 +706,7 @@ struct NextOpenSection: View {
       }
 
     case "chores":
-      nextSection(header: { sectionHeader("Chores") }) {
+      groupedListSection(header: { sectionGroupHeader("Chores") }) {
         let chores = model.openChores
         ForEach(Array(chores.enumerated()), id: \.element.id) { idx, chore in
           let tag = NextRowTag.chore(chore.id)
@@ -720,7 +719,7 @@ struct NextOpenSection: View {
       }
 
     case "habits":
-      nextSection(header: { bucketSectionHeader("Habits", showsCountdown: !lingerHabits) }) {
+      groupedListSection(header: { bucketSectionHeader("Habits", showsCountdown: !lingerHabits) }) {
         let habits = habitsNow
         ForEach(Array(habits.enumerated()), id: \.element.id) { idx, habit in
           let tag = NextRowTag.habit(habit.id)
@@ -733,7 +732,7 @@ struct NextOpenSection: View {
       }
 
     case "supplements":
-      nextSection(header: { bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements) }) {
+      groupedListSection(header: { bucketSectionHeader("Supplements", showsCountdown: !lingerSupplements) }) {
         let supps = supplementsNow
         ForEach(Array(supps.enumerated()), id: \.element.id) { idx, supp in
           let tag = NextRowTag.supplement(supp.id)
@@ -953,7 +952,7 @@ struct NextDoneSection: View {
     // read-through record. The log folds away behind its header (chevron +
     // count) so the open work stays in focus.
     let items = events
-    nextSection(header: {
+    groupedListSection(header: {
       nextFoldableSectionHeader(title: "Done Today", count: items.count,
                                 isCollapsed: isCollapsed) {
         Haptics.tick()
@@ -1389,9 +1388,8 @@ struct CompletionRateBadge: View {
   }
 }
 
-// Section headers for the Next List. iOS: plain `Text` so the grouped `List`
-// styles them with its default header treatment. macOS: Tasks-style group
-// headers — semibold title parked over the card's checkbox column.
+// Section headers for the Next List — typography and section wrapper live in
+// `GroupedListSection.swift` (`sectionGroupHeader`, `groupedListSection`).
 /// Foldable Next section header — title, live count, and a disclosure chevron.
 /// Tapping anywhere toggles the section. Matches `DayBucketHeader`'s chevron
 /// rotation (right when collapsed, down when expanded) and the Tasks tab's
@@ -1401,7 +1399,7 @@ func nextFoldableSectionHeader(title: String, count: Int, isCollapsed: Bool,
                                onToggle: @escaping () -> Void) -> some View {
   Button(action: onToggle) {
     HStack(spacing: 8) {
-      Text(title)
+      sectionGroupHeader(title)
       if count > 0 {
         Text("\(count)")
           .monospacedDigit()
@@ -1422,55 +1420,6 @@ func nextFoldableSectionHeader(title: String, count: Int, isCollapsed: Bool,
   .accessibilityHint(isCollapsed ? "Expand" : "Collapse")
 }
 
-@ViewBuilder
-func nextSectionHeader<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-  #if os(macOS)
-  content()
-    .font(.system(size: Theme.groupHeaderFontSize, weight: .semibold))
-    .foregroundStyle(Theme.inkPrimary)
-    .textCase(nil)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.leading, TaskCardMetrics.headerLeading)
-    .padding(.trailing, TaskCardMetrics.margin)
-    .padding(.top, 24)
-    .padding(.bottom, 8)
-  #else
-  content()
-  #endif
-}
-
-/// Next `Section` wrapper. macOS `List` pins `Section` headers while scrolling;
-/// Tasks keeps headers in the scroll content (`SelectableScrollList`). On macOS
-/// we render the header as the first row of each section so it scrolls away with
-/// its card — the same rhythm as Tasks. iOS keeps native grouped section headers.
-@ViewBuilder
-func nextSection<Header: View, Content: View>(
-  @ViewBuilder header: () -> Header,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  #if os(macOS)
-  Section {
-    nextSectionHeader(content: header)
-      .listRowInsets(EdgeInsets())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .selectionDisabled()
-    content()
-  }
-  #else
-  Section {
-    content()
-  } header: {
-    nextSectionHeader(content: header)
-  }
-  #endif
-}
-
-@ViewBuilder
-private func sectionHeader(_ title: String) -> some View {
-  Text(title)
-}
-
 // MARK: - Bucketed section header
 //
 // Shared by the time-of-day sections (habits + supplements) so both read the
@@ -1486,6 +1435,7 @@ private func bucketSectionHeader(_ sectionTitle: String,
   let bucket = DayBucket.current.rawValue
   HStack(spacing: 8) {
     Text("\(DayBucket.label(forKey: bucket)) \(sectionTitle)")
+      .sectionGroupHeaderTitleStyle()
     Spacer()
     if showsCountdown { BucketTimeLeft(bucket: bucket, font: .footnote.weight(.semibold)) }
   }

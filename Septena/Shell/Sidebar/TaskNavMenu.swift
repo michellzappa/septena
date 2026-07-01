@@ -109,10 +109,18 @@ struct ScreenTitleMenuLabel: View {
     // Intrinsic width (no `maxWidth: .infinity`) so the menu it triggers
     // anchors to the title, not the full row width — the row fills the rest
     // via a trailing Spacer at the call site.
-    HStack(spacing: 12) {
+    //
+    // Shares the list's leading grid: the icon rides the same `checkboxTap`
+    // column (parked at `headerLeading`, nudged like every row checkbox and
+    // section-header glyph) and the title lands one `iconTextGap` past it, so
+    // the sun/inbox/emoji/checkbox stack under one X and Today/Inbox/area
+    // titles under another.
+    HStack(spacing: Theme.iconTextGap) {
       Image(systemName: icon)
         .font(.title2)
         .foregroundStyle(iconTint)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
       HStack(spacing: 6) {
         Text(title)
           .font(.septenaScreenTitle)
@@ -122,7 +130,7 @@ struct ScreenTitleMenuLabel: View {
           .foregroundStyle(.secondary)
       }
     }
-    .padding(.leading, Theme.hPadding)
+    .padding(.leading, TaskCardMetrics.headerLeading)
     .padding(.top, 12)
     .padding(.bottom, 18)
     .contentShape(Rectangle())

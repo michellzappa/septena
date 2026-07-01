@@ -89,8 +89,8 @@ struct CoachView: View {
 
   private var coachesSection: some View {
     let domains = CoachDomain.allCases
-    return coachSection(
-      header: { Text("Coaches") },
+    return groupedListSection(
+      header: { sectionGroupHeader("Coaches") },
       footer: { Text("On-device coaches that reflect your logged data back to you.") }
     ) {
       ForEach(Array(domains.enumerated()), id: \.element.id) { idx, domain in
@@ -106,8 +106,8 @@ struct CoachView: View {
 
   @ViewBuilder
   private var exercisesSection: some View {
-    coachSection(
-      header: { Text("Exercises") },
+    groupedListSection(
+      header: { sectionGroupHeader("Exercises") },
       footer: { Text("Guided reflections that turn into goals.") }
     ) {
       if OnDeviceAI.isAvailable {
@@ -134,7 +134,7 @@ struct CoachView: View {
 
   @ViewBuilder
   private var goalsSection: some View {
-    coachSection(
+    groupedListSection(
       header: {
         ListSectionHeaderTitle(title: "Goals",
                                onAdd: addGoal,
@@ -198,38 +198,6 @@ struct CoachView: View {
     goals.removeAll { $0.id == goal.id }
     Haptics.warning()
   }
-}
-
-// MARK: - Section chrome
-
-/// Coach `Section` wrapper — same header rhythm as the Next feed (`nextSection`),
-/// with an optional footer for the explanatory copy under each band.
-@ViewBuilder
-private func coachSection<Header: View, Footer: View, Content: View>(
-  @ViewBuilder header: () -> Header,
-  @ViewBuilder footer: () -> Footer,
-  @ViewBuilder content: () -> Content
-) -> some View {
-  #if os(macOS)
-  Section {
-    nextSectionHeader(content: header)
-      .listRowInsets(EdgeInsets())
-      .listRowSeparator(.hidden)
-      .listRowBackground(Color.clear)
-      .selectionDisabled()
-    content()
-  } footer: {
-    footer()
-  }
-  #else
-  Section {
-    content()
-  } header: {
-    nextSectionHeader(content: header)
-  } footer: {
-    footer()
-  }
-  #endif
 }
 
 // MARK: - Row chrome

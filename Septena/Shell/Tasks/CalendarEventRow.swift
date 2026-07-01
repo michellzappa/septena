@@ -10,17 +10,8 @@ import SwiftUI
 /// here purely to read the day's agenda at a glance alongside its tasks.
 struct CalendarEventRow: View {
   let event: EKEvent
-  /// Tint used when the event's own calendar has no color (rare). The deep list
-  /// passes `theme.color(for: "calendar")` so the fallback matches the dashboard.
-  var fallback: Color
 
   @Environment(\.rowHInset) private var rowHInset
-
-  /// The event's calendar color — the leading rail and the time stamp wear it,
-  /// the way the dashboard timeline tints its calendar bars.
-  private var color: Color {
-    event.calendar?.cgColor.map { Color($0) } ?? fallback
-  }
 
   /// Locale-aware short start time ("09:00" / "9:00 AM"). Nil for all-day events,
   /// which read as a plain titled bar with no clock.
@@ -44,16 +35,26 @@ struct CalendarEventRow: View {
     // text, tighter rows) so the whole block reads as a calm reference strip,
     // halfway to Things' grey calendar card. The calendar-colored time keeps it
     // scannable and ties each event to its calendar.
-    HStack(alignment: .center, spacing: 8) {
-      // The calendar color rides the time stamp itself (not a leading rail) —
-      // it ties the event to its calendar while keeping the strip quiet. All-day
-      // events have no time, so they read as a plain titled line.
-      if let timeLabel {
-        Text(timeLabel)
-          .font(.system(size: 13))
-          .monospacedDigit()
-          .foregroundStyle(color)
+    HStack(alignment: .center, spacing: Theme.iconTextGap) {
+      // The time rides the same `checkboxTap` column (centered + nudged) as the
+      // row checkboxes and header icons above, so it sits under that leading
+      // grid and the title lands on the shared task-title X. Neutral ink keeps
+      // the strip quiet; all-day events leave the column empty but still reserved.
+      Group {
+        if let timeLabel {
+          Text(timeLabel)
+            .font(.system(size: 11))
+            .monospacedDigit()
+            .lineLimit(1)
+            // The time is wider than the `checkboxTap` column it centers in, so
+            // pin it to its ideal one-line width and let it overflow rather than
+            // wrap/truncate ("9:00 AM" locales included).
+            .fixedSize(horizontal: true, vertical: false)
+            .foregroundStyle(Theme.inkSecondary)
+        }
       }
+      .frame(width: Theme.checkboxTap, alignment: .center)
+      .offset(x: -Theme.checkboxLeadingNudge)
       Text(displayTitle)
         .font(.system(size: 13))
         .foregroundStyle(event.isAllDay ? Theme.inkSecondary : Theme.inkPrimary)

@@ -662,7 +662,7 @@ struct NextSuggestionsSection: View {
   var body: some View {
     let items = visible
     if !items.isEmpty {
-      nextSection(header: { Text("Suggested") }) {
+      groupedListSection(header: { sectionGroupHeader("Suggested") }) {
         ForEach(Array(items.enumerated()), id: \.element.id) { idx, suggestion in
           let tag = NextRowTag.suggestion(suggestion.id)
           NextSuggestionRow(

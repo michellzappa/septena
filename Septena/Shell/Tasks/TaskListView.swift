@@ -1115,9 +1115,8 @@ struct TaskListView: View {
             .scaledFont(size: 16)
             .foregroundStyle(Theme.iconMuted)
             .frame(width: Theme.checkboxTap, alignment: .center)
-          Text(title)
-            .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
-            .foregroundStyle(Theme.inkPrimary)
+            .offset(x: -Theme.checkboxLeadingNudge)
+          Text(title).sectionGroupHeaderTitleStyle()
           if let count, count > 0 {
             Text("\(count)")
               .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
@@ -2438,14 +2437,17 @@ struct TaskListView: View {
           // a chapter marker. A user emoji takes the dot's place.
           AreaIcon(tint: Theme.inkSecondary, diameter: 21, lineWidth: 1.5, emoji: areaEmoji)
             .frame(width: Theme.checkboxTap, alignment: .center)
+            .offset(x: -Theme.checkboxLeadingNudge)
         } else if icon != nil {
           Image(systemName: icon!)
             .scaledFont(size: 16)
             .foregroundStyle(Theme.iconMuted)
             .frame(width: Theme.checkboxTap, alignment: .center)
+            .offset(x: -Theme.checkboxLeadingNudge)
         } else {
           ProjectProgressIcon(progress: projectProgress ?? 0, tint: Theme.inkSecondary, diameter: 14)
             .frame(width: Theme.checkboxTap, alignment: .center)
+            .offset(x: -Theme.checkboxLeadingNudge)
         }
         // Tappable target is JUST the title (+ chevron) — not the whole row.
         // The Spacer keeps the rest of the row visually aligned but inert, so
@@ -2454,15 +2456,12 @@ struct TaskListView: View {
           GroupHeaderLabel(title: title, hasChevron: true, action: onTap)
             .padding(.leading, titleLeadingCorrection)
         } else {
-          Text(title)
-            .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
-            .foregroundStyle(Theme.inkPrimary)
+          Text(title).sectionGroupHeaderTitleStyle()
         }
         Spacer()
         if let onAdd {
           HeaderQuickAddButton(accessibilityLabel: "Add task to \(title)",
                                action: onAdd,
-                               accent: theme.color(for: "tasks"),
                                placement: .scrollGroupHeader,
                                hapticOnTap: true)
         }
@@ -2503,7 +2502,7 @@ struct TaskListView: View {
   private func calendarEventsBlock(_ events: [EKEvent]) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(sortedEvents(events), id: \.calendarRowID) { event in
-        CalendarEventRow(event: event, fallback: theme.color(for: "calendar"))
+        CalendarEventRow(event: event)
       }
     }
     .asListRow()
@@ -3071,9 +3070,7 @@ private struct GroupHeaderLabel: View {
   var body: some View {
     Button(action: action) {
       HStack(spacing: 4) {
-        Text(title)
-          .scaledFont(size: Theme.groupHeaderFontSize, weight: .semibold)
-          .foregroundStyle(Theme.inkPrimary)
+        Text(title).sectionGroupHeaderTitleStyle()
         if hasChevron {
           Image(systemName: "chevron.right")
             .scaledFont(size: Theme.groupHeaderFontSize - 6, weight: .semibold)
@@ -3544,12 +3541,11 @@ enum TaskCardMetrics {
   /// Card margin off the screen edge — the app-wide page gutter (sidebar / Next /
   /// every section destination use this, so the task cards sit at the same X).
   static let margin = Theme.pageGutter
-  /// Row content inset INSIDE the card — the same value `DrawerSection` lowers
-  /// its rows to, so a task row's checkbox/title sit where a drawer card's do.
-  static let contentInset = Theme.Spacing.xl
+  /// Row content inset INSIDE the card. Tucked a little tighter than the drawer
+  /// cards' `Spacing.xl` (16) so the checkbox, title, and full-width divider sit
+  /// closer to the card's leading edge — a calmer, less-indented Today list.
+  static let contentInset: CGFloat = 10
   static let radius: CGFloat = 14
-  /// Leading X of the title column, measured from the card's inner edge.
-  static let separatorInset = contentInset + Theme.checkboxTap + Theme.iconTextGap
   /// Leading X of a row's checkbox (and so the group header's icon, which is the
   /// same `checkboxTap`-wide column) from the screen edge: the card margin plus
   /// the in-card content inset. Headers park their icon here so it sits exactly
@@ -3589,12 +3585,13 @@ private struct TaskCardChrome: ViewModifier {
             shape.fill(Color.primary.opacity(Theme.pointerHoverOpacity))
           }
           // Hairline between rows, dropped against a selected cell (native lists
-          // hide the rule adjacent to the highlight).
+          // hide the rule adjacent to the highlight). Spans the full card width
+          // (no leading inset) so it reads as a clean row divider, not an
+          // indented text underline.
           if (position == .top || position == .middle) && !isSelected {
             Rectangle()
               .fill(Theme.border)
               .frame(height: 0.5)
-              .padding(.leading, TaskCardMetrics.separatorInset)
           }
         }
       }
