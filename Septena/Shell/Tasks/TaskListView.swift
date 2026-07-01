@@ -169,6 +169,9 @@ struct TaskListView: View {
   /// pages we want to hide historical completions but keep just-completed
   /// rows visible until the user navigates away (matches the reference design).
   @State private var sessionDoneIds: Set<String> = []
+  /// Tasks created on this device this session — excludes them from the remote-
+  /// arrival reveal (local `startCreate` already animates the append).
+  @State private var sessionCreatedIds: Set<String> = []
 
   /// Drives the "linger → fade" beat after a check (see `SettleStore`). Keeps
   /// a just-completed row in place for a moment, then fades it out where it
@@ -580,6 +583,7 @@ struct TaskListView: View {
     // session-scoped state and re-trigger the network refresh.
     .onChange(of: filter) { _, _ in
       sessionDoneIds = []
+      sessionCreatedIds = []
       settle.cancelAll()
       clearSelection()
       expandedEditId = nil
@@ -687,6 +691,7 @@ struct TaskListView: View {
       quickAddGroupTarget = nil
     }
     let task = seed.create(via: mutator, deferPush: true, atBottom: true)
+    sessionCreatedIds.insert(task.id)
     draftEditIds.insert(task.id)
     quickAddDraftAtTop = showsQuickAddAtTop
     quickAddDraftId = task.id
@@ -1486,6 +1491,7 @@ struct TaskListView: View {
         today: task.today,
         notes: task.notes
       )
+      sessionCreatedIds.insert(copy.id)
       if let rule = task.recurrence {
         mutator.setRecurrence(id: copy.id, recurrence: rule)
       }
@@ -2795,21 +2801,41 @@ struct TaskListView: View {
   /// settle timer (or a reload / filter swap, which cancels it) clears these
   /// out; we never `cancelAll()` here for the same reason.
   private func preservingSettling(fresh: [SeptenaTask], prior: [SeptenaTask]) -> [SeptenaTask] {
-    let freshIDs = Set(fresh.map(\.id))
-    let lingering = prior.filter { settle.isSettling($0.id) && !freshIDs.contains($0.id) }
-    var merged = fresh
-    for task in lingering {
-      guard let priorIndex = prior.firstIndex(where: { $0.id == task.id }) else { continue }
-      var insertAt = 0
-      for i in stride(from: priorIndex - 1, through: 0, by: -1) {
-        if let anchor = merged.firstIndex(where: { $0.id == prior[i].id }) {
-          insertAt = anchor + 1
-          break
-        }
-      }
-      merged.insert(task, at: min(insertAt, merged.count))
+    RemoteTaskSync.preservingSettling(fresh: fresh, prior: prior, isSettling: settle.isSettling)
+  }
+
+  /// IDs in `fresh` that weren't on screen a moment ago and weren't created
+  /// locally this session — worth the gentle expand-in beat (inverse of settle).
+  private func remoteArrivingIDs(prior: [SeptenaTask], fresh: [SeptenaTask]) -> Set<String> {
+    RemoteTaskSync.arrivingIDs(
+      prior: prior,
+      fresh: fresh,
+      excluding: ownCreateExclusions(),
+      animate: loadedFilters.contains(filter)
+    )
+  }
+
+  private func ownCreateExclusions() -> Set<String> {
+    var ids = sessionCreatedIds
+    ids.formUnion(draftEditIds)
+    if let quickAddDraftId { ids.insert(quickAddDraftId) }
+    return ids
+  }
+
+  /// Assign a merged list with motion only when a passive sync needs it —
+  /// ghost completions prefer settle; remote arrivals prefer expand.
+  private func assignMerged(_ merged: [SeptenaTask],
+                            ghosted: Set<String>,
+                            arrived: Set<String>,
+                            assign: ( [SeptenaTask]) -> Void) {
+    if !ghosted.isEmpty {
+      motion.run(Theme.Motion.settle) { assign(merged) }
+    } else if !arrived.isEmpty {
+      RemoteTaskSync.flashTodayPromotes(ids: arrived, in: merged, via: promoteFlash)
+      motion.run(Theme.Motion.expand) { assign(merged) }
+    } else {
+      assign(merged)
     }
-    return merged
   }
 
   /// Ghost-check remote completions: a row that was open on screen a moment ago
@@ -2887,10 +2913,8 @@ struct TaskListView: View {
     let local = LocalCache.tasks(in: modelContext, filter: filter)
     let ghost = ghostCheckRemoteCompletions(prior: prior, fresh: local)
     let merged = preservingSettling(fresh: local, prior: ghost.rows)
-    // Animate only when a remote completion needs the in-place strike+fade;
-    // an ordinary reload assigns without a transaction (no spurious motion).
-    if ghost.ghosted.isEmpty { items = merged }
-    else { motion.run(Theme.Motion.settle) { items = merged } }
+    let arrived = remoteArrivingIDs(prior: prior, fresh: local)
+    assignMerged(merged, ghosted: ghost.ghosted, arrived: arrived) { items = $0 }
     review = []
     doneToday = []
     loadedFilters.insert(filter)
@@ -2931,8 +2955,10 @@ struct TaskListView: View {
       let triageGhost = ghostCheckRemoteCompletions(prior: triageStorage,
                                                     fresh: localTriage)
       let mergedTriage = preservingSettling(fresh: localTriage, prior: triageGhost.rows)
-      if triageGhost.ghosted.isEmpty { triageStorage = mergedTriage }
-      else { motion.run(Theme.Motion.settle) { triageStorage = mergedTriage } }
+      let triageArrived = remoteArrivingIDs(prior: triageStorage, fresh: localTriage)
+      assignMerged(mergedTriage, ghosted: triageGhost.ghosted, arrived: triageArrived) {
+        triageStorage = $0
+      }
       // The Inbox lives on the Today view now (the triage rows), so classify
       // the live open rows — that's what powers the one-tap "file here"
       // suggestion chip and the implicit "not this" learning. refresh also

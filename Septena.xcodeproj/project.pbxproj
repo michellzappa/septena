@@ -241,6 +241,7 @@
 		3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		3F551F42D378A536BCFECB01 /* TasksDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */; };
 		3F6197E64BB37124A0668AB1 /* AreaAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */; };
+		3FE4E78E09E1048D730DACF8 /* RemoteTaskSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		4046D9E1CC4A257A229FEBA5 /* RhythmWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E807B4F41EC2581024D07E0B /* RhythmWire.swift */; };
 		406485770B71FC7B93855865 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
@@ -924,6 +925,7 @@
 		FB7190826418C67623A99FED /* SupportStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E455CC1709E4A8C0430FEF0E /* SupportStore.swift */; };
 		FB79CB77D7DB4D47195A606D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
 		FC13A7AE0BCBC2D9F413B232 /* VirtueSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283D02F47FC57BD00F27178E /* VirtueSummarizer.swift */; };
+		FC2E90AB984DB22819EF9799 /* RemoteTaskSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */; };
 		FC7818C6AC28D1D064D52C5C /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422B1072AC84061389BB5BA5 /* MirrorReader.swift */; };
 		FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		FD34B7723DDB02C9A9492D1F /* MacroWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAEECC11E3355B23E650226 /* MacroWidgetWire.swift */; };
@@ -1028,6 +1030,7 @@
 		03669C5350B224AF8B8C7845 /* CoachBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachBackend.swift; sourceTree = "<group>"; };
 		0406A27ED1059173E5A4EBBD /* RhythmWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmWidget.swift; sourceTree = "<group>"; };
 		04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesQuickAddMenu.swift; sourceTree = "<group>"; };
+		04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteTaskSync.swift; sourceTree = "<group>"; };
 		0546FA3A26D7FAFC642688C5 /* ThingsImportTestFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportTestFixtures.swift; sourceTree = "<group>"; };
 		05717A5AFCE742FF68367E5F /* MedicationsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicationsPlugin.swift; sourceTree = "<group>"; };
 		05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocaleFormatting.swift; sourceTree = "<group>"; };
@@ -2201,6 +2204,7 @@
 				3E344068B6FEE62E7F0C23E3 /* ConversationCard.swift */,
 				541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */,
 				0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */,
+				04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */,
 				A08DA8E8E77422BB9583A61C /* TaskCommands.swift */,
 				41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */,
 				D46BD49E9085E6317FFB26A4 /* TaskComposer.swift */,
@@ -3149,6 +3153,7 @@
 				187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */,
 				06404AD63413258122570D58 /* RemindersImportView.swift in Sources */,
 				E5FA0F06A41B43E0225C90D4 /* RemindersInboxSection.swift in Sources */,
+				FC2E90AB984DB22819EF9799 /* RemoteTaskSync.swift in Sources */,
 				A74FEF9709CD1B937FF5CFA3 /* ReportHTMLRenderer.swift in Sources */,
 				E8D98C92FDAE55895AED01E4 /* ReportModels.swift in Sources */,
 				50516F572A62A45207EF654E /* ReportPayloadBuilder.swift in Sources */,
@@ -3616,6 +3621,7 @@
 				94702073666C4968D36B96C5 /* RemindersBridge.swift in Sources */,
 				58FDA00BDC6BB4FBADB665A9 /* RemindersImportView.swift in Sources */,
 				E82FB8F3AA77028D2377FF0F /* RemindersInboxSection.swift in Sources */,
+				3FE4E78E09E1048D730DACF8 /* RemoteTaskSync.swift in Sources */,
 				94910BED0EE914A8B4B40CE7 /* ReportHTMLRenderer.swift in Sources */,
 				A28FBED1C8607B7D867D391F /* ReportModels.swift in Sources */,
 				C10037145245CB47D498B5FF /* ReportPayloadBuilder.swift in Sources */,

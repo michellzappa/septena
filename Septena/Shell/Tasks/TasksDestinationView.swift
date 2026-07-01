@@ -55,6 +55,8 @@ struct TasksDestinationView: View {
   @State private var mode: DrawerMode = .remembered(for: "tasks", default: .log)
   /// Daily completed-task counts backing the Patterns heatmap.
   @State private var history: [TaskCompletionDay] = []
+  /// False until the first `reload()` paints — suppresses arrival motion on cold open.
+  @State private var hasPaintedLists = false
 
   private var accent: Color { theme.color(for: "tasks") }
 
@@ -99,6 +101,7 @@ struct TasksDestinationView: View {
     // remote edits still fold in on reopen as before.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       absorbRemoteCompletions()
+      absorbRemoteArrivals()
       mergeTaskFieldsFromCache()
     }
     // Host the composer here so it stacks on top of the drawer sheet and
@@ -229,6 +232,7 @@ struct TasksDestinationView: View {
     doneTasks = completed
       .filter { ($0.completedAt ?? "").hasPrefix(today) }
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    hasPaintedLists = true
   }
 
   /// Collapse the logbook into a contiguous daily series of completed-task
@@ -331,6 +335,41 @@ struct TasksDestinationView: View {
     }
     for id in triageDone {
       ghostInboxCompletion(id: id, completedAt: completedAt(for: id, in: freshTriage))
+    }
+  }
+
+  /// Ghost-arrive rows another device just created or filed into this drawer.
+  /// Replays the gentle expand-in beat (inverse of settle) without haptics.
+  /// Field edits still route through `mergeTaskFieldsFromCache`; we don't
+  /// full-reload here so in-flight local settle beats stay intact.
+  private func absorbRemoteArrivals() {
+    guard hasPaintedLists else { return }
+
+    var freshToday = LocalCache.tasks(in: modelContext, filter: .today)
+    if !todayGroupByList {
+      freshToday.sort(by: SeptenaTask.compareNextPageOrder)
+    }
+    let freshTriage = LocalCache.tasks(in: modelContext, filter: .triage)
+
+    let todayArrived = RemoteTaskSync.arrivingIDs(
+      prior: openTasks, fresh: freshToday, animate: true
+    )
+    let triageArrived = RemoteTaskSync.arrivingIDs(
+      prior: triageTasks, fresh: freshTriage, animate: true
+    )
+    guard !todayArrived.isEmpty || !triageArrived.isEmpty else { return }
+
+    let mergedToday = RemoteTaskSync.preservingSettling(
+      fresh: freshToday, prior: openTasks, isSettling: settle.isSettling
+    )
+    let mergedTriage = RemoteTaskSync.preservingSettling(
+      fresh: freshTriage, prior: triageTasks, isSettling: settle.isSettling
+    )
+    RemoteTaskSync.flashTodayPromotes(ids: todayArrived, in: mergedToday, via: promoteFlash)
+
+    motion.run(Theme.Motion.expand) {
+      openTasks = mergedToday
+      triageTasks = mergedTriage
     }
   }
 

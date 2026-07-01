@@ -498,7 +498,7 @@ struct NextView: View {
     // mutate tasks so the Next checklist stays in sync. A completed task also
     // lands in the Done Today log, so reload that too.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      tasksModel.refreshFromCache()
+      tasksModel.refreshFromCache(motion: motion, promoteFlash: promoteFlash)
       Task { await doneModel.load(today: clock.today, now: clock.now) }
     }
     // Passive logs (mood check-in, caffeine, meals, …) post scoped

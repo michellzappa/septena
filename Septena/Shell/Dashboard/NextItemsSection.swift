@@ -53,9 +53,10 @@ final class TodayTasksModel {
     hasLoaded = true
   }
 
-  func refreshFromCache() {
+  func refreshFromCache(motion: A11yMotion? = nil, promoteFlash: PromoteFlashStore? = nil) {
     let context = LocalStore.shared.container.mainContext
     let fresh = LocalCache.tasks(in: context, filter: .today)
+    let prior = tasks
     let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     // The `.today` query excludes done tasks, so a plain re-read would yank a
     // just-completed row out from under the settle beat — and this runs on
@@ -71,11 +72,22 @@ final class TodayTasksModel {
     }
     let kept = Set(merged.map(\.id))
     merged.append(contentsOf: fresh.filter { !kept.contains($0.id) })  // newly arrived
-    tasks = merged
-    // Urgency sort on sync only — never while a row is mid-settle (that would
-    // hop it). Completion keeps its in-list index; `openTasks` is a filter.
-    if actedTasks.isEmpty {
-      tasks.sort(by: SeptenaTask.compareNextPageOrder)
+    let arrived = RemoteTaskSync.arrivingIDs(prior: prior, fresh: fresh, animate: hasLoaded)
+    let apply = {
+      self.tasks = merged
+      // Urgency sort on sync only — never while a row is mid-settle (that would
+      // hop it). Completion keeps its in-list index; `openTasks` is a filter.
+      if self.actedTasks.isEmpty {
+        self.tasks.sort(by: SeptenaTask.compareNextPageOrder)
+      }
+    }
+    if hasLoaded, !arrived.isEmpty, let motion {
+      if let promoteFlash {
+        RemoteTaskSync.flashTodayPromotes(ids: arrived, in: merged, via: promoteFlash)
+      }
+      motion.run(Theme.Motion.expand, apply)
+    } else {
+      apply()
     }
   }
 
