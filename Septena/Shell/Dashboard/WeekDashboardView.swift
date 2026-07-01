@@ -400,8 +400,13 @@ struct WeekDashboardView: View {
         // (`PageChromeMetrics.iPadBarHeight`), so the page's own `pageTop` is
         // redundant there — drop it so Today's content sits at the same height
         // as the list tabs. iPhone keeps a tightened `pageTop`.
-        .septenaSurface(top: chromeBarReservesTop ? 0 : dialBreathingRoom,
-                        includesHorizontal: !usesPushNavigation)
+        // Today's tile grid is intentionally WIDE (adaptive multi-column on
+        // iPad), so it opts out of the ~640 readable-column cap the list tabs
+        // use — the scroll-level `septenaTabScrollInsets` horizontal inset is a
+        // no-op on this ScrollView anyway. Its side breathing room comes from
+        // `pageGutter` here on every size class (iPhone/iPad/Mac alike);
+        // dropping it on iPad let the widgets run to the screen edge.
+        .septenaSurface(top: chromeBarReservesTop ? 0 : dialBreathingRoom)
         #if DEBUG
         // Hidden keyboard shortcuts: ⟨ / ⟩ (the comma/period keys) step the
         // homepage back/forward a day through the last week, driving
@@ -532,17 +537,7 @@ struct WeekDashboardView: View {
   /// row, and sync status isn't surfaced in the chrome.
   @ViewBuilder
   private var weekMenuExtra: some View {
-    Picker(selection: Binding(
-      get: { currentLayoutMode },
-      set: { homepageLayoutRaw = $0.rawValue }
-    )) {
-      ForEach(HomepageLayoutMode.allCases) { mode in
-        Label(mode.title, systemImage: mode.icon).tag(mode)
-      }
-    } label: {
-      Text("Dashboard")
-    }
-    .pickerStyle(.inline)
+    HomepageLayoutMenuSection()
     Divider()
     // Insights — folded in from the old top-right toolbar button. Insights has
     // no per-day series, so the menu is its natural home. (Free like the rest

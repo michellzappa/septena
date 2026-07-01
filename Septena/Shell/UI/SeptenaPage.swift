@@ -60,7 +60,9 @@ extension SeptenaTab {
 @Observable
 final class IPadChromeModel {
   struct Entry {
-    var localActions: AnyView?
+    /// Built when the "···" menu opens — not at publish time — so rows
+    /// that read `@AppStorage` / other live state stay current.
+    var localActions: (() -> AnyView?)?
     var add: PageAdd?
     /// When false the overlay hides the "···" control entirely (Tasks subpages).
     var showsOverflowMenu: Bool = true
@@ -70,7 +72,7 @@ final class IPadChromeModel {
   /// `RootTabView` hides the window-level chrome overlay when false.
   private var atRootByID: [String: Bool] = [:]
 
-  func set(_ id: String, localActions: AnyView?, add: PageAdd?,
+  func set(_ id: String, localActions: (() -> AnyView?)?, add: PageAdd?,
            showsOverflowMenu: Bool = true) {
     entries[id] = Entry(localActions: localActions, add: add,
                         showsOverflowMenu: showsOverflowMenu)
@@ -186,16 +188,17 @@ private struct TabScrollContentInsetsModifier: ViewModifier {
     #endif
   }
 
-  private var scrollInsets: EdgeInsets {
-    let horizontal: CGFloat
-    if appliesWideHorizontal, containerWidth > 0 {
-      horizontal = WideContentMetrics.horizontalContentMargin(
-        containerWidth: containerWidth, contentGutter: contentGutter)
-    } else {
-      horizontal = 0
-    }
-    let topInset = appliesWideHorizontal ? top : 0
-    return EdgeInsets(top: topInset, leading: horizontal, bottom: 0, trailing: horizontal)
+  /// Centering inset for the wide content column (0 on iPhone compact / before
+  /// the pane width is measured).
+  private var horizontalInset: CGFloat {
+    guard appliesWideHorizontal, containerWidth > 0 else { return 0 }
+    return WideContentMetrics.horizontalContentMargin(
+      containerWidth: containerWidth, contentGutter: contentGutter)
+  }
+
+  /// Top chrome inset (floating iPad bar). 0 on iPhone compact.
+  private var topInset: CGFloat {
+    appliesWideHorizontal ? top : 0
   }
 
   func body(content: Content) -> some View {
@@ -211,7 +214,14 @@ private struct TabScrollContentInsetsModifier: ViewModifier {
           guard width > 0, abs(containerWidth - width) > 0.5 else { return }
           containerWidth = width
         }
-        .contentMargins(.all, scrollInsets, for: .scrollContent)
+        // Top chrome inset is a *vertical-only* scrollContent margin — safe, it
+        // doesn't touch a list style's horizontal card inset. The horizontal
+        // column narrowing goes through `.safeAreaPadding` so it COMPOSES with
+        // `.insetGrouped` (redraws its rounded cards inside the narrowed region)
+        // instead of overriding the list's own side inset — the latter flattened
+        // the cards edge-to-edge and killed their rounded corners on iPad.
+        .contentMargins(.top, topInset, for: .scrollContent)
+        .safeAreaPadding(.horizontal, horizontalInset)
     } else {
       content
     }
@@ -360,7 +370,7 @@ private struct PageChromeModifier: ViewModifier {
     let showOverflow = id != "tasks" || tasksShowsIndexOverflow
     iPadChrome.set(
       id,
-      localActions: showOverflow ? localActions() : nil,
+      localActions: showOverflow ? localActions : nil,
       add: add,
       showsOverflowMenu: showOverflow
     )

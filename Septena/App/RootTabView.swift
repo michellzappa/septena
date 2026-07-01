@@ -344,8 +344,8 @@ struct RootTabView: View {
           // on Tasks, and the Tasks-only sidebar toggle — "+" stays trailing.
           if entry?.showsOverflowMenu != false {
             Menu {
-              if let actions = entry?.localActions {
-                actions
+              if let actions = entry?.localActions, let rows = actions() {
+                rows
                 Divider()
               }
               Button { nav.showSettings = true } label: {

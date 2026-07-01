@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Which renderer the homepage uses for the resolved list of domains
 /// (`WeekDashboardView.visibleDomains`, ordered by Settings). The order is
@@ -77,5 +78,26 @@ enum HomepageLayoutMode: String, CaseIterable, Identifiable, Hashable {
     switch self {
     case .tiles, .dense, .heatmap, .rings: return true
     }
+  }
+}
+
+/// Inline picker for the Today "···" overflow menu. Owns its own
+/// `@AppStorage` binding so the selected layout checkmark tracks
+/// `UserDefaults` even when the iPad window chrome renders a stored
+/// menu snapshot (`IPadChromeModel`).
+struct HomepageLayoutMenuSection: View {
+  @AppStorage(SettingsKey.homepageLayout)
+  private var homepageLayoutRaw: String = HomepageLayoutMode.tiles.rawValue
+
+  var body: some View {
+    Picker(selection: $homepageLayoutRaw) {
+      ForEach(HomepageLayoutMode.allCases) { mode in
+        Label(mode.title, systemImage: mode.icon)
+          .tag(mode.rawValue)
+      }
+    } label: {
+      Text("Dashboard")
+    }
+    .pickerStyle(.inline)
   }
 }
