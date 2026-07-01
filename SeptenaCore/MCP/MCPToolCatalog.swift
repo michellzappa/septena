@@ -584,6 +584,7 @@ enum MCPToolCatalog {
   private static func nutritionWriteProps(includeLoggedAt: Bool) -> [String: Any] {
     var p: [String: Any] = [
       "foods": ["type": "string", "description": "Newline-separated list of foods/items consumed."],
+      "ingredients": ["type": "string", "description": "Newline-separated ingredient breakdown (optional detail under foods)."],
       "emoji": ["type": "string"], "note": ["type": "string"],
       "mealType": ["type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"]],
       "proteinG": ["type": "number"], "fatG": ["type": "number"], "carbsG": ["type": "number"],

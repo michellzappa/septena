@@ -1171,29 +1171,54 @@ enum MCPDispatch {
       .sorted { $0.loggedAt > $1.loggedAt } ?? []
   }
 
+  private static let nutritionMealTypes = Set(["breakfast", "lunch", "dinner", "snack"])
+
+  /// Wire shape for nutrition list/log responses — mirrors the hosted gateway's
+  /// `listNutritionEntries` row so mealType, sugarG, and other micros round-trip.
+  private static func nutritionEntryWire(_ e: NutritionEntryEntity, iso: ISO8601DateFormatter) -> [String: Any] {
+    var out: [String: Any] = [
+      "id": e.id,
+      "loggedAt": iso.string(from: e.loggedAt),
+      "foods": e.foods,
+      "proteinG": e.proteinG,
+      "fatG": e.fatG,
+      "carbsG": e.carbsG,
+    ]
+    if let v = e.emoji, !v.isEmpty { out["emoji"] = v }
+    if let v = e.note, !v.isEmpty { out["note"] = v }
+    if let v = e.mealType { out["mealType"] = v }
+    if let v = e.source { out["source"] = v }
+    if let v = e.fiberG { out["fiberG"] = v }
+    if let v = e.sugarG { out["sugarG"] = v }
+    if let v = e.saturatedFatG { out["saturatedFatG"] = v }
+    if let v = e.alcoholG { out["alcoholG"] = v }
+    if let v = e.kcal { out["kcal"] = v }
+    if let v = e.sodiumMg { out["sodiumMg"] = v }
+    if let v = e.cholesterolMg { out["cholesterolMg"] = v }
+    if let v = e.potassiumMg { out["potassiumMg"] = v }
+    if let v = e.waterMl { out["waterMl"] = v }
+    if let v = e.ingredients, !v.isEmpty { out["ingredients"] = v }
+    return out
+  }
+
   private static func nutritionList(_ args: MCPArgs) -> Any {
     let (from, to) = range(args, daysBack: 6)
     let limit = args.int("limit") ?? 200
     let iso = ISO8601DateFormatter()
-    let rows = nutritionEntities(from, to).prefix(limit).map { e -> [String: Any] in
-      var out: [String: Any] = [
-        "id": e.id, "loggedAt": iso.string(from: e.loggedAt), "foods": e.foods,
-        "proteinG": e.proteinG, "fatG": e.fatG, "carbsG": e.carbsG,
-      ]
-      if let m = e.mealType { out["mealType"] = m }
-      if let n = e.note { out["note"] = n }
-      if let k = e.kcal { out["kcal"] = k }
-      if let w = e.waterMl { out["waterMl"] = w }
-      return out
-    }
+    let rows = nutritionEntities(from, to).prefix(limit).map { nutritionEntryWire($0, iso: iso) }
     return ["entries": Array(rows)]
   }
 
   private static func nutritionLog(_ args: MCPArgs) throws -> Any {
     let foods = try args.requireString("foods").components(separatedBy: "\n").filter { !$0.isEmpty }
+    let ingredients = args.string("ingredients")?.components(separatedBy: "\n").filter { !$0.isEmpty }
     let loggedAt = args.string("loggedAt").flatMap { ISO8601DateFormatter().date(from: $0) } ?? Date()
+    if let mealType = args.string("mealType"), !nutritionMealTypes.contains(mealType) {
+      throw MCPError.badArgument("mealType must be breakfast|lunch|dinner|snack, got '\(mealType)'")
+    }
     let e = SeptenaServices.shared.nutritionMutator.addEntry(
       loggedAt: loggedAt, emoji: args.string("emoji") ?? "", foods: foods,
+      ingredients: ingredients,
       note: args.string("note") ?? "", mealType: args.string("mealType"), source: "mcp",
       proteinG: args.double("proteinG") ?? 0, fatG: args.double("fatG") ?? 0, carbsG: args.double("carbsG") ?? 0,
       fiberG: args.double("fiberG"), sugarG: args.double("sugarG"),
@@ -1201,16 +1226,20 @@ enum MCPDispatch {
       kcal: args.double("kcal"), sodiumMg: args.double("sodiumMg"),
       cholesterolMg: args.double("cholesterolMg"), potassiumMg: args.double("potassiumMg"),
       waterMl: args.double("waterMl"))
-    return ["id": e.id]
+    return nutritionEntryWire(e, iso: ISO8601DateFormatter())
   }
 
   private static func nutritionUpdate(_ args: MCPArgs) throws -> Any {
     let id = try args.requireString("id")
+    if let mealType = args.string("mealType"), !nutritionMealTypes.contains(mealType) {
+      throw MCPError.badArgument("mealType must be breakfast|lunch|dinner|snack, got '\(mealType)'")
+    }
     let foods = args.string("foods")?.components(separatedBy: "\n").filter { !$0.isEmpty }
+    let ingredients = args.string("ingredients")?.components(separatedBy: "\n").filter { !$0.isEmpty }
     SeptenaServices.shared.nutritionMutator.updateEntry(
       id: id,
       pickedAt: args.string("loggedAt").flatMap { ISO8601DateFormatter().date(from: $0) },
-      emoji: args.string("emoji"), foods: foods, note: args.string("note"),
+      emoji: args.string("emoji"), foods: foods, ingredients: ingredients, note: args.string("note"),
       mealType: args.string("mealType"),
       proteinG: args.double("proteinG"), fatG: args.double("fatG"), carbsG: args.double("carbsG"),
       fiberG: args.double("fiberG"), sugarG: args.double("sugarG"),
@@ -1223,17 +1252,27 @@ enum MCPDispatch {
 
   private static func nutritionDaySummary(_ args: MCPArgs) -> Any {
     let date = args.string("date") ?? today
+    let iso = ISO8601DateFormatter()
     guard let sum = (try? ctx.fetch(FetchDescriptor<NutritionDailySummaryEntity>()))?
       .first(where: { $0.date == date }) else {
       return ["date": date, "summary": NSNull()]
     }
     var out: [String: Any] = ["date": date, "entryCount": sum.entryCount]
+    if let v = sum.firstLoggedAt { out["firstLoggedAt"] = iso.string(from: v) }
+    if let v = sum.lastLoggedAt { out["lastLoggedAt"] = iso.string(from: v) }
     if let v = sum.kcal { out["kcal"] = v }
     if let v = sum.proteinG { out["proteinG"] = v }
     if let v = sum.fatG { out["fatG"] = v }
     if let v = sum.carbsG { out["carbsG"] = v }
+    if let v = sum.fiberG { out["fiberG"] = v }
+    if let v = sum.sugarG { out["sugarG"] = v }
+    if let v = sum.saturatedFatG { out["saturatedFatG"] = v }
+    if let v = sum.alcoholG { out["alcoholG"] = v }
+    if let v = sum.sodiumMg { out["sodiumMg"] = v }
+    if let v = sum.cholesterolMg { out["cholesterolMg"] = v }
+    if let v = sum.potassiumMg { out["potassiumMg"] = v }
     if let v = sum.waterMl { out["waterMl"] = v }
-    return out
+    return ["date": date, "summary": out]
   }
 
   // MARK: - Training

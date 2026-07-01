@@ -3503,6 +3503,7 @@ final class NutritionMutator {
                 // a valid value.
                 emoji: String? = "",
                 foods: [String],
+                ingredients: [String]? = nil,
                 note: String? = "",
                 mealType: String? = nil,
                 // Default "manual" — every entry written through this mutator
@@ -3527,9 +3528,11 @@ final class NutritionMutator {
                 photoAssetID: String? = nil) -> NutritionEntryEntity {
     let id = generateID()
     let now = Date.now
+    let joinedIngredients = ingredients?.filter { !$0.isEmpty }.joined(separator: "\n")
     let entity = NutritionEntryEntity(
       id: id, loggedAt: loggedAt, updatedAt: now,
       emoji: emoji, foods: foods.joined(separator: "\n"),
+      ingredients: joinedIngredients.flatMap { $0.isEmpty ? nil : $0 },
       note: note, mealType: mealType, source: source,
       proteinG: proteinG, fatG: fatG, carbsG: carbsG,
       fiberG: fiberG, sugarG: sugarG, saturatedFatG: saturatedFatG,
@@ -3557,6 +3560,7 @@ final class NutritionMutator {
                    pickedAt: Date? = nil,
                    emoji: String? = nil,
                    foods: [String]? = nil,
+                   ingredients: [String]? = nil,
                    note: String? = nil,
                    mealType: String? = nil,
                    proteinG: Double? = nil,
@@ -3579,6 +3583,10 @@ final class NutritionMutator {
     if let pickedAt { entity.loggedAt = pickedAt }
     if let emoji { entity.emoji = emoji }
     if let foods { entity.foods = foods.joined(separator: "\n") }
+    if let ingredients {
+      let joined = ingredients.filter { !$0.isEmpty }.joined(separator: "\n")
+      entity.ingredients = joined.isEmpty ? nil : joined
+    }
     if let note { entity.note = note }
     if let mealType { entity.mealType = mealType }
     if let proteinG { entity.proteinG = proteinG }

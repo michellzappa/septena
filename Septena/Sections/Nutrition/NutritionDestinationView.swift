@@ -314,6 +314,7 @@ struct NutritionDestinationView: View {
         loggedAt: Date.now,
         emoji: entry.emoji,
         foods: entry.foods,
+        ingredients: entry.ingredients,
         proteinG: entry.proteinG,
         fatG: entry.fatG,
         carbsG: entry.carbsG,

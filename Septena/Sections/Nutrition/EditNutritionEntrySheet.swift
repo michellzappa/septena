@@ -203,6 +203,7 @@ struct EditNutritionEntrySheet: View {
 
   private func save() {
     let foods = lines(foodsText)
+    let ingredients = lines(ingredientsText)
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
     let mutator = SeptenaServices.shared.nutritionMutator
@@ -219,6 +220,7 @@ struct EditNutritionEntrySheet: View {
           pickedAt: time,
           emoji: emojiValue.isEmpty ? nil : emojiValue,
           foods: foods,
+          ingredients: ingredients.isEmpty ? [] : ingredients,
           proteinG: parseDouble(proteinG),
           fatG: parseDouble(fatG),
           carbsG: parseDouble(carbsG),
@@ -247,6 +249,7 @@ struct EditNutritionEntrySheet: View {
           loggedAt: time,
           emoji: emojiValue.isEmpty ? nil : emojiValue,
           foods: foods,
+          ingredients: ingredients.isEmpty ? nil : ingredients,
           proteinG: parseDouble(proteinG),
           fatG: parseDouble(fatG),
           carbsG: parseDouble(carbsG),

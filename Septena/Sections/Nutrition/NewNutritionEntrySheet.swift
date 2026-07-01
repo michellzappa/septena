@@ -242,6 +242,7 @@ struct NewNutritionEntrySheet: View {
   private func save() {
     let foods = lines(foodsText)
     guard !foods.isEmpty else { return }
+    let ingredients = lines(ingredientsText)
     let emojiValue = emoji.trimmingCharacters(in: .whitespacesAndNewlines)
 
     NutritionPlugin.commitMeal(
@@ -255,6 +256,7 @@ struct NewNutritionEntrySheet: View {
         loggedAt: time,
         emoji: emojiValue.isEmpty ? nil : emojiValue,
         foods: foods,
+        ingredients: ingredients.isEmpty ? nil : ingredients,
         proteinG: parseDouble(proteinG),
         fatG: parseDouble(fatG),
         carbsG: parseDouble(carbsG),

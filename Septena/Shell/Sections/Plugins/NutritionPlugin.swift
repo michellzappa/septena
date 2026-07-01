@@ -132,6 +132,7 @@ enum NutritionPlugin: SectionPlugin {
               inputs: """
                 required: foods · \
                 optional: loggedAt (ISO8601), emoji, note, mealType (breakfast|lunch|dinner|snack), \
+                ingredients (newline-separated), \
                 proteinG, fatG, carbsG, \
                 fiberG, sugarG, saturatedFatG, alcoholG, \
                 kcal (override; else 4P+9F+4C+7A), \
@@ -141,6 +142,7 @@ enum NutritionPlugin: SectionPlugin {
               inputs: """
                 required: id · \
                 optional: loggedAt (ISO8601), foods, emoji, note, mealType (breakfast|lunch|dinner|snack), \
+                ingredients (newline-separated), \
                 proteinG, fatG, carbsG, \
                 fiberG, sugarG, saturatedFatG, alcoholG, kcal, \
                 sodiumMg, cholesterolMg, potassiumMg, waterMl

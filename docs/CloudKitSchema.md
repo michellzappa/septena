@@ -116,7 +116,7 @@ These fields exist in code but never registered in Dev because they're optional 
 | `Area` | `context` |
 | `Project` | `completedAt`, `context`, `githubRepo` |
 | `SessionType` | `kind` |
-| `NutritionEntry` | `mealType`, `sugarG`, `saturatedFatG`, `alcoholG`, `sodiumMg`, `cholesterolMg`, `potassiumMg` |
+| `NutritionEntry` | `mealType`, `ingredients`, `sugarG`, `saturatedFatG`, `alcoholG`, `sodiumMg`, `cholesterolMg`, `potassiumMg` |
 | `NutritionDaySum` | `sugarG`, `saturatedFatG`, `alcoholG`, `sodiumMg`, `cholesterolMg`, `potassiumMg` |
 
 **Fix (required before deploy):** in a Development build, write each field once so it
@@ -580,7 +580,8 @@ recordName is e.g. `quote:readwise:456`.
 |---|---|---|---|---|
 | `loggedAt` | Timestamp | `Date` | No | true Timestamp; **pre-existing** (not pending) |
 | `emoji` | String | `String?` | Yes | |
-| `foods` | String | `String` | No | |
+| `foods` | String | `String` | No | newline-separated |
+| `ingredients` | String | `String?` | Yes | newline-separated breakdown |
 | `note` | String | `String?` | Yes | |
 | `mealType` | String | `String?` | Yes | |
 | `source` | String | `String?` | Yes | |

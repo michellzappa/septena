@@ -1422,6 +1422,7 @@ final class NutritionEntryEntity {
   var updatedAt: Date
   var emoji: String?
   var foods: String         // \n-joined list
+  var ingredients: String?  // \n-joined list; nil when empty
   var note: String?
   var mealType: String?     // breakfast|lunch|dinner|snack
   var source: String?       // manual|import|barcode|mcp
@@ -1455,6 +1456,7 @@ final class NutritionEntryEntity {
        updatedAt: Date = .now,
        emoji: String? = nil,
        foods: String = "",
+       ingredients: String? = nil,
        note: String? = nil,
        mealType: String? = nil,
        source: String? = nil,
@@ -1477,6 +1479,7 @@ final class NutritionEntryEntity {
     self.updatedAt = updatedAt
     self.emoji = emoji
     self.foods = foods
+    self.ingredients = ingredients
     self.note = note
     self.mealType = mealType
     self.source = source
@@ -2236,6 +2239,7 @@ enum NutritionEntryCloudKitSchema {
     static let loggedAt       = "loggedAt"
     static let emoji          = "emoji"
     static let foods          = "foods"
+    static let ingredients    = "ingredients"
     static let note           = "note"
     static let mealType       = "mealType"
     static let source         = "source"
@@ -3226,6 +3230,7 @@ extension NutritionEntryEntity: CloudKitSystemFieldsBacked {
     record[NutritionEntryCloudKitSchema.Field.loggedAt]      = loggedAt as NSDate
     record[NutritionEntryCloudKitSchema.Field.emoji]         = emoji
     record[NutritionEntryCloudKitSchema.Field.foods]         = foods
+    record[NutritionEntryCloudKitSchema.Field.ingredients]   = ingredients
     record[NutritionEntryCloudKitSchema.Field.note]          = note
     record[NutritionEntryCloudKitSchema.Field.mealType]      = mealType
     record[NutritionEntryCloudKitSchema.Field.source]        = source
@@ -3249,6 +3254,7 @@ extension NutritionEntryEntity: CloudKitSystemFieldsBacked {
     if let v = record[NutritionEntryCloudKitSchema.Field.loggedAt] as? Date { loggedAt = v }
     emoji         = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.emoji])
     if let v = record[NutritionEntryCloudKitSchema.Field.foods] as? String { foods = v }
+    ingredients   = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.ingredients])
     note          = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.note])
     mealType      = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.mealType])
     source        = optionalChecklistString(record[NutritionEntryCloudKitSchema.Field.source])

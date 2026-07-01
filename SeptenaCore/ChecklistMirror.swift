@@ -1492,6 +1492,9 @@ enum ChecklistMirror {
       potassiumMg: e.potassiumMg,
       waterMl: e.waterMl,
       foods: e.foods.split(separator: "\n", omittingEmptySubsequences: true).map(String.init),
+      ingredients: e.ingredients.map {
+        $0.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+      }.flatMap { $0.isEmpty ? nil : $0 },
       photoAssetID: e.photoAssetID,
       file: e.id
     )
