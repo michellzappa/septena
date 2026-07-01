@@ -135,7 +135,13 @@ struct CoachView: View {
   @ViewBuilder
   private var goalsSection: some View {
     coachSection(
-      header: { CoachGoalsSectionHeader(onAdd: addGoal) },
+      header: {
+        ListSectionHeaderTitle(title: "Goals",
+                               onAdd: addGoal,
+                               addAccessibilityLabel: "Add goal",
+                               accent: theme.color(for: "goals"),
+                               keyboardShortcut: "n")
+      },
       footer: { Text("Free-text intentions; tag them so a coach picks them up.") }
     ) {
       if goals.isEmpty {
@@ -224,27 +230,6 @@ private func coachSection<Header: View, Footer: View, Content: View>(
     footer()
   }
   #endif
-}
-
-private struct CoachGoalsSectionHeader: View {
-  @Environment(SectionTheme.self) private var theme
-  let onAdd: () -> Void
-
-  var body: some View {
-    HStack {
-      Text("Goals")
-      Spacer()
-      Button(action: onAdd) {
-        Image(systemName: "plus.circle")
-          .font(.footnote.weight(.semibold))
-      }
-      .buttonStyle(.borderless)
-      .textCase(nil)
-      .tint(theme.color(for: "goals"))
-      .accessibilityLabel("Add goal")
-      .keyboardShortcut("n", modifiers: .command)
-    }
-  }
 }
 
 // MARK: - Row chrome

@@ -670,7 +670,12 @@ struct NextOpenSection: View {
   private func block(for key: String) -> some View {
     switch key {
     case "tasks":
-      nextSection(header: { tasksSectionHeader(onAdd: onAddTask) }) {
+      nextSection(header: {
+        ListSectionHeaderTitle(title: "Tasks Today",
+                               onAdd: onAddTask,
+                               addAccessibilityLabel: "Add task",
+                               accent: theme.color(for: "tasks"))
+      }) {
         let tasks = tasksModel.openTasks
         ForEach(Array(tasks.enumerated()), id: \.element.id) { idx, task in
           let tag = NextRowTag.task(task.id)
@@ -1464,35 +1469,6 @@ func nextSection<Header: View, Content: View>(
 @ViewBuilder
 private func sectionHeader(_ title: String) -> some View {
   Text(title)
-}
-
-// Tasks header with a trailing quick-add "+". There's no dedicated SwiftUI API
-// for a control in a grouped-List section header — the standard composition is
-// a custom header `HStack { Text; Spacer; Button }`: `.textCase(nil)` keeps the
-// glyph from being upper-cased with the title, and `.buttonStyle(.borderless)`
-// makes the "+" independently tappable inside the header instead of triggering
-// the whole row. The glyph is `plus.circle` to match the intake suggestion
-// rows' trailing affordance (see `NextSuggestionsSection.rowLabel`) so every
-// "add" on the Next page reads as one family — same circled shape, with the
-// header's accent tint signalling it's a live action rather than a row hint.
-// nil action falls back to the plain title.
-@ViewBuilder
-private func tasksSectionHeader(onAdd: (() -> Void)?) -> some View {
-  if let onAdd {
-    HStack {
-      Text("Tasks Today")
-      Spacer()
-      Button(action: onAdd) {
-        Image(systemName: "plus.circle")
-          .font(.footnote.weight(.semibold))
-      }
-      .buttonStyle(.borderless)
-      .textCase(nil)
-      .accessibilityLabel("Add task")
-    }
-  } else {
-    Text("Tasks Today")
-  }
 }
 
 // MARK: - Bucketed section header

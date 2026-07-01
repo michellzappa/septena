@@ -2296,16 +2296,11 @@ struct TaskListView: View {
         }
         Spacer()
         if let onAdd {
-          Button {
-            Haptics.tick()
-            onAdd()
-          } label: {
-            Image(systemName: "plus.circle")
-              .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(theme.color(for: "tasks"))
-          }
-          .buttonStyle(.borderless)
-          .accessibilityLabel("Add task to \(title)")
+          HeaderQuickAddButton(accessibilityLabel: "Add task to \(title)",
+                               action: onAdd,
+                               accent: theme.color(for: "tasks"),
+                               placement: .scrollGroupHeader,
+                               hapticOnTap: true)
         }
       }
       // Park the header's icon column at the same X as the row checkbox below it
