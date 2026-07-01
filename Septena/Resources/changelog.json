@@ -4,59 +4,84 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1291,
-      "date": "2026-06-30",
+      "build": 1293,
+      "date": "2026-07-01",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Tasks, rebuilt",
-          "detail": "Edit task titles inline, capture with a quick-add line, group Today by area and project, and undo deletes, moves, and defers from a toast.",
+          "title": "Time travel across every section",
+          "detail": "A single day-clock now drives dashboards, sections, goals, and detail views so day-rollover and time travel stay consistent everywhere.",
+          "section": null
+        },
+        {
+          "title": "Reworked Today for Tasks",
+          "detail": "Today gains a quiet calendar agenda, filing chips, inline quick-add, group-by-area-and-project, and a tenure dial on the checkbox showing how long a task has waited.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today",
-          "detail": "System calendar events now weave into Today and Upcoming so your whole day is in one place.",
+          "title": "Faster, more forgiving task editing",
+          "detail": "Inline rename and quick-add, a longer undo window, confirmation toasts with undo for delete/move/defer, and inline move-to-area or project menus.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days, with one-tap restore before they auto-purge.",
+          "detail": "Deleted tasks land in a Recently Deleted view with restore and 30-day auto-purge, synced across your devices.",
           "section": "tasks"
         },
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring your existing tasks over from a Things database export.",
+          "detail": "Bring an existing Things database export straight into Septena.",
           "section": "tasks"
         },
         {
-          "title": "The Week tab is now Today",
-          "detail": "The home tab is renamed to Today and centers its content on wider screens.",
-          "section": null
-        },
-        {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and have it analyzed on-device, with a gentle caption when you break your fast.",
+          "detail": "Snap a meal and get on-device analysis, with a clearer tap affordance instead of an auto-launching camera.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a post-session weekly review, an auto-advance flow with a rest timer on your watch, and a Start Training Session shortcut.",
-          "section": "training"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Surface the goals that matter most as tiles right on the week dashboard.",
+          "title": "Pin goals to your week",
+          "detail": "Pinned goals now render as tiles on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels let you pick Off, Minimal, Balanced, or Full, and see exactly what's been sent.",
+          "title": "Redesigned Coach hub",
+          "detail": "The Coach view is now a grouped list that matches the Next feed.",
           "section": null
         },
         {
-          "title": "A richer watch",
-          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers, expanded intake tiles, and a fasting complication that morphs through the night.",
+          "title": "Smarter Next feed",
+          "detail": "Native selection and keyboard navigation, dismissed suggestions synced across devices, a per-section show-in-Next toggle, and a foldable Done Today log.",
+          "section": null
+        },
+        {
+          "title": "Training session upgrades",
+          "detail": "Start a session from an intent or Control Center, follow an auto-advancing flow with a watch Live Activity, and review effort-weighted muscle volume after each session.",
+          "section": "training"
+        },
+        {
+          "title": "Richer watch capture",
+          "detail": "A per-kind action drawer, interactive intake nudges, expanded intake tiles and meal picker, and a time-of-day sky behind the paged Next feed.",
+          "section": null
+        },
+        {
+          "title": "See and control what telemetry is sent",
+          "detail": "Graded analytics levels from off to full, a checklist of exactly what's collected, and a log of what was recently sent.",
+          "section": null
+        },
+        {
+          "title": "Unified iPad and Mac chrome",
+          "detail": "Consistent page chrome with Quick Find, a single sidebar toggle, centered wide-content columns, and pointer-hover highlights on tappable cards.",
+          "section": null
+        },
+        {
+          "title": "Custom emoji on intake trackers",
+          "detail": "Set your own emoji on tracker methods and varieties, with a guessed symbol as a fallback.",
+          "section": "intake"
+        },
+        {
+          "title": "Week tab is now Today",
+          "detail": "The home tab is renamed to Today and centers its content on wide screens.",
           "section": null
         }
       ]
