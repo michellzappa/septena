@@ -27,6 +27,7 @@
 		04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
 		0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */; };
 		06404AD63413258122570D58 /* RemindersImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */; };
+		06958AC9B030C48CD2CEFA35 /* ListSelectionScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E827D45E85DADADCBF8DDE /* ListSelectionScope.swift */; };
 		06ADE13C31B283F59B6C5C9D /* ChoresPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3C973F9983AB94CEB95337 /* ChoresPlugin.swift */; };
 		06C50FCE5222712BF80255FB /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7AE711DD74BE91E7EECA48 /* BodyPlugin.swift */; };
 		074A612AE1335D061817FE4A /* LocalNotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D64482931874D466089A99 /* LocalNotificationScheduler.swift */; };
@@ -107,6 +108,7 @@
 		1CBE2EA1B7BA4C308BC38173 /* TasksTodayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E504EABDF2EA957D5E1781A5 /* TasksTodayWidget.swift */; };
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		1D075925DFF88985F673FD7F /* SiriShortcutsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B234E4AED39B8EF15DD9A6 /* SiriShortcutsSettingsPane.swift */; };
+		1D2006B009331B7C3737C6B4 /* HeaderQuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A71CFCB3DDCFDE67DE7CEFA /* HeaderQuickAdd.swift */; };
 		1D83FF8B75518376B066822F /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
 		1D9688F8151A47D8555D18FB /* CanonicalExerciseName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6458F5784F01C48C06CAE489 /* CanonicalExerciseName.swift */; };
 		1DCDA337088FC9FEA65F9F73 /* NextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47CA5EA5A9284AB449966DCC /* NextView.swift */; };
@@ -147,6 +149,7 @@
 		2617860D3D3E46AE4C06425D /* MilestonePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112DA7513628EF825585692E /* MilestonePresenter.swift */; };
 		262BCA840BF28F47B44CE247 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
 		262EF303D006D36A39042280 /* ExerciseCatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B55D56BF301C74DCB785773E /* ExerciseCatalogView.swift */; };
+		26310B62ED88D10E7CA8040D /* AreaAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */; };
 		26A182E1DEED67FE6249991C /* SpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31015AE7AF02EFE629F34E4C /* SpotlightIndexer.swift */; };
 		26CA73F4919AE8DF5708BA94 /* AdaptiveColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54EBDD344E387CF1C7B01D4 /* AdaptiveColor.swift */; };
 		271ED637C90C08FC42DF6238 /* ConsistencyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E4AE35AB6070F3A880EC04 /* ConsistencyStats.swift */; };
@@ -237,6 +240,7 @@
 		3EEDE3247DF0EDB92F55843D /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
 		3EFD534FCC0E072DCACD3839 /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		3F551F42D378A536BCFECB01 /* TasksDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B5D7C95F12FB9F9E53565E /* TasksDestinationView.swift */; };
+		3F6197E64BB37124A0668AB1 /* AreaAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */; };
 		403EE99D65456FD99F82D568 /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
 		4046D9E1CC4A257A229FEBA5 /* RhythmWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E807B4F41EC2581024D07E0B /* RhythmWire.swift */; };
 		406485770B71FC7B93855865 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
@@ -450,6 +454,7 @@
 		798377D4528F15E2126EFFD2 /* ThingsImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26856872506A82C42388C3FB /* ThingsImportView.swift */; };
 		79B6B875C7F72AC31CC510C7 /* GoalGridSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84FDF565EF256B9FFDFFC782 /* GoalGridSupport.swift */; };
 		79CD631BA2DE2EC60AA7D872 /* SupportSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9321092AE095993F6AB02F /* SupportSettingsPane.swift */; };
+		79D1099E5C313FB81F4333FD /* ListSelectionScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E827D45E85DADADCBF8DDE /* ListSelectionScope.swift */; };
 		79D1DC33EB8C79CE79487DE3 /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13465E0A2D6B50EEAE9C880 /* DemoSeed.swift */; };
 		7A17945534ABEF825F7910CA /* MacroTargetMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */; };
 		7B31219E381E3F70CD833622 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
@@ -475,6 +480,7 @@
 		813E354BF63CCF41776EADCA /* SeptenaSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6962898B56CBFB87E5417A5 /* SeptenaSceneDelegate.swift */; };
 		81C3630BC69E02BB0B9CBA53 /* TaskComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D46BD49E9085E6317FFB26A4 /* TaskComposer.swift */; };
 		829009F90CB9E37A6D1D9341 /* LogRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DDBCEACF8957679BD5E02F2 /* LogRow.swift */; };
+		831E68322D50FEDDB1C9D315 /* HeaderQuickAdd.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A71CFCB3DDCFDE67DE7CEFA /* HeaderQuickAdd.swift */; };
 		83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
 		8438CEB6FCC5D04CD5216D95 /* NutritionRingsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7184022A465622EEE08AD3CA /* NutritionRingsBuilder.swift */; };
 		8461BA56D29E32C34EA7FE90 /* ThingsImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DFB5D438977C9BCC02A5468 /* ThingsImportSupport.swift */; };
@@ -698,6 +704,7 @@
 		BF8496432439A9FD8CFAE95E /* DayBucket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85942F0F6AEDE3D4607485D4 /* DayBucket.swift */; };
 		BFA5390E06045DBE733EE2BA /* CorrelationsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D85EAF7345BE84A44B89936 /* CorrelationsHomepageView.swift */; };
 		BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 624F4DB126AEF0811BFBF590 /* BrowseGutDaySheet.swift */; };
+		BFB342359A1991C0ECAE21B3 /* AttachmentFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */; };
 		BFCA488316372363DD31EFFB /* ThingsImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26856872506A82C42388C3FB /* ThingsImportView.swift */; };
 		BFFF86242017A00A21757004 /* WakingDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B436039E56AE29B498D15D /* WakingDay.swift */; };
 		C08B86E9AFEE7B2E7D36557E /* OnDeviceAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A392FAFE9C986DE043966D /* OnDeviceAI.swift */; };
@@ -908,6 +915,7 @@
 		F97689E39AD64A5101DB4296 /* AddHabitPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24E908729637004C14E5310 /* AddHabitPage.swift */; };
 		F9F57C388B322698AB16E5F2 /* ImportExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E92C8955A3139189A23641 /* ImportExportSettings.swift */; };
 		FA130606654EC68D24FD9E94 /* TasksWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FC87654F413302D31832AE /* TasksWidgetSnapshotStore.swift */; };
+		FA5018A3975D431A9352C013 /* AttachmentFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */; };
 		FA6ACC1A0B5AA5A3C72116E9 /* ThingsDateDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDD0F2C1A80067D2D24A9ED /* ThingsDateDecoder.swift */; };
 		FA7DB874B35156F613E9DDAE /* ValuesFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA5A367598E8EAAD49252C9 /* ValuesFlowView.swift */; };
 		FA8C3EB8AAD6FFAA0A097A80 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
@@ -1146,6 +1154,7 @@
 		4847155874CE3B82AD612728 /* WeekDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardView.swift; sourceTree = "<group>"; };
 		4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaSeedRegistrar.swift; sourceTree = "<group>"; };
 		4ACB6256DD75D93215BDFD3C /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentFeed.swift; sourceTree = "<group>"; };
 		4CB0FEA3128C7486D772B3A6 /* MilestoneUnits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneUnits.swift; sourceTree = "<group>"; };
 		4D23858A1A44DB2F156B311E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsDestinationView.swift; sourceTree = "<group>"; };
@@ -1160,6 +1169,7 @@
 		50C93BF01E5F69A01E9E9302 /* SettingsRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRecord.swift; sourceTree = "<group>"; };
 		5122E5C1D750654468CDCE96 /* SeptenaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51885FDFDB9CF27D638FBD81 /* DiscoveryShelf.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryShelf.swift; sourceTree = "<group>"; };
+		524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaAttachment.swift; sourceTree = "<group>"; };
 		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		530B8FDCAE87F532F06C9F1F /* EditIntakeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditIntakeEntrySheet.swift; sourceTree = "<group>"; };
 		533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSearchSheet.swift; sourceTree = "<group>"; };
@@ -1207,6 +1217,7 @@
 		675F31A4511CBADB2FB97B81 /* MoodIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodIntents.swift; sourceTree = "<group>"; };
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
 		691B6450608A9F9E24709985 /* RhythmSnapshotBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmSnapshotBuilder.swift; sourceTree = "<group>"; };
+		6A71CFCB3DDCFDE67DE7CEFA /* HeaderQuickAdd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderQuickAdd.swift; sourceTree = "<group>"; };
 		6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationRingsView.swift; sourceTree = "<group>"; };
 		6B51BC53BD88D706639E85DB /* ChoreDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoreDetailView.swift; sourceTree = "<group>"; };
 		6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCommit.swift; sourceTree = "<group>"; };
@@ -1228,6 +1239,7 @@
 		71619B3F8898583F88154FB7 /* WeekDashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardScreen.swift; sourceTree = "<group>"; };
 		7184022A465622EEE08AD3CA /* NutritionRingsBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRingsBuilder.swift; sourceTree = "<group>"; };
 		71BD49CCB43AB0603D015D48 /* IntegrationsSettingsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsSettingsPane.swift; sourceTree = "<group>"; };
+		71E827D45E85DADADCBF8DDE /* ListSelectionScope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListSelectionScope.swift; sourceTree = "<group>"; };
 		729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeOfDayWheel.swift; sourceTree = "<group>"; };
 		737DB8DAAF3F0ED112C03BEB /* AddInfoPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoPalette.swift; sourceTree = "<group>"; };
 		7431ACB92D29DD715935B49F /* MealPhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPhotoAnalyzer.swift; sourceTree = "<group>"; };
@@ -2238,10 +2250,12 @@
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
 				DA5CC0F56E6E022C95AB16E4 /* DistanceUnit.swift */,
 				5F6A1305E991C15F64C716D9 /* EmojiPicker.swift */,
+				6A71CFCB3DDCFDE67DE7CEFA /* HeaderQuickAdd.swift */,
 				105A64B4FE28BF5907996A17 /* HomeChrome.swift */,
 				CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */,
 				C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */,
 				6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */,
+				71E827D45E85DADADCBF8DDE /* ListSelectionScope.swift */,
 				6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */,
 				5DDBCEACF8957679BD5E02F2 /* LogRow.swift */,
 				112DA7513628EF825585692E /* MilestonePresenter.swift */,
@@ -2323,6 +2337,8 @@
 			children = (
 				B54EBDD344E387CF1C7B01D4 /* AdaptiveColor.swift */,
 				63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */,
+				524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */,
+				4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */,
 				8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */,
 				7027B881D1D8B1B09B105034 /* CalendarBridge.swift */,
 				6458F5784F01C48C06CAE489 /* CanonicalExerciseName.swift */,
@@ -2893,9 +2909,11 @@
 				1E49405865D5B2F03CC98499 /* AppAttestClient.swift in Sources */,
 				DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */,
 				E666EB185C74070004ACD166 /* AppleIntelligenceUnavailableCard.swift in Sources */,
+				26310B62ED88D10E7CA8040D /* AreaAttachment.swift in Sources */,
 				1044DAF00212F1890D0BBCC3 /* AreaRecord.swift in Sources */,
 				E8CE6D6CCE3418CBE815E85A /* AreasBackend.swift in Sources */,
 				A34023762B95F32B5CC4D981 /* AreasProjectsView.swift in Sources */,
+				FA5018A3975D431A9352C013 /* AttachmentFeed.swift in Sources */,
 				171C4DED1F4D6CF052F024ED /* BackfillChoresSheet.swift in Sources */,
 				6F57829A6E98A79B04CCA884 /* BackfillHabitsSheet.swift in Sources */,
 				D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */,
@@ -3014,6 +3032,7 @@
 				0FEC34A8DE1AC32545F489C4 /* HabitsPlugin.swift in Sources */,
 				58DC084B12BA54003373BF5F /* HabitsQuickAddMenu.swift in Sources */,
 				5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */,
+				831E68322D50FEDDB1C9D315 /* HeaderQuickAdd.swift in Sources */,
 				EF6F6DC70A2A20577E2BDCBD /* HealthKitBridge.swift in Sources */,
 				AA637C7BAA42F926C11A1854 /* HeatmapHomepageView.swift in Sources */,
 				9E9837BDF917453E5CC6EB90 /* HeatmapLevels.swift in Sources */,
@@ -3043,6 +3062,7 @@
 				B952E848C59122F46C1DF7D3 /* KeyboardShortcutsView.swift in Sources */,
 				88DCC6E7BDFD768BD320F29B /* KeychainStore.swift in Sources */,
 				376DFEC50F389C3D73911189 /* ListKeyboardNavigation.swift in Sources */,
+				79D1099E5C313FB81F4333FD /* ListSelectionScope.swift in Sources */,
 				65675DD9901E66BA47721979 /* LocalMCPServer.swift in Sources */,
 				3E8232F947D6A67FFAED7EC5 /* LocalMCPSettingsPane.swift in Sources */,
 				FEF7B36E05988907669E6A03 /* LocalNotificationScheduler.swift in Sources */,
@@ -3356,9 +3376,11 @@
 				BB01E5596948745ABE6D9A40 /* AppAttestClient.swift in Sources */,
 				887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */,
 				DEF6485917B66FBC2949A92D /* AppleIntelligenceUnavailableCard.swift in Sources */,
+				3F6197E64BB37124A0668AB1 /* AreaAttachment.swift in Sources */,
 				74E631E4D6B41796BBE7B3FA /* AreaRecord.swift in Sources */,
 				C7AC2E4E116DAB445A500573 /* AreasBackend.swift in Sources */,
 				A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */,
+				BFB342359A1991C0ECAE21B3 /* AttachmentFeed.swift in Sources */,
 				45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */,
 				3D7D10D1B1E3CCBB8D8ACD14 /* BackfillHabitsSheet.swift in Sources */,
 				2062DECFE8C3FA1BD4668E60 /* BackfillSupplementsSheet.swift in Sources */,
@@ -3477,6 +3499,7 @@
 				DE2DC97811EBF7E4B01C3261 /* HabitsPlugin.swift in Sources */,
 				3AD2CBA0A9A2EF4ACE740C5D /* HabitsQuickAddMenu.swift in Sources */,
 				28777ACD729D9C78846219C4 /* Haptics.swift in Sources */,
+				1D2006B009331B7C3737C6B4 /* HeaderQuickAdd.swift in Sources */,
 				1DFCCAA759E4B23AC3D03C10 /* HealthKitBridge.swift in Sources */,
 				174606742D6D5BE5AFBFCA50 /* HeatmapHomepageView.swift in Sources */,
 				47834FE9B2FCA347333C4CC6 /* HeatmapLevels.swift in Sources */,
@@ -3506,6 +3529,7 @@
 				8D1D5310AB62AF7E33538641 /* KeyboardShortcutsView.swift in Sources */,
 				A13DDF926FA144F9A7CFBF64 /* KeychainStore.swift in Sources */,
 				16B1D2ED5505FC961FF92B33 /* ListKeyboardNavigation.swift in Sources */,
+				06958AC9B030C48CD2CEFA35 /* ListSelectionScope.swift in Sources */,
 				D3852E3A3953E48A78381A8B /* LocalMCPServer.swift in Sources */,
 				70256EDB9597D9DA17B4E839 /* LocalMCPSettingsPane.swift in Sources */,
 				074A612AE1335D061817FE4A /* LocalNotificationScheduler.swift in Sources */,
