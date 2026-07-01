@@ -1608,6 +1608,28 @@ enum ChecklistMirror {
     return NextItemsResponse(date: date, bucket: bucket ?? "", items: items)
   }
 
+  /// Habit IDs backed by a "do it more" goal — a measurable goal whose metric
+  /// targets this one habit's weekly completion (`habits.<id>.done_week`, see
+  /// `HabitsPlugin`) with a `gte` ("at least N times") comparator. These earn a
+  /// quiet target mark and stay pinned in the open Next list after they're done,
+  /// so the habit you're deliberately building keeps a little more presence than
+  /// the rest. Parsed straight from the metric key so this stays in SeptenaCore
+  /// without importing the Habits plugin's key builder; reads `GoalEntity`
+  /// directly (not `LocalCache.goals`, which is `@MainActor`) so it's safe to
+  /// call from a background mirror read.
+  static func habitsWithGrowthGoal(context: ModelContext) -> Set<String> {
+    let prefix = "habits.", suffix = ".done_week"
+    let goals = (try? context.fetch(FetchDescriptor<GoalEntity>())) ?? []
+    var ids: Set<String> = []
+    for g in goals where g.metricComparator == "gte" {
+      guard let key = g.metricKey,
+            key.hasPrefix(prefix), key.hasSuffix(suffix),
+            key.count > prefix.count + suffix.count else { continue }
+      ids.insert(String(key.dropFirst(prefix.count).dropLast(suffix.count)))
+    }
+    return ids
+  }
+
   // MARK: - Mood
 
   static func loadMoodDay(context: ModelContext, date: String) -> MoodDayResponse {

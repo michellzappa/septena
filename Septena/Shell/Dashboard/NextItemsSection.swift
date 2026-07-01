@@ -216,6 +216,11 @@ struct TodayTaskRow: View {
 final class NextItemsModel {
   var habits: [HabitDayItem] = []
   var habitBuckets: [String] = []
+  /// Habit IDs backed by a "do it more" goal (see
+  /// `ChecklistMirror.habitsWithGrowthGoal`). These get a quiet target mark and
+  /// stay in the open list once done, so the habit you're building keeps a bit
+  /// more presence in Next than the rest.
+  var goalBackedHabitIDs: Set<String> = []
   var supplements: [SupplementDayItem] = []
   var chores: [ChoreItem] = []
   /// Chores deferred this session — kept visible (with badge) until reload.
@@ -268,14 +273,23 @@ final class NextItemsModel {
   /// just acted on it this session (keeps it from jumping to "done").
   var openHabits: [HabitDayItem] {
     habits.filter { h in
-      actedHabits.contains(h.id) || (!h.done && !h.skipped)
+      actedHabits.contains(h.id) || (!h.done && !h.skipped) || isStickyGoalHabit(h)
     }
   }
 
   var doneHabits: [HabitDayItem] {
     habits.filter { h in
-      !actedHabits.contains(h.id) && (h.done || h.skipped)
+      !actedHabits.contains(h.id) && (h.done || h.skipped) && !isStickyGoalHabit(h)
     }
+  }
+
+  /// A goal-backed habit that's been completed (not skipped) stays in the open
+  /// list — checked, in place — instead of dropping into the Done strip, so the
+  /// habit you're deliberately building keeps its presence for the rest of its
+  /// time-of-day window. A *skipped* one still drifts to Done (skipping is a
+  /// deliberate set-aside; don't force stickiness on it).
+  func isStickyGoalHabit(_ h: HabitDayItem) -> Bool {
+    goalBackedHabitIDs.contains(h.id) && h.done && !h.skipped
   }
 
   var openSupplements: [SupplementDayItem] {
@@ -327,6 +341,7 @@ final class NextItemsModel {
     static let habitBuckets  = "next.habitBuckets"
     static let supplements   = "next.supplements"
     static let chores        = "next.chores"
+    static let growthGoals   = "next.growthGoals"
   }
 
   /// Synchronous cache prime — paints the last-known habits / supplements
@@ -344,6 +359,7 @@ final class NextItemsModel {
     if let v = ResponseCache.load([String].self, forKey: CacheKey.habitBuckets) { habitBuckets = v }
     if let v = ResponseCache.load([SupplementDayItem].self, forKey: CacheKey.supplements) { supplements = v }
     if let v = ResponseCache.load([ChoreItem].self, forKey: CacheKey.chores) { chores = v }
+    if let v = ResponseCache.load([String].self, forKey: CacheKey.growthGoals) { goalBackedHabitIDs = Set(v) }
     calendarEvents = CalendarBridge.shared.todayEvents()
     hasLoaded = true
   }
@@ -361,7 +377,8 @@ final class NextItemsModel {
     let snap = await MirrorReader.shared.read { ctx in
       (habits: ChecklistMirror.loadHabitsDay(context: ctx, date: day),
        supplements: ChecklistMirror.loadSupplementsDay(context: ctx, date: day),
-       chores: ChecklistMirror.loadChores(context: ctx, today: day))
+       chores: ChecklistMirror.loadChores(context: ctx, today: day),
+       growthGoals: ChecklistMirror.habitsWithGrowthGoal(context: ctx))
     }
 
     if let hRes = snap.habits {
@@ -370,6 +387,9 @@ final class NextItemsModel {
       ResponseCache.save(habits, forKey: CacheKey.habits)
       ResponseCache.save(habitBuckets, forKey: CacheKey.habitBuckets)
     }
+
+    goalBackedHabitIDs = snap.growthGoals
+    ResponseCache.save(Array(snap.growthGoals), forKey: CacheKey.growthGoals)
 
     if let sRes = snap.supplements {
       supplements = sRes.items
@@ -1058,12 +1078,23 @@ struct HabitRow: View {
       title: habit.name,
       isListSelected: isListSelected,
       trailing: {
-        if habit.skipped {
-          StatusBadge(text: "Skipped")
-        } else if let rate = completionRate {
-          CompletionRateBadge(percent: rate, tint: tint)
-        } else if let t = habit.time {
-          Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+        HStack(spacing: 6) {
+          // Quiet mark for a habit you've set a "do it more" goal on — a small
+          // target glyph in the section tint, low-key so it reads as "this is
+          // one you're building," never as a nag.
+          if model.goalBackedHabitIDs.contains(habit.id) {
+            Image(systemName: "target")
+              .font(.body)
+              .foregroundStyle(tint.opacity(0.7))
+              .accessibilityLabel("Goal habit")
+          }
+          if habit.skipped {
+            StatusBadge(text: "Skipped")
+          } else if let rate = completionRate {
+            CompletionRateBadge(percent: rate, tint: tint)
+          } else if let t = habit.time {
+            Text(t).font(.septenaMeta).foregroundStyle(Theme.inkSecondary)
+          }
         }
       },
       onToggle: { commitToggle() }
