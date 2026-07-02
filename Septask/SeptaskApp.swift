@@ -34,7 +34,7 @@ struct SeptaskApp: App {
   var body: some Scene {
     @Bindable var navigation = navigation
     return WindowGroup {
-      ContentView()
+      SeptaskRootView()
         .overlay { LogCommitOverlay() }
         // Dedicated Septask Settings (P3) — reached from the sidebar gear
         // (`nav.showSettings`) and ⌘, below. A sheet on both platforms.

@@ -76,8 +76,10 @@ struct TaskNavMenu<Trigger: View>: View {
     }
   }
 
-  /// One navigable row. The current route shows a leading checkmark in place
-  /// of its glyph (the standard "selected item" menu cue).
+  /// One navigable row. The current route keeps its own glyph and gains a
+  /// checkmark *next to* it (riding at the head of the title `Text`), rather
+  /// than the checkmark replacing the glyph — so a selected area still reads as
+  /// that area, not as a bare checkmark.
   ///
   /// Every row is a `Label(title, systemImage:)` — same structure throughout,
   /// on purpose. Areas use their `folder` SF Symbol here rather than their user
@@ -85,13 +87,26 @@ struct TaskNavMenu<Trigger: View>: View {
   /// one), but a bare-`Text` row directly followed by `Label` rows gets promoted
   /// to a centered group header by the macOS menu. Uniform `Label`s keep every
   /// destination a normal, left-aligned item. (The sidebar still shows emoji.)
+  ///
+  /// The checkmark is an SF Symbol interpolated into the title `Text` (not a
+  /// second view in the label): `Text` + an interpolated `Image` are the menu
+  /// primitives macOS is guaranteed to render, whereas a custom multi-view menu
+  /// label is not.
   @ViewBuilder
   private func destButton(_ route: Route) -> some View {
     let isCurrent = nav.path.last?.sameDestination(as: route) == true
     Button {
       nav.go(to: route)
     } label: {
-      Label(route.title, systemImage: isCurrent ? "checkmark" : route.icon)
+      if isCurrent {
+        Label {
+          Text("\(Image(systemName: "checkmark"))  \(route.title)")
+        } icon: {
+          Image(systemName: route.icon)
+        }
+      } else {
+        Label(route.title, systemImage: route.icon)
+      }
     }
   }
 }

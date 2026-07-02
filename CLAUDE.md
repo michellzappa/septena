@@ -185,6 +185,40 @@ quick-add, time travel, MCP skill, goals, flourish, import/export, Next feed,
 watch). The classic bug: a section with a manifest row + destination but **no
 `HomepageDomain` case**, so its dashboard tile silently never renders.
 
+## Septask — the second app target
+
+Septask is the focused task app over the SAME private CloudKit task data:
+same repo, same shared sources, a different composition root (plan + phase
+findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
+`SeptenaMac`, `Septask`, `SeptaskMac`.
+
+- **Shared folders own behavior; the roots own composition.** `SeptenaCore`,
+  `Shell/Tasks`, `Shell/Sidebar`, `Shell/UI` (and listed shared files)
+  compile into both apps — edit once, both change. App-level chrome lives in
+  the roots (`Septena/App/App.swift` vs `Septask/SeptaskApp.swift`), which is
+  the ONE place that isn't shared: window styles, scenes, commands, and
+  environment injection must be kept in parity deliberately (the
+  hidden-title-bar sidebar drift came from exactly this).
+- **Septask-specific exceptions, three sizes:** (1) `#if SEPTASK` inside a
+  shared file for small branches (the target sets that compilation
+  condition); (2) a Septask-only implementation in `Septask/` (settings
+  shell, welcome, tab bar) — composition only, never task business logic;
+  (3) a `project.yml` exclude when a file shouldn't compile at all.
+  **Never copy a task file into `Septask/` to tweak it** — copies drift.
+- **After touching shared code, build all four schemes.** The compiler
+  catches type-level seams, but NOT the runtime one: a shared view reading a
+  new `@Environment(X.self)` crashes at launch in whichever app forgot to
+  inject it. The required-injection list lives in `docs/SEPTASK.md` ("P1
+  Findings").
+- **Keep the `Septask` and `SeptaskMac` source lists in `project.yml` in
+  lockstep** — they must stay identical (new shared-file inclusions go in
+  both).
+- Septask runs `RuntimeProfile.tasksOnly` (task/area/project mutators only,
+  no provider stores) but still mirrors the WHOLE zone locally — CKSyncEngine
+  fetches per-zone; non-task records are applied and invisible.
+- The Septask icon is generated, not drawn — regeneration recipe and the
+  raw-pixel-coordinate trap are in `docs/SEPTASK.md` ("Icon Notes").
+
 ## Known traps (from prior sessions)
 
 - **"Week" = trailing 7 days** (today + previous 6), never the calendar week.
@@ -246,6 +280,8 @@ watch). The classic bug: a section with a manifest row + destination but **no
 - `Septena/App/` — entry (`App.swift`), root tabs, App Intents, watch bridge.
 - `Septena/Shell/` — dashboards, settings, tasks, goals, intelligence, shared UI.
 - `Septena/Sections/` — per-section destination views and sheets.
+- `Septask/` — Septask's composition root only (app entry, welcome, settings
+  shell, tab bar, assets, entitlements). Task behavior never lives here.
 - `SeptenaWatch/` + `SeptenaWatchComplication/` — watch app & complications
   (**hand-wired per section**, not manifest-driven, except the shared Next feed).
 - `SeptenaWidgets/`, `SeptenaLiveActivitiesExtension/` — extensions.
