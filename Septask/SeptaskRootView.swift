@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// Septask's top-level tabs (iPhone). Home hosts the full sidebar module;
-/// Today and Upcoming are first-class smart-list tabs; the trailing `+` is
-/// an action, not a destination — it presents quick-add and selection never
-/// actually moves to it.
+/// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
+/// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
+/// module" in both apps; Today and Upcoming are first-class smart-list tabs;
+/// the trailing `+` is an action, not a destination — it presents quick-add
+/// and selection never actually moves to it.
 enum SeptaskTab: Hashable {
-  case home, today, upcoming, add
+  case tasks, today, upcoming, add
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -42,7 +43,7 @@ struct SeptaskRootView: View {
     }
     // Shared task views navigate through the ONE NavigationState path
     // (project drill-ins, smart-list jumps); ContentView's stack renders it
-    // on the Home tab. A route landing while a filter tab is frontmost
+    // on the Tasks tab. A route landing while a filter tab is frontmost
     // must move selection — the tab-bar twin of RootTabView's pendingTab
     // forwarding.
     .onChange(of: nav.path) { _, path in
@@ -50,7 +51,7 @@ struct SeptaskRootView: View {
       switch last {
       case .filter(.today):    selection = .today
       case .filter(.upcoming): selection = .upcoming
-      default:                 selection = .home
+      default:                 selection = .tasks
       }
     }
     // Quick-add, presented from the tab bar's separated `+`. AddTaskPage is
@@ -79,7 +80,7 @@ struct SeptaskRootView: View {
           selection = newValue
         }
       })) {
-      Tab("Home", systemImage: "house.fill", value: SeptaskTab.home) {
+      Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
         ContentView()
       }
       Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
