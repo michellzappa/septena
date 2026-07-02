@@ -57,9 +57,6 @@ private struct SeptaskWelcomeView: View {
             feature(icon: "brain.head.profile",
                     title: "AI on your terms",
                     detail: "Connect your own Claude or use Apple's on-device intelligence. You set how far AI may reach — including not at all.")
-            feature(icon: "square.and.arrow.down",
-                    title: "Bring your Things",
-                    detail: "A one-time import from a Things database export, in Settings whenever you're ready. Your Things data is never modified.")
           }
           .padding(.horizontal, 8)
         }
