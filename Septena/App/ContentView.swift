@@ -86,7 +86,14 @@ struct ContentView: View {
   private func destination(for route: Route) -> some View {
     switch route {
     case .filter(let f):  TaskListView(filter: f)
-    case .next:           NextView()
+    case .next:
+      // Next is a life-OS surface; Septask compiles the tasks shell only and
+      // nothing there navigates to .next (docs/SEPTASK.md).
+      #if SEPTASK
+      EmptyView()
+      #else
+      NextView()
+      #endif
     case .project(let p): ProjectDetailView(project: p).id(p.id)
     case .area(let a):    AreaDetailView(area: a).id(a.id)
     }

@@ -147,7 +147,13 @@ final class SeptenaServices {
       // republish on any `.septenaDataChanged` / `.septenaTasksChanged` that
       // touches Next, so every data source (tasks, checklist, training,
       // nutrition, mood, intake) stays in sync without each mutator opting in.
+      // Compile-gated, not just profile-gated: Septask ships no watch/widgets
+      // and excludes WatchSnapshotPublisher.swift + NextFeed.swift entirely
+      // (NextFeed reaches up into shell types the Septask target doesn't
+      // compile — see project.yml).
+      #if !SEPTASK
       WatchSnapshotPublisher.install(context: context)
+      #endif
 
       // Legacy `hasOnboarded` backfill only — manifest seeding waits for the
       // first CloudKit pull in `absorbRemoteChanges()` so a reinstall never
@@ -1167,26 +1173,34 @@ final class SeptenaServices {
         batchTouchedData = false
       }
       taskMutator.bind(ckEngine: ckEngine)
-      checklistMutator.bind(ckEngine: ckEngine)
-      goalMutator.bind(ckEngine: ckEngine)
-      milestoneMutator.bind(ckEngine: ckEngine)
-      coachVoiceMutator.bind(ckEngine: ckEngine)
-      coachMessageMutator.bind(ckEngine: ckEngine)
-      gutMutator.bind(ckEngine: ckEngine)
-      activityMutator.bind(ckEngine: ckEngine)
-      symptomsMutator.bind(ckEngine: ckEngine)
-      medicationsMutator.bind(ckEngine: ckEngine)
-      intakeMutator.bind(ckEngine: ckEngine)
-      groceryMutator.bind(ckEngine: ckEngine)
-      trainingMutator.bind(ckEngine: ckEngine)
-      nutritionMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       // Lets project deletion cascade-clear the link on referencing tasks.
       projectsMutator.taskMutator = taskMutator
-      OuraStore.shared.bind(ckEngine: ckEngine)
-      WithingsStore.shared.bind(ckEngine: ckEngine)
-      QuoteStore.shared.bind(ckEngine: ckEngine)
+      // Everything below is life-OS-only. In the tasks-only profile (Septask)
+      // the non-task mutators stay unbound — their write paths are never
+      // reachable from a task-only shell, and an unbound mutator dropping a
+      // write loudly beats one silently queueing changes the shell can't show.
+      // The provider stores (Oura / Withings / Readwise) also stay cold so a
+      // tasks-only process never talks to third-party APIs.
+      if !RuntimeProfile.current.isTasksOnly {
+        checklistMutator.bind(ckEngine: ckEngine)
+        goalMutator.bind(ckEngine: ckEngine)
+        milestoneMutator.bind(ckEngine: ckEngine)
+        coachVoiceMutator.bind(ckEngine: ckEngine)
+        coachMessageMutator.bind(ckEngine: ckEngine)
+        gutMutator.bind(ckEngine: ckEngine)
+        activityMutator.bind(ckEngine: ckEngine)
+        symptomsMutator.bind(ckEngine: ckEngine)
+        medicationsMutator.bind(ckEngine: ckEngine)
+        intakeMutator.bind(ckEngine: ckEngine)
+        groceryMutator.bind(ckEngine: ckEngine)
+        trainingMutator.bind(ckEngine: ckEngine)
+        nutritionMutator.bind(ckEngine: ckEngine)
+        OuraStore.shared.bind(ckEngine: ckEngine)
+        WithingsStore.shared.bind(ckEngine: ckEngine)
+        QuoteStore.shared.bind(ckEngine: ckEngine)
+      }
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
         // Start the engine (it kicks off its own background fetch) but do
@@ -1237,20 +1251,28 @@ final class SeptenaServices {
     // Heal dangling project references now that the initial fetch has
     // landed (so we never stub a project that's merely mid-sync).
     await reconcileProjectGraph(context: context)
-    // Now that synced history is present: repair pre-`occurredAt` event
-    // rows (local-only) and publish this device's timezone so the gateway
-    // resolves the user's real zone instead of defaulting to UTC.
-    OccurredAtBackfill.runIfNeeded(context: context)
-    // Lift the symptom-shaped gut fields (discomfort, blood) into standalone
-    // Symptoms events. Local-only, idempotent, gated once-per-device; runs
-    // after the fetch so synced gut rows are present.
-    GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
+    // Life-domain repairs run only in the full profile: a tasks-only process
+    // (Septask) leaves gut/medication/event history untouched — those
+    // migrators write through mutators that are unbound there, and the full
+    // app repairs the same rows on its own next launch anyway.
+    if !RuntimeProfile.current.isTasksOnly {
+      // Repair pre-`occurredAt` event rows (local-only).
+      OccurredAtBackfill.runIfNeeded(context: context)
+      // Lift the symptom-shaped gut fields (discomfort, blood) into standalone
+      // Symptoms events. Local-only, idempotent, gated once-per-device; runs
+      // after the fetch so synced gut rows are present.
+      GutSymptomMigrator.runIfNeeded(context: context, mutator: symptomsMutator)
+    }
     // Retire the legacy `someday` task status — the "Someday" bucket merged
     // into "Anytime". Rewrites stored statusRaw → "open" and pushes the fix;
     // gated once-per-device, after the fetch so synced someday rows are present.
     SomedayStatusMigrator.runIfNeeded(context: context, engine: ckEngine)
-    // Fold any retired `bedtime` medication bucket into `evening`.
-    medicationsMutator.migrateBedtimeBuckets()
+    if !RuntimeProfile.current.isTasksOnly {
+      // Fold any retired `bedtime` medication bucket into `evening`.
+      medicationsMutator.migrateBedtimeBuckets()
+    }
+    // Publish this device's timezone so the gateway resolves the user's real
+    // zone instead of defaulting to UTC — task tools need it too.
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
   }
 

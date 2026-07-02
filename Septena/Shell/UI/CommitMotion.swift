@@ -756,9 +756,15 @@ enum SectionLog {
                      canvasVoteEyebrow: Bool = true,
                      logCommit: LogCommitCenter?,
                      write: () -> Void) {
+    // Septask compiles no SectionRegistry (plugin behavior is full-app);
+    // there callers pass `motion` explicitly or get the default burst.
+    #if SEPTASK
+    let resolved = motion ?? .burst
+    #else
     let resolved = motion
       ?? SectionRegistry.plugin(forKey: sectionKey)?.logFlourish?.motion
       ?? .burst
+    #endif
     // The "vote cast" identity line only rides the budgeted canvas moments,
     // resolved once here from the manifest so every section reads the same.
     // Callers can override with a moment-specific line (fast broken, etc.).

@@ -399,17 +399,20 @@ struct SidebarRootView: View {
     } label: {
       Label("New Project", systemImage: "number")
     }
+    #if !SEPTASK
     Divider()
     // Page-specific settings, in the same slot Next uses (just above the
     // shared Settings row): Tasks has no dedicated pane — its knobs live in
     // Settings ▸ Sections ▸ Tasks, so deep-link straight there. Rides
     // `NavigationState` (iOS forwards it through the shared settings sheet).
+    // Septask has no Settings surface until P3, so the entry is compiled out.
     Button {
       nav.settingsDestination = .section("tasks")
       nav.showSettings = true
     } label: {
       Label("Task Settings", systemImage: "checklist")
     }
+    #endif
   }
 
   private var sidebarBehavior: some ViewModifier {

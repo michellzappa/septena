@@ -175,7 +175,11 @@ final class NavigationState {
   /// `showSettings` by the contextual entry points ("Customize <Section>",
   /// the Insights gear) so Settings opens already pushed to that pane.
   /// `nil` opens the default root (Sections). Cleared on dismiss.
+  /// Septask doesn't compile the full Settings surface (its own settings
+  /// shell is P3 — docs/SEPTASK.md), so the property is gated with the type.
+  #if !SEPTASK
   var settingsDestination: SettingsView.SettingsDestination?
+  #endif
 
   /// The one app-global modal sheet currently presented (or nil). All the
   /// app-level palettes/sheets — Quick Find, Add Info, the Quick-Action section

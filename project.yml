@@ -182,6 +182,93 @@ targets:
     dependencies:
       - sdk: FoundationModels.framework
 
+  # Septask — the focused task app over the same private task data
+  # (docs/SEPTASK.md). Same SeptenaCore sources compiled in, different
+  # composition root: the SEPTASK compilation condition flips
+  # RuntimeProfile.current to .tasksOnly so SeptenaServices binds only the
+  # task/area/project mutators and never touches life-OS subsystems or
+  # third-party provider stores. Septask.entitlements is hand-maintained
+  # (same iCloud container/zone as Septena — CloudKit is the convergence
+  # point between the two apps; the SwiftData mirrors stay separate).
+  Septask:
+    type: application
+    platform: iOS
+    sources:
+      - path: Septask
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptenaCore
+        excludes:
+          - "**/.DS_Store"
+          # Next-feed composition reaches UP into shell types
+          # (NextSuggestionsModel in Shell/Dashboard) — fine when core+shell
+          # share a target, unresolvable here. Next is out of Septask's
+          # surface, so both the feed and its one core dependent are cut;
+          # the call site in SeptenaServices is `#if !SEPTASK`-gated.
+          - NextFeed.swift
+          - WatchSnapshotPublisher.swift
+      # P1 (docs/SEPTASK.md): the real task UI, by source inclusion — the same
+      # files the full app compiles, never copies. TasksDestinationView is the
+      # full-app drawer adapter and stays out. Cross-domain spots inside these
+      # files are `#if !SEPTASK`-gated (Task Settings entry, NextView route).
+      - path: Septena/Shell/Tasks
+        excludes:
+          - TasksDestinationView.swift
+      - path: Septena/Shell/Sidebar
+      - path: Septena/Shell/UI
+        excludes:
+          # Training-effort glyph — reaches into Sections/Training; unused by
+          # any task surface.
+          - IntensityGlyph.swift
+          # Dashboard tile card — reaches into homepage domain types; unused
+          # by any task surface.
+          - ModuleTile.swift
+      - path: Septena/App/ContentView.swift
+      - path: Septena/App/NavigationState.swift
+      - path: Septena/App/ShortcutAction.swift
+      - path: Septena/App/SeptenaTab.swift
+      - path: Septena/App/OpenNewTaskRouting.swift
+      - path: Septena/Shell/Settings/SettingsKeys.swift
+      # Supporter-finish constants used by LogCommit's celebration variant.
+      - path: Septena/Shell/Settings/SeptenaPlus.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
+      # Drawer chrome: task views use its shared plumbing (`macSheetFrame`,
+      # the `usesPushNavigation` / `rowHInset` environment keys).
+      - path: Septena/Shell/Sections/SectionDrawer.swift
+      - path: Septena/Shell/Sections/TimeTravelSheet.swift
+      - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
+      - path: Septena/Shell/Intelligence/OnDeviceAI.swift
+      - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
+    info:
+      path: Septask/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDisplayName: Septask
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UIBackgroundModes:
+          - remote-notification
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Septask/Septask.entitlements
+      configs:
+        # DEBUG must be restated: overriding SWIFT_ACTIVE_COMPILATION_CONDITIONS
+        # replaces Xcode's Debug default rather than appending to it, and
+        # DemoSeedMode gates on `#if DEBUG`.
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG SEPTASK"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
+
   SeptenaWatch:
     type: application
     platform: watchOS
@@ -451,6 +538,19 @@ schemes:
       config: Debug
       targets:
         - SeptenaUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  Septask:
+    build:
+      targets:
+        Septask: all
+    run:
+      config: Debug
     profile:
       config: Release
     analyze:

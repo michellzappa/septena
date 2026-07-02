@@ -95,6 +95,9 @@ struct PageAddButton: View {
   }
 }
 
+// Full-app tab chrome: rides TabSelection + SettingsStore, which Septask
+// doesn't compile (no tab bar there) — see docs/SEPTASK.md.
+#if !SEPTASK
 /// The section switcher as a centered segmented control — the Calendar pattern.
 /// On iPad the `TabView`'s own tab bar is hidden and this rides the navigation
 /// bar's `principal` slot, so the switcher sits on ONE row flanked by the gear
@@ -159,6 +162,7 @@ struct TabSwitcher: View {
     }
   }
 }
+#endif
 
 // MARK: - Tab scroll insets (top chrome + wide horizontal)
 

@@ -24,8 +24,12 @@ enum OpenNewTaskRouting {
     return true
   }
 
+  // Septask has no App/Mac delegate; the stash-and-consume path is
+  // full-app-only, so entry points fall back to the focused-scene actions.
   private static var hostNavigation: NavigationState? {
-    #if os(iOS)
+    #if SEPTASK
+    nil
+    #elseif os(iOS)
     AppDelegate.navigation
     #elseif os(macOS)
     MacAppDelegate.navigation
@@ -35,7 +39,8 @@ enum OpenNewTaskRouting {
   }
 
   private static func stashPending() {
-    #if os(iOS)
+    #if SEPTASK
+    #elseif os(iOS)
     AppDelegate.pendingOpenNewTask = true
     #elseif os(macOS)
     MacAppDelegate.pendingOpenNewTask = true
@@ -43,7 +48,9 @@ enum OpenNewTaskRouting {
   }
 
   private static func takePending() -> Bool {
-    #if os(iOS)
+    #if SEPTASK
+    return false
+    #elseif os(iOS)
     defer { AppDelegate.pendingOpenNewTask = false }
     return AppDelegate.pendingOpenNewTask
     #elseif os(macOS)

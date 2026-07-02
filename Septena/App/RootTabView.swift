@@ -7,22 +7,6 @@ import SwiftUI
 // tab unchanged so we can iterate on the new tabs without breaking the
 // daily-driver UX.
 
-enum SeptenaTab: Hashable {
-  case week, next, tasks, goals
-
-  /// Stable, low-cardinality screen name for telemetry. Kept here so the
-  /// dashboard's labels match the enum even if the tab's display title
-  /// changes.
-  var analyticsName: String {
-    switch self {
-    case .week:  return "week"
-    case .next:  return "next"
-    case .tasks: return "tasks"
-    case .goals: return "goals"
-    }
-  }
-}
-
 // Shared selection so tiles deep inside the Week dashboard can switch tabs
 // (e.g. Tasks tile → Tasks tab). Injected via .environment on the TabView.
 @Observable final class TabSelection {

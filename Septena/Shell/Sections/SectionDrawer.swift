@@ -613,8 +613,9 @@ struct SectionDrawer<Content: View>: View {
     .modifier(OptionalSearchable(text: searchText, prompt: searchPrompt))
     // Deep-linked section Settings. iOS presents it over the drawer so
     // closing returns the user here; macOS routes to the shared Settings
-    // window (see the SectionSettingsLink action above).
-    #if os(iOS)
+    // window (see the SectionSettingsLink action above). Septask compiles
+    // no SettingsView (its own settings shell is P3 — docs/SEPTASK.md).
+    #if os(iOS) && !SEPTASK
     .sheet(isPresented: $showingSettings) {
       SettingsView(initialDestination: .section(sectionKey))
     }
