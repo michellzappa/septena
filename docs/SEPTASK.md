@@ -1,11 +1,25 @@
 # Septask - separate Tasks app plan
 
-**Status:** P3 landed — Septask has its own one-time welcome (Septena's
-design language, Septask copy, app-local completion) and a dedicated
-Settings sheet (shared task toggles, shared accent picker, Things import,
-AI & Claude incl. macOS MCP pane, about + welcome reset), wired to the
-sidebar gear and ⌘,. Next: P4 (Darwin nudge, badge decision), app icon.
+**Status:** P0–P4 landed. Septask ships on iOS/iPad + native macOS with the
+real task UI, its own welcome and Settings, and the same-device Darwin
+nudge. Remaining before shipping: app icon + assets, on-device signed
+convergence test, App Store packaging. Web project links (P5) follow the
+native-sharing work per `docs/NATIVE_PROJECT_SHARING_SPEC.md`.
 Internal codename: **Septask**.
+
+## P4 Findings (2026-07-02)
+
+- **`SeptenaCore/SiblingNudge.swift`**: Darwin-notification hint between the
+  two apps. Posted from `CKEngine` after `.sentRecordZoneChanges` confirms
+  accepted saves/deletes; observed in `SeptenaServices.start()` (both
+  profiles) with a 400ms debounce → `fetchChanges()`. Per-profile
+  notification names so an app never re-fetches off its own send. Carries no
+  data — CloudKit stays the only data path; foreground refresh remains the
+  correctness guarantee (a suspended sibling misses the ring).
+- **Badge decision**: `SettingsKey.badgeShowOverdue` is device-local
+  UserDefaults, so each app opts into the overdue badge independently
+  (default off). Enabling it in both apps double-badges — acceptable;
+  user-resolvable; no cross-app coordination built.
 
 ## P3 Findings (2026-07-02)
 

@@ -1213,6 +1213,12 @@ final class SeptenaServices {
         PerfTrace.spanSync("start.ckEngineStart") {
           ckEngine.start()
         }
+        // Same-device sibling app wrote (Septena ↔ Septask): fetch its
+        // changes now rather than on next foreground. See SiblingNudge.
+        SiblingNudge.observe { [weak self] in
+          guard let self else { return }
+          Task { try? await self.ckEngine.fetchChanges() }
+        }
         // Readwise highlights are device-local now (see QuoteStore). Clear any
         // backlog a pre-change build queued — thousands of `quote:readwise:*`
         // uploads that re-locked the UI on every launch until drained. One-shot

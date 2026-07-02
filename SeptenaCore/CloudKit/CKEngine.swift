@@ -602,6 +602,12 @@ func handleEvent(
         // mutator's scoped post already brought the UI current, and a second
         // app-wide reload here is the per-edit hitch we're eliminating.
         applyDidFinishBatch?(!freshServerRecords.isEmpty)
+        // The server now holds these changes — ring the same-device sibling
+        // app (Septena ↔ Septask) so it fetches now instead of on its next
+        // foreground. Purely a hint; see SiblingNudge.
+        if !sent.savedRecords.isEmpty || !sent.deletedRecordIDs.isEmpty {
+          SiblingNudge.post()
+        }
       }
 
     case .fetchedDatabaseChanges, .sentDatabaseChanges,

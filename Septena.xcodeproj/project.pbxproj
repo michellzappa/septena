@@ -32,6 +32,7 @@
 		04164EF0E55B482160D53028 /* IntakeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDD99A14104B857C0AD4661 /* IntakeModel.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
+		04EED183D775AD966C4EACBB /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
 		04F4F297227A2CD0867E79A9 /* SectionGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */; };
 		0578243E033490DBAFABEEE2 /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */; };
 		059C8A11D111A1E4C20A388A /* TaskNavMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567240B663C68644B7223D98 /* TaskNavMenu.swift */; };
@@ -206,6 +207,7 @@
 		25776A668CC5E7C3FF155EEC /* TrainingSessionSpans.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA6D6CD108B2CA33C40C1DCF /* TrainingSessionSpans.swift */; };
 		259CE0E0350FAB702F2AC5E8 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59A88F76E4A01B4157081C37 /* WelcomeView.swift */; };
 		25E8A556F4476BD84FD81158 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
+		25F2FB5AEB4751EBE4FCF042 /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
 		2614C85B322C6D7EBF283684 /* ListKeyboardNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */; };
 		2617860D3D3E46AE4C06425D /* MilestonePresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112DA7513628EF825585692E /* MilestonePresenter.swift */; };
 		262BCA840BF28F47B44CE247 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
@@ -652,6 +654,7 @@
 		79D1099E5C313FB81F4333FD /* ListSelectionScope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71E827D45E85DADADCBF8DDE /* ListSelectionScope.swift */; };
 		79D1DC33EB8C79CE79487DE3 /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13465E0A2D6B50EEAE9C880 /* DemoSeed.swift */; };
 		7A17945534ABEF825F7910CA /* MacroTargetMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */; };
+		7A1D060431D1419F063CCED6 /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
 		7A26D518BAB7FD4DE6F31F63 /* TrainingTabAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DD884E5B3E12C029B36A624 /* TrainingTabAccessory.swift */; };
 		7A873AC7ADBFB62736FAE352 /* TasksQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B5F0D2E1B01AAEF2217FA4 /* TasksQuickAddMenu.swift */; };
 		7A8EACA4E474FB3FCA671F53 /* OuraProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509271CE5A03BE4EC284151A /* OuraProvider.swift */; };
@@ -1050,6 +1053,7 @@
 		C9730A8D5FCB43EAC9A6C304 /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */; };
 		C979D4254BA3426C243BB319 /* CommunitySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474D7FFD0D64FFFD949E53AD /* CommunitySignIn.swift */; };
 		C9933E4E455B5E1CE5012B28 /* HeatmapLevels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5BA0A891EA19221B63484D /* HeatmapLevels.swift */; };
+		C99FE1546CD03185ACDA54C0 /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
 		C9BCD0430EC4B5561CB1F143 /* MilestoneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2ABB5641A551478BB6D1FE7 /* MilestoneEngine.swift */; };
 		C9CE47DECCE06EDE9E42B1D6 /* DiscoveryFlowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8406632D2A873E175B61F4DC /* DiscoveryFlowChrome.swift */; };
@@ -1491,6 +1495,7 @@
 		296A39809598381550C2AC11 /* WolfActivityRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WolfActivityRing.swift; sourceTree = "<group>"; };
 		2B3E066DC1C51CBAEDA71AB9 /* SectionTileWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTileWidget.swift; sourceTree = "<group>"; };
 		2B7343AF2043955FB0BE2EC9 /* ValuesSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuesSuggestions.swift; sourceTree = "<group>"; };
+		2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiblingNudge.swift; sourceTree = "<group>"; };
 		2DC74986EF0ED7384B3D6BAB /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2DEA562A3534C8F99FDC9B0E /* NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationState.swift; sourceTree = "<group>"; };
 		2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuickAddMenu.swift; sourceTree = "<group>"; };
@@ -2811,6 +2816,7 @@
 				C03DC46C772E45B60ECB7343 /* SectionTheme.swift */,
 				5D227602C1039FA2206A539A /* SeptenaServices.swift */,
 				E5439F75303F906465F9F2C6 /* SettingsMirror.swift */,
+				2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */,
 				B57B46F99E041E6147DBFCE6 /* SuggestionBlocks.swift */,
 				B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */,
 				3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */,
@@ -3484,6 +3490,7 @@
 				F7A99F53FA4C9341F8D60752 /* SettingsMirror.swift in Sources */,
 				B2E310CC0C21A54B61ED3363 /* SettingsRecord.swift in Sources */,
 				6804DE97DB747232B44C2E63 /* ShortcutAction.swift in Sources */,
+				C99FE1546CD03185ACDA54C0 /* SiblingNudge.swift in Sources */,
 				66673F814E35719B797E706A /* SidebarView.swift in Sources */,
 				4518FF8DABC6B97B89A727A7 /* SkillCopy.swift in Sources */,
 				DB810EC0F96EC21F8604304F /* SkyAtmosphere.swift in Sources */,
@@ -3706,6 +3713,7 @@
 				B12532631DF245E7173A2AE8 /* SettingsMirror.swift in Sources */,
 				7354DD58EC485F7B5ADC2FC4 /* SettingsRecord.swift in Sources */,
 				31BBA78DA6CC7EB1B9D83319 /* ShortcutAction.swift in Sources */,
+				25F2FB5AEB4751EBE4FCF042 /* SiblingNudge.swift in Sources */,
 				110305AAD3CCF8664AA52A28 /* SidebarView.swift in Sources */,
 				AF4A021FAEC2C8221EC04AAB /* SkillCopy.swift in Sources */,
 				FEFC06C4EC4F266585B95B11 /* SkyAtmosphere.swift in Sources */,
@@ -4088,6 +4096,7 @@
 				ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */,
 				B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */,
 				D1390C463EBA8DB590C709F5 /* ShortcutAction.swift in Sources */,
+				04EED183D775AD966C4EACBB /* SiblingNudge.swift in Sources */,
 				83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */,
 				FD4734D3C3E01AFC05370BEA /* SiriShortcutsSettingsPane.swift in Sources */,
 				560CB294728BABC387F9DC3A /* SkillCopy.swift in Sources */,
@@ -4564,6 +4573,7 @@
 				8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */,
 				76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */,
 				D7C756207C468C4D0EBD7E69 /* ShortcutAction.swift in Sources */,
+				7A1D060431D1419F063CCED6 /* SiblingNudge.swift in Sources */,
 				3D46571B9A58D75B1947368B /* SidebarView.swift in Sources */,
 				CE82A5E3D0856F7B75826EC4 /* SiriShortcutsSettingsPane.swift in Sources */,
 				7E1D0698BEC4782B56DF090F /* SkillCopy.swift in Sources */,
