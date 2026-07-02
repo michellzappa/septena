@@ -242,6 +242,7 @@ targets:
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
+      - path: Septena/Shell/Capture/QuickFindView.swift
       # Drawer chrome: task views use its shared plumbing (`macSheetFrame`,
       # the `usesPushNavigation` / `rowHInset` environment keys).
       - path: Septena/Shell/Sections/SectionDrawer.swift
@@ -321,6 +322,7 @@ targets:
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
+      - path: Septena/Shell/Capture/QuickFindView.swift
       - path: Septena/Shell/Sections/SectionDrawer.swift
       - path: Septena/Shell/Sections/TimeTravelSheet.swift
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift

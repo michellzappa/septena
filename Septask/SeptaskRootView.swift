@@ -19,16 +19,40 @@ struct SeptaskRootView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @State private var selection: SeptaskTab = .today
-  @State private var showQuickAdd = false
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
   var body: some View {
-    rootLayout
+    @Bindable var nav = nav
+    return rootLayout
       // Same as RootTabView: resolve the push-vs-sheet rule once at the
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
+      // The app-global modals, one `.sheet(item:)` like RootTabView — the
+      // task-relevant subset only. Full-app modals (training, mood, section
+      // sheets) have no Septask entry points; if one is ever set anyway the
+      // sheet shows empty rather than crashing.
+      .sheet(item: $nav.presentedModal) { modal in
+        switch modal {
+        case .quickFind:
+          QuickFindView()
+            .septenaModalSheet(detents: [.medium, .large],
+                               macWidth: 560, macHeight: 420)
+        case .addInfo:
+          // Septask's quick capture IS the task composer — no multi-section
+          // palette here (the tasks-only twin of AddInfoSheet).
+          SeptaskQuickAdd()
+            .septenaModalSheet(detents: [.medium, .large],
+                               macWidth: 560, macHeight: 520)
+        case .keyboardShortcuts:
+          KeyboardShortcutsView()
+            .septenaModalSheet(detents: [.medium, .large],
+                               macWidth: 480, macHeight: 560)
+        default:
+          EmptyView()
+        }
+      }
   }
 
   @ViewBuilder
@@ -54,12 +78,6 @@ struct SeptaskRootView: View {
       default:                 selection = .tasks
       }
     }
-    // Quick-add, presented from the tab bar's separated `+`. AddTaskPage is
-    // the same smart-bucketing composer the full app's ⌘K palette hosts —
-    // it files into whatever list `nav.path` currently shows.
-    .sheet(isPresented: $showQuickAdd) {
-      SeptaskQuickAdd()
-    }
     #else
     ContentView()
     #endif
@@ -75,7 +93,9 @@ struct SeptaskRootView: View {
       get: { selection },
       set: { newValue in
         if newValue == .add {
-          showQuickAdd = true
+          // Route through the shared modal state so the tab-bar `+`, ⌘K,
+          // and any future entry point all present the same sheet.
+          nav.presentAddInfo(section: .tasks)
         } else {
           selection = newValue
         }
@@ -99,16 +119,12 @@ struct SeptaskRootView: View {
   #endif
 }
 
-#if os(iOS)
 /// Quick-add sheet: a fresh router per presentation so the draft never
-/// leaks between opens. Medium detent first — it's a capture surface.
+/// leaks between opens. Sizing comes from the host's `septenaModalSheet`.
 private struct SeptaskQuickAdd: View {
   @State private var router = AddInfoRouter()
 
   var body: some View {
     AddTaskPage(router: router)
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
   }
 }
-#endif

@@ -60,6 +60,10 @@ struct SeptaskApp: App {
         .modelContainer(localStore.container)
         .task {
           await services.start()
+          // Overdue-badge driver (Settings ▸ Badge). Same core singleton the
+          // full app starts; never prompts for permission (macOS dock dot;
+          // iOS deliberately stays clear).
+          BadgeManager.shared.start(context: localStore.container.mainContext)
           // Off the critical path, like App.swift: first frame renders from
           // the local mirror; the server pull patches it via notifications.
           Task { await services.absorbRemoteChanges() }
@@ -93,6 +97,12 @@ struct SeptaskApp: App {
           .keyboardShortcut("3", modifiers: .command)
         Button("Logbook")  { navigation.path = [.filter(.logbook)] }
           .keyboardShortcut("4", modifiers: .command)
+
+        Divider()
+
+        // Quick Find — same slot as the full app's Go menu (App.swift).
+        Button("Quick Find…") { navigation.showQuickFind = true }
+          .keyboardShortcut("f", modifiers: [.command, .shift])
       }
       // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`;
       // items disable themselves when no task list is focused.
@@ -109,10 +119,21 @@ struct SeptaskApp: App {
       // ⌘N is New To-Do, not New Window — inline in the focused list, else
       // the quick-add fallback.
       CommandGroup(replacing: .newItem) { NewTaskCommand() }
+      // ⌘K quick capture — the tab bar `+`'s keyboard twin. Sits in File
+      // alongside New To-Do, same as the full app's Add Info.
+      CommandGroup(after: .newItem) {
+        Button("New To-Do (Quick Add)…") { navigation.presentAddInfo(section: .tasks) }
+          .keyboardShortcut("k", modifiers: .command)
+      }
       // ⌘, opens Septask's Settings sheet — standard Preferences shortcut.
       CommandGroup(replacing: .appSettings) {
         Button("Settings…") { navigation.showSettings = true }
           .keyboardShortcut(",", modifiers: .command)
+      }
+      // ⌘⇧/ opens the shortcuts cheat-sheet, in Help like the full app.
+      CommandGroup(after: .help) {
+        Button("Keyboard Shortcuts") { navigation.showKeyboardShortcuts = true }
+          .keyboardShortcut("/", modifiers: [.command, .shift])
       }
     }
   }

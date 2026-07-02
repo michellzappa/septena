@@ -23,7 +23,17 @@ struct KeyboardShortcutGroup: Identifiable {
 }
 
 enum KeyboardShortcutsCatalogue {
-  static let groups: [KeyboardShortcutGroup] = [
+  // Navigation differs per shell: Septena's tab hops + smart-list jumps vs
+  // Septask's plain ⌘1–4 smart lists (its Go menu — see SeptaskApp).
+  private static var navigation: KeyboardShortcutGroup {
+    #if SEPTASK
+    KeyboardShortcutGroup(title: "Navigation", shortcuts: [
+      KeyboardShortcut2(keys: ["⌘", "1"], label: "Today"),
+      KeyboardShortcut2(keys: ["⌘", "2"], label: "Upcoming"),
+      KeyboardShortcut2(keys: ["⌘", "3"], label: "Anytime"),
+      KeyboardShortcut2(keys: ["⌘", "4"], label: "Logbook"),
+    ])
+    #else
     KeyboardShortcutGroup(title: "Navigation", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "1"], label: "Week tab"),
       KeyboardShortcut2(keys: ["⌘", "2"], label: "Next tab"),
@@ -34,9 +44,22 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌥", "⌘", "3"], label: "Next list"),
       KeyboardShortcut2(keys: ["⌥", "⌘", "4"], label: "Upcoming"),
       KeyboardShortcut2(keys: ["⌥", "⌘", "5"], label: "Unscheduled"),
-    ]),
+    ])
+    #endif
+  }
+
+  private static var quickCaptureLabel: String {
+    #if SEPTASK
+    "New to-do — quick capture"
+    #else
+    "Add Info — quick capture"
+    #endif
+  }
+
+  static let groups: [KeyboardShortcutGroup] = [
+    navigation,
     KeyboardShortcutGroup(title: "General", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "K"], label: "Add Info — quick capture"),
+      KeyboardShortcut2(keys: ["⌘", "K"], label: quickCaptureLabel),
       KeyboardShortcut2(keys: ["⌘", "⇧", "F"], label: "Quick Find"),
       KeyboardShortcut2(keys: ["⌘", "/"], label: "Show / hide sidebar"),
       KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
