@@ -1,99 +1,86 @@
 import SwiftUI
 
-/// Septask's root: the shared `ContentView` (single-stack on iPhone, split
-/// view on iPad/Mac) plus a Septask-only bottom tab bar on compact width.
-/// Composition only — the bar drives the SAME single `NavigationState` path
-/// the stack renders, so every shared behavior (flat-app replace semantics,
-/// ⌘N inline create, project drill-in pushes) keeps working unchanged. A
-/// native `TabView` with per-tab stacks would fork that one path; this
-/// deliberately doesn't.
+/// Septask's top-level tabs (iPhone). Browse hosts the full sidebar module;
+/// the other three are the smart lists as first-class tabs.
+enum SeptaskTab: Hashable {
+  case inbox, today, upcoming, browse
+}
+
+/// Septask's root, mirroring `RootTabView`'s shell shape: the standard
+/// system `TabView` on iPhone (bottom bar, Music-style minimize on scroll),
+/// and NO tab bar on iPad regular / macOS — there the split-view sidebar is
+/// the switcher, which is the norm (Septena's iPad segmented switcher is a
+/// full-app exception, deliberately not copied). Composition only: every
+/// tab hosts shared views unchanged.
 struct SeptaskRootView: View {
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
+  @State private var selection: SeptaskTab = .today
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
   var body: some View {
+    rootLayout
+      // Same as RootTabView: resolve the push-vs-sheet rule once at the
+      // shell root and publish `\.usesPushNavigation` to every surface.
+      .resolvesAdaptiveNavigation()
+  }
+
+  @ViewBuilder
+  private var rootLayout: some View {
     #if os(iOS)
-    if hSize == .compact {
-      ContentView()
-        .safeAreaInset(edge: .bottom, spacing: 0) { SeptaskTabBar() }
-    } else {
-      ContentView()
+    Group {
+      if hSize == .compact {
+        systemTabView
+      } else {
+        ContentView()
+      }
+    }
+    // Shared task views navigate through the ONE NavigationState path
+    // (project drill-ins, smart-list jumps); ContentView's stack renders it
+    // on the Browse tab. A route landing while a filter tab is frontmost
+    // must move selection — the tab-bar twin of RootTabView's pendingTab
+    // forwarding.
+    .onChange(of: nav.path) { _, path in
+      guard hSize == .compact, let last = path.last else { return }
+      switch last {
+      case .project, .area:    selection = .browse
+      case .filter(.triage):   selection = .inbox
+      case .filter(.today):    selection = .today
+      case .filter(.upcoming): selection = .upcoming
+      case .filter, .next:     selection = .browse
+      }
     }
     #else
     ContentView()
     #endif
   }
-}
 
-#if os(iOS)
-/// iPhone bottom bar: Inbox / Today / Upcoming / Browse. Reuses the
-/// segmented-glass language of the full app's TabSwitcher (PlatformShims'
-/// `glassSegmentTrack` / selection underlay) so the chrome reads native to
-/// the family. The smart lists replace the path (the app is conceptually
-/// flat); Browse pops to the sidebar root and stays highlighted for
-/// everything reached from it (areas, projects).
-private struct SeptaskTabBar: View {
-  @Environment(NavigationState.self) private var nav
-  @Environment(SectionTheme.self) private var theme
-  @Namespace private var bubble
+  #if os(iOS)
+  /// Standard iOS 26 `TabView`, exactly the full app's pattern
+  /// (RootTabView.systemTabView): `.tabItem` labels, system minimize
+  /// behavior, accent tint.
+  private var systemTabView: some View {
+    TabView(selection: $selection) {
+      NavigationStack { TaskListView(filter: .triage) }
+        .tabItem { Label("Inbox", systemImage: "tray.full") }
+        .tag(SeptaskTab.inbox)
 
-  private var tabs: [(route: Route?, title: String, icon: String)] {
-    [(Route.filter(.triage),   String(localized: "Inbox"),    "tray.full"),
-     (Route.filter(.today),    String(localized: "Today"),    "sun.max.fill"),
-     (Route.filter(.upcoming), String(localized: "Upcoming"), "calendar"),
-     (nil,                     String(localized: "Browse"),   "list.bullet")]
-  }
+      NavigationStack { TaskListView(filter: .today) }
+        .tabItem { Label("Today", systemImage: "sun.max.fill") }
+        .tag(SeptaskTab.today)
 
-  private func isSelected(_ route: Route?) -> Bool {
-    guard let route else {
-      // Browse owns the sidebar root and everything reached from it.
-      switch nav.path.last {
-      case nil, .project, .area: return true
-      default: return false
-      }
+      NavigationStack { TaskListView(filter: .upcoming) }
+        .tabItem { Label("Upcoming", systemImage: "calendar") }
+        .tag(SeptaskTab.upcoming)
+
+      ContentView()
+        .tabItem { Label("Browse", systemImage: "list.bullet") }
+        .tag(SeptaskTab.browse)
     }
-    return nav.path.last?.sameDestination(as: route) ?? false
+    .tabBarMinimizeBehavior(.onScrollDown)
+    .tint(theme.accent)
   }
-
-  var body: some View {
-    GlassEffectContainer {
-      HStack(spacing: 2) {
-        ForEach(tabs, id: \.title) { tab in
-          let selected = isSelected(tab.route)
-          Button {
-            if let route = tab.route {
-              nav.go(to: route)
-            } else if !nav.path.isEmpty {
-              Haptics.tap()
-              nav.path = []
-            }
-          } label: {
-            VStack(spacing: 2) {
-              Image(systemName: tab.icon)
-                .font(.system(size: 17, weight: .semibold))
-              Text(tab.title)
-                .font(.caption2.weight(.semibold))
-            }
-            .foregroundStyle(selected ? AnyShapeStyle(theme.accent)
-                                      : AnyShapeStyle(.secondary))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .glassSegmentSelectionUnderlay(isSelected: selected,
-                                           tint: theme.accent, in: bubble)
-            .contentShape(Capsule())
-          }
-          .buttonStyle(.plain)
-          .glassEffectID(tab.title, in: bubble)
-          .accessibilityLabel(tab.title)
-          .accessibilityAddTraits(selected ? .isSelected : [])
-        }
-      }
-      .padding(4)
-      .glassSegmentTrack()
-    }
-    .padding(.horizontal, 24)
-    .padding(.bottom, 6)
-  }
+  #endif
 }
-#endif

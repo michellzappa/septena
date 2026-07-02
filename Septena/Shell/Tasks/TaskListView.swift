@@ -393,9 +393,11 @@ struct TaskListView: View {
 
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
-  /// Per-row top filing suggestion — snapshotted in `load()` from the same
-  /// `filingRankedSuggestions` path as the context menu. Held in @State (not
-  /// read live off the @Observable engine) so the row chip renders reliably.
+  /// Per-row top filing suggestion — the "→ Suggested" capsule. Rebuilt by
+  /// `refreshFilingSuggestions()` synchronously on appear / filter-swap (so the
+  /// chip is on the first frame, not a beat late) and again inside `load()` on
+  /// passive syncs. Held in @State (not read live off the @Observable engine)
+  /// so the row chip renders reliably.
   @State private var filingSuggestions: [String: SuggestionEngine.Suggestion] = [:]
 
   /// done / (done + open) per project, mirroring the sidebar's aggregate so the
@@ -548,6 +550,9 @@ struct TaskListView: View {
       // never fires and `calendarEvents` would otherwise stay empty until the
       // load lands — a visible layout jump.
       refreshCalendarEvents()
+      // Same beat for the Inbox "→ Suggested" capsules — otherwise the top
+      // Inbox rows render chip-less for one frame, then reflow when load() lands.
+      refreshFilingSuggestions()
       Task { await load() }
     }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
@@ -605,6 +610,7 @@ struct TaskListView: View {
       // frame is the "weird rebuild between screens". Mirrors the synchronous
       // correctness the `items`/`storageFilter` getter already gives the rows.
       refreshCalendarEvents()
+      refreshFilingSuggestions()
       Task { await load() }
     }
     // Leaving reorder edit mode drops the selection so nothing stale lingers.
@@ -2948,12 +2954,6 @@ struct TaskListView: View {
         acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
       }
     }
-    // Refresh the inbox suggestion engine from local data. LocalCache
-    // returns every status, so the engine sees the full corpus for
-    // ranking.
-    // Today's triage band gets the richer per-task ranked suggestions; area
-    // pages train the model on load so area-direct rows can classify into
-    // child projects on demand. Other views never surface filing picks.
     if filter == .today {
       // Re-read the Inbox and merge back any just-checked row that's still
       // settling (the `.triage` query drops done tasks), so an accepted
@@ -2967,42 +2967,14 @@ struct TaskListView: View {
       assignMerged(mergedTriage, ghosted: triageGhost.ghosted, arrived: triageArrived) {
         triageStorage = $0
       }
-      // The Inbox lives on the Today view now (the triage rows), so classify
-      // the live open rows — that's what powers the one-tap "file here"
-      // suggestion chip and the implicit "not this" learning. refresh also
-      // primes the model for the composer's on-keystroke suggest().
-      if TaskRowFlags.filingSuggestionsEnabled {
-        let training = LocalCache.trainingTasks(in: modelContext)
-        suggestionEngine.refresh(inbox: localTriage,
-                                 allTasks: training,
-                                 projects: projects,
-                                 areas: areas)
-      }
     } else {
       triageStorage = []
     }
-    if TaskRowFlags.filingSuggestionsEnabled,
-       filter != .today && filter != .logbook && filter != .recentlyDeleted {
-      suggestionEngine.prepare(allTasks: LocalCache.trainingTasks(in: modelContext),
-                               projects: projects,
-                               areas: areas)
-    }
-    // Snapshot the menu's top filing pick per visible open row so the chip
-    // matches the context menu (same `filingRankedSuggestions` path).
-    var freshSuggestions: [String: SuggestionEngine.Suggestion] = [:]
-    if TaskRowFlags.filingSuggestionsEnabled,
-       filter != .logbook && filter != .recentlyDeleted {
-      var seen = Set<String>()
-      let candidates = (triageItems + items + review).filter {
-        ($0.status == .open || settle.isSettling($0.id)) && seen.insert($0.id).inserted
-      }
-      for t in candidates {
-        if let top = filingRankedSuggestions(for: t)?.first {
-          freshSuggestions[t.id] = top
-        }
-      }
-    }
-    filingSuggestions = freshSuggestions
+    // Rebuild the Inbox filing-suggestion snapshot (the "→ Suggested" capsule).
+    // Same call the synchronous on-appear / filter-swap path uses, so a passive
+    // re-read keeps the chips current; the engine's model build is memoized, so
+    // running it here and on appear trains at most once.
+    refreshFilingSuggestions()
     // Refresh dismissed state — banner reappears next day automatically.
     if filter == .today {
       let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
@@ -3028,6 +3000,47 @@ struct TaskListView: View {
     calendarEvents = filter == .today
       ? CalendarBridge.shared.remainingTodayEvents()
       : CalendarBridge.shared.upcomingEvents(days: 30)
+  }
+
+  /// Rebuild the per-row filing-suggestion snapshot (`filingSuggestions`, the
+  /// "→ Suggested" capsule) SYNCHRONOUSLY, so the chip is on the first frame
+  /// instead of popping in a beat later when the async `load()` resolves — the
+  /// same beat `refreshCalendarEvents()` gives the woven agenda. This was the
+  /// last Inbox input still set only inside `load()`, so on every appear/return
+  /// the top Inbox rows rendered without their capsule for one frame, then
+  /// reflowed as it landed. Cheap to call eagerly: the classifier's model build
+  /// is memoized on a corpus signature (`SuggestionEngine.ensureModel`), so the
+  /// appear beat and the `load()` beat train the model at most once between them.
+  private func refreshFilingSuggestions() {
+    guard TaskRowFlags.filingSuggestionsEnabled,
+          filter != .logbook, filter != .recentlyDeleted else {
+      if !filingSuggestions.isEmpty { filingSuggestions = [:] }
+      return
+    }
+    // Train the classifier (memoized). Today's Inbox gets the richer per-id
+    // ranked picks; every other creatable list just primes the general model so
+    // `filingRankedSuggestions` can rank area-direct rows on demand.
+    if filter == .today {
+      suggestionEngine.refresh(inbox: LocalCache.tasks(in: modelContext, filter: .triage),
+                               allTasks: LocalCache.trainingTasks(in: modelContext),
+                               projects: projects,
+                               areas: areas)
+    } else {
+      suggestionEngine.prepare(allTasks: LocalCache.trainingTasks(in: modelContext),
+                               projects: projects,
+                               areas: areas)
+    }
+    // Snapshot the top pick per visible open row so the chip matches the
+    // context menu (same `filingRankedSuggestions` path).
+    var fresh: [String: SuggestionEngine.Suggestion] = [:]
+    var seen = Set<String>()
+    let candidates = (triageItems + items + review).filter {
+      ($0.status == .open || settle.isSettling($0.id)) && seen.insert($0.id).inserted
+    }
+    for t in candidates {
+      if let top = filingRankedSuggestions(for: t)?.first { fresh[t.id] = top }
+    }
+    filingSuggestions = fresh
   }
 
   // MARK: - New-to-dos banner
