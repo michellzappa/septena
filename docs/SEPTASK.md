@@ -1,10 +1,33 @@
 # Septask - separate Tasks app plan
 
-**Status:** P2 landed — `Septask` (iOS/iPad) and `SeptaskMac` (native macOS,
-`com.septena.tasks.mac`) both compile the real task UI and run. Side-by-side
-CloudKit convergence was demonstrated on macOS (Septena + Septask, same
-data). Next: P3 (welcome + dedicated settings), then P4 (Darwin nudge).
+**Status:** P3 landed — Septask has its own one-time welcome (Septena's
+design language, Septask copy, app-local completion) and a dedicated
+Settings sheet (shared task toggles, shared accent picker, Things import,
+AI & Claude incl. macOS MCP pane, about + welcome reset), wired to the
+sidebar gear and ⌘,. Next: P4 (Darwin nudge, badge decision), app icon.
 Internal codename: **Septask**.
+
+## P3 Findings (2026-07-02)
+
+- **Shared, not copied**: the task settings rows moved from TasksPlugin's
+  `TasksDetailContent` into `Shell/Tasks/TaskSettingsSections.swift` (both
+  shells mount the same rows; full-app-only rows — Open-in, Show-in-Next,
+  the SettingsView AI deep link — are `#if !SEPTASK`-gated inside it).
+  Also extracted to shared files: the palette picker
+  (`Shell/UI/PaletteSwatch.swift`), `ClaudeGatewayDetail` (+ its private
+  timer — extract private helpers together), and `SkillCopy`
+  (`Shell/UI/SkillCopy.swift`).
+- **Septask-local shell** (`Septask/`): `SeptaskSettingsView` (composition
+  only) and `SeptaskWelcome` (gate + view, completion under
+  `septask.welcome.completed`).
+- **Accent is the shared `SectionEntity.color`** via
+  `SettingsMirror.setSectionColor("tasks")` + `theme.setColor` — changing it
+  in Septask recolors Septena's Tasks surfaces, by design.
+- **Smoke-test trap**: building with `CODE_SIGNING_ALLOWED=NO` strips the
+  ad-hoc entitlements simulator builds normally embed, and `CKContainer`
+  init then traps at launch. Simulator smoke tests must build through
+  `scripts/build.sh` (ad-hoc signed); `CODE_SIGNING_ALLOWED=NO` is for
+  compile verification only.
 
 ## P2 Findings (2026-07-02)
 

@@ -99,9 +99,22 @@ struct ClaudeAISettingsPane: View {
         }
       }
 
+      // Septask compiles no SettingsView destination graph — link the pane
+      // directly (macOS only; the pane type itself is macOS-gated, and the
+      // iOS discoverability row needs the full app's destination handling).
+      #if SEPTASK
+      #if os(macOS)
+      NavigationLink {
+        LocalMCPSettingsPane()
+      } label: {
+        Label("MCP Server", systemImage: "server.rack")
+      }
+      #endif
+      #else
       NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
         Label("MCP Server", systemImage: "server.rack")
       }
+      #endif
     } header: {
       Text("Connections")
     } footer: {
@@ -113,7 +126,11 @@ struct ClaudeAISettingsPane: View {
     }
   }
 
+  // The skill briefs render from SectionRegistry, which Septask doesn't
+  // compile — the section is full-app-only.
+  @ViewBuilder
   private var skillsSection: some View {
+    #if !SEPTASK
     Section {
       NavigationLink(value: SettingsView.SettingsDestination.skills) {
         Label("MCP Skills", systemImage: "book.closed")
@@ -121,6 +138,7 @@ struct ClaudeAISettingsPane: View {
     } footer: {
       Text("The briefs that teach a model how to use each section through the connection — tools, conventions, examples.")
     }
+    #endif
   }
 
   // MARK: - Apple Intelligence status

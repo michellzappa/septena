@@ -232,6 +232,13 @@ targets:
       - path: Septena/Shell/Settings/SettingsKeys.swift
       # Supporter-finish constants used by LogCommit's celebration variant.
       - path: Septena/Shell/Settings/SeptenaPlus.swift
+      # P3: the AI/Claude pane + gateway detail (SettingsView deep links
+      # inside are #if !SEPTASK-gated), the macOS local MCP pane, and the
+      # hex→Color helper the shared palette picker rides.
+      - path: Septena/Shell/Settings/AISettingsPane.swift
+      - path: Septena/Shell/Settings/ClaudeGatewayDetail.swift
+      - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
+      - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
@@ -306,6 +313,10 @@ targets:
       - path: Septena/App/OpenNewTaskRouting.swift
       - path: Septena/Shell/Settings/SettingsKeys.swift
       - path: Septena/Shell/Settings/SeptenaPlus.swift
+      - path: Septena/Shell/Settings/AISettingsPane.swift
+      - path: Septena/Shell/Settings/ClaudeGatewayDetail.swift
+      - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
+      - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift

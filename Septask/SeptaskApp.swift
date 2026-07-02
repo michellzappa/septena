@@ -32,9 +32,17 @@ struct SeptaskApp: App {
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some Scene {
-    WindowGroup {
+    @Bindable var navigation = navigation
+    return WindowGroup {
       ContentView()
         .overlay { LogCommitOverlay() }
+        // Dedicated Septask Settings (P3) — reached from the sidebar gear
+        // (`nav.showSettings`) and ⌘, below. A sheet on both platforms.
+        .sheet(isPresented: $navigation.showSettings) {
+          SeptaskSettingsView()
+        }
+        // One-time Septask welcome; self-gating after completion.
+        .septaskWelcomeGate()
         // Keep the tasks accent aligned with the CloudKit-synced section
         // color — inbound batches repaint the cache-backed theme.
         .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
@@ -94,6 +102,11 @@ struct SeptaskApp: App {
       // ⌘N is New To-Do, not New Window — inline in the focused list, else
       // the quick-add fallback.
       CommandGroup(replacing: .newItem) { NewTaskCommand() }
+      // ⌘, opens Septask's Settings sheet — standard Preferences shortcut.
+      CommandGroup(replacing: .appSettings) {
+        Button("Settings…") { navigation.showSettings = true }
+          .keyboardShortcut(",", modifiers: .command)
+      }
     }
   }
 }

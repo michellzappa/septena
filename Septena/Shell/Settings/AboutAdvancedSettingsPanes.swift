@@ -630,16 +630,3 @@ struct SkillPreambleView: View {
   }
 }
 
-/// Tiny cross-platform pasteboard wrapper. Lives at file scope so all
-/// skill views (and the per-section detail pane footer) share one impl.
-enum SkillCopy {
-  static func copy(_ text: String) {
-    #if canImport(UIKit)
-    UIPasteboard.general.string = text
-    #elseif canImport(AppKit)
-    let pb = NSPasteboard.general
-    pb.clearContents()
-    pb.setString(text, forType: .string)
-    #endif
-  }
-}
