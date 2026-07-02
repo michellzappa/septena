@@ -1,10 +1,29 @@
 # Septask - separate Tasks app plan
 
-**Status:** P1 landed — the `Septask` iOS target compiles the real task UI
-(`Shell/Tasks` + `Shell/Sidebar` + `ContentView`) and boots to the task home
-in the simulator. Remaining P0 exit criterion: side-by-side CloudKit
-convergence on a signed device. Next: P2 (Mac target, shell polish), P3
-(welcome + settings). Internal codename: **Septask**.
+**Status:** P2 landed — `Septask` (iOS/iPad) and `SeptaskMac` (native macOS,
+`com.septena.tasks.mac`) both compile the real task UI and run. Side-by-side
+CloudKit convergence was demonstrated on macOS (Septena + Septask, same
+data). Next: P3 (welcome + dedicated settings), then P4 (Darwin nudge).
+Internal codename: **Septask**.
+
+## P2 Findings (2026-07-02)
+
+- **`SeptaskMac` mirrors the `SeptenaMac` pattern**: separate target, same
+  source list as `Septask` (keep the two lists in lockstep), `PRODUCT_NAME:
+  Septask`, own hand-written `Septask/SeptaskMac.entitlements`, generated
+  `Septask/Info-Mac.plist`.
+- **Menu commands**: SeptaskApp mounts the task-scoped subset of App.swift's
+  commands — Go (⌘1–4 smart lists, no tab hop needed), the Task menu
+  (focused-scene row actions), ⌘/ sidebar, ⌘N New To-Do. Quick Find /
+  Add Info / Settings / cheat-sheet are deliberately absent until P3 mounts
+  their sheet hosts.
+- **Platform-conditional seams hide from the other platform's compiler**:
+  SectionDrawer's `#if os(macOS)` settings branch referenced the gated
+  `settingsDestination` and only failed once a macOS target compiled it.
+  When adding a `#if !SEPTASK` gate, grep the file for `os(macOS)` /
+  `os(iOS)` branches touching the same symbol.
+- **EventKit usage descriptions** (Reminders inbox, Today calendar strip)
+  are required in BOTH Info.plists — the task UI requests access at runtime.
 
 ## P1 Findings (2026-07-02)
 

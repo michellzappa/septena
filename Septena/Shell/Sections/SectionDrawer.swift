@@ -538,9 +538,12 @@ struct SectionDrawer<Content: View>: View {
                   if let settingsAction {
                     settingsAction()
                   } else {
-                    #if os(macOS)
+                    #if os(macOS) && !SEPTASK
                     nav.settingsDestination = .section(sectionKey)
                     nav.showSettings = true
+                    #elseif os(macOS)
+                    // Septask compiles no Settings surface until P3 (and
+                    // mounts no drawers) — inert by design.
                     #else
                     showingSettings = true
                     #endif

@@ -64,5 +64,36 @@ struct SeptaskApp: App {
           }
         }
     }
+    // The task-scoped subset of the full app's menu commands (App.swift) —
+    // only entries whose backing surface Septask compiles. Quick Find /
+    // Add Info / Settings / the shortcuts cheat-sheet wait for their sheet
+    // hosts (P3). No tab bar here, so the smart lists take plain ⌘1–4.
+    .commands {
+      CommandMenu("Go") {
+        Button("Today")    { navigation.path = [.filter(.today)] }
+          .keyboardShortcut("1", modifiers: .command)
+        Button("Upcoming") { navigation.path = [.filter(.upcoming)] }
+          .keyboardShortcut("2", modifiers: .command)
+        Button("Anytime")  { navigation.path = [.filter(.unscheduled)] }
+          .keyboardShortcut("3", modifiers: .command)
+        Button("Logbook")  { navigation.path = [.filter(.logbook)] }
+          .keyboardShortcut("4", modifiers: .command)
+      }
+      // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`;
+      // items disable themselves when no task list is focused.
+      CommandMenu("Task") { TaskCommandsMenu() }
+      // ⌘/ toggles the sidebar, same as the full app.
+      CommandGroup(after: .sidebar) {
+        Button(navigation.sidebarVisibility == .detailOnly
+               ? "Show Sidebar" : "Hide Sidebar") {
+          navigation.sidebarVisibility =
+            navigation.sidebarVisibility == .detailOnly ? .all : .detailOnly
+        }
+        .keyboardShortcut("/", modifiers: .command)
+      }
+      // ⌘N is New To-Do, not New Window — inline in the focused list, else
+      // the quick-add fallback.
+      CommandGroup(replacing: .newItem) { NewTaskCommand() }
+    }
   }
 }

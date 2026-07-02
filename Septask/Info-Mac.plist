@@ -30,11 +30,5 @@
 	<string>Septask imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Septask imports tasks from your Reminders lists into the Inbox.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<key>UILaunchScreen</key>
-	<dict/>
 </dict>
 </plist>

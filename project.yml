@@ -252,6 +252,12 @@ targets:
         UILaunchScreen: {}
         UIBackgroundModes:
           - remote-notification
+        # The compiled task UI includes the Reminders inbox and the Today
+        # calendar strip (EventKit) — access requests crash without these.
+        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -264,6 +270,75 @@ targets:
         # DEBUG must be restated: overriding SWIFT_ACTIVE_COMPILATION_CONDITIONS
         # replaces Xcode's Debug default rather than appending to it, and
         # DemoSeedMode gates on `#if DEBUG`.
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG SEPTASK"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
+
+  # Native macOS sibling, following the Septena / SeptenaMac pattern (separate
+  # target, not a multiplatform destination). Same source list as Septask —
+  # keep the two in lockstep when adding P-phase inclusions.
+  SeptaskMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Septask
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptenaCore
+        excludes:
+          - "**/.DS_Store"
+          - NextFeed.swift
+          - WatchSnapshotPublisher.swift
+      - path: Septena/Shell/Tasks
+        excludes:
+          - TasksDestinationView.swift
+      - path: Septena/Shell/Sidebar
+      - path: Septena/Shell/UI
+        excludes:
+          - IntensityGlyph.swift
+          - ModuleTile.swift
+      - path: Septena/App/ContentView.swift
+      - path: Septena/App/NavigationState.swift
+      - path: Septena/App/ShortcutAction.swift
+      - path: Septena/App/SeptenaTab.swift
+      - path: Septena/App/OpenNewTaskRouting.swift
+      - path: Septena/Shell/Settings/SettingsKeys.swift
+      - path: Septena/Shell/Settings/SeptenaPlus.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
+      - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
+      - path: Septena/Shell/Sections/SectionDrawer.swift
+      - path: Septena/Shell/Sections/TimeTravelSheet.swift
+      - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
+      - path: Septena/Shell/Intelligence/OnDeviceAI.swift
+      - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
+    dependencies:
+      - sdk: FoundationModels.framework
+    info:
+      path: Septask/Info-Mac.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDisplayName: Septask
+        ITSAppUsesNonExemptEncryption: false
+        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        # Target name disambiguates from the iOS target; the shipped bundle
+        # is Septask.app (same pattern as SeptenaMac → Septena.app).
+        PRODUCT_NAME: Septask
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.mac
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Septask/SeptaskMac.entitlements
+      configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG SEPTASK"
         Release:
@@ -549,6 +624,19 @@ schemes:
     build:
       targets:
         Septask: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  SeptaskMac:
+    build:
+      targets:
+        SeptaskMac: all
     run:
       config: Debug
     profile:
