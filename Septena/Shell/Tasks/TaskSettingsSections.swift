@@ -127,6 +127,9 @@ struct TaskSettingsSections: View {
       Text("Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar.")
       #endif
     }
+    // Septask hoists the import entry to its Settings root (its own row
+    // beside AI & Claude); here it stays nested in the tasks pane.
+    #if !SEPTASK
     Section {
       NavigationLink {
         ThingsImportView()
@@ -136,7 +139,6 @@ struct TaskSettingsSections: View {
     } footer: {
       Text("One-time migration from a Things database export. Your Things data is not modified.")
     }
-    #if !SEPTASK
     Section {
       Text("Areas and projects are managed in the Tasks tab.")
         .font(.callout)
