@@ -72,6 +72,13 @@ struct SeptaskApp: App {
           }
         }
     }
+    // macOS: drop the "Septask" title strip, same as App.swift — on this SDK
+    // the hidden-title-bar window is what gives the NavigationSplitView
+    // sidebar its full-height rounded pane; the default style renders the
+    // classic square sidebar under a title bar.
+    #if os(macOS)
+    .windowStyle(.hiddenTitleBar)
+    #endif
     // The task-scoped subset of the full app's menu commands (App.swift) —
     // only entries whose backing surface Septask compiles. Quick Find /
     // Add Info / Settings / the shortcuts cheat-sheet wait for their sheet
