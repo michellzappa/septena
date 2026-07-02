@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Septask's top-level tabs (iPhone). Browse hosts the full sidebar module;
-/// the other three are the smart lists as first-class tabs.
+/// Septask's top-level tabs (iPhone). Home hosts the full sidebar module;
+/// Today and Upcoming are first-class smart-list tabs; the trailing `+` is
+/// an action, not a destination — it presents quick-add and selection never
+/// actually moves to it.
 enum SeptaskTab: Hashable {
-  case inbox, today, upcoming, browse
+  case home, today, upcoming, add
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -16,6 +18,7 @@ struct SeptaskRootView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @State private var selection: SeptaskTab = .today
+  @State private var showQuickAdd = false
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
@@ -39,18 +42,22 @@ struct SeptaskRootView: View {
     }
     // Shared task views navigate through the ONE NavigationState path
     // (project drill-ins, smart-list jumps); ContentView's stack renders it
-    // on the Browse tab. A route landing while a filter tab is frontmost
+    // on the Home tab. A route landing while a filter tab is frontmost
     // must move selection — the tab-bar twin of RootTabView's pendingTab
     // forwarding.
     .onChange(of: nav.path) { _, path in
       guard hSize == .compact, let last = path.last else { return }
       switch last {
-      case .project, .area:    selection = .browse
-      case .filter(.triage):   selection = .inbox
       case .filter(.today):    selection = .today
       case .filter(.upcoming): selection = .upcoming
-      case .filter, .next:     selection = .browse
+      default:                 selection = .home
       }
+    }
+    // Quick-add, presented from the tab bar's separated `+`. AddTaskPage is
+    // the same smart-bucketing composer the full app's ⌘K palette hosts —
+    // it files into whatever list `nav.path` currently shows.
+    .sheet(isPresented: $showQuickAdd) {
+      SeptaskQuickAdd()
     }
     #else
     ContentView()
@@ -58,29 +65,49 @@ struct SeptaskRootView: View {
   }
 
   #if os(iOS)
-  /// Standard iOS 26 `TabView`, exactly the full app's pattern
-  /// (RootTabView.systemTabView): `.tabItem` labels, system minimize
-  /// behavior, accent tint.
+  /// Standard iOS 26 `TabView`, the full app's pattern (RootTabView):
+  /// system tab items, minimize-on-scroll, accent tint. The `+` rides the
+  /// separated trailing slot; selecting it presents quick-add and the
+  /// binding swallows the change so the current tab stays put.
   private var systemTabView: some View {
-    TabView(selection: $selection) {
-      NavigationStack { TaskListView(filter: .triage) }
-        .tabItem { Label("Inbox", systemImage: "tray.full") }
-        .tag(SeptaskTab.inbox)
-
-      NavigationStack { TaskListView(filter: .today) }
-        .tabItem { Label("Today", systemImage: "sun.max.fill") }
-        .tag(SeptaskTab.today)
-
-      NavigationStack { TaskListView(filter: .upcoming) }
-        .tabItem { Label("Upcoming", systemImage: "calendar") }
-        .tag(SeptaskTab.upcoming)
-
-      ContentView()
-        .tabItem { Label("Browse", systemImage: "list.bullet") }
-        .tag(SeptaskTab.browse)
+    TabView(selection: Binding(
+      get: { selection },
+      set: { newValue in
+        if newValue == .add {
+          showQuickAdd = true
+        } else {
+          selection = newValue
+        }
+      })) {
+      Tab("Home", systemImage: "house.fill", value: SeptaskTab.home) {
+        ContentView()
+      }
+      Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
+        NavigationStack { TaskListView(filter: .today) }
+      }
+      Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
+        NavigationStack { TaskListView(filter: .upcoming) }
+      }
+      Tab("New To-Do", systemImage: "plus", value: SeptaskTab.add, role: .search) {
+        Color.clear
+      }
     }
     .tabBarMinimizeBehavior(.onScrollDown)
     .tint(theme.accent)
   }
   #endif
 }
+
+#if os(iOS)
+/// Quick-add sheet: a fresh router per presentation so the draft never
+/// leaks between opens. Medium detent first — it's a capture surface.
+private struct SeptaskQuickAdd: View {
+  @State private var router = AddInfoRouter()
+
+  var body: some View {
+    AddTaskPage(router: router)
+      .presentationDetents([.medium, .large])
+      .presentationDragIndicator(.visible)
+  }
+}
+#endif
