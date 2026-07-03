@@ -83,6 +83,7 @@ struct SeptaskApp: App {
             settingsStore.reconcileWelcomeName(context: context, engine: services.ckEngine)
             settingsStore.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
             settingsStore.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
+            settingsStore.reconcileSupporter(context: context, engine: services.ckEngine)
           }
         }
         .onChange(of: scenePhase) { _, phase in

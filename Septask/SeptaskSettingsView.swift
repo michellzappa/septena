@@ -40,7 +40,11 @@ struct SeptaskSettingsView: View {
                 Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
                   .font(.title3.weight(.semibold))
                   .foregroundStyle(.primary)
-                FreeAccountBadge()
+                if plusUnlocked {
+                  SeptenaPlusBadge()
+                } else {
+                  FreeAccountBadge()
+                }
               }
               Spacer(minLength: 0)
             }
@@ -180,12 +184,16 @@ private struct SeptaskAccountPane: View {
               .onChange(of: welcomeName) { _, newValue in
                 store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
               }
-            FreeAccountBadge()
+            if plusUnlocked {
+              SeptenaPlusBadge()
+            } else {
+              FreeAccountBadge()
+            }
           }
         }
         .padding(.vertical, 6)
       } footer: {
-        Text("Your name is shared with Septena via iCloud. There's no Septask account — your identity is your Apple ID.")
+        Text("Your name and supporter status are shared with Septena via iCloud. There's no Septask account — your identity is your Apple ID, and supporting happens in Septena.")
       }
 
       Section {

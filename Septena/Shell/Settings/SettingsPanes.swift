@@ -1063,26 +1063,8 @@ struct SeptenaPlusFeatureRow: View {
   }
 }
 
-/// Compact "Supporter" pill worn on the profile. Ink capsule with a
-/// champagne-foil hairline and a small foil heart, so it reads as a small
-/// pressed-metal plate of thanks rather than a colorful sticker. Marks who
-/// chose to support — it never gates anything.
-struct SeptenaPlusBadge: View {
-  var body: some View {
-    HStack(spacing: 3) {
-      Image(systemName: "heart.fill")
-        .font(.system(size: 8, weight: .bold))
-        .foregroundStyle(SeptenaPlus.foil)
-      Text(LocalizedStringKey(SeptenaPlus.badgeWord))
-        .foregroundStyle(.white)
-    }
-    .font(.caption2.weight(.bold))
-    .padding(.horizontal, 8)
-    .padding(.vertical, 3)
-    .background(SeptenaPlus.ink, in: Capsule())
-    .overlay(Capsule().strokeBorder(SeptenaPlus.foil.opacity(0.5), lineWidth: 0.75))
-  }
-}
+// SeptenaPlusBadge moved to Shell/UI/ProfileAvatar.swift (shared with Septask).
+
 
 /// The one member badge worn beside a name across every community surface —
 /// the roadmap, testimonials, support threads, and the profile pane. Precedence

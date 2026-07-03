@@ -291,6 +291,10 @@ struct SeptenaApp: App {
             // pre-existing local-only name up (engine in hand here).
             settingsStore.reconcileWelcomeName(
               context: localStore.container.mainContext, engine: ckEngine)
+            // Push the StoreKit-mirrored supporter flag into the synced
+            // payload so Septask wears the badge too.
+            settingsStore.reconcileSupporter(
+              context: localStore.container.mainContext, engine: ckEngine)
             // Same bridge for the day-bucket cutoffs: adopt an inbound value
             // from another device, or push a pre-existing local override up.
             settingsStore.reconcileDayBucketCutoffs(

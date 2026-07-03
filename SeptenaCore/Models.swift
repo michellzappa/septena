@@ -1509,6 +1509,12 @@ struct AppSettings: Codable {
   /// `welcomeName` @AppStorage key that `WelcomeHeader` reads locally.
   /// Defaulted so the existing memberwise-init call sites stay source-stable.
   var welcomeName: String? = nil
+  /// Cosmetic supporter state ("Support Septena" purchase), synced so the
+  /// badge/foil follow the account into Septask — StoreKit entitlements are
+  /// per-app, so the sibling can't read the purchase itself. Gates nothing,
+  /// by product rule. Authoritative writer: the app hosting StoreKit
+  /// (Septena); tasks-only shells adopt inbound values only.
+  var supporter: Bool? = nil
 
   /// User-configured boundary hours for the morning/afternoon/evening day
   /// buckets (Settings ▸ Time of Day). Synced across devices; mirrored into

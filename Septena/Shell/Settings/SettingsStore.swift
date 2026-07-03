@@ -433,6 +433,28 @@ final class SettingsStore {
     }
   }
 
+  /// Cosmetic supporter state follows the account (it gates nothing). The
+  /// StoreKit truth lives in the app hosting purchases (Septena) — its local
+  /// entitlement mirror is authoritative and pushes up, including a lapse.
+  /// The tasks-only shell has no StoreKit and adopts the synced value only.
+  func reconcileSupporter(context: ModelContext, engine: CKEngine?) {
+    let key = SettingsKey.plusUnlocked
+    let local = UserDefaults.standard.bool(forKey: key)
+    if RuntimeProfile.current.isTasksOnly {
+      if let synced = serverSettings?.supporter, synced != local {
+        UserDefaults.standard.set(synced, forKey: key)
+      }
+      return
+    }
+    guard engine != nil, serverSettings?.supporter != local else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.supporter = local
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Mark the first-run welcome complete: stamp the synced `onboardedAt` and
   /// push it to CloudKit (so other devices skip the welcome), and flip the
   /// device-local `welcomeCompleted` flag (so the gate dismisses immediately
