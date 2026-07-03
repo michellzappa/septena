@@ -1,10 +1,18 @@
 # Native CloudKit Project Sharing Spec
 
-**Status:** planning / migration spec. Not started. Sequenced AFTER Septask
-P2 (docs/SEPTASK.md "P0 Findings"): Phase 0's dev spike may start any time,
-but Phases 1–2 rewrite SeptenaCore identity + CKEngine internals that the
-Septask target compiles — land Septask on today's single-engine core first so
-sharing lands once and Septask inherits it (Phase 5 then becomes near-free).
+**Status:** planning / migration spec. Not started. Core design decisions
+**locked 2026-07-03** (§5, §6, §12 below). Sequenced AFTER Septask P2
+(docs/SEPTASK.md "P0 Findings"): Phase 0's dev spike may start any time, but
+Phases 1–2 rewrite SeptenaCore identity + CKEngine internals that the Septask
+target compiles — land Septask on today's single-engine core first so sharing
+lands once and Septask inherits it (Phase 5 then becomes near-free).
+
+**Sequencing vs. prod cutover (decided 2026-07-03): sharing is a fast-follow,
+NOT a launch blocker.** Every schema change here is additive (new local fields +
+reads/writes against `sharedCloudDatabase`; the existing private-zone records are
+untouched), so the initial Dev→Prod cutover ships WITHOUT sharing and Phase 6
+becomes a later, separate additive deploy. Do not fold this multi-database
+migration + identity-namespace rewrite into the pre-launch critical path.
 
 Goal: add Apple-native collaboration for Septask/Septena task projects using
 CloudKit sharing (`CKShare`), while preserving Septena's requirement that
@@ -163,40 +171,41 @@ Friend's shared project:  id = "ab9k"
 Current SwiftData models cannot represent both because `ProjectEntity.id` is
 unique and tasks reference projects by that bare ID.
 
-### Required Decision
+### Decision (locked 2026-07-03)
 
-Before implementing `CKShare`, add a local namespace strategy for shared task
-identity.
+Split identity across two layers instead of overloading the single `id`:
 
-Recommended approach:
+1. **`localKey` becomes the SwiftData unique key** (`@Attribute(.unique)` moves
+   here). Format:
 
-- Keep user-facing/domain IDs stable (`id` as authored by owner) for export and
-  CloudKit record naming.
-- Add local mirror namespace fields to task/project/area entities:
-  - `cloudOwnerName` or equivalent owner identifier.
-  - `cloudDatabaseScope` / `isShared`.
-  - `localKey` or a derived unique key for SwiftData uniqueness.
-- Join tasks to projects by the namespaced key in local UI, while preserving
-  the owner-authored `project` string for CloudKit payload compatibility.
+   ```text
+   private:<projectID>          shared:<ownerName>:<projectID>
+   private:<taskID>             shared:<ownerName>:<taskID>
+   ```
 
-Possible local key format:
+2. **`id` stays the owner-authored short ID** used for CloudKit record naming
+   (`project:<id>`, task record name) and for export/import — but it **loses its
+   local global-uniqueness** (drop `.unique` from `id`; two owners may legitimately
+   both hold `id == "ab9k"`).
 
-```text
-private:<projectID>
-shared:<ownerName>:<projectID>
-```
+3. **`task.project` stays as the owner-authored project string** on the CloudKit
+   payload (UI, caches, MCP, import/export depend on it), but the **local join
+   becomes scope-aware**: resolve `task → project` within the same
+   `(scope, ownerName)` namespace via `localKey`, never by bare `id` globally.
 
-For tasks:
+Add these local mirror fields to task/project/area entities:
 
-```text
-private:<taskID>
-shared:<ownerName>:<taskID>
-```
+- `localKey` — the namespaced unique above.
+- `cloudOwnerName` — owner identifier (empty/self for private).
+- `cloudScope` / `isShared` — see §6.
 
-The exact implementation depends on SwiftData constraints. If changing the
-existing unique `id` field is too invasive, add a separate shared wrapper layer
-or mirror entity. Do not assume short IDs are globally unique across iCloud
-owners.
+Migration/backfill: existing private rows get `localKey = "private:" + id`,
+`cloudScope = .privateOwned`. No CloudKit record names change; no production data
+moves. This is why the whole feature stays additive.
+
+Rejected alternative: keeping `id` globally unique and inventing a wrapper/mirror
+entity — more moving parts, and it forks the read model the whole app already
+depends on. Changing the SwiftData unique key is the smaller blast radius.
 
 This identity namespace work is a prerequisite for production-ready sharing.
 
@@ -216,13 +225,30 @@ enum CloudScope {
 }
 ```
 
-The implementation may use:
+**Decision (locked 2026-07-03): a separate `SharedCKEngine`** for
+`container.sharedCloudDatabase` — NOT one `CKEngine` generalized to own two
+`CKSyncEngine` instances.
 
-- one `CKEngine` generalized to own two `CKSyncEngine` instances, or
-- a separate `SharedCKEngine` for `container.sharedCloudDatabase`.
+Why the separate engine:
 
-Prefer the least invasive implementation that keeps private sync behavior
-unchanged.
+- The private path is the app's most critical and least-tested subsystem; a
+  separate engine keeps its behavior byte-for-byte unchanged (the hard
+  requirement below) instead of threading scope conditionals through it.
+- Separate sync-state files fall out naturally (`CKEngineState.shared.json`).
+- Scope routing lives explicitly at the outbox/mutator layer (which engine gets a
+  pending change), not as a branch buried inside one engine.
+
+Cost to control: duplicated apply/fetch plumbing. Mitigation — extract the
+record apply/encode dispatch into a shared protocol (`RecordApplying`) that both
+engines reuse, so `applyFetchedRecord` / `recordProvider` logic is written once.
+
+**Prerequisite hardening (do before Phase 2).** The current single engine
+swallows its oplock-resolution fetch failure (`CKEngine.swift` ~L573,
+`(try? await db.records(for:)) ?? [:]`) and has no backoff/circuit-breaker. A
+two-engine world doubles the surface where a silent sync failure can hide, so
+harden that path first — log the fetch error and back off instead of retrying
+with stale etags. Small (~20 LOC), but it must land before shared sync doubles
+the risk.
 
 Requirements:
 
@@ -493,25 +519,45 @@ Recommendation: do not design this until project sharing is real in dev.
 
 ---
 
-## 12. Open Questions
+## 12. Resolved Decisions (2026-07-03)
+
+Product/scope questions — decided, to build as written:
+
+- **Identity: short ID vs. namespaced local key** → both, at different layers.
+  Owner-authored short `id` for CloudKit naming + export; namespaced `localKey`
+  for SwiftData uniqueness + local joins. See §5.
+- **Shared project with no matching area (participant side)** → render under a
+  synthetic **"Shared with you"** group. Never fabricate an area row.
+- **Project notes/context shared in v1?** → **Yes.** They are fields on the
+  share-root Project record; stripping them is extra work and unexpected.
+- **Task conversations shared with collaborators?** → **No in v1.** The AI/coach
+  thread is owner-private reasoning; leaking it to a collaborator is the wrong
+  default. Omit conversation records from the shared graph; revisit later behind
+  explicit opt-in + copy. *(Judgment call — flip if collaboration is meant to
+  include the thread.)*
+- **MCP tools see shared projects?** → **No in v1.** Keeps the two-server
+  lockstep burden and the private/shared-confusion risk out of scope. MCP
+  list/create operate on private scope only; shared projects are not returned.
+- **Participant reorder / `position` stability** → participants may reorder;
+  conflicts are **last-writer-wins**. Accept reorder jitter across writers — no
+  CRDT/OT in v1 (personal-scale collaboration, not a team tool).
+- **Recently Deleted conflict behavior** → participant delete = **soft-delete
+  round-trips** (permission-gated, shared-DB write); **hard purge + restore are
+  owner-only**. See §8.
+- **Minimum macOS sharing UI** → v1 ships share **creation on iOS/iPadOS**
+  (`UICloudSharingController`); **macOS participates** (accept invite + edit),
+  with share-creation UI deferred to a fast-follow if the native macOS path needs
+  custom wrapping. *(Judgment call — revisit if macOS-first creation is required
+  at launch.)*
+
+### Empirical — the Phase 0 spike answers these (not planning gaps)
+
+These are unknowns the dev spike resolves by running code, not by more design:
 
 - Does CloudKit parent hierarchy work cleanly with the current custom zone and
   `CKSyncEngine` flow, or do shared descendants require a different save order?
-- Should shared tasks preserve owner-authored short IDs, or should the
-  participant mirror always use a namespaced local key?
-- How should shared projects appear when the participant has no matching area?
-- Are project notes/context shared with participants in v1?
-- Can participants reorder tasks, and does `position` remain stable across
-  private/shared writers?
-- Are task conversations shared with collaborators by default? For v1, probably
-  yes if the conversation lives on the task, but the UI copy must make that
-  clear.
-- Should MCP tools see shared projects? If yes, they need scope-aware IDs and
-  must not confuse private and shared records.
-- How does Recently Deleted behave for shared tasks when owner and participant
-  disagree?
-- What is the minimum macOS sharing UI that feels native if
-  `UICloudSharingController` is iOS-only?
+- Whether project→task inclusion needs explicit `parent` references or the share
+  root's hierarchy is sufficient.
 
 ---
 
