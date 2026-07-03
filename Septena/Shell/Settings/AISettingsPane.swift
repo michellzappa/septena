@@ -126,11 +126,22 @@ struct ClaudeAISettingsPane: View {
     }
   }
 
-  // The skill briefs render from SectionRegistry, which Septask doesn't
-  // compile — the section is full-app-only.
+  // Septena's pane renders every section's brief via the SettingsView
+  // destination graph; Septask compiles no SectionRegistry, so it links the
+  // task brief directly (TasksSkill, shared with TasksPlugin).
   @ViewBuilder
   private var skillsSection: some View {
-    #if !SEPTASK
+    #if SEPTASK
+    Section {
+      NavigationLink {
+        TasksSkillPane()
+      } label: {
+        Label("MCP Skills", systemImage: "book.closed")
+      }
+    } footer: {
+      Text("The brief that teaches a model how to use your tasks through the connection — tools, conventions, examples.")
+    }
+    #else
     Section {
       NavigationLink(value: SettingsView.SettingsDestination.skills) {
         Label("MCP Skills", systemImage: "book.closed")

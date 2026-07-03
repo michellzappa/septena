@@ -14,6 +14,8 @@ struct SeptaskSettingsView: View {
     case account
     case general
     case claudeAI
+    case calendar
+    case reminders
     case data
     case privacy
     case aboutSeptask
@@ -56,8 +58,17 @@ struct SeptaskSettingsView: View {
           NavigationLink(value: Destination.claudeAI) {
             row("AI & Claude", icon: "brain.head.profile", tint: 5)
           }
+          NavigationLink(value: Destination.calendar) {
+            row("Calendar", icon: "calendar", tint: 6)
+          }
+          NavigationLink(value: Destination.reminders) {
+            row("Reminders", icon: "checklist", tint: 2)
+          }
+        }
+
+        Section {
           NavigationLink(value: Destination.data) {
-            row("Data", icon: "square.and.arrow.up", tint: 1)
+            row("Sharing & Data", icon: "square.and.arrow.up", tint: 1)
           }
           NavigationLink(value: Destination.privacy) {
             row("Privacy", icon: "hand.raised", tint: 3)
@@ -133,6 +144,8 @@ struct SeptaskSettingsView: View {
     case .account:      SeptaskAccountPane()
     case .general:      SeptaskGeneralPane()
     case .claudeAI:     ClaudeAISettingsPane().navigationTitle("AI & Claude")
+    case .calendar:     CalendarDetail().navigationTitle("Calendar")
+    case .reminders:    RemindersInboxDetail().navigationTitle("Reminders")
     case .data:         SeptaskDataPane()
     case .privacy:      SeptaskPrivacyPane()
     case .aboutSeptask: SeptaskAboutPane()
@@ -258,9 +271,14 @@ private struct SeptaskDataPane: View {
       } footer: {
         Text("A one-time migration from a Things database export. Your Things data is never modified.")
       }
+      Section {
+        EmptyView()
+      } footer: {
+        Text("Task export and shareable project links are planned — they'll live here.")
+      }
     }
     .formStyle(.grouped)
-    .navigationTitle("Data")
+    .navigationTitle("Sharing & Data")
   }
 }
 

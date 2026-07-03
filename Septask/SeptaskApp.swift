@@ -73,7 +73,17 @@ struct SeptaskApp: App {
           BadgeManager.shared.start(context: localStore.container.mainContext)
           // Off the critical path, like App.swift: first frame renders from
           // the local mirror; the server pull patches it via notifications.
-          Task { await services.absorbRemoteChanges() }
+          Task {
+            await services.absorbRemoteChanges()
+            // Post-fetch reconciles, mirroring App.swift's launch task —
+            // adopt CloudKit-synced values (or push local ones up). Without
+            // these the profile name set in Septena never lands here.
+            let context = localStore.container.mainContext
+            settingsStore.reloadFromMirror(context: context)
+            settingsStore.reconcileWelcomeName(context: context, engine: services.ckEngine)
+            settingsStore.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
+            settingsStore.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
+          }
         }
         .onChange(of: scenePhase) { _, phase in
           // Foreground fetch is the reliable refresh path (push is best

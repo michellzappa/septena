@@ -76,37 +76,26 @@ struct TaskNavMenu<Trigger: View>: View {
     }
   }
 
-  /// One navigable row. The current route keeps its own glyph and gains a
-  /// checkmark *next to* it (riding at the head of the title `Text`), rather
-  /// than the checkmark replacing the glyph — so a selected area still reads as
-  /// that area, not as a bare checkmark.
+  /// One navigable row. Rendered as a `Toggle` (not a `Button`) so the current
+  /// route keeps its own glyph AND gains a checkmark *next to* it: a menu
+  /// `Toggle` draws the native selection checkmark in the leading state column,
+  /// which coexists with the `Label`'s icon — where a `Button` + `Label` can
+  /// only show a checkmark by giving up the icon slot for it. The binding is
+  /// navigation, not real two-way state: flipping a row on navigates there;
+  /// re-selecting the current (already-on) row is a no-op.
   ///
-  /// Every row is a `Label(title, systemImage:)` — same structure throughout,
-  /// on purpose. Areas use their `folder` SF Symbol here rather than their user
-  /// emoji: an emoji has to ride in the title `Text` (SF Symbols can't render
-  /// one), but a bare-`Text` row directly followed by `Label` rows gets promoted
-  /// to a centered group header by the macOS menu. Uniform `Label`s keep every
-  /// destination a normal, left-aligned item. (The sidebar still shows emoji.)
-  ///
-  /// The checkmark is an SF Symbol interpolated into the title `Text` (not a
-  /// second view in the label): `Text` + an interpolated `Image` are the menu
-  /// primitives macOS is guaranteed to render, whereas a custom multi-view menu
-  /// label is not.
+  /// Every row's label is a `Label(title, systemImage:)` — same structure
+  /// throughout, on purpose. Areas use their `folder` SF Symbol here rather than
+  /// their user emoji: an emoji has to ride in the title `Text` (SF Symbols
+  /// can't render one), but a bare-`Text` row directly followed by `Label` rows
+  /// gets promoted to a centered group header by the macOS menu. Uniform
+  /// `Label`s keep every destination a normal, left-aligned item. (The sidebar
+  /// still shows emoji.)
   @ViewBuilder
   private func destButton(_ route: Route) -> some View {
     let isCurrent = nav.path.last?.sameDestination(as: route) == true
-    Button {
-      nav.go(to: route)
-    } label: {
-      if isCurrent {
-        Label {
-          Text("\(Image(systemName: "checkmark"))  \(route.title)")
-        } icon: {
-          Image(systemName: route.icon)
-        }
-      } else {
-        Label(route.title, systemImage: route.icon)
-      }
+    Toggle(isOn: Binding(get: { isCurrent }, set: { if $0 { nav.go(to: route) } })) {
+      Label(route.title, systemImage: route.icon)
     }
   }
 }
