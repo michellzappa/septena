@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1336,
-      "date": "2026-07-03",
+      "build": 1345,
+      "date": "2026-07-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused app just for your tasks",
-          "detail": "A dedicated task app that works over the same private data as Septena, with its own tabs, quick capture, and settings.",
+          "title": "Introducing Septask, a focused task app",
+          "detail": "A dedicated, streamlined app for your to-dos on iPhone and Mac, working over the same private task data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar now shows up alongside your tasks",
-          "detail": "Today and Upcoming weave in your calendar events, with device-synced control over which calendars stay hidden.",
+          "title": "A more capable Today and task list",
+          "detail": "Group tasks into project section headings, multi-select for bulk actions, weave calendar events into Today and Upcoming, and import from a Things export.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks and undo mistakes",
-          "detail": "A Recently Deleted view keeps tasks for 30 days with restore, plus undo toasts for delete, move, and defer, and one-tap import from a Things export.",
+          "title": "Recover deleted tasks",
+          "detail": "Recently Deleted keeps removed tasks for 30 days with one-tap restore, and undo toasts cover delete, move, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Bulk actions and faster task editing",
-          "detail": "Multi-select to act on many tasks at once, rename and add tasks inline, and file them into areas and projects from suggestions.",
-          "section": "tasks"
-        },
-        {
-          "title": "Snap a photo to log a meal",
+          "title": "Snap a photo of your meal",
           "detail": "Photo-first meal capture analyzes food on-device, with an optional ingredient breakdown per meal.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly review, plus an auto-advancing rest flow that surfaces on your watch.",
+          "title": "Smarter strength training",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on sets, and an auto-advancing rest timer that continues on your watch.",
           "section": "training"
         },
         {
           "title": "Pin the goals that matter to your dashboard",
-          "detail": "Chosen goals now appear as tiles on the week dashboard, and goal-backed habits stay visible in Next after you complete them.",
+          "detail": "Any measurable goal can be pinned to the week dashboard as its own tile.",
           "section": "goals"
         },
         {
-          "title": "See exactly what's shared, and choose how much",
-          "detail": "Graded analytics levels from off to full, a plain-language checklist of what gets sent, and a log of what was sent recently.",
+          "title": "A richer wrist experience",
+          "detail": "A time-of-day sky behind a paged Next feed, tap-to-quick-add intake tiles, and long-press action drawers to complete, skip, or defer.",
+          "section": null
+        },
+        {
+          "title": "Clearer, more private analytics",
+          "detail": "Choose exactly how much you share with graded telemetry levels, and see what's been sent in a recent-activity log.",
           "section": null
         }
       ]
