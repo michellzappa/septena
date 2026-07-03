@@ -18,10 +18,39 @@ enum SeptaskTab: Hashable {
 struct SeptaskRootView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  // Read the full task environment here (all injected by SeptaskApp, so these
+  // are safe) so the modal sheets below can RE-inject it. `.sheet` normally
+  // inherits `@Observable` environment, but the quick-add path presents
+  // AddTaskPage directly (not via AddInfoSheet), and a sheet that reparents
+  // must not be left guessing — a missing object is a hard launch trap
+  // (docs/SEPTASK.md P1 env-injection note).
+  @Environment(DayClock.self) private var dayClock
+  @Environment(TaskMutator.self) private var taskMutator
+  @Environment(AreasMutator.self) private var areasMutator
+  @Environment(ProjectsMutator.self) private var projectsMutator
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(LogCommitCenter.self) private var logCommit
   @State private var selection: SeptaskTab = .today
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   #endif
+
+  /// Re-inject the whole task environment onto a presented sheet's content —
+  /// belt-and-suspenders against `@Observable` environment loss across a
+  /// presentation boundary.
+  private func withEnvironment<V: View>(_ content: V) -> some View {
+    content
+      .environment(nav)
+      .environment(theme)
+      .environment(dayClock)
+      .environment(taskMutator)
+      .environment(areasMutator)
+      .environment(projectsMutator)
+      .environment(ckEngine)
+      .environment(settingsStore)
+      .environment(logCommit)
+  }
 
   var body: some View {
     @Bindable var nav = nav
@@ -36,17 +65,17 @@ struct SeptaskRootView: View {
       .sheet(item: $nav.presentedModal) { modal in
         switch modal {
         case .quickFind:
-          QuickFindView()
+          withEnvironment(QuickFindView())
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 560, macHeight: 420)
         case .addInfo:
           // Septask's quick capture IS the task composer — no multi-section
           // palette here (the tasks-only twin of AddInfoSheet).
-          SeptaskQuickAdd()
+          withEnvironment(SeptaskQuickAdd())
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 560, macHeight: 520)
         case .keyboardShortcuts:
-          KeyboardShortcutsView()
+          withEnvironment(KeyboardShortcutsView())
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 480, macHeight: 560)
         default:

@@ -3206,7 +3206,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					1B1FB88A3182F26908EEC837 = {
-						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					2A4D1301995EEBAA1BE5D242 = {
@@ -4991,6 +4990,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5029,6 +5029,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (

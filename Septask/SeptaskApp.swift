@@ -43,8 +43,19 @@ struct SeptaskApp: App {
         .overlay { LogCommitOverlay() }
         // Dedicated Septask Settings (P3) — reached from the sidebar gear
         // (`nav.showSettings`) and ⌘, below. A sheet on both platforms.
+        // Re-inject the environment: a settings pane hosts ThingsImportView
+        // (reads the mutators) and could reparent across the sheet boundary.
         .sheet(isPresented: $navigation.showSettings) {
           SeptaskSettingsView()
+            .environment(navigation)
+            .environment(theme)
+            .environment(settingsStore)
+            .environment(services.taskMutator)
+            .environment(services.areasMutator)
+            .environment(services.projectsMutator)
+            .environment(services.ckEngine)
+            .environment(dayClock)
+            .environment(logCommit)
         }
         // One-time Septask welcome; self-gating after completion.
         .septaskWelcomeGate()
