@@ -41,6 +41,7 @@ enum ThingsImportParser {
     let hasDeadlineCol = taskColumns.contains("deadline")
     let hasDueDateCol = taskColumns.contains("dueDate")
     let hasStartDateCol = taskColumns.contains("startDate")
+    let hasHeadingCol = taskColumns.contains("heading")
 
     var areas: [ThingsAreaRecord] = []
     if reader.tableExists("TMArea") {
@@ -60,11 +61,25 @@ enum ThingsImportParser {
              todayIndex, start, \(hasStartDateCol ? "startDate" : "NULL AS startDate"),
              \(hasDeadlineCol ? "deadline" : "NULL AS deadline"),
              \(hasDueDateCol ? "dueDate" : "NULL AS dueDate"),
+             \(hasHeadingCol ? "heading" : "NULL AS heading"),
              creationDate, stopDate
       FROM TMTask
       WHERE type = 0
       """)
     var tasks = taskRows.compactMap { parseTask($0, hasDeadlineCol: hasDeadlineCol, hasDueDateCol: hasDueDateCol, hasStartDateCol: hasStartDateCol) }
+
+    // Things `type = 2` rows are project section dividers ("headings"). They
+    // carry a project FK; a task's membership is the `heading` column above.
+    // Trashed headings are filtered here (they have no completed/cancelled
+    // status the way tasks/projects do).
+    var headings: [ThingsHeadingRecord] = []
+    let includeTrashedClause = options.includeTrashed ? "" : " AND (trashed IS NULL OR trashed = 0)"
+    let headingRows = try reader.queryRows(sql: """
+      SELECT uuid, title, project, "index"
+      FROM TMTask
+      WHERE type = 2\(includeTrashedClause)
+      """)
+    headings = headingRows.compactMap { parseHeading($0) }
 
     let tagsByTask = try loadTags(reader: reader)
     let checklistByTask = try loadChecklists(reader: reader)
@@ -82,7 +97,7 @@ enum ThingsImportParser {
       throw ThingsImportError.emptyDatabase
     }
 
-    return ThingsDatabaseSnapshot(areas: areas, projects: projects, tasks: tasks)
+    return ThingsDatabaseSnapshot(areas: areas, projects: projects, tasks: tasks, headings: headings)
   }
 
   // MARK: - Row parsers
@@ -106,6 +121,16 @@ enum ThingsImportParser {
       notes: nonEmpty(row["notes"] as? String),
       status: ThingsItemStatus(rawValue: statusRaw) ?? .open,
       trashed: intValue(row["trashed"]) != 0
+    )
+  }
+
+  private static func parseHeading(_ row: [String: Any?]) -> ThingsHeadingRecord? {
+    guard let id = row["uuid"] as? String, let title = row["title"] as? String else { return nil }
+    return ThingsHeadingRecord(
+      id: id,
+      title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+      projectID: row["project"] as? String,
+      sortIndex: doubleValue(row["index"]) ?? 0
     )
   }
 
@@ -145,6 +170,7 @@ enum ThingsImportParser {
       notes: nonEmpty(row["notes"] as? String),
       areaID: row["area"] as? String,
       projectID: row["project"] as? String,
+      headingID: row["heading"] as? String,
       status: ThingsItemStatus(rawValue: statusRaw) ?? .open,
       trashed: intValue(row["trashed"]) != 0,
       sortIndex: doubleValue(row["index"]) ?? 0,

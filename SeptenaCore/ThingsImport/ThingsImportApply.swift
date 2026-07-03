@@ -25,7 +25,8 @@ enum ThingsImportApply {
     }
 
     let total = Double(
-      plan.areasToCreate.count + plan.projectsToCreate.count + plan.tasksToImport.count
+      plan.areasToCreate.count + plan.projectsToCreate.count
+        + plan.headingsToCreate.count + plan.tasksToImport.count
     )
     var done = 0.0
     func tick() {
@@ -59,6 +60,22 @@ enum ThingsImportApply {
       tick()
     }
 
+    // Headings before their member tasks so the FK resolves. Each is created
+    // fresh (createHeading mints its own id, like create does for tasks), then
+    // reordered to its Things `index` so it interleaves with tasks in order.
+    var headingSeptenaByThingsID: [String: String] = [:]
+    for heading in plan.headingsToCreate {
+      guard let created = taskMutator.createHeading(
+        title: heading.title, project: heading.projectSeptenaID) else { continue }
+      if heading.position != 0 {
+        taskMutator.reorder(id: created.id, toPosition: heading.position)
+      }
+      ThingsImportMapping.setTask(thingsID: heading.thingsID, septenaID: created.id)
+      headingSeptenaByThingsID[heading.thingsID] = created.id
+      result.headingsCreated += 1
+      tick()
+    }
+
     for task in plan.tasksToImport {
       let created = taskMutator.create(
         title: task.title,
@@ -73,6 +90,16 @@ enum ThingsImportApply {
 
       if task.position != 0 {
         taskMutator.reorder(id: created.id, toPosition: task.position)
+      }
+
+      // File under a heading — prefer one created this run, else an existing
+      // mapped heading from a prior import (idempotent re-import).
+      if let headingThingsID = task.headingThingsID {
+        let headingSeptena = headingSeptenaByThingsID[headingThingsID]
+          ?? ThingsImportMapping.taskSeptenaID(for: headingThingsID)
+        if let headingSeptena {
+          taskMutator.setHeading(id: created.id, heading: headingSeptena)
+        }
       }
 
       switch task.status {

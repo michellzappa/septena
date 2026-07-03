@@ -112,6 +112,35 @@ enum ThingsToSeptenaMapper {
       }
     }
 
+    // Headings (Things `type = 2` section dividers). A heading is a task-shaped
+    // row, so it reuses the task id-mapping table for idempotency. We only mark
+    // a heading resolvable (its members can point at it) when it maps to a live
+    // Septena row or is scheduled for creation this run.
+    var headingsToCreate: [ThingsPlannedHeading] = []
+    var resolvableHeadingIDs = Set<String>()   // Things heading uuids we can file under
+    for heading in snapshot.headings {
+      // A heading without a resolvable project can't be created — its members
+      // fall back to the project's un-headed block (or Inbox). No data lost.
+      guard let projectSeptena = heading.projectID.flatMap({ projectMap[$0] }) else { continue }
+
+      if let mapped = ThingsImportMapping.taskSeptenaID(for: heading.id) {
+        if existing.liveTaskSeptenaIDs.contains(mapped) {
+          resolvableHeadingIDs.insert(heading.id)   // already imported & live — reuse
+          continue
+        }
+        if existing.deletedMappedThingsTaskIDs.contains(heading.id), !options.reimportDeleted {
+          continue   // deleted since last import and not re-importing — skip
+        }
+      }
+
+      headingsToCreate.append(ThingsPlannedHeading(
+        thingsID: heading.id,
+        title: heading.title,
+        projectSeptenaID: projectSeptena,
+        position: heading.sortIndex))
+      resolvableHeadingIDs.insert(heading.id)
+    }
+
     // Tasks
     var tasksToImport: [ThingsPlannedTask] = []
     var skippedDuplicates = 0
@@ -131,6 +160,11 @@ enum ThingsToSeptenaMapper {
 
       let areaSeptena = task.projectID == nil ? task.areaID.flatMap { areaMap[$0] } : nil
       let projectSeptena = task.projectID.flatMap { projectMap[$0] }
+      // File under a heading only when the project resolved (a heading always
+      // lives in a project) and the heading itself is resolvable this run.
+      let headingThingsID = (projectSeptena != nil)
+        ? task.headingID.flatMap { resolvableHeadingIDs.contains($0) ? $0 : nil }
+        : nil
 
       var notes = task.notes
       if options.appendTagsToNotes, !task.tags.isEmpty {
@@ -156,6 +190,7 @@ enum ThingsToSeptenaMapper {
         notes: notes,
         areaSeptenaID: areaSeptena,
         projectSeptenaID: projectSeptena,
+        headingThingsID: headingThingsID,
         today: task.today,
         scheduled: task.scheduled,
         deadline: task.deadline,
@@ -176,7 +211,8 @@ enum ThingsToSeptenaMapper {
       skippedDuplicates: skippedDuplicates,
       viewCounts: viewCounts,
       areaIDByThingsID: areaMap,
-      projectIDByThingsID: projectMap
+      projectIDByThingsID: projectMap,
+      headingsToCreate: headingsToCreate
     )
   }
 

@@ -9,6 +9,10 @@ struct ThingsDatabaseSnapshot: Sendable {
   var areas: [ThingsAreaRecord]
   var projects: [ThingsProjectRecord]
   var tasks: [ThingsTaskRecord]
+  /// Things `type = 2` rows — section dividers inside a project. Map to Septena
+  /// headings (`TaskEntity.kind == "heading"`). Defaulted so call sites (and
+  /// tests) that predate heading support keep compiling.
+  var headings: [ThingsHeadingRecord] = []
 }
 
 struct ThingsAreaRecord: Sendable, Identifiable, Hashable {
@@ -26,12 +30,25 @@ struct ThingsProjectRecord: Sendable, Identifiable, Hashable {
   var trashed: Bool
 }
 
+/// A Things `type = 2` section-divider row. Carries a project FK; member tasks
+/// reference it via their `heading` column (see `ThingsTaskRecord.headingID`).
+struct ThingsHeadingRecord: Sendable, Identifiable, Hashable {
+  var id: String            // Things uuid
+  var title: String
+  var projectID: String?    // owning project (Things uuid)
+  /// Things manual order (`index` column) — shared with tasks in the project.
+  var sortIndex: Double
+}
+
 struct ThingsTaskRecord: Sendable, Identifiable, Hashable {
   var id: String
   var title: String
   var notes: String?
   var areaID: String?
   var projectID: String?
+  /// Owning heading (Things `heading` column → a `type = 2` row's uuid), or nil.
+  /// Defaulted so pre-heading call sites (and tests) keep compiling.
+  var headingID: String? = nil
   var status: ThingsItemStatus
   var trashed: Bool
   /// Things manual order (`index` column).
@@ -100,6 +117,10 @@ struct ThingsImportPlan: Sendable {
   var areaIDByThingsID: [String: String]
   /// Every Things project uuid → resolved Septena id (includes merges).
   var projectIDByThingsID: [String: String]
+  /// Section-divider rows to create (order preserved via `position`). Member
+  /// tasks reference them by Things uuid (`ThingsPlannedTask.headingThingsID`),
+  /// resolved to the created Septena id at apply time.
+  var headingsToCreate: [ThingsPlannedHeading]
 }
 
 struct ThingsPlannedArea: Sendable, Hashable {
@@ -119,12 +140,25 @@ struct ThingsPlannedProject: Sendable, Hashable {
   let isMerge: Bool
 }
 
+struct ThingsPlannedHeading: Sendable, Hashable {
+  let thingsID: String
+  let title: String
+  let projectSeptenaID: String
+  /// Things manual order (`index`) — applied via `reorder`, exactly like tasks.
+  let position: Double
+}
+
 struct ThingsPlannedTask: Sendable, Hashable {
   let thingsID: String
   let title: String
   let notes: String?
   let areaSeptenaID: String?
   let projectSeptenaID: String?
+  /// Owning heading, as a Things uuid — resolved to the created Septena heading
+  /// id at apply time (headings get their ids from `createHeading`, like tasks
+  /// get theirs from `create`). Nil when the task isn't filed under a heading
+  /// or its heading couldn't be resolved (e.g. the project was skipped).
+  let headingThingsID: String?
   let today: Bool
   let scheduled: Date?
   let deadline: Date?
@@ -162,6 +196,7 @@ struct ThingsImportApplyResult: Sendable {
   var areasMerged = 0
   var projectsCreated = 0
   var projectsMerged = 0
+  var headingsCreated = 0
   var tasksImported = 0
   var tasksSkipped = 0
 }

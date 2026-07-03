@@ -46,6 +46,81 @@ import Foundation
     #expect(with.tasks[0].status == .completed)
   }
 
+  @Test func parserReadsHeadingsAndMembership() throws {
+    let dbURL = try ThingsImportTestFixtures.makeTemporaryDatabase(
+      projects: [(id: "proj-1", title: "Renovation", areaID: nil)],
+      tasks: [(id: "task-1", title: "Buy paint", areaID: nil, projectID: "proj-1", status: 0, today: false)],
+      headings: [(id: "head-1", title: "Kitchen", projectID: "proj-1", index: 5)],
+      taskHeadings: ["task-1": "head-1"]
+    )
+    defer { try? FileManager.default.removeItem(at: dbURL.deletingLastPathComponent()) }
+
+    let snapshot = try ThingsImportParser.parse(databaseURL: dbURL, options: ThingsImportOptions(), copyToScratchpad: false)
+    #expect(snapshot.headings.count == 1)
+    #expect(snapshot.headings[0].title == "Kitchen")
+    #expect(snapshot.headings[0].projectID == "proj-1")
+    #expect(snapshot.headings[0].sortIndex == 5)
+    #expect(snapshot.tasks.count == 1)   // the type=2 row is NOT a task
+    #expect(snapshot.tasks[0].headingID == "head-1")
+  }
+
+  @Test func mapperPlansHeadingsAndFilesMembers() {
+    ThingsImportMapping.resetAll()
+    defer { ThingsImportMapping.resetAll() }
+
+    let snapshot = ThingsDatabaseSnapshot(
+      areas: [],
+      projects: [ThingsProjectRecord(
+        id: "proj-1", title: "Renovation", areaID: nil, notes: nil, status: .open, trashed: false)],
+      tasks: [ThingsTaskRecord(
+        id: "task-1", title: "Buy paint", notes: nil, areaID: nil, projectID: "proj-1",
+        headingID: "head-1", status: .open, trashed: false, sortIndex: 1, today: false,
+        scheduled: nil, deadline: nil, created: nil, completedAt: nil, tags: [], checklistLines: []
+      )],
+      headings: [ThingsHeadingRecord(id: "head-1", title: "Kitchen", projectID: "proj-1", sortIndex: 5)]
+    )
+    let plan = ThingsToSeptenaMapper.buildPlan(
+      snapshot: snapshot,
+      existing: .init(areas: [], projects: [], liveTaskSeptenaIDs: [], deletedMappedThingsTaskIDs: []),
+      options: ThingsImportOptions(),
+      idGenerator: { "projid" }
+    )
+
+    #expect(plan.headingsToCreate.count == 1)
+    #expect(plan.headingsToCreate[0].thingsID == "head-1")
+    #expect(plan.headingsToCreate[0].projectSeptenaID == "projid")
+    #expect(plan.headingsToCreate[0].position == 5)
+    #expect(plan.tasksToImport.count == 1)
+    #expect(plan.tasksToImport[0].headingThingsID == "head-1")
+  }
+
+  @Test func mapperDropsHeadingWhenProjectUnresolved() {
+    ThingsImportMapping.resetAll()
+    defer { ThingsImportMapping.resetAll() }
+
+    // Heading references a project that isn't in the snapshot → un-creatable.
+    // Its member task survives, just without a heading FK (no data lost).
+    let snapshot = ThingsDatabaseSnapshot(
+      areas: [],
+      projects: [],
+      tasks: [ThingsTaskRecord(
+        id: "task-1", title: "Loose", notes: nil, areaID: nil, projectID: nil,
+        headingID: "head-1", status: .open, trashed: false, sortIndex: 0, today: false,
+        scheduled: nil, deadline: nil, created: nil, completedAt: nil, tags: [], checklistLines: []
+      )],
+      headings: [ThingsHeadingRecord(id: "head-1", title: "Orphan", projectID: "missing", sortIndex: 0)]
+    )
+    let plan = ThingsToSeptenaMapper.buildPlan(
+      snapshot: snapshot,
+      existing: .init(areas: [], projects: [], liveTaskSeptenaIDs: [], deletedMappedThingsTaskIDs: []),
+      options: ThingsImportOptions()
+    )
+
+    #expect(plan.headingsToCreate.isEmpty)
+    #expect(plan.tasksToImport.count == 1)
+    #expect(plan.tasksToImport[0].headingThingsID == nil)
+  }
+
   @Test func mapperMergesAreaByTitle() {
     ThingsImportMapping.resetAll()
     defer { ThingsImportMapping.resetAll() }

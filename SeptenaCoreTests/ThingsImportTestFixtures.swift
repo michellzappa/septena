@@ -7,7 +7,10 @@ enum ThingsImportTestFixtures {
   static func makeTemporaryDatabase(
     areas: [(id: String, title: String)] = [],
     projects: [(id: String, title: String, areaID: String?)] = [],
-    tasks: [(id: String, title: String, areaID: String?, projectID: String?, status: Int, today: Bool)] = []
+    tasks: [(id: String, title: String, areaID: String?, projectID: String?, status: Int, today: Bool)] = [],
+    headings: [(id: String, title: String, projectID: String, index: Double)] = [],
+    // taskID → owning heading uuid (writes the `heading` column on that task row)
+    taskHeadings: [String: String] = [:]
   ) throws -> URL {
     let dir = FileManager.default.temporaryDirectory
       .appendingPathComponent("things-import-test-\(UUID().uuidString)", isDirectory: true)
@@ -24,7 +27,7 @@ enum ThingsImportTestFixtures {
       CREATE TABLE TMArea (uuid TEXT PRIMARY KEY, title TEXT, trashed INTEGER DEFAULT 0);
       CREATE TABLE TMTask (
         uuid TEXT PRIMARY KEY, title TEXT, type INTEGER, notes TEXT,
-        area TEXT, project TEXT, status INTEGER DEFAULT 0, trashed INTEGER DEFAULT 0,
+        area TEXT, project TEXT, heading TEXT, status INTEGER DEFAULT 0, trashed INTEGER DEFAULT 0,
         "index" REAL DEFAULT 0, todayIndex INTEGER DEFAULT 0, start INTEGER DEFAULT 0,
         startDate INTEGER, deadline INTEGER, dueDate REAL,
         creationDate REAL, stopDate REAL
@@ -44,13 +47,20 @@ enum ThingsImportTestFixtures {
         VALUES ('\(project.id)', '\(sqlEscape(project.title))', 1, \(area), 0);
         """)
     }
+    for heading in headings {
+      try exec(db, """
+        INSERT INTO TMTask (uuid, title, type, project, status, "index")
+        VALUES ('\(heading.id)', '\(sqlEscape(heading.title))', 2, '\(heading.projectID)', 0, \(heading.index));
+        """)
+    }
     for task in tasks {
       let area = task.areaID.map { "'\($0)'" } ?? "NULL"
       let project = task.projectID.map { "'\($0)'" } ?? "NULL"
+      let heading = taskHeadings[task.id].map { "'\($0)'" } ?? "NULL"
       let todayIndex = task.today ? 1 : 0
       try exec(db, """
-        INSERT INTO TMTask (uuid, title, type, area, project, status, todayIndex)
-        VALUES ('\(task.id)', '\(sqlEscape(task.title))', 0, \(area), \(project), \(task.status), \(todayIndex));
+        INSERT INTO TMTask (uuid, title, type, area, project, heading, status, todayIndex)
+        VALUES ('\(task.id)', '\(sqlEscape(task.title))', 0, \(area), \(project), \(heading), \(task.status), \(todayIndex));
         """)
     }
 
