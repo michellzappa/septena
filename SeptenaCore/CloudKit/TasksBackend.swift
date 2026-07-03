@@ -51,6 +51,11 @@ protocol TasksBackend: AnyObject {
   /// caller computes the value as the midpoint of the new neighbours' order
   /// keys; we just persist + sync it.
   func reorder(id: String, toPosition position: Double)
+  /// Create a project section-divider "heading" (see `TaskEntity.isHeading`).
+  @discardableResult
+  func createHeading(title: String, project: String, atTop: Bool) -> SeptenaTask
+  /// File a task under a heading (`heading = headingID`) or clear it (`nil`).
+  func setHeading(id: String, heading: String?)
 }
 
 // MARK: - CloudKit backend
@@ -328,6 +333,11 @@ final class CloudKitTasksBackend: TasksBackend {
   /// no server record to keep, so it's purged outright.
   func delete(id: String) {
     guard let entity = fetch(id: id) else { return }
+    // Deleting a heading dissolves it: members are re-parented to the un-headed
+    // block first (their tasks survive), then the divider row itself trashes.
+    if entity.isHeading {
+      dissolveHeadingMembers(headingID: id)
+    }
     if entity.cloudKitSystemFields == nil {
       purge(id: id)   // never pushed — nothing to keep
       return
@@ -473,6 +483,11 @@ final class CloudKitTasksBackend: TasksBackend {
     }
     entity.pendingSync = true
     commitAndPush(entity, op: "moveToProject")
+    // A heading takes its section with it — re-home the members so they don't
+    // strand in the old project (see `rehomeHeadingMembers`).
+    if entity.isHeading {
+      rehomeHeadingMembers(headingID: id, toProject: project)
+    }
   }
 
   func reorder(id: String, toPosition position: Double) {
@@ -480,5 +495,76 @@ final class CloudKitTasksBackend: TasksBackend {
     entity.position = position
     entity.pendingSync = true
     commitAndPush(entity, op: "reorder")
+  }
+
+  // MARK: Headings (project section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)
+
+  /// Create a section-divider row inside a project. Modelled as a `TaskEntity`
+  /// with `kind == "heading"` so it inherits sync / `position` order / drag for
+  /// free, but it's excluded from every task feed, count, and badge (see
+  /// `TaskEntity.isHeading`). Appends to the foot of the project by default —
+  /// "New heading" adds a fresh section at the bottom; pass `atTop` to prepend.
+  @discardableResult
+  func createHeading(title: String, project: String, atTop: Bool = false) -> SeptenaTask {
+    let id = uniqueTaskID()
+    let position = atTop
+      ? TaskOrder.topPosition(in: context)
+      : TaskOrder.bottomPosition(in: context)
+    let entity = TaskEntity(
+      id: id,
+      title: title,
+      statusRaw: TaskStatus.open.rawValue,
+      created: SeptenaDate.today,
+      project: project,
+      position: position,
+      pendingSync: true,
+      source: TaskSource.app,
+      sourceClient: currentAppClientLabel,
+      createdAt: Date(),
+      kind: TaskKind.heading
+    )
+    context.insert(entity)
+    commitAndPush(entity, op: "createHeading")
+    return SeptenaTask(entity)
+  }
+
+  /// File a task under a heading (`heading = headingID`) or out of one (`nil`).
+  /// Membership is a plain FK — dragging the heading later moves only its own
+  /// row; its members render beneath it wherever it lands, by construction.
+  func setHeading(id: String, heading: String?) {
+    guard let entity = fetch(id: id) else { return }
+    entity.heading = heading
+    entity.pendingSync = true
+    commitAndPush(entity, op: "setHeading")
+  }
+
+  /// Re-parent every task filed under `headingID` back to the un-headed block
+  /// (`heading = nil`). Used when a heading is deleted — the divider goes, the
+  /// tasks stay (section-invariant spirit: deleting structure never deletes
+  /// user data).
+  private func dissolveHeadingMembers(headingID: String) {
+    let members = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.heading == headingID && $0.deletedAt == nil }
+    ))) ?? []
+    for m in members {
+      m.heading = nil
+      m.pendingSync = true
+      commitAndPush(m, op: "dissolveHeading.member")
+    }
+  }
+
+  /// A heading carries its section with it — when it moves to another project,
+  /// re-home its members' `project` (and clear their `area`) so they stay
+  /// beneath it in the new home.
+  private func rehomeHeadingMembers(headingID: String, toProject project: String?) {
+    let members = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.heading == headingID && $0.deletedAt == nil }
+    ))) ?? []
+    for m in members {
+      m.project = project
+      if project != nil { m.area = nil }
+      m.pendingSync = true
+      commitAndPush(m, op: "moveHeading.member")
+    }
   }
 }

@@ -9,7 +9,7 @@ Tracked work, not urgent. Ordered loosely by appeal, not priority.
 ## Lists
 
 - **Logbook grouped by completion date** — Today / Yesterday / This Week / Earlier headers in the Logbook view.
-- **Project headings** — manual section dividers inside a project (not a sort; preserves manual order). Requires a `Heading` model alongside tasks in the project's ordered children. Defer until a real project asks for it.
+- ~~**Project headings** — manual section dividers inside a project~~ — **SHIPPED** (P3 of `docs/ORDERING_AND_HEADINGS_PLAN.md`): headings are `TaskEntity` rows with `kind == "heading"`, rendered as grouped sections in project detail, excluded from every other surface. Only leftover: mapping *Things'* native headings on import (see that plan's "Remaining").
 
 ## Data model (deferred)
 

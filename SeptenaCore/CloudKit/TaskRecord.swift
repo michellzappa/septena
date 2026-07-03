@@ -61,6 +61,14 @@ static let createdAt = "createdAt"
     /// this absent. See `TaskOrder`.
 static let position = "position"
 
+    /// Row shape. STRING, additive. `"heading"` marks a project section
+    /// divider; ordinary tasks leave it absent (never author an empty string).
+    /// See `TaskKind` / `TaskEntity.isHeading`.
+static let kind = "kind"
+    /// FK to the owning heading's id for a task filed under one. STRING,
+    /// additive. Absent for un-headed tasks and heading rows.
+static let heading = "heading"
+
     // Over-provisioned for schema flexibility post-Production deploy.
     // Adding fields later is allowed but slow to roll out; renaming /
     // retyping is impossible. Reserve a few slots now so we can absorb
@@ -128,6 +136,15 @@ extension TaskEntity: CloudKitSystemFieldsBacked {
       record[TaskCloudKitSchema.Field.position] = position
     }
 
+    // Row shape + heading membership. Conditional so ordinary un-headed tasks
+    // never author these fields — only headings and tasks filed under one do
+    // (mirrors the `position`/`conversationJSON` conditional-write pattern, and
+    // keeps the additive prod deploy clean).
+    if kind == TaskKind.heading {
+      record[TaskCloudKitSchema.Field.kind] = kind
+    }
+    record[TaskCloudKitSchema.Field.heading] = heading
+
     // Recently-Deleted marker. `deletedAt` rides the already-deployed
     // `reservedString1` field so soft-delete syncs across devices with no
     // schema deploy (docs/RECENTLY_DELETED_SPEC.md). A trashed task's record
@@ -177,6 +194,13 @@ func apply(_ record: CKRecord) {
     // Manual order. Absent on un-dragged rows (and gateway-authored ones) →
     // leave at 0 so the createdAt fallback orders them.
     if let v = record[TaskCloudKitSchema.Field.position] as? Double { position = v }
+
+    // Row shape + heading membership. Absent on ordinary tasks (and on rows
+    // authored before the schema learned these fields) → default to task /
+    // un-headed. Mirror `heading` directly (including clearing it when the
+    // remote value is absent) so re-filing on another device propagates.
+    kind = optionalTaskString(record[TaskCloudKitSchema.Field.kind]) ?? ""
+    heading = optionalTaskString(record[TaskCloudKitSchema.Field.heading])
 
     // Recently-Deleted marker (rides `reservedString1`). Mirror it directly —
     // including clearing it on restore, when the remote value is absent — so a

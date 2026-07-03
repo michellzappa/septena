@@ -90,6 +90,17 @@ final class TaskEntity {
   /// insert; `.distantPast` only on pre-migration rows. Drives the agent-cue
   /// decay window.
   var createdAt: Date = Date.distantPast
+  /// Row *shape* (`TaskKind`). `""`/absent = an ordinary task; `"heading"` =
+  /// a section divider inside a project. A heading is modelled as a task so it
+  /// inherits sync / `position` order / drag for free, but it must be excluded
+  /// from every task feed, list, count, and badge — read `isHeading`, never the
+  /// raw string. Additive CloudKit field, conditional write.
+  var kind: String = ""
+  /// For a member task filed under a heading: the heading task's `id` (a FK).
+  /// nil for un-headed tasks and for heading rows themselves. Dragging a
+  /// heading moves only its own row; members render under it wherever it lands
+  /// by construction. Additive CloudKit field, conditional write.
+  var heading: String?
 
   init(id: String,
        title: String,
@@ -118,7 +129,9 @@ final class TaskEntity {
        source: String? = nil,
        sourceClient: String? = nil,
        acknowledgedAt: Date? = nil,
-       createdAt: Date = Date.distantPast) {
+       createdAt: Date = Date.distantPast,
+       kind: String = "",
+       heading: String? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -147,7 +160,14 @@ final class TaskEntity {
     self.sourceClient = sourceClient
     self.acknowledgedAt = acknowledgedAt
     self.createdAt = createdAt
+    self.kind = kind
+    self.heading = heading
   }
+
+  /// True when this row is a project section divider, not a to-do. The single
+  /// read point — every feed/count/list gates on this so headings never leak
+  /// out of a project's detail view (see `TaskKind`).
+  var isHeading: Bool { kind == TaskKind.heading }
 
   var status: TaskStatus {
     get { TaskStatus(rawValue: statusRaw) ?? .open }
@@ -163,7 +183,7 @@ final class TaskEntity {
   /// only the body of this one property changes. Centralized here so the
   /// `.today` filter (and anything else) reads from a single source.
   var isOnToday: Bool {
-    guard status == .open else { return false }
+    guard status == .open, !isHeading else { return false }
     if today { return true }
     if let s = scheduled, s <= SeptenaDate.today { return true }
     if let d = deadline, d <= SeptenaDate.today { return true }
@@ -180,7 +200,7 @@ final class TaskEntity {
   /// `SeptenaTask.isInTriageBand`; keep the two in lockstep. The agent arm
   /// reuses the same predicate as `showsAgentCue` so band == cue for agent rows.
   var isInTriageBand: Bool {
-    guard status == .open else { return false }
+    guard status == .open, !isHeading else { return false }
     if source == TaskSource.mcp {
       guard acknowledgedAt == nil, createdAt != .distantPast else { return false }
       return Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
@@ -1658,6 +1678,8 @@ extension SeptenaTask {
     createdAt = e.createdAt
     position = e.position
     conversation = e.conversation
+    kind = e.kind
+    heading = e.heading
   }
 
   /// Manual-order sort key — see `TaskOrder.key`.
@@ -3538,10 +3560,12 @@ enum LocalCache {
   }
 
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
+  /// Headings are dividers, not to-dos: excluded so they never inflate any
+  /// count or aggregate (see `TaskEntity.isHeading`).
   @MainActor
   static func liveTasks(in context: ModelContext) -> [SeptenaTask] {
     liveEntities(in: context)
-      .filter { !$0.pendingDeletion }
+      .filter { !$0.pendingDeletion && !$0.isHeading }
       .map(SeptenaTask.init)
   }
 
@@ -3551,21 +3575,41 @@ enum LocalCache {
   static func trainingTasks(in context: ModelContext) -> [SeptenaTask] {
     liveEntities(in: context)
       .filter {
-        !$0.pendingDeletion && $0.status != .cancelled &&
+        !$0.pendingDeletion && !$0.isHeading && $0.status != .cancelled &&
         ($0.area != nil || $0.project != nil)
       }
       .map(SeptenaTask.init)
   }
 
   /// Tasks filed in a project — project progress glyphs without scanning the
-  /// full logbook.
+  /// full logbook. Excludes heading dividers so they don't count toward a
+  /// project's done/total.
   @MainActor
   static func tasksWithProject(in context: ModelContext) -> [SeptenaTask] {
     (try? context.fetch(FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
-        e.deletedAt == nil && !e.pendingDeletion && e.project != nil
+        e.deletedAt == nil && !e.pendingDeletion
+          && e.project != nil && e.kind != "heading"
       }
     )))?.map(SeptenaTask.init) ?? []
+  }
+
+  /// The section-divider "heading" rows filed in a project, in manual order
+  /// (`TaskOrder.key`). The ONE place headings are surfaced — the project
+  /// detail view partitions its tasks under these. Every other read excludes
+  /// them (see `convert`). Open rows only; a soft-deleted heading is gone.
+  @MainActor
+  static func headings(inProject projectId: String,
+                       in context: ModelContext) -> [SeptenaTask] {
+    (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion
+          && e.project == projectId && e.kind == "heading"
+      }
+    )))?
+      .sorted { TaskOrder.key($0) != TaskOrder.key($1)
+                  ? TaskOrder.key($0) < TaskOrder.key($1) : $0.id < $1.id }
+      .map(SeptenaTask.init) ?? []
   }
 
   /// Predicate-narrowed fetch for each list filter. Open smart lists still
@@ -3654,6 +3698,12 @@ enum LocalCache {
     // either confirm the deletion (row removed) or resurrect them if
     // the server rejects.
     if e.pendingDeletion { return nil }
+    // Headings are project section dividers, not to-dos — they must never
+    // surface in ANY task list, count, feed, or badge (only in a project's
+    // grouped detail view, which reads them via `headings(inProject:)`). This
+    // is the single shared exclusion the plan calls for; every filter funnels
+    // through here. See `TaskKind` / `TaskEntity.isHeading`.
+    if e.isHeading { return nil }
     // Recently Deleted view: show ONLY soft-deleted rows (the inverse of all
     // other filters). Return early before the `deletedAt != nil` guard below.
     if filter == .recentlyDeleted {

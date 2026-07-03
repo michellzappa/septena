@@ -110,8 +110,9 @@ final class SpotlightIndexer {
     if SettingsMirror.showInSpotlight("tasks", context: context) {
       let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
       // Recently-Deleted tasks must drop out of Spotlight (reconcile then prunes
-      // any previously-indexed trashed row).
-      entities = rows.filter { $0.deletedAt == nil }
+      // any previously-indexed trashed row). Project headings aren't to-dos, so
+      // they never get indexed either (see `TaskEntity.isHeading`).
+      entities = rows.filter { $0.deletedAt == nil && !$0.isHeading }
                      .map { TaskChoice(id: $0.id, title: $0.title, notes: $0.notes) }
     } else {
       entities = []

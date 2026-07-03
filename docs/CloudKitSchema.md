@@ -64,6 +64,7 @@ promoted to Prod unless the Console already shows them):
 | 11 | **New record type** `Quote` (whole type, 4 fields — user-added + Readwise-imported daily-message lines for the optional dashboard footer) | `Quote` | all | — |
 | 12 | **New record types** for the generalized **Intake** section (replaces retired caffeine/cannabis types — consumables purge 2026-06-12) | `IntakeKind`, `IntakeItem`, `IntakeEvent` | all | — |
 | 13 | **New field** `reservedString1` on `Project` + `reservedString2` on `Area` — carry the JSON-encoded `AreaAttachment` (the one read-only context feed: repo/calendar/feed pointer). First write of these reserved slots. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
+| 14 | **New fields** `kind` + `heading` — project section dividers ("headings"). `kind == "heading"` marks a divider row (a `Task` record); `heading` is the FK from a member task to its divider. Both conditional-write. See `TaskKind`. | `Task` | `kind` / `heading` | String |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -185,6 +186,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `acknowledgedAt` | Timestamp | `Date?` | Yes | |
 | `createdAt` | Timestamp | `Date` | conditional | written only when `!= .distantPast` (sentinel guard) |
 | `position` | Double | `Double` | conditional | manual drag order; written only when `!= 0` |
+| `kind` | String | `String` (`kind`) | conditional | row shape; `"heading"` = project section divider, else absent. Written only when `== "heading"`. See `TaskKind` |
+| `heading` | String | `String?` (`heading`) | Yes | FK to owning heading's `id` for a task filed under one; absent otherwise |
 | `parentTaskId`, `remindAt`, `reservedDate1`, `reservedDate2`, `reservedString1`, `reservedInt1` | — | reserved | — | over-provisioned slots; never encoded/decoded |
 
 #### Area  — recordName `area:{id}`

@@ -47,7 +47,10 @@ enum TasksPlugin: SectionPlugin {
         ]),
       ],
       collect: { ctx in
+        // Headings are project section dividers, not to-dos — don't export
+        // them as tasks (see `TaskEntity.isHeading`).
         let tasks    = try ctx.fetch(FetchDescriptor<TaskEntity>())
+                          .filter { !$0.isHeading }
         let projects = try ctx.fetch(FetchDescriptor<ProjectEntity>())
         let areas    = try ctx.fetch(FetchDescriptor<AreaEntity>())
         return [

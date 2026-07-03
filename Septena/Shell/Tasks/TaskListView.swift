@@ -228,6 +228,15 @@ struct TaskListView: View {
     case project(String)
   }
   @State private var quickAddGroupTarget: QuickAddGroupTarget?
+  /// Project section dividers ("headings"). A pending create (into this
+  /// project id), a pending rename (this heading), and a pending delete
+  /// (this heading, dissolving its members). All routed through standard
+  /// `.alert` / `.confirmationDialog` — no inline-TextField-in-List (the macOS
+  /// selectable-row focus trap). See docs/ORDERING_AND_HEADINGS_PLAN.md.
+  @State private var headingCreateProject: String?
+  @State private var headingRenameTarget: SeptenaTask?
+  @State private var headingDeleteTarget: SeptenaTask?
+  @State private var headingDraftTitle: String = ""
   /// Shared namespace for the title hero-glide: the closed row's title and the
   /// open inline editor's title field carry the same `matchedGeometryEffect` id,
   /// so on expand/collapse the title moves between the two positions instead of
@@ -538,6 +547,44 @@ struct TaskListView: View {
       Button("OK", role: .cancel) { errorMessage = nil }
     } message: {
       Text(errorMessage ?? "")
+    }
+    // Section (heading) create — a standard alert TextField, never an inline
+    // row field (the macOS selectable-List focus trap). See ORDERING_AND_HEADINGS_PLAN.
+    .alert("New Section", isPresented: Binding(
+      get: { headingCreateProject != nil },
+      set: { if !$0 { headingCreateProject = nil } }
+    )) {
+      TextField("Section name", text: $headingDraftTitle)
+      Button("Add") {
+        if let pid = headingCreateProject { commitHeadingCreate(title: headingDraftTitle, project: pid) }
+        headingCreateProject = nil
+      }
+      Button("Cancel", role: .cancel) { headingCreateProject = nil }
+    }
+    .alert("Rename Section", isPresented: Binding(
+      get: { headingRenameTarget != nil },
+      set: { if !$0 { headingRenameTarget = nil } }
+    )) {
+      TextField("Section name", text: $headingDraftTitle)
+      Button("Rename") {
+        if let h = headingRenameTarget { commitHeadingRename(h, title: headingDraftTitle) }
+        headingRenameTarget = nil
+      }
+      Button("Cancel", role: .cancel) { headingRenameTarget = nil }
+    }
+    .confirmationDialog(
+      "Delete this section? Its tasks stay in the project.",
+      isPresented: Binding(
+        get: { headingDeleteTarget != nil },
+        set: { if !$0 { headingDeleteTarget = nil } }
+      ),
+      titleVisibility: .visible
+    ) {
+      Button("Delete Section", role: .destructive) {
+        if let h = headingDeleteTarget { mutator.delete(id: h.id); Task { await load() } }
+        headingDeleteTarget = nil
+      }
+      Button("Cancel", role: .cancel) { headingDeleteTarget = nil }
     }
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
@@ -1001,7 +1048,13 @@ struct TaskListView: View {
 
   /// Return / double-click(Mac) / tap(touch) on a row → open it for editing.
   /// Multi-select has no single primary action, so Return no-ops there.
+  ///
+  /// The quick-add "New task" row is a selectable row too (see `quickAddLine`):
+  /// activating it spawns a fresh draft and opens its inline editor — the DRY
+  /// twin of clicking the row, so keyboard (Return) and pointer (double-click /
+  /// tap) share one path.
   private func activateRow(_ id: String) {
+    if id == Self.quickAddScrollID { startCreate(); return }
     guard selection.count <= 1 else { return }
     guard let task = currentTask(id: id) else { return }
     beginEdit(task)
@@ -1180,6 +1233,9 @@ struct TaskListView: View {
       groupedUpcomingItems
     case .recentlyDeleted:
       visibleRows
+    case .project:
+      reviewRows
+      projectGroupedRows
     default:
       reviewRows
       visibleRows
@@ -1247,9 +1303,13 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
-    // Today with an empty day still shows the Inbox card + quick-add — no
-    // redundant "Nothing here yet" under it.
-    if showsEmptyTaskList && !(filter == .today && allowsInlineCreate) {
+    // A creatable list that's empty already offers a "New task" line (Today's
+    // Inbox card, or the top quick-add on a project / area) — the big "Nothing
+    // here yet" card under it is redundant, and on an area that only holds
+    // projects it's plain wrong (the area isn't empty). Show the empty state
+    // only where there's no inline capture affordance (Logbook, Recently
+    // Deleted, Upcoming).
+    if showsEmptyTaskList && !allowsInlineCreate {
       if filter == .recentlyDeleted {
         ContentUnavailableView(
           "No Recently Deleted Tasks",
@@ -1334,6 +1394,210 @@ struct TaskListView: View {
     return true
   }
 
+  // MARK: - Project headings (section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)
+
+  /// The section-divider rows for the current project, in manual order. Empty
+  /// for every non-project filter (headings only live inside a project).
+  private var projectHeadingList: [SeptenaTask] {
+    guard case .project(let pid) = filter else { return [] }
+    return LocalCache.headings(inProject: pid, in: LocalStore.shared.container.mainContext)
+  }
+
+  private var projectHeadingIds: Set<String> { Set(projectHeadingList.map(\.id)) }
+
+  /// Project detail, partitioned by heading: the un-headed block first (with
+  /// the foot quick-add), then each heading as a divider row followed by its
+  /// member tasks. Tasks whose `heading` points at a since-deleted divider fall
+  /// back into the un-headed block. Headings never appear anywhere else (see
+  /// `TaskEntity.isHeading`).
+  @ViewBuilder
+  private var projectGroupedRows: some View {
+    let headings = projectHeadingList
+    let headingIds = Set(headings.map(\.id))
+    let unheaded = visibleItems.filter { t in
+      guard let h = t.heading else { return true }
+      return !headingIds.contains(h)
+    }
+    cardedRows(unheaded,
+               quickMenu: { filingSuggestions[$0.id] != nil },
+               appendQuickAdd: attachesQuickAddToVisibleCard,
+               reorderable: true,
+               grouped: true)
+    ForEach(headings) { heading in
+      headingRow(heading)
+      let members = visibleItems.filter { $0.heading == heading.id }
+      cardedRows(members, reorderable: true, grouped: true)
+    }
+    addSectionButton
+  }
+
+  /// A section-divider row: the heading title styled like a group header, but a
+  /// real draggable row + drop target (reorder headings, or drop tasks onto it
+  /// to file them under it) with a Rename / New Task / Delete context menu.
+  private func headingRow(_ heading: SeptenaTask) -> some View {
+    HStack(spacing: 4) {
+      Text(heading.title).sectionGroupHeaderTitleStyle()
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, Theme.hPadding)
+    .padding(.top, 18)
+    .padding(.bottom, 2)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+    .asListRow()
+    .selectionDisabled()
+    .draggable(TaskDragIDs(ids: [heading.id])) {
+      Text(heading.title)
+        .scaledFont(size: 13, weight: .medium)
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+    .modifier(TaskReorderDrop(perform: { ids, before in
+      handleHeadingDrop(ids: ids, targetHeading: heading, before: before)
+    }))
+    .contextMenu { headingContextMenu(heading) }
+  }
+
+  @ViewBuilder
+  private func headingContextMenu(_ heading: SeptenaTask) -> some View {
+    Button {
+      headingDraftTitle = heading.title
+      headingRenameTarget = heading
+    } label: { Label("Rename Section", systemImage: "pencil") }
+    Button {
+      startCreateUnderHeading(heading)
+    } label: { Label("New Task in Section", systemImage: "plus") }
+    Divider()
+    Button(role: .destructive) {
+      headingDeleteTarget = heading
+    } label: { Label("Delete Section", systemImage: "trash") }
+  }
+
+  /// Quiet Things-style "+ Add Section" affordance at the foot of a project.
+  private var addSectionButton: some View {
+    Button {
+      guard case .project(let pid) = filter else { return }
+      headingDraftTitle = ""
+      headingCreateProject = pid
+    } label: {
+      HStack(spacing: 6) {
+        Image(systemName: "plus")
+        Text("Add Section")
+      }
+      .font(.septenaMeta)
+      .foregroundStyle(Theme.inkSecondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, Theme.hPadding)
+      .padding(.vertical, 12)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(PlainHoverRowButtonStyle())
+    .asListRow()
+  }
+
+  /// A reorder drop inside a project's grouped list. The drop target is a task
+  /// row: the dragged rows join the target's group (`heading`) and take manual
+  /// positions around the target within that group. Cross-group filing falls
+  /// out of reading `target.heading` — no separate "move to section" gesture.
+  private func handleGroupedTaskDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
+    // A heading dragged onto a task isn't meaningful — headings drop on headings.
+    guard !projectHeadingIds.contains(target.id) else { return false }
+    let group = target.heading   // destination group; nil = un-headed block
+    let byId = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    let groupRows = visibleItems.filter { $0.heading == group && !dragged.contains($0.id) }
+    guard let targetIdx = groupRows.firstIndex(where: { $0.id == target.id }) else { return false }
+    let insertion = before ? targetIdx : targetIdx + 1
+    let above = insertion > 0 ? groupRows[insertion - 1].orderKey : nil
+    let below = insertion < groupRows.count ? groupRows[insertion].orderKey : nil
+    let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
+    let strictlyPlaced =
+      zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
+      && (above.map { slots.first! > $0 } ?? true)
+      && (below.map { slots.last! < $0 } ?? true)
+    for id in ids where byId[id]?.heading != group {
+      mutator.setHeading(id: id, heading: group)
+    }
+    if strictlyPlaced {
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+    } else {
+      // Midpoint precision exhausted in this group — re-space it at `gap` steps.
+      var final = groupRows.map(\.id)
+      final.insert(contentsOf: ids, at: insertion)
+      let base = groupRows.first?.orderKey ?? TaskOrder.gap
+      for (i, id) in final.enumerated() {
+        let pos = base + TaskOrder.gap * Double(i)
+        mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+      }
+    }
+    Haptics.tick()
+    Task { await load() }
+    return true
+  }
+
+  /// A drop landed on a heading row. Headings dragged here reorder among the
+  /// project's headings; tasks dragged here file under the heading (at its top).
+  private func handleHeadingDrop(ids: [String], targetHeading: SeptenaTask, before: Bool) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty, !dragged.contains(targetHeading.id) else { return false }
+    let headingIds = projectHeadingIds
+    if ids.allSatisfy({ headingIds.contains($0) }) {
+      // Reorder headings among themselves.
+      let remaining = projectHeadingList.filter { !dragged.contains($0.id) }
+      guard let ti = remaining.firstIndex(where: { $0.id == targetHeading.id }) else { return false }
+      let insertion = before ? ti : ti + 1
+      let above = insertion > 0 ? remaining[insertion - 1].orderKey : nil
+      let below = insertion < remaining.count ? remaining[insertion].orderKey : nil
+      let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+    } else {
+      // Tasks dropped onto the label → file under this heading, above its first member.
+      let members = visibleItems.filter { $0.heading == targetHeading.id && !dragged.contains($0.id) }
+      let slots = TaskOrder.positions(count: ids.count, above: nil, below: members.first?.orderKey)
+      for (id, pos) in zip(ids, slots) {
+        mutator.setHeading(id: id, heading: targetHeading.id)
+        mutator.reorder(id: id, toPosition: pos)
+      }
+    }
+    Haptics.tick()
+    Task { await load() }
+    return true
+  }
+
+  /// Create a heading in the current project, then re-file the tasks the alert
+  /// carried (create) — used by the "Add Section" flow and rename.
+  private func commitHeadingCreate(title: String, project: String) {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return }
+    mutator.createHeading(title: trimmed, project: project)
+    Task { await load() }
+  }
+
+  private func commitHeadingRename(_ heading: SeptenaTask, title: String) {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != heading.title else { return }
+    mutator.update(id: heading.id, title: trimmed, notes: nil)
+    Task { await load() }
+  }
+
+  /// "New Task in Section": spawn an inline-create draft already filed under the
+  /// heading, so the row appears in that group as you type.
+  private func startCreateUnderHeading(_ heading: SeptenaTask) {
+    guard case .project(let pid) = filter else { return }
+    let draft = mutator.create(title: "", project: pid, source: TaskSource.app,
+                               deferPush: true, atBottom: true)
+    mutator.setHeading(id: draft.id, heading: heading.id)
+    draftEditIds.insert(draft.id)
+    Task {
+      await load()
+      selectOnly(draft.id)
+      expandedEditId = draft.id
+    }
+  }
+
   /// Things-style footer on project / area pages: a quiet link that expands
   /// completed tasks for this list. Reuses `row(_:)` so checkboxes and context
   /// menus match the open list.
@@ -1366,7 +1630,11 @@ struct TaskListView: View {
         .monospacedDigit()
         .foregroundStyle(Theme.inkSecondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, Theme.hPadding)
+        // Sit the footer link on the cards' content column (over the row
+        // checkboxes), not the wider page gutter, so it reads as part of the
+        // list rather than a stray link at a different indent.
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
@@ -1414,13 +1682,30 @@ struct TaskListView: View {
 
   // MARK: - Keyboard navigation
 
+  /// True when the "New task" trigger is currently a selectable row (i.e. no
+  /// capture draft is already in flight — while one is, the slot hosts the
+  /// inline editor, whose real task id is already in the order). When true its
+  /// sentinel id joins `keyboardOrderedTaskIds` at the trigger's render position
+  /// so ↑/↓ can land on it and Return activates it (see `activateRow`).
+  private var showsQuickAddTriggerRow: Bool {
+    allowsInlineCreate && quickAddDraftId == nil
+  }
+
+  /// The sentinel id for the quick-add trigger, or empty when it isn't shown.
+  private var quickAddOrderedIds: [String] {
+    showsQuickAddTriggerRow ? [Self.quickAddScrollID] : []
+  }
+
   /// Flat ordered list of task IDs in the same order they're rendered.
-  /// Drives ↑/↓ and ⌘↑/⌘↓ traversal.
+  /// Drives ↑/↓ and ⌘↑/⌘↓ traversal. The quick-add trigger (`quickAddOrderedIds`)
+  /// is spliced in at the render position of its "New task" row.
   private var keyboardOrderedTaskIds: [String] {
     switch filter {
     case .today:
       // Inbox section = agent proposals + loose today tasks, rendered above
-      // the main list. Classified tasks follow — grouped or flat per setting.
+      // the main list. The quick-add line sits at the foot of the Inbox card,
+      // so its sentinel follows the loose rows. Classified tasks follow —
+      // grouped or flat per setting.
       let todayPool = items + review
       let looseToday = todayPool.filter { $0.project == nil && $0.area == nil }
       let classified = todayPool.filter { $0.project != nil || $0.area != nil }
@@ -1433,19 +1718,22 @@ struct TaskListView: View {
           .sorted(by: SeptenaTask.compareNextPageOrder)
           .map(\.id)
       }
-      return triageItems.map(\.id) + looseToday.map(\.id) + classifiedIds
+      return triageItems.map(\.id) + looseToday.map(\.id)
+        + quickAddOrderedIds + classifiedIds
     case .unscheduled:
-      return review.map(\.id) + orderedFromGroupedOpen(pool: items)
+      return review.map(\.id) + orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
+      // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
       return review.map(\.id) + upcomingBuckets().flatMap { $0.tasks.map(\.id) }
     case .project, .area:
-      var ids = review.map(\.id) + visibleItems.map(\.id)
+      // Foot-of-card quick-add sits after the open rows, before the logged scope.
+      var ids = review.map(\.id) + visibleItems.map(\.id) + quickAddOrderedIds
       if isScopeLoggedExpanded {
         ids.append(contentsOf: loggedScopeItems.map(\.id))
       }
       return ids
     default:
-      return review.map(\.id) + visibleItems.map(\.id)
+      return review.map(\.id) + visibleItems.map(\.id) + quickAddOrderedIds
     }
   }
 
@@ -2081,16 +2369,26 @@ struct TaskListView: View {
       taskRow(task)
         .id(Self.quickAddScrollID)
     } else if quickAddDraftId == nil {
-      QuickAddTriggerRow(action: { startCreate() })
-        .id(Self.quickAddScrollID)
+      // The primary trigger is a first-class *selectable* row: it carries the
+      // quick-add sentinel id (also in `keyboardOrderedTaskIds`), so arrow-nav
+      // lands on it and click / double-click / tap / Return all route through
+      // the container's `onActivate` → `activateRow` → `startCreate()`. The
+      // `asTaskRow` id doubles as the scroll target, so no extra `.id` needed.
+      QuickAddTriggerRow()
+        .asTaskRow(id: Self.quickAddScrollID,
+                   isSelected: selection.contains(Self.quickAddScrollID))
     } else {
       // A capture is in flight in ANOTHER slot (grouped Today: the header "+"
       // hosts the editor in its area/project section while the Inbox keeps its
-      // trigger row). The scroll id must stay unique — if this trigger row also
-      // carried it, `startCreate`'s force-scroll resolves to the Inbox row at
-      // the top, the viewport jumps away, and the LazyVStack tears down the
-      // just-opened editor (purging the empty draft via `onVanish`).
-      QuickAddTriggerRow(action: { startCreate() })
+      // trigger row). This one is NOT keyboard-reachable (absent from
+      // `keyboardOrderedTaskIds` while a draft exists) and must NOT carry the
+      // scroll id — if it did, `startCreate`'s force-scroll resolves to the
+      // Inbox row at the top, the viewport jumps away, and the LazyVStack tears
+      // down the just-opened editor (purging the empty draft via `onVanish`). A
+      // plain tap is enough for this rare secondary slot.
+      QuickAddTriggerRow()
+        .contentShape(Rectangle())
+        .onTapGesture { startCreate() }
     }
   }
 
@@ -2174,7 +2472,47 @@ struct TaskListView: View {
 
   @ViewBuilder
   private func taskContextMenu(for task: SeptenaTask) -> some View {
-    rowActionsMenu(target: actionTarget(for: task))
+    Group {
+      rowActionsMenu(target: actionTarget(for: task))
+      sectionMoveMenu(for: task)
+    }
+  }
+
+  /// "Move to Section ▸" — the reliable, standard-macOS way to file a task into
+  /// a project heading (drag-to-section also works, but pointer drag in a custom
+  /// scroll list is finicky on macOS). Shown only on a project page that has
+  /// headings; acts on the whole selection. Lands the task(s) at the foot of the
+  /// chosen section so the result is predictable.
+  @ViewBuilder
+  private func sectionMoveMenu(for task: SeptenaTask) -> some View {
+    let headings = projectHeadingList
+    if case .project = filter, !headings.isEmpty {
+      let ids = actionTarget(for: task).ids
+      Divider()
+      Menu {
+        Button("No Section") { fileIntoHeading(ids, heading: nil) }
+        Divider()
+        ForEach(headings) { h in
+          Button(h.title) { fileIntoHeading(ids, heading: h.id) }
+        }
+      } label: {
+        Label("Move to Section", systemImage: "text.append")
+      }
+    }
+  }
+
+  /// File `ids` under `heading` (nil = the un-headed block) at the foot of that
+  /// group, so a menu-move lands where the user expects rather than wherever the
+  /// task's old order key happens to sort.
+  private func fileIntoHeading(_ ids: [String], heading: String?) {
+    let members = visibleItems.filter { $0.heading == heading && !ids.contains($0.id) }
+    let slots = TaskOrder.positions(count: ids.count, above: members.last?.orderKey, below: nil)
+    for (id, pos) in zip(ids, slots) {
+      mutator.setHeading(id: id, heading: heading)
+      mutator.reorder(id: id, toPosition: pos)
+    }
+    Haptics.pick()
+    Task { await load() }
   }
 
   /// Ranked filing picks for one open task — single source for the context
@@ -2425,7 +2763,8 @@ struct TaskListView: View {
                           quickMenu: ((SeptenaTask) -> Bool)? = nil,
                           appendQuickAdd: Bool = false,
                           quickAddShowsEditor: Bool = true,
-                          reorderable: Bool = false) -> some View {
+                          reorderable: Bool = false,
+                          grouped: Bool = false) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
@@ -2436,8 +2775,13 @@ struct TaskListView: View {
                         isSelected: selection.contains(task.id) && expandedEditId != task.id)
         // After the chrome, so the drop target (and its targeting wash) spans
         // the full card slice the user sees, not just the inner row content.
+        // In a project's grouped list a drop also re-files across headings
+        // (`handleGroupedTaskDrop` reads the target row's group).
         .modifier(TaskReorderDrop(perform: reorderable
-          ? { ids, before in handleReorderDrop(ids: ids, target: task, before: before) }
+          ? { ids, before in
+              grouped
+                ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
+                : handleReorderDrop(ids: ids, target: task, before: before) }
           : nil))
     }
     if appendQuickAdd {
@@ -3760,28 +4104,35 @@ extension View {
 // The shared atom behind in-place rename rows. The quick-add footer is now a
 // separate `QuickAddTriggerRow` that opens the full inline editor.
 
+// Pure visual — no `Button`. Interaction is driven by the row it sits in:
+// as a *selectable* row (the primary slot) its click/double-click/tap/Return all
+// route through the container's `onActivate` → `startCreate()`, exactly like a
+// task row; as a plain secondary slot the caller attaches a tap gesture. This is
+// what makes the "New task" line keyboard-selectable and Return-activatable
+// without a bespoke code path (see `activateRow`).
 private struct QuickAddTriggerRow: View {
-  let action: () -> Void
   @Environment(\.rowHInset) private var rowHInset
   @Environment(\.rowVInset) private var rowVInset
 
   var body: some View {
-    Button(action: action) {
-      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-        TaskCheckbox(isDone: false, dashed: TaskRowFlags.languageV2,
-                     isToday: false, onToggle: {})
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-        Text("New task")
-          .font(.septenaTaskTitle)
-          .foregroundStyle(Theme.inkSecondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .padding(.horizontal, rowHInset)
-      .padding(.vertical, rowVInset)
-      .contentShape(Rectangle())
+    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      TaskCheckbox(isDone: false, dashed: TaskRowFlags.languageV2,
+                   isToday: false, onToggle: {})
+        // Decorative here — let taps fall through to the row's selection gesture
+        // instead of the checkbox's own (empty) button.
+        .allowsHitTesting(false)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      Text("New task")
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .buttonStyle(.plain)
+    .padding(.horizontal, rowHInset)
+    .padding(.vertical, rowVInset)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .combine)
     .accessibilityLabel("New task")
+    .accessibilityAddTraits(.isButton)
   }
 }
 

@@ -1339,6 +1339,9 @@
     "Add medications in Settings first." : {
 
     },
+    "Add Section" : {
+
+    },
     "Add Supplement" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6030,6 +6033,9 @@
           }
         }
       }
+    },
+    "Projects" : {
+
     },
     "Projects in this area will be detached but not deleted." : {
       "localizations" : {

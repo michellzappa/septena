@@ -174,6 +174,9 @@ enum TaskReads {
     var madeByDay: [String: Int] = [:]
 
     for e in LocalCache.liveEntities(in: context) {
+      // Headings are dividers, not to-dos — never count toward openCount, the
+      // smart-list badges, or the made/done histogram (see `TaskEntity.isHeading`).
+      if e.isHeading { continue }
       if e.status == .open { allOpen += 1 }
       guard !e.pendingDeletion else { continue }
 

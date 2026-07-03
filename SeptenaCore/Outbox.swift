@@ -235,6 +235,25 @@ final class TaskMutator {
     cloudBackend.reorder(id: id, toPosition: position)
   }
 
+  /// Create a project section-divider "heading" (docs/ORDERING_AND_HEADINGS_PLAN.md).
+  @discardableResult
+  func createHeading(title: String, project: String, atTop: Bool = false) -> SeptenaTask? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] createHeading called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.createHeading(title: title, project: project, atTop: atTop)
+  }
+
+  /// File a task under a heading (or clear it with `nil`).
+  func setHeading(id: String, heading: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setHeading called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setHeading(id: id, heading: heading)
+  }
+
   func update(id: String, title: String? = nil, notes: String? = nil) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)

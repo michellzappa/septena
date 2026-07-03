@@ -18,7 +18,7 @@ Most of the foundation is already built and synced; the UI just stopped using it
 | Drag source | ⚠️ macOS-only `.draggable` on rows | `TaskListView.swift:1768` |
 | Sidebar drop | ✅ `.dropDestination(for: TaskDragIDs.self)` on area/project/Today rows → `moveToArea/Project/Today` (not platform-gated) | `SidebarView.swift:1593` |
 | In-list reorder | ❌ removed — no drop targets between rows | — |
-| Headings | ❌ no concept anywhere in model or schema | — |
+| Headings | ✅ shipped — `TaskEntity.kind`/`heading` + conditional CK writes, `TaskMutator.createHeading/setHeading` (+ delete-dissolves / move-rehomes members), project-view grouped rendering + heading drag, excluded from every feed/count, MCP filtered in both servers | `Persistence.swift`, `CloudKit/TaskRecord.swift`, `CloudKit/TasksBackend.swift`, `TaskListView.swift`, gateway `listTasks.ts` |
 | Sidebar area/project order | ⚠️ device-local `@AppStorage` JSON + context-menu move up/down; no drag, not synced | `SidebarView.swift:37` |
 
 Container constraint: task lists render in `SelectableScrollList`
@@ -126,15 +126,39 @@ Enabled on project / area / Inbox lists via `cardedRows(reorderable:)` +
 order; degenerate midpoints re-space the visible list at `gap` steps. No
 end-of-list zone yet — the last row's bottom half covers drop-at-end.
 
-**P3 — Headings.** Model fields + conditional CK writes + `CloudKitSchema.md`
-rows; mutator methods; project-view grouped rendering + heading row UI;
-heading drag; **exclusion filter everywhere tasks are counted or fed** (Today,
-Upcoming, Inbox, badges, Next feed, watch, widgets, Quick Find) via one shared
-predicate (e.g. `SeptenaTask.isHeading` used by the existing "live/open"
-filters); MCP update **in both servers** (in-app `MCPToolCatalog` + gateway
-repo: filter headings out of `tasks_list` or expose them deliberately) + skill
-briefs in the same change; Things import maps its native headings (importer
-already writes `position`). ~300–400 lines.
+**P3 — Headings. ✅ SHIPPED.** Model fields
+(`TaskEntity.kind`/`heading`) + conditional CK writes + `CloudKitSchema.md` rows
+(changelog #14); mutator methods (`createHeading`/`setHeading`, delete dissolves
+members → `heading = nil`, move-to-project re-homes members); project-view
+grouped rendering (un-headed block + one card per heading, `projectGroupedRows`
+in `TaskListView.swift`) with a section-divider row (draggable + drop target,
+Rename / New Task / Delete context menu via standard `.alert`/`.confirmationDialog`
+— no inline-TextField-in-List) + "Add Section" foot button; heading drag
+(reorder headings among themselves; drop a task onto a heading or a row in its
+group files it via `handleGroupedTaskDrop`/`handleHeadingDrop` — cross-group
+filing falls out of reading the target row's `heading`). **Exclusion is one
+shared predicate `isHeading`** on both `TaskEntity` and the `SeptenaTask` DTO,
+gating `isOnToday`/`isInTriageBand`, `LocalCache.convert` (the central chokepoint
+for every list/count/feed), `liveTasks`/`trainingTasks`/`tasksWithProject`,
+`TaskReads.dashboardStats`, Quick Find, Spotlight, App-Intent entities, and the
+export `collect` — headings surface ONLY via `LocalCache.headings(inProject:)`.
+MCP filtered **in both servers**: in-app `tasks_list` (via `LocalCache`) +
+`tasks_get` predicate exclude headings; gateway `listTasks.ts` drops `kind ==
+"heading"` at the map chokepoint (covers the non-client-filtered `anytime`
+view) + mirrored guards in `matchesView`/`inTriageBand`, and `getTask` 404s a
+heading. All four schemes build green.
+
+**Things-import mapping. ✅ DONE.** The importer maps Things' native heading
+rows (TMTask `type = 2`) → Septena headings + the members' `heading` FK. Parser
+adds a `type = 2` query + reads the `heading` column on the task query (guarded
+by `hasHeadingCol`, like `hasDeadlineCol`); `ThingsHeadingRecord` +
+`headingID` on `ThingsTaskRecord` (`ThingsImportModels.swift`); the mapper plans
+`headingsToCreate` (reusing the task id-mapping table for idempotency, dropping
+headings whose project didn't resolve) and stamps each member task's
+`headingThingsID`; apply creates headings via `createHeading` before their
+members (reordered to the Things `index`), then files members via `setHeading`,
+resolving the FK from the just-created map or a prior import's mapping. All four
+schemes build green.
 
 **P4 — Optional, later.** Sidebar drag-reorder of areas/projects (replace the
 context-menu up/down; needs its own small `Transferable` id type; order could

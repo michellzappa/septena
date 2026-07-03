@@ -69,7 +69,7 @@ struct TaskChoiceQuery: EntityQuery {
     let context = LocalStore.shared.container.mainContext
     let wanted = Set(ids)
     let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    return rows.filter { wanted.contains($0.id) && $0.deletedAt == nil }
+    return rows.filter { wanted.contains($0.id) && $0.deletedAt == nil && !$0.isHeading }
                .map { TaskChoice(id: $0.id, title: $0.title) }
   }
 

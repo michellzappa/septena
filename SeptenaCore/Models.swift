@@ -25,6 +25,18 @@ public enum TaskSource {
   public static let things = "things"
 }
 
+/// Values stamped on a task row's `kind` field — what *shape* of row it is.
+/// A heading is a `TaskEntity` (so it inherits sync/order/drag for free) that
+/// renders as a section divider inside a project and NEVER appears in any
+/// task feed, list, count, or badge (see `TaskEntity.isHeading` and the
+/// exclusion filters). Absent/`""` = an ordinary task.
+public enum TaskKind {
+  /// An ordinary to-do. The default; stored as `""`/absent.
+  public static let task = ""
+  /// A section divider inside a project. Members point back via `heading`.
+  public static let heading = "heading"
+}
+
 /// Tunables for the "agent created this" freshness cue. Provenance is
 /// permanent; the cue is transient and decays so a long-ignored agent row
 /// stops glowing even if never explicitly acknowledged.
@@ -84,6 +96,16 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Rides alongside the entity, not the wire — set in `init(_:)`. `0` = never
   /// dragged (order falls back to `createdAt`).
   var position: Double = 0
+  /// Row shape (`TaskKind`). `""`/absent = task, `"heading"` = a project
+  /// section divider. Rides alongside the entity, not the wire. Read `isHeading`.
+  var kind: String = ""
+  /// FK to the owning heading's id when this task is filed under one; else nil.
+  /// Rides alongside the entity, not the wire.
+  var heading: String? = nil
+
+  /// True when this DTO is a project section divider, not a to-do — the mirror
+  /// of `TaskEntity.isHeading`. Headings are excluded from every feed/count.
+  var isHeading: Bool { kind == TaskKind.heading }
 
   /// The task's conversation (Task Conversations), decoded from the entity in
   /// `init(_:)`. Rides alongside, not the wire (excluded from CodingKeys), so the
@@ -181,7 +203,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// this rather than the raw `today` flag, or a scheduled-today task looks
   /// like it isn't in Today. Keep in lockstep with `TaskEntity.isOnToday`.
   var isOnToday: Bool {
-    guard status == .open else { return false }
+    guard status == .open, !isHeading else { return false }
     if today { return true }
     if let s = scheduled, s <= SeptenaDate.today { return true }
     if let d = deadline, d <= SeptenaDate.today { return true }
@@ -230,7 +252,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// its natural bucket rather than living in limbo). DTO mirror of
   /// `TaskEntity.isInTriageBand` — keep the two in lockstep.
   var isInTriageBand: Bool {
-    guard status == .open else { return false }
+    guard status == .open, !isHeading else { return false }
     if source == TaskSource.mcp { return showsAgentCue() }
     return scheduled == nil && deadline == nil
         && project == nil && area == nil && !today
