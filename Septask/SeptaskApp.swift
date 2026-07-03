@@ -37,26 +37,13 @@ struct SeptaskApp: App {
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some Scene {
-    @Bindable var navigation = navigation
-    return WindowGroup {
+    WindowGroup {
       SeptaskRootView()
         .overlay { LogCommitOverlay() }
-        // Dedicated Septask Settings (P3) — reached from the sidebar gear
-        // (`nav.showSettings`) and ⌘, below. A sheet on both platforms.
-        // Re-inject the environment: a settings pane hosts ThingsImportView
-        // (reads the mutators) and could reparent across the sheet boundary.
-        .sheet(isPresented: $navigation.showSettings) {
-          SeptaskSettingsView()
-            .environment(navigation)
-            .environment(theme)
-            .environment(settingsStore)
-            .environment(services.taskMutator)
-            .environment(services.areasMutator)
-            .environment(services.projectsMutator)
-            .environment(services.ckEngine)
-            .environment(dayClock)
-            .environment(logCommit)
-        }
+        // Settings presentation lives in SeptaskRootView now: a sheet on iOS,
+        // a real Settings window (below) on macOS — mirroring App.swift so
+        // Septask's Settings is a native window with traffic lights, not a
+        // modal dialog.
         // One-time Septask welcome; self-gating after completion.
         .septaskWelcomeGate()
         // Keep the tasks accent + settings cache aligned with the
@@ -181,5 +168,28 @@ struct SeptaskApp: App {
           .keyboardShortcut("/", modifiers: [.command, .shift])
       }
     }
+
+    // macOS: Settings is a first-class window (native traffic lights, ⌘W,
+    // reused across opens), same as App.swift's Window("Settings"). Opened by
+    // SeptaskRootView when `showSettings` flips. A separate scene gets its own
+    // environment — replicate the WindowGroup's chain so the panes resolve
+    // SettingsStore / CKEngine / mutators / DayClock.
+    #if os(macOS)
+    Window("Settings", id: "septask-settings") {
+      SeptaskSettingsView()
+        .environment(navigation)
+        .environment(theme)
+        .environment(settingsStore)
+        .environment(services.taskMutator)
+        .environment(services.areasMutator)
+        .environment(services.projectsMutator)
+        .environment(services.ckEngine)
+        .environment(dayClock)
+        .environment(logCommit)
+        .modelContainer(localStore.container)
+        .septenaTextSize()
+    }
+    .windowResizability(.contentSize)
+    #endif
   }
 }

@@ -34,6 +34,8 @@ struct SeptaskRootView: View {
   @State private var selection: SeptaskTab = .today
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
+  #else
+  @Environment(\.openWindow) private var openWindow
   #endif
 
   /// Re-inject the whole task environment onto a presented sheet's content —
@@ -82,6 +84,20 @@ struct SeptaskRootView: View {
           EmptyView()
         }
       }
+      // Settings — mirrors RootTabView exactly: a sheet on iOS, a real
+      // Settings window on macOS (traffic lights, ⌘W), opened by flipping
+      // `nav.showSettings`. The window scene lives in SeptaskApp.
+      #if os(iOS)
+      .sheet(isPresented: $nav.showSettings) {
+        withEnvironment(SeptaskSettingsView())
+      }
+      #else
+      .onChange(of: nav.showSettings) { _, open in
+        guard open else { return }
+        openWindow(id: "septask-settings")
+        nav.showSettings = false
+      }
+      #endif
   }
 
   @ViewBuilder

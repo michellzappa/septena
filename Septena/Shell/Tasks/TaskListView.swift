@@ -3418,7 +3418,7 @@ struct TaskListRowContextMenu: View {
       Button {
         onCopy(target)
       } label: {
-        Label("Copy \(count) Titles", systemImage: "doc.on.doc")
+        Label("Copy Titles", systemImage: "doc.on.doc")
       }
 
       Divider()
@@ -3556,35 +3556,35 @@ struct TaskListRowContextMenu: View {
   }
 
   private var todayAddLabel: String {
-    count > 1 ? "Move \(count) to Today" : "Move to Today"
+    "Move to Today"
   }
 
   private var todayRemoveLabel: String {
-    count > 1 ? "Remove \(count) from Today" : "Remove from Today"
+    "Remove from Today"
   }
 
   private var whenLabel: String {
-    count > 1 ? "When… (\(count) tasks)" : "When…"
+    "When…"
   }
 
   private var deadlineLabel: String {
-    count > 1 ? "Deadline… (\(count) tasks)" : "Deadline…"
+    "Deadline…"
   }
 
   private var moveLabel: String {
-    count > 1 ? "Move \(count) Tasks" : "Move"
+    count > 1 ? "Move Tasks" : "Move"
   }
 
   private var duplicateLabel: String {
-    count > 1 ? "Duplicate \(count) Tasks" : "Duplicate"
+    count > 1 ? "Duplicate Tasks" : "Duplicate"
   }
 
   private var cancelLabel: String {
-    count > 1 ? "Cancel \(count) Tasks" : "Cancel Task"
+    count > 1 ? "Cancel Tasks" : "Cancel Task"
   }
 
   private var deleteLabel: String {
-    count > 1 ? "Delete \(count) Tasks" : "Delete"
+    count > 1 ? "Delete Tasks" : "Delete"
   }
 }
 

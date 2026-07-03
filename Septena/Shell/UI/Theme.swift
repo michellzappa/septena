@@ -432,39 +432,58 @@ enum Theme {
 //   - New York/system serif   → restrained editorial display moments
 //   - System mono             → numerics / metrics (tabular)
 
+// The editorial face uses SwiftUI's system serif design, which maps to Apple's
+// New York on Apple platforms. Titles/body/metrics are one semantic set; the
+// app-wide Text Size setting reaches all of them.
+//
+// Two platform paths, one appearance at the default step:
+//   - iOS / watch: native system text styles, so Dynamic Type works and the
+//     Text Size setting is applied as a `dynamicTypeSize` offset at the root.
+//   - macOS: no Dynamic Type, so the tokens are explicit sizes scaled by
+//     `FontScale` (see TextSizeScale.swift). Base sizes come from the matching
+//     AppKit text style, so factor 1.0 == the prior `Font.system(<style>)` size.
+#if os(macOS)
+extension Font {
+  static var septenaScreenTitle: Font  { .system(size: SeptenaTypeScale.size(.largeTitle), weight: .semibold) }
+  static var septenaWelcomeTitle: Font { .system(size: SeptenaTypeScale.size(.largeTitle), weight: .semibold, design: .serif).italic() }
+  static var septenaWordmark: Font     { .system(size: SeptenaTypeScale.size(.title1), weight: .semibold, design: .serif) }
+  static var septenaGoalTitle: Font    { .system(size: SeptenaTypeScale.size(.title3), weight: .semibold, design: .serif) }
+  static var septenaSectionTitle: Font { .system(size: SeptenaTypeScale.size(.title2), weight: .semibold) }
+  static var septenaCardTitle: Font    { .system(size: SeptenaTypeScale.size(.headline), weight: .semibold) }
+  static var septenaTileTitle: Font    { .system(size: SeptenaTypeScale.size(.headline), weight: .semibold) }
+  static var septenaSidebarRow: Font   { .system(size: SeptenaTypeScale.size(.body)) }
+  static var septenaTaskTitle: Font    { .system(size: SeptenaTypeScale.size(.body)) }
+  static var septenaNotes: Font        { .system(size: SeptenaTypeScale.size(.subheadline)) }
+  static var septenaButton: Font       { .system(size: SeptenaTypeScale.size(.subheadline), weight: .semibold) }
+  static var septenaLabel: Font        { .system(size: SeptenaTypeScale.size(.footnote), weight: .medium) }
+  static var septenaBadge: Font        { .system(size: SeptenaTypeScale.size(.caption2), weight: .semibold) }
+  static var septenaMeta: Font         { .system(size: SeptenaTypeScale.size(.footnote)).monospacedDigit() }
+  static var septenaMetaStrong: Font   { .system(size: SeptenaTypeScale.size(.footnote), weight: .semibold).monospacedDigit() }
+  static var septenaMetric: Font       { .system(size: SeptenaTypeScale.size(.body), design: .monospaced).monospacedDigit() }
+}
+#else
 extension Font {
   // MARK: Titles
-  // The editorial face uses SwiftUI's system serif design, which maps to
-  // Apple's New York on Apple platforms and keeps Dynamic Type native.
-  // Interior destination headers use SF Pro so app chrome remains familiar.
   /// Destination header — SF Pro semibold at largeTitle. Neutral interior H1.
   static let septenaScreenTitle  = Font.system(.largeTitle, weight: .semibold)
   /// Dashboard welcome greeting — New York Large Semibold Italic.
   static let septenaWelcomeTitle = Font.system(.largeTitle, design: .serif).weight(.semibold).italic()
-  /// App wordmark — New York Semibold, used where the name *is* the brand
-  /// (the About pane). Shares the editorial face of the Dashboard welcome.
+  /// App wordmark — New York Semibold, used where the name *is* the brand.
   static let septenaWordmark     = Font.system(.title, design: .serif).weight(.semibold)
-  /// Goal card title — New York Semibold. A goal's first line is its name,
-  /// so it gets the editorial face; the rest of the text reads as body.
+  /// Goal card title — New York Semibold (editorial face for the goal's name).
   static let septenaGoalTitle    = Font.system(.title3, design: .serif).weight(.semibold)
   /// Section header within a screen — SF Pro semibold at title2.
   static let septenaSectionTitle = Font.system(.title2, weight: .semibold)
   /// Card header — SF Pro at headline (already semibold by default).
   static let septenaCardTitle    = Font.system(.headline)
-  /// Dashboard tile header — slightly larger on iOS so it reads at a glance
-  /// in the Histogram layout; macOS keeps the denser headline size.
-  #if os(iOS)
+  /// Dashboard tile header — larger on iOS so it reads at a glance.
   static let septenaTileTitle    = Font.system(.title3, weight: .semibold)
-  #else
-  static let septenaTileTitle    = Font.system(.headline)
-  #endif
 
   // MARK: UI body (SF Pro)
   static let septenaSidebarRow   = Font.system(.body)
-  // Row titles / task names — the app's most-read text layer. Based on the
-  // `.body` text style (per DesignSpec.md §5) so it participates in Dynamic
-  // Type and the app-wide text-size setting; macOS renders `.body` a touch
-  // smaller than iOS natively, preserving the prior 15/16pt feel.
+  /// Row titles / task names — the app's most-read text layer. Based on the
+  /// `.body` text style (per DesignSpec.md §5) so it participates in Dynamic
+  /// Type and the app-wide text-size setting.
   static let septenaTaskTitle    = Font.system(.body)
   static let septenaNotes        = Font.system(.subheadline)
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
@@ -476,6 +495,7 @@ extension Font {
   static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold).monospacedDigit()
   static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
 }
+#endif
 
 /// Wide-pane horizontal breathing room for the four home tabs.
 /// Caps and centers the content column on iPad / macOS so lists and tiles

@@ -27,100 +27,106 @@ struct SeptaskSettingsView: View {
   @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
   @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @State private var path: [Destination] = []
+  /// Detail selection for the macOS split view (a sidebar+detail Settings
+  /// window, matching `SettingsView`). Unused on iOS, which pushes via `path`.
+  @State private var selection: Destination? = .general
 
   var body: some View {
+    #if os(macOS)
+    // macOS: a NavigationSplitView (persistent sidebar + detail), sized and
+    // Escape-closable like SettingsView — hosted in a real Settings window
+    // (SeptaskApp), so it carries native traffic lights, not a Done button.
+    NavigationSplitView {
+      List(selection: $selection) { listContent(selectable: true) }
+        .scrollContentBackground(.hidden)
+        .background(SettingsTopGradient())
+        .navigationTitle("Settings")
+    } detail: {
+      NavigationStack { pane(selection ?? .general) }
+    }
+    .frame(width: 700, height: 560)
+    .onExitCommand { dismiss() }
+    #else
+    // iOS/iPad: the same list, pushed in a NavigationStack sheet with a Done
+    // button — matching SettingsView's compact presentation.
     NavigationStack(path: $path) {
-      List {
-        // Identity card — the Apple-ID analogue, the full app's top-of-
-        // Settings row. There's no Septask account: identity is your iCloud.
-        Section {
-          NavigationLink(value: Destination.account) {
-            HStack(spacing: 14) {
-              ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 56)
-              VStack(alignment: .leading, spacing: 3) {
-                Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
-                  .font(.title3.weight(.semibold))
-                  .foregroundStyle(.primary)
-                if plusUnlocked {
-                  SeptenaPlusBadge()
-                } else {
-                  FreeAccountBadge()
-                }
-              }
-              Spacer(minLength: 0)
-            }
-            .padding(.vertical, 8)
+      List { listContent(selectable: false) }
+        .scrollContentBackground(.hidden)
+        .background(SettingsTopGradient())
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { dismiss() }
           }
         }
+        .navigationDestination(for: Destination.self) { pane($0) }
+    }
+    #endif
+  }
 
-        Section {
-          NavigationLink(value: Destination.general) {
-            row("General", icon: "slider.horizontal.3", tint: 0)
+  /// The Settings root list — identical rows on both platforms. `selectable`
+  /// picks the navigation idiom: `.tag` for the macOS split view's
+  /// `List(selection:)`, a `NavigationLink(value:)` for the iOS push stack.
+  @ViewBuilder
+  private func listContent(selectable: Bool) -> some View {
+    // Identity card — the Apple-ID analogue, the full app's top-of-Settings
+    // row. There's no Septask account: identity is your iCloud.
+    Section {
+      entry(.account, selectable: selectable) {
+        HStack(spacing: 14) {
+          ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 56)
+          VStack(alignment: .leading, spacing: 3) {
+            Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
+              .font(.title3.weight(.semibold))
+              .foregroundStyle(.primary)
+            if plusUnlocked { SeptenaPlusBadge() } else { FreeAccountBadge() }
           }
-          NavigationLink(value: Destination.notifications) {
-            row("Notifications", icon: "bell.badge", tint: 4)
-          }
+          Spacer(minLength: 0)
         }
-
-        Section {
-          NavigationLink(value: Destination.claudeAI) {
-            row("AI & Claude", icon: "brain.head.profile", tint: 5)
-          }
-          NavigationLink(value: Destination.calendar) {
-            row("Calendar", icon: "calendar", tint: 6)
-          }
-          NavigationLink(value: Destination.reminders) {
-            row("Reminders", icon: "checklist", tint: 2)
-          }
-        }
-
-        Section {
-          NavigationLink(value: Destination.data) {
-            row("Sharing & Data", icon: "square.and.arrow.up", tint: 1)
-          }
-          NavigationLink(value: Destination.privacy) {
-            row("Privacy", icon: "hand.raised", tint: 3)
-          }
-        }
-
-        // About rows, set apart below the intent groups like the full app:
-        // Septena wears its colorful mark (it points at the bigger app);
-        // Septask's own About wears the white-on-gray discs — its icon.
-        Section {
-          NavigationLink(value: Destination.aboutSeptena) {
-            Label {
-              Text("About Septena")
-            } icon: {
-              SeptenaDiscTile(size: glyphSize, colored: true)
-            }
-          }
-          NavigationLink(value: Destination.aboutSeptask) {
-            Label {
-              Text("About Septask")
-            } icon: {
-              SeptenaDiscTile(size: glyphSize)
-            }
-          }
-        }
-      }
-      .scrollContentBackground(.hidden)
-      .background(SettingsTopGradient())
-      .navigationTitle("Settings")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { dismiss() }
-        }
-      }
-      .navigationDestination(for: Destination.self) { destination in
-        pane(destination)
+        .padding(.vertical, 8)
       }
     }
-    #if os(macOS)
-    .macSheetFrame()
-    #endif
+
+    Section {
+      entry(.general, selectable: selectable) { row("General", icon: "slider.horizontal.3", tint: 0) }
+      entry(.notifications, selectable: selectable) { row("Notifications", icon: "bell.badge", tint: 4) }
+    }
+
+    Section {
+      entry(.claudeAI, selectable: selectable) { row("AI & Claude", icon: "brain.head.profile", tint: 5) }
+      entry(.calendar, selectable: selectable) { row("Calendar", icon: "calendar", tint: 6) }
+      entry(.reminders, selectable: selectable) { row("Reminders", icon: "checklist", tint: 2) }
+    }
+
+    Section {
+      entry(.data, selectable: selectable) { row("Sharing & Data", icon: "square.and.arrow.up", tint: 1) }
+      entry(.privacy, selectable: selectable) { row("Privacy", icon: "hand.raised", tint: 3) }
+    }
+
+    // About rows, set apart below the intent groups like the full app:
+    // Septena wears its colorful mark (it points at the bigger app);
+    // Septask's own About wears the white-on-gray discs — its icon.
+    Section {
+      entry(.aboutSeptena, selectable: selectable) {
+        Label { Text("About Septena") } icon: { SeptenaDiscTile(size: glyphSize, colored: true) }
+      }
+      entry(.aboutSeptask, selectable: selectable) {
+        Label { Text("About Septask") } icon: { SeptenaDiscTile(size: glyphSize) }
+      }
+    }
+  }
+
+  /// One list row, as either a selectable tag (macOS split view) or a
+  /// value-based push link (iOS stack).
+  @ViewBuilder
+  private func entry<L: View>(_ dest: Destination, selectable: Bool,
+                              @ViewBuilder label: () -> L) -> some View {
+    if selectable {
+      label().tag(dest)
+    } else {
+      NavigationLink(value: dest) { label() }
+    }
   }
 
   private var glyphSize: CGFloat {

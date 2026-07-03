@@ -49,7 +49,55 @@ enum TextSizeStep: Int, CaseIterable, Identifiable {
   static func resolve(_ raw: Int) -> TextSizeStep {
     TextSizeStep(rawValue: max(-2, min(2, raw))) ?? .normal
   }
+
+  /// macOS has no Dynamic Type, so there the step maps to an explicit font
+  /// multiplier applied to the `.septena*` tokens (see `SeptenaTypeScale`).
+  /// iOS ignores this and uses the `rawValue` as a `DynamicTypeSize` offset.
+  var macFactor: CGFloat {
+    switch self {
+    case .xSmall: return 0.85
+    case .small:  return 0.92
+    case .normal: return 1.0
+    case .large:  return 1.10
+    case .xLarge: return 1.20
+    }
+  }
 }
+
+#if os(macOS)
+import AppKit
+
+/// macOS text-scale backing. macOS doesn't support Dynamic Type, so the
+/// app-wide Text Size setting is delivered by scaling the `.septena*` font
+/// tokens directly. This is `@Observable` and read from *inside* those token
+/// getters, so SwiftUI tracks the dependency and re-renders exactly the text
+/// views when the factor changes — no `.id()` rebuild, no lost navigation or
+/// scroll state. A singleton (not environment-injected) so it can't trip the
+/// missing-`@Environment` launch crash CLAUDE.md warns about.
+@Observable
+final class FontScale {
+  static let shared = FontScale()
+  var factor: CGFloat = TextSizeStep.resolve(
+    UserDefaults.standard.integer(forKey: SettingsKey.textSizeStep)).macFactor
+
+  private init() {}
+
+  func setStep(_ step: Int) {
+    let next = TextSizeStep.resolve(step).macFactor
+    if next != factor { factor = next }
+  }
+}
+
+/// A text style's base point size (from AppKit, so it tracks the system) times
+/// the current macOS text-scale factor. At factor 1.0 this equals the size the
+/// matching `Font.system(<style>)` rendered before, so nothing shifts at the
+/// default step.
+enum SeptenaTypeScale {
+  static func size(_ style: NSFont.TextStyle) -> CGFloat {
+    NSFont.preferredFont(forTextStyle: style).pointSize * FontScale.shared.factor
+  }
+}
+#endif
 
 // MARK: - DynamicTypeSize offset
 
@@ -73,13 +121,26 @@ private struct SeptenaTextSizeModifier: ViewModifier {
   // animations). Text size is naturally per-device — bigger on a Mac window
   // than on a phone — so it isn't part of the CloudKit-synced payload.
   @AppStorage(SettingsKey.textSizeStep) private var step: Int = 0
-  // The ambient size ABOVE this modifier — i.e. what the OS resolved from the
-  // system Dynamic Type setting. We offset from it rather than replacing it.
+
+  #if os(macOS)
+  // macOS: no Dynamic Type. Keep the shared FontScale in sync with the setting;
+  // the `.septena*` tokens read it, and SwiftUI observation re-renders the
+  // affected text (state-preserving — the setting can even live in a sheet that
+  // stays put while you drag).
+  func body(content: Content) -> some View {
+    content
+      .onAppear { FontScale.shared.setStep(step) }
+      .onChange(of: step) { _, newStep in FontScale.shared.setStep(newStep) }
+  }
+  #else
+  // iOS / watch: offset the OS Dynamic Type size rather than replacing it, so an
+  // accessibility text size set system-wide is respected and merely nudged.
   @Environment(\.dynamicTypeSize) private var systemSize
 
   func body(content: Content) -> some View {
     content.dynamicTypeSize(systemSize.shifted(by: TextSizeStep.resolve(step).rawValue))
   }
+  #endif
 }
 
 extension View {
@@ -136,7 +197,11 @@ struct TextSizeSettingsPane: View {
           Spacer()
         }
       } footer: {
+        #if os(macOS)
+        Text("Adjusts text size everywhere in the app. This is a per-device preference — it doesn’t change your other Septena devices.")
+        #else
         Text("Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size.")
+        #endif
       }
 
       Section {
