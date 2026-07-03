@@ -48,6 +48,9 @@ interface TaskOut {
   source?: string;
   acknowledgedAt?: number; // ms epoch; present once the user has engaged the row
   createdAt?: number;      // ms epoch
+  // Row shape: "heading" = a project section divider, not a to-do. Filtered out
+  // of every view below (mirrors iOS TaskEntity.isHeading). Absent = task.
+  kind?: string;
 }
 
 // Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
@@ -99,7 +102,14 @@ export async function listTasks(
     source: optionalString(r.fields.source?.value),
     acknowledgedAt: optionalNumber(r.fields.acknowledgedAt?.value),
     createdAt: optionalNumber(r.fields.createdAt?.value),
+    kind: optionalString(r.fields.kind?.value),
   }));
+
+  // Project headings (section dividers) are not to-dos — drop them from every
+  // view here, the single chokepoint (mirrors iOS LocalCache.convert). This
+  // also covers the non-client-filtered views ("anytime"/"completed"), whose
+  // capped fetch would otherwise leak an open, dateless heading row.
+  tasks = tasks.filter((t) => t.kind !== "heading");
 
   // Truncation signal so a caller knows there's more beyond `limit` (the
   // classic "I scanned `completed` to 400, missed #481, concluded deleted"
@@ -137,7 +147,7 @@ function optionalNumber(value: unknown): number | undefined {
 /// window (reuses the agent-cue, so cue-decay = ratification-by-timeout).
 /// Human arm: a loose capture with no disposition at all (the classic Inbox).
 function inTriageBand(t: TaskOut, nowMs: number): boolean {
-  if (t.status !== "open") return false;
+  if (t.status !== "open" || t.kind === "heading") return false;
   if (t.source === "mcp") {
     if (t.acknowledgedAt) return false;
     if (!t.createdAt) return false;
@@ -149,7 +159,7 @@ function inTriageBand(t: TaskOut, nowMs: number): boolean {
 /// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep
 /// with iOS so the two surfaces never disagree on what "Today" means.
 function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: number): boolean {
-  if (t.status !== "open") return false;
+  if (t.status !== "open" || t.kind === "heading") return false;
   switch (view) {
     case "today":
       // Ratified + due — the triage band (unratified) is excluded.

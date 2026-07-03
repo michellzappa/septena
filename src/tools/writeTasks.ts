@@ -447,6 +447,11 @@ function optionalString(value: unknown): string | undefined {
 export async function getTask(client: CloudKitClient, input: { id: string }) {
   const fields = await lookupRecord(client, input.id);
   if (!fields) throw new Error(`Task not found: ${input.id}`);
+  // Project headings (section dividers) are not to-dos — read as not-found over
+  // MCP, mirroring listTasks and the iOS in-app server (TaskEntity.isHeading).
+  if (optionalString(fields.kind?.value) === "heading") {
+    throw new Error(`Task not found: ${input.id}`);
+  }
   const convo = decodeConvo(fields);
   const lastProvider = [...convo.thread].reverse().find((t) => t.role === "provider");
   const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
