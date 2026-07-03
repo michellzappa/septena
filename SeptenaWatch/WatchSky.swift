@@ -83,6 +83,21 @@ extension View {
     listRowBackground(Color.clear)
   }
 
+  /// The frosted pill every feed row floats on — the single source for that look
+  /// so every page's rows read the same. A soft translucent *white* rounded card
+  /// (not `.ultraThinMaterial`, which renders near-black on watchOS and reads as
+  /// a dark slab fighting the sky); the dimmed sky still tints through it, giving
+  /// each row containment without an opaque fill (the Reminders / Things wrist
+  /// pattern). `NextItemRow` layers its press / done highlight on top via
+  /// `extraHighlight`; the static summary tiles pass 0. Pair with `watchSkyRow()`,
+  /// which clears the *system* row fill so only this pill + the sky show.
+  func watchGlassRow(extraHighlight: Double = 0) -> some View {
+    background(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(Color.white.opacity(0.16 + extraHighlight))
+    )
+  }
+
   /// Drop the system list background so the sky canvas shows through the feed.
   func watchSkyList() -> some View {
     scrollContentBackground(.hidden)

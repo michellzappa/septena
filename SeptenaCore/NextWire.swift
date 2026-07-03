@@ -310,7 +310,7 @@ struct MealWire: Codable, Hashable, Identifiable {
 /// (watch) to render its quick-log choices via `ConsumableContainer.choices`
 /// and write an `IntakeEvent` record. Mirrors the kind's config; everything
 /// optional-with-defaults so the wire stays additive.
-struct IntakeKindWire: Codable, Hashable {
+struct IntakeKindWire: Codable, Hashable, Identifiable {
   var id: String
   var name: String
   var symbol: String? = nil

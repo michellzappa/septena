@@ -28,6 +28,9 @@ struct NextWatchView: View {
   @State private var conn = WatchConnectivity.shared
   @State private var quickLogItem: NextItem?
   @State private var capturing = false
+  /// The intake tracker whose quick-add sheet is open — set by tapping a summary
+  /// tile, cleared on log/dismiss.
+  @State private var intakeQuickAdd: IntakeKindWire?
   /// The push stack — set by the foot-of-feed summary links and by the macro /
   /// training complication deep links (`onOpenURL`).
   @State private var path: [WatchPage] = []
@@ -64,6 +67,11 @@ struct NextWatchView: View {
     }
     .sheet(isPresented: $capturing) {
       CaptureSheet(conn: conn) { capturing = false }
+    }
+    .sheet(item: $intakeQuickAdd) { kind in
+      NavigationStack {
+        IntakeCaptureInput(kind: kind, conn: conn) { intakeQuickAdd = nil }
+      }
     }
     // Complication tap targets: the macro / training rings carry a `widgetURL`,
     // which the system delivers here. Route it to the matching summary page.
@@ -324,22 +332,12 @@ struct NextWatchView: View {
       }
       // Each intake tracker as its own top-level tile (Caffeine, Cannabis, …),
       // sitting beside Nutrition / Training — the trackers + today's tally are
-      // visible here directly, no "Intakes" sub-page to drill into.
+      // visible here directly, and each tile taps straight into its quick-add.
       if hasIntake {
         ForEach(intakeSummaryRows) { row in
           intakeTile(row)
         }
       }
-      #if DEBUG
-      // TEMP: which intake trackers the fetched snapshot actually carries —
-      // `k` = kinds list, `t` = today's tally. If caffeine is absent from `k`,
-      // it's missing from the publish, not the watch UI. Remove once resolved.
-      Text("dbg k:[\(conn.intakeKinds.map(\.name).joined(separator: ","))] t:[\(conn.intakeToday.map(\.name).joined(separator: ","))]")
-        .font(.system(size: 9, design: .monospaced))
-        .foregroundStyle(.orange)
-        .listRowInsets(EdgeInsets(top: 8, leading: 6, bottom: 6, trailing: 6))
-        .listRowBackground(Color.clear)
-      #endif
     }
   }
 
@@ -366,28 +364,41 @@ struct NextWatchView: View {
   }
 
   /// A single intake-tracker tile: tinted glyph + name on the left, today's tally
-  /// (the wire's noun line, else "×N") on the right. A terminal info tile — unlike
-  /// the Nutrition / Training rows it doesn't drill in (intake is a tally, not a
-  /// ring set), but it matches their glyph alignment and row padding.
+  /// (the wire's noun line, else "×N") on the right. Tapping opens the same
+  /// container-aware quick-add the Capture sheet and suggestion nudges use, so a
+  /// tracker can be logged straight from the summary. Falls back to a plain,
+  /// non-tappable info row for a today-only tracker the kinds list hasn't synced
+  /// (no full config to drive the quick-add).
   private func intakeTile(_ row: IntakeTodayWire) -> some View {
     let tint = WatchSectionTint.color(forSectionKey: row.id,
                                       colors: row.color.map { [row.id: $0] } ?? [:])
-    return HStack(spacing: 9) {
-      Image(systemName: row.symbol ?? "circle.fill")
-        .font(.body)
-        .foregroundStyle(tint)
-        .frame(width: 18)
-      Text(row.name).font(.body)
-      Spacer(minLength: 4)
-      Text(row.detail ?? "×\(row.count)")
-        .font(.caption)
-        .fontWeight(.semibold)
-        .foregroundStyle(tint)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
+    let kind = conn.intakeKinds.first { $0.id == row.id }
+    return Button {
+      if let kind { intakeQuickAdd = kind }
+    } label: {
+      HStack(spacing: 9) {
+        Image(systemName: row.symbol ?? "circle.fill")
+          .font(.body)
+          .foregroundStyle(tint)
+          .frame(width: 18)
+        Text(row.name).font(.body)
+        Spacer(minLength: 4)
+        Text(row.detail ?? "×\(row.count)")
+          .font(.caption)
+          .fontWeight(.semibold)
+          .foregroundStyle(tint)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+      }
+      .padding(.horizontal, 4)
+      .padding(.vertical, 4)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
     }
-    .padding(.vertical, 4)
-    .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    .buttonStyle(.plain)
+    .disabled(kind == nil)
+    .watchGlassRow()
+    .listRowInsets(EdgeInsets(top: 2, leading: 3, bottom: 2, trailing: 3))
     .watchSkyRow()
   }
 
@@ -402,11 +413,13 @@ struct NextWatchView: View {
         Text(title).font(.body)
         Spacer(minLength: 0)
       }
-      // Match the standard task rows above, which carry an inner vertical pad on
-      // top of the row insets — without it these links read a touch shorter.
+      // Match the standard task rows above, which carry an inner pad on top of
+      // the row insets — without it these links read a touch shorter / narrower.
+      .padding(.horizontal, 4)
       .padding(.vertical, 4)
     }
-    .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
+    .watchGlassRow()
+    .listRowInsets(EdgeInsets(top: 2, leading: 3, bottom: 2, trailing: 3))
     .watchSkyRow()
   }
 }
@@ -607,20 +620,13 @@ struct NextItemRow: View {
       // the few points of text.
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      // Each row sits on a persistent frosted pill — a light translucent rounded
-      // card the colorful sky still shows through (the Reminders / Things wrist
-      // pattern) so rows read as distinct without an opaque slab. We use a soft
-      // *white* tint, not `.ultraThinMaterial`: watchOS materials render near-
-      // black and read as a dark slab fighting the sky, where a white film lifts
-      // off a colorful background the way the system rows do. The tap-press /
-      // done highlight layers more white on top: the row lights while the finger
-      // is down (so a hold reads as "registering" before the drawer opens) and
-      // stays lit once tapped — `done` holds the highlight through the ~1.1s
+      // Each row sits on the shared frosted pill (`watchGlassRow`, the single
+      // source for that look across every page). The tap-press / done highlight
+      // layers more white on top via `extraHighlight`: the row lights while the
+      // finger is down (so a hold reads as "registering" before the drawer opens)
+      // and stays lit once tapped — `done` holds the highlight through the ~1.1s
       // settle before the row fades.
-      .background(
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .fill(Color.white.opacity(0.16 + highlightOpacity))
-      )
+      .watchGlassRow(extraHighlight: highlightOpacity)
       .scaleEffect(isPressing ? 0.98 : 1)
       .animation(.easeOut(duration: 0.14), value: isPressing)
       .animation(.easeOut(duration: 0.14), value: done)
