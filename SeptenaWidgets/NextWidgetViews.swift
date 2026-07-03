@@ -74,9 +74,10 @@ private func categories(_ items: [NextItem]) -> [NextCategory] {
 // MARK: - Home Screen: small (top 3 categories) & medium (top 4)
 //
 // Both render through the shared `WidgetListLayout` so Next and Today are the
-// same widget with a different accent and leading glyph. Next's glyph is the
-// per-category SF Symbol — load-bearing, it tells the categories apart — tinted
-// with `Theme.nextAccent`; the header carries the same accent on the bucket icon.
+// same widget with a different leading glyph. Next's glyph is the per-category
+// SF Symbol — load-bearing, it tells the categories apart — tinted with that
+// category's section accent (`kindAccent`), matching the app's Next feed; the
+// header's bucket icon stays neutral gray.
 
 private struct SmallView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: true) } }
 private struct MediumView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: false) } }
@@ -92,11 +93,12 @@ private struct HomeList: View {
       header: WidgetListHeader(
         icon: entry.bucket.icon,
         title: entry.bucket.title,
-        accent: Theme.nextAccent,
+        accent: Theme.inkSecondary,
         trailing: "\(entry.remaining)",
         compact: compact
       ),
-      isEmpty: cats.isEmpty
+      isEmpty: cats.isEmpty,
+      fill: .distributed
     ) {
       ForEach(cats.prefix(compact ? 3 : 4)) { cat in
         WidgetListRow(
@@ -107,7 +109,7 @@ private struct HomeList: View {
         ) {
           Image(systemName: kindIcon(cat.kind))
             .font(.system(size: compact ? 11 : 12))
-            .foregroundStyle(Theme.nextAccent)
+            .foregroundStyle(kindAccent(cat.kind))
         }
       }
     }
@@ -192,4 +194,22 @@ private func kindIcon(_ kind: String) -> String {
   case "suggestion": return "sparkles"
   default:           return "circle"
   }
+}
+
+/// Per-category glyph tint — the app's Next feed colors each row by its
+/// section accent, so the widget does the same. The widget can't run
+/// `SectionTheme` (no SwiftData in the extension), so map the category kind to
+/// the shipped baseline section token and resolve it through `AdaptiveColor`
+/// (the same hex→adaptive resolver the app uses). User recolors in Settings
+/// don't reach the widget; the defaults match a fresh install.
+private func kindAccent(_ kind: String) -> Color {
+  let token: String?
+  switch kind {
+  case "task":       token = "#ef4444"   // tasks
+  case "chore":      token = "#a855f7"   // chores
+  case "habit":      token = "#22c55e"   // habits
+  case "supplement": token = "#3b82f6"   // supplements
+  default:           token = nil         // suggestion / unknown → neutral
+  }
+  return AdaptiveColor.adaptive(token) ?? Theme.inkSecondary
 }

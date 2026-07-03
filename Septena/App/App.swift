@@ -516,7 +516,13 @@ struct SeptenaApp: App {
     // available, no global hotkey required.
     #if os(macOS)
     MenuBarExtra {
+      // MenuBarExtra is a SEPARATE scene: it does NOT inherit the main
+      // WindowGroup's environment. macOS builds the menu content at scene
+      // setup, so a `@Environment(DayClock.self)` read in MenuBarMenu traps
+      // at launch unless DayClock is injected here. (This is the whole app's
+      // one menu-bar dependency; keep it in sync if MenuBarMenu grows.)
       MenuBarMenu()
+        .environment(dayClock)
     } label: {
       // MenuBarExtra labels must be Text/Image/Label — arbitrary Views
       // (e.g. Canvas) get silently dropped by the status bar.

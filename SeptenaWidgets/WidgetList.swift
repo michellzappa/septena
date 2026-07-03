@@ -34,6 +34,9 @@ enum WidgetListMetrics {
   // Spacing
   static func headerGap(_ compact: Bool) -> CGFloat { compact ? 6 : 8 }
   static func rowGap(_ compact: Bool) -> CGFloat { compact ? 7 : 9 }
+  /// Wider gap for the `.distributed` fill (Next) so its rows breathe into the
+  /// full card height instead of clumping under the header.
+  static func rowGapWide(_ compact: Bool) -> CGFloat { compact ? 10 : 13 }
 }
 
 /// `[accent icon]  Title  …  trailing`. The trailing slot is a bare count
@@ -117,6 +120,15 @@ struct WidgetListEmptyState: View {
   }
 }
 
+/// How the rows sit in the space below the header.
+///   • `.packed`      — pinned up under the header (a trailing spacer eats the
+///                       slack). Today uses this.
+///   • `.distributed` — the rows block fills the remaining height and centers
+///                       within it, so the margin under the header equals the
+///                       margin at the bottom and the rows breathe. Next uses
+///                       this (with a slightly wider row gap).
+enum WidgetRowFill { case packed, distributed }
+
 /// Header-over-rows scaffold shared by both list widgets: the header gap, the
 /// rows' own gap, top-leading alignment, and the trailing spacer that pins rows
 /// up when there are fewer than the family allows.
@@ -124,7 +136,15 @@ struct WidgetListLayout<Rows: View>: View {
   let compact: Bool
   let header: WidgetListHeader
   let isEmpty: Bool
+  var fill: WidgetRowFill = .packed
   @ViewBuilder var rows: Rows
+
+  private var rowSpacing: CGFloat {
+    switch fill {
+    case .packed:      return WidgetListMetrics.rowGap(compact)
+    case .distributed: return WidgetListMetrics.rowGapWide(compact)
+    }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: WidgetListMetrics.headerGap(compact)) {
@@ -132,10 +152,15 @@ struct WidgetListLayout<Rows: View>: View {
       if isEmpty {
         WidgetListEmptyState(compact: compact)
       } else {
-        VStack(alignment: .leading, spacing: WidgetListMetrics.rowGap(compact)) {
-          rows
+        let stack = VStack(alignment: .leading, spacing: rowSpacing) { rows }
+        switch fill {
+        case .packed:
+          stack
+          Spacer(minLength: 0)
+        case .distributed:
+          // Fill the leftover height and center — equal margin top and bottom.
+          stack.frame(maxHeight: .infinity, alignment: .center)
         }
-        Spacer(minLength: 0)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

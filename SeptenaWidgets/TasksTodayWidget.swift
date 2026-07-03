@@ -103,8 +103,10 @@ private struct TasksTodayWidgetContent: View {
           title: task.title,
           overdue: task.isOverdue
         ) {
-          Circle()
-            .stroke(Theme.todayAccent, lineWidth: 1.5)
+          // Match the app's task checkbox: a neutral-gray rounded square
+          // (`Theme.checkboxStroke`), not a gold progress dot.
+          RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+            .strokeBorder(Theme.checkboxStroke, lineWidth: 1.5)
             .frame(width: WidgetListMetrics.glyphFrame(compact),
                    height: WidgetListMetrics.glyphFrame(compact))
         }
