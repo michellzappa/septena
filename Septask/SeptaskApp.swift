@@ -76,6 +76,10 @@ struct SeptaskApp: App {
         .environment(logCommit)
         .environment(iPadChrome)
         .modelContainer(localStore.container)
+        // App-wide text-size preference — shared `.septenaTextSize()` reading
+        // the same device-local step Septena writes. Outermost so it flows to
+        // the root, overlays, and the Settings sheet.
+        .septenaTextSize()
         .task {
           await services.start()
           // Overdue-badge driver (Settings ▸ Badge). Same core singleton the

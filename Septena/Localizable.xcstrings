@@ -944,6 +944,12 @@
         }
       }
     },
+    "A focused, private task manager — calm lists, careful keyboarding, and an AI that answers to you." : {
+
+    },
+    "A one-time migration from a Things database export. Your Things data is never modified." : {
+
+    },
     "A public, read-only version of this board — handy for sharing." : {
 
     },
@@ -960,6 +966,9 @@
         }
       }
     },
+    "A quiet reminder when the Claude connection needs a refresh." : {
+
+    },
     "A sentence or two about how Septena helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved." : {
 
     },
@@ -975,6 +984,15 @@
           }
         }
       }
+    },
+    "About Septask" : {
+
+    },
+    "About Septena" : {
+
+    },
+    "Accent" : {
+
     },
     "Account ID" : {
 
@@ -1391,6 +1409,9 @@
         }
       }
     },
+    "Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size." : {
+
+    },
     "After 1 minute" : {
 
     },
@@ -1595,6 +1616,9 @@
     "App Lock" : {
 
     },
+    "App-local things stay local: each app has its own welcome, view preferences, and window setup." : {
+
+    },
     "Appended to how this coach talks." : {
       "localizations" : {
         "pt-BR" : {
@@ -1766,6 +1790,9 @@
           }
         }
       }
+    },
+    "Badge" : {
+
     },
     "Based on %@ signals" : {
       "localizations" : {
@@ -2239,6 +2266,9 @@
           }
         }
       }
+    },
+    "Claude connection" : {
+
     },
     "Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app." : {
 
@@ -2744,6 +2774,9 @@
     "Deleted tasks appear here for 30 days before being permanently removed." : {
 
     },
+    "Deleting either app never deletes your data — it lives in your iCloud, not in the app. And hiding the Tasks section inside Septena never turns Septask off." : {
+
+    },
     "Despondent" : {
       "localizations" : {
         "pt-BR" : {
@@ -3042,6 +3075,9 @@
           }
         }
       }
+    },
+    "Edits made in either app appear in the other, usually within seconds when both are open. Your task accent color and task behavior settings travel too." : {
+
     },
     "Effort scale" : {
 
@@ -3528,6 +3564,9 @@
         }
       }
     },
+    "Get Started" : {
+
+    },
     "GitHub" : {
       "localizations" : {
         "pt-BR" : {
@@ -3603,6 +3642,9 @@
           }
         }
       }
+    },
+    "Good to know" : {
+
     },
     "Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch." : {
       "localizations" : {
@@ -4787,6 +4829,9 @@
     "Mark which method uses the container below. Changing the cap only affects future quick-adds." : {
 
     },
+    "Marks the app icon while any task is overdue — the same count as Today's overdue pill. On Mac it's a dock dot; per-device, so each device opts in on its own." : {
+
+    },
     "Matcha" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5023,6 +5068,9 @@
       }
     },
     "Morning / afternoon / evening boundaries decide when a bucketed habit or supplement counts as “due now” in the list." : {
+
+    },
+    "Morning run" : {
 
     },
     "Motion Gallery tunes the logging flourishes. Data Tools re-pulls records from CloudKit and generates LLM import prompts." : {
@@ -5482,6 +5530,9 @@
     "Nothing important happens on its own. The AI fills in small, reversible stuff; anything that's a real decision or can't be undone always waits for your tap." : {
 
     },
+    "Nothing leaves your devices unless you connect an AI. Apple's on-device intelligence runs locally; connecting Claude routes requests through your own gateway token, which you can disconnect any time in AI & Claude." : {
+
+    },
     "Nothing left for today" : {
       "localizations" : {
         "pt-BR" : {
@@ -5546,6 +5597,9 @@
           }
         }
       }
+    },
+    "Nudges" : {
+
     },
     "Nudges fire around when you usually log this, and stay quiet once it’s done for the day." : {
       "localizations" : {
@@ -5651,6 +5705,9 @@
           }
         }
       }
+    },
+    "One dataset, two apps" : {
+
     },
     "one time" : {
       "localizations" : {
@@ -5786,6 +5843,9 @@
           }
         }
       }
+    },
+    "Paste into a model's context to teach it the task tools without connecting MCP." : {
+
     },
     "Per day" : {
 
@@ -5937,6 +5997,9 @@
       "shouldTranslate" : false
     },
     "Pressure" : {
+
+    },
+    "Preview" : {
 
     },
     "Prices couldn't load right now — check your connection and reopen this screen." : {
@@ -6241,6 +6304,9 @@
         }
       }
     },
+    "Reminders for task deadlines are planned — they'll live here." : {
+
+    },
     "Remove" : {
       "localizations" : {
         "pt-BR" : {
@@ -6527,6 +6593,15 @@
     "Send" : {
 
     },
+    "Septask is a focused window onto your tasks: everything lives in your iCloud, synced by CloudKit, readable by no one else. No accounts, no hosted inference, no servers of ours." : {
+
+    },
+    "Septask is the focused task app from Septena, a private life operating system. Both apps read and write the same tasks, areas, and projects — one dataset in your iCloud, two first-class windows onto it." : {
+
+    },
+    "Septask keeps your tasks in your private iCloud — nothing lives on a server of ours." : {
+
+    },
     "Septena" : {
       "localizations" : {
         "pt-BR" : {
@@ -6536,6 +6611,9 @@
           }
         }
       }
+    },
+    "Septena adds the rest of life around your tasks — habits, training, nutrition, health, dashboards, and a daily Next list — each an optional section you can enable or hide." : {
+
     },
     "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
       "localizations" : {
@@ -6649,6 +6727,9 @@
         }
       }
     },
+    "septena.app" : {
+
+    },
     "Septena+ membership" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6742,6 +6823,9 @@
       }
     },
     "Sets per muscle" : {
+
+    },
+    "Sets the app's text size. Per-device — it doesn't change Septena." : {
 
     },
     "Settings" : {
@@ -7456,6 +7540,9 @@
         }
       }
     },
+    "Task export and shareable project links are planned — they'll live here." : {
+
+    },
     "Tasks" : {
       "localizations" : {
         "pt-BR" : {
@@ -7542,6 +7629,9 @@
     "Testimonials are tied to your Apple ID — sign in to iCloud, then come back." : {
 
     },
+    "Text Size" : {
+
+    },
     "Thank you" : {
       "localizations" : {
         "pt-BR" : {
@@ -7561,6 +7651,9 @@
           }
         }
       }
+    },
+    "The accent is shared with Septena — changing it here recolors Tasks there too." : {
+
     },
     "The app is free. Chip in to keep it independent." : {
       "localizations" : {
@@ -7601,6 +7694,12 @@
           }
         }
       }
+    },
+    "The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
+
+    },
+    "The full picture" : {
+
     },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
       "extractionState" : "stale",
@@ -7853,6 +7952,9 @@
           }
         }
       }
+    },
+    "Tomorrow · Health" : {
+
     },
     "Tone" : {
       "localizations" : {
@@ -8301,6 +8403,9 @@
         }
       }
     },
+    "Welcome to Septask" : {
+
+    },
     "Welcome to Septena" : {
 
     },
@@ -8347,6 +8452,9 @@
     "What is sent" : {
 
     },
+    "What leaves the device" : {
+
+    },
     "What moves your day — cross-section correlations" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8359,6 +8467,9 @@
       }
     },
     "What should we call you?" : {
+
+    },
+    "What syncs" : {
 
     },
     "What the dots mean" : {
@@ -8389,6 +8500,9 @@
           }
         }
       }
+    },
+    "Where your data lives" : {
+
     },
     "Whether weights, distances, and fluids show in metric (kg, km, ml) or imperial (lb, mi, fl oz) across Training, Body, and Hydration. Your data is always stored the same way — this only changes how it’s displayed and entered." : {
 
@@ -8587,6 +8701,9 @@
     "Your lines join the rotation alongside the packs you've enabled." : {
 
     },
+    "Your name and supporter status are shared with Septena via iCloud. There's no Septask account — your identity is your Apple ID, and supporting happens in Septena." : {
+
+    },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
@@ -8623,6 +8740,12 @@
           }
         }
       }
+    },
+    "Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud." : {
+
+    },
+    "Your tasks, areas, projects, and task conversations live in your private iCloud database, synced by CloudKit. There is no Septask account and no server of ours holding your data." : {
+
     },
     "Your testimonial" : {
 

@@ -242,6 +242,9 @@ targets:
       - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Settings/ConnectedAppsDetails.swift
+      # Shared string catalog — localizes the whole reused task UI (already
+      # translated) and collects Septask-only strings for translation.
+      - path: Septena/Localizable.xcstrings
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
@@ -259,6 +262,12 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septask
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UIBackgroundModes:
@@ -325,6 +334,9 @@ targets:
       - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Settings/ConnectedAppsDetails.swift
+      # Shared string catalog — localizes the whole reused task UI (already
+      # translated) and collects Septask-only strings for translation.
+      - path: Septena/Localizable.xcstrings
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
@@ -347,6 +359,12 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: Septask
+        CFBundleLocalizations:
+          - en
+          - fr
+          - de
+          - es
+          - pt-BR
         ITSAppUsesNonExemptEncryption: false
         CFBundleIconFile: AppIcon
         NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.

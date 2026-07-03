@@ -210,7 +210,7 @@ struct SettingsView: View {
     case reports         // practitioner reports — scoped shareable section bundles
     case layout, correlations, timeOfDay
     case nextFeed        // Next list: suggestions, carry-over, per-section visibility
-    case quickActions, appIcon
+    case quickActions, appIcon, textSize
     case skills, localMcp, motionGallery, dataTools
     case support
     case communityProfile   // public username / display name / bio (community Worker)
@@ -389,6 +389,7 @@ struct SettingsView: View {
     case .claudeAI:     return "AI"
     case .quickActions: return "Quick Actions"
     case .appIcon:      return "App Icon"
+    case .textSize:     return "Text Size"
     case .layout:       return "Layout"
     case .correlations: return "Insights"
     case .timeOfDay:    return "Time of Day"
@@ -432,6 +433,7 @@ struct SettingsView: View {
     case .claudeAI:     return "brain.head.profile"
     case .quickActions: return "bolt"
     case .appIcon:      return "app.badge"
+    case .textSize:     return "textformat.size"
     case .layout:       return "square.grid.2x2"
     case .correlations: return "chart.dots.scatter"
     case .timeOfDay:    return "clock"
@@ -482,6 +484,7 @@ struct SettingsView: View {
     case .claudeAI:          ClaudeAISettingsPane()
     case .quickActions:      QuickActionsSettingsPane()
     case .appIcon:           AppIconSettingsPane()
+    case .textSize:          TextSizeSettingsPane()
     case .layout:            LayoutSettingsPane()
     case .correlations:      CorrelationsSettingsPane()
     case .timeOfDay:         TimeOfDaySettingsPane()

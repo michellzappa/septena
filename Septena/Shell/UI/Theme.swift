@@ -461,11 +461,11 @@ extension Font {
 
   // MARK: UI body (SF Pro)
   static let septenaSidebarRow   = Font.system(.body)
-  #if os(macOS)
-  static let septenaTaskTitle    = Font.system(size: 15)
-  #else
-  static let septenaTaskTitle    = Font.system(size: 16)
-  #endif
+  // Row titles / task names — the app's most-read text layer. Based on the
+  // `.body` text style (per DesignSpec.md §5) so it participates in Dynamic
+  // Type and the app-wide text-size setting; macOS renders `.body` a touch
+  // smaller than iOS natively, preserving the prior 15/16pt feel.
+  static let septenaTaskTitle    = Font.system(.body)
   static let septenaNotes        = Font.system(.subheadline)
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
   static let septenaLabel        = Font.system(.footnote, weight: .medium)

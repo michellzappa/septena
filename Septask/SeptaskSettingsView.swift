@@ -255,6 +255,16 @@ private struct SeptaskGeneralPane: View {
         Text("The accent is shared with Septena — changing it here recolors Tasks there too.")
       }
 
+      Section {
+        NavigationLink {
+          TextSizeSettingsPane()
+        } label: {
+          Label("Text Size", systemImage: "textformat.size")
+        }
+      } footer: {
+        Text("Sets the app's text size. Per-device — it doesn't change Septena.")
+      }
+
       TaskSettingsSections()
 
       Section {

@@ -183,4 +183,10 @@ enum SettingsKey {
   /// Seconds the app may sit backgrounded before the lock re-arms. 0 =
   /// immediately. Absent → 60. Read by `AppLock`.
   static let appLockGraceSeconds = "septena.security.appLockGrace"
+  /// App-wide text-size step, a signed `TextSizeStep` raw value (−2…+2).
+  /// Offsets the OS Dynamic Type setting rather than replacing it (see
+  /// `TextSizeScale.swift`). Absent → 0 → text follows the system size
+  /// unchanged. Device-local, like the other display preferences; read by the
+  /// `.septenaTextSize()` root modifier in both app targets.
+  static let textSizeStep = "septena.display.textSizeStep"
 }

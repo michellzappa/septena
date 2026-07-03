@@ -29,6 +29,7 @@
 		03F4D6C2B204D072D7147C89 /* AISettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD583880ED63C58AF877EFD /* AISettingsPane.swift */; };
 		04154B7F4571983A8933673E /* SeptenaTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF832BE2BCBE6BE2DD116878 /* SeptenaTab.swift */; };
 		04164EF0E55B482160D53028 /* IntakeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDD99A14104B857C0AD4661 /* IntakeModel.swift */; };
+		04404294B5D2FAD948267465 /* TextSizeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 450D253463F39069D60B4256 /* TextSizeScale.swift */; };
 		0448F507E1F1600F9933AEED /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5ECFDA9128B73993023CB6 /* Models.swift */; };
 		04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
 		04EED183D775AD966C4EACBB /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
@@ -266,6 +267,7 @@
 		2F5659D1B9F54BAF86590DE4 /* WeightUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E301A5710B7AA1F688D9F0 /* WeightUnit.swift */; };
 		2F5A937885F690EC85B4A322 /* GitHubDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4752E39BC337503CC5BAD76 /* GitHubDestinationView.swift */; };
 		2F80DE9C62563F9C69A31F95 /* GitHubPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F83C851BDFC90BE157FD301 /* GitHubPlugin.swift */; };
+		2FAD30E7916688823B23AAA7 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
 		2FC4C4D31FE568792AA4A6F6 /* ClaudeGatewayDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF49F51756CC59FB1792FFF /* ClaudeGatewayDetail.swift */; };
 		3001B4A5B0285FA146B92FBD /* SessionCompleteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9F5509B06FAD96E79B08D4 /* SessionCompleteSheet.swift */; };
 		303AA6552B1FB390F0B263AC /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
@@ -672,6 +674,7 @@
 		7AE482F93B5D306B07671E01 /* Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64EB95DB6A86885B3FA483C1 /* Migration.swift */; };
 		7B31219E381E3F70CD833622 /* DashboardReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91427A4EA51692C963F686C /* DashboardReader.swift */; };
 		7B76F0E4AB2868F54240F937 /* SelectablePillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49C0EE16FCF1B2E76D8D337 /* SelectablePillsView.swift */; };
+		7BD7E0D2FDFCCD98FE13B7DA /* TextSizeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 450D253463F39069D60B4256 /* TextSizeScale.swift */; };
 		7C9148C4E0FC269D9A4E2365 /* ProfileAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79C5F444FF752423C964920B /* ProfileAvatar.swift */; };
 		7C9FCE494744086CBC4EFAA7 /* IkigaiMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB16726C9C1C5A2A1CDEDD3 /* IkigaiMiniApp.swift */; };
 		7CF1C28B21BE36F27C305B72 /* ConsumableContainerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71304188F87157FA7687FF57 /* ConsumableContainerTests.swift */; };
@@ -961,6 +964,7 @@
 		B211B2678BDDD3B30FD9307D /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		B2392A52F6D29B6BE1E64B02 /* CoachDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D8CB429512008D4925614A9 /* CoachDomain.swift */; };
 		B27F1A7FA8C123597D5E415E /* HydrationIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A35DEB46BB5366AC3FEABE /* HydrationIntents.swift */; };
+		B2877C12008A0EEED6BB971A /* TextSizeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 450D253463F39069D60B4256 /* TextSizeScale.swift */; };
 		B2C441490622B7CAFAF959B9 /* ConsumableContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */; };
 		B2D48CC2CC0FAE236C1EB7F5 /* HomepageDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B215154685D3F91F1884F5 /* HomepageDomain.swift */; };
 		B2E14AA11D3195E8F27276BB /* WatchSky.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCA995E74F8AF991CB006F9 /* WatchSky.swift */; };
@@ -981,6 +985,7 @@
 		B6C7E84B3556A32B83A59B19 /* TrainingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74217E6989D103E5BA416E54 /* TrainingIntents.swift */; };
 		B6DCD2403FD1C55BF64AA2AF /* DashboardDiscoveryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12CE112405E07A4FB491C5A /* DashboardDiscoveryCard.swift */; };
 		B702DEDC0C79ADFDA5B9CE24 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
+		B702DF934FF4AAEA192F88F5 /* TextSizeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 450D253463F39069D60B4256 /* TextSizeScale.swift */; };
 		B716560276C736E30E061040 /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
 		B7A59913ED603636CBA72243 /* GitHubProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */; };
 		B7B90BD80CAB785BFAF64C0E /* PurposePromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4767B3C1192FEBEF9685F09D /* PurposePromptService.swift */; };
@@ -1190,6 +1195,7 @@
 		DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808A135DB47F304105813AE4 /* AppLock.swift */; };
 		DEDCC99A1C816EA4692F7A44 /* KeyboardShortcutsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */; };
 		DF016EF192B7891D2DBE3CB6 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		DF15FB5A5E41D74EE466EB7F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */; };
 		DF18562CFD663359486C92FF /* InsightsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12BBB5200E230B6672B99A6A /* InsightsDestination.swift */; };
 		DF314619D7223F60746BF380 /* ThingsImportApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */; };
 		DF31DB00141F239CBC845BAE /* PlatformDelegates.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD6DDD7BF3D997DF7C499AFC /* PlatformDelegates.swift */; };
@@ -1570,6 +1576,7 @@
 		4338BD11F7C5F927846C01AD /* LogEntryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntryRow.swift; sourceTree = "<group>"; };
 		44C7B41F8744B2EADC170EC8 /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
 		44D44998956C28A061A4DBAE /* AreasProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreasProjectsView.swift; sourceTree = "<group>"; };
+		450D253463F39069D60B4256 /* TextSizeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextSizeScale.swift; sourceTree = "<group>"; };
 		46077D40BFADE69BDE238E84 /* Changelog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Changelog.swift; sourceTree = "<group>"; };
 		473849A78E0E577B6653610D /* CoachMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachMiniApp.swift; sourceTree = "<group>"; };
 		474D7FFD0D64FFFD949E53AD /* CommunitySignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunitySignIn.swift; sourceTree = "<group>"; };
@@ -2721,6 +2728,7 @@
 				2085456E2239FA343DA34D32 /* SolarClock.swift */,
 				3EA1FB5C0671C7DC4801C53D /* SteppedDatePicker.swift */,
 				AF9E152DA345E00295EC4F58 /* SyncIndicator.swift */,
+				450D253463F39069D60B4256 /* TextSizeScale.swift */,
 				7F911216C13CBFC7E330714A /* Theme.swift */,
 				729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */,
 				27B4DF2D4A21D88AD4B3A964 /* VolumeUnit.swift */,
@@ -3202,10 +3210,10 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					0FA54A9629590B2580526F3D = {
-						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					1B1FB88A3182F26908EEC837 = {
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					2A4D1301995EEBAA1BE5D242 = {
@@ -3214,6 +3222,7 @@
 						TestTargetID = 1B1FB88A3182F26908EEC837;
 					};
 					51A3B15DE3F705B5E2134553 = {
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					82DED0A5735C22C10D7212B5 = {
@@ -3289,6 +3298,7 @@
 				8AE6AE4CCBACDFC9DAB4FBDD /* AppIcon.icon in Resources */,
 				24B78DD653EEBECD27F770A4 /* Assets.xcassets in Resources */,
 				5F8890F11B6D2D88C754C9E9 /* Info.plist in Resources */,
+				DF15FB5A5E41D74EE466EB7F /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3348,6 +3358,7 @@
 				E6EF573EC0A1562E8D6A296A /* AppIcon.icon in Resources */,
 				A74BB3E7BE101E9C7D13BA62 /* Assets.xcassets in Resources */,
 				C7A27278DC8ED0B98BE3D1D1 /* Info-Mac.plist in Resources */,
+				2FAD30E7916688823B23AAA7 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3574,6 +3585,7 @@
 				0CEBD7A4BC2763A2A643D7D5 /* TasksWidgetSnapshotStore.swift in Sources */,
 				09BE618E1E50BF70FAC33830 /* TasksWidgetWire.swift in Sources */,
 				C111A4010844A4EB34C21208 /* Telemetry.swift in Sources */,
+				7BD7E0D2FDFCCD98FE13B7DA /* TextSizeScale.swift in Sources */,
 				42CF65BD1FD4A7F66E657CF6 /* Theme.swift in Sources */,
 				89703F76F497967F8679E1B5 /* ThingsDateDecoder.swift in Sources */,
 				68A43C6FAD298BA30C7D905C /* ThingsImportApply.swift in Sources */,
@@ -3805,6 +3817,7 @@
 				596F35CD111D9B9512E95CBB /* TasksWidgetSnapshotStore.swift in Sources */,
 				2810C836B6407BBEA41CDF1F /* TasksWidgetWire.swift in Sources */,
 				CD1EB3709A8D26B46CD4B77A /* Telemetry.swift in Sources */,
+				04404294B5D2FAD948267465 /* TextSizeScale.swift in Sources */,
 				05C8CC1421116F8F119E5175 /* Theme.swift in Sources */,
 				6E8DA635CCBC03DD78E5FD09 /* ThingsDateDecoder.swift in Sources */,
 				6565580E334C0FC5E21899C3 /* ThingsImportApply.swift in Sources */,
@@ -4213,6 +4226,7 @@
 				F27A49A18DF9CF2FC68436D0 /* TasksWidgetSnapshotStore.swift in Sources */,
 				69D5457C2DA3BF62EA5A2A31 /* TasksWidgetWire.swift in Sources */,
 				F0FEBF1726404CCDEFDFE963 /* Telemetry.swift in Sources */,
+				B2877C12008A0EEED6BB971A /* TextSizeScale.swift in Sources */,
 				D01136C3F62828F390C2ED45 /* Theme.swift in Sources */,
 				93F61DC370438B6A146DE82A /* ThingsDateDecoder.swift in Sources */,
 				DF314619D7223F60746BF380 /* ThingsImportApply.swift in Sources */,
@@ -4695,6 +4709,7 @@
 				FA130606654EC68D24FD9E94 /* TasksWidgetSnapshotStore.swift in Sources */,
 				6BACD91316B05430F78C3C70 /* TasksWidgetWire.swift in Sources */,
 				4187A4D58209E2B5CCF518A4 /* Telemetry.swift in Sources */,
+				B702DF934FF4AAEA192F88F5 /* TextSizeScale.swift in Sources */,
 				E6C8DBF309966F7E6CF312CB /* Theme.swift in Sources */,
 				B8658AFA5F781F5B982557B6 /* ThingsDateDecoder.swift in Sources */,
 				72A30C74C5703C1092BFB56A /* ThingsImportApply.swift in Sources */,
@@ -4808,7 +4823,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/Septask.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septask/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -4935,6 +4949,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -4990,7 +5005,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5029,7 +5043,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septena/SeptenaMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septena/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5086,6 +5099,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5233,7 +5247,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/Septask.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Septask/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

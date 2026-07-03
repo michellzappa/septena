@@ -118,6 +118,10 @@ struct SeptenaApp: App {
         .environment(logCommit)
         .environment(appLock)
         .modelContainer(localStore.container)
+        // App-wide text-size preference (Settings ▸ General ▸ Text Size).
+        // Outermost so it reads the OS Dynamic Type size and flows the offset
+        // to RootTabView, its overlays, and every presented sheet.
+        .septenaTextSize()
         .onChange(of: scenePhase) { _, phase in
           // Drive the privacy lock first: re-arm / re-cover on background,
           // prompt for auth on return. No-op unless the user enabled it.

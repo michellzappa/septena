@@ -445,6 +445,9 @@ private struct DisplayBehaviorSettingsSections: View {
     #endif
 
     Section {
+      NavigationLink(value: SettingsView.SettingsDestination.textSize) {
+        Label("Text Size", systemImage: "textformat.size")
+      }
       NavigationLink(value: SettingsView.SettingsDestination.appIcon) {
         Label("App Icon", systemImage: "app.badge")
       }
