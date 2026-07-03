@@ -2890,6 +2890,88 @@ struct TrainingExerciseEditorBody: View {
       for: entry.exercise, metric: progressMetric, in: modelContext, today: clock.today)
   }
 
+  /// A one-tap "do a little more than last time" target for a strength set.
+  struct ProgressionHint: Equatable {
+    let weightKg: Double
+    let reps: String
+    let reason: String
+  }
+
+  /// Linear, effort-gated progression off the frozen "last time" values
+  /// (`lastByExercise`, captured at session start so it can't shift mid-set).
+  /// The natural equipment step (`WeightCadence`) is the load increment — the
+  /// same one the weight stepper uses. Effort just gates the aggression:
+  /// - easy (RIR 3+): well within reserve → jump two steps
+  /// - max (RIR 0, to failure): at the load's ceiling → hold load, add a rep
+  /// - otherwise (hard/moderate/unrated): standard one-step load bump
+  /// Strength only; nil when there's no comparable weighted history.
+  private var progressionHint: ProgressionHint? {
+    guard !entry.isCardio, !entry.isMobility,
+          let last = store.draft?.lastByExercise[exerciseKey(entry.exercise)],
+          let w = last.weight, w > 0,
+          let repsStr = last.reps, let reps = Int(repsStr), reps > 0
+    else { return nil }
+    let inc = WeightCadence.resolve(forExercise: entry.exercise).step(.kg)
+    switch TrainingEffort.canonicalKey(last.difficulty) {
+    case "easy":
+      return ProgressionHint(weightKg: w + 2 * inc, reps: "\(reps)", reason: "last set was easy")
+    case "max":
+      return ProgressionHint(weightKg: w, reps: "\(reps + 1)", reason: "to failure last time — earn a rep before more load")
+    default:
+      return ProgressionHint(weightKg: w + inc, reps: "\(reps)", reason: "steady progress")
+    }
+  }
+
+  /// The suggested target as a compact "62.5 kg × 5" string in the user's unit.
+  private func hintTargetText(_ h: ProgressionHint) -> String {
+    let u = WeightUnit.current
+    let dw = u.display(h.weightKg)
+    let wStr = dw.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(dw))" : dw.decimalString(1)
+    return "\(wStr) \(u.suffix) × \(h.reps)"
+  }
+
+  /// True when the current entry already matches the suggestion — then the
+  /// nudge is informational and the Apply button is redundant.
+  private func hintAlreadyApplied(_ h: ProgressionHint) -> Bool {
+    let wMatches = (entry.weight.map { abs($0 - h.weightKg) < 0.01 }) ?? false
+    return wMatches && (entry.reps ?? "") == h.reps
+  }
+
+  /// The proactive "coach" nudge above the weight field: what to aim for, why,
+  /// and a one-tap Apply. Non-destructive — never auto-fills an aspirational
+  /// load into a log the user might Save unchanged; the bump is a deliberate tap.
+  @ViewBuilder
+  private func progressionHintRow(_ h: ProgressionHint) -> some View {
+    HStack(spacing: 10) {
+      Image(systemName: "arrow.up.forward")
+        .font(.footnote.weight(.bold))
+        .foregroundStyle(accent)
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Aim \(hintTargetText(h))")
+          .font(.subheadline.weight(.semibold).monospacedDigit())
+        Text(h.reason)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 8)
+      if !hintAlreadyApplied(h) {
+        Button("Apply") {
+          setWeight(fmt(WeightUnit.current.display(h.weightKg)))
+          setReps(h.reps)
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+        .tint(accent)
+      }
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(accent.opacity(0.10))
+    )
+  }
+
   /// True when there's anything to draw in the history panel — a 2+ point
   /// chart or at least one recent session. Gates the panel so we never render
   /// an empty bordered card.
@@ -3017,6 +3099,9 @@ struct TrainingExerciseEditorBody: View {
 
   private var strengthInputs: some View {
     VStack(spacing: 18) {
+      if let hint = progressionHint {
+        progressionHintRow(hint)
+      }
       // Field shows / steps in the user's unit; `setWeight` converts back to
       // the kg the model stores. Step by the equipment's natural cadence
       // (barbell 2.5/5, machine 5/10, …), inferred from the exercise name.
