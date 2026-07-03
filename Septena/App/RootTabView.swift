@@ -132,6 +132,10 @@ struct RootTabView: View {
         switch action {
         case .openSection(let key):
           nav.presentSection(key: key)
+        case .newTask:
+          // Same inline "new to-do" route as ⌘N / the sidebar + — lands on
+          // Tasks ▸ Today with the composer open.
+          OpenNewTaskRouting.apply(to: nav)
         }
         nav.pendingShortcut = nil
       }

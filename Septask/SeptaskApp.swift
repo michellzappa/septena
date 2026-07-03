@@ -35,6 +35,12 @@ struct SeptaskApp: App {
   private let localStore = LocalStore.shared
   private let services = SeptenaServices.shared
   @Environment(\.scenePhase) private var scenePhase
+  #if os(iOS)
+  /// Slim composition-root delegate for Home Screen Quick Action delivery
+  /// (SeptaskQuickActions.swift) — the tasks-only twin of the full app's
+  /// AppDelegate. iOS only; macOS has no icon long-press menu.
+  @UIApplicationDelegateAdaptor(SeptaskAppDelegate.self) private var appDelegate
+  #endif
 
   var body: some Scene {
     WindowGroup {
@@ -52,6 +58,19 @@ struct SeptaskApp: App {
           settingsStore.reloadFromMirror(context: localStore.container.mainContext)
           theme.paintFromCache()
         }
+        // Home Screen Quick Action routing. The delegate publishes onto
+        // `pendingShortcut` (warm) or `SeptaskApp.task` drains it (cold);
+        // either way we land the shared quick-add composer — the same sheet
+        // the tab-bar `+` and ⌘I present. Septask ships no sections, so
+        // `.openSection` is a no-op here.
+        .onChange(of: navigation.pendingShortcut) { _, action in
+          guard let action else { return }
+          switch action {
+          case .newTask:      navigation.presentAddInfo(section: .tasks)
+          case .openSection:  break
+          }
+          navigation.pendingShortcut = nil
+        }
         .environment(navigation)
         .environment(theme)
         .environment(settingsStore)
@@ -68,6 +87,15 @@ struct SeptaskApp: App {
         // the root, overlays, and the Settings sheet.
         .septenaTextSize()
         .task {
+          #if os(iOS)
+          // Drain a shortcut captured during cold launch (the delegate
+          // stashes it before NavigationState exists), then hand the delegate
+          // a live reference so warm-launch taps publish straight through.
+          if let pending = SeptaskAppDelegate.consumePendingShortcut() {
+            navigation.pendingShortcut = pending
+          }
+          SeptaskAppDelegate.navigation = navigation
+          #endif
           await services.start()
           #if DEBUG
           // Screenshot / UI-test builds: load curated demo data into the

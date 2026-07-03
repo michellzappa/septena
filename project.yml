@@ -270,6 +270,22 @@ targets:
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
+        # Scene lifecycle so Home Screen Quick Actions land: the cold-launch
+        # item rides UIScene.ConnectionOptions, delivered to SeptaskSceneDelegate
+        # (SeptaskQuickActions.swift). Without an explicit delegate class iOS
+        # uses a no-op default and drops the tap. Mirrors the full app.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptaskSceneDelegate
+        # Always-present icon long-press action: "New To-Do" → quick-add
+        # composer. Type matches ShortcutAction.newTask's rawValue.
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.septena.app.newtask
+            UIApplicationShortcutItemTitle: New To-Do
+            UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAdd
         UIBackgroundModes:
           - remote-notification
         # The compiled task UI includes the Reminders inbox and the Today
