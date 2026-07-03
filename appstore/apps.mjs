@@ -54,9 +54,10 @@ export const APPS = {
     metadataMacDir: "metadata-septask-mac",
     bundleIds: { ios: "com.septena.tasks", mac: "com.septena.tasks.mac" },
     devices: {
-      // Inactive until Septask captures exist; flip each on once its raw shots
-      // land so validate.mjs's parity guard never lets a placeholder ship.
-      iphone69: { active: false },
+      // Flip each on once its raw shots land so validate.mjs's parity guard
+      // never lets a placeholder ship. iphone69 captured 2026-07-03
+      // (tasks-today / tasks-anytime / tasks-project); iPad + Mac still pending.
+      iphone69: { active: true },
       ipad13: { active: false },
       mac: { active: false },
     },

@@ -9,7 +9,9 @@
     "render": "node render.mjs",
     "validate": "node validate.mjs",
     "all": "node metadata.mjs && node render.mjs && node validate.mjs",
+    "all:septask": "SEPTENA_APP=septask npm run all",
     "viz": "npm run all && node serve.mjs",
+    "viz:septask": "SEPTENA_APP=septask npm run viz",
     "postinstall": "playwright install chromium"
   },
   "devDependencies": {

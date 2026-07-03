@@ -10,6 +10,16 @@
 # macOS is a separate ASC app (com.septena.cloud.mac): when it goes live, run
 # deliver with `--app_identifier com.septena.cloud.mac --platform osx
 # --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac`.
+#
+# Septask is a second app with its own two ASC records. Build its package with
+# `cd appstore && npm run all:septask`, then deliver each (bundle ids verified in
+# project.yml — com.septena.tasks / com.septena.tasks.mac):
+#   fastlane deliver --app_identifier com.septena.tasks --platform ios \
+#     --metadata_path appstore/metadata-septask \
+#     --screenshots_path appstore/screenshots-septask
+#   fastlane deliver --app_identifier com.septena.tasks.mac --platform osx \
+#     --metadata_path appstore/metadata-septask-mac \
+#     --screenshots_path appstore/screenshots-septask-mac
 
 app_identifier "com.septena.cloud"
 platform "ios"

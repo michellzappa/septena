@@ -19,6 +19,7 @@
 // (01-Week … 14-Body). Missing captures render a branded placeholder.
 
 import { theme } from "./theme.mjs";
+import { currentApp } from "./apps.mjs";
 const S = theme.sections;
 
 // iPhone narrative, defined first so iPad can reuse it (same captures, same
@@ -139,5 +140,14 @@ const watch = [
   },
 ];
 
-export const panels = { iphone69: iphone, ipad13: ipad, mac, watch };
-export const panelsFor = (deviceKey) => panels[deviceKey] ?? [];
+// Septena's panels, keyed by device class.
+const septena = { iphone69: iphone, ipad13: ipad, mac, watch };
+
+// Septask's panels live in a sibling file so this file stays Septena's. Loaded
+// lazily-by-object here; both are plain data.
+import { septaskPanels } from "./panels.septask.mjs";
+
+const BY_APP = { septena, septask: septaskPanels };
+
+export const panels = septena; // back-compat: Septena's set
+export const panelsFor = (deviceKey) => (BY_APP[currentApp().key] ?? {})[deviceKey] ?? [];

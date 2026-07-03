@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0005E8A6C2FF9414541F560E /* MacScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B99695510172AC18897474EA /* MacScreenshotTests.swift */; };
 		002C465DC1BF297DFED1A82A /* GroceriesQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04282C19B1BCFF16B61F4CA1 /* GroceriesQuickAddMenu.swift */; };
 		00868D16B0589C557DE9D20A /* RingsHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5DE68E3B7FE05E1182EE513 /* RingsHomepageView.swift */; };
 		00883D131EC6534569B7B513 /* AreaRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C729259A5867D99CC64AA9C3 /* AreaRecord.swift */; };
@@ -121,6 +122,7 @@
 		17ADAC551DA38D31B787D33C /* HomepageDomainData.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E4B96D09624A89E4D87019 /* HomepageDomainData.swift */; };
 		17BB1FD5CD0BDDED4B990D59 /* GutIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D9C97637C2269CC0B754DCA /* GutIntents.swift */; };
 		17D6C8BA0763862CEF2095C3 /* SelectableScrollList.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */; };
+		17EA2769D0E4932A78E6705A /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38951C4CD8077FBCC4FD6D14 /* ScreenshotTests.swift */; };
 		182894C3B7902C0B4CE365BA /* DemoSeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = E13465E0A2D6B50EEAE9C880 /* DemoSeed.swift */; };
 		1845A67D3BBE2251B9363863 /* AIPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */; };
 		187093B93D48863B5E1E1E37 /* RemindersBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561130AE996F0E92FE02767D /* RemindersBridge.swift */; };
@@ -1384,6 +1386,13 @@
 			remoteGlobalIDString = C99314A0CFDF9A8B0AEB409A;
 			remoteInfo = SeptenaWatch;
 		};
+		4C7AF289ACB53BFDDB130BCF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 51A3B15DE3F705B5E2134553;
+			remoteInfo = Septask;
+		};
 		5D6C81753C635D1F34F6AC10 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
@@ -1404,6 +1413,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = FA39C23110542023235A82C8;
 			remoteInfo = SeptenaLiveActivitiesExtension;
+		};
+		E92C4CEE2C668CC181A8BB5A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0FA54A9629590B2580526F3D;
+			remoteInfo = SeptaskMac;
 		};
 		F11ACB2FF642D4B161655D71 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -1550,8 +1566,9 @@
 		35841A1E340D44524476E6BC /* GroupedListSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupedListSection.swift; sourceTree = "<group>"; };
 		3795310A060A418D32730BFA /* SkyAtmosphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyAtmosphere.swift; sourceTree = "<group>"; };
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
+		38951C4CD8077FBCC4FD6D14 /* ScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTests.swift; sourceTree = "<group>"; };
 		39261AEAACE14E6C8A503DFE /* OnboardingTargetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTargetsView.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B662C803101D7F26F47EBE6 /* TrainingTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingTargetMigration.swift; sourceTree = "<group>"; };
 		3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskConvo.swift; sourceTree = "<group>"; };
@@ -1626,8 +1643,8 @@
 		56D46EB2B5D44183C0600DCF /* SymptomsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymptomsPlugin.swift; sourceTree = "<group>"; };
 		58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDraft.swift; sourceTree = "<group>"; };
 		5835F104E8DFAA668ACCF9A5 /* Fasting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fasting.swift; sourceTree = "<group>"; };
-		59055370ABA84DB912D64D1E /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		594D306ECD44EA64FBBBCA85 /* Septask.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptaskMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		59A88F76E4A01B4157081C37 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		5A180DB4658590D42B413003 /* TrainingSessionSpansTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionSpansTests.swift; sourceTree = "<group>"; };
 		5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventRow.swift; sourceTree = "<group>"; };
@@ -1690,8 +1707,8 @@
 		7665B2DC0D88761C66A7600D /* MCPToolCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolCatalog.swift; sourceTree = "<group>"; };
 		7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPatternsSection.swift; sourceTree = "<group>"; };
 		77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueFlowView.swift; sourceTree = "<group>"; };
-		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		78BD3A7769358CC755D5E3E3 /* CoachContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachContextBuilder.swift; sourceTree = "<group>"; };
 		792CC5DC9E3C1EE23F36FF57 /* WidgetInsets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetInsets.swift; sourceTree = "<group>"; };
 		79C180106D47D0477F75695A /* NewNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewNutritionEntrySheet.swift; sourceTree = "<group>"; };
@@ -1738,7 +1755,7 @@
 		8A0DB568F37B6A4DE1B82492 /* VirtuePromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtuePromptService.swift; sourceTree = "<group>"; };
 		8AA5BDDAF414C995743611BD /* FastingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FastingTests.swift; sourceTree = "<group>"; };
 		8B1AC82A051DFA765B575639 /* ClaudeGatewayProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeGatewayProvider.swift; sourceTree = "<group>"; };
-		8C3684B380D00696C61A7996 /* Septask.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C3684B380D00696C61A7996 /* Septask.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CF49F51756CC59FB1792FFF /* ClaudeGatewayDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeGatewayDetail.swift; sourceTree = "<group>"; };
 		8D3DB688522E2EB3B5330CDE /* MacroWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroWidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		8D8CB429512008D4925614A9 /* CoachDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachDomain.swift; sourceTree = "<group>"; };
@@ -1794,6 +1811,7 @@
 		AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroTargetMigration.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
 		AD6B66F3172A26B693C3094E /* TrainingPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPlugin.swift; sourceTree = "<group>"; };
+		ADCDCE95E0DA23E5FD2E4953 /* SeptaskMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptaskMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ADD8E6A4806221403EC33C42 /* ImportExportCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportExportCatalog.swift; sourceTree = "<group>"; };
 		AE312F7471B9A4905722A69F /* TrainingLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLiveActivityCoordinator.swift; sourceTree = "<group>"; };
 		AE7D333F2E13739590414CDA /* GroceriesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceriesPlugin.swift; sourceTree = "<group>"; };
@@ -1819,6 +1837,7 @@
 		B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuggestionEngine.swift; sourceTree = "<group>"; };
 		B7A1880819394CCA40FDB923 /* AddMoodPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMoodPage.swift; sourceTree = "<group>"; };
 		B87BCED8C3D11E7E122FA79C /* IntakePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakePlugin.swift; sourceTree = "<group>"; };
+		B99695510172AC18897474EA /* MacScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScreenshotTests.swift; sourceTree = "<group>"; };
 		BA03EC8DE6C2A705D7681555 /* NutritionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionPlugin.swift; sourceTree = "<group>"; };
 		BA9B6C995B9C77E9835E54BC /* WeekDashboardTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekDashboardTypes.swift; sourceTree = "<group>"; };
 		BB3A88C2CE6907A4D7BF34C2 /* AddNutritionPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddNutritionPage.swift; sourceTree = "<group>"; };
@@ -1838,11 +1857,12 @@
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditHabitSheet.swift; sourceTree = "<group>"; };
 		C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsView.swift; sourceTree = "<group>"; };
-		C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsQuickAddMenu.swift; sourceTree = "<group>"; };
 		C641220AFE9A17115F46A97C /* ReasoningProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReasoningProvider.swift; sourceTree = "<group>"; };
 		C71A4E1AB6E0523DC1EFBCDA /* TasksSkillPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkillPane.swift; sourceTree = "<group>"; };
 		C729259A5867D99CC64AA9C3 /* AreaRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaRecord.swift; sourceTree = "<group>"; };
+		C76671701936DCFC77B97142 /* SeptaskUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C786883CC7034B22DDADE727 /* CompletionPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionPatternsSection.swift; sourceTree = "<group>"; };
 		C79C561E59D69B3653B65047 /* EditNutritionEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditNutritionEntrySheet.swift; sourceTree = "<group>"; };
 		C7B436039E56AE29B498D15D /* WakingDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakingDay.swift; sourceTree = "<group>"; };
@@ -1876,7 +1896,7 @@
 		D4A1CF28130DC18463097263 /* NotificationKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationKit.swift; sourceTree = "<group>"; };
 		D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditExerciseEntrySheet.swift; sourceTree = "<group>"; };
 		D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersImportView.swift; sourceTree = "<group>"; };
-		D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaLiveActivitiesExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaLiveActivitiesExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsToSeptenaMapper.swift; sourceTree = "<group>"; };
 		D85295BF9DDB44A2F3614388 /* AddInfoPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoPalette.swift; sourceTree = "<group>"; };
 		D8FD5F9DD75DBCCE7F97E728 /* CommunityTestimonialPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityTestimonialPane.swift; sourceTree = "<group>"; };
@@ -1904,7 +1924,7 @@
 		E2416C5A216AEE7F3DBA82BB /* WeightCadence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightCadence.swift; sourceTree = "<group>"; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
 		E31DA79ECD8884E07F3A15A5 /* IntakeReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakeReader.swift; sourceTree = "<group>"; };
-		E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E3876639898BA733B43E63C4 /* WorkoutLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLogEntity.swift; sourceTree = "<group>"; };
 		E455CC1709E4A8C0430FEF0E /* SupportStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportStore.swift; sourceTree = "<group>"; };
 		E4752E39BC337503CC5BAD76 /* GitHubDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubDestinationView.swift; sourceTree = "<group>"; };
@@ -1926,7 +1946,7 @@
 		EFAEECC11E3355B23E650226 /* MacroWidgetWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroWidgetWire.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
 		F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomepageLayoutMode.swift; sourceTree = "<group>"; };
-		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
 		F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextBlocks.swift; sourceTree = "<group>"; };
 		F2DEA6B14875DD8BB28133A3 /* ChoresPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
@@ -2102,6 +2122,7 @@
 				AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */,
 				82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */,
 				784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */,
+				F364148FAD64C43890D125DA /* App */,
 				E5651035008888FF03C82755 /* Resources */,
 				59B08D4759930317F4B0B9CB /* Sections */,
 				842F4255B425A42BBD476DDD /* Shell */,
@@ -2164,6 +2185,14 @@
 			path = SeptenaUITests;
 			sourceTree = "<group>";
 		};
+		437AEED6E2BD9473C72CC988 /* SeptaskUITests */ = {
+			isa = PBXGroup;
+			children = (
+				38951C4CD8077FBCC4FD6D14 /* ScreenshotTests.swift */,
+			);
+			path = SeptaskUITests;
+			sourceTree = "<group>";
+		};
 		4410E8EDE85F86F8FBA717BF /* Intelligence */ = {
 			isa = PBXGroup;
 			children = (
@@ -2173,6 +2202,7 @@
 				4767B3C1192FEBEF9685F09D /* PurposePromptService.swift */,
 				756B5C19E36F271ED9C5AB5B /* ValuesPromptService.swift */,
 				8A0DB568F37B6A4DE1B82492 /* VirtuePromptService.swift */,
+				0B92FD5AED2B7EED0BC952CD /* Components */,
 			);
 			name = Intelligence;
 			path = Septena/Shell/Intelligence;
@@ -2431,12 +2461,19 @@
 		842F4255B425A42BBD476DDD /* Shell */ = {
 			isa = PBXGroup;
 			children = (
+				CC79ED5B01C41A0D165FE0CA /* Capture */,
 				98A1947F6BF14D5A6D6C2A1A /* Coach */,
 				D040A92EAE3D0AB95A695CE5 /* Dashboard */,
 				03B5A38B75A9FBCDF905E644 /* Goals */,
+				4410E8EDE85F86F8FBA717BF /* Intelligence */,
 				86446509AEE92C03A74BCF48 /* Onboarding */,
 				F823096891A2B23FC7CB5D6B /* Reports */,
+				D97BDB7442163601D397B102 /* Sections */,
 				58E88D7A812F74DFC3213689 /* Security */,
+				6D68A1F0A14D187F52B0AB8E /* Settings */,
+				87100EA2A5455E2B0A07163C /* Sidebar */,
+				AC3601086E54088A26CF492F /* Tasks */,
+				BCF085879C9767DF22181130 /* UI */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -2519,6 +2556,8 @@
 				4410E8EDE85F86F8FBA717BF /* Intelligence */,
 				D97BDB7442163601D397B102 /* Sections */,
 				05564C13E82831C5B0929CB5 /* Septask */,
+				F7AB8922904AB24D3C87F6B3 /* SeptaskMacUITests */,
+				437AEED6E2BD9473C72CC988 /* SeptaskUITests */,
 				28850E874FD7157D02F3C43D /* Septena */,
 				E129AEFF2C1B93C7B4789164 /* SeptenaCore */,
 				9DD0B9F75C6D7B3F0BB0CDE1 /* SeptenaCoreTests */,
@@ -2673,11 +2712,13 @@
 			isa = PBXGroup;
 			children = (
 				8C3684B380D00696C61A7996 /* Septask.app */,
-				594D306ECD44EA64FBBBCA85 /* Septask.app */,
+				594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */,
+				ADCDCE95E0DA23E5FD2E4953 /* SeptaskMacUITests.xctest */,
+				C76671701936DCFC77B97142 /* SeptaskUITests.xctest */,
 				39E8BE393381A7D49657D3C0 /* Septena.app */,
 				8E99BF2435646190AC7F9AD2 /* SeptenaCoreTests.xctest */,
 				D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */,
-				59055370ABA84DB912D64D1E /* Septena.app */,
+				59055370ABA84DB912D64D1E /* SeptenaMac.app */,
 				9F2B50F5BF1098E27A7D4DCA /* SeptenaMacUITests.xctest */,
 				C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */,
 				5122E5C1D750654468CDCE96 /* SeptenaWatch.app */,
@@ -2743,6 +2784,7 @@
 			isa = PBXGroup;
 			children = (
 				67B23DB30F74DB6CE84F7C6E /* QuickFindView.swift */,
+				FEB5AF15AD001744F77A0B72 /* AddInfo */,
 			);
 			name = Capture;
 			path = Septena/Shell/Capture;
@@ -2959,6 +3001,14 @@
 			path = Septena/App;
 			sourceTree = "<group>";
 		};
+		F7AB8922904AB24D3C87F6B3 /* SeptaskMacUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B99695510172AC18897474EA /* MacScreenshotTests.swift */,
+			);
+			path = SeptaskMacUITests;
+			sourceTree = "<group>";
+		};
 		F823096891A2B23FC7CB5D6B /* Reports */ = {
 			isa = PBXGroup;
 			children = (
@@ -3011,7 +3061,7 @@
 			packageProductDependencies = (
 			);
 			productName = SeptaskMac;
-			productReference = 594D306ECD44EA64FBBBCA85 /* Septask.app */;
+			productReference = 594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */;
 			productType = "com.apple.product-type.application";
 		};
 		1B1FB88A3182F26908EEC837 /* SeptenaMac */ = {
@@ -3030,7 +3080,7 @@
 			packageProductDependencies = (
 			);
 			productName = SeptenaMac;
-			productReference = 59055370ABA84DB912D64D1E /* Septena.app */;
+			productReference = 59055370ABA84DB912D64D1E /* SeptenaMac.app */;
 			productType = "com.apple.product-type.application";
 		};
 		2A4D1301995EEBAA1BE5D242 /* SeptenaMacUITests */ = {
@@ -3142,6 +3192,42 @@
 			productReference = 5122E5C1D750654468CDCE96 /* SeptenaWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D376ECA460FF2B1C93DD79C1 /* SeptaskUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7692A996906683B393239A0C /* Build configuration list for PBXNativeTarget "SeptaskUITests" */;
+			buildPhases = (
+				E76C745C28FA436F9AD8835A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1BB068C592F2D67879E48247 /* PBXTargetDependency */,
+			);
+			name = SeptaskUITests;
+			packageProductDependencies = (
+			);
+			productName = SeptaskUITests;
+			productReference = C76671701936DCFC77B97142 /* SeptaskUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		DC6B69DA0AFA1DAECCF333FC /* SeptaskMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5EEC9B933530F5F0172711E4 /* Build configuration list for PBXNativeTarget "SeptaskMacUITests" */;
+			buildPhases = (
+				14EF934324C86E62670607F9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AC6CD3A7F24596362124AE49 /* PBXTargetDependency */,
+			);
+			name = SeptaskMacUITests;
+			packageProductDependencies = (
+			);
+			productName = SeptaskMacUITests;
+			productReference = ADCDCE95E0DA23E5FD2E4953 /* SeptaskMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B0778FE3CB8F87A00AFCC352 /* Build configuration list for PBXNativeTarget "SeptenaLiveActivitiesExtension" */;
@@ -3210,6 +3296,7 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					0FA54A9629590B2580526F3D = {
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					1B1FB88A3182F26908EEC837 = {
@@ -3241,6 +3328,16 @@
 					C99314A0CFDF9A8B0AEB409A = {
 						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
+					};
+					D376ECA460FF2B1C93DD79C1 = {
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 51A3B15DE3F705B5E2134553;
+					};
+					DC6B69DA0AFA1DAECCF333FC = {
+						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 0FA54A9629590B2580526F3D;
 					};
 					FA39C23110542023235A82C8 = {
 						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
@@ -3276,6 +3373,8 @@
 			targets = (
 				51A3B15DE3F705B5E2134553 /* Septask */,
 				0FA54A9629590B2580526F3D /* SeptaskMac */,
+				DC6B69DA0AFA1DAECCF333FC /* SeptaskMacUITests */,
+				D376ECA460FF2B1C93DD79C1 /* SeptaskUITests */,
 				FD752EC978FED2E2D676DE2D /* Septena */,
 				904F2F0D56A19DA95C229D97 /* SeptenaCoreTests */,
 				FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */,
@@ -3403,6 +3502,14 @@
 				BFFF86242017A00A21757004 /* WakingDay.swift in Sources */,
 				212791064E27A5BFE083F1D4 /* WidgetInsets.swift in Sources */,
 				D70EF3688E57A04C0EA23818 /* WidgetList.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		14EF934324C86E62670607F9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0005E8A6C2FF9414541F560E /* MacScreenshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4338,6 +4445,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E76C745C28FA436F9AD8835A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				17EA2769D0E4932A78E6705A /* ScreenshotTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F0376DA5C03EA92945E59842 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -4773,6 +4888,16 @@
 			target = 1B1FB88A3182F26908EEC837 /* SeptenaMac */;
 			targetProxy = 5D6C81753C635D1F34F6AC10 /* PBXContainerItemProxy */;
 		};
+		1BB068C592F2D67879E48247 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 51A3B15DE3F705B5E2134553 /* Septask */;
+			targetProxy = 4C7AF289ACB53BFDDB130BCF /* PBXContainerItemProxy */;
+		};
+		AC6CD3A7F24596362124AE49 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0FA54A9629590B2580526F3D /* SeptaskMac */;
+			targetProxy = E92C4CEE2C668CC181A8BB5A /* PBXContainerItemProxy */;
+		};
 		B3BC9423C06E32CBA24D7D43 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */;
@@ -4801,6 +4926,24 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		0E929D5AA147022E14AA948D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.macuitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = SeptaskMac;
+			};
+			name = Release;
+		};
 		1E187131DD9F51C922DDC10D /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
@@ -4949,7 +5092,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5035,6 +5177,24 @@
 			};
 			name = Debug;
 		};
+		748903FF3B8AE86031C99F4D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Septask;
+			};
+			name = Release;
+		};
 		76EDDC69B856BB8BABDA6C01 /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
@@ -5099,7 +5259,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -5222,6 +5381,24 @@
 			};
 			name = Debug;
 		};
+		C14E1C000CDA01DE8D51639F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Septask;
+			};
+			name = Debug;
+		};
 		D23C04669DB4DCCC38457505 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
@@ -5257,6 +5434,24 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG SEPTASK";
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		EB7DB84935F1185F2E47C8DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0C1EC25B0AEBC39AE8560FA /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.macuitests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = SeptaskMac;
 			};
 			name = Debug;
 		};
@@ -5387,6 +5582,24 @@
 			buildConfigurations = (
 				A24D5F82127FA487745E7536 /* Debug */,
 				88FD6E4D9DC8921105158F9C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5EEC9B933530F5F0172711E4 /* Build configuration list for PBXNativeTarget "SeptaskMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EB7DB84935F1185F2E47C8DD /* Debug */,
+				0E929D5AA147022E14AA948D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7692A996906683B393239A0C /* Build configuration list for PBXNativeTarget "SeptaskUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C14E1C000CDA01DE8D51639F /* Debug */,
+				748903FF3B8AE86031C99F4D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

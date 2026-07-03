@@ -20,7 +20,9 @@ private struct SeptaskWelcomeGate: ViewModifier {
   @AppStorage(SeptaskWelcome.completedKey) private var completed = false
 
   private var presented: Binding<Bool> {
-    Binding(get: { !completed }, set: { if !$0 { completed = true } })
+    // Demo-seed (screenshot) launches land straight in tasks — the welcome
+    // would otherwise cover a fresh simulator and block every capture.
+    Binding(get: { !completed && !DemoSeedMode.isOn }, set: { if !$0 { completed = true } })
   }
 
   func body(content: Content) -> some View {

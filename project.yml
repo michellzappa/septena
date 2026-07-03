@@ -643,6 +643,44 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: SeptenaMac
 
+  # Septask marketing-screenshot capture (App Store viz pipeline, appstore/,
+  # SEPTENA_APP=septask). Task-only sidebar navigation; see the test file.
+  SeptaskUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SeptaskUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: Septask
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Septask
+
+  SeptaskMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: SeptaskMacUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeptaskMac
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.macuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: SeptaskMac
+
 schemes:
   Septena:
     build:
@@ -670,6 +708,10 @@ schemes:
         Septask: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - SeptaskUITests
     profile:
       config: Release
     analyze:
@@ -683,6 +725,10 @@ schemes:
         SeptaskMac: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - SeptaskMacUITests
     profile:
       config: Release
     analyze:

@@ -10,6 +10,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentApp } from "./apps.mjs";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const LOCALE = "en-US";
@@ -25,7 +26,7 @@ const LOCALIZED = new Set([
 const NON_LOCALIZED = new Set(["copyright", "primary_category", "secondary_category"]);
 
 export function parseAppstoreMd() {
-  const md = readFileSync(join(ROOT, "..", "docs", "APPSTORE.md"), "utf8");
+  const md = readFileSync(join(ROOT, "..", ...currentApp().metadataDoc.split("/")), "utf8");
   const platforms = [];
   const platRe = /^## Platform: (.+?) \((.+?)\)\s*$/gm;
   const blocks = [...md.matchAll(platRe)];
@@ -46,8 +47,11 @@ export function parseAppstoreMd() {
   return platforms;
 }
 
-const metadataDirFor = (platform) =>
-  platform === "iOS" ? "metadata" : `metadata-${platform.toLowerCase().replace("os", "")}`; // macOS → metadata-mac
+// iOS → the app's metadata dir; anything else (macOS) → its mac metadata dir.
+const metadataDirFor = (platform) => {
+  const app = currentApp();
+  return platform === "iOS" ? app.metadataDir : app.metadataMacDir;
+};
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   for (const p of parseAppstoreMd()) {

@@ -82,6 +82,18 @@ struct SeptaskApp: App {
         .septenaTextSize()
         .task {
           await services.start()
+          #if DEBUG
+          // Screenshot / UI-test builds: load curated demo data into the
+          // in-memory store, same as App.swift. No-op in release. Without this
+          // Septask's demo launch is empty (the seed lives in the app root, the
+          // one place composition isn't shared). Nudge a reload so the task
+          // lists don't race ahead of the synchronous inserts and show 0.
+          if DemoSeedMode.isOn {
+            DemoSeed.populate(context: localStore.container.mainContext, today: dayClock.today)
+            NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+            NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
+          }
+          #endif
           // Overdue-badge driver (Settings ▸ Badge). Same core singleton the
           // full app starts; never prompts for permission (macOS dock dot;
           // iOS deliberately stays clear).

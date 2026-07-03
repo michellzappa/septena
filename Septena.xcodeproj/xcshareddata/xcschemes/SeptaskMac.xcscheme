@@ -37,6 +37,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "DC6B69DA0AFA1DAECCF333FC"
+               BuildableName = "SeptaskMacUITests.xctest"
+               BlueprintName = "SeptaskMacUITests"
+               ReferencedContainer = "container:Septena.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

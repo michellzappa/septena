@@ -10,7 +10,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, openSync, readSync, closeSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { devices } from "./devices.mjs";
+import { allDevices } from "./devices.mjs";
 import { panelsFor } from "./panels.config.mjs";
 import { parseAppstoreMd, LIMITS } from "./metadata.mjs";
 
@@ -44,7 +44,7 @@ const metadataReport = platforms.map((p) => {
 });
 
 // ----- screenshots + raw -----
-const deviceReport = Object.entries(devices).map(([key, d]) => {
+const deviceReport = Object.entries(allDevices()).map(([key, d]) => {
   const outDir = join(ROOT, d.outDir);
   // Validate exactly the CURRENT panels' expected files (so a stale leftover
   // from a renamed/removed panel can't pollute the set — important where the
