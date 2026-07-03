@@ -27,6 +27,11 @@ struct SeptaskApp: App {
   /// same wiring as the full app: overlay mounted innermost so it can read
   /// `logCommit` from the environment chain below.
   @State private var logCommit = LogCommitCenter()
+  /// The settings mirror cache — same object the full app uses. Septask's
+  /// Settings reads it for the profile name, telemetry level, and the What's
+  /// New list, so the panes behave identically to Septena's. Reloaded on
+  /// inbound data changes below, like App.swift.
+  @State private var settingsStore = SettingsStore()
   private let localStore = LocalStore.shared
   private let services = SeptenaServices.shared
   @Environment(\.scenePhase) private var scenePhase
@@ -43,13 +48,15 @@ struct SeptaskApp: App {
         }
         // One-time Septask welcome; self-gating after completion.
         .septaskWelcomeGate()
-        // Keep the tasks accent aligned with the CloudKit-synced section
-        // color — inbound batches repaint the cache-backed theme.
+        // Keep the tasks accent + settings cache aligned with the
+        // CloudKit-synced mirror — inbound batches repaint both.
         .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+          settingsStore.reloadFromMirror(context: localStore.container.mainContext)
           theme.paintFromCache()
         }
         .environment(navigation)
         .environment(theme)
+        .environment(settingsStore)
         .environment(services.taskMutator)
         .environment(services.areasMutator)
         .environment(services.projectsMutator)

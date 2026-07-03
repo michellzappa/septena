@@ -363,6 +363,7 @@
       }
     },
     "%@ ref%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1637,6 +1638,7 @@
       }
     },
     "area: %@   project: %@   status: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2552,6 +2554,7 @@
 
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3372,6 +3375,7 @@
       }
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3989,10 +3993,8 @@
         }
       }
     },
-    "id: %@" : {
-      "shouldTranslate" : false
-    },
     "id: %@   area: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4914,6 +4916,7 @@
 
     },
     "Missing Areas" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4924,6 +4927,7 @@
       }
     },
     "Missing Projects" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -8246,6 +8250,9 @@
           }
         }
       }
+    },
+    "Weave your calendar's events into Today and Upcoming." : {
+
     },
     "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar." : {
 

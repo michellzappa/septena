@@ -1709,6 +1709,40 @@ enum TaskOrder {
       .max()
     return (maxKey ?? 0) + gap
   }
+
+  /// Evenly spaced keys for `count` tasks dropped between two neighbor keys
+  /// (nil at a list edge). Guaranteed non-zero (0 is the "never dragged"
+  /// sentinel): a batch that lands on 0 is shifted half a step, which stays
+  /// strictly inside the neighbor interval. Callers must still treat a result
+  /// that doesn't sort strictly between its neighbors (midpoint precision
+  /// exhausted) as the renumber signal — see `TaskListView` drop handling.
+  static func positions(count: Int, above: Double?, below: Double?) -> [Double] {
+    guard count > 0 else { return [] }
+    var slots: [Double]
+    let nudge: Double
+    switch (above, below) {
+    case let (a?, b?):
+      let step = (b - a) / Double(count + 1)
+      slots = (1...count).map { a + step * Double($0) }
+      nudge = step / 2
+    case let (a?, nil):
+      slots = (1...count).map { a + gap * Double($0) }
+      nudge = gap / 2
+    case let (nil, b?):
+      slots = (1...count).map { b - gap * Double(count + 1 - $0) }
+      nudge = -gap / 2
+    case (nil, nil):
+      slots = (1...count).map { gap * Double($0) }
+      nudge = 0
+    }
+    if slots.contains(0) { slots = slots.map { $0 + nudge } }
+    return slots
+  }
+
+  /// Single-task drop key between two neighbors — `positions` for one.
+  static func between(above: Double?, below: Double?) -> Double {
+    positions(count: 1, above: above, below: below)[0]
+  }
 }
 
 extension Project {

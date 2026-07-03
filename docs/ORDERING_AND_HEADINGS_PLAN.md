@@ -112,13 +112,19 @@ first heading clears `heading`.
 
 ## Phases (each lands green on `main`, build all four schemes)
 
-**P1 — Order math (pure, tiny).** `TaskOrder.between(above:below:)` +
-renumber-on-collision helper + zero-sentinel guard. No UI. ~40 lines.
+**P1 — Order math (pure, tiny). ✅ SHIPPED.** `TaskOrder.positions(count:above:below:)`
++ `between(above:below:)` with zero-sentinel guard (`Persistence.swift`);
+renumber-on-collision lives in the drop handler.
 
-**P2 — Drag & drop.** Un-gate `.draggable` for iOS; add `TaskReorderDrop`
-modifier + insertion indicator + end-of-list drop zone; enable in project/area
-lists; multi-select drop keeps payload order. Verify iPad drag→sidebar.
-~120–150 lines, all in `Shell/Tasks` (shared, both apps).
+**P2 — Drag & drop. ✅ SHIPPED (needs hands-on verification).** `.draggable`
+un-gated for iOS; `TaskReorderDrop` modifier (`TaskComponents.swift`) — single
+per-row `.dropDestination`, sidebar-style accent wash while targeted,
+above/below by drop point vs. row midline (a live insertion line needs
+`DropDelegate`; deferred to P4 polish if the midline feel isn't enough).
+Enabled on project / area / Inbox lists via `cardedRows(reorderable:)` +
+`handleReorderDrop` in `TaskListView.swift`; multi-select drops keep render
+order; degenerate midpoints re-space the visible list at `gap` steps. No
+end-of-list zone yet — the last row's bottom half covers drop-at-end.
 
 **P3 — Headings.** Model fields + conditional CK writes + `CloudKitSchema.md`
 rows; mutator methods; project-view grouped rendering + heading row UI;

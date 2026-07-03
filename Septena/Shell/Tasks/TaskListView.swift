@@ -1283,7 +1283,55 @@ struct TaskListView: View {
   private var visibleRows: some View {
     cardedRows(visibleItems,
                quickMenu: { filingSuggestions[$0.id] != nil },
-               appendQuickAdd: attachesQuickAddToVisibleCard)
+               appendQuickAdd: attachesQuickAddToVisibleCard,
+               reorderable: isManuallyOrderedList)
+  }
+
+  /// True where the rendered order IS the manual `TaskOrder.key` order —
+  /// project / area pages and the Inbox. Date- and tier-sorted surfaces
+  /// (Today, Upcoming) and history views are never reorder targets.
+  private var isManuallyOrderedList: Bool {
+    switch filter {
+    case .project, .area, .triage: return true
+    default: return false
+    }
+  }
+
+  /// A reorder drop landed on `target`: insert the dragged ids above (`before`)
+  /// or below it and persist new manual positions via the mutator. Neighbors
+  /// are read from the rendered order with the dragged rows removed, so a drop
+  /// one slot away from the original spot computes against the right keys.
+  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
+    let rendered = excludingQuickAddCapture(visibleItems)
+    let remaining = rendered.filter { !dragged.contains($0.id) }
+    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
+    let insertion = before ? targetIdx : targetIdx + 1
+    let above = insertion > 0 ? remaining[insertion - 1].orderKey : nil
+    let below = insertion < remaining.count ? remaining[insertion].orderKey : nil
+    let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
+    let strictlyPlaced =
+      zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
+      && (above.map { slots.first! > $0 } ?? true)
+      && (below.map { slots.last! < $0 } ?? true)
+    if strictlyPlaced {
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+    } else {
+      // Midpoint precision exhausted in this gap (dozens of drops into the
+      // same slot) — re-space the whole visible list at `gap` steps anchored
+      // at its current top key, dragged rows spliced in place.
+      var final = remaining.map(\.id)
+      final.insert(contentsOf: ids, at: insertion)
+      let base = rendered.first?.orderKey ?? TaskOrder.gap
+      for (i, id) in final.enumerated() {
+        let pos = base + TaskOrder.gap * Double(i)
+        mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+      }
+    }
+    Haptics.tick()
+    Task { await load() }
+    return true
   }
 
   /// Things-style footer on project / area pages: a quiet link that expands
@@ -1847,9 +1895,11 @@ struct TaskListView: View {
     // trailing accessory (left of the date) rather than appended at the edge.
     rowContent(task, accessory: quickMenu ? suggestionCapsule(for: task) : nil)
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
-    // it. `.draggable` pairs with the sidebar's `.dropDestination(for:)`; the
-    // explicit preview is a compact title pill.
-    #if os(macOS)
+    // it, or between rows of a manually-ordered list to reorder. `.draggable`
+    // pairs with the sidebar's `.dropDestination(for:)` and `TaskReorderDrop`;
+    // the explicit preview is a compact title pill. On iOS the lift starts
+    // from the system long-press drag (UIKit arbitrates it against the tap
+    // and context-menu gestures).
     .draggable(dragPayload(for: task)) {
       let payload = dragPayload(for: task)
       if payload.ids.count > 1 {
@@ -1868,7 +1918,6 @@ struct TaskListView: View {
           .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
       }
     }
-    #endif
   }
 
   /// The one-tap "file here" capsule — same top pick as the context menu's
@@ -2031,9 +2080,17 @@ struct TaskListView: View {
        let task = quickAddCaptureTask, expandedEditId == task.id {
       taskRow(task)
         .id(Self.quickAddScrollID)
-    } else {
+    } else if quickAddDraftId == nil {
       QuickAddTriggerRow(action: { startCreate() })
         .id(Self.quickAddScrollID)
+    } else {
+      // A capture is in flight in ANOTHER slot (grouped Today: the header "+"
+      // hosts the editor in its area/project section while the Inbox keeps its
+      // trigger row). The scroll id must stay unique — if this trigger row also
+      // carried it, `startCreate`'s force-scroll resolves to the Inbox row at
+      // the top, the viewport jumps away, and the LazyVStack tears down the
+      // just-opened editor (purging the empty draft via `onVanish`).
+      QuickAddTriggerRow(action: { startCreate() })
     }
   }
 
@@ -2367,7 +2424,8 @@ struct TaskListView: View {
   private func cardedRows(_ tasks: [SeptenaTask],
                           quickMenu: ((SeptenaTask) -> Bool)? = nil,
                           appendQuickAdd: Bool = false,
-                          quickAddShowsEditor: Bool = true) -> some View {
+                          quickAddShowsEditor: Bool = true,
+                          reorderable: Bool = false) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
@@ -2376,6 +2434,11 @@ struct TaskListView: View {
                         // The open editor keeps the plain card surface (a clean
                         // editing field), not the gray selection fill.
                         isSelected: selection.contains(task.id) && expandedEditId != task.id)
+        // After the chrome, so the drop target (and its targeting wash) spans
+        // the full card slice the user sees, not just the inner row content.
+        .modifier(TaskReorderDrop(perform: reorderable
+          ? { ids, before in handleReorderDrop(ids: ids, target: task, before: before) }
+          : nil))
     }
     if appendQuickAdd {
       quickAddLine(showsEditor: quickAddShowsEditor)

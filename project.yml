@@ -240,6 +240,7 @@ targets:
       - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
+      - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift
@@ -321,6 +322,7 @@ targets:
       - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
+      - path: Septena/Shell/Settings/SettingsStore.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoSection.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRouter.swift
       - path: Septena/Shell/Capture/AddInfo/AddInfoRow.swift

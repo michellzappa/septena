@@ -1,9 +1,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Task drag payload (macOS sidebar drop)
+// MARK: - Task drag payload (sidebar re-home + in-list reorder)
 
-/// Drag payload for re-homing one or more tasks onto a sidebar destination.
+/// Drag payload for re-homing one or more tasks onto a sidebar destination,
+/// or reordering them within a manually-ordered list (`TaskReorderDrop`).
 struct TaskDragIDs: Codable, Hashable, Transferable {
   let ids: [String]
 
@@ -14,6 +15,100 @@ struct TaskDragIDs: Codable, Hashable, Transferable {
 
 extension UTType {
   static let septenaTaskDragIDs = UTType(exportedAs: "com.septena.task-drag-ids")
+}
+
+/// Row-level reorder target for manually-ordered lists — the in-list
+/// counterpart of the sidebar's `SidebarTaskDrop`, same `TaskDragIDs`
+/// payload. While a drag hovers, the row parts an animated gap on the side
+/// the drop would land (top half = insert above, bottom half = below) —
+/// pushing the rows beneath out of the way — with an accent insertion line
+/// in the opening. `perform` is nil on rows that aren't reorderable
+/// (date/tier-sorted lists), which makes the modifier a pass-through.
+///
+/// Uses `onDrop(of:delegate:)` rather than `.dropDestination` deliberately:
+/// only `DropDelegate.dropUpdated` exposes the hover location live (needed
+/// for the insertion side) and the drop proposal (`.move`, so the cursor
+/// doesn't wear the green copy badge).
+struct TaskReorderDrop: ViewModifier {
+  static let gapHeight: CGFloat = 14
+
+  let perform: ((_ ids: [String], _ before: Bool) -> Bool)?
+  /// nil = no drag hovering; true = would insert above this row; false = below.
+  @State private var hoverBefore: Bool? = nil
+  @State private var rowHeight: CGFloat = 0
+
+  func body(content: Content) -> some View {
+    if let perform {
+      content
+        // Height of the un-parted row — captured before the gap padding so
+        // the delegate's midline compare doesn't shift when the gap opens.
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { rowHeight = $0 }
+        .padding(.top, hoverBefore == true ? Self.gapHeight : 0)
+        .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
+        .overlay(alignment: .top) { if hoverBefore == true { insertionLine } }
+        .overlay(alignment: .bottom) { if hoverBefore == false { insertionLine } }
+        .animation(.easeOut(duration: 0.14), value: hoverBefore)
+        .onDrop(of: [.septenaTaskDragIDs],
+                delegate: TaskReorderDropDelegate(hoverBefore: $hoverBefore,
+                                                  rowHeight: { rowHeight },
+                                                  perform: perform))
+    } else {
+      content
+    }
+  }
+
+  /// A 3pt accent capsule centered in the parted gap.
+  private var insertionLine: some View {
+    Capsule()
+      .fill(Color.accentColor)
+      .frame(height: 3)
+      .padding(.horizontal, 20)
+      .frame(height: Self.gapHeight)
+  }
+}
+
+private struct TaskReorderDropDelegate: DropDelegate {
+  @Binding var hoverBefore: Bool?
+  let rowHeight: () -> CGFloat
+  let perform: (_ ids: [String], _ before: Bool) -> Bool
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropEntered(info: DropInfo) { update(info) }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    update(info)
+    return DropProposal(operation: .move)
+  }
+
+  func dropExited(info: DropInfo) { hoverBefore = nil }
+
+  func performDrop(info: DropInfo) -> Bool {
+    let before = hoverBefore ?? true
+    hoverBefore = nil
+    // A drag carries ONE payload holding the whole selection (see
+    // `dragPayload(for:)`), so the first provider is the drop.
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first
+    else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data)
+      else { return }
+      DispatchQueue.main.async { _ = perform(payload.ids, before) }
+    }
+    return true
+  }
+
+  /// Which side of the row the pointer is on. The open gap pads the content
+  /// down, so subtract it before the midline compare; the flip then moves the
+  /// content *away* from the pointer, so the side is hysteresis-stable (no
+  /// flicker at the midline).
+  private func update(_ info: DropInfo) {
+    let adjusted = info.location.y - (hoverBefore == true ? TaskReorderDrop.gapHeight : 0)
+    hoverBefore = adjusted < rowHeight() / 2
+  }
 }
 
 // MARK: - Checkbox feel

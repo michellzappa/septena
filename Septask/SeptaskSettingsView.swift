@@ -1,47 +1,54 @@
 import SwiftUI
 import SwiftData
 
-/// Septask's Settings — a visual mirror of the full app's Settings root
-/// (docs/SEPTASK.md P3) at task-app scale: the same `ColoredGlyph` icon-tile
-/// rows in intent groups, the same top luminance wash, the same disc-tile
-/// About treatment, fed by the same value-based destination pattern —
-/// fewer rows, identical design. Shell-only composition: behavior lives in
-/// shared files (`TaskSettingsSections`, `ClaudeAISettingsPane`,
-/// `ThingsImportView`, `SettingsMirror`, `SettingsChrome`); only app-local
-/// concerns (welcome reset, the About pages, the privacy explainer) are
-/// defined here.
+/// Septask's Settings — the full app's architecture (`SettingsView`) at
+/// task-app scale (docs/SEPTASK.md P3): an identity header card, then
+/// intent-grouped `ColoredGlyph` rows into real panes, then About set apart
+/// with disc tiles — the same shape as Septena, stripped to what a task app
+/// needs. Shell-only composition: behavior lives in shared files
+/// (`TaskSettingsSections`, `ClaudeAISettingsPane`, `ThingsImportView`,
+/// `SettingsMirror`, `SettingsStore`, `SettingsChrome`, `ProfileAvatar`);
+/// only app-local surfaces (the About pages, task privacy copy) are here.
 struct SeptaskSettingsView: View {
   enum Destination: Hashable {
-    case tasks
+    case account
+    case general
     case claudeAI
-    case thingsImport
+    case data
     case privacy
     case aboutSeptask
     case aboutSeptena
   }
 
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SectionTheme.self) private var theme
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
   @State private var path: [Destination] = []
 
   var body: some View {
     NavigationStack(path: $path) {
       List {
+        // Identity card — the Apple-ID analogue, the full app's top-of-
+        // Settings row. There's no Septask account: identity is your iCloud.
         Section {
-          NavigationLink(value: Destination.tasks) {
-            row("Tasks", icon: "checkmark", tint: 0)
-          }
-          HStack {
-            row("Accent", icon: "paintpalette", tint: 1)
-            Spacer()
-            PaletteSwatchButton(selectedHex: theme.token(for: "tasks")) { hex in
-              SettingsMirror.setSectionColor("tasks", hex: hex,
-                                             context: modelContext,
-                                             engine: ckEngine)
-              theme.setColor(hex, for: "tasks")
+          NavigationLink(value: Destination.account) {
+            HStack(spacing: 14) {
+              ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 56)
+              VStack(alignment: .leading, spacing: 3) {
+                Text(welcomeName.isEmpty ? "Your Profile" : welcomeName)
+                  .font(.title3.weight(.semibold))
+                  .foregroundStyle(.primary)
+                FreeAccountBadge()
+              }
+              Spacer(minLength: 0)
             }
+            .padding(.vertical, 8)
+          }
+        }
+
+        Section {
+          NavigationLink(value: Destination.general) {
+            row("General", icon: "slider.horizontal.3", tint: 0)
           }
         }
 
@@ -49,11 +56,11 @@ struct SeptaskSettingsView: View {
           NavigationLink(value: Destination.claudeAI) {
             row("AI & Claude", icon: "brain.head.profile", tint: 5)
           }
-          NavigationLink(value: Destination.thingsImport) {
-            row("Import from Things", icon: "square.and.arrow.down", tint: 3)
+          NavigationLink(value: Destination.data) {
+            row("Data", icon: "square.and.arrow.up", tint: 1)
           }
           NavigationLink(value: Destination.privacy) {
-            row("Privacy", icon: "hand.raised", tint: 4)
+            row("Privacy", icon: "hand.raised", tint: 3)
           }
         }
 
@@ -108,17 +115,14 @@ struct SeptaskSettingsView: View {
   /// The full app's static-row anatomy: label + `ColoredGlyph` tile, tinted
   /// from the shared root palette by row order.
   private func row(_ title: String, icon: String, tint index: Int) -> some View {
-    Label {
+    let color = SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count]
+    return Label {
       Text(title)
     } icon: {
       #if os(macOS)
-      ColoredGlyph(icon: icon,
-                   color: SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count],
-                   size: 20, glyphRatio: 0.48)
+      ColoredGlyph(icon: icon, color: color, size: 20, glyphRatio: 0.48)
       #else
-      ColoredGlyph(icon: icon,
-                   color: SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count],
-                   size: 29, glyphRatio: 0.38)
+      ColoredGlyph(icon: icon, color: color, size: 29, glyphRatio: 0.38)
       #endif
     }
   }
@@ -126,35 +130,156 @@ struct SeptaskSettingsView: View {
   @ViewBuilder
   private func pane(_ destination: Destination) -> some View {
     switch destination {
-    case .tasks:
-      Form { TaskSettingsSections() }
-        .formStyle(.grouped)
-        .navigationTitle("Tasks")
-
-    case .claudeAI:
-      ClaudeAISettingsPane()
-        .navigationTitle("AI & Claude")
-
-    case .thingsImport:
-      ThingsImportView()
-
-    case .privacy:
-      SeptaskPrivacyPane()
-
-    case .aboutSeptask:
-      SeptaskAboutPane()
-
-    case .aboutSeptena:
-      AboutSeptenaPane()
+    case .account:      SeptaskAccountPane()
+    case .general:      SeptaskGeneralPane()
+    case .claudeAI:     ClaudeAISettingsPane().navigationTitle("AI & Claude")
+    case .data:         SeptaskDataPane()
+    case .privacy:      SeptaskPrivacyPane()
+    case .aboutSeptask: SeptaskAboutPane()
+    case .aboutSeptena: AboutSeptenaPane()
     }
   }
 }
 
-// MARK: - Privacy
+// MARK: - Account
 
-/// Task-only privacy explainer (docs/SEPTASK.md keeps this Septask-specific).
-/// Every claim traces to the product's architecture — no marketing copy.
+/// The Apple-ID analogue: editable name + iCloud sync state. No membership
+/// section (the support flow is Septena's; Septask stays out of it for v1).
+private struct SeptaskAccountPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+  @AppStorage(SettingsKey.welcomeName) private var welcomeName: String = ""
+  @AppStorage(SettingsKey.plusUnlocked) private var plusUnlocked: Bool = false
+
+  var body: some View {
+    Form {
+      Section {
+        HStack(spacing: 16) {
+          ProfileAvatar(name: welcomeName, isPlus: plusUnlocked, size: 64)
+          VStack(alignment: .leading, spacing: 4) {
+            TextField("Your name", text: $welcomeName)
+              .font(.title2.weight(.semibold))
+              .textContentType(.givenName)
+              #if os(iOS)
+              .textInputAutocapitalization(.words)
+              #endif
+              .onChange(of: welcomeName) { _, newValue in
+                store.setWelcomeName(newValue, context: modelContext, engine: ckEngine)
+              }
+            FreeAccountBadge()
+          }
+        }
+        .padding(.vertical, 6)
+      } footer: {
+        Text("Your name is shared with Septena via iCloud. There's no Septask account — your identity is your Apple ID.")
+      }
+
+      Section {
+        HStack {
+          Label("Sync", systemImage: iCloudStatus.symbol)
+          Spacer()
+          Text(iCloudStatus.text).foregroundStyle(.secondary)
+        }
+      } header: {
+        Text("iCloud")
+      } footer: {
+        Text("Septask keeps your tasks in your private iCloud — nothing lives on a server of ours.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Account")
+  }
+
+  private var iCloudStatus: (text: String, symbol: String) {
+    switch ckEngine.accountStatus {
+    case .available:              return ("Active", "checkmark.icloud.fill")
+    case .noAccount:              return ("No iCloud account", "exclamationmark.icloud.fill")
+    case .restricted:             return ("Restricted", "xmark.icloud.fill")
+    case .temporarilyUnavailable: return ("Temporarily unavailable", "exclamationmark.icloud.fill")
+    default:                      return ("Checking…", "icloud")
+    }
+  }
+}
+
+// MARK: - General (the task app's "home" settings)
+
+/// The task settings promoted to General — accent, the shared task toggles,
+/// and the logging-animation switch. This is the "Tasks section becomes the
+/// Home settings" move: in a task app, the task knobs ARE the general knobs.
+private struct SeptaskGeneralPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SectionTheme.self) private var theme
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var loggingAnimations = true
+
+  var body: some View {
+    Form {
+      Section {
+        HStack {
+          Text("Accent")
+          Spacer()
+          PaletteSwatchButton(selectedHex: theme.token(for: "tasks")) { hex in
+            SettingsMirror.setSectionColor("tasks", hex: hex,
+                                           context: modelContext, engine: ckEngine)
+            theme.setColor(hex, for: "tasks")
+          }
+        }
+      } footer: {
+        Text("The accent is shared with Septena — changing it here recolors Tasks there too.")
+      }
+
+      TaskSettingsSections()
+
+      Section {
+        Toggle(isOn: $loggingAnimations) {
+          Label("Completion animations", systemImage: "party.popper")
+        }
+      } footer: {
+        Text("The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("General")
+  }
+}
+
+// MARK: - Data
+
+private struct SeptaskDataPane: View {
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink {
+          ThingsImportView()
+        } label: {
+          Label("Import from Things", systemImage: "square.and.arrow.down")
+        }
+      } footer: {
+        Text("A one-time migration from a Things database export. Your Things data is never modified.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Data")
+  }
+}
+
+// MARK: - Privacy (task-only)
+
+/// Telemetry transparency (the real level dial, via SettingsStore) plus a
+/// task-scoped data-locality explainer. App Lock is intentionally absent —
+/// Septask doesn't mount the lock cover yet, so the toggle would be a lie.
 private struct SeptaskPrivacyPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+  @AppStorage(SettingsKey.telemetryLevel) private var levelRaw: String =
+    TelemetryClient.TelemetryLevel.balanced.rawValue
+
+  private var level: TelemetryClient.TelemetryLevel {
+    TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
+  }
+
   var body: some View {
     Form {
       Section {
@@ -162,15 +287,32 @@ private struct SeptaskPrivacyPane: View {
       } header: {
         Text("Where your data lives")
       }
+
       Section {
-        Text("Nothing leaves your devices unless you connect an AI. Apple's on-device intelligence runs locally; connecting Claude routes requests through your own gateway token, which you can disconnect at any time in AI & Claude.")
+        Text("Nothing leaves your devices unless you connect an AI. Apple's on-device intelligence runs locally; connecting Claude routes requests through your own gateway token, which you can disconnect any time in AI & Claude.")
       } header: {
         Text("What leaves the device")
       }
+
       Section {
-        Text("Inbox filing suggestions learn from your own history, on this device. The model never uploads anywhere.")
+        Picker("Usage data", selection: Binding(
+          get: { level },
+          set: { store.setTelemetryLevel($0, context: modelContext, engine: ckEngine) }
+        )) {
+          ForEach(TelemetryClient.TelemetryLevel.allCases, id: \.self) { lvl in
+            Text(lvl.title).tag(lvl)
+          }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
       } header: {
-        Text("On-device learning")
+        Text("Anonymous usage data")
+      } footer: {
+        Text(level.summary)
+      }
+
+      Section {
+        Text("Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud.")
       }
     }
     .formStyle(.grouped)
