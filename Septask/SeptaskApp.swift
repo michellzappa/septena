@@ -151,11 +151,12 @@ struct SeptaskApp: App {
       // ⌘N is New To-Do, not New Window — inline in the focused list, else
       // the quick-add fallback.
       CommandGroup(replacing: .newItem) { NewTaskCommand() }
-      // ⌘K quick capture — the tab bar `+`'s keyboard twin. Sits in File
-      // alongside New To-Do, same as the full app's Add Info.
+      // ⌘I quick capture — the tab bar `+`'s keyboard twin, matching
+      // Septena's Add Info (⌘I). Moved off ⌘K so ⌘K completes the selected
+      // task (the Task menu's Mark as Complete); ⌘N still makes a new to-do.
       CommandGroup(after: .newItem) {
-        Button("New To-Do (Quick Add)…") { navigation.presentAddInfo(section: .tasks) }
-          .keyboardShortcut("k", modifiers: .command)
+        Button("Quick Add…") { navigation.presentAddInfo(section: .tasks) }
+          .keyboardShortcut("i", modifiers: .command)
       }
       // ⌘, opens Septask's Settings sheet — standard Preferences shortcut.
       CommandGroup(replacing: .appSettings) {

@@ -482,13 +482,14 @@ struct SeptenaApp: App {
         Button("Settings…") { navigation.showSettings = true }
           .keyboardShortcut(",", modifiers: .command)
       }
-      // ⌘K opens Add Info — the unified quick-add palette (port of the
-      // webapp's ⌘K). It's a "capture" action, so it sits in File alongside
-      // New To-Do rather than in a bespoke top-level "Add" menu. Quick Find
+      // ⌘I opens Add Info — the unified quick-add palette ("I" for Info). It
+      // sits in File alongside New To-Do rather than a bespoke "Add" menu.
+      // Moved off ⌘K so ⌘K cleanly completes the selected task (the Task
+      // menu's Mark as Complete) — File's ⌘K used to shadow it. Quick Find
       // (⌘⇧F) lives in the Go menu above.
       CommandGroup(after: .newItem) {
         Button("Add Info…") { navigation.presentAddInfo() }
-          .keyboardShortcut("k", modifiers: .command)
+          .keyboardShortcut("i", modifiers: .command)
       }
       // Override the default ⌘N "New Window" with "New To-Do". When a task
       // list is focused, `NewTaskCommand` routes to the in-list inline

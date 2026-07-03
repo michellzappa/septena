@@ -59,7 +59,7 @@ enum KeyboardShortcutsCatalogue {
   static let groups: [KeyboardShortcutGroup] = [
     navigation,
     KeyboardShortcutGroup(title: "General", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "K"], label: quickCaptureLabel),
+      KeyboardShortcut2(keys: ["⌘", "I"], label: quickCaptureLabel),
       KeyboardShortcut2(keys: ["⌘", "⇧", "F"], label: "Quick Find"),
       KeyboardShortcut2(keys: ["⌘", "/"], label: "Show / hide sidebar"),
       KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),

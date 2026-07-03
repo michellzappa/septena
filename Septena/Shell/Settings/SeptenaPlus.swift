@@ -8,10 +8,15 @@ import SwiftUI
 //
 // The whole app is free — every section, every feature, forever, with
 // nothing gated. "Support Septena" is a pure tip jar: an optional way to
-// keep the app independent and ad-free. A supporter unlocks NOTHING another
-// user can't have; the only thing it changes is cosmetic (a "Supporter"
-// badge + the avatar foil ring). That discipline is the whole product, so
-// don't put a real feature behind `plusUnlocked` — ship it free.
+// keep the app independent and ad-free. A supporter unlocks no in-app
+// capability another user can't have; what it changes is cosmetic (a
+// "Supporter" badge + the avatar foil ring) plus one timing perk — early
+// access to new builds via TestFlight. That's not a paywall: everyone still
+// gets every feature, supporters just get it weeks sooner. So the rule still
+// holds — don't put a real in-app feature behind `plusUnlocked`, ship it
+// free; early access only changes *when* you get the same build, never
+// *whether*. (Delivery is operational: supporters are invited to a TestFlight
+// group; there's no in-app gate to enforce it here.)
 //
 // Purchases run through StoreKit 2 (`SupportStore`). Locally they resolve
 // against Config/Septena.storekit wired into the scheme, so the flow is
@@ -131,13 +136,18 @@ enum SeptenaPlus {
           detail: "Septena is built by one person with a lot of AI help, and the AI is the one part that was never free. Chipping in keeps the tokens flowing — and the updates coming."),
   ]
 
-  /// The cosmetic perks a supporter actually gets. Deliberately small — the
-  /// point is to support the app, not to buy capability.
+  /// The perks a supporter actually gets: two cosmetic marks plus one real
+  /// head-start — early access to new builds. Deliberately small; the point
+  /// is to support the app, not to buy in-app capability.
   static let perks: [SeptenaPlusFeature] = [
     .init(id: "badge",
           icon: "checkmark.seal",
           title: "A Supporter badge",
           detail: "A quiet mark on your profile and a foil ring on your avatar. Just for you — it changes nothing about what the app can do."),
+    .init(id: "earlyaccess",
+          icon: "sparkles",
+          title: "Get new versions first",
+          detail: "Opt into TestFlight and get new builds weeks before they reach the App Store — first to try what's next. Every feature still lands free for everyone; you just get it sooner."),
     .init(id: "thanks",
           icon: "heart",
           title: "Our genuine thanks",
