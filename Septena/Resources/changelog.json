@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1326,
+      "build": 1332,
       "date": "2026-07-03",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask — a focused app just for tasks",
-          "detail": "A dedicated task app over the same private data, on iPhone and Mac, with a native tab bar, quick capture, and settings that mirror Septena.",
+          "title": "Weave your calendar into Tasks",
+          "detail": "Your system calendar events now appear alongside Today and Upcoming, read-only and opt-in, so your day is in one place.",
           "section": "tasks"
         },
         {
-          "title": "Tasks gets a major overhaul",
-          "detail": "Inline editing and quick-add, multi-select bulk actions, calendar events woven into Today and Upcoming, undo toasts, and a Recently Deleted view with 30-day restore.",
+          "title": "Recover deleted tasks",
+          "detail": "Deleted tasks move to Recently Deleted with restore and a 30-day auto-purge, and undo toasts cover delete, move, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and analyze it on-device, with an optional ingredient breakdown per meal.",
+          "title": "Bulk-edit and file tasks faster",
+          "detail": "Multi-select lets you complete, move, and file several tasks at once, with inline editing and a quick-add line throughout.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import your tasks from Things",
+          "detail": "Bring an existing Things database export straight into Septena's tasks.",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo of your meal",
+          "detail": "Capture meals photo-first with on-device analysis and an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly review, plus an auto-advancing rest flow and a watch Live Activity in the Smart Stack.",
-          "section": "training"
-        },
-        {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Keep the goals that matter most front and center as dashboard tiles.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter front and center as tiles on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "See exactly what telemetry is sent",
-          "detail": "Choose from graded analytics levels (off, minimal, balanced, full) and review a log of what was recently sent.",
-          "section": null
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a weekly muscle review, plus an auto-advancing rest flow that carries onto your watch.",
+          "section": "training"
         },
         {
-          "title": "Next and Today home screen widgets",
-          "detail": "Glanceable task and Next lists on your Home Screen, styled to match the app.",
-          "section": "tasks"
-        },
-        {
-          "title": "A livelier watch and Next feed",
-          "detail": "Time-of-day sky behind a paged watch feed, long-press action drawers, keyboard navigation in Next, and goal-backed habits that stay put after you complete them.",
+          "title": "Choose exactly what you share",
+          "detail": "Graded analytics levels from off to full, with a clear view of what's sent and a recently-sent log.",
           "section": null
         }
       ]
