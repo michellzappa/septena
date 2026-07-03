@@ -976,7 +976,14 @@ struct MealPickerView: View {
               .lineLimit(1)
               .minimumScaleFactor(0.8)
           }
-          if meal.count > 1 {
+          // Already logged today → a green check, in place of the ×N badge, so
+          // the row reads as done.
+          if meal.loggedToday {
+            Spacer(minLength: 0)
+            Image(systemName: "checkmark.circle.fill")
+              .font(.body)
+              .foregroundStyle(.green)
+          } else if meal.count > 1 {
             Spacer(minLength: 0)
             Text("×\(meal.count)")
               .font(.caption2.monospacedDigit())
@@ -986,6 +993,10 @@ struct MealPickerView: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      // Grayed + un-tappable once logged today, so it can't be re-logged by a
+      // stray tap. Clears at the next day's snapshot.
+      .disabled(meal.loggedToday)
+      .opacity(meal.loggedToday ? 0.45 : 1)
       .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
     }
     .listStyle(.plain)

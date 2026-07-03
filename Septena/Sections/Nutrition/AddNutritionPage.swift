@@ -8,6 +8,9 @@ private struct MealCandidate: Identifiable {
   let id: String
   let representative: NutritionEntry
   let count: Int
+  /// Already logged today → shown with a check, grayed, and un-tappable so it
+  /// can't be re-logged by accident.
+  let loggedToday: Bool
 }
 
 struct AddNutritionPage: View {
@@ -39,11 +42,13 @@ struct AddNutritionPage: View {
               AddInfoRow(
                 title: title(for: meal.representative),
                 subtitle: macros(for: meal),
-                tint: tint
+                tint: tint,
+                accessory: meal.loggedToday ? .check(true) : .none
               )
             }
             .buttonStyle(.plain)
-            .disabled(working)
+            .disabled(working || meal.loggedToday)
+            .opacity(meal.loggedToday ? 0.5 : 1)
           }
         }
       }
@@ -73,6 +78,12 @@ struct AddNutritionPage: View {
   }
 
   private func dedup(_ entries: [NutritionEntry]) -> [MealCandidate] {
+    // Meals already logged today stay in the list but sink to the bottom, grayed
+    // and un-tappable (below), so the user sees them as done without re-logging
+    // by accident. Same dedup key (foods.first, lowercased); the flag clears
+    // tomorrow (or if today's entry is deleted).
+    let loggedToday = Set(
+      entries.filter { $0.date == clock.today }.compactMap { $0.foods.first?.lowercased() })
     // Pick the most-recent representative per dedup key so the row's
     // macros reflect the latest version of that meal (the user may have
     // re-logged it with updated grams).
@@ -89,11 +100,13 @@ struct AddNutritionPage: View {
       }
     }
     return bucketed.map { (key, value) in
-      MealCandidate(id: key, representative: value.0, count: value.1)
+      MealCandidate(id: key, representative: value.0, count: value.1,
+                    loggedToday: loggedToday.contains(key))
     }
-    // Sort by recency of last occurrence; frequency only as tiebreaker.
-    // Matches the user's expectation that the freshest meal is on top.
+    // Already-logged meals sink to the bottom; above that it's recency of last
+    // occurrence, with frequency as the tiebreaker (freshest meal on top).
     .sorted { lhs, rhs in
+      if lhs.loggedToday != rhs.loggedToday { return !lhs.loggedToday }
       let l = lhs.representative.date + lhs.representative.time
       let r = rhs.representative.date + rhs.representative.time
       if l != r { return l > r }

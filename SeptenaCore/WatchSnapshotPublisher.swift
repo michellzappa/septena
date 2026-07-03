@@ -295,6 +295,12 @@ enum WatchSnapshotPublisher {
         .joined(separator: "|")
     }
 
+    // Meals already logged today stay in the list but get grayed + un-tappable
+    // on the wrist (below), so the user sees them as done and can't re-log by
+    // accident. Republished on every mutation, so the flag clears tomorrow.
+    let today = SeptenaDate.today
+    let loggedToday = Set(entries.filter { $0.date == today }.map(signature))
+
     var groups: [String: [NutritionEntry]] = [:]
     for e in entries {
       guard let first = e.foods.first, !first.isEmpty else { continue }
@@ -311,13 +317,17 @@ enum WatchSnapshotPublisher {
       else { return nil }
       let wire = MealWire(
         id: sig, emoji: t.emoji, foods: t.foods, count: items.count,
+        loggedToday: loggedToday.contains(sig),
         proteinG: t.proteinG, fatG: t.fatG, carbsG: t.carbsG, kcal: t.kcal,
         fiberG: t.fiberG, sugarG: t.sugarG, saturatedFatG: t.saturatedFatG,
         alcoholG: t.alcoholG, sodiumMg: t.sodiumMg, cholesterolMg: t.cholesterolMg,
         potassiumMg: t.potassiumMg)
       return (wire, t.date, t.time)
     }
+    // Already-logged meals sink to the bottom (still shown, grayed); above that
+    // it's frequency then recency as before.
     .sorted { a, b in
+      if a.0.loggedToday != b.0.loggedToday { return !a.0.loggedToday }
       if a.0.count != b.0.count { return a.0.count > b.0.count }
       return (a.1, a.2) > (b.1, b.2)
     }

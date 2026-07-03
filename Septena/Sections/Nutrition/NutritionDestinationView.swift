@@ -177,6 +177,11 @@ struct NutritionDestinationView: View {
   /// ranked by frequency then recency. Feeds the "+" search-and-re-log
   /// sheet — no ≥2 threshold or cap, since search wants the full set.
   private var allDistinctMeals: [UsualMeal] {
+    // Meals already logged today stay in the list but sink to the bottom, grayed
+    // and un-tappable (see the row + button below), so the user sees them as
+    // done without re-logging by accident. The flag clears tomorrow (or if
+    // today's entry is deleted).
+    let loggedToday = Set(entries.filter { $0.date == today }.map(mealSignature))
     var groups: [String: [NutritionEntry]] = [:]
     for e in entries {
       guard let first = e.foods.first, !first.isEmpty else { continue }
@@ -184,9 +189,13 @@ struct NutritionDestinationView: View {
     }
     return groups.compactMap { sig, items -> UsualMeal? in
       let template = items.max { ($0.date, $0.time) < ($1.date, $1.time) }!
-      return UsualMeal(signature: sig, template: template, count: items.count)
+      return UsualMeal(signature: sig, template: template, count: items.count,
+                       loggedToday: loggedToday.contains(sig))
     }
+    // Already-logged meals sink to the bottom; above that it's frequency then
+    // recency, as before.
     .sorted { a, b in
+      if a.loggedToday != b.loggedToday { return !a.loggedToday }
       if a.count != b.count { return a.count > b.count }
       return (a.template.date, a.template.time) > (b.template.date, b.template.time)
     }
@@ -996,6 +1005,9 @@ struct UsualMeal: Identifiable {
   let signature: String
   let template: NutritionEntry
   let count: Int
+  /// Already logged today → the row is grayed, checked, and un-tappable so it
+  /// can't be re-logged by accident.
+  let loggedToday: Bool
   var id: String { signature }
 }
 
@@ -1062,6 +1074,10 @@ struct MealRelogSearchView: View {
               mealRow(meal)
             }
             .buttonStyle(.plain)
+            // Already logged today → grayed + un-tappable so a stray tap can't
+            // re-log it.
+            .disabled(meal.loggedToday)
+            .opacity(meal.loggedToday ? 0.5 : 1)
           }
           .listStyle(.plain)
         }
@@ -1121,13 +1137,16 @@ struct MealRelogSearchView: View {
           .font(.caption2.monospacedDigit())
           .foregroundStyle(.secondary)
       }
-      Image(systemName: "arrow.clockwise")
+      // Done today → a green check instead of the re-log arrow.
+      Image(systemName: meal.loggedToday ? "checkmark.circle.fill" : "arrow.clockwise")
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.tint)
+        .foregroundStyle(meal.loggedToday ? AnyShapeStyle(Color.green) : AnyShapeStyle(.tint))
     }
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Tap to log again now.")
+    .accessibilityLabel(meal.loggedToday
+      ? "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Already logged today."
+      : "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Tap to log again now.")
   }
 }
 
