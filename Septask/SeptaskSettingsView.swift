@@ -13,6 +13,7 @@ struct SeptaskSettingsView: View {
   enum Destination: Hashable {
     case account
     case general
+    case notifications
     case claudeAI
     case calendar
     case reminders
@@ -55,6 +56,9 @@ struct SeptaskSettingsView: View {
         Section {
           NavigationLink(value: Destination.general) {
             row("General", icon: "slider.horizontal.3", tint: 0)
+          }
+          NavigationLink(value: Destination.notifications) {
+            row("Notifications", icon: "bell.badge", tint: 4)
           }
         }
 
@@ -147,6 +151,7 @@ struct SeptaskSettingsView: View {
     switch destination {
     case .account:      SeptaskAccountPane()
     case .general:      SeptaskGeneralPane()
+    case .notifications: SeptaskNotificationsPane()
     case .claudeAI:     ClaudeAISettingsPane().navigationTitle("AI & Claude")
     case .calendar:     CalendarDetail().navigationTitle("Calendar")
     case .reminders:    RemindersInboxDetail().navigationTitle("Reminders")
@@ -262,6 +267,46 @@ private struct SeptaskGeneralPane: View {
     }
     .formStyle(.grouped)
     .navigationTitle("General")
+  }
+}
+
+// MARK: - Notifications
+
+/// Septask's notification surface: the overdue badge (driven by the shared
+/// BadgeManager this app starts at launch) and the Claude reconnect nudge
+/// (armed from ClaudeGatewayProvider in core). Septena's per-section nudge
+/// scheduler is SectionRegistry-driven and doesn't run here; task deadline
+/// reminders are the planned addition.
+private struct SeptaskNotificationsPane: View {
+  @AppStorage(SettingsKey.badgeShowOverdue) private var taskBadge: Bool = false
+  @AppStorage(ClaudeGatewayProvider.connectionNudgeKey) private var claudeNudge: Bool = true
+
+  var body: some View {
+    Form {
+      Section {
+        Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
+      } header: {
+        Text("Badge")
+      } footer: {
+        Text("Marks the app icon while any task is overdue — the same count as Today's overdue pill. On Mac it's a dock dot; per-device, so each device opts in on its own.")
+      }
+
+      Section {
+        Toggle(isOn: $claudeNudge) {
+          VStack(alignment: .leading, spacing: 1) {
+            Text("Claude connection")
+            Text("A quiet reminder when the Claude connection needs a refresh.")
+              .font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        Text("Nudges")
+      } footer: {
+        Text("Reminders for task deadlines are planned — they'll live here.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Notifications")
   }
 }
 

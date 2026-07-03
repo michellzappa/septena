@@ -66,9 +66,13 @@ struct TaskSettingsSections: View {
       .labelsHidden()
     }
     #endif
+    // Septask hoists the badge toggle into its root Notifications pane —
+    // badge IS the notification story there; here it stays with the tasks knobs.
+    #if !SEPTASK
     Section("Badge") {
       Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
     }
+    #endif
     Section {
       Toggle("Show completed tasks in Today", isOn: $todayShowCompleted)
       Toggle(isOn: $showAging) {
