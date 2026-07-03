@@ -75,7 +75,6 @@ func markdownAttributed(_ raw: String) -> AttributedString {
 struct AreaDetailView: View {
   let area: Area
   @Environment(DayClock.self) private var clock
-  @Environment(SectionTheme.self) private var theme
   @Environment(NavigationState.self) private var nav
   @Environment(\.horizontalSizeClass) private var hSize
   @Environment(AreasMutator.self) private var areasMutator
@@ -143,7 +142,11 @@ struct AreaDetailView: View {
           notesField($draftNotes, focused: $notesFocused)
           AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
-        .padding(.horizontal, Theme.hPadding)
+        // Park the whole header on the task cards' content column so the area
+        // glyph, notes, and the project rings / task checkboxes below all line
+        // up at one X — instead of the header sitting 10–18pt to their left.
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
         .padding(.top, 12)
         .padding(.bottom, 16)
         // Observe focus from a stable parent — if `.onChange` lives on the
@@ -153,12 +156,19 @@ struct AreaDetailView: View {
           if !focused { commitNotes() }
         }
 
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(projectsInArea) { project in
+        // Projects ride in the SAME grouped-card language as the task rows below
+        // (rings for projects, checkboxes for loose tasks) under a quiet
+        // "Projects" header — so the area reads as one continuous list rather
+        // than a differently-indented block floating above the tasks.
+        if !projectsInArea.isEmpty {
+          projectsSectionHeader
+          let areaProjects = projectsInArea
+          ForEach(Array(areaProjects.enumerated()), id: \.element.id) { idx, project in
             Button { openProject(project) } label: {
               projectRow(project)
             }
             .buttonStyle(PlainHoverRowButtonStyle())
+            .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count))
           }
         }
       }
@@ -203,12 +213,29 @@ struct AreaDetailView: View {
     #endif
   }
 
+  /// Quiet "Projects" header over the project card — matches the group-header
+  /// rhythm used by the mixed task lists (title parked on the card's content
+  /// column, generous top whitespace as the group break).
+  private var projectsSectionHeader: some View {
+    Text("Projects")
+      .sectionGroupHeaderTitleStyle()
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.leading, TaskCardMetrics.headerLeading)
+      .padding(.trailing, TaskCardMetrics.margin)
+      .padding(.top, 4)
+      .padding(.bottom, 8)
+  }
+
   @ViewBuilder
   private func projectRow(_ project: Project) -> some View {
     HStack(alignment: .center, spacing: Theme.iconTextGap) {
+      // Ink (not accent) ring, sized + nudged to sit exactly over the task
+      // checkboxes in the card below — the same treatment the mixed-list group
+      // headers give a project ring.
       ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
-                          tint: theme.accent)
-        .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+                          tint: Theme.inkSecondary, diameter: 14)
+        .frame(width: Theme.checkboxTap, alignment: .center)
+        .offset(x: -Theme.checkboxLeadingNudge)
 
       Text(project.title)
         .font(.septenaTaskTitle.weight(.semibold))
@@ -218,7 +245,9 @@ struct AreaDetailView: View {
         .foregroundStyle(Theme.iconMuted)
       Spacer()
     }
-    .padding(.horizontal, Theme.hPadding)
+    // `taskCardChrome` adds the outer card margin; this is the in-card content
+    // inset, so the ring lands on the checkbox column of the card below.
+    .padding(.horizontal, TaskCardMetrics.contentInset)
     // Match the tightened task rows below so the area screen reads as one
     // dense list rather than airy projects over compact tasks.
     .padding(.vertical, Theme.rowVPaddingTight)
@@ -403,7 +432,8 @@ struct ProjectDetailView: View {
             // diameter 14 in the checkbox-width column so it reads identically
             // wherever a project progress ring appears.
             ProjectProgressIcon(progress: progress, tint: Theme.inkSecondary, diameter: 14)
-              .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+              .frame(width: Theme.checkboxTap, alignment: .center)
+              .offset(x: -Theme.checkboxLeadingNudge)
             ClickToEditTitle(placeholder: "Project", text: $draftName,
                              onCommit: { commitNameTo($0) }) {
               TaskNavMenu { NavMenuChevron() }
@@ -413,7 +443,10 @@ struct ProjectDetailView: View {
           notesField($draftNotes, focused: $notesFocused)
           AttachmentZone(attachment: draftAttachment) { showingAttachmentEditor = true }
         }
-        .padding(.horizontal, Theme.hPadding)
+        // Match the area page: park the header on the task cards' content
+        // column so the progress ring sits over the checkboxes below.
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
         .padding(.top, 12)
         .padding(.bottom, 16)
         .onChange(of: notesFocused) { _, focused in

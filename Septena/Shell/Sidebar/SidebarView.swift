@@ -380,6 +380,10 @@ struct SidebarRootView: View {
                         isSelected: isSelected(spec.route))
         }
         .buttonStyle(InertButtonStyle())
+        // Drag-a-task-onto-Today re-home, matching the area / project cards
+        // below. Only the Today tile takes a drop; self-gates to iPad
+        // full-screen (inert on iPhone/compact).
+        .modifier(SmartListTaskDrop(route: spec.route, mutator: taskMutator))
       }
     }
     .frame(maxWidth: .infinity)
@@ -710,8 +714,10 @@ struct SidebarRootView: View {
     }
     #else
     .contextMenu { areaMenu(area) }
-    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
     #endif
+    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
+    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
+    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
   }
 
   @ViewBuilder
@@ -733,8 +739,10 @@ struct SidebarRootView: View {
     }
     #else
     .contextMenu { projectMenu(project) }
-    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator))
     #endif
+    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
+    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
+    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator))
   }
 
   // MARK: - Context menus
@@ -1573,11 +1581,16 @@ private struct SidebarSheets: ViewModifier {
   }
 }
 
-// MARK: - Task drop into sidebar (macOS)
+// MARK: - Task drop into sidebar
 
-#if os(macOS)
 /// Drop target for tasks dragged from `TaskListView` onto a sidebar area /
 /// project / smart-list row. Pairs with the source via `TaskDragIDs`.
+///
+/// Active only on a co-visible sidebar+list canvas (`usesPushNavigation` —
+/// iPad full-screen and Mac). On iPhone / compact the sidebar is a separate
+/// pushed screen, so a task can never be dragged onto a row there: the
+/// modifier passes the row through untouched (no highlight machinery, no drop
+/// surface), leaving the context-menu "Move to…" as the sole re-home path.
 private struct SidebarTaskDrop: ViewModifier {
   enum Kind {
     case area(String)
@@ -1596,21 +1609,26 @@ private struct SidebarTaskDrop: ViewModifier {
 
   let kind: Kind
   let mutator: TaskMutator
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
-    content
-      .background(
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-          .fill(Color.accentColor.opacity(isTargeted ? 0.18 : 0))
-          .animation(.easeOut(duration: 0.12), value: isTargeted)
-      )
-      .dropDestination(for: TaskDragIDs.self) { payloads, _ in
-        let ids = payloads.flatMap(\.ids)
-        guard !ids.isEmpty else { return false }
-        for id in ids { rehome(id) }
-        return true
-      } isTargeted: { isTargeted = $0 }
+    if usesPushNavigation {
+      content
+        .background(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color.accentColor.opacity(isTargeted ? 0.18 : 0))
+            .animation(.easeOut(duration: 0.12), value: isTargeted)
+        )
+        .dropDestination(for: TaskDragIDs.self) { payloads, _ in
+          let ids = payloads.flatMap(\.ids)
+          guard !ids.isEmpty else { return false }
+          for id in ids { rehome(id) }
+          return true
+        } isTargeted: { isTargeted = $0 }
+    } else {
+      content
+    }
   }
 
   private func rehome(_ id: String) {
@@ -1641,4 +1659,3 @@ private struct SmartListTaskDrop: ViewModifier {
     }
   }
 }
-#endif
