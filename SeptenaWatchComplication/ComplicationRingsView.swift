@@ -20,10 +20,9 @@ extension Color {
 }
 
 /// Apple-Activity-style concentric rings — one per metric, each filling toward
-/// its target. Built on the vendored `WolfActivityRing` (`ActivityRing`), which
-/// handles the over-100% lap via a `color → tipColor` angular gradient + a bright
-/// tip cap — pure color contrast, so it survives the restricted watchOS
-/// complication (WidgetKit) rendering mode where `.shadow()` is unreliable.
+/// its target. Built on the vendored `WolfActivityRing` (`ActivityRing`) with its
+/// stock rendering; progress is clamped to the ring's 0…100% range so an over-goal
+/// metric reads as a full ring (the real over-target value shows in the legend).
 /// Generic over any rings-style complication; the caller supplies the per-key color.
 struct RingsView: View {
   let rings: [ComplicationRing]
@@ -37,15 +36,6 @@ struct RingsView: View {
   /// complications leave it off, where an empty ring reads as a target to fill.
   var hidesEmptyRings: Bool = false
 
-  // On a tinted watch face the rings render `.widgetAccentable(false)` → WidgetKit
-  // *vibrant* mode, which maps content to a luminance × alpha mask on the face's
-  // single-color ramp. A saturated-hue track (`c.opacity(0.22)`) collapses to ≈
-  // background there (the hue's own luminance is too low), so we use a dim *neutral*
-  // gray instead — low enough to recede as a faint "remaining" ring (the Apple
-  // Activity empty-track look, so the filled arc pops), high enough to survive the
-  // mask. In `.fullColor` the track is the section hue at low alpha.
-  @Environment(\.widgetRenderingMode) private var renderingMode
-
   var body: some View {
     GeometryReader { geo in
       let side = min(geo.size.width, geo.size.height)
@@ -58,8 +48,10 @@ struct RingsView: View {
         ForEach(Array(shown.enumerated()), id: \.element.key) { idx, ring in
           let radius = outerRadius - CGFloat(idx) * (lineWidth + spacing)
           if radius >= lineWidth * 0.75 {
-            let p = progress(ring)
-            ActivityRing(progress: p, options: options(ring, radius: radius, progress: p))
+            // Fill toward the goal only — an over-target metric reads as a full
+            // ring, not a washed-out lap. The true value lives in the legend.
+            let p = min(progress(ring), 1)
+            ActivityRing(progress: p, options: options(ring, radius: radius))
           }
         }
       }
@@ -73,44 +65,16 @@ struct RingsView: View {
     return ring.value / goal
   }
 
-  private func options(_ ring: ComplicationRing, radius: CGFloat, progress: Double) -> ActivityRingOptions {
+  private func options(_ ring: ComplicationRing, radius: CGFloat) -> ActivityRingOptions {
     // The metric's authored Settings color when present (matches the section),
-    // else the domain's fixed fallback hue.
+    // else the domain's fixed fallback hue. Everything else is WolfActivityRing's
+    // stock look: solid arc, a dim neutral "remaining" track, subtle head cap.
     let c = Color(hexToken: ring.colorHex) ?? color(ring.key)
     var o = ActivityRingOptions()
     o.radius = Double(radius)
     o.thickness = Double(lineWidth)
-    // Under goal: a solid ring (matches the phone's macro tiles, reads as
-    // "complete" at exactly 100%). Over goal: dim the tail and keep the head
-    // full, so the overflow laps over the dimmed first lap and is unmistakable
-    // — WolfActivityRing's own over-100% pattern, minus the shadow.
-    if progress >= 1 {
-      // Reached / passed goal. Keep the ring full-bright (completion should read
-      // prominent, not faded) but brighten the HEAD toward white — the ring glows
-      // to a light tip and the cap marks where the head met the start. Differentiates
-      // a COMPLETED ring from an in-progress one, and the light head laps visibly
-      // over the body when over goal. Color contrast carries it in the complication
-      // (shadows are unreliable there); the shadow adds depth in-app.
-      o.color = c
-      o.tipColor = .white
-      o.tipShadowColor = .black.opacity(0.5)
-    } else {
-      o.color = c
-      o.tipColor = c
-      o.tipShadowColor = .clear
-    }
-    // The unfilled track is a dim "remaining" ring (Apple-Activity style), not a
-    // bright loop — the empty part should read as low-alpha so the fill stands
-    // out. Full color: a faint tint of the section hue. Vibrant / accented (tinted
-    // faces): the hue desaturates away, so luminance is the only lever — a dim
-    // neutral gray, kept just bright enough to survive the vibrant mask.
-    o.backgroundColor = renderingMode == .fullColor
-      ? c.opacity(0.22)
-      : Color(white: 0.18)
-    // A small black wedge ahead of the head marks the divider so completion stays
-    // legible even when the track and fill desaturate to the same tint. An angular
-    // (not pixel) gap, so it reads consistently across the concentric rings.
-    o.trackGap = 0.04
+    o.color = c
+    // Thin concentric rings read cleaner without the library's double edge-line.
     o.outlineColor = .clear
     return o
   }

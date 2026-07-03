@@ -54,11 +54,6 @@ public struct ActivityRingOptions {
     public var tipShadowColor: Color = .black.opacity(0.3)
     public var outlineColor: Color = Color.gray.opacity(0.35)
     public var outlineThickness: Double = 1
-    // Septena: fraction of the circle left empty *just ahead of the head*, so the
-    // track doesn't close into a seamless full-alpha loop — the gap marks the
-    // divider ("you are here"), which is the only completion cue that survives the
-    // tinted-face vibrant rendering mode. 0 = the original continuous track.
-    public var trackGap: Double = 0
 
     public init() {
     }
@@ -92,26 +87,9 @@ public struct ActivityRing<Content>: View where Content: View {
 
         ZStack {
             if options.backgroundColor != .clear {
-                if options.trackGap > 0 {
-                    // Track = the remainder of the circle, starting a small gap
-                    // AFTER the head. At/over goal there's no remainder, so the
-                    // ring closes (a complete loop reads as done). Butt cap keeps
-                    // the gap edge crisp against the round fill head.
-                    let trackStart = min(progress + options.trackGap, 1)
-                    if trackStart < 1 {
-                        Circle()
-                            .trim(from: trackStart, to: 1)
-                            .stroke(options.backgroundColor,
-                                    style: StrokeStyle(lineWidth: options.thickness, lineCap: .butt))
-                            .rotationEffect(Angle(degrees: -90))
-                            .frame(width: options.radius * 2.0)
-                            .animation(.easeOut, value: progress)
-                    }
-                } else {
-                    Circle()
-                        .stroke(options.backgroundColor, lineWidth: options.thickness)
-                        .frame(width: options.radius * 2.0)
-                }
+                Circle()
+                    .stroke(options.backgroundColor, lineWidth: options.thickness)
+                    .frame(width: options.radius * 2.0)
             }
             if options.outlineColor != .clear {
                 Circle()
