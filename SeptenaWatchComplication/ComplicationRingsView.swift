@@ -21,8 +21,8 @@ extension Color {
 
 /// Apple-Activity-style concentric rings — one per metric, each filling toward
 /// its target. Built on the vendored `WolfActivityRing` (`ActivityRing`) with its
-/// stock rendering; progress is clamped to the ring's 0…100% range so an over-goal
-/// metric reads as a full ring (the real over-target value shows in the legend).
+/// stock rendering: a solid arc over a dim same-hue track, and — past the goal —
+/// the library's lapped head cap + drop shadow for the Activity "lap over" look.
 /// Generic over any rings-style complication; the caller supplies the per-key color.
 struct RingsView: View {
   let rings: [ComplicationRing]
@@ -48,9 +48,10 @@ struct RingsView: View {
         ForEach(Array(shown.enumerated()), id: \.element.key) { idx, ring in
           let radius = outerRadius - CGFloat(idx) * (lineWidth + spacing)
           if radius >= lineWidth * 0.75 {
-            // Fill toward the goal only — an over-target metric reads as a full
-            // ring, not a washed-out lap. The true value lives in the legend.
-            let p = min(progress(ring), 1)
+            // Pass true progress (including > 1) so the library laps the head cap
+            // over the filled ring — with its drop shadow — once a metric is past
+            // its goal. That over-100% "lap over" is the whole Activity-ring look.
+            let p = progress(ring)
             ActivityRing(progress: p, options: options(ring, radius: radius))
           }
         }
@@ -68,12 +69,16 @@ struct RingsView: View {
   private func options(_ ring: ComplicationRing, radius: CGFloat) -> ActivityRingOptions {
     // The metric's authored Settings color when present (matches the section),
     // else the domain's fixed fallback hue. Everything else is WolfActivityRing's
-    // stock look: solid arc, a dim neutral "remaining" track, subtle head cap.
+    // stock look: a solid arc, the library's head cap + drop shadow (which laps
+    // and lifts once past goal), over a dim "remaining" track.
     let c = Color(hexToken: ring.colorHex) ?? color(ring.key)
     var o = ActivityRingOptions()
     o.radius = Double(radius)
     o.thickness = Double(lineWidth)
     o.color = c
+    // Dim tint of the ring's OWN hue for the unfilled remainder (not neutral gray),
+    // so the empty track reads as "this ring, not yet full" — the demo's look.
+    o.backgroundColor = c.opacity(0.22)
     // Thin concentric rings read cleaner without the library's double edge-line.
     o.outlineColor = .clear
     return o
