@@ -462,8 +462,21 @@ final class CloudKitTasksBackend: TasksBackend {
     // committed list instead of vanishing off the Today surface (see
     // `TaskEntity.isInTriageBand`, docs/TRIAGE_BAND_SPEC.md).
     let ratifying = area != nil && entity.isInTriageBand
+    // A re-home into a new home resets both order + membership axes together
+    // (docs/DRAG_AND_DROP.md §4): entering an area clears the old project *and
+    // its section FK*, and lands the row at the top of the destination — so
+    // every re-home path (sidebar drag, "Move…" sheet, composer, MCP, which all
+    // funnel through here) agrees, instead of leaving a stale `heading` and an
+    // arbitrary sort spot. "New home" also covers leaving a project into an
+    // area whose denormalized label already matched (hence the `project != nil`
+    // clause); a bare re-drop onto the area a row already lives in is a no-op.
+    let entersNewHome = area != nil && (entity.area != area || entity.project != nil)
     entity.area = area
     if area != nil { entity.project = nil }
+    if entersNewHome, !entity.isHeading {
+      entity.heading = nil
+      entity.position = TaskOrder.topPosition(in: context)
+    }
     if ratifying {
       entity.today = true
       entity.todaySetOn = SeptenaDate.today
@@ -475,8 +488,17 @@ final class CloudKitTasksBackend: TasksBackend {
   func moveToProject(id: String, project: String?) {
     guard let entity = fetch(id: id) else { return }
     let ratifying = project != nil && entity.isInTriageBand
+    // Ordinary tasks entering a project drop any stale section FK and land at
+    // the top of the destination (docs/DRAG_AND_DROP.md §4) — headings are
+    // exempt: they keep their own order and carry their section via
+    // `rehomeHeadingMembers` below.
+    let entersNewHome = project != nil && (entity.project != project || entity.area != nil)
     entity.project = project
     if project != nil { entity.area = nil }
+    if entersNewHome, !entity.isHeading {
+      entity.heading = nil
+      entity.position = TaskOrder.topPosition(in: context)
+    }
     if ratifying {
       entity.today = true
       entity.todaySetOn = SeptenaDate.today

@@ -121,8 +121,16 @@ struct TaskDraft: Equatable {
     if recurrence != original.recurrence {
       mutator.setRecurrence(id: id, recurrence: recurrence)
     }
+    // Project and area are mutually exclusive: a project owns its area, and the
+    // backend's `moveToProject` clears area (create() does the same via
+    // `effectiveArea = project != nil ? nil : area`). The composer's list picker
+    // carries the project's *parent-area* id for its breadcrumb, so when a
+    // project is chosen we must NOT also fire `moveToArea` — it would run after
+    // `moveToProject` and clobber the just-set project back to its parent area.
+    // (Invisible for area-less projects, whose pick carries a nil areaId — which
+    // is why this only bit nested projects.)
     if projectId != original.project { mutator.moveToProject(id: id, project: projectId) }
-    if areaId != original.area { mutator.moveToArea(id: id, area: areaId) }
+    if projectId == nil, areaId != original.area { mutator.moveToArea(id: id, area: areaId) }
   }
 
   /// Did this edit change a *placement* field — project, area, scheduled, due,
