@@ -1879,6 +1879,12 @@ struct WeekDashboardView: View {
       valence: emotion.valence,
       emotion: emotion.word)
     Haptics.success()
+    // A tile quick-log now celebrates like a sheet check-in: fire the same
+    // affect-matched, wordless flourish AddMoodPage plays (motion chosen by
+    // the logged quadrant, accent = quadrant color). Fired at the app root;
+    // the overlay honors Reduce Motion + the logging-animations opt-out.
+    logCommit?.fire(.flourish(motion: emotion.quadrant.commitMotion,
+                              accent: emotion.quadrant.color, intensity: 1))
     Task { await refreshMood() }
   }
 
