@@ -26,6 +26,9 @@ struct EditExerciseEntrySheet: View {
 
   @State private var note: String = ""
 
+  // Drives the keyboard "Done" bar — decimal pads have no return key.
+  @FocusState private var numberFocused: Bool
+
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
   private var effortScale: EffortScale { EffortScale(rawValue: effortScaleRaw) ?? .difficulty }
 
@@ -39,7 +42,9 @@ struct EditExerciseEntrySheet: View {
 
   var body: some View {
     AdaptiveEditScaffold(title: "Edit entry", canSave: original.file != nil, onSave: save) {
-      formBody.onAppear { seed() }
+      formBody
+        .keyboardDoneBar($numberFocused)
+        .onAppear { seed() }
     }
   }
 
@@ -87,6 +92,7 @@ struct EditExerciseEntrySheet: View {
         #if os(iOS)
         .keyboardType(.decimalPad)
         #endif
+        .focused($numberFocused)
         .multilineTextAlignment(.trailing)
         .frame(maxWidth: 100)
     }

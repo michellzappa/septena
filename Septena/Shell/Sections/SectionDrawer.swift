@@ -1195,6 +1195,37 @@ struct AdaptiveEditScaffold<FormContent: View>: View {
   }
 }
 
+extension View {
+  /// A "Done" accessory bar that floats just above the keyboard while a numeric
+  /// field is focused — the standard way to dismiss a `.decimalPad`, which has
+  /// no return key. Built on `safeAreaInset(edge: .bottom)` rather than
+  /// `ToolbarItemGroup(placement: .keyboard)`: the keyboard toolbar attaches only
+  /// to the first-focused field in a sheet and does not reappear on subsequent
+  /// edits (a long-standing SwiftUI bug), whereas a safe-area inset renders
+  /// reliably every time the bound focus turns on. Pass a `@FocusState` bound to
+  /// the field(s).
+  func keyboardDoneBar(_ focused: FocusState<Bool>.Binding) -> some View {
+    #if os(iOS)
+    safeAreaInset(edge: .bottom) {
+      if focused.wrappedValue {
+        HStack {
+          Spacer()
+          Button("Done") { focused.wrappedValue = false }
+            .font(.body.weight(.semibold))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+        .transition(.move(edge: .bottom))
+      }
+    }
+    #else
+    self
+    #endif
+  }
+}
+
 /// The inline header used by `AdaptiveEditScaffold` in its docked-inspector
 /// mode: Cancel · title · Save, on a material bar. Kept private — forms only
 /// ever go through the scaffold.
