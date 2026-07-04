@@ -591,6 +591,18 @@ struct ArrivedTodayMarker: View {
 // `@ViewBuilder` slot the caller fills. Per-type toggle side-effects
 // (celebrations, haptics) live in `onToggle`; per-type long-press actions are
 // attached by the caller via `.contextMenu` on the returned row.
+extension VerticalAlignment {
+  private enum RowTitleCenter: AlignmentID {
+    static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
+  }
+  /// Vertical center of a row's *title* text. The checkbox pins to this so it
+  /// stays optically centered whether the title is a single line or wraps to
+  /// two — `.firstTextBaseline` only ever tracks the first line, so a two-line
+  /// title left the checkbox riding high. A subtitle below the title does not
+  /// pull the guide down, since it's set on the title line alone.
+  static let rowTitleCenter = VerticalAlignment(RowTitleCenter.self)
+}
+
 struct CheckableRow<Trailing: View>: View {
   var tint: Color
   var isDone: Bool
@@ -672,7 +684,7 @@ struct CheckableRow<Trailing: View>: View {
   }
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+    HStack(alignment: .rowTitleCenter, spacing: Theme.iconTextGap) {
       TaskCheckbox(
         tint: tint,
         isDone: isDone,
@@ -686,7 +698,7 @@ struct CheckableRow<Trailing: View>: View {
         onToggle: onToggle
       )
       .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
-      .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+      .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
 
       if let leadingEmoji {
         Text(leadingEmoji).font(.body)
@@ -694,6 +706,7 @@ struct CheckableRow<Trailing: View>: View {
 
       VStack(alignment: .leading, spacing: 4) {
         titleLine
+          .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         if let subtitle {
           Text(subtitle)
             .font(.septenaMeta)
