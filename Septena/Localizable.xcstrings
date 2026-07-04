@@ -5603,6 +5603,9 @@
         }
       }
     },
+    "now" : {
+
+    },
     "Now" : {
       "localizations" : {
         "pt-BR" : {
@@ -7953,6 +7956,9 @@
           }
         }
       }
+    },
+    "TODAY" : {
+
     },
     "Token" : {
       "localizations" : {

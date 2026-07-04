@@ -122,6 +122,7 @@ enum TrainingMetrics {
 /// edge); mobility tracks session length.
 enum TrainingProgressMetric: String, Sendable, Codable {
   case oneRepMax   // strength — kg (Epley e1RM, or raw weight when reps absent)
+  case topWeight   // strength — kg (heaviest load logged that day, reps ignored)
   case pace        // cardio — m/min (distance ÷ duration)
   case duration    // mobility — minutes
 }
@@ -194,16 +195,33 @@ extension TrainingMetrics {
   /// when the entry lacks the fields that metric needs.
   private static func value(of e: ExerciseEntryEntity,
                             metric: TrainingProgressMetric) -> Double? {
+    progressValue(metric: metric, weight: e.weight, reps: e.reps,
+                  distanceM: e.distanceM, durationMin: e.durationMin)
+  }
+
+  /// The plotted value for one (weight, reps, distance, duration) tuple under a
+  /// metric — same rules the history series uses, exposed so the in-session
+  /// editor can plot the set being entered *right now* against its own trend.
+  /// Nil when the fields that metric needs are absent.
+  static func progressValue(metric: TrainingProgressMetric,
+                            weight: Double?, reps: String?,
+                            distanceM: Double?, durationMin: Double?) -> Double? {
     switch metric {
     case .oneRepMax:
-      guard let w = e.weight, w > 0 else { return nil }
-      if let r = Int(e.reps ?? ""), r > 0 { return w * (1 + Double(r) / 30) }
+      guard let w = weight, w > 0 else { return nil }
+      if let r = Int(reps ?? ""), r > 0 { return w * (1 + Double(r) / 30) }
+      return w
+    case .topWeight:
+      // Heaviest load actually put on the bar that day — reps ignored. The
+      // honest "am I loading more?" line, distinct from e1RM which rises when
+      // you add reps at the same weight.
+      guard let w = weight, w > 0 else { return nil }
       return w
     case .pace:
-      guard let d = e.distanceM, d > 0, let m = e.durationMin, m > 0 else { return nil }
+      guard let d = distanceM, d > 0, let m = durationMin, m > 0 else { return nil }
       return d / m
     case .duration:
-      guard let m = e.durationMin, m > 0 else { return nil }
+      guard let m = durationMin, m > 0 else { return nil }
       return m
     }
   }

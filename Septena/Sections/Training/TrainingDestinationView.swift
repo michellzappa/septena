@@ -2716,6 +2716,10 @@ struct TrainingExerciseEditorBody: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(DayClock.self) private var clock
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
+  /// Which strength history line the chart draws: false = estimated 1RM
+  /// (weight×reps), true = top weight actually lifted. Tapping the chart flips
+  /// it; remembered app-wide like the effort scale. No effect on cardio/mobility.
+  @AppStorage("training.strength.chartTopWeight") private var strengthTopWeight = false
 
   let index: Int
   let entry: DraftEntry
@@ -2734,6 +2738,10 @@ struct TrainingExerciseEditorBody: View {
   /// Primary (first) + secondary muscles this exercise works, resolved from its
   /// catalog definition. Loaded on appear; empty for cardio / untagged slugs.
   @State private var muscles: [Muscle] = []
+
+  /// Drives the keyboard "Done" bar — the numeric steppers use `.decimalPad`,
+  /// which has no return key to dismiss it.
+  @FocusState private var fieldFocused: Bool
 
   // Hoisted formatter — was re-allocated per recents-row render.
   private static let monthDayPosixFormatter: DateFormatter = {
@@ -2811,15 +2819,8 @@ struct TrainingExerciseEditorBody: View {
     // is hosted on a plain sheet / inspector whose default surface is white).
     .scrollContentBackground(.hidden)
     .background(Theme.groupedBackground)
-    #if os(iOS)
-    .toolbar {
-      // Decimal pad has no return key — give it a Done to dismiss.
-      ToolbarItemGroup(placement: .keyboard) {
-        Spacer()
-        Button("Done") { dismissKeyboard() }
-      }
-    }
-    #endif
+    // Floating "Done" above the keyboard — the decimal pad has no return key.
+    .keyboardDoneBar($fieldFocused)
     .onAppear {
       if entry.isCardio, avgPace == nil {
         avgPace = store.cardioAvgPace(for: entry.exercise, context: modelContext)
@@ -2881,11 +2882,30 @@ struct TrainingExerciseEditorBody: View {
   private var progressMetric: TrainingProgressMetric {
     if entry.isMobility { return .duration }
     if entry.isCardio   { return .pace }
-    return .oneRepMax
+    return strengthTopWeight ? .topWeight : .oneRepMax
   }
 
+  /// True when the chart can flip metrics — strength only; cardio/mobility have
+  /// a single meaningful axis, so a tap there is a no-op.
+  private var canToggleMetric: Bool {
+    !entry.isCardio && !entry.isMobility
+  }
+
+  /// The value of the set being entered right now, under the chart's metric —
+  /// plotted as a distinct "today" marker so you can see where the current set
+  /// lands against your trend. Nil until enough fields are filled; updates live
+  /// as you type. Falls back to nil (no marker) rather than 0.
+  private var todayValue: Double? {
+    TrainingMetrics.progressValue(
+      metric: progressMetric, weight: entry.weight, reps: entry.reps,
+      distanceM: entry.distanceM, durationMin: entry.durationMin)
+  }
+
+  /// The number shown in the history header: today's in-progress set if one is
+  /// entered, otherwise the most recent logged value.
+  private var headerValue: Double? { todayValue ?? progress?.latest }
+
   private func loadProgress() {
-    guard progress == nil else { return }
     progress = TrainingMetrics.progressSeries(
       for: entry.exercise, metric: progressMetric, in: modelContext, today: clock.today)
   }
@@ -3006,11 +3026,36 @@ struct TrainingExerciseEditorBody: View {
   @ViewBuilder
   private var progressHistory: some View {
     if let s = progress, s.points.count >= 2 {
-      VStack(alignment: .leading, spacing: 4) {
-        HStack {
-          Text(TrainingProgressFormat.title(progressMetric))
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .firstTextBaseline) {
+          VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 5) {
+              Text(TrainingProgressFormat.title(progressMetric))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+              // Affordance: strength charts flip between est. 1RM and top weight.
+              if canToggleMetric {
+                Image(systemName: "arrow.left.arrow.right")
+                  .font(.system(size: 8, weight: .bold))
+                  .foregroundStyle(.tertiary)
+              }
+            }
+            // The visible number — today's set if it's being entered, else the
+            // latest logged value. Makes the metric's *reading* legible even
+            // when fixed reps leave the two lines the same shape.
+            if let v = headerValue {
+              HStack(spacing: 5) {
+                Text(TrainingProgressFormat.value(v, metric: progressMetric))
+                  .font(.title3.weight(.semibold).monospacedDigit())
+                  .foregroundStyle(Theme.inkPrimary)
+                if todayValue != nil {
+                  Text("now")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(accent)
+                }
+              }
+            }
+          }
           Spacer()
           if let t = TrainingProgressFormat.trend(s) {
             Text(t.text)
@@ -3020,7 +3065,17 @@ struct TrainingExerciseEditorBody: View {
           }
         }
         TrainingProgressChart(series: s, accent: accent, height: 108, weeklyGrid: true,
-                              weightFactor: WeightUnit.current.displayFactor)
+                              weightFactor: WeightUnit.current.displayFactor,
+                              todayValue: todayValue,
+                              todayDate: SeptenaDate.parse(clock.today))
+      }
+      // Tap anywhere on the header+chart to flip the strength metric. Whole
+      // block is the target (charts are hard to hit), no-op for cardio/mobility.
+      .contentShape(Rectangle())
+      .onTapGesture {
+        guard canToggleMetric else { return }
+        strengthTopWeight.toggle()
+        loadProgress()
       }
     } else {
       recentSessionsTable
@@ -3241,6 +3296,7 @@ struct TrainingExerciseEditorBody: View {
             #if os(iOS)
             .keyboardType(.decimalPad)
             #endif
+            .focused($fieldFocused)
             .multilineTextAlignment(.center)
             .textFieldStyle(.plain)
             .font(.system(.title3, design: .rounded).weight(.medium))
@@ -3318,13 +3374,6 @@ struct TrainingExerciseEditorBody: View {
   private func setLevel(_ s: String) {
     store.update { $0.entries[index].level = Double(s.replacingOccurrences(of: ",", with: ".")) }
   }
-
-  #if os(iOS)
-  private func dismissKeyboard() {
-    UIApplication.shared.sendAction(
-      #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-  }
-  #endif
 }
 
 // MARK: - Shared progress chart
@@ -3349,12 +3398,17 @@ struct TrainingProgressChart: View {
   /// Strip the chart down to a bare trend line — no axes, dots, or rules — for
   /// the in-session exercise rows, where it sits as a tiny trailing glance.
   var sparkline: Bool = false
+  /// The in-progress set's value (pre-scale, same units as `series`), plotted as
+  /// a distinct ringed "today" marker so the current set reads against the
+  /// trend. Ignored in sparkline mode; needs `todayDate` to place on the x-axis.
+  var todayValue: Double? = nil
+  var todayDate: Date? = nil
 
   private var scale: Double {
     switch series.metric {
-    case .pace:      return DistanceUnit.current.speed(1)   // m/min → km/h or mi/h
-    case .oneRepMax: return weightFactor
-    case .duration:  return 1.0
+    case .pace:                 return DistanceUnit.current.speed(1)   // m/min → km/h or mi/h
+    case .oneRepMax, .topWeight: return weightFactor
+    case .duration:             return 1.0
     }
   }
 
@@ -3362,7 +3416,9 @@ struct TrainingProgressChart: View {
   /// the full height and the trend reads, instead of being squashed against a
   /// zero baseline. Falls back to a small band when the values are flat.
   private var yDomain: ClosedRange<Double> {
-    let vals = series.points.map { $0.value * scale }
+    var vals = series.points.map { $0.value * scale }
+    // Fold today's provisional value in so its marker never clips off-axis.
+    if !sparkline, let tv = todayValue { vals.append(tv * scale) }
     guard let lo = vals.min(), let hi = vals.max() else { return 0...1 }
     if lo == hi {
       let pad = max(abs(lo) * 0.1, 1)
@@ -3407,6 +3463,22 @@ struct TrainingProgressChart: View {
           .annotation(position: .top, alignment: .trailing) {
             Text("avg \(TrainingProgressFormat.pace(avg))")
               .font(.caption2).foregroundStyle(.secondary)
+          }
+      }
+      // "You are here" — the set being entered now, a ringed dot with a TODAY
+      // tag, plotted at today's x so it stands apart from the logged history.
+      if !sparkline, let tv = todayValue, let td = todayDate {
+        PointMark(x: .value("Date", td), y: .value("Value", tv * scale))
+          .symbol {
+            Circle()
+              .fill(accent)
+              .frame(width: 9, height: 9)
+              .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+          }
+          .annotation(position: .top, spacing: 2) {
+            Text("TODAY")
+              .font(.system(size: 8, weight: .heavy))
+              .foregroundStyle(accent)
           }
       }
     }
@@ -3456,8 +3528,23 @@ enum TrainingProgressFormat {
   static func title(_ m: TrainingProgressMetric) -> String {
     switch m {
     case .oneRepMax: return "EST. 1RM · 90 DAYS"
+    case .topWeight: return "TOP WEIGHT · 90 DAYS"
     case .pace:      return "SPEED · 90 DAYS"
     case .duration:  return "DURATION · 90 DAYS"
+    }
+  }
+
+  /// A single metric value as a readable, unit-suffixed string — the header
+  /// readout ("126 kg", "12.4 km/h", "20 min"). Weight metrics convert kg into
+  /// the user's chosen unit; pace/duration pass through.
+  static func value(_ v: Double, metric: TrainingProgressMetric) -> String {
+    switch metric {
+    case .oneRepMax, .topWeight:
+      let u = WeightUnit.current
+      let d = v * u.displayFactor
+      return "\(d.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(d))" : d.decimalString(1)) \(u.suffix)"
+    case .pace:     return pace(v)
+    case .duration: return "\(Int(v.rounded())) min"
     }
   }
 
@@ -3479,7 +3566,7 @@ enum TrainingProgressFormat {
     let up = delta >= 0
     let mag: String
     switch s.metric {
-    case .oneRepMax:
+    case .oneRepMax, .topWeight:
       let u = WeightUnit.current
       let d = abs(delta) * u.displayFactor
       mag = "\(d.decimalString(d < 10 ? 1 : 0)) \(u.suffix)"
