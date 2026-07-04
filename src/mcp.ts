@@ -87,6 +87,10 @@ import {
   logGutEvent, logGutEventJsonSchema, type LogGutEventInput,
 } from "./tools/gut.js";
 import {
+  listMoodEvents, listMoodEventsJsonSchema, type ListMoodEventsInput,
+  logMoodEvent, logMoodEventJsonSchema, type LogMoodEventInput,
+} from "./tools/mood.js";
+import {
   listNutritionEntries, listNutritionEntriesJsonSchema, type ListNutritionEntriesInput,
   logNutritionEntry, logNutritionEntryJsonSchema, type LogNutritionEntryInput,
   updateNutritionEntry, updateNutritionEntryJsonSchema, type UpdateNutritionEntryInput,
@@ -394,6 +398,18 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "gut_event_log",
       description: "Log a new gut event with Bristol Stool Scale type. Cramping, discomfort or blood are symptoms — log them with symptoms_log instead.",
       inputSchema: logGutEventJsonSchema,
+    },
+  ],
+  mood: [
+    {
+      name: "mood_list",
+      description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 7 days; pass date for a single day or from/to for a range.",
+      inputSchema: listMoodEventsJsonSchema,
+    },
+    {
+      name: "mood_log",
+      description: "Log a mood. Provide emotion — a word from the canonical grid (e.g. 'Anxious', 'Content', 'Calm', 'Excited'); its quadrant / arousal / valence are derived automatically.",
+      inputSchema: logMoodEventJsonSchema,
     },
   ],
   nutrition: [
@@ -926,6 +942,15 @@ async function callTool(
     }
     case "gut_event_log": {
       const result = await logGutEvent(client, (params.arguments ?? {}) as unknown as LogGutEventInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    // ---- Mood ----
+    case "mood_list": {
+      const result = await listMoodEvents(client, (params.arguments ?? {}) as ListMoodEventsInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "mood_log": {
+      const result = await logMoodEvent(client, (params.arguments ?? {}) as unknown as LogMoodEventInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Nutrition ----
