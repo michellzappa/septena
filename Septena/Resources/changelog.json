@@ -4,70 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1362,
+      "build": 1367,
       "date": "2026-07-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring a Things database export into Septena, with headings mapped to project sections.",
+          "title": "A refreshed Tasks experience",
+          "detail": "Add section headings inside projects, multi-select bulk actions, a redesigned date picker, and calendar events woven right into Today and Upcoming.",
           "section": "tasks"
         },
         {
-          "title": "Project section headings",
-          "detail": "Organize a project into labeled sections that stay out of your feeds and counts.",
+          "title": "Recover deleted tasks",
+          "detail": "Deleted tasks now rest in Recently Deleted for 30 days with one-tap undo before they're purged.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events now appear alongside tasks, with per-device hidden-calendar sync.",
+          "title": "Import from Things",
+          "detail": "Bring your projects, tasks, and headings across from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with undo",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore them.",
-          "section": "tasks"
-        },
-        {
-          "title": "Reorder and file tasks by drag, and act on many at once",
-          "detail": "Drag areas and projects into order, drop tasks between them, and multi-select for bulk move, copy, and defer.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and get an on-device analysis, with an optional ingredient breakdown.",
+          "title": "Photo-first meal logging",
+          "detail": "Snap a meal and get an on-device breakdown of what's in it, with an optional per-ingredient view.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "One-tap progression hints on strength sets, an auto-advancing rest flow, and a weekly muscle-volume review after each session.",
+          "detail": "Rest timers now auto-advance you through the workout, with one-tap progression hints and a weekly muscle-group review after each session.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as dashboard tiles.",
+          "title": "Pin goals to your week",
+          "detail": "Keep the goals you care about front and center as tiles on the dashboard.",
           "section": "goals"
         },
         {
-          "title": "Home-screen widgets",
-          "detail": "New Next and Today widgets share the app's tile design and a native container surface.",
+          "title": "New Home Screen widgets",
+          "detail": "Next and Today widgets bring your plan to the Home Screen, and the watch gains a time-of-day sky, quick-add tiles, and richer ring complications.",
           "section": null
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded telemetry levels let you pick Off, Minimal, Balanced, or Full, and see exactly what's been sent.",
+          "title": "Choose what you share",
+          "detail": "Graded analytics levels let you see exactly what's sent and dial telemetry from off to full at any time.",
           "section": null
-        },
-        {
-          "title": "A richer Apple Watch",
-          "detail": "Tap intake tiles to quick-add, use long-press action drawers on Next rows, and watch a time-of-day sky behind your feed.",
-          "section": null
-        },
-        {
-          "title": "Introducing Septask",
-          "detail": "A focused companion app for just your tasks, over the same private data.",
-          "section": "tasks"
         }
       ]
     },
