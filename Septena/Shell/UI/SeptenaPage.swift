@@ -399,7 +399,19 @@ private struct PageChromeModifier: ViewModifier {
     // instead of the window overlay. `usesPushNavigation` is true on iPad
     // regular regardless of column width.
     if usesPushNavigation {
-      // iPad: chrome is the window-level overlay bar (RootTabView.iPadTabless),
+      #if SEPTASK
+      // Septask never renders the floating iPad overlay bar — that lives only in
+      // Septena's `RootTabView.iPadTabless`. Routing chrome there would strand the
+      // gear/"+" off-screen AND leave an empty, background-hidden nav bar with no
+      // scroll-edge "pocket", so content hard-cuts at the top instead of the iOS 26
+      // soft fade. Put the chrome in the real (translucent) navigation bar like
+      // iPhone/macOS: the bar's Liquid Glass gives the top fade its pocket, and the
+      // gear/"+" become visible. Wide content margins still apply.
+      content
+        .toolbar { chromeToolbar }
+        .septenaTabScrollInsets(top: scrollTopInset ?? 0, contentGutter: wideContentGutter)
+      #else
+      // Septena iPad: chrome is the window-level overlay bar (RootTabView.iPadTabless),
       // not nav-bar toolbar items — so it aligns to the content gutter and the
       // Tasks sidebar can't shift it. Publish this page's "···"/"+" for the
       // overlay to render; draw nothing in the (transparent) nav bar here.
@@ -410,6 +422,7 @@ private struct PageChromeModifier: ViewModifier {
           contentGutter: wideContentGutter)
         .onAppear { publishIPadChrome() }
         .onChange(of: nav.path.last?.id) { _, _ in publishIPadChrome() }
+      #endif
     } else {
       // iPhone: ···/+ live in the page's own nav bar (bottom tab bar stays).
       content
