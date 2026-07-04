@@ -308,6 +308,19 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   fights the framework (and that we then chase across sessions). When the
   idiomatic API genuinely can't do it, say so plainly and pick the closest
   standard behavior — don't invent.
+- **One selection/target language per surface — NEVER two.** There is exactly
+  ONE visual treatment for "this row/item is selected, focused, hovered, pressed,
+  or a drop target" on any given surface, and it is the app's canonical token
+  (`Theme.listSelectionFill` via `SelectableListRowBackground`, with native
+  rings suppressed by `.septenaSuppressListCellSelection()`). When a new
+  interaction needs to emphasize a row (a drag drop-target, a hover, a keyboard
+  focus), it **reuses that token** — it does NOT invent a second style (a
+  different color, an accent fill vs. a neutral fill, an outline vs. a fill, a
+  bespoke overlay, or the raw platform selection ring left un-suppressed). Two
+  competing highlight systems visible on one surface at the same time (e.g. a
+  blue outline on the selected row and an accent fill on the drop-hover row) is a
+  **bug**, full stop — it reads as chaos. If you catch yourself adding a
+  highlight, first find what the surface already uses for emphasis and reuse it.
 - **All *app* documentation lives in `docs/`.** Any new `.md` — plan, handoff,
   spec, design note, feature write-up — goes in `docs/`, never the repo root. Root
   is reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
