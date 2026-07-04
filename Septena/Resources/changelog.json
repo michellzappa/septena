@@ -4,59 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1350,
+      "build": 1353,
       "date": "2026-07-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A dedicated Tasks-only app for iPhone and Mac that works over the same private data as Septena, with its own tab bar, settings, quick capture, and Home Screen quick action.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring over tasks and headings from a Things database export, mapped into projects and sections.",
           "section": "tasks"
         },
         {
           "title": "Organize projects with section headings",
-          "detail": "Group tasks inside a project under headings, with Things imports mapping their native headings across automatically.",
+          "detail": "Break long projects into labeled sections that stay out of your feeds and counts.",
           "section": "tasks"
         },
         {
-          "title": "Faster task editing",
-          "detail": "Edit titles in place, multi-select for bulk move and file, quick-add from the top or bottom of a list, and undo actions from a confirmation toast.",
+          "title": "See your calendar alongside Today",
+          "detail": "System calendar events now weave into Today and Upcoming, showing only what's still ahead.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with restore",
-          "detail": "Deleted tasks now wait 30 days in a Recently Deleted view where you can restore them before they auto-purge.",
+          "title": "Recover deleted tasks",
+          "detail": "Recently Deleted keeps tasks for 30 days with one-tap restore and undo for delete, move, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events appear alongside your tasks, with hidden-calendar choices syncing across devices.",
+          "title": "Edit and manage tasks faster",
+          "detail": "Inline title editing, a quick-add line, multi-select bulk actions, and smarter filing suggestions.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and analyze it on-device, with an optional ingredient breakdown per meal.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture with on-device analysis, plus an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "One-tap progression hints on strength sets, effort-weighted muscle volume with a weekly review, and a rest flow that auto-advances with a watch Live Activity.",
+          "title": "Smarter strength training",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, and an auto-advancing rest flow with a Live Activity.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as tiles on the week dashboard.",
+          "title": "Pin goals to your week",
+          "detail": "Keep the goals that matter most as tiles on the week dashboard.",
           "section": "goals"
         },
         {
           "title": "Choose how much you share",
-          "detail": "New graded telemetry levels let you see exactly what's sent and pick off, minimal, balanced, or full.",
+          "detail": "Graded analytics levels from off to full, with a clear view of exactly what gets sent.",
           "section": null
         },
         {
-          "title": "A richer Apple Watch",
-          "detail": "Tap intake tiles to quick-add, use long-press action drawers on Next rows, and see the feed float over a time-of-day sky.",
+          "title": "A richer watch experience",
+          "detail": "A time-of-day sky behind a paged Next feed, interactive rows, and expanded intake tiles.",
           "section": null
         }
       ]
