@@ -92,7 +92,7 @@ struct ConsistencyHeatmap: View {
 
   private let cell: CGFloat = {
     #if WIDGET_EXTENSION
-    9
+    12
     #else
     12
     #endif

@@ -17,31 +17,35 @@ struct HeatmapTileRow: View {
     #endif
   }
 
-  // MARK: - Widget — compact header, heatmap full width
+  // MARK: - Widget — text column on the left, heatmap right-aligned
 
   #if WIDGET_EXTENSION
   private var widgetLayout: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 6) {
-        SectionGlyph(icon: display.icon, accent: display.accent, size: 22, glyphRatio: 0.48)
-        Text(display.title)
-          .font(.subheadline.weight(.semibold))
-          .foregroundStyle(.primary)
-          .lineLimit(1)
+    HStack(alignment: .center, spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 7) {
+          SectionGlyph(icon: display.icon, accent: display.accent, size: 22, glyphRatio: 0.48)
+          Text(display.title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+        }
+        // Headline (e.g. "4 sessions · 210/300 min") sits under the title and
+        // wraps to as many rows as it needs rather than truncating.
         Text(display.headline)
           .font(.caption)
           .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.tail)
-          .layoutPriority(-1)
-        Spacer(minLength: 0)
+          .lineLimit(3)
+          .fixedSize(horizontal: false, vertical: true)
       }
+      .frame(width: 115, alignment: .leading)
+
       heatmap
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
-    .padding(.horizontal, 6)
+    .padding(.horizontal, 10)
     .padding(.vertical, 10)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
   #endif
 
