@@ -15,6 +15,9 @@ protocol ProjectsBackend: AnyObject {
   func setGithubRepo(id: String, repo: String?) async throws
   func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
+  /// Renumber projects to match `orderedIDs` (synced sidebar order — the
+  /// caller passes one parent group's ids). See `docs/DRAG_AND_DROP.md` §5.
+  func reorder(orderedIDs: [String]) async throws
 }
 
 // MARK: - Facade
@@ -82,6 +85,9 @@ final class ProjectsMutator: ProjectsBackend {
       taskMutator?.moveToProject(id: task.id, project: nil)
     }
     try await requireBackend().delete(id: id)
+  }
+  func reorder(orderedIDs: [String]) async throws {
+    try await requireBackend().reorder(orderedIDs: orderedIDs)
   }
 
   /// Forensic — create a record with a specific id.
@@ -207,5 +213,25 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     let staged = entity
     context.delete(entity)
     commitAndPush(staged, op: "delete", deletion: true)
+  }
+
+  /// Renumber the given projects to `orderedIDs` (positions 1…N) and sync. The
+  /// caller passes one parent group's ids, so positions are per-group; that's
+  /// fine because projects are always sorted within their group. Only changed
+  /// rows push; one save + one structure-changed post. See `docs/DRAG_AND_DROP.md`.
+  func reorder(orderedIDs: [String]) async throws {
+    var changed: [String] = []
+    for (index, id) in orderedIDs.enumerated() {
+      guard let entity = fetch(id: id) else { continue }
+      let newPos = index + 1
+      if entity.position != newPos { entity.position = newPos; changed.append(id) }
+    }
+    guard !changed.isEmpty else { return }
+    do { try context.save() } catch {
+      SeptenaLog.error("CK projects: reorder save failed", error)
+    }
+    for id in changed { engine.noteProjectChange(id: id) }
+    SeptenaLog.info("[CK] project reorder → \(changed.count) repositioned")
+    NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
   }
 }

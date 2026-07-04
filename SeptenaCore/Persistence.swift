@@ -238,6 +238,11 @@ final class ProjectEntity {
   /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
   /// reserved CloudKit string slot. See [AreaAttachment.swift].
   var attachmentJSON: String?
+  /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
+  /// order / title); a reorder renumbers the whole group 1…N. Rides the
+  /// reserved `reservedInt1` CK slot — additive in Prod, no record-type bump.
+  /// See `docs/DRAG_AND_DROP.md` §5 gap #2.
+  var position: Int = 0
   var lastSyncedAt: Date
   var updatedAt: String?
   var deletedAt: String?
@@ -256,6 +261,7 @@ final class ProjectEntity {
        context: String? = nil,
        githubRepo: String? = nil,
        attachmentJSON: String? = nil,
+       position: Int = 0,
        lastSyncedAt: Date = .distantPast,
        updatedAt: String? = nil,
        deletedAt: String? = nil,
@@ -270,6 +276,7 @@ final class ProjectEntity {
     self.context = context
     self.githubRepo = githubRepo
     self.attachmentJSON = attachmentJSON
+    self.position = position
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -303,13 +310,18 @@ final class AreaEntity {
   /// JSON-encoded `AreaAttachment` (the one read-only context feed). Rides a
   /// reserved CloudKit string slot. See [AreaAttachment.swift].
   var attachmentJSON: String?
+  /// Sidebar sort order (synced). `0` = unset (falls back to legacy device
+  /// order / title); a reorder renumbers the areas 1…N. Rides the reserved
+  /// `reservedInt1` CK slot — additive in Prod, no record-type bump. See
+  /// `docs/DRAG_AND_DROP.md` §5 gap #2.
+  var position: Int = 0
   var lastSyncedAt: Date
   var updatedAt: String?
   /// CKRecord system-fields blob. See `TaskEntity.cloudKitSystemFields`.
   var cloudKitSystemFields: Data?
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
-       attachmentJSON: String? = nil,
+       attachmentJSON: String? = nil, position: Int = 0,
        lastSyncedAt: Date = .distantPast, updatedAt: String? = nil,
        cloudKitSystemFields: Data? = nil) {
     self.id = id
@@ -317,6 +329,7 @@ final class AreaEntity {
     self.context = context
     self.emoji = emoji
     self.attachmentJSON = attachmentJSON
+    self.position = position
     self.lastSyncedAt = lastSyncedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -1779,6 +1792,7 @@ extension Project {
               context: e.context,
               githubRepo: e.githubRepo,
               attachment: e.attachment,
+              position: e.position,
               updatedAt: e.updatedAt,
               deletedAt: e.deletedAt)
   }
@@ -1788,6 +1802,7 @@ extension Area {
   init(_ e: AreaEntity) {
     self.init(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
               attachment: e.attachment,
+              position: e.position,
               updatedAt: e.updatedAt)
   }
 }

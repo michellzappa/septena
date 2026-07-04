@@ -30,10 +30,12 @@ enum AreaCloudKitSchema {
     /// JSON-encoded `AreaAttachment`. Rides the second reserved string slot —
     /// additive in Prod, no record-type bump. See [AreaAttachment.swift].
     static let attachment = "reservedString2"
+    /// Synced sidebar sort order. Rides the reserved int slot — additive in
+    /// Prod, no record-type bump. See `docs/DRAG_AND_DROP.md` §5 gap #2.
+    static let position = "reservedInt1"
 
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedDate1 = "reservedDate1"
-    static let reservedInt1 = "reservedInt1"
   }
 }
 
@@ -49,6 +51,9 @@ extension AreaEntity: CloudKitSystemFieldsBacked {
     record[AreaCloudKitSchema.Field.context] = context
     record[AreaCloudKitSchema.Field.emoji] = emoji
     record[AreaCloudKitSchema.Field.attachment] = attachmentJSON
+    // Conditional write (matches TaskRecord.position): 0 is the "unset"
+    // sentinel, so an un-ordered area writes nothing and keeps the record lean.
+    if position != 0 { record[AreaCloudKitSchema.Field.position] = position }
     return record
   }
 }
@@ -61,6 +66,7 @@ extension AreaEntity {
     context = optionalAreaString(record[AreaCloudKitSchema.Field.context])
     emoji = optionalAreaString(record[AreaCloudKitSchema.Field.emoji])
     attachmentJSON = optionalAreaString(record[AreaCloudKitSchema.Field.attachment])
+    if let v = record[AreaCloudKitSchema.Field.position] as? Int { position = v }
     captureCloudKitSystemFields(from: record)
   }
 

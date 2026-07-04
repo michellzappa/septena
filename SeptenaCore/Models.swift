@@ -369,6 +369,10 @@ struct Project: Identifiable, Codable, Hashable {
   /// [AreaAttachment.swift]. Carries the legacy `githubRepo` as a `.git`
   /// attachment via the entity-level read-fallback.
   var attachment: AreaAttachment?
+  /// Sidebar sort order (synced, from `ProjectEntity.position`). Populated by
+  /// the entity init only — intentionally NOT a `CodingKey`, so the MCP/wire
+  /// JSON stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
+  var position: Int
   var updatedAt: String?
   var deletedAt: String?
 
@@ -383,12 +387,12 @@ struct Project: Identifiable, Codable, Hashable {
   init(id: String, title: String, status: ProjectStatus = .active,
        area: String? = nil, created: String? = nil, completedAt: String? = nil,
        notes: String? = nil, context: String? = nil, githubRepo: String? = nil,
-       attachment: AreaAttachment? = nil,
+       attachment: AreaAttachment? = nil, position: Int = 0,
        updatedAt: String? = nil, deletedAt: String? = nil) {
     self.id = id; self.title = title; self.status = status
     self.area = area; self.created = created; self.completedAt = completedAt
     self.notes = notes; self.context = context; self.githubRepo = githubRepo
-    self.attachment = attachment
+    self.attachment = attachment; self.position = position
     self.updatedAt = updatedAt; self.deletedAt = deletedAt
   }
 
@@ -404,6 +408,7 @@ struct Project: Identifiable, Codable, Hashable {
     context = try c.decodeIfPresent(String.self, forKey: .context)
     githubRepo = try c.decodeIfPresent(String.self, forKey: .githubRepo)
     attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
+    position = 0   // not on the wire; set via ProjectEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
   }
@@ -420,17 +425,20 @@ struct Area: Identifiable, Codable, Hashable {
   /// The one read-only context feed (repo / calendar / feed). See
   /// [AreaAttachment.swift].
   var attachment: AreaAttachment?
+  /// Sidebar sort order (synced, from `AreaEntity.position`). Populated by the
+  /// entity init only — intentionally NOT a `CodingKey`, so the MCP/wire JSON
+  /// stays unchanged. See `docs/DRAG_AND_DROP.md` §5 gap #2.
+  var position: Int
   var updatedAt: String?
-  // Areas are stored on the server as a single wholesale-replace array,
-  // so there's no per-row tombstone. Removed areas just stop appearing
-  // in /changes — we delete-by-omission for areas, tombstone for tasks
-  // and projects. No `deletedAt` field by design.
+  // Removed areas tombstone per-record via CloudKit like tasks/projects; the
+  // "wholesale-replace array" note here is FastAPI-era history. No `deletedAt`
+  // field by design (delete-by-omission from the local mirror).
 
   init(id: String, title: String, context: String? = nil, emoji: String? = nil,
-       attachment: AreaAttachment? = nil,
+       attachment: AreaAttachment? = nil, position: Int = 0,
        updatedAt: String? = nil) {
     self.id = id; self.title = title; self.context = context; self.emoji = emoji
-    self.attachment = attachment
+    self.attachment = attachment; self.position = position
     self.updatedAt = updatedAt
   }
 
@@ -441,6 +449,7 @@ struct Area: Identifiable, Codable, Hashable {
     context = try c.decodeIfPresent(String.self, forKey: .context)
     emoji = try c.decodeIfPresent(String.self, forKey: .emoji)
     attachment = try c.decodeIfPresent(AreaAttachment.self, forKey: .attachment)
+    position = 0   // not on the wire; set via AreaEntity init
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
   }
 

@@ -65,6 +65,7 @@ promoted to Prod unless the Console already shows them):
 | 12 | **New record types** for the generalized **Intake** section (replaces retired caffeine/cannabis types — consumables purge 2026-06-12) | `IntakeKind`, `IntakeItem`, `IntakeEvent` | all | — |
 | 13 | **New field** `reservedString1` on `Project` + `reservedString2` on `Area` — carry the JSON-encoded `AreaAttachment` (the one read-only context feed: repo/calendar/feed pointer). First write of these reserved slots. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
 | 14 | **New fields** `kind` + `heading` — project section dividers ("headings"). `kind == "heading"` marks a divider row (a `Task` record); `heading` is the FK from a member task to its divider. Both conditional-write. See `TaskKind`. | `Task` | `kind` / `heading` | String |
+| 15 | **New field** `reservedInt1` — synced sidebar sort order (`position`) for areas & projects; renumbered 1…N on Move Up/Down, conditional-write (0 = unset). First write of this reserved int slot. See `docs/DRAG_AND_DROP.md` §5 gap #2. | `Area`, `Project` | `reservedInt1` | Int(64) |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -197,7 +198,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `context` | String | `String?` | Yes | |
 | `reservedString1` | String | `String?` (`emoji`) | Yes | user-assigned glyph; replaces the area dot in UI |
 | `reservedString2` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
-| `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `reservedInt1` | Int(64) | `Int` (`position`) | conditional | synced sidebar sort order; 0 = unset |
+| `reservedDate1` | — | reserved | — | |
 
 #### Project  — recordName `project:{id}`
 | Field | CK type | Swift | Nullable | Notes |
@@ -212,7 +214,8 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `context` | String | `String?` | Yes | |
 | `githubRepo` | String | `String?` | Yes | legacy repo pointer; mirrored from a `.git` `AreaAttachment`, else nil |
 | `reservedString1` | String | `String?` (`attachmentJSON`) | Yes | JSON-encoded `AreaAttachment` (one read-only context feed) |
-| `reservedString2`, `reservedDate1`, `reservedInt1` | — | reserved | — | |
+| `reservedInt1` | Int(64) | `Int` (`position`) | conditional | synced sidebar sort order; 0 = unset |
+| `reservedString2`, `reservedDate1` | — | reserved | — | |
 
 #### Section  — recordName `section:{id}`
 | Field | CK type | Swift | Nullable | Notes |

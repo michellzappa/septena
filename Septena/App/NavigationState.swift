@@ -83,7 +83,8 @@ extension Route {
 /// the sidebar (`SidebarRootView`) and the title dropdown (`TaskNavMenu`)
 /// render from, so the two surfaces can never list different things or in a
 /// different order. Smart-list identity lives here; area / project ordering
-/// reads the same persisted `sidebar.*Order` keys the sidebar writes.
+/// reads the synced `position` field (legacy device-local `sidebar.*Order`
+/// keys are the pre-sync upgrade fallback). See `docs/DRAG_AND_DROP.md` §5.
 @MainActor
 enum TaskDestinations {
   /// Smart lists, in display order. Next is intentionally absent — it's a
@@ -96,11 +97,31 @@ enum TaskDestinations {
   ]
 
   static func orderedAreas(_ loaded: [Area]) -> [Area] {
-    applyStoredOrder(loaded, key: "sidebar.areaOrder")
+    positionOrdered(loaded, legacyKey: "sidebar.areaOrder", position: { $0.position })
   }
 
   static func orderedProjects(_ loaded: [Project]) -> [Project] {
-    applyStoredOrder(loaded, key: "sidebar.projectOrder")
+    positionOrdered(loaded, legacyKey: "sidebar.projectOrder", position: { $0.position })
+  }
+
+  /// Order by the synced `position` (docs/DRAG_AND_DROP.md §5 gap #2). Once
+  /// anything's been ordered, position wins: ascending, with unset rows
+  /// (`position == 0` — newly created, never dragged) sinking to the bottom in
+  /// the incoming (title-sorted) order, matching the old append-new behavior.
+  /// Before any reorder on this build (every position still 0), fall back to
+  /// the legacy device-local `sidebar.*Order` so the upgrade is seamless — the
+  /// first reorder renumbers everyone and this fallback never runs again.
+  private static func positionOrdered<T: Identifiable>(
+    _ loaded: [T], legacyKey: String, position: (T) -> Int
+  ) -> [T] where T.ID == String {
+    guard loaded.contains(where: { position($0) != 0 }) else {
+      return applyStoredOrder(loaded, key: legacyKey)
+    }
+    return loaded.enumerated().sorted { a, b in
+      let pa = position(a.element) == 0 ? Int.max : position(a.element)
+      let pb = position(b.element) == 0 ? Int.max : position(b.element)
+      return pa != pb ? pa < pb : a.offset < b.offset
+    }.map(\.element)
   }
 
   /// Reorder `loaded` to match a persisted `[id]` order, appending any ids the

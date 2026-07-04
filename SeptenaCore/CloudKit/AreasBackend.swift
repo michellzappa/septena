@@ -39,6 +39,9 @@ protocol AreasBackend: AnyObject {
   func setEmoji(id: String, emoji: String?) async throws
   func setAttachment(id: String, attachment: AreaAttachment?) async throws
   func delete(id: String) async throws
+  /// Renumber areas to match `orderedIDs` (synced sidebar order). See
+  /// `docs/DRAG_AND_DROP.md` §5 gap #2.
+  func reorder(orderedIDs: [String]) async throws
 }
 
 // MARK: - Facade
@@ -84,6 +87,9 @@ final class AreasMutator: AreasBackend {
   }
   func delete(id: String) async throws {
     try await requireBackend().delete(id: id)
+  }
+  func reorder(orderedIDs: [String]) async throws {
+    try await requireBackend().reorder(orderedIDs: orderedIDs)
   }
 
   /// Forensic — create a record with a specific id.
@@ -193,5 +199,25 @@ final class CloudKitAreasBackend: AreasBackend {
     let staged = entity
     context.delete(entity)
     commitAndPush(staged, op: "delete", deletion: true)
+  }
+
+  /// Renumber areas to `orderedIDs` (positions 1…N) and sync. The set is tiny,
+  /// so we rewrite the whole order on each reorder rather than midpoint-insert;
+  /// only rows whose position actually changed are pushed, with a single save +
+  /// one structure-changed post for the batch. See `docs/DRAG_AND_DROP.md` §5.
+  func reorder(orderedIDs: [String]) async throws {
+    var changed: [String] = []
+    for (index, id) in orderedIDs.enumerated() {
+      guard let entity = fetch(id: id) else { continue }
+      let newPos = index + 1
+      if entity.position != newPos { entity.position = newPos; changed.append(id) }
+    }
+    guard !changed.isEmpty else { return }
+    do { try context.save() } catch {
+      SeptenaLog.error("CK areas: reorder save failed", error)
+    }
+    for id in changed { engine.noteAreaChange(id: id) }
+    SeptenaLog.info("[CK] area reorder → \(changed.count) repositioned")
+    NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
   }
 }

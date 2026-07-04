@@ -32,10 +32,10 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   @State private var recentlyDeletedCount: Int = 0
 
-  // Persisted sidebar order — arrays of IDs in display order.
-  // Written on every Move Up/Down; applied when loading from cache/server.
-  @AppStorage("sidebar.areaOrder")    private var areaOrderData: Data = Data()
-  @AppStorage("sidebar.projectOrder") private var projectOrderData: Data = Data()
+  // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
+  // Move Up/Down renumbers via areas/projects mutators; the legacy device-local
+  // `sidebar.*Order` UserDefaults keys survive only as NavigationState's
+  // pre-sync upgrade fallback, so nothing here reads/writes them anymore.
   /// Areas the user has folded shut (Things-style) — their projects are
   /// hidden until re-expanded. Stored as a JSON id set; only areas that
   /// actually have projects ever show the fold control.
@@ -867,8 +867,9 @@ struct SidebarRootView: View {
 
   private func commitAreaOrder(_ next: [Area]) {
     Haptics.tick()
-    areas = next
-    areaOrderData = (try? JSONEncoder().encode(next.map(\.id))) ?? Data()
+    areas = next   // optimistic; the reorder re-posts .septenaStructureChanged → load() re-sorts by position
+    let ids = next.map(\.id)
+    Task { try? await areasMutator.reorder(orderedIDs: ids) }
   }
 
   /// Reorder a project within its parent group (top-level when parent is
@@ -917,8 +918,9 @@ struct SidebarRootView: View {
     }
 
     Haptics.tick()
-    projects = next
-    projectOrderData = (try? JSONEncoder().encode(next.map(\.id))) ?? Data()
+    projects = next   // optimistic; reorder re-posts .septenaStructureChanged → load() re-sorts by position
+    let groupIDs = nextSiblings.map(\.id)
+    Task { try? await projectsMutator.reorder(orderedIDs: groupIDs) }
   }
 
   private var topLevelProjects: [Project] {

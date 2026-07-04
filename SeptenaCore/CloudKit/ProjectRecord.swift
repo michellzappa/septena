@@ -33,11 +33,13 @@ enum ProjectCloudKitSchema {
     /// JSON-encoded `AreaAttachment`. Rides the first reserved string slot —
     /// additive in Prod, no record-type bump. See [AreaAttachment.swift].
     static let attachment = "reservedString1"
+    /// Synced sidebar sort order. Rides the reserved int slot — additive in
+    /// Prod, no record-type bump. See `docs/DRAG_AND_DROP.md` §5 gap #2.
+    static let position = "reservedInt1"
 
     // Reserved.
     static let reservedString2 = "reservedString2"
     static let reservedDate1 = "reservedDate1"
-    static let reservedInt1 = "reservedInt1"
   }
 }
 
@@ -61,6 +63,8 @@ extension ProjectEntity: CloudKitSystemFieldsBacked {
     // permanently ENCRYPTED_STRING in the CK schema, so attempting to
     // write a STRING there fails even after a zone reset.
     record[ProjectCloudKitSchema.Field.notesText] = notes
+    // Conditional write (matches TaskRecord.position): 0 = unset sentinel.
+    if position != 0 { record[ProjectCloudKitSchema.Field.position] = position }
     return record
   }
 }
@@ -79,6 +83,7 @@ extension ProjectEntity {
     attachmentJSON = optionalProjectString(record[ProjectCloudKitSchema.Field.attachment])
     notes = optionalProjectString(record[ProjectCloudKitSchema.Field.notesText])
       ?? optionalProjectString(record.encryptedValues[ProjectCloudKitSchema.Field.encryptedNotes])
+    if let v = record[ProjectCloudKitSchema.Field.position] as? Int { position = v }
     captureCloudKitSystemFields(from: record)
   }
 
