@@ -4,49 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1345,
+      "build": 1350,
       "date": "2026-07-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Introducing Septask, a focused task app",
-          "detail": "A dedicated, streamlined app for your to-dos on iPhone and Mac, working over the same private task data as Septena.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A dedicated Tasks-only app for iPhone and Mac that works over the same private data as Septena, with its own tab bar, settings, quick capture, and Home Screen quick action.",
           "section": "tasks"
         },
         {
-          "title": "A more capable Today and task list",
-          "detail": "Group tasks into project section headings, multi-select for bulk actions, weave calendar events into Today and Upcoming, and import from a Things export.",
+          "title": "Organize projects with section headings",
+          "detail": "Group tasks inside a project under headings, with Things imports mapping their native headings across automatically.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "Recently Deleted keeps removed tasks for 30 days with one-tap restore, and undo toasts cover delete, move, and defer.",
+          "title": "Faster task editing",
+          "detail": "Edit titles in place, multi-select for bulk move and file, quick-add from the top or bottom of a list, and undo actions from a confirmation toast.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo of your meal",
-          "detail": "Photo-first meal capture analyzes food on-device, with an optional ingredient breakdown per meal.",
+          "title": "Recently Deleted with restore",
+          "detail": "Deleted tasks now wait 30 days in a Recently Deleted view where you can restore them before they auto-purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events appear alongside your tasks, with hidden-calendar choices syncing across devices.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and analyze it on-device, with an optional ingredient breakdown per meal.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on sets, and an auto-advancing rest timer that continues on your watch.",
+          "title": "Smarter training sessions",
+          "detail": "One-tap progression hints on strength sets, effort-weighted muscle volume with a weekly review, and a rest flow that auto-advances with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Pin the goals that matter to your dashboard",
-          "detail": "Any measurable goal can be pinned to the week dashboard as its own tile.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most in view as tiles on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "A richer wrist experience",
-          "detail": "A time-of-day sky behind a paged Next feed, tap-to-quick-add intake tiles, and long-press action drawers to complete, skip, or defer.",
+          "title": "Choose how much you share",
+          "detail": "New graded telemetry levels let you see exactly what's sent and pick off, minimal, balanced, or full.",
           "section": null
         },
         {
-          "title": "Clearer, more private analytics",
-          "detail": "Choose exactly how much you share with graded telemetry levels, and see what's been sent in a recent-activity log.",
+          "title": "A richer Apple Watch",
+          "detail": "Tap intake tiles to quick-add, use long-press action drawers on Next rows, and see the feed float over a time-of-day sky.",
           "section": null
         }
       ]
