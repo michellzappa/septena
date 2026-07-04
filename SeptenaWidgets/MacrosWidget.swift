@@ -49,7 +49,7 @@ struct MacrosWidgetView: View {
       .widgetSurfaceInsets()
       .widgetURL(URL(string: "septena://section/nutrition"))
       .containerBackground(for: .widget) {
-        Theme.cardSurface
+        Theme.widgetSurface
       }
   }
 

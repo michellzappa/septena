@@ -66,7 +66,7 @@ struct SectionTileWidgetView: View {
       .widgetSurfaceInsets()
       .widgetURL(deepLink)
       .containerBackground(for: .widget) {
-        Theme.cardSurface
+        Theme.widgetSurface
       }
   }
 

@@ -68,6 +68,19 @@ enum Theme {
     #endif
   }()
 
+  /// Home Screen widget container surface. Matches Apple's stock widgets
+  /// (Batteries, Weather): pure black in dark mode, white in light. In-app
+  /// cards use `cardSurface` — a lifted gray — because they sit *on* a grouped
+  /// background; a widget's container IS the background, so a gray fill reads
+  /// as a washed-out box next to the system widgets rather than a native one.
+  static let widgetSurface: Color = {
+    #if os(macOS)
+    return Color(nsColor: .controlBackgroundColor)
+    #else
+    return Color(.systemBackground)
+    #endif
+  }()
+
   /// Cross-platform analogue of `UIColor.systemGroupedBackground` — the soft
   /// gray under insetGrouped lists / dashboard canvases on iOS.
   /// macOS uses a hand-mixed dynamic gray: lighter than

@@ -15,10 +15,11 @@ struct NextWidgetView: View {
       .containerBackground(for: .widget) { background }
   }
 
-  /// Home Screen families share the list-widget card surface (`Theme.cardSurface`)
-  /// with Today, so the two read as siblings. Lock Screen accessories stay
-  /// transparent — the system renders them monochrome over the wallpaper — and
-  /// the circular accessory uses the standard dark accessory disc.
+  /// Home Screen families share the widget container surface (`Theme.widgetSurface`)
+  /// with Today, so the two read as siblings — and match Apple's stock widgets
+  /// (near-black in dark). Lock Screen accessories stay transparent — the system
+  /// renders them monochrome over the wallpaper — and the circular accessory uses
+  /// the standard dark accessory disc.
   @ViewBuilder
   private var background: some View {
     switch family {
@@ -27,7 +28,7 @@ struct NextWidgetView: View {
     case .accessoryRectangular, .accessoryInline:
       Color.clear
     default:
-      Theme.cardSurface
+      Theme.widgetSurface
     }
   }
 

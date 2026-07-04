@@ -49,7 +49,7 @@ struct TasksTodayWidgetView: View {
       .widgetSurfaceInsets()
       .widgetURL(URL(string: "septena://tasks/today"))
       .containerBackground(for: .widget) {
-        Theme.cardSurface
+        Theme.widgetSurface
       }
   }
 
