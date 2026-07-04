@@ -102,6 +102,16 @@
         }
       }
     },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
     "%@ · lag %@d · n=%@ · p=%@" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1453,6 +1463,9 @@
 
     },
     "AI provider override" : {
+
+    },
+    "Aim %@" : {
 
     },
     "Alcohol" : {
@@ -5926,6 +5939,9 @@
       }
     },
     "Pick an audience to start — each pre-selects sensible sections you can edit. Reports share aggregate trends only, never individual entries." : {
+
+    },
+    "Pick another date" : {
 
     },
     "Pick up to %@ sections. Each one becomes a shortcut in the Home Screen long-press menu, opening directly into that section." : {
