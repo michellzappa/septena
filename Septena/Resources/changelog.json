@@ -4,60 +4,70 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1353,
+      "build": 1362,
       "date": "2026-07-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Import your tasks from Things",
-          "detail": "Bring over tasks and headings from a Things database export, mapped into projects and sections.",
+          "detail": "Bring a Things database export into Septena, with headings mapped to project sections.",
           "section": "tasks"
         },
         {
-          "title": "Organize projects with section headings",
-          "detail": "Break long projects into labeled sections that stay out of your feeds and counts.",
+          "title": "Project section headings",
+          "detail": "Organize a project into labeled sections that stay out of your feeds and counts.",
           "section": "tasks"
         },
         {
-          "title": "See your calendar alongside Today",
-          "detail": "System calendar events now weave into Today and Upcoming, showing only what's still ahead.",
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events now appear alongside tasks, with per-device hidden-calendar sync.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "Recently Deleted keeps tasks for 30 days with one-tap restore and undo for delete, move, and defer.",
+          "title": "Recently Deleted with undo",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore them.",
           "section": "tasks"
         },
         {
-          "title": "Edit and manage tasks faster",
-          "detail": "Inline title editing, a quick-add line, multi-select bulk actions, and smarter filing suggestions.",
+          "title": "Reorder and file tasks by drag, and act on many at once",
+          "detail": "Drag areas and projects into order, drop tasks between them, and multi-select for bulk move, copy, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture with on-device analysis, plus an optional ingredient breakdown.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and get an on-device analysis, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, and an auto-advancing rest flow with a Live Activity.",
+          "title": "Smarter training sessions",
+          "detail": "One-tap progression hints on strength sets, an auto-advancing rest flow, and a weekly muscle-volume review after each session.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your week",
-          "detail": "Keep the goals that matter most as tiles on the week dashboard.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most in view as dashboard tiles.",
           "section": "goals"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels from off to full, with a clear view of exactly what gets sent.",
+          "title": "Home-screen widgets",
+          "detail": "New Next and Today widgets share the app's tile design and a native container surface.",
           "section": null
         },
         {
-          "title": "A richer watch experience",
-          "detail": "A time-of-day sky behind a paged Next feed, interactive rows, and expanded intake tiles.",
+          "title": "Choose how much you share",
+          "detail": "Graded telemetry levels let you pick Off, Minimal, Balanced, or Full, and see exactly what's been sent.",
           "section": null
+        },
+        {
+          "title": "A richer Apple Watch",
+          "detail": "Tap intake tiles to quick-add, use long-press action drawers on Next rows, and watch a time-of-day sky behind your feed.",
+          "section": null
+        },
+        {
+          "title": "Introducing Septask",
+          "detail": "A focused companion app for just your tasks, over the same private data.",
+          "section": "tasks"
         }
       ]
     },
