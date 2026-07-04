@@ -14,8 +14,8 @@ import WidgetKit
 // the tile widgets disable them (`septenaWidgetMargins()`). Both list widgets
 // still target the same content box — ~8pt horizontal, 16pt vertical — so the
 // content lines up regardless of how each one reaches that inset:
-//   • Next  — system margins (~16) + `widgetHorizontalBleed()` (−8)  → ~8 / 16
-//   • Today — `septenaWidgetMargins()` + `widgetSurfaceInsets()`     →   8 / 16
+//   • Next  — system margins (~16) + `widgetHorizontalBleed()` (−6)  → ~10 / 16
+//   • Today — `septenaWidgetMargins()` + `widgetSurfaceInsets()`     →  10 / 16
 // Both sit on `Theme.cardSurface`.
 
 /// The single source of truth for sizes and spacing across the list widgets.
@@ -33,10 +33,10 @@ enum WidgetListMetrics {
 
   // Spacing
   static func headerGap(_ compact: Bool) -> CGFloat { compact ? 6 : 8 }
-  static func rowGap(_ compact: Bool) -> CGFloat { compact ? 7 : 9 }
+  static func rowGap(_ compact: Bool) -> CGFloat { compact ? 8 : 10 }
   /// Wider gap for the `.distributed` fill (Next) so its rows breathe into the
   /// full card height instead of clumping under the header.
-  static func rowGapWide(_ compact: Bool) -> CGFloat { compact ? 10 : 13 }
+  static func rowGapWide(_ compact: Bool) -> CGFloat { compact ? 11 : 14 }
 }
 
 /// `[accent icon]  Title  …  trailing`. The trailing slot is a bare count
@@ -83,7 +83,7 @@ struct WidgetListRow<Leading: View>: View {
       leading
         .frame(width: WidgetListMetrics.glyphFrame(compact))
       Text(title)
-        .font(.system(size: WidgetListMetrics.rowText(compact), weight: .medium))
+        .font(.system(size: WidgetListMetrics.rowText(compact), weight: .regular))
         .foregroundStyle(.primary)
         .lineLimit(1)
         .truncationMode(.tail)
@@ -95,7 +95,7 @@ struct WidgetListRow<Leading: View>: View {
       Spacer(minLength: 4)
       if let trailingCount, trailingCount > 1 {
         Text("\(trailingCount)")
-          .font(.system(size: WidgetListMetrics.trailingText, weight: .semibold).monospacedDigit())
+          .font(.system(size: WidgetListMetrics.trailingText, weight: .regular).monospacedDigit())
           .foregroundStyle(.secondary)
       }
     }

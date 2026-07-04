@@ -1,14 +1,14 @@
 import SwiftUI
 import WidgetKit
 
-/// Home-screen widget gutters. Horizontal is half the typical system content
-/// margin (~16pt → 8pt); vertical matches the system default.
+/// Home-screen widget gutters. Horizontal is just inside half the typical
+/// system content margin; vertical matches the system default.
 enum WidgetLayout {
-  static let horizontal: CGFloat = 8
+  static let horizontal: CGFloat = 10
   static let vertical: CGFloat = 16
   /// Pull home-screen content outward by half the system horizontal gutter
   /// (used when system content margins stay enabled — e.g. Next + accessories).
-  static let horizontalBleed: CGFloat = -8
+  static let horizontalBleed: CGFloat = -6
 }
 
 struct WidgetSurfaceInsets: ViewModifier {

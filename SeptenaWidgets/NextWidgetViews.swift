@@ -77,8 +77,8 @@ private func categories(_ items: [NextItem]) -> [NextCategory] {
 // Both render through the shared `WidgetListLayout` so Next and Today are the
 // same widget with a different leading glyph. Next's glyph is the per-category
 // SF Symbol — load-bearing, it tells the categories apart — tinted with that
-// category's section accent (`kindAccent`), matching the app's Next feed; the
-// header's bucket icon stays neutral gray.
+// category's section accent (`kindAccent`), matching the app's Next feed. The
+// header keeps the app's Next icon while the title remains the current bucket.
 
 private struct SmallView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: true) } }
 private struct MediumView: View { var entry: NextEntry; var body: some View { HomeList(entry: entry, compact: false) } }
@@ -92,7 +92,7 @@ private struct HomeList: View {
     WidgetListLayout(
       compact: compact,
       header: WidgetListHeader(
-        icon: entry.bucket.icon,
+        icon: "arrow.right",
         title: entry.bucket.title,
         accent: Theme.inkSecondary,
         trailing: "\(entry.remaining)",
