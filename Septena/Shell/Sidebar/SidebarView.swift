@@ -1109,6 +1109,11 @@ private struct IOSSidebarListChrome: ViewModifier {
       // above the first area and between area cards; tighten it for a denser,
       // more Reminders-like rhythm.
       .listSectionSpacing(IOSSidebarListMetrics.sectionSpacing)
+      // iOS 26 soft scroll-edge: content blurs/fades as it scrolls under the top
+      // instead of a hard cutoff — matching the task lists (SelectableScrollList)
+      // and home pages (SeptenaPage). Especially visible on Septask iPad, where
+      // the grid now sits at the top with no floating bar above it.
+      .scrollEdgeEffectStyle(.soft, for: .top)
   }
 }
 #endif
@@ -1625,8 +1630,11 @@ private struct SidebarTaskDrop: ViewModifier {
     if usesPushNavigation {
       content
         .background(
+          // ONE canonical emphasis: a drop-hover reuses the SAME fill as a
+          // selected row (`Theme.listSelectionFill`), never a second bespoke
+          // accent treatment. See CLAUDE.md "One selection/target language".
           RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(Color.accentColor.opacity(isTargeted ? 0.18 : 0))
+            .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
             .animation(.easeOut(duration: 0.12), value: isTargeted)
         )
         .dropDestination(for: TaskDragIDs.self) { payloads, _ in
