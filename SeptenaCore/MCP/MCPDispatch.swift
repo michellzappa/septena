@@ -97,7 +97,7 @@ enum MCPDispatch {
     "symptoms_list", "medications_list",
     "intake_kinds_list", "intake_items_list", "intake_events_list",
     "nutrition_entries_list", "nutrition_day_summary",
-    "training_entries_list", "training_exercises_list",
+    "training_entries_list", "training_exercises_list", "training_sessions_list",
     "hydration_today", "hydration_history", "grocery_items_list",
   ]
 
@@ -212,6 +212,9 @@ enum MCPDispatch {
     case "training_exercises_list": return trainingExercises(args)
     case "training_exercise_create": return try trainingExerciseCreate(args)
     case "training_exercise_update": return try trainingExerciseUpdate(args)
+    case "training_sessions_list":   return trainingSessions(args)
+    case "training_session_create":  return try trainingSessionCreate(args)
+    case "training_session_update":  return try trainingSessionUpdate(args)
 
     // ---- Hydration ----
     case "hydration_log":       return try hydrationLog(args)
@@ -1425,6 +1428,75 @@ enum MCPDispatch {
       aliases: args.stringArray("aliases"), primaryMuscle: primary,
       secondaryMuscles: secondary, archived: args.bool("archived"))
     return exerciseDefinitionJSON(id)
+  }
+
+  // MARK: - Training: session types (routines)
+
+  private static let validSessionKinds = SessionKind.allCases.map(\.rawValue)
+
+  private static func checkedSessionKind(_ value: String) throws -> SessionKind {
+    guard let kind = SessionKind(rawValue: value) else {
+      throw MCPError.badArgument(
+        "invalid kind '\(value)'. Valid: \(validSessionKinds.joined(separator: ", "))")
+    }
+    return kind
+  }
+
+  private static func sessionTypeJSON(_ id: String) -> [String: Any] {
+    guard let s = (try? ctx.fetch(FetchDescriptor<SessionTypeEntity>(
+      predicate: #Predicate { $0.id == id })))?.first else { return ["id": id] }
+    var out: [String: Any] = [
+      "id": s.id, "label": s.label, "exercises": s.exercises,
+      "archived": s.archived, "sortIndex": s.sortIndex,
+      // Resolve kind to a concrete category even for legacy rows written before
+      // the `kind` field existed (fall back to the id-derived default).
+      "kind": (s.kindRaw.flatMap(SessionKind.init(rawValue:)) ?? SessionKind.defaulted(for: s.id)).rawValue,
+    ]
+    if let emoji = s.emoji { out["emoji"] = emoji }
+    return out
+  }
+
+  private static func trainingSessions(_ args: MCPArgs) -> Any {
+    let includeArchived = args.bool("archived") ?? false
+    let limit = args.int("limit") ?? 200
+    let rows = (try? ctx.fetch(FetchDescriptor<SessionTypeEntity>()))?
+      .filter { includeArchived || !$0.archived }
+      .sorted { $0.sortIndex < $1.sortIndex }
+      .prefix(limit) ?? []
+    return ["sessions": rows.map { sessionTypeJSON($0.id) }]
+  }
+
+  private static func trainingSessionCreate(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    let label = try args.requireString("label")
+    if ((try? ctx.fetch(FetchDescriptor<SessionTypeEntity>(
+      predicate: #Predicate { $0.id == id })))?.first) != nil {
+      throw MCPError.badArgument(
+        "session type '\(id)' already exists — use training_session_update")
+    }
+    let kind = try args.string("kind").map { try checkedSessionKind($0) }
+    let entity = SeptenaServices.shared.trainingMutator.addSessionType(
+      id: id, label: label, emoji: args.string("emoji"),
+      exercises: args.stringArray("exercises") ?? [], kind: kind)
+    return sessionTypeJSON(entity.id)
+  }
+
+  private static func trainingSessionUpdate(_ args: MCPArgs) throws -> Any {
+    let id = try args.requireString("id")
+    guard ((try? ctx.fetch(FetchDescriptor<SessionTypeEntity>(
+      predicate: #Predicate { $0.id == id })))?.first) != nil else {
+      throw MCPError.badArgument(
+        "no session type with id '\(id)' — call training_sessions_list to find the id")
+    }
+    // emoji: absent = leave; "" = clear; value = set. Read from raw args because
+    // args.string() collapses "" → nil and we'd lose the explicit clear signal.
+    var emoji: String?? = nil
+    if let e = args.raw["emoji"] as? String { emoji = .some(e.isEmpty ? nil : e) }
+    let kind = try args.string("kind").map { try checkedSessionKind($0) }
+    SeptenaServices.shared.trainingMutator.updateSessionType(
+      id: id, label: args.string("label"), emoji: emoji,
+      exercises: args.stringArray("exercises"), kind: kind, archived: args.bool("archived"))
+    return sessionTypeJSON(id)
   }
 
   // MARK: - Hydration (backed by Nutrition)

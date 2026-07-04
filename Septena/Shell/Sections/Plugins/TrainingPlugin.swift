@@ -102,24 +102,18 @@ enum TrainingPlugin: SectionPlugin {
               inputs: "required: sessionType (id e.g. 'upper'), exercise (canonical NAME — e.g. 'Chest press') · optional: date (default today), time (HH:MM), weight (kg), sets (int or 'AMRAP'), reps, difficulty, durationMin, distanceM, level, note, concludedAt (ISO8601)"),
         SectionSkill.Tool("training_entry_update",   "Patch any subset of fields (rename/retag supported; only fields you pass change)",
               inputs: "required: id · optional: date, time, sessionType, exercise, weight, sets, reps, difficulty, durationMin, distanceM, level, note, concludedAt"),
-        SectionSkill.Tool("training_entry_delete",   "Remove an entry",
-              inputs: "required: id"),
         SectionSkill.Tool("training_exercises_list", "Exercise catalog (definitions)",
               inputs: "optional: type (strength|cardio|mobility|core), archived (default false), limit"),
         SectionSkill.Tool("training_exercise_create", "Add an exercise definition. id defaults to slugified name",
               inputs: "required: name, type (strength|cardio|mobility|core) · optional: id (slug), subgroup (e.g. push/pull), aliases (array), primaryMuscle, secondaryMuscles (array)"),
-        SectionSkill.Tool("training_exercise_update", "Update an exercise definition",
+        SectionSkill.Tool("training_exercise_update", "Update an exercise definition (archive with archived: true)",
               inputs: "required: id · optional: name, type, subgroup, aliases, primaryMuscle, secondaryMuscles, archived"),
-        SectionSkill.Tool("training_exercise_delete", "Delete from catalog",
-              inputs: "required: id"),
-        SectionSkill.Tool("training_sessions_list",  "Session-type templates (e.g. 'upper', 'lower', 'cardio')",
+        SectionSkill.Tool("training_sessions_list",  "Session-type templates / routines (e.g. 'upper', 'lower', 'cardio')",
               inputs: "optional: archived (default false), limit"),
         SectionSkill.Tool("training_session_create", "Create a session template. id is the canonical key",
-              inputs: "required: id (e.g. 'upper'), label · optional: emoji, exercises (array of canonical names), kind"),
-        SectionSkill.Tool("training_session_update", "Update a session template",
-              inputs: "required: id · optional: label, emoji, exercises, kind, archived"),
-        SectionSkill.Tool("training_session_delete", "Remove a session template",
-              inputs: "required: id"),
+              inputs: "required: id (e.g. 'upper'), label · optional: emoji, exercises (array of canonical NAMES), kind (strength|cardio|mobility|mixed)"),
+        SectionSkill.Tool("training_session_update", "Update a session template. Archive (remove from pickers, non-destructive) with archived: true",
+              inputs: "required: id · optional: label, emoji, exercises, kind (strength|cardio|mobility|mixed), archived"),
       ],
       body: """
       ### Model
@@ -178,8 +172,9 @@ enum TrainingPlugin: SectionPlugin {
 
       ### Don't
       - Don't pass an exercise id where `exercise` is expected — it's the **canonical name** (e.g. 'Chest press'), not the slug.
-      - Don't pass arbitrary strings for `sessionType` — resolve to an existing SessionType id first.
-      - Don't `training_exercise_delete` something that has historical entries unless the user is sure. Entries keep a denormalised exercise name, but the catalog reference is lost.
+      - Don't pass arbitrary strings for `sessionType` — resolve to an existing SessionType id (via `training_sessions_list`) or create one first with `training_session_create`.
+      - Don't invent a routine on the fly — reuse an existing session template when one fits; only `training_session_create` a genuinely new split.
+      - Prefer archiving (`archived: true` via the update tools) over removal — there is no delete tool, and archiving keeps historical entries intact while hiding the template/exercise from pickers.
       """
     )
   }

@@ -43,6 +43,11 @@ enum MCPToolCatalog {
     "abs", "lowerBack",
   ]
 
+  /// The 4 routine categories (mirrors `SessionKind.allCases`). Drives the
+  /// session-type create/update `kind` enum; the dispatch-side validator
+  /// (`checkedSessionKind`) resolves the same raw values back to the enum.
+  private static let sessionKindEnum = ["strength", "cardio", "mobility", "mixed"]
+
   // MARK: - Global tools (always exposed)
 
   static var global: [MCPTool] {
@@ -533,6 +538,31 @@ enum MCPToolCatalog {
                 "aliases": ["type": "array", "items": ["type": "string"]],
                 "primaryMuscle": ["type": "string", "description": "One of: \(muscleEnum.joined(separator: ", ")). Empty string clears it."],
                 "secondaryMuscles": ["type": "array", "items": ["type": "string", "enum": muscleEnum]],
+                "archived": ["type": "boolean"],
+              ]]),
+      MCPTool(name: "training_sessions_list",
+              description: "List session-type templates (routines, e.g. 'upper'/'lower'/'cardio') — id, label, emoji, exercises, kind. Filter by archived state.",
+              inputSchema: ["type": "object", "properties": [
+                "archived": ["type": "boolean", "description": "Include archived. Defaults to false."],
+                "limit": ["type": "integer", "default": 200],
+              ]]),
+      MCPTool(name: "training_session_create",
+              description: "Create a session-type template (routine). id is the canonical key (e.g. 'upper'). exercises are canonical exercise NAMES.",
+              inputSchema: ["type": "object", "required": ["id", "label"], "properties": [
+                "id": ["type": "string", "description": "Canonical key, e.g. 'upper'/'lower'/'cardio'."],
+                "label": ["type": "string", "description": "Display name."],
+                "emoji": ["type": "string"],
+                "exercises": ["type": "array", "items": ["type": "string"], "description": "Canonical exercise NAMES in this session (not slugs)."],
+                "kind": ["type": "string", "enum": sessionKindEnum, "description": "Routine category."],
+              ]]),
+      MCPTool(name: "training_session_update",
+              description: "Update a session-type template — rename, set emoji/exercises/kind, or archive. Pass archived: true to remove it from pickers without deleting (non-destructive). Pass emoji: \"\" to clear it.",
+              inputSchema: ["type": "object", "required": ["id"], "properties": [
+                "id": ["type": "string", "description": "Session-type id (from training_sessions_list)."],
+                "label": ["type": "string"],
+                "emoji": ["type": "string"],
+                "exercises": ["type": "array", "items": ["type": "string"]],
+                "kind": ["type": "string", "enum": sessionKindEnum],
                 "archived": ["type": "boolean"],
               ]]),
     ],

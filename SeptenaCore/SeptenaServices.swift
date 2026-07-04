@@ -3366,13 +3366,22 @@ final class TrainingMutator {
   // MARK: - Session types
 
   @discardableResult
-  func addSessionType(label: String, emoji: String? = nil, exercises: [String] = []) -> SessionTypeEntity {
-    let id = uniqueSessionTypeID(for: label)
-    let entity = SessionTypeEntity(id: id,
+  func addSessionType(id: String? = nil,
+                      label: String,
+                      emoji: String? = nil,
+                      exercises: [String] = [],
+                      kind: SessionKind? = nil) -> SessionTypeEntity {
+    // Seed the id from an explicit canonical key when given ('upper'), else from
+    // the label; `uniqueSessionTypeID` slugifies + de-dupes either way so the id
+    // stays a clean, collision-free key. Callers read the resolved id back off
+    // the returned entity.
+    let resolvedID = uniqueSessionTypeID(for: (id?.isEmpty == false) ? id! : label)
+    let entity = SessionTypeEntity(id: resolvedID,
                                    label: label,
                                    emoji: emoji,
                                    exercises: exercises,
-                                   sortIndex: nextSessionTypeSortIndex())
+                                   sortIndex: nextSessionTypeSortIndex(),
+                                   kindRaw: kind?.rawValue)
     context.insert(entity)
     commitSessionType(entity, op: "create")
     return entity
@@ -3381,11 +3390,15 @@ final class TrainingMutator {
   func updateSessionType(id: String,
                          label: String? = nil,
                          emoji: String?? = nil,
-                         exercises: [String]? = nil) {
+                         exercises: [String]? = nil,
+                         kind: SessionKind? = nil,
+                         archived: Bool? = nil) {
     guard let entity = fetchSessionType(id: id) else { return }
     if let label { entity.label = label }
     if let emoji { entity.emoji = emoji }
     if let exercises { entity.exercises = exercises }
+    if let kind { entity.kindRaw = kind.rawValue }
+    if let archived { entity.archived = archived }
     entity.updatedAt = .now
     commitSessionType(entity, op: "update")
   }
