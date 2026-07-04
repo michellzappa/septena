@@ -99,6 +99,9 @@ import {
   listExercises, listExercisesJsonSchema, type ListExercisesInput,
   createExercise, createExerciseJsonSchema, type CreateExerciseInput,
   updateExercise, updateExerciseJsonSchema, type UpdateExerciseInput,
+  listSessionTypes, listSessionTypesJsonSchema, type ListSessionTypesInput,
+  createSessionType, createSessionTypeJsonSchema, type CreateSessionTypeInput,
+  updateSessionType, updateSessionTypeJsonSchema, type UpdateSessionTypeInput,
 } from "./tools/training.js";
 import {
   logHydration, logHydrationJsonSchema, type LogHydrationInput,
@@ -445,6 +448,21 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       name: "training_exercise_update",
       description: "Edit an exercise definition — set muscle tags, rename, retype, archive. Use to clean up / backfill muscle groups one exercise at a time. Pass primaryMuscle: \"\" to clear it.",
       inputSchema: updateExerciseJsonSchema,
+    },
+    {
+      name: "training_sessions_list",
+      description: "List session-type templates (routines, e.g. 'upper'/'lower'/'cardio') — id, label, emoji, exercises, kind. Filter by archived state.",
+      inputSchema: listSessionTypesJsonSchema,
+    },
+    {
+      name: "training_session_create",
+      description: "Create a session-type template (routine). id is the canonical key (e.g. 'upper'). exercises are canonical exercise NAMES.",
+      inputSchema: createSessionTypeJsonSchema,
+    },
+    {
+      name: "training_session_update",
+      description: "Update a session-type template — rename, set emoji/exercises/kind, or archive. Pass archived: true to remove it from pickers without deleting (non-destructive). Pass emoji: \"\" to clear it.",
+      inputSchema: updateSessionTypeJsonSchema,
     },
   ],
   hydration: [
@@ -950,6 +968,18 @@ async function callTool(
     }
     case "training_exercise_update": {
       const result = await updateExercise(client, (params.arguments ?? {}) as unknown as UpdateExerciseInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "training_sessions_list": {
+      const result = await listSessionTypes(client, (params.arguments ?? {}) as ListSessionTypesInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "training_session_create": {
+      const result = await createSessionType(client, (params.arguments ?? {}) as unknown as CreateSessionTypeInput);
+      return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+    }
+    case "training_session_update": {
+      const result = await updateSessionType(client, (params.arguments ?? {}) as unknown as UpdateSessionTypeInput);
       return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
     }
     // ---- Hydration ----

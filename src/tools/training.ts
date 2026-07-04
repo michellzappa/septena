@@ -47,6 +47,31 @@ function assertMuscle(value: string): string {
   return value;
 }
 
+// The 4 routine categories — must stay in lockstep with the iOS `SessionKind`
+// enum (SeptenaCore/Models.swift).
+export const SESSION_KINDS = ["strength", "cardio", "mobility", "mixed"] as const;
+const SESSION_KIND_SET = new Set<string>(SESSION_KINDS);
+
+function assertSessionKind(value: string): string {
+  if (!SESSION_KIND_SET.has(value)) {
+    throw new Error(`invalid kind '${value}'. Valid: ${SESSION_KINDS.join(", ")}`);
+  }
+  return value;
+}
+
+// Mirror of SessionKind.defaulted(for:) (SeptenaCore/Models.swift) — resolves a
+// concrete category for rows written before the `kind` field existed, so both
+// MCP surfaces always return a category.
+function defaultedSessionKind(id: string): string {
+  const key = id.toLowerCase();
+  if (["cardio", "run", "running", "bike", "cycling", "swim", "swimming",
+       "row", "rowing", "z2", "zone2"].includes(key)) return "cardio";
+  if (["yoga", "mobility", "stretch", "stretching", "flexibility"].includes(key)) return "mobility";
+  if (["upper", "lower", "push", "pull", "legs", "chest", "back", "shoulders",
+       "arms", "strength", "lifting", "full", "fullbody", "full-body", "full_body"].includes(key)) return "strength";
+  return "mixed";
+}
+
 type ModifyOp =
   | { operationType: "create" | "forceUpdate"; record: { recordType: string; recordName: string; fields: Record<string, { value: unknown }> } }
   | { operationType: "delete"; record: { recordName: string } };
@@ -172,6 +197,40 @@ export const updateExerciseJsonSchema = {
   },
 } as const;
 
+// ---- SessionType (routine template) ----
+
+export const listSessionTypesJsonSchema = {
+  type: "object",
+  properties: {
+    archived: { type: "boolean", description: "Include archived. Defaults to false." },
+    limit:    { type: "integer", default: 200 },
+  },
+} as const;
+
+export const createSessionTypeJsonSchema = {
+  type: "object",
+  required: ["id", "label"],
+  properties: {
+    id:        { type: "string", description: "Canonical key, e.g. 'upper'/'lower'/'cardio'." },
+    label:     { type: "string", description: "Display name." },
+    emoji:     { type: "string" },
+    exercises: { type: "array", items: { type: "string" }, description: "Canonical exercise NAMES in this session (not slugs)." },
+    kind:      { type: "string", enum: SESSION_KINDS, description: "Routine category." },
+  },
+} as const;
+
+export const updateSessionTypeJsonSchema = {
+  type: "object", required: ["id"],
+  properties: {
+    id:        { type: "string" },
+    label:     { type: "string" },
+    emoji:     { type: ["string", "null"], description: "Pass \"\" or null to clear." },
+    exercises: { type: "array", items: { type: "string" } },
+    kind:      { type: "string", enum: SESSION_KINDS },
+    archived:  { type: "boolean", description: "Archive (remove from pickers) without deleting." },
+  },
+} as const;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -193,6 +252,11 @@ export interface CreateExerciseInput {
 export interface UpdateExerciseInput {
   id: string; name?: string; type?: string; subgroup?: string | null;
   aliases?: string[]; primaryMuscle?: string | null; secondaryMuscles?: string[]; archived?: boolean;
+}
+export interface ListSessionTypesInput { archived?: boolean; limit?: number }
+export interface CreateSessionTypeInput { id: string; label: string; emoji?: string; exercises?: string[]; kind?: string }
+export interface UpdateSessionTypeInput {
+  id: string; label?: string; emoji?: string | null; exercises?: string[]; kind?: string; archived?: boolean;
 }
 
 // ============================================================================
@@ -415,6 +479,92 @@ export async function updateExercise(client: CloudKitClient, input: UpdateExerci
   const res = await modify(client, [{
     operationType: "forceUpdate",
     record: { recordType: "ExerciseDefinition", recordName: `exercise-def:${input.id}`, fields },
+  }]);
+  const code = res.records[0]?.serverErrorCode;
+  if (code) throw new Error(res.records[0]?.reason ?? code);
+  return { id: input.id, updated };
+}
+
+// ============================================================================
+// SessionType implementations
+// ============================================================================
+
+export async function listSessionTypes(client: CloudKitClient, input: ListSessionTypesInput) {
+  // Sort server-side by sortIndex (the proven definition-catalog convention,
+  // matching Supplement/Habit/ExerciseDefinition), but filter `archived`
+  // client-side — SessionType has no guaranteed queryable `archived` index and
+  // routines are few, so a full fetch + JS filter is both safe and cheap.
+  const res = await client.queryRecords({
+    recordType: "SessionType",
+    sortBy: [{ fieldName: "sortIndex", ascending: true }],
+    resultsLimit: input.limit ?? 200,
+  });
+
+  const includeArchived = input.archived === true;
+  const sessions = res.records
+    .map((r) => {
+      const id = r.recordName.replace(/^session-type:/, "");
+      return {
+        id,
+        label:     optStr(r.fields.label?.value) ?? "",
+        emoji:     optStr(r.fields.emoji?.value),
+        exercises: optStrArray(r.fields.exercises?.value),
+        // Resolve to a concrete category even when the row predates the `kind`
+        // field (mirrors the in-app read fallback).
+        kind:      optStr(r.fields.kind?.value) ?? defaultedSessionKind(id),
+        archived:  ((r.fields.archived?.value as number) ?? 0) !== 0,
+        sortIndex: (r.fields.sortIndex?.value as number) ?? 0,
+      };
+    })
+    .filter((s) => includeArchived || !s.archived);
+
+  return { sessions };
+}
+
+export async function createSessionType(client: CloudKitClient, input: CreateSessionTypeInput) {
+  if (input.kind) assertSessionKind(input.kind);
+  // Slug the id so it stays a clean canonical key; the response returns the
+  // resolved id for the agent to use in subsequent update / entry-log calls.
+  const id = slugify(input.id);
+  const fields: Record<string, { value: unknown }> = {
+    label:     { value: input.label },
+    exercises: { value: input.exercises ?? [] },
+    archived:  { value: 0 },
+    sortIndex: { value: 0 },
+  };
+  if (input.emoji) fields.emoji = { value: input.emoji };
+  if (input.kind)  fields.kind  = { value: input.kind };
+
+  // `kind` is intentionally NOT protected: on a fresh account where the field
+  // isn't schema-registered yet, the fallback drops it and the read side
+  // re-derives it via defaultedSessionKind — the deploy-deadlock escape hatch.
+  const { droppedFields } = await client.createWithFieldFallback({
+    recordType: "SessionType",
+    recordName: `session-type:${id}`,
+    fields,
+    protectedFields: ["label"],
+  });
+
+  return droppedFields.length > 0
+    ? { id, label: input.label, droppedFields }
+    : { id, label: input.label };
+}
+
+export async function updateSessionType(client: CloudKitClient, input: UpdateSessionTypeInput) {
+  if (input.kind) assertSessionKind(input.kind);
+  const fields: Record<string, { value: unknown }> = {};
+  const updated: string[] = [];
+  if (input.label !== undefined)     { fields.label = { value: input.label }; updated.push("label"); }
+  if (input.emoji !== undefined)     { fields.emoji = { value: input.emoji ?? "" }; updated.push("emoji"); }
+  if (input.exercises !== undefined) { fields.exercises = { value: input.exercises }; updated.push("exercises"); }
+  if (input.kind !== undefined)      { fields.kind = { value: input.kind }; updated.push("kind"); }
+  if (input.archived !== undefined)  { fields.archived = { value: input.archived ? 1 : 0 }; updated.push("archived"); }
+
+  if (!updated.length) return { id: input.id, updated: [] };
+
+  const res = await modify(client, [{
+    operationType: "forceUpdate",
+    record: { recordType: "SessionType", recordName: `session-type:${input.id}`, fields },
   }]);
   const code = res.records[0]?.serverErrorCode;
   if (code) throw new Error(res.records[0]?.reason ?? code);

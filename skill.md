@@ -34,7 +34,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 | `medications` | `medications_list`, `medications_create`, `medications_log` |
 | `gut` | `gut_events_list`, `gut_event_log` |
 | `nutrition` | `nutrition_entries_list`, `nutrition_entry_log`, `nutrition_entry_update`, `nutrition_day_summary` |
-| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update` |
+| `training` | `training_entries_list`, `training_entry_log`, `training_entry_update`, `training_exercises_list`, `training_exercise_create`, `training_exercise_update`, `training_sessions_list`, `training_session_create`, `training_session_update` |
 | `hydration` | `hydration_log`, `hydration_today`, `hydration_history` |
 | `groceries` | `grocery_items_list`, `grocery_item_create`, `grocery_item_set_low` |
 
@@ -225,6 +225,11 @@ Backfilling / fixing muscle tags (per-exercise):
 1. `training_exercises_list()` → read current `primaryMuscle` (absent = unassigned)
 2. `training_exercise_update({id, primaryMuscle, secondaryMuscles})` → set them; pass `primaryMuscle: ""` to clear a wrong tag
 
+**Session-type templates (routines)** — the user's splits (`upper`, `lower`, `cardio`, a custom `push`/`pull`/`legs`, …). Fields: `id` (canonical key), `label`, `emoji`, `exercises` (canonical exercise NAMES), `kind` (`strength|cardio|mobility|mixed`).
+- `training_sessions_list()` → enumerate routines. Do this to resolve a `sessionType` id before logging, or to show the user their setup.
+- `training_session_create({id, label, …})` → add a routine. `id` is the canonical key you'll then pass as `sessionType` when logging.
+- `training_session_update({id, …})` → rename, re-emoji, edit the exercise list, change `kind`. **There is no delete** — pass `archived: true` to remove a routine from pickers without losing data (`archived: false` restores it).
+
 ```
 # "3 sets of 8 chest press at 80kg"
 training_entry_log(sessionType: "upper", exercise: "Chest press", weight: 80, sets: "3", reps: "8")
@@ -234,6 +239,13 @@ training_entry_log(sessionType: "cardio", exercise: "Run", durationMin: 24, dist
 
 # Fix a mis-tagged machine: Calf Press → calves
 training_exercise_update(id: "calf-press", primaryMuscle: "calves")
+
+# "Set up a Push / Pull / Legs split"
+training_session_create(id: "push", label: "Push", emoji: "💪", kind: "strength",
+                        exercises: ["Chest press", "Overhead press", "Triceps pushdown"])
+
+# "I don't use the cardio day anymore" — archive, don't delete
+training_session_update(id: "cardio", archived: true)
 ```
 
 ### Hydration
