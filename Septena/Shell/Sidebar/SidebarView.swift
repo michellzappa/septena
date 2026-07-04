@@ -387,6 +387,13 @@ struct SidebarRootView: View {
       }
     }
     .frame(maxWidth: .infinity)
+    #if SEPTASK
+    // Septask draws no floating chrome bar above the sidebar (iPadBarHeight == 0),
+    // so on the two-column iPad canvas the 2×2 would sit flush to the top edge.
+    // Give it a top margin matching its own left/right inset (the insetGrouped
+    // gutter) so the grid is symmetric. iPhone/compact keeps its nav-bar spacing.
+    .padding(.top, usesPushNavigation ? Theme.pageGutter : 0)
+    #endif
   }
   #endif
 

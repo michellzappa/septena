@@ -34,7 +34,17 @@ enum PageChromeMetrics {
   /// Height reserved at the top of each iPad page so content rests below the
   /// floating chrome bar (gear/switcher/+). Matches the bar's rendered height
   /// (≈60pt circles + 8pt top padding) with a little breathing room.
+  ///
+  /// Septask draws no floating chrome bar (its split-view sidebar is the
+  /// switcher — see `SeptaskRootView`), so there is nothing to clear: every
+  /// task surface reserves 0 and content rests at the normal page top instead
+  /// of ~62pt lower. The constant is gated at the source so all surfaces
+  /// (`SelectableScrollList`, `pageChrome`, `septenaTabInset`) agree.
+  #if SEPTASK
+  static let iPadBarHeight: CGFloat = 0
+  #else
   static let iPadBarHeight: CGFloat = 74
+  #endif
 }
 
 extension SeptenaTab {
