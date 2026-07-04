@@ -258,14 +258,27 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
   if (input.scheduled !== undefined) { fields.scheduled = { value: input.scheduled ?? "" }; updated.push("scheduled"); }
   const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
   if (updDeadline !== undefined) { fields.deadline = { value: updDeadline ?? "" }; updated.push("deadline"); }
+  // Re-home clears BOTH the cross-field container AND any stale project section
+  // FK (`heading`) — LOCKSTEP with the app's TasksBackend.moveToArea/
+  // moveToProject (app repo docs/DRAG_AND_DROP.md §4). Divergence, on purpose:
+  // the app also resets `position` so the row lands at the top of the
+  // destination; a chat move deliberately does NOT (no read-before-write here,
+  // and landing order matters far less for an agent move) — the row keeps its
+  // existing order key. Documented, not an oversight.
   if (input.area !== undefined) {
     fields.area = { value: input.area ?? "" };
-    if (input.area) fields.project = { value: "" };
+    if (input.area) {
+      fields.project = { value: "" };
+      fields.heading = { value: "" };
+    }
     updated.push("area");
   }
   if (input.project !== undefined) {
     fields.project = { value: input.project ?? "" };
-    if (input.project) fields.area = { value: "" };
+    if (input.project) {
+      fields.area = { value: "" };
+      fields.heading = { value: "" };
+    }
     updated.push("project");
   }
   if (input.status !== undefined) { fields.status = { value: input.status }; updated.push("status"); }
