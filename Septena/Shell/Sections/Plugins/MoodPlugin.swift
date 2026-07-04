@@ -25,6 +25,45 @@ enum MoodPlugin: SectionPlugin {
 
   static func detailPaneContent() -> AnyView? { AnyView(MoodDetailContent()) }
 
+  // MARK: - MCP / agent contract
+
+  static var mcpSkill: SectionSkill? {
+    SectionSkill(
+      key: "mood",
+      summary: "Log how you feel and read mood history — Russell's circumplex (pleasant↔unpleasant × calm↔energetic).",
+      tools: [
+        SectionSkill.Tool("mood_list", "List mood check-ins by day or range",
+              inputs: "optional: date, from, to, limit (default 100)"),
+        SectionSkill.Tool("mood_log", "Log a mood by emotion word; quadrant/arousal/valence are derived",
+              inputs: "required: emotion (a word from the grid, e.g. 'Anxious'/'Content'/'Calm') · optional: date (default today), time (HH:MM, sets the daypart bucket), note"),
+      ],
+      body: """
+      ### Model
+      A mood check-in is one point on Russell's circumplex: a **quadrant** plus a
+      3×3 cell within it (arousal 1–3 = calm→energetic, valence 1–3 =
+      unpleasant→pleasant). You log by **emotion word** — the canonical word fixes
+      the quadrant/arousal/valence, so agents never pass raw coordinates.
+
+      Quadrants: `hap` pleasant-high-energy, `han` unpleasant-high-energy,
+      `lap` pleasant-low-energy, `lan` unpleasant-low-energy.
+
+      ### Vocabulary (the only valid `emotion` values)
+      - **hap:** Excited, Elated, Ecstatic, Eager, Upbeat, Joyful, Focused, Alive, Content
+      - **han:** Enraged, Panicked, Stressed, Angry, Anxious, Frustrated, Irritated, Tense, Restless
+      - **lan:** Bored, Discouraged, Disappointed, Sad, Lonely, Glum, Drained, Hopeless, Despondent
+      - **lap:** Mellow, Easygoing, Pleased, Calm, Grateful, Loved, Relaxed, Serene, Tranquil
+
+      ### Examples
+      "I'm feeling anxious this afternoon" → `mood_log(emotion: "Anxious")`
+      "How's my mood this week?" → `mood_list({ from: "<mon>", to: "<sun>" })`
+
+      ### Don't
+      - Don't invent emotion words — pick the closest one from the vocabulary above (matched case-insensitively; unknown words are rejected with the valid list).
+      - Mood is a *check-in*, not a diary — put situational detail in `note`, not the emotion.
+      """
+    )
+  }
+
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "mood",

@@ -48,6 +48,12 @@ enum MCPToolCatalog {
   /// (`checkedSessionKind`) resolves the same raw values back to the enum.
   private static let sessionKindEnum = ["strength", "cardio", "mobility", "mixed"]
 
+  /// All 36 canonical mood emotion words, derived from `MoodVocabulary` — the
+  /// single source shared with the phone + watch pickers, so this can't drift.
+  /// Used as the `mood_log` emotion enum (an invalid word is rejected at the
+  /// schema; the dispatch handler resolves the word to its circumplex triple).
+  private static let moodEmotionEnum = MoodVocabulary.quadrants.flatMap { MoodVocabulary.words(for: $0) }
+
   // MARK: - Global tools (always exposed)
 
   static var global: [MCPTool] {
@@ -412,6 +418,19 @@ enum MCPToolCatalog {
                 "time": ["type": "string", "description": "HH:MM or HH:MM:SS. Defaults to now."],
                 "bristol": ["type": "integer", "minimum": 1, "maximum": 7, "description": "Bristol Stool Scale type (1–7)."],
                 "volume": ["type": "string", "enum": ["small", "medium", "large"]],
+                "note": ["type": "string"],
+              ]]),
+    ],
+    "mood": [
+      MCPTool(name: "mood_list",
+              description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              inputSchema: eventListSchema(defaultLimit: 100)),
+      MCPTool(name: "mood_log",
+              description: "Log a mood. Provide emotion — a word from the canonical grid (e.g. 'Anxious', 'Content', 'Calm', 'Excited'); its quadrant / arousal / valence are derived automatically.",
+              inputSchema: ["type": "object", "required": ["emotion"], "properties": [
+                "date": ["type": "string", "description": "YYYY-MM-DD. Defaults to today."],
+                "time": ["type": "string", "description": "HH:MM. Defaults to now (sets the morning/afternoon/evening bucket)."],
+                "emotion": ["type": "string", "enum": moodEmotionEnum, "description": "Canonical emotion word (see enum). Matched case-insensitively."],
                 "note": ["type": "string"],
               ]]),
     ],

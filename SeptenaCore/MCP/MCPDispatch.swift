@@ -93,7 +93,7 @@ enum MCPDispatch {
     "tasks_list", "tasks_get", "tasks_list_projects", "tasks_list_areas",
     "goals_list", "settings_get", "sections_list",
     "habits_list", "supplements_list", "chores_list",
-    "gut_events_list",
+    "gut_events_list", "mood_list",
     "symptoms_list", "medications_list",
     "intake_kinds_list", "intake_items_list", "intake_events_list",
     "nutrition_entries_list", "nutrition_day_summary",
@@ -188,6 +188,10 @@ enum MCPDispatch {
     // ---- Gut ----
     case "gut_events_list":     return gutList(args)
     case "gut_event_log":       return try gutLog(args)
+
+    // ---- Mood ----
+    case "mood_list":           return moodList(args)
+    case "mood_log":            return try moodLog(args)
 
     // ---- Symptoms ----
     case "symptoms_list":       return symptomsList(args)
@@ -984,6 +988,46 @@ enum MCPDispatch {
       bristol: bristol,
       volume: args.string("volume"), note: args.string("note") ?? "")
     return ["id": e.id, "date": e.date, "bristol": e.bristol]
+  }
+
+  // MARK: - Mood
+
+  /// Resolve an emotion word to its circumplex cell (quadrant + arousal +
+  /// valence) via `MoodVocabulary` — the single source shared with the phone /
+  /// watch pickers. Case-insensitive; throws a listing of valid words on a miss
+  /// so the agent can self-correct.
+  private static func moodResolveEmotion(_ word: String) throws -> MoodVocabulary.Emotion {
+    let needle = word.trimmingCharacters(in: .whitespaces).lowercased()
+    for q in MoodVocabulary.quadrants {
+      if let hit = MoodVocabulary.grid(for: q).first(where: { $0.word.lowercased() == needle }) {
+        return hit
+      }
+    }
+    let all = MoodVocabulary.quadrants.flatMap { MoodVocabulary.words(for: $0) }
+    throw MCPError.badArgument("unknown emotion '\(word)'. Valid: \(all.joined(separator: ", "))")
+  }
+
+  private static func moodList(_ args: MCPArgs) -> Any {
+    let (from, to) = range(args, daysBack: 6)
+    let limit = args.int("limit") ?? 100
+    let rows = (try? ctx.fetch(FetchDescriptor<MoodEventEntity>()))?
+      .filter { $0.date >= from && $0.date <= to }
+      .sorted { $0.occurredAt > $1.occurredAt }
+      .prefix(limit) ?? []
+    return ["events": rows.map { (e: MoodEventEntity) -> [String: Any] in
+      ["id": e.id, "date": e.date, "bucket": e.bucket, "quadrant": e.quadrant,
+       "arousal": e.arousal, "valence": e.valence, "emotion": e.emotion, "note": e.note ?? ""]
+    }]
+  }
+
+  private static func moodLog(_ args: MCPArgs) throws -> Any {
+    let cell = try moodResolveEmotion(try args.requireString("emotion"))
+    let e = SeptenaServices.shared.moodMutator.logEntry(
+      date: args.string("date") ?? today, time: args.string("time") ?? nowHHMM,
+      quadrant: cell.quadrant, arousal: cell.arousal, valence: cell.valence,
+      emotion: cell.word, note: args.string("note"))
+    return ["id": e.id, "date": e.date, "emotion": e.emotion,
+            "quadrant": e.quadrant, "arousal": e.arousal, "valence": e.valence]
   }
 
   // MARK: - Symptoms
