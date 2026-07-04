@@ -270,6 +270,10 @@ struct TaskListView: View {
   /// Working buffer for the in-place rename; seeded from the task on begin,
   /// committed (or discarded) on submit / blur / Esc.
   @State private var titleDraft: String = ""
+  /// macOS can turn a double-click into "select row" followed by "activate row".
+  /// If that selection just closed a different editor, consume the paired
+  /// activation so the first click sequence only saves/folds the open editor.
+  @State private var suppressActivationAfterSelectionCloseId: String?
 
   /// Whether the Inbox section (on the Today view) is folded. Expanded by
   /// default; the header shows the count either way.
@@ -721,6 +725,7 @@ struct TaskListView: View {
   /// to the drawer composer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
     guard filter != .recentlyDeleted else { return }
+    guard !closeActiveEditIfNeeded() else { return }
     guard allowsInlineCreate else {
       withAnimation(.snappy(duration: 0.25)) {
         expandedEditId = nil
@@ -728,7 +733,6 @@ struct TaskListView: View {
       }
       return
     }
-    if expandedEditId != nil { collapseEdit() }
     inlineFocus = nil
     editingTitleId = nil
     var seed = TaskDraft(filter: filter)
@@ -762,6 +766,7 @@ struct TaskListView: View {
   /// on Upcoming). Re-tapping while a capture is already open scrolls back to it.
   private func openContextualQuickAdd() {
     guard filter != .recentlyDeleted else { return }
+    guard !closeActiveEditIfNeeded() else { return }
     if quickAddDraftId != nil {
       scrollToTargetID = Self.quickAddScrollID
       scrollToTargetTick += 1
@@ -797,6 +802,10 @@ struct TaskListView: View {
   /// `List`) precisely because the container can host an inline-editable
   /// `TextField` on macOS without the List focus/selection corruption.
   private func beginEdit(_ task: SeptenaTask) {
+    if editingTitleId == task.id {
+      commitRename(task)
+    }
+    guard !closeActiveEditIfNeeded(except: task.id) else { return }
     // Drop any focused quick-add line so its keyboard doesn't fight the editor.
     inlineFocus = nil
     withAnimation(.snappy(duration: 0.22)) {
@@ -826,6 +835,39 @@ struct TaskListView: View {
     // `onVanish` (fired right after its autosave on teardown) — never a timed
     // guess here, which used to front-run the animation-delayed autosave and
     // purge a task the user had just typed.
+  }
+
+  /// Close whichever task-editing surface is active and let its normal save path
+  /// run. Returns true when the caller should consume the tap/command that caused
+  /// the close instead of also performing its own action.
+  @discardableResult
+  private func closeActiveEditIfNeeded(except targetID: String? = nil) -> Bool {
+    if let id = expandedEditId, id != targetID {
+      collapseEdit()
+      return true
+    }
+    if let id = editingTitleId, id != targetID {
+      if let task = currentTask(id: id) {
+        commitRename(task)
+      } else {
+        endRename()
+      }
+      return true
+    }
+    if inlineFocus != nil {
+      inlineFocus = nil
+      return true
+    }
+    if composerIsOpen {
+      closeComposer()
+      return true
+    }
+    return false
+  }
+
+  private func closeEditOrClearSelection() {
+    guard !closeActiveEditIfNeeded() else { return }
+    clearSelection()
   }
 
   /// Drop an inline-create placeholder that never received a title.
@@ -942,7 +984,7 @@ struct TaskListView: View {
       selectable: usesSelectionModel,
       onActivate: activateRow,
       onToggle: toggleRow,
-      onClear: { clearSelection() },
+      onClear: { closeEditOrClearSelection() },
       scrollToTick: scrollToTargetTick,
       scrollToID: scrollToTargetID,
       canvasFill: listCanvasFill,
@@ -968,7 +1010,18 @@ struct TaskListView: View {
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
     // an explicit click on a different row.
     .onChange(of: selection) { _, sel in
-      if let id = expandedEditId, !sel.contains(id) { collapseEdit() }
+      if let suppressed = suppressActivationAfterSelectionCloseId,
+         !sel.contains(suppressed) {
+        suppressActivationAfterSelectionCloseId = nil
+      }
+      if let id = expandedEditId, !sel.contains(id) {
+        suppressActivationAfterSelectionCloseId = sel.count == 1 ? sel.first : nil
+        collapseEdit()
+      } else if let id = editingTitleId, !sel.contains(id) {
+        suppressActivationAfterSelectionCloseId = sel.count == 1 ? sel.first : nil
+        if let task = currentTask(id: id) { commitRename(task) }
+        else { endRename() }
+      }
     }
     #if os(macOS)
     // Esc fallback when the list itself holds focus (the inline field owns Esc
@@ -1054,7 +1107,15 @@ struct TaskListView: View {
   /// twin of clicking the row, so keyboard (Return) and pointer (double-click /
   /// tap) share one path.
   private func activateRow(_ id: String) {
-    if id == Self.quickAddScrollID { startCreate(); return }
+    if suppressActivationAfterSelectionCloseId == id {
+      suppressActivationAfterSelectionCloseId = nil
+      return
+    }
+    if id == Self.quickAddScrollID {
+      if closeActiveEditIfNeeded() { return }
+      startCreate()
+      return
+    }
     guard selection.count <= 1 else { return }
     guard let task = currentTask(id: id) else { return }
     beginEdit(task)
@@ -1169,6 +1230,7 @@ struct TaskListView: View {
     let headerTopPadding: CGFloat = 18
     #endif
     Button {
+      if closeActiveEditIfNeeded() { return }
       Haptics.tick()
       withAnimation(.easeInOut(duration: 0.2)) { onToggle() }
     } label: {
@@ -1254,10 +1316,13 @@ struct TaskListView: View {
       // a double-click in that blank space drops the cursor onto the quick-add
       // line (the macOS "double-click empty space to add" affordance).
       #if os(macOS)
-      .simultaneousGesture(TapGesture(count: 2).onEnded { startCreate() })
-      .simultaneousGesture(TapGesture(count: 1).onEnded { clearSelection() })
+      .simultaneousGesture(TapGesture(count: 2).onEnded {
+        if closeActiveEditIfNeeded() { return }
+        startCreate()
+      })
+      .simultaneousGesture(TapGesture(count: 1).onEnded { closeEditOrClearSelection() })
       #else
-      .onTapGesture { clearSelection() }
+      .onTapGesture { closeEditOrClearSelection() }
       #endif
       .asListRow()
   }
@@ -1435,12 +1500,24 @@ struct TaskListView: View {
   /// real draggable row + drop target (reorder headings, or drop tasks onto it
   /// to file them under it) with a Rename / New Task / Delete context menu.
   private func headingRow(_ heading: SeptenaTask) -> some View {
-    HStack(spacing: 4) {
+    // Match the Today area/project group header (`groupHeaderBody`): same title
+    // style + same top padding, and an empty leading icon column so the section
+    // title lands at the SAME X as those headers (and the task text below it),
+    // instead of floating further left.
+    #if os(macOS)
+    let headingTopPadding: CGFloat = 24
+    #else
+    let headingTopPadding: CGFloat = 18
+    #endif
+    return HStack(spacing: Theme.iconTextGap) {
+      Color.clear
+        .frame(width: Theme.checkboxTap)
+        .offset(x: -Theme.checkboxLeadingNudge)
       Text(heading.title).sectionGroupHeaderTitleStyle()
       Spacer(minLength: 0)
     }
     .padding(.horizontal, Theme.hPadding)
-    .padding(.top, 18)
+    .padding(.top, headingTopPadding)
     .padding(.bottom, 2)
     .frame(maxWidth: .infinity, alignment: .leading)
     .contentShape(Rectangle())
@@ -1587,6 +1664,7 @@ struct TaskListView: View {
   /// heading, so the row appears in that group as you type.
   private func startCreateUnderHeading(_ heading: SeptenaTask) {
     guard case .project(let pid) = filter else { return }
+    guard !closeActiveEditIfNeeded() else { return }
     let draft = mutator.create(title: "", project: pid, source: TaskSource.app,
                                deferPush: true, atBottom: true)
     mutator.setHeading(id: draft.id, heading: heading.id)
@@ -1623,6 +1701,7 @@ struct TaskListView: View {
 
   private var scopeLoggedToggleRow: some View {
     Button {
+      if closeActiveEditIfNeeded() { return }
       toggleScopeLoggedExpanded()
     } label: {
       Text(scopeLoggedToggleLabel)
@@ -2710,7 +2789,10 @@ struct TaskListView: View {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
                       areaEmoji: area.emoji,
-                      onTap: { nav.path = [.area(area)] },
+                      onTap: {
+                        if closeActiveEditIfNeeded() { return }
+                        nav.path = [.area(area)]
+                      },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(areaId: area.id) } : nil)
         }
@@ -2725,7 +2807,10 @@ struct TaskListView: View {
             groupHeader(icon: nil,
                         title: project.title,
                         projectProgress: progressByProject[project.id],
-                        onTap: { nav.path = [.project(project)] },
+                        onTap: {
+                          if closeActiveEditIfNeeded() { return }
+                          nav.path = [.project(project)]
+                        },
                         onAdd: showsGroupedHeaderQuickAdd
                           ? { startCreate(projectId: project.id) } : nil)
           }
@@ -2744,7 +2829,10 @@ struct TaskListView: View {
           groupHeader(icon: nil,
                       title: project.title,
                       projectProgress: progressByProject[project.id],
-                      onTap: { nav.path = [.project(project)] },
+                      onTap: {
+                        if closeActiveEditIfNeeded() { return }
+                        nav.path = [.project(project)]
+                      },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(projectId: project.id) } : nil)
         }
@@ -2770,9 +2858,13 @@ struct TaskListView: View {
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
-                        // The open editor keeps the plain card surface (a clean
-                        // editing field), not the gray selection fill.
-                        isSelected: selection.contains(task.id) && expandedEditId != task.id)
+                        // The "active" row — the selected row OR the one open in
+                        // the inline editor — carries the neutral selection fill,
+                        // so opening a task to edit it keeps (rather than strips)
+                        // the "this is the row you're on" anchor. Subtle by design:
+                        // it's the same unemphasized gray as a plain selection,
+                        // Things/Reminders-style, never the section accent.
+                        isSelected: selection.contains(task.id) || expandedEditId == task.id)
         // After the chrome, so the drop target (and its targeting wash) spans
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
