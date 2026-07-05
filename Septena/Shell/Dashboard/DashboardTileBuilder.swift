@@ -60,6 +60,12 @@ enum DashboardTileBuilder {
   static let ymdFormatter: DateFormatter = {
     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
   }()
+  static let integerFormatter: NumberFormatter = {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.maximumFractionDigits = 0
+    return f
+  }()
 
   static func domainData(for domain: HomepageDomain, ctx: DashboardTileContext, theme: SectionTheme) -> HomepageDomainData? {
     Instance(ctx: ctx, theme: theme).domainData(for: domain)
@@ -261,7 +267,7 @@ enum DashboardTileBuilder {
           // single-column rows, widget wire). Without it those fall back to the
           // generic "intake" section token, collapsing all trackers to one color.
           accentHex: t.color,
-          headline: "\(t.todayCount) today",
+          headline: "\(t.todayCount) logged today",
           headlineStats: stats,
           progress: nil,
           history: .bars(t.dailyCounts),
@@ -279,7 +285,7 @@ enum DashboardTileBuilder {
           domain: .tasks,
           title: String(localized: "Tasks", comment: "Section name"),
           accent: theme.color(for: "tasks"),
-          headline: "\(openToday) open · \(doneToday)/\(totalToday) done",
+          headline: "\(doneToday) of \(totalToday) done today",
           headlineStats: [
             .init(label: "Today", value: "\(openToday)"),
             .init(label: "Inbox", value: "\(toSort)"),
@@ -302,8 +308,8 @@ enum DashboardTileBuilder {
           title: String(localized: "Habits", comment: "Section name"),
           accent: theme.color(for: "habits"),
           headline: skipped > 0
-            ? "\(done)/\(total) · \(skipped) skipped"
-            : "\(done)/\(total)",
+            ? "\(done) of \(total) done today · \(skipped) skipped"
+            : "\(done) of \(total) done today",
           headlineStats: [
             .init(label: "Done", value: "\(done)"),
             .init(label: "Skipped", value: "\(skipped)"),
@@ -372,7 +378,7 @@ enum DashboardTileBuilder {
           domain: .training,
           title: String(localized: "Training", comment: "Section name"),
           accent: theme.color(for: "training"),
-          headline: "\(sessionCount) sessions · \(minutes)/\(target) min",
+          headline: "\(sessionCount) \(plural(sessionCount, "session")) · \(minutes) of \(target) min",
           headlineStats: [
             .init(label: "Sessions", value: "\(sessionCount)"),
             .init(label: "Z2", value: "\(minutes)", unit: "min"),
@@ -409,8 +415,8 @@ enum DashboardTileBuilder {
           title: String(localized: "Chores", comment: "Section name"),
           accent: theme.color(for: "chores"),
           headline: overdue > 0
-            ? "\(done)/\(total) · \(overdue) overdue"
-            : "\(done)/\(total)",
+            ? "\(done) of \(total) done today · \(overdue) overdue"
+            : "\(done) of \(total) done today",
           headlineStats: [
             .init(label: "Due", value: "\(dueToday)"),
             .init(label: "Overdue", value: "\(overdue)"),
@@ -431,7 +437,7 @@ enum DashboardTileBuilder {
           domain: .supplements,
           title: String(localized: "Supplements", comment: "Section name"),
           accent: theme.color(for: "supplements"),
-          headline: "\(done)/\(total)",
+          headline: "\(done) of \(total) taken today",
           headlineStats: [
             .init(label: "Done", value: "\(done)"),
             .init(label: "Total", value: "\(total)"),
@@ -517,7 +523,7 @@ enum DashboardTileBuilder {
           domain: .nutrition,
           title: String(localized: "Nutrition", comment: "Section name"),
           accent: accent,
-          headline: "\(Int(ctx.todayProteinSum))g protein · \(Int(ctx.todayKcalSum)) kcal",
+          headline: "\(Int(ctx.todayProteinSum)) g protein · \(Int(ctx.todayKcalSum)) kcal today",
           headlineStats: [
             .init(label: "Protein", value: "\(Int(ctx.todayProteinSum))", unit: "g"),
             .init(label: "Kcal", value: "\(Int(ctx.todayKcalSum))"),
@@ -573,7 +579,7 @@ enum DashboardTileBuilder {
           headline: {
             let parts = [
               weight.map { String(format: "%.1f \(WeightUnit.current.suffix)", WeightUnit.current.display($0)) },
-              fat.map { String(format: "%.1f%%", $0) },
+              fat.map { String(format: "%.1f%% body fat", $0) },
             ].compactMap { $0 }
             return parts.isEmpty ? "—" : parts.joined(separator: " · ")
           }(),
@@ -615,7 +621,9 @@ enum DashboardTileBuilder {
           domain: .github,
           title: String(localized: "GitHub", comment: "Section name"),
           accent: theme.color(for: "github"),
-          headline: today > 0 ? "\(today) today · \(week) this week" : "\(week) this week",
+          headline: today > 0
+            ? "\(today) \(plural(today, "contribution")) today · \(week) this week"
+            : "\(week) \(plural(week, "contribution")) this week",
           headlineStats: [
             .init(label: "Today", value: "\(today)"),
             .init(label: "Streak", value: "\(streak)", unit: "d"),
@@ -636,7 +644,7 @@ enum DashboardTileBuilder {
           domain: .gut,
           title: String(localized: "Gut", comment: "Section name"),
           accent: theme.color(for: "gut"),
-          headline: "\(count)",
+          headline: "\(count) \(count == 1 ? "entry" : "entries") today",
           headlineStats: [
             .init(label: "Today", value: "\(count)"),
             .init(label: "Avg Bristol",
@@ -662,7 +670,7 @@ enum DashboardTileBuilder {
           domain: .symptoms,
           title: String(localized: "Symptoms", comment: "Section name"),
           accent: theme.color(for: "symptoms"),
-          headline: "\(todayRows.count) · peak \(peak)",
+          headline: "\(todayRows.count) logged · peak \(peak)",
           headlineStats: [
             .init(label: "Today", value: "\(todayRows.count)"),
             .init(label: "Peak", value: "\(peak)", unit: "/10"),
@@ -702,7 +710,9 @@ enum DashboardTileBuilder {
           domain: .medications,
           title: String(localized: "Medications", comment: "Section name"),
           accent: theme.color(for: "medications"),
-          headline: routine.isEmpty ? "\(taken) taken" : "\(taken)/\(routine.count) taken",
+          headline: routine.isEmpty
+            ? "\(taken) taken today"
+            : "\(taken) of \(routine.count) taken today",
           headlineStats: [
             .init(label: "Taken", value: "\(taken)"),
             .init(label: "Skipped", value: "\(skipped)"),
@@ -740,9 +750,9 @@ enum DashboardTileBuilder {
           domain: .activity,
           title: String(localized: "Activity", comment: "Section name"),
           accent: theme.color(for: "activity"),
-          headline: "\(snap.steps) steps · \(snap.exMin) min",
+          headline: "\(formatInteger(snap.steps)) steps · \(snap.exMin) min",
           headlineStats: [
-            .init(label: "Steps", value: "\(snap.steps)"),
+            .init(label: "Steps", value: formatInteger(snap.steps)),
             .init(label: "Active",
                   value: "\(Int(snap.kcal))",
                   unit: "kcal"),
@@ -840,7 +850,7 @@ enum DashboardTileBuilder {
           domain: .intake,
           title: SectionManifest.byKey["intake"]?.defaultLabel ?? "Intake",
           accent: theme.color(for: "intake"),
-          headline: "\(ctx.intakeTiles.count) trackers · \(totalToday) today",
+          headline: "\(ctx.intakeTiles.count) trackers · \(totalToday) logged today",
           headlineStats: [
             .init(label: "Trackers", value: "\(ctx.intakeTiles.count)"),
             .init(label: "Today", value: "\(totalToday)"),
@@ -853,7 +863,15 @@ enum DashboardTileBuilder {
 
       func formatHoursShort(_ h: Double) -> String {
         let total = Int((h * 60).rounded())
-        return String(format: "%d:%02d", total / 60, total % 60)
+        return String(format: "%dh %dm", total / 60, total % 60)
+      }
+
+      func formatInteger(_ value: Int) -> String {
+        DashboardTileBuilder.integerFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+      }
+
+      func plural(_ count: Int, _ singular: String, _ plural: String? = nil) -> String {
+        count == 1 ? singular : (plural ?? "\(singular)s")
       }
 
       /// Live fasting state ctx.derived from `ctx.nutritionStats`. Returns `.fed`
@@ -875,7 +893,7 @@ enum DashboardTileBuilder {
           domain: .mood,
           title: String(localized: "Mood", comment: "Section name"),
           accent: theme.color(for: "mood"),
-          headline: "\(today) of 3 today",
+          headline: "\(today) of 3 check-ins today",
           headlineStats: [
             .init(label: "Today",  value: "\(today)"),
             .init(label: "Target", value: "3"),
