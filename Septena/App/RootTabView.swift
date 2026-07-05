@@ -136,6 +136,9 @@ struct RootTabView: View {
           // Same inline "new to-do" route as ⌘N / the sidebar + — lands on
           // Tasks ▸ Today with the composer open.
           OpenNewTaskRouting.apply(to: nav)
+        case .today:
+          nav.pendingTab = .tasks
+          nav.path = [.filter(.today)]
         }
         nav.pendingShortcut = nil
       }

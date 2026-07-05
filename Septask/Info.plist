@@ -61,9 +61,17 @@
 			<key>UIApplicationShortcutItemIconType</key>
 			<string>UIApplicationShortcutIconTypeAdd</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>New To-Do</string>
+			<string>Quick Add</string>
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.septena.app.newtask</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeDate</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Today</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.septena.app.today</string>
 		</dict>
 	</array>
 	<key>UIBackgroundModes</key>

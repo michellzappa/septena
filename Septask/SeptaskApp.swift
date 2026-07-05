@@ -60,13 +60,14 @@ struct SeptaskApp: App {
         }
         // Home Screen Quick Action routing. The delegate publishes onto
         // `pendingShortcut` (warm) or `SeptaskApp.task` drains it (cold);
-        // either way we land the shared quick-add composer — the same sheet
-        // the tab-bar `+` and ⌘I present. Septask ships no sections, so
-        // `.openSection` is a no-op here.
+        // either way we land the same surfaces as the tab bar: quick-add
+        // composer or Today. Septask ships no sections, so `.openSection`
+        // is a no-op here.
         .onChange(of: navigation.pendingShortcut) { _, action in
           guard let action else { return }
           switch action {
           case .newTask:      navigation.presentAddInfo(section: .tasks)
+          case .today:        navigation.path = [.filter(.today)]
           case .openSection:  break
           }
           navigation.pendingShortcut = nil

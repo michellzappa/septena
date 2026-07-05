@@ -280,12 +280,15 @@ targets:
             UIWindowSceneSessionRoleApplication:
               - UISceneConfigurationName: Default
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptaskSceneDelegate
-        # Always-present icon long-press action: "New To-Do" → quick-add
-        # composer. Type matches ShortcutAction.newTask's rawValue.
+        # Always-present icon long-press actions. Types match
+        # ShortcutAction's raw values.
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: com.septena.app.newtask
-            UIApplicationShortcutItemTitle: New To-Do
+            UIApplicationShortcutItemTitle: Quick Add
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAdd
+          - UIApplicationShortcutItemType: com.septena.app.today
+            UIApplicationShortcutItemTitle: Today
+            UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeDate
         UIBackgroundModes:
           - remote-notification
         # The compiled task UI includes the Reminders inbox and the Today
