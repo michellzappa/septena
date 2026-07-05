@@ -476,7 +476,7 @@ struct TaskListView: View {
     // hierarchy — same pattern as the Week dashboard's time-travel keys.
     return withSnackbar
       .background {
-        if filter != .recentlyDeleted {
+        if rowCommandShortcutsEnabled {
           Group {
             Button("", action: editSelected)
               .keyboardShortcut(TaskRowShortcuts.editDetails)
@@ -1037,7 +1037,7 @@ struct TaskListView: View {
     #endif
     #if os(macOS)
     .onCopyCommand {
-      guard usesSelectionModel else { return [] }
+      guard usesSelectionModel, !listInputActive else { return [] }
       let ids = orderedActionIDs()
       guard !ids.isEmpty else { return [] }
       let text = ids.compactMap { currentTask(id: $0)?.title }.joined(separator: "\n")
@@ -1073,6 +1073,18 @@ struct TaskListView: View {
   /// `SelectableScrollList`'s key-suppression + focus-reclaim.
   private var listInputActive: Bool {
     composerIsOpen || expandedEditId != nil || editingTitleId != nil || inlineFocus != nil
+  }
+
+  /// Row-level command shortcuts should only exist while the list owns input.
+  /// When a task editor or inline text field is active, native text editing
+  /// commands (Copy, Paste, Select All) must stay with the focused control.
+  private var rowCommandShortcutsEnabled: Bool {
+    filter != .recentlyDeleted
+      && !listInputActive
+      && whenSheet == nil
+      && !showingMoveSheet
+      && !showingRepeatSheet
+      && !nav.showQuickFind
   }
 
   /// iPad split detail: reserve the floating chrome bar on the `ScrollView`
