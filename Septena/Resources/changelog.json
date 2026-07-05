@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1367,
-      "date": "2026-07-04",
+      "build": 1375,
+      "date": "2026-07-05",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A refreshed Tasks experience",
-          "detail": "Add section headings inside projects, multi-select bulk actions, a redesigned date picker, and calendar events woven right into Today and Upcoming.",
+          "title": "A rebuilt Tasks experience",
+          "detail": "Drag tasks between Today groups, add project section headings, multi-select for bulk actions, inline editing, and a redesigned date picker with quick-pick pills.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "Deleted tasks now rest in Recently Deleted for 30 days with one-tap undo before they're purged.",
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events now appear alongside your tasks, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
-          "title": "Import from Things",
-          "detail": "Bring your projects, tasks, and headings across from a Things database export.",
+          "title": "Recently Deleted with undo",
+          "detail": "Deleted tasks are recoverable for 30 days, with an undo toast for delete, move, and defer.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal logging",
-          "detail": "Snap a meal and get an on-device breakdown of what's in it, with an optional per-ingredient view.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring in tasks from a Things database export, mapping native headings to project sections.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal for on-device analysis, add an optional ingredient breakdown, and re-log past meals scaled by amount.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "Rest timers now auto-advance you through the workout, with one-tap progression hints and a weekly muscle-group review after each session.",
+          "detail": "An auto-advancing rest flow with a watch Live Activity, one-tap progression hints on strength sets, effort-weighted muscle volume, and a post-session weekly review.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your week",
-          "detail": "Keep the goals you care about front and center as tiles on the dashboard.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep any measurable goal in view as a tile on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "New Home Screen widgets",
-          "detail": "Next and Today widgets bring your plan to the Home Screen, and the watch gains a time-of-day sky, quick-add tiles, and richer ring complications.",
-          "section": null
-        },
-        {
-          "title": "Choose what you share",
-          "detail": "Graded analytics levels let you see exactly what's sent and dial telemetry from off to full at any time.",
+          "title": "Graded privacy controls",
+          "detail": "Choose how much anonymized analytics to share across four levels, and see exactly what was recently sent.",
           "section": null
         }
       ]
