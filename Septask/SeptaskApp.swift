@@ -43,7 +43,7 @@ struct SeptaskApp: App {
   #endif
 
   var body: some Scene {
-    WindowGroup {
+    WindowGroup(id: "main") {
       SeptaskRootView()
         .overlay { LogCommitOverlay() }
         // Settings presentation lives in SeptaskRootView now: a sheet on iOS,
@@ -137,12 +137,16 @@ struct SeptaskApp: App {
           }
         }
     }
+    .restorationBehavior(.automatic)
     // macOS: drop the "Septask" title strip, same as App.swift — on this SDK
     // the hidden-title-bar window is what gives the NavigationSplitView
     // sidebar its full-height rounded pane; the default style renders the
     // classic square sidebar under a title bar.
     #if os(macOS)
     .windowStyle(.hiddenTitleBar)
+    .defaultSize(width: 980, height: 700)
+    .defaultPosition(.center)
+    .defaultLaunchBehavior(.presented)
     #endif
     // The task-scoped subset of the full app's menu commands (App.swift) —
     // only entries whose backing surface Septask compiles. Quick Find /

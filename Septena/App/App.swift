@@ -423,11 +423,15 @@ struct SeptenaApp: App {
           #endif
         }
     }
+    .restorationBehavior(.automatic)
     // macOS: drop the "Septena" title strip. Traffic lights remain — the
     // window chrome collapses into the toolbar area, giving the sidebar /
     // detail content the full height like the reference design does.
     #if os(macOS)
     .windowStyle(.hiddenTitleBar)
+    .defaultSize(width: 1180, height: 820)
+    .defaultPosition(.center)
+    .defaultLaunchBehavior(.presented)
     #endif
     // ⌘1-4 switch the four top-level tabs (Week / Next / Tasks / Goals) via
     // `nav.pendingTab`, which RootTabView observes. ⌥⌘1-5 jump to the Tasks
