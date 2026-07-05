@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 // compact homepage on iPhone: the root screen IS the sidebar.
 // QuickFind + smart lists + areas/projects + Settings. See docs/reference/navigation.md.
@@ -1637,12 +1638,12 @@ private struct SidebarTaskDrop: ViewModifier {
             .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
             .animation(.easeOut(duration: 0.12), value: isTargeted)
         )
-        .dropDestination(for: TaskDragIDs.self) { payloads, _ in
-          let ids = payloads.flatMap(\.ids)
-          guard !ids.isEmpty else { return false }
-          for id in ids { rehome(id) }
-          return true
-        } isTargeted: { isTargeted = $0 }
+        .onDrop(of: [.septenaTaskDragIDs],
+                delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
+                  guard !ids.isEmpty else { return false }
+                  for id in ids { rehome(id) }
+                  return true
+                })
     } else {
       content
     }
@@ -1659,6 +1660,41 @@ private struct SidebarTaskDrop: ViewModifier {
     case .today:
       mutator.moveToToday(id: id, today: true)
     }
+  }
+}
+
+private struct SidebarTaskDropDelegate: DropDelegate {
+  @Binding var isTargeted: Bool
+  let perform: (_ ids: [String]) -> Bool
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropEntered(info: DropInfo) {
+    isTargeted = true
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    isTargeted = true
+    return DropProposal(operation: .move)
+  }
+
+  func dropExited(info: DropInfo) {
+    isTargeted = false
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    isTargeted = false
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
+            !payload.ids.isEmpty
+      else { return }
+      DispatchQueue.main.async { _ = perform(payload.ids) }
+    }
+    return true
   }
 }
 

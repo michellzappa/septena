@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import EventKit  // optional calendar agenda woven into Today / Upcoming
+import UniformTypeIdentifiers
 #if canImport(AppKit)
 import AppKit  // NSEvent.modifierFlags for ⌘/⇧-click selection
 #endif
@@ -228,6 +229,15 @@ struct TaskListView: View {
     case project(String)
   }
   @State private var quickAddGroupTarget: QuickAddGroupTarget?
+
+  /// Drop destinations inside the Today list itself. Sidebar drops are still
+  /// handled by `SidebarTaskDrop`; this covers compact iPhone/iPad and the
+  /// visible Today groups on regular canvases.
+  private enum TodayDropTarget: Equatable {
+    case inbox
+    case area(String)
+    case project(String)
+  }
   /// Project section dividers ("headings"). A pending create (into this
   /// project id), a pending rename (this heading), and a pending delete
   /// (this heading, dissolving its members). All routed through standard
@@ -1211,7 +1221,8 @@ struct TaskListView: View {
             cardedRows(allInbox,
                        quickMenu: { filingSuggestions[$0.id] != nil },
                        appendQuickAdd: showsQuickAddInInbox,
-                       quickAddShowsEditor: quickAddInInboxShowsEditor)
+                       quickAddShowsEditor: quickAddInInboxShowsEditor,
+                       moveDropTarget: .inbox)
           }
         } header: {
           inboxHeader(count: allInbox.count)
@@ -1227,6 +1238,7 @@ struct TaskListView: View {
                           isCollapsed: inboxCollapsed) {
       inboxCollapsed.toggle()
     }
+    .modifier(todayMoveDrop(.inbox))
   }
 
   /// A foldable section header — same anatomy as the area `groupHeader` (icon
@@ -2186,6 +2198,46 @@ struct TaskListView: View {
     applyMove(ids, areaId: areaId, projectId: projectId)
   }
 
+  private func todayDropDestination(_ target: TodayDropTarget) -> (areaId: String?, projectId: String?) {
+    switch target {
+    case .inbox:
+      return (nil, nil)
+    case .area(let areaId):
+      return (areaId, nil)
+    case .project(let projectId):
+      return (nil, projectId)
+    }
+  }
+
+  private func isTask(_ task: SeptenaTask, alreadyIn target: TodayDropTarget) -> Bool {
+    switch target {
+    case .inbox:
+      return task.area == nil && task.project == nil
+    case .area(let areaId):
+      return task.project == nil && task.area == areaId
+    case .project(let projectId):
+      return task.project == projectId
+    }
+  }
+
+  private func handleTodayMoveDrop(ids: [String], target: TodayDropTarget) -> Bool {
+    guard filter == .today else { return false }
+    let moving = ids.filter { id in
+      guard let task = currentTask(id: id), !task.isHeading else { return false }
+      return !isTask(task, alreadyIn: target)
+    }
+    guard !moving.isEmpty else { return false }
+    let destination = todayDropDestination(target)
+    applyMove(moving, areaId: destination.areaId, projectId: destination.projectId)
+    return true
+  }
+
+  private func todayMoveDrop(_ target: TodayDropTarget?) -> TaskMoveDrop {
+    TaskMoveDrop(perform: target.map { target in
+      { ids in handleTodayMoveDrop(ids: ids, target: target) }
+    })
+  }
+
   private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
     guard !ids.isEmpty else { return }
     for id in ids { applyWhen(id: id, kind: kind, date: date) }
@@ -2791,12 +2843,14 @@ struct TaskListView: View {
 
     // Areas in sidebar order: direct-area tasks, then each project's tasks.
     ForEach(areas) { area in
+      let areaDropTarget: TodayDropTarget? = filter == .today ? .area(area.id) : nil
       let areaTasks = byArea[area.id] ?? []
       if !areaTasks.isEmpty {
         Section {
           cardedRows(areaTasks,
                      appendQuickAdd: showsQuickAddInArea(area.id),
-                     quickAddShowsEditor: true)
+                     quickAddShowsEditor: true,
+                     moveDropTarget: areaDropTarget)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -2806,15 +2860,18 @@ struct TaskListView: View {
                         nav.path = [.area(area)]
                       },
                       onAdd: showsGroupedHeaderQuickAdd
-                        ? { startCreate(areaId: area.id) } : nil)
+                        ? { startCreate(areaId: area.id) } : nil,
+                      moveDropTarget: areaDropTarget)
         }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
+        let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
         if let tasks = byProject[project.id], !tasks.isEmpty {
           Section {
             cardedRows(tasks,
                        appendQuickAdd: showsQuickAddInProject(project.id),
-                       quickAddShowsEditor: true)
+                       quickAddShowsEditor: true,
+                       moveDropTarget: projectDropTarget)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -2824,7 +2881,8 @@ struct TaskListView: View {
                           nav.path = [.project(project)]
                         },
                         onAdd: showsGroupedHeaderQuickAdd
-                          ? { startCreate(projectId: project.id) } : nil)
+                          ? { startCreate(projectId: project.id) } : nil,
+                        moveDropTarget: projectDropTarget)
           }
         }
       }
@@ -2832,11 +2890,13 @@ struct TaskListView: View {
 
     // Top-level projects (no area).
     ForEach(projects.filter { $0.area == nil }) { project in
+      let projectDropTarget: TodayDropTarget? = filter == .today ? .project(project.id) : nil
       if let tasks = byProject[project.id], !tasks.isEmpty {
         Section {
           cardedRows(tasks,
                      appendQuickAdd: showsQuickAddInProject(project.id),
-                     quickAddShowsEditor: true)
+                     quickAddShowsEditor: true,
+                     moveDropTarget: projectDropTarget)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
@@ -2846,7 +2906,8 @@ struct TaskListView: View {
                         nav.path = [.project(project)]
                       },
                       onAdd: showsGroupedHeaderQuickAdd
-                        ? { startCreate(projectId: project.id) } : nil)
+                        ? { startCreate(projectId: project.id) } : nil,
+                      moveDropTarget: projectDropTarget)
         }
       }
     }
@@ -2864,11 +2925,13 @@ struct TaskListView: View {
                           appendQuickAdd: Bool = false,
                           quickAddShowsEditor: Bool = true,
                           reorderable: Bool = false,
-                          grouped: Bool = false) -> some View {
+                          grouped: Bool = false,
+                          moveDropTarget: TodayDropTarget? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
+        .modifier(todayMoveDrop(moveDropTarget))
         .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
@@ -2934,11 +2997,13 @@ struct TaskListView: View {
                            areaEmoji: String? = nil,
                            projectProgress: Double? = nil,
                            onTap: (() -> Void)? = nil,
-                           onAdd: (() -> Void)? = nil) -> some View {
+                           onAdd: (() -> Void)? = nil,
+                           moveDropTarget: TodayDropTarget? = nil) -> some View {
     groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
                     projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
       .textCase(nil)
       .selectionDisabled()
+      .modifier(todayMoveDrop(moveDropTarget))
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -4112,6 +4177,62 @@ enum TaskCardMetrics {
   /// Gap below each card so consecutive cards don't jam together. Headed groups
   /// add their header's top padding on top of this.
   static let groupGap = Theme.Spacing.sm
+}
+
+private struct TaskMoveDrop: ViewModifier {
+  let perform: ((_ ids: [String]) -> Bool)?
+  @State private var isTargeted = false
+
+  func body(content: Content) -> some View {
+    if let perform {
+      content
+        .background(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
+            .animation(.easeOut(duration: 0.12), value: isTargeted)
+        )
+        .onDrop(of: [.septenaTaskDragIDs],
+                delegate: TaskMoveDropDelegate(isTargeted: $isTargeted,
+                                               perform: perform))
+    } else {
+      content
+    }
+  }
+}
+
+private struct TaskMoveDropDelegate: DropDelegate {
+  @Binding var isTargeted: Bool
+  let perform: (_ ids: [String]) -> Bool
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropEntered(info: DropInfo) {
+    isTargeted = true
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    isTargeted = true
+    return DropProposal(operation: .move)
+  }
+
+  func dropExited(info: DropInfo) {
+    isTargeted = false
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    isTargeted = false
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
+            !payload.ids.isEmpty
+      else { return }
+      DispatchQueue.main.async { _ = perform(payload.ids) }
+    }
+    return true
+  }
 }
 
 private struct TaskCardChrome: ViewModifier {
