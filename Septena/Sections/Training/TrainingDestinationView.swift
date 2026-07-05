@@ -3473,7 +3473,7 @@ struct TrainingProgressChart: View {
             Circle()
               .fill(accent)
               .frame(width: 9, height: 9)
-              .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+              .overlay(Circle().stroke(Theme.paperBackground, lineWidth: 2))
           }
           .annotation(position: .top, spacing: 2) {
             Text("TODAY")
