@@ -394,6 +394,7 @@
 		45B9EAD1910CC66985604C12 /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */; };
 		45CFCA5E661E722E12BCA92B /* BackfillChoresSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54F508173C5BD014AEB8830C /* BackfillChoresSheet.swift */; };
 		46105F4548BD31EC85EC61CF /* IkigaiViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277E998B7BA4B19B1AEFB2C6 /* IkigaiViewModel.swift */; };
+		462980003018475D8C09CBF4 /* NutritionRelogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2CE317A9CAE58440D6D776 /* NutritionRelogging.swift */; };
 		469FDB4B24DA570092B1A588 /* SectionGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */; };
 		46AD501517F0473D34CC97B4 /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
 		46B3BA591D78F8D643DA7E43 /* TrainingTargetMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B662C803101D7F26F47EBE6 /* TrainingTargetMigration.swift */; };
@@ -1173,6 +1174,7 @@
 		DA53A4B834BD56C1EBAD0123 /* TaskDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */; };
 		DA9DB792BEDED624B97E2CA5 /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
 		DAA1045E933DAB0E3748675D /* ChoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B51BC53BD88D706639E85DB /* ChoreDetailView.swift */; };
+		DADB195B10404C6059841CAF /* NutritionRelogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2CE317A9CAE58440D6D776 /* NutritionRelogging.swift */; };
 		DB0F231B1B679E0D2EC442F1 /* SelectablePillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B49C0EE16FCF1B2E76D8D337 /* SelectablePillsView.swift */; };
 		DB810EC0F96EC21F8604304F /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3795310A060A418D32730BFA /* SkyAtmosphere.swift */; };
 		DBD1584A15E7BCA54B072F50 /* TasksBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3882D64DF6517B0447F5F65C /* TasksBackend.swift */; };
@@ -1653,6 +1655,7 @@
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5B607B2041EC629B65EAF216 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5BC1153D56644D5B54CAFCFD /* BodyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPlugin.swift; sourceTree = "<group>"; };
+		5C2CE317A9CAE58440D6D776 /* NutritionRelogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionRelogging.swift; sourceTree = "<group>"; };
 		5C480659283E01C4B16C910C /* DiscoveryMiniApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryMiniApp.swift; sourceTree = "<group>"; };
 		5D227602C1039FA2206A539A /* SeptenaServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaServices.swift; sourceTree = "<group>"; };
 		5D4E8B3CEF27206319F32F38 /* MacroComplicationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroComplicationViews.swift; sourceTree = "<group>"; };
@@ -2414,6 +2417,7 @@
 				42EB061D69FA656547DC171F /* NutritionDestinationView.swift */,
 				CEA8B3755DDC65DD48AF4C3E /* NutritionQuickAddMenu.swift */,
 				6CEAA5532CD1C1A47DB1BBAC /* NutritionRecommendations.swift */,
+				5C2CE317A9CAE58440D6D776 /* NutritionRelogging.swift */,
 				533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */,
 				BD3CA536691F53ACB6FB8438 /* NutritionTargets.swift */,
 			);
@@ -4223,6 +4227,7 @@
 				2A7F5CB76A16EEA99EF1037E /* NutritionPlugin.swift in Sources */,
 				688DF9C7BC0CB50A51BF1191 /* NutritionQuickAddMenu.swift in Sources */,
 				454D024E707CE7FF7C823FEA /* NutritionRecommendations.swift in Sources */,
+				462980003018475D8C09CBF4 /* NutritionRelogging.swift in Sources */,
 				8438CEB6FCC5D04CD5216D95 /* NutritionRingsBuilder.swift in Sources */,
 				2242B79D13554F2C937E85BD /* NutritionSearchSheet.swift in Sources */,
 				CCE4EB8948EA998EC853A191 /* NutritionTargets.swift in Sources */,
@@ -4714,6 +4719,7 @@
 				22896AEF2C2DD3ECA0AC0421 /* NutritionPlugin.swift in Sources */,
 				352B532706902FA61068D9FB /* NutritionQuickAddMenu.swift in Sources */,
 				3E0EF1DA201030BB6F2A4019 /* NutritionRecommendations.swift in Sources */,
+				DADB195B10404C6059841CAF /* NutritionRelogging.swift in Sources */,
 				E9A55D9D943C72E84F2E0EC1 /* NutritionRingsBuilder.swift in Sources */,
 				57C60FD78BA0AE6412721809 /* NutritionSearchSheet.swift in Sources */,
 				CE413E4F9F273A915583D9E5 /* NutritionTargets.swift in Sources */,

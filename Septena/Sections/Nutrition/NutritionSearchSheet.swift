@@ -20,6 +20,7 @@ struct NutritionSearchSheet: View {
 
   let entries: [NutritionEntry]
   @State private var query: String = ""
+  @State private var multiplierPercent = NutritionRelogging.defaultPercent
 
   private struct Candidate: Identifiable {
     let id: String
@@ -70,6 +71,9 @@ struct NutritionSearchSheet: View {
               .foregroundStyle(.secondary)
           }
         } else {
+          Section {
+            NutritionMultiplierControl(percent: $multiplierPercent)
+          }
           ForEach(filtered) { c in
             Button { duplicate(c.representative) } label: {
               row(c)
@@ -105,12 +109,14 @@ struct NutritionSearchSheet: View {
       if let emoji = e.emoji, !emoji.isEmpty { return "\(emoji) \(head)" }
       return head
     }()
+    let factor = NutritionRelogging.factor(for: multiplierPercent)
     let macros = [
       c.count > 1 ? "\(c.count)×" : nil,
-      "\(Int(e.proteinG))P",
-      "\(Int(e.fatG))F",
-      "\(Int(e.carbsG))C",
-      "\(Int(e.kcal))kcal",
+      multiplierPercent == NutritionRelogging.defaultPercent ? nil : "\(multiplierPercent)%",
+      "\(Int(NutritionRelogging.scaled(e.proteinG, by: factor).rounded()))P",
+      "\(Int(NutritionRelogging.scaled(e.fatG, by: factor).rounded()))F",
+      "\(Int(NutritionRelogging.scaled(e.carbsG, by: factor).rounded()))C",
+      "\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal",
     ].compactMap { $0 }.joined(separator: " · ")
 
     return VStack(alignment: .leading, spacing: 2) {
@@ -132,16 +138,7 @@ struct NutritionSearchSheet: View {
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
     ) {
-      SeptenaServices.shared.nutritionMutator.addEntry(
-        loggedAt: Date.now,
-        emoji: entry.emoji,
-        foods: entry.foods,
-        proteinG: entry.proteinG,
-        fatG: entry.fatG,
-        carbsG: entry.carbsG,
-        fiberG: entry.fiberG,
-        kcal: entry.kcal
-      )
+      NutritionRelogging.addDuplicate(entry, percent: multiplierPercent)
       AddInfoSection.nutrition.notifyTilesChanged()
     }
     dismiss()

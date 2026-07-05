@@ -244,7 +244,7 @@ struct NutritionDestinationView: View {
         meals: allDistinctMeals,
         colors: MealChipColors(protein: proteinColor, fat: fatColor,
                                carbs: carbsColor, kcal: kcalColor),
-        onPick: { entry in logAgainNow(entry) },
+        onPick: { entry, percent in logAgainNow(entry, percent: percent) },
         onCreateNew: { creating = true },
         onScan: { scanning = true }
       )
@@ -273,9 +273,10 @@ struct NutritionDestinationView: View {
     // covers a full year so the user can scroll back across season
     // changes without per-day refetches).
     let since = sinceDate(daysBack: 365)
+    let statsDate = viewingDate
     let r = await MirrorReader.shared.read { ctx in
       (entries: ChecklistMirror.loadNutritionEntries(context: ctx, since: since),
-       stats: ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90, today: viewingDate),
+       stats: ChecklistMirror.buildNutritionStatsResponse(context: ctx, days: 90, today: statsDate),
        settings: SettingsMirror.loadSettings(context: ctx))
     }
     entries = r.entries
@@ -311,7 +312,8 @@ struct NutritionDestinationView: View {
   }
 
   /// Re-log an existing meal at the current moment.
-  private func logAgainNow(_ entry: NutritionEntry) {
+  private func logAgainNow(_ entry: NutritionEntry,
+                           percent: Int = NutritionRelogging.defaultPercent) {
     NutritionPlugin.commitMeal(
       loggedAt: .now,
       today: clock.today,
@@ -319,24 +321,7 @@ struct NutritionDestinationView: View {
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
     ) {
-      SeptenaServices.shared.nutritionMutator.addEntry(
-        loggedAt: Date.now,
-        emoji: entry.emoji,
-        foods: entry.foods,
-        ingredients: entry.ingredients,
-        proteinG: entry.proteinG,
-        fatG: entry.fatG,
-        carbsG: entry.carbsG,
-        fiberG: entry.fiberG,
-        sugarG: entry.sugarG,
-        saturatedFatG: entry.saturatedFatG,
-        alcoholG: entry.alcoholG,
-        kcal: entry.kcal == 0 ? nil : entry.kcal,
-        sodiumMg: entry.sodiumMg,
-        cholesterolMg: entry.cholesterolMg,
-        potassiumMg: entry.potassiumMg,
-        waterMl: entry.waterMl
-      )
+      NutritionRelogging.addDuplicate(entry, percent: percent)
       AddInfoSection.nutrition.notifyTilesChanged()
     }
   }
@@ -1030,7 +1015,7 @@ struct MealRelogSearchView: View {
   let meals: [UsualMeal]
   let colors: MealChipColors
   /// Re-log the picked meal now. The sheet dismisses itself first.
-  let onPick: (NutritionEntry) -> Void
+  let onPick: (NutritionEntry, Int) -> Void
   /// Open the rare hand-authoring path. The sheet dismisses itself first.
   let onCreateNew: () -> Void
   /// Open the photo-first scan path. The sheet dismisses itself first.
@@ -1038,6 +1023,7 @@ struct MealRelogSearchView: View {
 
   @Environment(\.dismiss) private var dismiss
   @State private var query = ""
+  @State private var multiplierPercent = NutritionRelogging.defaultPercent
 
   private var filtered: [UsualMeal] {
     let q = query.lowercased().trimmingCharacters(in: .whitespaces)
@@ -1066,18 +1052,23 @@ struct MealRelogSearchView: View {
         } else if filtered.isEmpty {
           ContentUnavailableView.search(text: query)
         } else {
-          List(filtered) { meal in
-            Button {
-              dismiss()
-              onPick(meal.template)
-            } label: {
-              mealRow(meal)
+          List {
+            Section {
+              NutritionMultiplierControl(percent: $multiplierPercent)
             }
-            .buttonStyle(.plain)
-            // Already logged today → grayed + un-tappable so a stray tap can't
-            // re-log it.
-            .disabled(meal.loggedToday)
-            .opacity(meal.loggedToday ? 0.5 : 1)
+            ForEach(filtered) { meal in
+              Button {
+                dismiss()
+                onPick(meal.template, multiplierPercent)
+              } label: {
+                mealRow(meal)
+              }
+              .buttonStyle(.plain)
+              // Already logged today → grayed + un-tappable so a stray tap can't
+              // re-log it.
+              .disabled(meal.loggedToday)
+              .opacity(meal.loggedToday ? 0.5 : 1)
+            }
           }
           .listStyle(.plain)
         }
@@ -1108,6 +1099,7 @@ struct MealRelogSearchView: View {
 
   private func mealRow(_ meal: UsualMeal) -> some View {
     let e = meal.template
+    let factor = NutritionRelogging.factor(for: multiplierPercent)
     return HStack(alignment: .center, spacing: 10) {
       if let emoji = e.emoji, !emoji.isEmpty { Text(emoji) }
       VStack(alignment: .leading, spacing: 2) {
@@ -1120,13 +1112,17 @@ struct MealRelogSearchView: View {
             .lineLimit(1)
         }
         HStack(spacing: 6) {
-          Text("\(Int(e.proteinG.rounded()))P").foregroundStyle(colors.protein)
+          if multiplierPercent != NutritionRelogging.defaultPercent {
+            Text("\(multiplierPercent)%").foregroundStyle(.secondary)
+            Text("·").foregroundStyle(.secondary.opacity(0.5))
+          }
+          Text("\(Int(NutritionRelogging.scaled(e.proteinG, by: factor).rounded()))P").foregroundStyle(colors.protein)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(e.fatG.rounded()))F").foregroundStyle(colors.fat)
+          Text("\(Int(NutritionRelogging.scaled(e.fatG, by: factor).rounded()))F").foregroundStyle(colors.fat)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(e.carbsG.rounded()))C").foregroundStyle(colors.carbs)
+          Text("\(Int(NutritionRelogging.scaled(e.carbsG, by: factor).rounded()))C").foregroundStyle(colors.carbs)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(colors.kcal)
+          Text("\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal").foregroundStyle(colors.kcal)
         }
         .font(.caption2.monospacedDigit().weight(.semibold))
         .lineLimit(1)
@@ -1145,8 +1141,8 @@ struct MealRelogSearchView: View {
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(meal.loggedToday
-      ? "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Already logged today."
-      : "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Tap to log again now.")
+      ? "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Already logged today."
+      : "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Tap to log again now.")
   }
 }
 
