@@ -330,8 +330,11 @@ private struct A11yMinTapTargetModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    content
-      .frame(minWidth: minSize, minHeight: minSize)
+    // `SeptenaMetricScale.current` is 1.0 on iOS (@ScaledMetric already scaled
+    // `minSize`); on macOS it applies the app-wide Text Size factor.
+    let side = minSize * SeptenaMetricScale.current
+    return content
+      .frame(minWidth: side, minHeight: side)
       .contentShape(Rectangle())
   }
 }
@@ -361,7 +364,8 @@ private struct A11yScaledFrameModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    content.frame(width: size, height: size)
+    let side = size * SeptenaMetricScale.current   // 1.0 on iOS; macOS Text Size factor
+    return content.frame(width: side, height: side)
   }
 }
 
@@ -404,7 +408,7 @@ private struct ScaledSystemFontModifier: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    content.font(.system(size: size,
+    content.font(.system(size: size * SeptenaMetricScale.current,  // 1.0 on iOS; macOS Text Size factor
                          weight: weight ?? .regular,
                          design: design ?? .default))
   }

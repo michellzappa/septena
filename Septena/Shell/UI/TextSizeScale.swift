@@ -99,6 +99,23 @@ enum SeptenaTypeScale {
 }
 #endif
 
+/// Cross-platform metric multiplier for the app-wide Text Size setting, so the
+/// elements sized *to* text — icon glyphs, tap targets, fixed-size fonts — grow
+/// in proportion with it (never a uniform `scaleEffect` zoom; layout still
+/// reflows). On iOS this is always 1.0: `@ScaledMetric` already scales those
+/// with Dynamic Type (including our root offset), so multiplying again would
+/// double-count. On macOS (no Dynamic Type) it returns the `FontScale` factor.
+/// Read inside view bodies so macOS observation re-renders on change.
+enum SeptenaMetricScale {
+  static var current: CGFloat {
+    #if os(macOS)
+    FontScale.shared.factor
+    #else
+    1.0
+    #endif
+  }
+}
+
 // MARK: - DynamicTypeSize offset
 
 extension DynamicTypeSize {
