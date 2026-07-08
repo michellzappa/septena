@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1375,
-      "date": "2026-07-05",
+      "build": 1377,
+      "date": "2026-07-08",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A rebuilt Tasks experience",
-          "detail": "Drag tasks between Today groups, add project section headings, multi-select for bulk actions, inline editing, and a redesigned date picker with quick-pick pills.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A streamlined companion app for just your tasks, sharing the same private data as Septena across iPhone, iPad, and Mac.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal logging",
+          "detail": "Snap a meal and get on-device analysis with an optional ingredient breakdown, and re-log past meals scaled by amount.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Project headings and richer task organizing",
+          "detail": "Group tasks under headings within a project, multi-select for bulk actions, and drag tasks onto Today to re-home them.",
           "section": "tasks"
         },
         {
           "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events now appear alongside your tasks, with hidden-calendar choices synced across devices.",
+          "detail": "System calendar events now weave into your task lists, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted with undo",
-          "detail": "Deleted tasks are recoverable for 30 days, with an undo toast for delete, move, and defer.",
+          "detail": "Deleted tasks move to a Recently Deleted view with restore and a 30-day auto-purge, plus a longer completion undo window.",
           "section": "tasks"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring in tasks from a Things database export, mapping native headings to project sections.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal for on-device analysis, add an optional ingredient breakdown, and re-log past meals scaled by amount.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Smarter training sessions",
-          "detail": "An auto-advancing rest flow with a watch Live Activity, one-tap progression hints on strength sets, effort-weighted muscle volume, and a post-session weekly review.",
+          "title": "Smarter training progress",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, one-tap progression hints on strength sets, and an auto-advancing rest flow with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep any measurable goal in view as a tile on the week dashboard.",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Keep any measurable goal in view as a dashboard tile.",
           "section": "goals"
         },
         {
-          "title": "Graded privacy controls",
-          "detail": "Choose how much anonymized analytics to share across four levels, and see exactly what was recently sent.",
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels let you pick Off, Minimal, Balanced, or Full, with a clear log of what was recently sent.",
           "section": null
         }
       ]
