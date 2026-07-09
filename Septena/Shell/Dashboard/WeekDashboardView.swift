@@ -148,6 +148,9 @@ struct WeekDashboardView: View {
   /// Guards `loadNetwork` against overlapping runs so concurrent provider
   /// HTTP stays within the safe parallel ceiling.
   @State private var networkLoading = false
+  /// Dashboard reads settle in several waves. Publish one final widget state
+  /// instead of rebuilding and reloading every widget after each wave.
+  @State private var widgetPublishGeneration: UInt = 0
   @State private var gutToday: GutDayResponse? = nil
   @State private var gutHistory: [GutHistoryPoint] = []
   @State private var moodToday: MoodDayResponse? = nil
@@ -766,7 +769,7 @@ struct WeekDashboardView: View {
       loadMenuExtras()
     }
     #if os(iOS)
-    publishTileWidgetCatalog()
+    scheduleTileWidgetPublication()
     #endif
 
     // Network-backed tiles load on their own hop so a slow or variable
@@ -850,7 +853,7 @@ struct WeekDashboardView: View {
     // Training inputs (recentTraining) may have changed — refresh the cache.
     if sections.contains(.training) { recomputeDerived() }
     #if os(iOS)
-    publishTileWidgetCatalog()
+    scheduleTileWidgetPublication()
     #endif
   }
 
@@ -898,8 +901,7 @@ struct WeekDashboardView: View {
     completedTasks = listResult.items
     ResponseCache.save(listResult.items, forKey: CacheKey.completedTasks)
     #if os(iOS)
-    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: ctx))
-    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
+    scheduleTileWidgetPublication()
     #endif
   }
 
@@ -940,7 +942,7 @@ struct WeekDashboardView: View {
     // Body (Withings) + GitHub inputs just landed — refresh the tile cache.
     recomputeDerived()
     #if os(iOS)
-    publishTileWidgetCatalog()
+    scheduleTileWidgetPublication()
     #endif
   }
 
@@ -957,7 +959,7 @@ struct WeekDashboardView: View {
       // that just loaded — recompute so the Training tile reflects it.
       recomputeDerived()
       #if os(iOS)
-      publishTileWidgetCatalog()
+      scheduleTileWidgetPublication()
       #endif
     }
   }
@@ -1242,21 +1244,33 @@ struct WeekDashboardView: View {
   }
 
   #if os(iOS)
+  private func scheduleTileWidgetPublication() {
+    widgetPublishGeneration &+= 1
+    let generation = widgetPublishGeneration
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: 250_000_000)
+      guard !Task.isCancelled, generation == widgetPublishGeneration else { return }
+      publishTileWidgetCatalog()
+    }
+  }
+
   private func publishTileWidgetCatalog() {
     let catalog = DashboardTileBuilder.buildCatalog(
       ctx: tileContext,
       theme: theme,
       visibleDomains: visibleDomains
     )
-    TileWidgetSnapshotStore.save(catalog)
+    let tilesChanged = TileWidgetSnapshotStore.saveIfChanged(catalog)
     let macroSnapshot = visibleDomains.contains(.nutrition)
       ? DashboardTileBuilder.buildMacroSnapshot(ctx: tileContext, theme: theme)
       : nil
-    MacroWidgetSnapshotStore.save(macroSnapshot)
-    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: tileContext.modelContext))
-    WidgetCenter.shared.reloadTimelines(ofKind: "SectionTileWidget")
-    WidgetCenter.shared.reloadTimelines(ofKind: "MacrosWidget")
-    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
+    let macrosChanged = MacroWidgetSnapshotStore.saveIfChanged(macroSnapshot)
+    let tasksChanged = TasksWidgetSnapshotStore.saveIfChanged(
+      TasksWidgetBuilder.buildSnapshot(context: tileContext.modelContext)
+    )
+    if tilesChanged { WidgetCenter.shared.reloadTimelines(ofKind: "SectionTileWidget") }
+    if macrosChanged { WidgetCenter.shared.reloadTimelines(ofKind: "MacrosWidget") }
+    if tasksChanged { WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget") }
   }
   #endif
 
@@ -1798,7 +1812,7 @@ struct WeekDashboardView: View {
     let date = clock.today
     intakeTiles = await MirrorReader.shared.read { IntakeReader.loadTiles(context: $0, date: date) }
     #if os(iOS)
-    publishTileWidgetCatalog()
+    scheduleTileWidgetPublication()
     #endif
   }
 

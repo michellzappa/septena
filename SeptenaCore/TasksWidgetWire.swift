@@ -27,4 +27,8 @@ struct TasksWidgetWire: Codable, Equatable, Sendable {
       updatedAt: .now
     )
   }
+
+  func hasSameContent(as other: TasksWidgetWire) -> Bool {
+    today == other.today && totalCount == other.totalCount && tasks == other.tasks
+  }
 }

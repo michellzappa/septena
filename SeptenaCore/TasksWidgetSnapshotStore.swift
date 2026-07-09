@@ -22,4 +22,11 @@ enum TasksWidgetSnapshotStore {
     else { return }
     defaults.set(data, forKey: userDefaultsKey)
   }
+
+  @discardableResult
+  static func saveIfChanged(_ wire: TasksWidgetWire) -> Bool {
+    guard load().map({ !wire.hasSameContent(as: $0) }) ?? true else { return false }
+    save(wire)
+    return true
+  }
 }

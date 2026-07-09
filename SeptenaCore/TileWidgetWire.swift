@@ -72,6 +72,17 @@ struct TileWidgetWire: Codable, Equatable, Sendable {
     trailingTodayPending = data.trailingTodayPending
     self.updatedAt = updatedAt
   }
+
+  func hasSameContent(as other: TileWidgetWire) -> Bool {
+    itemID == other.itemID
+      && title == other.title
+      && iconSymbol == other.iconSymbol
+      && accentHex == other.accentHex
+      && headline == other.headline
+      && headlineStats == other.headlineStats
+      && history == other.history
+      && trailingTodayPending == other.trailingTodayPending
+  }
 }
 
 struct TileSectionOption: Codable, Equatable, Sendable, Identifiable {
@@ -86,6 +97,13 @@ struct TileWidgetCatalog: Codable, Equatable, Sendable {
   var tiles: [String: TileWidgetWire]
 
   static let empty = TileWidgetCatalog(sections: [], tiles: [:])
+
+  func hasSameContent(as other: TileWidgetCatalog) -> Bool {
+    guard sections == other.sections, tiles.count == other.tiles.count else { return false }
+    return tiles.allSatisfy { key, wire in
+      other.tiles[key].map { wire.hasSameContent(as: $0) } ?? false
+    }
+  }
 
   /// Gallery / placeholder content for the widget picker.
   static var sampleHabits: TileWidgetWire {

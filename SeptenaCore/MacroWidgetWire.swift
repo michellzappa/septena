@@ -46,4 +46,8 @@ struct MacroWidgetWire: Codable, Equatable, Sendable {
       updatedAt: .now
     )
   }
+
+  func hasSameContent(as other: MacroWidgetWire) -> Bool {
+    tiles == other.tiles && accentHex == other.accentHex
+  }
 }

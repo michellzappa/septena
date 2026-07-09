@@ -23,4 +23,12 @@ enum TileWidgetSnapshotStore {
     else { return }
     defaults.set(data, forKey: userDefaultsKey)
   }
+
+  /// Avoid app-group writes and timeline reloads when only `updatedAt` moved.
+  @discardableResult
+  static func saveIfChanged(_ catalog: TileWidgetCatalog) -> Bool {
+    guard !catalog.hasSameContent(as: load()) else { return false }
+    save(catalog)
+    return true
+  }
 }

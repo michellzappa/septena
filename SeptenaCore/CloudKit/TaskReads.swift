@@ -3,14 +3,29 @@ import SwiftData
 
 // TaskReads — the read side of the task data path. Synthesizes
 // `TasksListResponse` / `TasksCounts` from the local SwiftData mirror
-// that CKSyncEngine keeps fresh; the shape matches what the (now
-// retired) FastAPI endpoints used to return so existing view code
-// doesn't have to branch on backend.
+// that CKSyncEngine keeps fresh. Response DTOs stay stable so views do not
+// need to know anything about their persistence backing.
 //
 // Mutations live in `TaskMutator`. No FastAPI seams remain in either path.
 
 @MainActor
 enum TaskReads {
+  /// These are used on every dashboard refresh. Keeping them actor-isolated
+  /// avoids repeated formatter construction without sharing DateFormatter
+  /// across executors (it is not thread-safe).
+  private static let dayFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter
+  }()
+
+  private static let timestampFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    return formatter
+  }()
 
   // MARK: - list
 
@@ -158,12 +173,9 @@ enum TaskReads {
   static func dashboardStats(days: Int = 7, today: String, now: Date, context: ModelContext) -> DashboardStats {
     let cal = Calendar.current
     var dayKeys: [String] = []
-    let dayFormatter = DateFormatter()
-    dayFormatter.dateFormat = "yyyy-MM-dd"
-    dayFormatter.locale = Locale(identifier: "en_US_POSIX")
     for offset in stride(from: days - 1, through: 0, by: -1) {
       guard let d = cal.date(byAdding: .day, value: -offset, to: now) else { continue }
-      dayKeys.append(dayFormatter.string(from: d))
+      dayKeys.append(Self.dayFormatter.string(from: d))
     }
     let historyStartDay = dayKeys.first ?? today
 
@@ -206,7 +218,7 @@ enum TaskReads {
         }
       }
       if e.createdAt != .distantPast {
-        let createdDay = dayFormatter.string(from: e.createdAt)
+        let createdDay = Self.dayFormatter.string(from: e.createdAt)
         if createdDay >= historyStartDay {
           madeByDay[createdDay, default: 0] += 1
         }
@@ -234,7 +246,7 @@ enum TaskReads {
 
   // MARK: - tasksHistory
 
-  /// Local replacement for the (removed) FastAPI `/api/tasks/history`.
+  /// Compute the local task-history payload.
   /// Counts done-today, deferred (status open with todaySetOn matching the
   /// day), and cancelled tasks per day for the last `days` days ending
   /// today. The Tasks tile histogram only consumes `daily[*].done` —
@@ -249,9 +261,6 @@ enum TaskReads {
   /// server stores in `completed_at`, so direct string compare works.
   private static func cutoffDate(daysAgo: Int, now: Date) -> String {
     let d = Calendar.current.date(byAdding: .day, value: -daysAgo, to: now) ?? now
-    let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-    f.locale = Locale(identifier: "en_US_POSIX")
-    return f.string(from: d)
+    return Self.timestampFormatter.string(from: d)
   }
 }

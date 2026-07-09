@@ -25,4 +25,17 @@ enum MacroWidgetSnapshotStore {
     guard let data = try? JSONEncoder().encode(wire) else { return }
     defaults.set(data, forKey: userDefaultsKey)
   }
+
+  /// Returns whether the app-group payload changed in a widget-visible way.
+  @discardableResult
+  static func saveIfChanged(_ wire: MacroWidgetWire?) -> Bool {
+    let existing = load()
+    switch (wire, existing) {
+    case (nil, nil): return false
+    case let (next?, current?) where next.hasSameContent(as: current): return false
+    default:
+      save(wire)
+      return true
+    }
+  }
 }
