@@ -9,9 +9,9 @@ import SwiftUI
 /// See `LocalMCPServer` (SeptenaCore/MCP) for the transport + auth.
 struct LocalMCPSettingsPane: View {
   @AppStorage(SettingsKey.localMcpEnabled) private var enabled = false
-  @AppStorage(SettingsKey.localMcpToken) private var token = ""
   @AppStorage(MCPDefaultsKey.scope) private var scopeRaw = MCPAccessScope.thisMac.rawValue
   @AppStorage(MCPDefaultsKey.keepAlive) private var keepAlive = false
+  @State private var token = LocalMCPServer.token ?? ""
 
   private var port: UInt16 { LocalMCPServer.shared.port }
   private var scope: MCPAccessScope { MCPAccessScope(rawValue: scopeRaw) ?? .thisMac }
@@ -127,8 +127,8 @@ struct LocalMCPSettingsPane: View {
             token = LocalMCPServer.regenerateToken()
           }
         } footer: {
-          Text("Rotating invalidates the old token — re-run the command above "
-             + "(or update the header) in Claude Code afterward.")
+          Text("Stored in this Mac's Keychain. Rotating invalidates the old token — "
+             + "re-run the command above (or update the header) in Claude Code afterward.")
         }
       }
     }
@@ -141,6 +141,7 @@ struct LocalMCPSettingsPane: View {
         LocalMCPServer.shared.stop()
       }
     }
+    .onAppear { token = LocalMCPServer.token ?? "" }
   }
 
   private func copy(_ s: String) {

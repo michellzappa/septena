@@ -23,7 +23,8 @@ import Observation
 public enum MCPDefaultsKey {
   /// Bool — master switch for the loopback server (macOS only).
   public static let enabled = "septena.dev.localMcpEnabled"
-  /// String — bearer token shared with Claude Code.
+  /// Legacy UserDefaults location for the bearer token. Read once and migrated
+  /// into Keychain; new tokens are never persisted here.
   public static let token = "septena.dev.localMcpToken"
   /// String — `MCPAccessScope` raw value (which networks may connect).
   public static let scope = "septena.dev.localMcpScope"
@@ -183,11 +184,9 @@ final class LocalMCPServer {
               json: ["error": "local MCP token not configured"])
       return
     }
-    let authorized = headers.contains { line in
-      line.lowercased().hasPrefix("authorization:")
-        && line.contains("Bearer \(token)")
-    }
-    guard authorized else {
+    guard let header = headers.first(where: {
+      $0.lowercased().hasPrefix("authorization:")
+    }), Self.isAuthorized(header: header, token: token) else {
       respond(conn, status: "401 Unauthorized", json: ["error": "invalid or missing bearer token"])
       return
     }
@@ -237,10 +236,20 @@ final class LocalMCPServer {
 
   // MARK: - Token
 
-  /// Bearer token shared with Claude Code. Stored in UserDefaults so the
-  /// Settings pane (SwiftUI @AppStorage) and the server read the same value.
+  private nonisolated static let tokenKeychainAccount = "septena.dev.localMcpToken"
+
+  /// Bearer token shared with Claude Code. It is device-local because it
+  /// authorizes a listener on this specific Mac; the old UserDefaults value is
+  /// migrated once so existing Claude Code registrations keep working.
   nonisolated static var token: String? {
-    UserDefaults.standard.string(forKey: MCPDefaultsKey.token)
+    if let secured = KeychainStore.load(account: tokenKeychainAccount), !secured.isEmpty {
+      return secured
+    }
+    guard let legacy = UserDefaults.standard.string(forKey: MCPDefaultsKey.token),
+          !legacy.isEmpty else { return nil }
+    KeychainStore.store(legacy, account: tokenKeychainAccount, synchronizable: false)
+    UserDefaults.standard.removeObject(forKey: MCPDefaultsKey.token)
+    return legacy
   }
 
   /// Generate and persist a fresh token. Called from Settings on first enable
@@ -248,7 +257,32 @@ final class LocalMCPServer {
   @discardableResult
   nonisolated static func regenerateToken() -> String {
     let t = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-    UserDefaults.standard.set(t, forKey: MCPDefaultsKey.token)
+    KeychainStore.store(t, account: tokenKeychainAccount, synchronizable: false)
+    UserDefaults.standard.removeObject(forKey: MCPDefaultsKey.token)
     return t
+  }
+
+  /// Parse a single Authorization header exactly. Substring matching would
+  /// accept a valid token followed by arbitrary bytes, which is not a bearer
+  /// credential comparison.
+  nonisolated private static func isAuthorized(header: String, token: String) -> Bool {
+    guard let separator = header.firstIndex(of: ":") else { return false }
+    let name = header[..<separator].trimmingCharacters(in: .whitespacesAndNewlines)
+    guard name.caseInsensitiveCompare("Authorization") == .orderedSame else { return false }
+    let parts = header[header.index(after: separator)...]
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .split(separator: " ", omittingEmptySubsequences: true)
+    guard parts.count == 2,
+          String(parts[0]).caseInsensitiveCompare("Bearer") == .orderedSame else { return false }
+    return constantTimeEquals(String(parts[1]), token)
+  }
+
+  nonisolated private static func constantTimeEquals(_ lhs: String, _ rhs: String) -> Bool {
+    let a = Array(lhs.utf8)
+    let b = Array(rhs.utf8)
+    guard a.count == b.count else { return false }
+    var mismatch: UInt8 = 0
+    for (left, right) in zip(a, b) { mismatch |= left ^ right }
+    return mismatch == 0
   }
 }

@@ -173,8 +173,6 @@ enum SettingsKey {
   /// default. The key strings live in SeptenaCore (`MCPDefaultsKey`) so the
   /// `LocalMCPServer` and this facade can't drift.
   static let localMcpEnabled  = MCPDefaultsKey.enabled
-  /// macOS-only: bearer token Claude Code sends to the local MCP server.
-  static let localMcpToken    = MCPDefaultsKey.token
   /// Whole-app privacy lock: require Face ID / Touch ID / device passcode to
   /// reopen Septena after it's been backgrounded past the grace window.
   /// Local-only @AppStorage — the lock is a per-device privacy gate, not
