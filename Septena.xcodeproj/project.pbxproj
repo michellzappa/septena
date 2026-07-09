@@ -240,6 +240,7 @@
 		299444520068C69D2AB78A1D /* CoachMessageRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115B3D035A8FFAB40EB1205D /* CoachMessageRecord.swift */; };
 		2A325FD63D83A302DFCADF3C /* TasksWidgetBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA8F5D4A96860985631CC60B /* TasksWidgetBuilder.swift */; };
 		2A52AADC007E8D4E3CDBFCDE /* WeightCadence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2416C5A216AEE7F3DBA82BB /* WeightCadence.swift */; };
+		2A646738CC2ACD895F4372C5 /* CloudKitRecordRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */; };
 		2A7F5CB76A16EEA99EF1037E /* NutritionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA03EC8DE6C2A705D7681555 /* NutritionPlugin.swift */; };
 		2A808F941EDCCD97842147B3 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B801EA98E8CDE0DB13784C /* SettingsStore.swift */; };
 		2ACB1A5E6D4691D619480121 /* ImportExportCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD8E6A4806221403EC33C42 /* ImportExportCatalog.swift */; };
@@ -321,6 +322,7 @@
 		38E799575ED55AAB2060FA74 /* SuggestionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57B46F99E041E6147DBFCE6 /* SuggestionBlocks.swift */; };
 		39A35CD94587B6F340FB6CCD /* SymptomsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC63DAB721CC130BA2A96843 /* SymptomsDestinationView.swift */; };
 		39A612CCD19DC6D9EBEECE70 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11858EB6D58DB798DA7B0F8 /* App.swift */; };
+		39C06CCD360CA060CB88F4BD /* CloudKitRecordRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */; };
 		39E5B2572D34D6820D2A47C0 /* SectionOnboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC74E4A0F9C0C2C3B3504C62 /* SectionOnboarding.swift */; };
 		3A001545719292D31F6FD226 /* ImportExportSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E92C8955A3139189A23641 /* ImportExportSettings.swift */; };
 		3A3BB186CC0859429AA35606 /* CoachDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95444A1B0888099EA25F684A /* CoachDetailView.swift */; };
@@ -900,6 +902,7 @@
 		A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A66E3A4EEA2689BA3959EF19 /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
 		A6CDD7A6959034273646A61C /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
+		A6F952F9FD67AF4521F93FF5 /* CloudKitRecordRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */; };
 		A70ABEB3376EB0DEB4567CFC /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
 		A74BB3E7BE101E9C7D13BA62 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B607B2041EC629B65EAF216 /* Assets.xcassets */; };
 		A74FEF9709CD1B937FF5CFA3 /* ReportHTMLRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95D72EAF704F67D254707B97 /* ReportHTMLRenderer.swift */; };
@@ -1024,6 +1027,7 @@
 		BDBFF83CF142A53AD7261298 /* ExerciseStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD7F8E063810C0BD81EF824C /* ExerciseStatsView.swift */; };
 		BDCF56052810923820A2B1E8 /* GroupedListSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35841A1E340D44524476E6BC /* GroupedListSection.swift */; };
 		BE2DA1DB9438CBD99D22593B /* IntegrationsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BD49CCB43AB0603D015D48 /* IntegrationsSettingsPane.swift */; };
+		BE4994720A545C2E91202065 /* CloudKitRecordRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */; };
 		BE7C64BB366E2EDDCFE60FF6 /* HomepageLayoutMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B811772EC1DF4C9130BECD /* HomepageLayoutMode.swift */; };
 		BEBA5EEB5CF2BC95AC6BB675 /* NotificationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A1CF28130DC18463097263 /* NotificationKit.swift */; };
 		BED02B3B08E74E921C1A15EF /* ActivityDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7DFAC856BBE635EBBC6E4 /* ActivityDestinationView.swift */; };
@@ -1676,6 +1680,7 @@
 		6392DC43E2FE913972F42911 /* NextSuggestionsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSuggestionsSection.swift; sourceTree = "<group>"; };
 		6458F5784F01C48C06CAE489 /* CanonicalExerciseName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalExerciseName.swift; sourceTree = "<group>"; };
 		64EB95DB6A86885B3FA483C1 /* Migration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migration.swift; sourceTree = "<group>"; };
+		6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitRecordRegistry.swift; sourceTree = "<group>"; };
 		66002895D360885D852833DB /* MacroWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroWidgetViews.swift; sourceTree = "<group>"; };
 		67B23DB30F74DB6CE84F7C6E /* QuickFindView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickFindView.swift; sourceTree = "<group>"; };
 		68B6F4EE0E6882204B5E6088 /* BodyDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyDestinationView.swift; sourceTree = "<group>"; };
@@ -2620,6 +2625,7 @@
 				C729259A5867D99CC64AA9C3 /* AreaRecord.swift */,
 				1E598D0EF28BF638E97F3F22 /* AreasBackend.swift */,
 				D3A43D786998D198C9BCA480 /* CKEngine.swift */,
+				6513E3780ACF58CFD60D851E /* CloudKitRecordRegistry.swift */,
 				115B3D035A8FFAB40EB1205D /* CoachMessageRecord.swift */,
 				15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */,
 				545368C5D91673E810519444 /* GoalMilestoneRecord.swift */,
@@ -3565,6 +3571,7 @@
 				AEDA184A12B33E8C5BB4BA88 /* ChecklistMirror.swift in Sources */,
 				36CD96BACFEE9DAC1CFA6FDA /* ClaudeGatewayDetail.swift in Sources */,
 				0312D0E5DA56F8734A9D3F67 /* ClaudeGatewayProvider.swift in Sources */,
+				39C06CCD360CA060CB88F4BD /* CloudKitRecordRegistry.swift in Sources */,
 				26861F7E0929CC41A30E6DA4 /* CoachMessageRecord.swift in Sources */,
 				6D4169508BD478BC65A67B95 /* CoachVoiceRecord.swift in Sources */,
 				5BB7D20B7E8D2DC00C8F8122 /* CommitMotion.swift in Sources */,
@@ -3798,6 +3805,7 @@
 				338614EF21105A691BB7DC26 /* ChecklistMirror.swift in Sources */,
 				2FC4C4D31FE568792AA4A6F6 /* ClaudeGatewayDetail.swift in Sources */,
 				C7D5D8C59AA7955E3B7E2E34 /* ClaudeGatewayProvider.swift in Sources */,
+				A6F952F9FD67AF4521F93FF5 /* CloudKitRecordRegistry.swift in Sources */,
 				299444520068C69D2AB78A1D /* CoachMessageRecord.swift in Sources */,
 				B62688F9D5CA1E3D04A5B618 /* CoachVoiceRecord.swift in Sources */,
 				8EE2672F9F4861EA019F5DE0 /* CommitMotion.swift in Sources */,
@@ -4038,6 +4046,7 @@
 				64FF6F24087F235CF7FDA3FB /* ClaudeGatewayDetail.swift in Sources */,
 				2BE2D64D96CCF32360AB94A6 /* ClaudeGatewayProvider.swift in Sources */,
 				537D53C86D49631E817CD12B /* ClaudeReconnectCue.swift in Sources */,
+				BE4994720A545C2E91202065 /* CloudKitRecordRegistry.swift in Sources */,
 				2AF3B1DCAB335842A416251A /* CoachBackend.swift in Sources */,
 				E0001C3C4A47E0774F8C0156 /* CoachChatView.swift in Sources */,
 				30A7F5AE3F536202A8801656 /* CoachContextBuilder.swift in Sources */,
@@ -4530,6 +4539,7 @@
 				F5F962E54B99DBD31CA0B97A /* ClaudeGatewayDetail.swift in Sources */,
 				5913FEDDD567597FD292D6B2 /* ClaudeGatewayProvider.swift in Sources */,
 				59C87D8361594DCD721F3AA4 /* ClaudeReconnectCue.swift in Sources */,
+				2A646738CC2ACD895F4372C5 /* CloudKitRecordRegistry.swift in Sources */,
 				23066386CF43922C111C7CEB /* CoachBackend.swift in Sources */,
 				9DDAA9E81CDEEA0F79F1F4C0 /* CoachChatView.swift in Sources */,
 				E58F5CB6AFD36E75F44BE0AF /* CoachContextBuilder.swift in Sources */,

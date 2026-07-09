@@ -7,18 +7,8 @@ import UIKit
 import AppKit
 #endif
 
-// CKEngine — Phase 0 scaffolding.
-//
-// Owns the `CKSyncEngine` for the Septena CloudKit container. Nothing in
-// the app instantiates this yet; the FastAPI/Outbox path remains live.
-// Phase 1 will:
-//   1. Construct one of these from `App.swift` on launch.
-//   2. Have `TaskMutator` call `noteTaskChange(id:)` after each write.
-//   3. Fill in the `recordProvider` and `applyFetched(...)` paths so
-//      incoming records fold into the SwiftData mirror.
-//
-// The shape mirrors the Apple sample (CloudKitSyncEngine, WWDC23) so the
-// gap between "Phase 0 skeleton" and "Phase 1 production" stays narrow.
+// CKEngine — process-wide CKSyncEngine coordinator for the local-first
+// SwiftData mirror. All app data uses this direct CloudKit path.
 
 // MARK: - Constants
 
@@ -61,15 +51,12 @@ final class CKEngine {
   /// SwiftData / TaskEntity, keeping this file in SeptenaCore without a
   /// forward import on the higher layer.
   ///
-  /// The single-closure shape covers all three record types (Task, Area,
-  /// Project): App.swift dispatches by `record.recordType` for fetched
-  /// events and tries each entity type in order in the provider. The
-  /// deleted closure gets the recordType as a second argument because
-  /// the local mirror no longer holds the row by the time we'd need to
-  /// look it up.
-var recordProvider: ((CKRecord.ID) -> CKRecord?)?
-var applyFetchedRecord: ((CKRecord) -> Void)?
-var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) -> Void)?
+  /// The registry behind these closures covers every mirrored record type.
+  /// The deleted closure gets the record type too, because the local mirror
+  /// no longer holds the row by the time it needs to route the deletion.
+var recordProvider: ((CKRecord.ID) async -> CKRecord?)?
+var applyFetchedRecord: ((CKRecord) async -> Void)?
+var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) async -> Void)?
   /// Called once after every batch of fetched/sent record events is
   /// drained, so the host can perform a single `context.save()` and
   /// post one repaint notification instead of N. During a 553-row
@@ -82,7 +69,7 @@ var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) -> Void)?
   /// CloudKit system fields — the user-visible data was already applied
   /// optimistically and the mutator already posted a scoped change. Posting
   /// again would re-run the whole app's reload path for nothing.
-var applyDidFinishBatch: ((_ notify: Bool) -> Void)?
+var applyDidFinishBatch: ((_ notify: Bool) async -> Void)?
 
   /// Current iCloud account status. Refreshed on init, when the system
   /// posts `.CKAccountChanged`, and any time `refreshAccountStatus()` is
@@ -529,24 +516,23 @@ func handleEvent(
 
     case .fetchedRecordZoneChanges(let changes):
       Log.cloudKit.debug("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(self.applyingResetCascade)")
-      // Force every closure invocation onto MainActor. The closures
-      // touch SwiftData's mainContext, which isn't thread-safe — and
-      // @MainActor on the enclosing class isn't sufficient because
-      // CKSyncEngine calls our handlers from its own executor.
-      await MainActor.run {
-        for mod in changes.modifications {
-          applyFetchedRecord?(mod.record)
-        }
-        for del in changes.deletions {
-          if applyingResetCascade {
-            SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
-            continue
-          }
-          applyDeletedRecord?(del.recordID, del.recordType)
-        }
-        // Inbound remote changes — the UI hasn't seen these; repaint.
-        applyDidFinishBatch?(true)
+      // Materialize into the registry's background ModelActor. This keeps
+      // large CloudKit pulls from monopolizing the UI actor.
+      let callbacks = await MainActor.run {
+        (self.applyFetchedRecord, self.applyDeletedRecord, self.applyDidFinishBatch)
       }
+      for mod in changes.modifications {
+        await callbacks.0?(mod.record)
+      }
+      for del in changes.deletions {
+        if applyingResetCascade {
+          SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
+          continue
+        }
+        await callbacks.1?(del.recordID, del.recordType)
+      }
+      // Inbound remote changes — the UI hasn't seen these; repaint.
+      await callbacks.2?(true)
 
     case .sentRecordZoneChanges(let sent):
       // `savedRecords` are the records the server accepted and stamped
@@ -564,7 +550,7 @@ func handleEvent(
       // MainActor block so the fresh records are ready to fold in.
       // Capture database on MainActor first (CKSyncEngine breaks @MainActor isolation).
       let oplockIDs = sent.failedRecordSaves.compactMap { fail -> CKRecord.ID? in
-        guard let ckErr = fail.error as? CKError, ckErr.code == .serverRecordChanged else { return nil }
+        guard fail.error.code == .serverRecordChanged else { return nil }
         return fail.record.recordID
       }
       var freshServerRecords: [CKRecord] = []
@@ -575,15 +561,16 @@ func handleEvent(
         SeptenaLog.info("[CKEngine] fetched \(freshServerRecords.count) fresh records for oplock resolution")
       }
 
+      let applyRecord = await MainActor.run { self.applyFetchedRecord }
+      for save in sent.savedRecords {
+        await applyRecord?(save)
+      }
+      // Apply fresh server versions of oplock-conflicting records so the
+      // next CKSyncEngine retry sends the correct etag instead of looping.
+      for fresh in freshServerRecords {
+        await applyRecord?(fresh)
+      }
       await MainActor.run {
-        for save in sent.savedRecords {
-          applyFetchedRecord?(save)
-        }
-        // Apply fresh server versions of oplock-conflicting records so the
-        // next CKSyncEngine retry sends the correct etag instead of looping.
-        for fresh in freshServerRecords {
-          applyFetchedRecord?(fresh)
-        }
         for fail in sent.failedRecordSaves {
           SeptenaLog.error("[CKEngine] sent.save FAIL id=\(fail.record.recordID.recordName) error=\(fail.error.localizedDescription)")
         }
@@ -596,12 +583,6 @@ func handleEvent(
             failedDeletes: Array(sent.failedRecordDeletes)
           )
         }
-        // Our own writes echoing back. Fold in system fields (the save in the
-        // batch handler), but only repaint when an oplock conflict made the
-        // server's version win — otherwise the optimistic write + the
-        // mutator's scoped post already brought the UI current, and a second
-        // app-wide reload here is the per-edit hitch we're eliminating.
-        applyDidFinishBatch?(!freshServerRecords.isEmpty)
         // The server now holds these changes — ring the same-device sibling
         // app (Septena ↔ Septask) so it fetches now instead of on its next
         // foreground. Purely a hint; see SiblingNudge.
@@ -609,6 +590,13 @@ func handleEvent(
           SiblingNudge.post()
         }
       }
+      // Our own writes echoing back. Fold in system fields (the save in the
+      // batch handler), but only repaint when an oplock conflict made the
+      // server's version win — otherwise the optimistic write + the
+      // mutator's scoped post already brought the UI current, and a second
+      // app-wide reload here is the per-edit hitch we're eliminating.
+      let finishBatch = await MainActor.run { self.applyDidFinishBatch }
+      await finishBatch?(!freshServerRecords.isEmpty)
 
     case .fetchedDatabaseChanges, .sentDatabaseChanges,
          .willFetchChanges, .didFetchChanges,
@@ -628,25 +616,22 @@ func nextRecordZoneChangeBatch(
     let pending = syncEngine.state.pendingRecordZoneChanges
       .filter { context.options.scope.contains($0) }
     guard !pending.isEmpty else { return nil }
-    // Pre-resolve every record on MainActor before handing the batch
-    // builder a pure dictionary-lookup closure. CKSyncEngine's batch
-    // builder may invoke the resolver on a background queue; if it
-    // touched SwiftData there we'd corrupt the main context.
-    let resolved: [CKRecord.ID: CKRecord] = await MainActor.run {
-      var out: [CKRecord.ID: CKRecord] = [:]
-      for change in pending {
-        // PendingRecordZoneChange is an enum (.saveRecord(id) / .deleteRecord(id)).
-        // We only need the save case here — deletes don't ask the
-        // resolver for a CKRecord.
-        guard case .saveRecord(let id) = change else { continue }
-        if out[id] == nil, let rec = recordProvider?(id) {
-          out[id] = rec
-        }
+    // Pre-resolve every record on the registry's background ModelActor before
+    // handing the batch builder a pure dictionary-lookup closure.
+    let provider = await MainActor.run { self.recordProvider }
+    var resolved: [CKRecord.ID: CKRecord] = [:]
+    for change in pending {
+      // PendingRecordZoneChange is an enum (.saveRecord(id) / .deleteRecord(id)).
+      // We only need the save case here — deletes don't ask the resolver for
+      // a CKRecord.
+      guard case .saveRecord(let id) = change else { continue }
+      if resolved[id] == nil, let rec = await provider?(id) {
+        resolved[id] = rec
       }
-      return out
     }
+    let resolvedRecords = resolved
     return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { recordID in
-      resolved[recordID]
+      resolvedRecords[recordID]
     }
   }
 
