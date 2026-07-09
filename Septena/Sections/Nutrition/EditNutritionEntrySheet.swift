@@ -46,6 +46,8 @@ struct EditNutritionEntrySheet: View {
   @State private var photoAssetID: String? = nil
   // Edited flag so we can distinguish "unchanged" from "explicitly cleared".
   @State private var photoEdited: Bool = false
+  @State private var analyzing = false
+  @State private var analysisNote: String? = nil
 
   var body: some View {
     AdaptiveEditScaffold(title: original == nil ? "New Meal" : "Edit Meal",
@@ -53,11 +55,8 @@ struct EditNutritionEntrySheet: View {
       formBody
         .onAppear { seed() }
         .onChange(of: photoItem) { _, new in
-          // PhotosPicker hands us a PhotosPickerItem; the local identifier is
-          // present when we have Photos library read access. Request it lazily
-          // — the user only sees the prompt after their first pick.
           guard let new else { return }
-          Task { await capturePickedIdentifier(new) }
+          Task { await handlePicked(new) }
         }
     }
   }
@@ -119,21 +118,72 @@ struct EditNutritionEntrySheet: View {
             photoItem = nil
             photoAssetID = nil
             photoEdited = true
+            analysisNote = nil
           } label: {
             Text("Remove").font(.caption)
           }
         }
       }
+      .buttonStyle(.borderless)
+    }
+    if analyzing {
+      HStack(spacing: 8) {
+        ProgressView()
+        Text("Reading the photo…").font(.caption).foregroundStyle(.secondary)
+      }
+    } else if let analysisNote {
+      Text(analysisNote).font(.caption).foregroundStyle(.secondary)
     }
   }
 
-  private func capturePickedIdentifier(_ item: PhotosPickerItem) async {
-    // Photos read access is needed for `itemIdentifier` to be non-nil.
+  private func handlePicked(_ item: PhotosPickerItem) async {
     await PhotosBridge.shared.ensureAccess()
     await MainActor.run {
       photoAssetID = item.itemIdentifier
       photoEdited = true
+      analyzing = true
+      analysisNote = nil
     }
+    guard let data = try? await item.loadTransferable(type: Data.self) else {
+      await MainActor.run {
+        analyzing = false
+        analysisNote = "Couldn't read the photo — fill the fields below"
+      }
+      return
+    }
+    let draft = await MealPhotoAnalyzer.analyze(imageData: data)
+    await MainActor.run {
+      prefill(from: draft)
+      analysisNote = draft.note ?? "Couldn't identify nutrition from this photo — fill the fields below"
+      analyzing = false
+    }
+  }
+
+  /// Fill only blank fields. Photo analysis should help, never overwrite.
+  private func prefill(from draft: MealPhotoDraft) {
+    if foodsText.isEmpty, !draft.foods.isEmpty {
+      foodsText = draft.foods.joined(separator: "\n")
+    }
+    if ingredientsText.isEmpty, !draft.ingredients.isEmpty {
+      ingredientsText = draft.ingredients.joined(separator: "\n")
+    }
+    fillIfEmpty($proteinG, draft.proteinG)
+    fillIfEmpty($fatG, draft.fatG)
+    fillIfEmpty($saturatedFatG, draft.saturatedFatG)
+    fillIfEmpty($carbsG, draft.carbsG)
+    fillIfEmpty($sugarG, draft.sugarG)
+    fillIfEmpty($fiberG, draft.fiberG)
+    fillIfEmpty($kcal, draft.kcal)
+    fillIfEmpty($sodiumMg, draft.sodiumMg)
+    fillIfEmpty($cholesterolMg, draft.cholesterolMg)
+    fillIfEmpty($potassiumMg, draft.potassiumMg)
+  }
+
+  private func fillIfEmpty(_ field: Binding<String>, _ value: Double?) {
+    guard field.wrappedValue.isEmpty, let value else { return }
+    field.wrappedValue = value == value.rounded()
+      ? String(Int(value))
+      : String(format: "%.1f", value)
   }
 
   private func macroField(_ label: String, text: Binding<String>) -> some View {
