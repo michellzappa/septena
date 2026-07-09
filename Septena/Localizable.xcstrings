@@ -373,6 +373,7 @@
       }
     },
     "%@ ref%@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1680,6 +1681,7 @@
       }
     },
     "area: %@   project: %@   status: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2601,6 +2603,7 @@
 
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3427,6 +3430,7 @@
       }
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4050,10 +4054,8 @@
         }
       }
     },
-    "id: %@" : {
-
-    },
     "id: %@   area: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4978,6 +4980,7 @@
 
     },
     "Missing Areas" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4988,6 +4991,7 @@
       }
     },
     "Missing Projects" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
