@@ -1,8 +1,7 @@
 import SwiftUI
 
-// Edit/create sheet for a supplement definition. Edit enqueues
-// `PUT /api/supplements/update` through HTTPOutbox; create enqueues
-// `POST /api/supplements/new`.
+// Edit/create sheet for a supplement definition. Saves go through
+// `ChecklistMutator`, which persists locally and queues CloudKit.
 
 struct EditSupplementSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator

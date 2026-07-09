@@ -1,18 +1,17 @@
 import Foundation
 import SwiftData
 
-// TaskMutator — the write side of the task cache.
+// TaskMutator — the direct CloudKit write boundary for tasks.
 //
-// CloudKit (via CKSyncEngine) is the only backend for tasks. TaskMutator
-// is a thin pass-through to `CloudKitTasksBackend`; the legacy FastAPI
-// outbox path (and its OutboxEntity model) has been removed.
+// CloudKit (via CKSyncEngine) is the only backend for tasks. There is no
+// HTTP outbox or transport fallback; every write lands in SwiftData then is
+// queued through CKSyncEngine.
 
 // MARK: - TaskMutator
 
-/// The single entry point for any code path that mutates a task. Routes
-/// every operation through `CloudKitTasksBackend` (CKSyncEngine). The
-/// backend must be bound via `bind(ckEngine:)` before any mutation is
-/// invoked — callers must await `SeptenaServices.shared.start()` first.
+/// The single entry point for any code path that mutates a task. Its local
+/// store is bound to CKSyncEngine before use; callers must await
+/// `SeptenaServices.shared.start()` first.
 @MainActor
 @Observable
 final class TaskMutator {
@@ -35,8 +34,8 @@ final class TaskMutator {
     return _cloudBackend
   }
 
-  /// Outbox has been retired for tasks. Kept as a property so Settings
-  /// UI ("N pending mutations") keeps compiling; always reports zero.
+  /// CKSyncEngine owns its own persisted send queue. Task-specific outbox
+  /// counts no longer exist, so this compatibility surface is always zero.
   var pendingCount: Int { 0 }
 
   init(context: ModelContext, ckEngine: CKEngine? = nil) {

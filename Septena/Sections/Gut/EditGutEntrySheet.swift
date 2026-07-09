@@ -2,8 +2,7 @@ import SwiftUI
 
 // Edit sheet for a logged gut entry. Same pattern as
 // `EditCaffeineEntrySheet` — standard SwiftUI `Form` in a `NavigationStack`
-// presented via `.sheet(item:)`, save enqueues `PUT /api/gut/entry/{id}`
-// through HTTPOutbox.
+// presented via `.sheet(item:)`; saves go through the local-first gut mutator.
 
 struct EditGutEntrySheet: View {
   @Environment(SectionTheme.self) private var theme

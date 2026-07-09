@@ -258,6 +258,61 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
         && project == nil && area == nil && !today
   }
 
+  /// Native projection used by the SwiftData mirror. Keeping this typed avoids
+  /// serializing every row through the retired HTTP payload shape merely to
+  /// construct a value for the UI.
+  init(
+    id: String,
+    title: String,
+    status: TaskStatus,
+    created: String?,
+    scheduled: String?,
+    deadline: String?,
+    today: Bool,
+    todaySetOn: String?,
+    completedAt: String?,
+    area: String?,
+    project: String?,
+    notes: String?,
+    recurrence: Recurrence?,
+    nextOccurrence: String? = nil,
+    updatedAt: String?,
+    deletedAt: String?,
+    source: String? = nil,
+    sourceClient: String? = nil,
+    acknowledgedAt: Date? = nil,
+    createdAt: Date = .distantPast,
+    position: Double = 0,
+    kind: String = "",
+    heading: String? = nil,
+    conversation: TaskConvo = TaskConvo()
+  ) {
+    self.id = id
+    self.title = title
+    self.status = status
+    self.created = created
+    self.scheduled = scheduled
+    self.deadline = deadline
+    self.today = today
+    self.todaySetOn = todaySetOn
+    self.completedAt = completedAt
+    self.area = area
+    self.project = project
+    self.notes = notes
+    self.recurrence = recurrence
+    self.nextOccurrence = nextOccurrence
+    self.updatedAt = updatedAt
+    self.deletedAt = deletedAt
+    self.source = source
+    self.sourceClient = sourceClient
+    self.acknowledgedAt = acknowledgedAt
+    self.createdAt = createdAt
+    self.position = position
+    self.kind = kind
+    self.heading = heading
+    self.conversation = conversation
+  }
+
   enum CodingKeys: String, CodingKey {
     case id, title, status, created, scheduled, deadline, today
     case todaySetOn = "today_set_on"
@@ -1184,7 +1239,7 @@ struct MacrosConfig: Codable, Hashable {
 }
 
 /// Macro targets and fasting prefs, persisted in NSUbiquitousKeyValueStore.
-/// Replaces the `GET /api/nutrition/macros-config` FastAPI endpoint.
+/// Local macro-configuration payload shared by the nutrition surfaces.
 enum NutritionPrefs {
   private static let kvsKey = "nutrition.macrosConfig"
 

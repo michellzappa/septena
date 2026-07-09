@@ -5,9 +5,8 @@ import SwiftUI
 // header when docked as an inspector on regular width; NavigationStack +
 // Cancel/Save toolbar when presented as a bottom sheet) and closes after
 // save/cancel. Presented via `.adaptiveDetail(item:)` (edit) or
-// `.adaptiveDetail(isPresented:)` (create). Edit enqueues
-// `PUT /api/habits/update` through HTTPOutbox; create enqueues
-// `POST /api/habits/new`.
+// `.adaptiveDetail(isPresented:)` (create). Both paths persist locally and
+// are queued directly through CKSyncEngine by `ChecklistMutator`.
 
 struct EditHabitSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator

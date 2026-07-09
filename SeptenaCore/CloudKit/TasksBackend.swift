@@ -1,69 +1,16 @@
 import Foundation
 import SwiftData
 
-// TasksBackend — CloudKit is the only path for task mutations. The
-// protocol survives as a seam for tests and future re-routing, but the
-// runtime backend toggle has been removed.
+// CloudKit task store — CloudKit is the only path for task mutations.
 //
 // CKSyncEngine *is* the outbox — local mutation + `engine.noteTaskChange(id:)`
 // is the whole story; the engine batches, retries, and resolves
 // conflicts on its own.
 
-// MARK: - Protocol
+// MARK: - CloudKit store
 
-/// Mutation surface. `CloudKitTasksBackend` is the only conforming type
-/// in production; `TaskMutator` is now a thin shim that forwards to it.
-@MainActor
-protocol TasksBackend: AnyObject {
-  @discardableResult
-  func create(title: String,
-              area: String?,
-              project: String?,
-              scheduled: Date?,
-              deadline: Date?,
-              today: Bool,
-              notes: String?,
-              source: String,
-              deferPush: Bool,
-              atBottom: Bool) -> SeptenaTask
-
-  func update(id: String, title: String?, notes: String?)
-  /// Mark an agent-created row as seen (clears the freshness cue). Idempotent.
-  func acknowledge(id: String)
-  func complete(id: String)
-  func uncomplete(id: String)
-  func cancel(id: String)
-  /// Soft-delete → Recently Deleted (recoverable). See the impl.
-  func delete(id: String)
-  /// Bring a task back from Recently Deleted.
-  func restore(id: String)
-  /// Permanently destroy a task (hard delete). Used by "Delete Permanently"
-  /// and the 30-day auto-purge.
-  func purge(id: String)
-  func moveToToday(id: String, today: Bool)
-  func removeFromToday(id: String)
-  func schedule(id: String, date: Date?)
-  func setDeadline(id: String, date: Date?)
-  func setRecurrence(id: String, recurrence: Recurrence?)
-  func moveToArea(id: String, area: String?)
-  func moveToProject(id: String, project: String?)
-  /// Set a task's manual order position (Things-style drag-to-reorder). The
-  /// caller computes the value as the midpoint of the new neighbours' order
-  /// keys; we just persist + sync it.
-  func reorder(id: String, toPosition position: Double)
-  /// Create a project section-divider "heading" (see `TaskEntity.isHeading`).
-  @discardableResult
-  func createHeading(title: String, project: String, atTop: Bool) -> SeptenaTask
-  /// File a task under a heading (`heading = headingID`) or clear it (`nil`).
-  func setHeading(id: String, heading: String?)
-}
-
-// MARK: - CloudKit backend
-
-/// Matches Outbox.swift's private `serverNow()` — naive seconds-precision
-/// ISO-8601 so `completedAt` blends with FastAPI-authored rows. Kept
-/// local here rather than promoted because the CK and FastAPI paths
-/// diverge in Phase 6 anyway.
+/// Seconds-precision timestamp for task completion state. Kept local because
+/// task records intentionally use a display-friendly, stable string shape.
 private let ckTimestampFormatter: DateFormatter = {
   let f = DateFormatter()
   f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -87,7 +34,7 @@ private var currentAppClientLabel: String {
 }
 
 @MainActor
-final class CloudKitTasksBackend: TasksBackend {
+final class CloudKitTasksBackend {
   private let engine: CKEngine
   private let context: ModelContext
 
@@ -117,9 +64,8 @@ final class CloudKitTasksBackend: TasksBackend {
   }
 
   /// Persists the local mutation, tells the engine, posts the notification
-  /// so views repaint. Save errors are logged but not propagated — the
-  /// FastAPI path swallows them too, and there's no caller that can act
-  /// on the failure at this layer.
+  /// so views repaint. Save errors are logged but not propagated because the
+  /// UI has already rendered the optimistic local mutation.
   private func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) {
     let id = entity.id
     let title = entity.title

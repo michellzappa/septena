@@ -1,8 +1,7 @@
 import SwiftUI
 
-// Edit/create sheet for a chore definition — name, emoji, cadence. Edit
-// enqueues `PUT /api/chores/definitions/{id}` through HTTPOutbox; create
-// enqueues `POST /api/chores/definitions`.
+// Edit/create sheet for a chore definition — name, emoji, cadence. Saves go
+// through `ChecklistMutator`, which persists locally and queues CloudKit.
 
 struct EditChoreSheet: View {
   @Environment(ChecklistMutator.self) private var checklistMutator

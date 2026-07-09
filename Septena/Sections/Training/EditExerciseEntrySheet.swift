@@ -2,10 +2,8 @@ import SwiftUI
 
 // Edit sheet for a logged training entry. A SwiftUI `Form` hosted by the
 // shared `AdaptiveEditScaffold` and presented via `.adaptiveDetail(item:)`.
-// Save enqueues
-// `PUT /api/training/entries` through HTTPOutbox. The server identifies
-// the entry by its filename (`file` field in the JSON body) and
-// branches on cardio vs strength fields based on exercise type.
+// Saves go through the local-first training mutator; cardio and strength use
+// the same entry record with their respective fields.
 
 struct EditExerciseEntrySheet: View {
   private var trainingMutator: TrainingMutator { SeptenaServices.shared.trainingMutator }

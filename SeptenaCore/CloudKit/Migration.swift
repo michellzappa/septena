@@ -3,8 +3,7 @@ import SwiftData
 import CloudKit
 import OSLog
 
-// TasksMigrator — Phase 2. The one-shot, reversible move of every local
-// task from the FastAPI/Outbox path into CloudKit.
+// TasksMigrator — reversible CloudKit recovery/re-sync for local tasks.
 //
 // Safety contract:
 //   1. Migration ALWAYS writes a JSON snapshot to Application Support

@@ -1658,41 +1658,31 @@ final class ActivityDayEntity {
 
 extension SeptenaTask {
   init(_ e: TaskEntity) {
-    // Decode through the existing decoder so we exercise the same code path
-    // as the network layer. Cheaper than maintaining a second initializer.
-    let payload: [String: Any?] = [
-      "id": e.id,
-      "title": e.title,
-      "status": e.statusRaw,
-      "created": e.created,
-      "scheduled": e.scheduled,
-      "deadline": e.deadline,
-      "today": e.today,
-      "today_set_on": e.todaySetOn,
-      "completed_at": e.completedAt,
-      "area": e.area,
-      "project": e.project,
-      "notes": e.notes,
-      "recurrence": e.recurrenceUnit.map { unit -> [String: Any] in
-        ["unit": unit,
-         "interval": e.recurrenceInterval,
-         "after_completion": e.recurrenceAfterCompletion]
-      } as Any?,
-      "updated_at": e.updatedAt,
-      "deleted_at": e.deletedAt,
-    ]
-    let data = try! JSONSerialization.data(withJSONObject: payload.compactMapValues { $0 })
-    self = try! JSONDecoder().decode(SeptenaTask.self, from: data)
-    // Provenance + cue fields ride alongside the entity, not the wire — set
-    // them directly (the JSON path above is the legacy network shape).
-    source = e.source
-    sourceClient = e.sourceClient
-    acknowledgedAt = e.acknowledgedAt
-    createdAt = e.createdAt
-    position = e.position
-    conversation = e.conversation
-    kind = e.kind
-    heading = e.heading
+    self.init(
+      id: e.id,
+      title: e.title,
+      status: e.status,
+      created: e.created,
+      scheduled: e.scheduled,
+      deadline: e.deadline,
+      today: e.today,
+      todaySetOn: e.todaySetOn,
+      completedAt: e.completedAt,
+      area: e.area,
+      project: e.project,
+      notes: e.notes,
+      recurrence: e.recurrence,
+      updatedAt: e.updatedAt,
+      deletedAt: e.deletedAt,
+      source: e.source,
+      sourceClient: e.sourceClient,
+      acknowledgedAt: e.acknowledgedAt,
+      createdAt: e.createdAt,
+      position: e.position,
+      kind: e.kind,
+      heading: e.heading,
+      conversation: e.conversation
+    )
   }
 
   /// Manual-order sort key — see `TaskOrder.key`.
@@ -3508,52 +3498,13 @@ final class LocalStore {
       : ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
     do {
       container = try ModelContainer(for: schema, configurations: [config])
-    } catch let firstError {
-      // Schema drift between releases: wipe and re-pull from the server.
-      // Server is the source of truth so local data is safe to drop. We
-      // print() unconditionally so the underlying error survives release
-      // builds and shows up in Console.app / device logs — `try!` on the
-      // recovery path would otherwise trap before any diagnostic emerges.
-      Log.persistence.fault("ModelContainer init failed (1/2): \(firstError.localizedDescription, privacy: .public)")
-      Self.wipeAllKnownStores()
-      do {
-        container = try ModelContainer(for: schema, configurations: [config])
-      } catch let secondError {
-        Log.persistence.fault("ModelContainer init failed (2/2) after wipe: \(secondError.localizedDescription, privacy: .public)")
-        fatalError("LocalStore unrecoverable: \(secondError)")
-      }
-    }
-  }
-
-  /// Best-effort scrub of every location SwiftData might have left a store.
-  /// SwiftData's actual on-disk path varies by OS version and configuration;
-  /// brute-forcing every plausible location is cheaper than misdiagnosing a
-  /// stale-store launch crash.
-  private static func wipeAllKnownStores() {
-    let fm = FileManager.default
-    var dirs: [URL] = []
-    if let appSupport = try? fm.url(for: .applicationSupportDirectory,
-                                    in: .userDomainMask,
-                                    appropriateFor: nil, create: false) {
-      dirs.append(appSupport)
-    }
-    if let docs = try? fm.url(for: .documentDirectory,
-                              in: .userDomainMask,
-                              appropriateFor: nil, create: false) {
-      dirs.append(docs)
-    }
-    let bases = ["Septena", "default"]   // named + SwiftData default
-    for dir in dirs {
-      for base in bases {
-        for suffix in ["store", "store-shm", "store-wal", "sqlite",
-                       "sqlite-shm", "sqlite-wal"] {
-          let f = dir.appendingPathComponent("\(base).\(suffix)")
-          if fm.fileExists(atPath: f.path) {
-            try? fm.removeItem(at: f)
-            Log.persistence.notice("wiped \(f.lastPathComponent, privacy: .public)")
-          }
-        }
-      }
+    } catch let error {
+      // Never erase a local-first store as a recovery mechanism. It can
+      // contain writes that have not reached CloudKit yet (offline work,
+      // failed sends, or a first launch after a device restore). Preserve the
+      // files for a migration/repair build instead of silently discarding data.
+      Log.persistence.fault("ModelContainer init failed; local store preserved: \(error.localizedDescription, privacy: .public)")
+      fatalError("Local database could not be opened. Its files were preserved; install a compatible repair build rather than deleting Septena data. \(error)")
     }
   }
 }
@@ -3588,12 +3539,17 @@ enum LocalCache {
   /// Unassigned inbox/logbook rows don't teach filing targets.
   @MainActor
   static func trainingTasks(in context: ModelContext) -> [SeptenaTask] {
-    liveEntities(in: context)
-      .filter {
-        !$0.pendingDeletion && !$0.isHeading && $0.status != .cancelled &&
-        ($0.area != nil || $0.project != nil)
-      }
-      .map(SeptenaTask.init)
+    let candidates = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion && e.kind != "heading"
+      },
+      sortBy: [SortDescriptor(\.id)]
+    ))) ?? []
+    return candidates.compactMap { entity in
+      guard entity.status != .cancelled,
+            entity.area != nil || entity.project != nil else { return nil }
+      return SeptenaTask(entity)
+    }
   }
 
   /// Tasks filed in a project — project progress glyphs without scanning the
@@ -3607,6 +3563,36 @@ enum LocalCache {
           && e.project != nil && e.kind != "heading"
       }
     )))?.map(SeptenaTask.init) ?? []
+  }
+
+  /// Completion ratios for project headers. Keep this as an entity aggregate
+  /// so a normal task-list refresh does not allocate one DTO per historical
+  /// task merely to compute two integer counters.
+  @MainActor
+  static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil && !e.pendingDeletion
+          && e.project != nil && e.kind != "heading"
+      }
+    ))) ?? []
+    var done: [String: Int] = [:]
+    var total: [String: Int] = [:]
+    for row in rows {
+      guard let project = row.project else { continue }
+      switch row.status {
+      case .done:
+        done[project, default: 0] += 1
+        total[project, default: 0] += 1
+      case .open:
+        total[project, default: 0] += 1
+      case .cancelled:
+        break
+      }
+    }
+    return total.reduce(into: [:]) { result, pair in
+      result[pair.key] = Double(done[pair.key] ?? 0) / Double(pair.value)
+    }
   }
 
   /// The section-divider "heading" rows filed in a project, in manual order

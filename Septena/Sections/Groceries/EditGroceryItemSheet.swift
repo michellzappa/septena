@@ -1,10 +1,8 @@
 import SwiftUI
 
 // Edit/create sheet for a grocery item — name, emoji, category. Category is a
-// picker bound to the user's configured groceries categories (fetched
-// from the server and passed in by the dashboard). Edit enqueues
-// `PATCH /api/groceries/item/{id}` through HTTPOutbox; create enqueues
-// `POST /api/groceries/item`.
+// picker bound to the user's configured grocery categories. Edits and creates
+// go through the local-first grocery mutator.
 
 struct EditGroceryItemSheet: View {
   private var grocery: GroceryMutator { SeptenaServices.shared.groceryMutator }
