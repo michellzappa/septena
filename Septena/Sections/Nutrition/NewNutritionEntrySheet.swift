@@ -92,6 +92,7 @@ struct NewNutritionEntrySheet: View {
                   Label(photoAssetID == nil ? "Take photo…" : "Retake photo",
                         systemImage: "camera.viewfinder")
                 }
+                .accessibilityIdentifier("nutrition-take-photo-button")
               }
               PhotosPicker(
                 selection: $photoItem,
@@ -100,6 +101,7 @@ struct NewNutritionEntrySheet: View {
               ) {
                 Text(photoAssetID == nil ? "Choose photo…" : "Change photo")
               }
+              .accessibilityIdentifier("nutrition-choose-photo-button")
               if photoAssetID != nil {
                 Button(role: .destructive) {
                   photoItem = nil
@@ -108,8 +110,10 @@ struct NewNutritionEntrySheet: View {
                 } label: {
                   Text("Remove").font(.caption)
                 }
+                .accessibilityIdentifier("nutrition-remove-photo-button")
               }
             }
+            .buttonStyle(.borderless)
           }
           if analyzing {
             HStack(spacing: 8) {
@@ -158,7 +162,10 @@ struct NewNutritionEntrySheet: View {
       analysisNote = nil
     }
     guard let data = try? await item.loadTransferable(type: Data.self) else {
-      await MainActor.run { analyzing = false }
+      await MainActor.run {
+        analyzing = false
+        analysisNote = "Couldn't read the photo — fill the fields below"
+      }
       return
     }
     await analyzeAndFill(data)
@@ -181,7 +188,7 @@ struct NewNutritionEntrySheet: View {
     let draft = await MealPhotoAnalyzer.analyze(imageData: data)
     await MainActor.run {
       prefill(from: draft)
-      analysisNote = draft.note
+      analysisNote = draft.note ?? "Couldn't identify nutrition from this photo — fill the fields below"
       analyzing = false
     }
   }

@@ -45,6 +45,7 @@ struct NutritionQuickAddMenu: View {
     Button { onScan() } label: {
       Label("Scan a meal…", systemImage: "camera.viewfinder")
     }
+    .accessibilityIdentifier("nutrition-scan-meal-button")
     Button { onSearch() } label: {
       Label("Search meals…", systemImage: "magnifyingglass")
     }
