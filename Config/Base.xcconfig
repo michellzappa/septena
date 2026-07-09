@@ -23,7 +23,7 @@ CLOUDKIT_WEB_API_TOKEN =
 // default (1) is fine for day-to-day Debug builds; only an archive needs the
 // real, ever-increasing value. An xcconfig is the base layer, so project.yml
 // must NOT set CURRENT_PROJECT_VERSION (a project-level value would win).
-CURRENT_PROJECT_VERSION = 1377
+CURRENT_PROJECT_VERSION = 1382
 
 // Optional include — silently skipped when the file is absent (fresh clone or
 // CI without secrets), so the project still generates and builds. Copy
