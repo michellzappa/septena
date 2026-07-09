@@ -3,23 +3,56 @@ import Vision
 
 // Turn a meal photo into a draft the user confirms. Capability ladder:
 //
-//   rung 1  iOS 27 + Apple Intelligence + eligible device → multimodal model
-//           (`MealPhotoModelAnalyzer`, stubbed until Xcode 27)
+//   rung 1  iOS 27 + Apple Intelligence + eligible device → Foundation Models
+//           multimodal prompt with an image `Attachment`, structured
+//           `@Generable` output (`MealPhotoModelAnalyzer`)
 //   rung 2  ANY iOS 26+ device, no Apple Intelligence needed → Vision OCR reads
 //           a printed nutrition label; barcode detection is surfaced for a
 //           future packaged-food lookup
 //
-// Rung 2 always runs and is merged under rung 1, so the feature works on every
-// device and in every region (Apple Intelligence is not required for Vision).
+// Rung 2 runs off the main actor and fills gaps under rung 1, so printed-label
+// capture works on every device and in every region. The model rung is bounded:
+// beta on-device image prompting should never strand the form in "Reading…".
 
 enum MealPhotoAnalyzer {
+  private static let modelTimeoutNanoseconds: UInt64 = 18_000_000_000
+
   /// Best-effort analysis. Never throws — returns an empty draft on failure so
   /// the photo still attaches and the user just fills the form by hand.
   static func analyze(imageData: Data) async -> MealPhotoDraft {
-    let model = await MealPhotoModelAnalyzer.analyze(imageData: imageData)
-    let label = labelRung(imageData: imageData)
-    if let model { return model.merging(label) }
-    return label
+    async let label = labelDraft(imageData: imageData)
+    let model = await modelDraft(imageData: imageData)
+    let labelResult = await label
+
+    if let model { return model.merging(labelResult) }
+    return labelResult
+  }
+
+  private static func labelDraft(imageData: Data) async -> MealPhotoDraft {
+    await Task.detached(priority: .userInitiated) {
+      labelRung(imageData: imageData)
+    }.value
+  }
+
+  private static func modelDraft(imageData: Data) async -> MealPhotoDraft? {
+    let race = MealPhotoModelRace()
+    let modelTask = Task(priority: .userInitiated) {
+      let draft = await MealPhotoModelAnalyzer.analyze(imageData: imageData)
+      await race.finish(draft)
+    }
+    let timeoutTask = Task {
+      do {
+        try await Task.sleep(nanoseconds: modelTimeoutNanoseconds)
+      } catch {
+        return
+      }
+      modelTask.cancel()
+      await race.finish(nil)
+    }
+
+    let draft = await race.wait()
+    timeoutTask.cancel()
+    return draft
   }
 
   // MARK: - Rung 2: Vision OCR + barcode (on-device, no Apple Intelligence)
@@ -123,5 +156,26 @@ enum MealPhotoAnalyzer {
     guard let m = re.firstMatch(in: s, range: range), m.numberOfRanges > 1,
           let g = Range(m.range(at: 1), in: s) else { return nil }
     return String(s[g])
+  }
+}
+
+private actor MealPhotoModelRace {
+  private var continuation: CheckedContinuation<MealPhotoDraft?, Never>?
+  private var result: MealPhotoDraft?
+  private var finished = false
+
+  func wait() async -> MealPhotoDraft? {
+    if finished { return result }
+    return await withCheckedContinuation { continuation in
+      self.continuation = continuation
+    }
+  }
+
+  func finish(_ draft: MealPhotoDraft?) {
+    guard !finished else { return }
+    finished = true
+    result = draft
+    continuation?.resume(returning: draft)
+    continuation = nil
   }
 }

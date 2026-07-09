@@ -10,7 +10,7 @@ import Foundation
 //                 Intelligence required). Reads a printed nutrition label.
 //
 // The two are merged (`merging`), model-first with the label filling gaps, so a
-// device without the iOS-27 model still gets a real result from the label rung.
+// device without the iOS-27 model still gets deterministic nutrition-label OCR.
 
 struct MealPhotoDraft: Equatable {
   enum Source: Equatable { case model, label, mixed }
@@ -75,7 +75,13 @@ struct MealPhotoDraft: Equatable {
     out.cholesterolMg = out.cholesterolMg ?? other.cholesterolMg
     out.potassiumMg = out.potassiumMg ?? other.potassiumMg
     out.barcode = out.barcode ?? other.barcode
-    out.source = (isEmpty || other.isEmpty) ? source : .mixed
+    if isEmpty {
+      out.source = other.source
+    } else if other.isEmpty {
+      out.source = source
+    } else {
+      out.source = .mixed
+    }
     return out
   }
 }

@@ -32,8 +32,8 @@ enum OnDeviceAI {
   }
 
   /// True only where the on-device model can accept image input — iOS 27+ with
-  /// Apple Intelligence enabled on an eligible device. Image input is an iOS-27
-  /// symbol, so the actual multimodal call lives behind `#available` in
+  /// Apple Intelligence enabled on an eligible device. Multimodal attachments
+  /// are iOS-27 symbols, so the actual call lives behind `#available` in
   /// `MealPhotoModelAnalyzer`; this flag is the capability gate the meal-photo
   /// ladder checks before trying that rung. False on the 26 SDK / older devices,
   /// where the analyzer falls back to Vision OCR (no Apple Intelligence needed).
