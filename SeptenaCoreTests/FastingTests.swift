@@ -21,7 +21,11 @@ import Foundation
   }
 
   @Test func nilInputsAreFed() {
-    let state = computeFastingState(inputs: nil, calendar: Self.cal)
+    let state = computeFastingState(
+      inputs: nil,
+      now: at(2026, 6, 9, 12, 0),
+      calendar: Self.cal
+    )
     #expect(state == .fed)
     #expect(state.isFasting == false)
   }
