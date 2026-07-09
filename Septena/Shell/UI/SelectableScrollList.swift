@@ -129,7 +129,7 @@ private struct SelectableScrollRowModifier: ViewModifier {
       .id(id)
       .accessibilityElement(children: .contain)
       .accessibilityAddTraits(isSelected ? .isSelected : [])
-      .modifier(SelectableRowGestures(id: id, actions: actions))
+      .modifier(SelectableRowGestures(id: id, isSelected: isSelected, actions: actions))
   }
 }
 
@@ -137,6 +137,7 @@ private struct SelectableScrollRowModifier: ViewModifier {
 /// `NSEvent` read and `septenaOnDoubleClick` overlay don't leak into iOS.
 private struct SelectableRowGestures: ViewModifier {
   let id: String
+  let isSelected: Bool
   let actions: SelectableRowActions
 
   func body(content: Content) -> some View {
@@ -157,7 +158,17 @@ private struct SelectableRowGestures: ViewModifier {
         actions.click(id, currentEventModifiers())
       }
     #else
-    content.onTapGesture { actions.activate(id) }
+    content.onTapGesture {
+      // Regular-width iPad uses the same selection-first model as Mac: first
+      // tap selects, second tap opens. Compact iPhone passes `selectable: false`
+      // and keeps its direct tap-to-open behavior.
+      guard actions.selectable else { actions.activate(id); return }
+      if isSelected {
+        actions.activate(id)
+      } else {
+        actions.click(id, [])
+      }
+    }
     #endif
   }
 }
@@ -439,8 +450,15 @@ struct SelectableScrollList<Content: View>: View {
       )
       scrollRequest = nil
     case nil:
-      // Layout not ready yet — keep the request until row frames land.
+      // Wait for the initial layout pass — before any row has reported a frame,
+      // `nil` only means the list has not measured yet. Once other rows have
+      // frames, though, a missing target is the expected LazyVStack case: the
+      // next keyboard row is beyond the materialized buffer. Ask the proxy to
+      // reveal it so SwiftUI realizes that row; otherwise long Mac lists never
+      // follow selection past the visible region.
       guard viewportHeight > 0 else { return }
+      guard !rowFrames.isEmpty else { return }
+      proxy.scrollTo(request.id, anchor: request.scrollDown ? .bottom : .top)
       scrollRequest = nil
     }
   }

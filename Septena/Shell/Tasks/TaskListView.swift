@@ -16,9 +16,6 @@ struct TaskListView: View {
   /// instead of `client.*` so the UI never blocks on the network and
   /// offline edits survive an app restart.
   @Environment(TaskMutator.self) private var mutator
-  /// CloudKit engine. The SwiftData mirror is refreshed by the engine and
-  /// `load()` re-reads from that local mirror.
-  @Environment(CKEngine.self) private var ckEngine
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
   @Environment(\.modelContext) private var modelContext
@@ -165,6 +162,10 @@ struct TaskListView: View {
 
   @State private var isLoading = false
   @State private var errorMessage: String?
+  /// Every user action and sync notification used to schedule its own complete
+  /// local-store rebuild. A short generation debounce collapses a burst into
+  /// the newest read while keeping optimistic row patches immediate.
+  @State private var loadGeneration: UInt = 0
 
   /// IDs of tasks completed during this view's lifetime. On Project / Area
   /// pages we want to hide historical completions but keep just-completed
@@ -611,9 +612,6 @@ struct TaskListView: View {
       // never fires and `calendarEvents` would otherwise stay empty until the
       // load lands — a visible layout jump.
       refreshCalendarEvents()
-      // Same beat for the Inbox "→ Suggested" capsules — otherwise the top
-      // Inbox rows render chip-less for one frame, then reflow when load() lands.
-      refreshFilingSuggestions()
       Task { await load() }
     }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
@@ -671,7 +669,6 @@ struct TaskListView: View {
       // frame is the "weird rebuild between screens". Mirrors the synchronous
       // correctness the `items`/`storageFilter` getter already gives the rows.
       refreshCalendarEvents()
-      refreshFilingSuggestions()
       Task { await load() }
     }
     // Leaving reorder edit mode drops the selection so nothing stale lingers.
@@ -1035,12 +1032,10 @@ struct TaskListView: View {
     }
     #if os(macOS)
     // Esc fallback when the list itself holds focus (the inline field owns Esc
-    // while editing — see InlineTaskRow; the container's own Esc handler clears a
-    // selection). This catches the in-between: a half-typed rename whose field
-    // lost focus, or a focused quick-add line.
-    //   editing → COMMIT the rename (safer than cancel) · quick-add → blur.
+    // while editing — see InlineTaskRow; the container's own Esc handler clears
+    // a selection). A rename follows the standard cancel contract and reverts.
     .onExitCommand {
-      if let id = editingTitleId, let task = currentTask(id: id) { commitRename(task) }
+      if editingTitleId != nil { endRename() }
       else if inlineFocus != nil { inlineFocus = nil }
       else { clearSelection() }
     }
@@ -2303,14 +2298,9 @@ struct TaskListView: View {
     // `rowVInset` as closed rows).
     .id(task.id)
     .transition(.opacity)
-    #if os(macOS)
-    // Esc folds the editor but LEAVES the task selected — `collapseEdit` only
-    // clears `expandedEditId`, never `selection` (which is already [task.id]).
-    // Handling it here, on the row that hosts the focused field, intercepts Esc
-    // before it reaches the container's `.onExitCommand` (which would clear the
-    // selection), so the now-closed task stays highlighted.
-    .onExitCommand { collapseEdit() }
-    #endif
+    // `TaskComposerCard` owns Escape so it can discard an unsaved draft (with a
+    // confirmation when needed) before this row folds. The selection remains on
+    // the closed row after that shared cancel path.
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
@@ -2463,10 +2453,8 @@ struct TaskListView: View {
       showsDetails: true,
       onToggle: { toggle(task) },
       onCommit: { commitRename(task) },
-      // Esc commits too (safer than a cancel path that can leave a half-torn-down
-      // field with selected text) — it's just another way to finish, like Return
-      // or clicking away. `commitRename` writes only if the title actually changed.
-      onCancel: { commitRename(task) },
+      // Escape cancels a title edit; blur and Return still commit.
+      onCancel: { endRename() },
       onOpenDetails: {
         commitRename(task)
         beginEdit(task)
@@ -3480,6 +3468,18 @@ struct TaskListView: View {
   }
 
   private func load() async {
+    loadGeneration &+= 1
+    let generation = loadGeneration
+    // Completion, filing, drag, and a CK batch frequently land together. The
+    // cache already paints optimistically, so wait a single run-loop beat and
+    // discard every superseded rebuild instead of scanning the task history N
+    // times on the main actor.
+    try? await Task.sleep(nanoseconds: 75_000_000)
+    guard !Task.isCancelled, generation == loadGeneration else { return }
+    performLoad()
+  }
+
+  private func performLoad() {
     // Cache was already painted in init(); only show the loading state when
     // we have literally nothing to render (first ever launch, cache miss).
     if items.isEmpty { isLoading = true }
@@ -3513,23 +3513,9 @@ struct TaskListView: View {
     projects = LocalCache.projects(in: modelContext)
     areas = LocalCache.areas(in: modelContext)
     // Per-project completion ratio for the project pie glyph in mixed-list
-    // headers — computed from the full corpus (not the filter-scoped `items`,
-    // which omits a project's done rows). Mirrors SidebarView's aggregate.
-    do {
-      var done: [String: Int] = [:]
-      var total: [String: Int] = [:]
-      for t in LocalCache.tasksWithProject(in: modelContext) {
-        guard let pid = t.project else { continue }
-        switch t.status {
-        case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
-        case .open: total[pid, default: 0] += 1
-        case .cancelled: break
-        }
-      }
-      progressByProject = total.reduce(into: [:]) { acc, kv in
-        acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-      }
-    }
+    // headers. Aggregate raw entities rather than projecting the whole
+    // historical corpus into row DTOs on every refresh.
+    progressByProject = LocalCache.projectCompletionRatios(in: modelContext)
     if filter == .today {
       // Re-read the Inbox and merge back any just-checked row that's still
       // settling (the `.triage` query drops done tasks), so an accepted
@@ -4444,12 +4430,9 @@ private struct InlineTaskRow: View {
     // direct key press on the focused field and CONSUME it (`.handled`) so it
     // commits here and never reaches the sidebar.
     .onKeyPress(.return) { onCommit(); return .handled }
-    // Esc finishes the edit via `onCancel` (rename → COMMIT, quick-add →
-    // blur) — committing is safer than a discard path. The macOS field
-    // editor swallows Esc before `.onExitCommand` fires, so we catch it as a
-    // key press on the field (a key text input doesn't consume); this tears
-    // the field down, taking its select-all highlight with it. `.onExitCommand`
-    // is kept as a redundant fallback (idempotent).
+    // Escape cancels the inline title edit. The macOS field editor swallows Esc
+    // before a parent sees it, so handle both direct key delivery and AppKit's
+    // exit command on the field itself.
     .onKeyPress(.escape) { onCancel(); return .handled }
     .onExitCommand(perform: onCancel)
     #endif

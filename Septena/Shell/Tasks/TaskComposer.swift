@@ -109,6 +109,9 @@ struct TaskComposerCard: View {
   /// `select` for that pill (keyboard Space/Return on a focused pill). The bar
   /// resets it to nil after acting.
   @State private var pendingPillActivate: TaskAttributeBar.Attribute?
+  /// Escape follows the platform contract: cancel is non-destructive until a
+  /// dirty draft has been explicitly confirmed for discard.
+  @State private var showingKeyboardDiscardConfirmation = false
   /// Autosave guard. Every persistence path (explicit Save, Return-to-save,
   /// or a terminal action that already decided the outcome) flips this so the
   /// `.onDisappear` autosave doesn't double-write or resurrect a deleted task.
@@ -166,9 +169,38 @@ struct TaskComposerCard: View {
   /// same close path `AdaptiveEditScaffold` uses, so terminal actions match.
   private func close() { (onClose ?? adaptiveClose ?? { dismiss() })() }
 
+  private func requestKeyboardCancel() {
+    if isDirty {
+      showingKeyboardDiscardConfirmation = true
+    } else {
+      discard()
+      close()
+    }
+  }
+
+  private func discardAndClose() {
+    discard()
+    close()
+  }
+
   var body: some View {
     presentedContent
       .onAppear(perform: seed)
+      // A task editor is a normal form: Escape cancels rather than silently
+      // saving. On macOS the field editor consumes Escape, so carry both the
+      // AppKit exit command and SwiftUI key press forms.
+      .septenaOnEscape(requestKeyboardCancel)
+      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
+      .confirmationDialog(
+        isEditing ? "Discard changes?" : "Discard new task?",
+        isPresented: $showingKeyboardDiscardConfirmation,
+        titleVisibility: .visible
+      ) {
+        Button("Discard", role: .destructive) { discardAndClose() }
+        Button("Keep Editing", role: .cancel) {}
+      } message: {
+        Text("Your unsaved changes will be lost.")
+      }
       // Safety net: persist on any teardown the buttons didn't already handle
       // (app backgrounded, the inspector toggled shut by the system, a parent
       // removed, or — inline — the row folded). Idempotent via `savedOrSkipped`
@@ -347,6 +379,8 @@ struct TaskComposerCard: View {
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
+      .septenaOnEscape(requestKeyboardCancel)
+      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
   }
 
   /// Notes — an always-editable multi-line field sitting directly under the

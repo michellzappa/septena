@@ -8790,6 +8790,9 @@
     "Your unique handle on feature requests and comments. Leave blank to stay unnamed." : {
 
     },
+    "Your unsaved changes will be lost." : {
+
+    },
     "Zone 2 cardio" : {
       "localizations" : {
         "pt-BR" : {

@@ -20,6 +20,9 @@ struct TasksDestinationView: View {
   /// (see `TaskCelebration`). Optional and nil-safe.
   @Environment(LogCommitCenter.self) private var logCommit: LogCommitCenter?
   @Environment(DayClock.self) private var clock
+  #if os(iOS)
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  #endif
   @AppStorage(SettingsKey.todayShowCompleted) private var showCompleted: Bool = true
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
 
@@ -49,6 +52,15 @@ struct TasksDestinationView: View {
   @State private var editingTask: SeptenaTask?
   /// Row currently open in the composer — drives the selection highlight.
   @State private var selectedId: String?
+  /// The drawer is its own task surface, so it owns focus instead of relying on
+  /// the surrounding SectionDrawer (which may be focused for another section's
+  /// date navigation). This gives Mac and regular-width iPad the same arrows /
+  /// Return / Space / Escape contract as the full Tasks tab.
+  @FocusState private var taskListFocused: Bool
+  /// Keyboard traversal may move past the visible drawer viewport. Keep this
+  /// separate from `selectedId` so pointer selection never re-anchors the
+  /// scroll position just because a user clicked a row.
+  @State private var keyboardScrollTarget: String?
   // Tasks is a dual section: Log = today's actionable list; Patterns = a
   // throughput heatmap of completed tasks over time. Default Log — the list is
   // the everyday surface.
@@ -66,47 +78,147 @@ struct TasksDestinationView: View {
     selectedId = task.id
     editingTask = task
   }
-  /// Row open-tap, matching the deep `TaskListView`:
-  ///   • iOS  — a single tap opens the editor.
-  ///   • macOS — single click stays free (selection / context-menu target);
-  ///     the editor opens on double-click via `.septenaOnDoubleClick` below.
+  /// Row pointer/touch behavior mirrors the deep Tasks list: Mac selects on a
+  /// click and opens on double-click; regular iPad selects first and opens on a
+  /// second tap / Return; compact iPhone retains direct tap-to-edit.
   private func openTap(_ task: SeptenaTask) -> (() -> Void)? {
     #if os(macOS)
-    return nil
+    return { selectedId = task.id }
     #else
-    return { openEdit(task) }
+    return {
+      if horizontalSizeClass == .regular {
+        if selectedId == task.id { openEdit(task) }
+        else { selectedId = task.id }
+      } else {
+        openEdit(task)
+      }
+    }
     #endif
   }
 
+  private var usesSelectionModel: Bool {
+    #if os(macOS)
+    true
+    #else
+    horizontalSizeClass == .regular
+    #endif
+  }
+
+  private var composerIsOpen: Bool { creating || editingTask != nil }
+
+  /// Exact visual order of selectable drawer rows — the keyboard must never
+  /// jump from Inbox to Done while skipping Today.
+  private var keyboardTasks: [SeptenaTask] {
+    triageTasks + openTasks + (showCompleted ? doneTasks : [])
+  }
+
+  private func moveSelection(_ delta: Int) {
+    guard !keyboardTasks.isEmpty else { return }
+    let current = selectedId.flatMap { id in keyboardTasks.firstIndex { $0.id == id } }
+    let index: Int
+    if let current {
+      index = min(max(current + delta, 0), keyboardTasks.count - 1)
+    } else {
+      index = delta > 0 ? 0 : keyboardTasks.count - 1
+    }
+    let id = keyboardTasks[index].id
+    selectedId = id
+    keyboardScrollTarget = id
+  }
+
+  private func activateSelection() {
+    guard let selectedId,
+          let task = keyboardTasks.first(where: { $0.id == selectedId }) else { return }
+    openEdit(task)
+  }
+
+  private func toggleSelection() {
+    guard let selectedId,
+          let task = keyboardTasks.first(where: { $0.id == selectedId }) else { return }
+    if task.isInTriageBand { toggleInbox(task) }
+    else { toggle(task) }
+  }
+
+  private func reclaimTaskListFocus() {
+    guard usesSelectionModel, !composerIsOpen else { return }
+    DispatchQueue.main.async { taskListFocused = true }
+  }
+
+  private func scrollID(for taskID: String) -> String {
+    "tasks-drawer-row-\(taskID)"
+  }
+
   var body: some View {
-    SectionDrawer(sectionKey: "tasks",
-                  title: "Tasks",
-                  quickAdd: DrawerQuickAdd("New task") { openCreate() },
-                  mode: $mode,
-                  log: {
-      logContent
-    }, patterns: {
-      TaskPatternsSection(accent: accent, days: history)
-    })
-    .tint(accent)
-    .environment(promoteFlash)
-    .septenaToastStore(toastStore)
-    .septenaToastOverlay(store: toastStore)
-    .task { reload() }
-    .onChange(of: clock.today) { _, _ in reload() }
+    ScrollViewReader { proxy in
+      SectionDrawer(sectionKey: "tasks",
+                    title: "Tasks",
+                    quickAdd: DrawerQuickAdd("New task") { openCreate() },
+                    mode: $mode,
+                    log: {
+        logContent
+      }, patterns: {
+        TaskPatternsSection(accent: accent, days: history)
+      })
+      .tint(accent)
+      .environment(promoteFlash)
+      .septenaToastStore(toastStore)
+      .septenaToastOverlay(store: toastStore)
+      .task { reload() }
+      .onChange(of: clock.today) { _, _ in reload() }
     // A remote completion (another device checked a Today row) would otherwise
     // only surface on the next reopen, with the row silently gone. Ghost-check
     // it live instead — see `absorbRemoteCompletions`. We deliberately don't
     // full-reload here (that would cancel in-flight local settle beats); other
     // remote edits still fold in on reopen as before.
-    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
-      absorbRemoteCompletions()
-      absorbRemoteArrivals()
-      mergeTaskFieldsFromCache()
-    }
+      .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+        absorbRemoteCompletions()
+        absorbRemoteArrivals()
+        mergeTaskFieldsFromCache()
+      }
     // Host the composer here so it stacks on top of the drawer sheet and
     // dismisses back to it.
-    .taskComposerDrawer(isPresented: composerBinding) { composerCard }
+      .taskComposerDrawer(isPresented: composerBinding) { composerCard }
+      .focusable(usesSelectionModel)
+      .focused($taskListFocused)
+      .focusEffectDisabled()
+      .onAppear { reclaimTaskListFocus() }
+      .onChange(of: composerIsOpen) { _, isOpen in
+        if !isOpen { reclaimTaskListFocus() }
+      }
+      .onChange(of: keyboardScrollTarget) { _, id in
+        guard let id else { return }
+        // With no explicit anchor, ScrollViewReader performs the least
+        // disruptive movement needed to reveal an off-screen target.
+        proxy.scrollTo(scrollID(for: id))
+        keyboardScrollTarget = nil
+      }
+      .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
+        guard usesSelectionModel, !composerIsOpen, mode == .log else { return .ignored }
+        moveSelection(press.key == .downArrow ? 1 : -1)
+        return .handled
+      }
+      .onKeyPress(.return) {
+        guard usesSelectionModel, !composerIsOpen, mode == .log, selectedId != nil else { return .ignored }
+        activateSelection()
+        return .handled
+      }
+      .onKeyPress(.space) {
+        guard usesSelectionModel, !composerIsOpen, mode == .log, selectedId != nil else { return .ignored }
+        toggleSelection()
+        return .handled
+      }
+      .onKeyPress(.escape) {
+        guard usesSelectionModel, !composerIsOpen, selectedId != nil else { return .ignored }
+        selectedId = nil
+        return .handled
+      }
+      #if os(macOS)
+      .onExitCommand {
+        guard !composerIsOpen else { return }
+        selectedId = nil
+      }
+      #endif
+    }
   }
 
   @ViewBuilder
@@ -129,6 +241,7 @@ struct TasksDestinationView: View {
                               projects: projects, mutator: mutator,
                               onOpenDetail: { openEdit($0) },
                               onChange: { reloadAnimated() })
+              .id(scrollID(for: task.id))
           }
         }
       }
@@ -149,6 +262,7 @@ struct TasksDestinationView: View {
                               onOpenDetail: { openEdit($0) },
                               onChange: { reloadAnimated() })
               .transition(.opacity)
+              .id(scrollID(for: task.id))
           }
         }
       }
@@ -168,6 +282,7 @@ struct TasksDestinationView: View {
                               projects: projects, mutator: mutator,
                               onOpenDetail: { openEdit($0) },
                               onChange: { reloadAnimated() })
+              .id(scrollID(for: task.id))
           }
         }
       }
