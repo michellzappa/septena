@@ -1,5 +1,5 @@
 import Foundation
-#if compiler(>=6.3)
+#if compiler(>=6.4)
 import FoundationModels
 import ImageIO
 #endif
@@ -8,7 +8,8 @@ import ImageIO
 // on-device Foundation Model. Image input is an iOS-27 symbol family
 // (`Attachment`, `ImageAttachmentContent`, `ImageReference`) that does NOT
 // exist in the iOS-26 SDK. It compiles on 26 because the implementation is
-// guarded by `#if compiler(>=6.3)`.
+// guarded by `#if compiler(>=6.4)`, the first Swift compiler bundled with the
+// iOS-27/Xcode-27 SDK.
 //
 // Current Apple docs checked 2026-07-09:
 //   • `Attachment(CGImage, orientation:)` is iOS 27 beta, and `.label(_:)`
@@ -18,14 +19,14 @@ import ImageIO
 // Vision OCR/barcode runs as a separate deterministic rung in `MealPhotoAnalyzer`;
 // the model turn stays image-only so beta tool calls cannot hold the form open.
 // Until Xcode 27 is selected, the implementation below is skipped by
-// `#if compiler(>=6.3)` so this repo still builds with the local 26 SDK.
+// `#if compiler(>=6.4)` so this repo still builds with the local 26 SDK.
 
 enum MealPhotoModelAnalyzer {
   /// Analyze a meal photo with the on-device multimodal model. Returns nil when
   /// the platform/model can't do it — the caller falls back to the label rung.
   static func analyze(imageData: Data) async -> MealPhotoDraft? {
     guard await OnDeviceAI.supportsImageInput else { return nil }
-    #if compiler(>=6.3)
+    #if compiler(>=6.4)
     if #available(iOS 27, macOS 27, *) {
       return await analyzeWithFoundationModels(imageData: imageData)
     }
@@ -34,7 +35,7 @@ enum MealPhotoModelAnalyzer {
   }
 }
 
-#if compiler(>=6.3)
+#if compiler(>=6.4)
 @available(iOS 27, macOS 27, *)
 private extension MealPhotoModelAnalyzer {
   static func analyzeWithFoundationModels(imageData: Data) async -> MealPhotoDraft? {
