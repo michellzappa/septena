@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1401,
+      "build": 1405,
       "date": "2026-07-10",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Your calendar now lives in Today and Upcoming",
-          "detail": "Opt-in system-calendar events weave into your task lists so your day and your schedule are in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Organize projects with headings and drag-to-file",
-          "detail": "Add section headings inside a project and drag tasks onto Today groups or areas to re-home them.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recover deleted tasks and import from Things",
-          "detail": "A Recently Deleted view keeps tasks for 30 days with one-tap restore, and you can import an existing Things database.",
-          "section": "tasks"
-        },
-        {
-          "title": "Multi-select and bulk-edit your tasks",
-          "detail": "Select several tasks at once to complete, move, copy, or file them together, with undo toasts throughout.",
-          "section": "tasks"
-        },
-        {
-          "title": "Snap a photo to log a meal",
-          "detail": "On-device analysis reads the picture and prefills the meal's fields, and you can re-log past meals scaled by amount.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and Septena reads the food and prefills macros on-device, with a fast label fallback.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training reviews and progression",
-          "detail": "See effort-weighted muscle volume with a post-session weekly review, get one-tap progression hints on strength sets, and follow an auto-advancing rest flow with a watch Live Activity.",
+          "title": "Project headings and drag-to-organize tasks",
+          "detail": "Group work with section headings inside a project, and drag tasks onto Today groups or areas to re-home them.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recently Deleted with restore",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days with one-tap undo before they auto-purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events in your day",
+          "detail": "Your system calendar now weaves into Today and Upcoming so meetings sit alongside tasks.",
+          "section": "tasks"
+        },
+        {
+          "title": "Multi-select and bulk task actions",
+          "detail": "Select several tasks to complete, move, copy, or file them at once, with an undo toast for delete, move, and defer.",
+          "section": "tasks"
+        },
+        {
+          "title": "A stronger training review",
+          "detail": "Effort-weighted muscle volume, a post-session weekly review, one-tap progression hints, and an auto-advancing rest flow with a Live Activity.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Any measurable goal can sit on the dashboard as its own tile so your targets stay in view.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Pin any measurable goal to keep it front and center as a tile on the week dashboard.",
           "section": "goals"
         },
         {
-          "title": "Choose exactly what analytics you share",
-          "detail": "A graded telemetry ladder (off, minimal, balanced, full) shows what's sent and keeps a recently-sent log, with everything anonymized.",
+          "title": "Graded privacy controls",
+          "detail": "Choose exactly how much analytics you share across Off, Minimal, Balanced, and Full, and see a log of what was recently sent.",
           "section": null
         }
       ]
