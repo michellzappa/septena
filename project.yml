@@ -604,6 +604,7 @@ targets:
           - "**/.DS_Store"
       - path: SeptenaCore/Fasting.swift
       - path: SeptenaCore/DateParser.swift
+      - path: SeptenaCore/Logging.swift
       - path: SeptenaCore/ConsumableContainer.swift
       - path: SeptenaCore/SuggestionBlocks.swift
       - path: SeptenaCore/IntakeModel.swift

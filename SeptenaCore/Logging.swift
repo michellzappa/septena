@@ -12,6 +12,8 @@ import os
 
 extension Notification.Name {
   /// Posted after task mutations and CloudKit task-sync batches complete.
+  /// Local mutations carry `TaskChange.changedIDs`; inbound CloudKit batches
+  /// remain unscoped because a batch can add, delete, and move many rows.
   static let septenaTasksChanged = Notification.Name("septena.tasksChanged")
   /// Posted after area / project structure changes and CloudKit batches
   /// that update those records. Lets task-centric views avoid reloading
@@ -37,6 +39,25 @@ extension Notification.Name {
   static let septenaClaudeGatewayChanged = Notification.Name("septena.claudeGatewayChanged")
 }
 
+// MARK: - Scoped task changes
+
+/// Identity scoping for local task mutations. This is intentionally separate
+/// from `DataChange`: tasks have their own high-frequency repaint path and a
+/// task list needs to determine whether one changed row can enter or leave its
+/// current filter. An absent payload remains the conservative "reload all"
+/// signal used by CloudKit batches and migrations.
+enum TaskChange {
+  static let idsKey = "septena.changedTaskIDs"
+
+  static func post(_ ids: String...) {
+    NotificationCenter.default.post(
+      name: .septenaTasksChanged,
+      object: nil,
+      userInfo: [idsKey: Set(ids)]
+    )
+  }
+}
+
 // MARK: - Scoped data changes
 
 /// Section scoping for `.septenaDataChanged`. A mutator posts with the
@@ -60,6 +81,12 @@ enum DataChange {
 }
 
 extension Notification {
+  /// Changed task ids for a local optimistic mutation; nil for an unscoped
+  /// batch where any task may have changed.
+  var changedTaskIDs: Set<String>? {
+    userInfo?[TaskChange.idsKey] as? Set<String>
+  }
+
   /// Section keys this `.septenaDataChanged` touched; nil for an unscoped
   /// post (treat as "everything changed").
   var changedSections: Set<String>? {

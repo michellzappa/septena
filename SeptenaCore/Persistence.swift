@@ -3697,6 +3697,24 @@ enum LocalCache {
     return result
   }
 
+  /// Point-read used to decide whether a scoped local mutation can affect an
+  /// already-visible task list. The lookup is limited in SwiftData; matching
+  /// reuses the same filter conversion as list rendering so a task moving into
+  /// or out of a filter is never missed.
+  @MainActor
+  static func taskMatches(id: String, filter: TaskFilter,
+                          in context: ModelContext) -> Bool {
+    var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    descriptor.fetchLimit = 1
+    guard let entity = try? context.fetch(descriptor).first else { return false }
+    let today = SeptenaDate.today
+    if filter == .today {
+      return convert(entity, filter: .today, today: today) != nil
+        || convert(entity, filter: .triage, today: today) != nil
+    }
+    return convert(entity, filter: filter, today: today) != nil
+  }
+
   /// One row through the filter: nil when the row doesn't belong to `filter`,
   /// the wire DTO when it does. Extracted from the inline closure above so
   /// the (key, id) decoration stays readable.

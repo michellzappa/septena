@@ -635,6 +635,7 @@ struct TaskListView: View {
     // Debounced: a single mutation can fan out several `.septenaTasksChanged`
     // posts (local save + CK batch + Spotlight). Coalesce like the sidebar.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
+      .filter { taskChangeMayAffectCurrentList($0) }
       .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
       Task { await load() }
     }
@@ -3579,6 +3580,16 @@ struct TaskListView: View {
     }
     refreshCalendarEvents()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
+  }
+
+  /// Scoped local changes can skip an unrelated task list; unscoped CloudKit
+  /// batches always repaint. A row already visible may have left the filter;
+  /// a point-read catches a row that just entered it.
+  private func taskChangeMayAffectCurrentList(_ note: Notification) -> Bool {
+    guard let ids = note.changedTaskIDs else { return true }
+    let visible = Set((triageItems + items + review + doneToday).map(\.id))
+    if !visible.isDisjoint(with: ids) { return true }
+    return ids.contains { LocalCache.taskMatches(id: $0, filter: filter, in: modelContext) }
   }
 
   /// Pull the day's calendar events for the lists that show them (Today,

@@ -81,7 +81,7 @@ final class CloudKitTasksBackend {
       engine.noteTaskChange(id: id)
       SeptenaLog.info("[CK] \(op) id=\(id) title=\"\(title)\" → engine.noteTaskChange")
     }
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    TaskChange.post(id)
   }
 
   // MARK: Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
@@ -207,7 +207,7 @@ final class CloudKitTasksBackend {
     if deferPush {
       do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
       SeptenaLog.info("[CK] create(deferred) id=\(id) title=\"\(title)\" — engine push held until first update")
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      TaskChange.post(id)
     } else {
       commitAndPush(entity, op: "create")
     }
@@ -310,7 +310,7 @@ final class CloudKitTasksBackend {
     if neverPushed {
       do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
       SeptenaLog.info("[CK] purge(local-only) id=\(id) — was never pushed, skipping engine")
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      TaskChange.post(id)
     } else {
       commitAndPush(staged, op: "purge", deletion: true)
     }
