@@ -132,13 +132,6 @@ struct TasksDestinationView: View {
     openEdit(task)
   }
 
-  private func toggleSelection() {
-    guard let selectedId,
-          let task = keyboardTasks.first(where: { $0.id == selectedId }) else { return }
-    if task.isInTriageBand { toggleInbox(task) }
-    else { toggle(task) }
-  }
-
   private func reclaimTaskListFocus() {
     guard usesSelectionModel, !composerIsOpen else { return }
     DispatchQueue.main.async { taskListFocused = true }
@@ -200,11 +193,6 @@ struct TasksDestinationView: View {
       .onKeyPress(.return) {
         guard usesSelectionModel, !composerIsOpen, mode == .log, selectedId != nil else { return .ignored }
         activateSelection()
-        return .handled
-      }
-      .onKeyPress(.space) {
-        guard usesSelectionModel, !composerIsOpen, mode == .log, selectedId != nil else { return .ignored }
-        toggleSelection()
         return .handled
       }
       .onKeyPress(.escape) {

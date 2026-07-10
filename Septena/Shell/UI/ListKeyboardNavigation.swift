@@ -7,8 +7,9 @@ import SwiftUI
 // The model is deliberately thin and leans on native `List(selection:)`:
 //   • The list takes programmatic focus on appear, so ↑↓ run native
 //     `List(selection:)` row traversal with no custom key handling.
-//   • Return / Space / Escape map to the surface's own activate / toggle /
-//     clear handlers.
+//   • Return / Escape map to the surface's own activate / clear handlers.
+//     List completion stays on the explicit ⌘K Task-menu command, so Space
+//     remains available to focused controls.
 //   • While a text field or composer owns the keyboard (`inputActive`), those
 //     three keys are forwarded to that field instead of the list; when it flips
 //     back to false we reclaim focus on the next runloop (the editor steals it
@@ -21,7 +22,7 @@ import SwiftUI
 // can't fire on a bare keypress.
 private struct ListKeyboardNavigation: ViewModifier {
   /// True while a text field / composer owns the keyboard. Suppresses the
-  /// list's Return/Space/Escape so typing isn't hijacked, and — on its
+  /// list's Return/Escape so typing isn't hijacked, and — on its
   /// falling edge — triggers a focus-reclaim so ↑↓ keep selecting.
   let inputActive: Bool
   /// When false, the surface is off-screen (another tab, a covered route).
@@ -29,7 +30,6 @@ private struct ListKeyboardNavigation: ViewModifier {
   let isActive: Bool
   let hasSelection: Bool
   let onReturn: () -> Void
-  let onSpace: () -> Void
   let onEscape: () -> Void
 
   @FocusState private var listFocused: Bool
@@ -53,11 +53,6 @@ private struct ListKeyboardNavigation: ViewModifier {
         onReturn()
         return .handled
       }
-      .onKeyPress(.space) {
-        guard !inputActive, hasSelection else { return .ignored }
-        onSpace()
-        return .handled
-      }
       .onKeyPress(.escape) {
         guard !inputActive, hasSelection else { return .ignored }
         onEscape()
@@ -68,14 +63,13 @@ private struct ListKeyboardNavigation: ViewModifier {
 
 extension View {
   /// Make a selectable `List` keyboard-driven: focusable for native ↑↓
-  /// traversal, with Return / Space / Escape wired to the surface's handlers.
+  /// traversal, with Return / Escape wired to the surface's handlers.
   /// See `ListKeyboardNavigation`.
   func listKeyboardNavigation(
     inputActive: Bool,
     isActive: Bool = true,
     hasSelection: Bool,
     onReturn: @escaping () -> Void,
-    onSpace: @escaping () -> Void,
     onEscape: @escaping () -> Void
   ) -> some View {
     modifier(ListKeyboardNavigation(
@@ -83,7 +77,6 @@ extension View {
       isActive: isActive,
       hasSelection: hasSelection,
       onReturn: onReturn,
-      onSpace: onSpace,
       onEscape: onEscape
     ))
   }

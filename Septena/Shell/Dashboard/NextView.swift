@@ -440,15 +440,14 @@ struct NextView: View {
     .septenaNeutralListSelection()
     // Keyboard navigation, the same shared contract the Tasks tab uses
     // (`listKeyboardNavigation`): the List is focusable so ↑↓ move the native
-    // selection cursor across every tagged row; Return activates, Space
-    // toggles, Escape clears. Suppressed while a modal editor owns the
-    // keyboard so its fields keep Return/Space.
+    // selection cursor across every tagged row; Return activates and Escape
+    // clears. ⌘K is the explicit completion command. Suppressed while a modal
+    // editor owns the keyboard so its fields keep Return.
     .listKeyboardNavigation(
       inputActive: keyboardInputActive,
       isActive: keyboardNavActive,
       hasSelection: !selection.isEmpty,
       onReturn: activateSelection,
-      onSpace: toggleSelection,
       onEscape: { selection = [] }
     )
     .septenaOnEscape { selection = [] }
@@ -539,4 +538,3 @@ struct NextView: View {
     .iPadReportsNavDepth(id: "next", atRoot: true)
   }
 }
-

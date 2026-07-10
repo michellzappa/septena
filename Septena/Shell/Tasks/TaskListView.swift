@@ -65,6 +65,10 @@ struct TaskListView: View {
   @State private var doneTodayStorage: [SeptenaTask] = []
   @State private var triageStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
+  /// The archive is deliberately incremental: 1,000 completed tasks should
+  /// not be decoded, sorted, and rendered just to open the Logbook.
+  private static let logbookPageSize = 100
+  @State private var logbookLimit = logbookPageSize
 
   @State private var areas: [Area]
   @State private var projects: [Project]
@@ -115,12 +119,22 @@ struct TaskListView: View {
     get {
       storageFilter == filter
         ? itemsStorage
-        : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: filter)
+        : localTasks()
     }
     nonmutating set {
       itemsStorage = newValue
       storageFilter = filter
     }
+  }
+
+  /// The visible archive window. All other filters stay unbounded because
+  /// their task sets are actionable lists rather than long-lived history.
+  private func localTasks() -> [SeptenaTask] {
+    LocalCache.tasks(
+      in: modelContext,
+      filter: filter,
+      limit: filter == .logbook ? logbookLimit : nil
+    )
   }
 
   private var review: [SeptenaTask] {
@@ -645,7 +659,8 @@ struct TaskListView: View {
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear
     // session-scoped state and re-trigger the network refresh.
-    .onChange(of: filter) { _, _ in
+    .onChange(of: filter) { old, _ in
+      if old == .logbook { logbookLimit = Self.logbookPageSize }
       sessionDoneIds = []
       sessionCreatedIds = []
       settle.cancelAll()
@@ -990,7 +1005,6 @@ struct TaskListView: View {
       inputActive: listInputActive,
       selectable: usesSelectionModel,
       onActivate: activateRow,
-      onToggle: toggleRow,
       onClear: { closeEditOrClearSelection() },
       scrollToTick: scrollToTargetTick,
       scrollToID: scrollToTargetID,
@@ -1327,7 +1341,22 @@ struct TaskListView: View {
   // floating keyboard accessory / batch bar are `.safeAreaInset`s, so the
   // scroll content already insets for them while editing — this is just a
   // tidy end-of-list margin, not the 240pt dead-zone it used to be.
+  @ViewBuilder
   private var taskListFooter: some View {
+    if filter == .logbook, items.count == logbookLimit {
+      Button("Show \(Self.logbookPageSize) More") {
+        logbookLimit += Self.logbookPageSize
+        Task { await load() }
+      }
+      .buttonStyle(PlainHoverRowButtonStyle())
+      .font(.septenaMeta)
+      .foregroundStyle(Theme.inkSecondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.horizontal, TaskCardMetrics.headerLeading)
+      .padding(.vertical, 12)
+      .asListRow()
+    }
+
     Color.clear
       .frame(minHeight: 96)
       .contentShape(Rectangle())
@@ -2252,7 +2281,9 @@ struct TaskListView: View {
       expandedEditorRow(task)
     } else {
       row(task, quickMenu: quickMenu)
-        .asTaskRow(id: task.id, isSelected: selection.contains(task.id))
+        .asTaskRow(id: task.id,
+                   isSelected: selection.contains(task.id),
+                   isComplete: task.status == .done)
     }
   }
 
@@ -3500,7 +3531,7 @@ struct TaskListView: View {
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
     let prior = items
-    let local = LocalCache.tasks(in: modelContext, filter: filter)
+    let local = localTasks()
     let ghost = ghostCheckRemoteCompletions(prior: prior, fresh: local)
     let merged = preservingSettling(fresh: local, prior: ghost.rows)
     let arrived = remoteArrivingIDs(prior: prior, fresh: local)
@@ -3515,7 +3546,11 @@ struct TaskListView: View {
     // Per-project completion ratio for the project pie glyph in mixed-list
     // headers. Aggregate raw entities rather than projecting the whole
     // historical corpus into row DTOs on every refresh.
-    progressByProject = LocalCache.projectCompletionRatios(in: modelContext)
+    if filter == .today || filter == .unscheduled {
+      progressByProject = LocalCache.projectCompletionRatios(in: modelContext)
+    } else if !progressByProject.isEmpty {
+      progressByProject = [:]
+    }
     if filter == .today {
       // Re-read the Inbox and merge back any just-checked row that's still
       // settling (the `.triage` query drops done tasks), so an accepted
@@ -4084,357 +4119,5 @@ struct TaskListRowContextMenu: View {
 
   private var deleteLabel: String {
     count > 1 ? "Delete Tasks" : "Delete"
-  }
-}
-
-
-// MARK: - Focused values for the menu-bar "Task" commands
-//
-// TaskListView publishes a `TaskActions` value while it's the focused
-// scene; the CommandMenu reads it via `@FocusedValue` and exposes each
-// action as a real menu item with its keyboard shortcut. This replaces
-// the older pattern of attaching hidden `Button(...)`s in `.background()`,
-// which gave us shortcuts but no menu visibility.
-
-struct TaskActions {
-  var newTask: () -> Void
-  var toggleToday: (() -> Void)?
-  var openWhen: (() -> Void)?
-  var openDeadline: (() -> Void)?
-  var openMove: (() -> Void)?
-  /// Toggles done/open on the selected row(s) — same handler as Space.
-  var toggleComplete: (() -> Void)?
-  var delete: (() -> Void)?
-  var clearSchedule: (() -> Void)?
-  var editDetails: (() -> Void)?
-  var duplicate: (() -> Void)?
-  var copy: (() -> Void)?
-}
-
-private struct TaskActionsKey: FocusedValueKey {
-  typealias Value = TaskActions
-}
-
-extension FocusedValues {
-  var taskActions: TaskActions? {
-    get { self[TaskActionsKey.self] }
-    set { self[TaskActionsKey.self] = newValue }
-  }
-}
-
-// MARK: - Grouped-card chrome (sectioned task lists)
-//
-// On the sectioned lists (Today / Unscheduled) rows ride in rounded cards on the
-// gray canvas — the same grouped-card look as the sidebar / Next homes (a flat
-// white list read as "broken" once it had section headers, and whitespace alone
-// couldn't carry the grouping on the phone). Each row paints a slice of its
-// group's card behind itself; only the first/last row in a group round their
-// outer corners, so a run of rows reads as ONE continuous card with hairline
-// separators between them. The rows are NOT nested in a container — they stay
-// direct children of the scroll list, so selection / drag / keyboard nav are
-// completely untouched.
-
-enum TaskCardPosition {
-  case solo, top, middle, bottom
-  init(index: Int, count: Int) {
-    if count <= 1            { self = .solo }
-    else if index == 0       { self = .top }
-    else if index == count-1 { self = .bottom }
-    else                     { self = .middle }
-  }
-}
-
-/// Card geometry, shared by the row chrome, the group headers, and the inline
-/// editor so all three line up and match every other grouped page in the app.
-enum TaskCardMetrics {
-  /// Card margin off the screen edge — the app-wide page gutter (sidebar / Next /
-  /// every section destination use this, so the task cards sit at the same X).
-  static let margin = Theme.pageGutter
-  /// Row content inset INSIDE the card. Tucked a little tighter than the drawer
-  /// cards' `Spacing.xl` (16) so the checkbox, title, and full-width divider sit
-  /// closer to the card's leading edge — a calmer, less-indented Today list.
-  static let contentInset: CGFloat = 10
-  static let radius: CGFloat = 14
-  /// Leading X of a row's checkbox (and so the group header's icon, which is the
-  /// same `checkboxTap`-wide column) from the screen edge: the card margin plus
-  /// the in-card content inset. Headers park their icon here so it sits exactly
-  /// over the checkbox below.
-  static let headerLeading = margin + contentInset
-  /// Gap below each card so consecutive cards don't jam together. Headed groups
-  /// add their header's top padding on top of this.
-  static let groupGap = Theme.Spacing.sm
-}
-
-private struct TaskMoveDrop: ViewModifier {
-  let perform: ((_ ids: [String]) -> Bool)?
-  @State private var isTargeted = false
-
-  func body(content: Content) -> some View {
-    if let perform {
-      content
-        .background(
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
-            .animation(.easeOut(duration: 0.12), value: isTargeted)
-        )
-        .onDrop(of: [.septenaTaskDragIDs],
-                delegate: TaskMoveDropDelegate(isTargeted: $isTargeted,
-                                               perform: perform))
-    } else {
-      content
-    }
-  }
-}
-
-private struct TaskMoveDropDelegate: DropDelegate {
-  @Binding var isTargeted: Bool
-  let perform: (_ ids: [String]) -> Bool
-
-  func validateDrop(info: DropInfo) -> Bool {
-    info.hasItemsConforming(to: [.septenaTaskDragIDs])
-  }
-
-  func dropEntered(info: DropInfo) {
-    isTargeted = true
-  }
-
-  func dropUpdated(info: DropInfo) -> DropProposal? {
-    isTargeted = true
-    return DropProposal(operation: .move)
-  }
-
-  func dropExited(info: DropInfo) {
-    isTargeted = false
-  }
-
-  func performDrop(info: DropInfo) -> Bool {
-    isTargeted = false
-    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
-    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
-      guard let data,
-            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
-            !payload.ids.isEmpty
-      else { return }
-      DispatchQueue.main.async { _ = perform(payload.ids) }
-    }
-    return true
-  }
-}
-
-private struct TaskCardChrome: ViewModifier {
-  let position: TaskCardPosition
-  var isSelected: Bool = false
-  @State private var hovered = false
-
-  func body(content: Content) -> some View {
-    let r = TaskCardMetrics.radius
-    let topR = (position == .top || position == .solo) ? r : 0
-    let botR = (position == .bottom || position == .solo) ? r : 0
-    let shape = UnevenRoundedRectangle(
-      topLeadingRadius: topR, bottomLeadingRadius: botR,
-      bottomTrailingRadius: botR, topTrailingRadius: topR,
-      style: .continuous)
-    content
-      // Row content rides at the card's inner inset (matches DrawerSection rows).
-      .environment(\.rowHInset, TaskCardMetrics.contentInset)
-      .background(alignment: .bottom) {
-        ZStack(alignment: .bottom) {
-          // The selected row's highlight IS the cell fill — edge-to-edge within
-          // the card, taking the card's own corners (only the first/last row
-          // round) — so it reads as "this row is selected", not a rounded capsule
-          // floating on top of the row.
-          shape
-            .fill(isSelected ? Theme.listSelectionFill : Theme.cardSurface)
-          // Pointer hover — faint background wash only, suppressed while selected.
-          if hovered && !isSelected {
-            shape.fill(Color.primary.opacity(Theme.pointerHoverOpacity))
-          }
-          // Hairline between rows, dropped against a selected cell (native lists
-          // hide the rule adjacent to the highlight). Spans the full card width
-          // (no leading inset) so it reads as a clean row divider, not an
-          // indented text underline.
-          if (position == .top || position == .middle) && !isSelected {
-            Rectangle()
-              .fill(Theme.border)
-              .frame(height: 0.5)
-          }
-        }
-      }
-      // Card margin off the screen edge (content shifts in with it).
-      .padding(.horizontal, TaskCardMetrics.margin)
-      // Only the last row of a card carries the gap, so the rows within a card
-      // stay flush (one continuous card) while groups separate.
-      .padding(.bottom, (position == .bottom || position == .solo) ? TaskCardMetrics.groupGap : 0)
-      .onHover { hovered = $0 }
-  }
-}
-
-extension View {
-  func taskCardChrome(_ position: TaskCardPosition, isSelected: Bool = false) -> some View {
-    modifier(TaskCardChrome(position: position, isSelected: isSelected))
-  }
-}
-
-// MARK: - List row chrome helper
-//
-// Every row we draw inside the List should opt out of the default
-// separator / row background / row insets so our existing row composition
-// (selection pill, padding, full-bleed action icons) lines up exactly the
-// way it did inside the old LazyVStack. Non-task rows also opt out of List
-// selection so keyboard traversal lands only on tagged task rows.
-// Used in `body` directly and inside the grouping helpers.
-
-extension View {
-  // The Tasks list renders in a `SelectableScrollList` (ScrollView/LazyVStack)
-  // on EVERY platform now — never a native `List`. That's the only way to host
-  // an inline-editable row on macOS without the List focus/selection
-  // corruption, and keeping one container across iPhone/iPad/Mac is what makes
-  // the editing model "identical components" everywhere. These three helpers
-  // therefore drop all the old `List`-cell chrome (separators / row insets /
-  // selection suppression) — a LazyVStack row is just a full-width view.
-
-  /// A non-selectable full-bleed row (footer spacer, quick-add line, headers).
-  func asListRow() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  /// A selectable task row — neutral capsule highlight, `.isSelected` a11y, and
-  /// click/tap selection routed through the container (see `selectableScrollRow`).
-  func asTaskRow(id: String, isSelected: Bool) -> some View {
-    selectableScrollRow(id: id, isSelected: isSelected)
-  }
-
-  /// A non-selectable decorative row (section hairlines, banners, empty states).
-  func plainListChrome() -> some View {
-    frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
-// MARK: - Inline editable task line
-//
-// The shared atom behind in-place rename rows. The quick-add footer is now a
-// separate `QuickAddTriggerRow` that opens the full inline editor.
-
-// Pure visual — no `Button`. Interaction is driven by the row it sits in:
-// as a *selectable* row (the primary slot) its click/double-click/tap/Return all
-// route through the container's `onActivate` → `startCreate()`, exactly like a
-// task row; as a plain secondary slot the caller attaches a tap gesture. This is
-// what makes the "New task" line keyboard-selectable and Return-activatable
-// without a bespoke code path (see `activateRow`).
-private struct QuickAddTriggerRow: View {
-  @Environment(\.rowHInset) private var rowHInset
-  @Environment(\.rowVInset) private var rowVInset
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: false, dashed: TaskRowFlags.languageV2,
-                   isToday: false, onToggle: {})
-        // Decorative here — let taps fall through to the row's selection gesture
-        // instead of the checkbox's own (empty) button.
-        .allowsHitTesting(false)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-      Text("New task")
-        .font(.septenaTaskTitle)
-        .foregroundStyle(Theme.inkSecondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, rowVInset)
-    .contentShape(Rectangle())
-    .accessibilityElement(children: .combine)
-    .accessibilityLabel("New task")
-    .accessibilityAddTraits(.isButton)
-  }
-}
-
-// MARK: - Inline rename row
-
-private struct InlineTaskRow: View {
-  @Binding var text: String
-  let placeholder: String
-  let accent: Color
-  let isDone: Bool
-  var isToday: Bool = false
-  var dashed: Bool = false
-  @FocusState.Binding var focus: TaskListView.InlineFocus?
-  let focusValue: TaskListView.InlineFocus
-  /// Show the trailing ⓘ Details button (rename rows on iOS use it to escalate
-  /// to the full composer; the quick-add line doesn't).
-  var showsDetails: Bool = false
-  /// Rename rows grow to match wrapped static titles; the quick-add line stays
-  /// one row tall (a vertical-axis field reserves blank lines above the placeholder).
-  var allowsMultiline: Bool = true
-  let onToggle: () -> Void
-  let onCommit: () -> Void
-  let onCancel: () -> Void
-  var onOpenDetails: (() -> Void)? = nil
-
-  @Environment(\.rowHInset) private var rowHInset
-  @Environment(\.rowVInset) private var rowVInset
-
-  var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-      TaskCheckbox(isDone: isDone, dashed: dashed, isToday: isToday, onToggle: onToggle)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
-
-      titleField
-        .frame(maxWidth: .infinity, alignment: .leading)
-
-      if showsDetails, let onOpenDetails {
-        Button(action: onOpenDetails) {
-          Image(systemName: "info.circle")
-            .font(.body)
-            .foregroundStyle(accent)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Edit details")
-      }
-    }
-    .padding(.horizontal, rowHInset)
-    .padding(.vertical, rowVInset)
-    .contentShape(Rectangle())
-  }
-
-  @ViewBuilder
-  private var titleField: some View {
-    Group {
-      if allowsMultiline {
-        TextField(placeholder, text: $text, axis: .vertical)
-          .lineLimit(1...4)
-      } else {
-        TextField(placeholder, text: $text)
-          .lineLimit(1)
-      }
-    }
-    .textFieldStyle(.plain)
-    .font(.septenaTaskTitle)
-    .foregroundStyle(Theme.inkPrimary)
-    .focused($focus, equals: focusValue)
-    .submitLabel(.done)
-    .onSubmit(onCommit)
-    #if os(iOS)
-    // A vertical-axis TextField wraps long titles (so the editor grows to
-    // match the now-multiline static row), but on iOS the Return key inserts
-    // a newline instead of firing `.onSubmit`. We want Return to COMMIT, as
-    // it did single-line: catch the inserted newline, strip it, and commit.
-    // Soft visual wraps don't insert "\n", so only a real Return triggers this.
-    .onChange(of: text) { _, newValue in
-      guard allowsMultiline, newValue.contains("\n") else { return }
-      text = newValue.replacingOccurrences(of: "\n", with: "")
-      onCommit()
-    }
-    #endif
-    #if os(macOS)
-    // Return saves. `.onSubmit` alone leaks Return to the sidebar (it acts as
-    // the NavigationSplitView default action), so we ALSO catch Return as a
-    // direct key press on the focused field and CONSUME it (`.handled`) so it
-    // commits here and never reaches the sidebar.
-    .onKeyPress(.return) { onCommit(); return .handled }
-    // Escape cancels the inline title edit. The macOS field editor swallows Esc
-    // before a parent sees it, so handle both direct key delivery and AppKit's
-    // exit command on the field itself.
-    .onKeyPress(.escape) { onCancel(); return .handled }
-    .onExitCommand(perform: onCancel)
-    #endif
   }
 }

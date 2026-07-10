@@ -15,6 +15,36 @@ enum TaskRowShortcuts {
   static let delete = KeyboardShortcut(.delete, modifiers: .command)
 }
 
+/// Commands published by the focused task list. The menu bar and the iPad
+/// shortcut HUD consume this shared contract; `TaskListView` supplies only the
+/// handlers for its current selection.
+struct TaskActions {
+  var newTask: () -> Void
+  var toggleToday: (() -> Void)?
+  var openWhen: (() -> Void)?
+  var openDeadline: (() -> Void)?
+  var openMove: (() -> Void)?
+  /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘K
+  /// Task-menu command.
+  var toggleComplete: (() -> Void)?
+  var delete: (() -> Void)?
+  var clearSchedule: (() -> Void)?
+  var editDetails: (() -> Void)?
+  var duplicate: (() -> Void)?
+  var copy: (() -> Void)?
+}
+
+private struct TaskActionsKey: FocusedValueKey {
+  typealias Value = TaskActions
+}
+
+extension FocusedValues {
+  var taskActions: TaskActions? {
+    get { self[TaskActionsKey.self] }
+    set { self[TaskActionsKey.self] = newValue }
+  }
+}
+
 /// Menu-bar items for row-level actions. The handlers live on
 /// `TaskListView`; this view reads them from `FocusedValues.taskActions`
 /// so the items light up only while a task list is the focused scene.
@@ -83,7 +113,7 @@ struct TaskCommandsMenu: View {
 /// Only checklist-toggle is exposed here — the rest of the Task menu stays
 /// task-list-only so ⌘T / ⌘S / … don't silently no-op on a habit row.
 struct NextListActions {
-  /// Toggles done/open on the selected row — same handler as Space.
+  /// Toggles done/open on the selected row — invoked by ⌘K.
   var toggleComplete: (() -> Void)?
 }
 

@@ -15,7 +15,9 @@ import AppKit
 //   • Selection — click / ⌘-click (toggle) / ⇧-click (range), a `Set<String>`
 //     that stays the single source of truth, exactly like `List(selection:)`.
 //   • Keyboard traversal — ↑/↓ move a cursor, ⇧+↑/↓ extend the range, ⌘+↑/↓
-//     jump to the ends; Return activates, Space toggles, Esc clears. Arrow keys
+//     jump to the ends; Return activates and Esc clears. ⌘K is the explicit
+//     Task-menu completion command; bare Space remains available to focused
+//     controls. Arrow keys
 //     nudge the cursor row into view only when it would clip — no viewport
 //     re-anchoring while the row is already on-screen.
 //   • The neutral selection capsule — reuses `SelectableListRowBackground`, the
@@ -103,14 +105,20 @@ extension View {
   ///
   /// The visual chrome is identical to a `List` row because it uses the very
   /// same `SelectableListRowBackground`; only the container differs.
-  func selectableScrollRow(id: String, isSelected: Bool) -> some View {
-    modifier(SelectableScrollRowModifier(id: id, isSelected: isSelected))
+  func selectableScrollRow(id: String,
+                           isSelected: Bool,
+                           isComplete: Bool? = nil) -> some View {
+    modifier(SelectableScrollRowModifier(id: id,
+                                         isSelected: isSelected,
+                                         isComplete: isComplete))
   }
 }
 
 private struct SelectableScrollRowModifier: ViewModifier {
   let id: String
   let isSelected: Bool
+  /// nil for non-task selectable rows such as the quick-add trigger.
+  let isComplete: Bool?
   @Environment(\.selectableRowActions) private var actions
 
   func body(content: Content) -> some View {
@@ -128,8 +136,16 @@ private struct SelectableScrollRowModifier: ViewModifier {
       }
       .id(id)
       .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("septena.task.row.\(id)")
+      .accessibilityValue(accessibilityState)
       .accessibilityAddTraits(isSelected ? .isSelected : [])
       .modifier(SelectableRowGestures(id: id, isSelected: isSelected, actions: actions))
+  }
+
+  private var accessibilityState: String {
+    let selection = isSelected ? "selected" : "not selected"
+    guard let isComplete else { return selection }
+    return "\(selection), \(isComplete ? "completed" : "open")"
   }
 }
 
@@ -197,8 +213,6 @@ struct SelectableScrollList<Content: View>: View {
   var selectable: Bool = true
   /// Return / double-click / single-tap(iOS) on a row.
   var onActivate: (String) -> Void = { _ in }
-  /// Space on the cursor row (typically toggle-complete).
-  var onToggle: (String) -> Void = { _ in }
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
   /// Monotonic tick — parent increments to force-scroll to `scrollToID`.
@@ -325,11 +339,6 @@ struct SelectableScrollList<Content: View>: View {
       .onKeyPress(.return) {
         guard !inputActive, selectable, let id = activeRow else { return .ignored }
         onActivate(id)
-        return .handled
-      }
-      .onKeyPress(.space) {
-        guard !inputActive, selectable, let id = activeRow else { return .ignored }
-        onToggle(id)
         return .handled
       }
       .onKeyPress(.escape) {
