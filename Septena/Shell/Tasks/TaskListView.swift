@@ -2682,14 +2682,28 @@ struct TaskListView: View {
   /// menu's "Suggested" section and the one-tap row chip (chip uses `.first`).
   /// Only two flows: Inbox → area/project, and area-direct → child project.
   /// Tasks already filed into a project are never repositioned.
+  /// A loose, manually-captured Inbox row on Today: no project/area, no dates,
+  /// but `today == true` (so it renders in the Inbox card yet falls outside
+  /// `isInTriageBand`, whose non-agent branch requires `!today`). Mirrors the
+  /// `looseToday` population in `triageSection` so the filing capsule shows for
+  /// self-added Inbox tasks too, not just agent proposals.
+  private func isLooseTodayInboxCapture(_ task: SeptenaTask) -> Bool {
+    filter == .today && task.status == .open
+      && task.scheduled == nil && task.deadline == nil
+      && task.project == nil && task.area == nil && task.today
+  }
+
   private func filingRankedSuggestions(for task: SeptenaTask) -> [SuggestionEngine.Suggestion]? {
     guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
     guard task.status == .open else { return nil }
     guard filter != .logbook && filter != .recentlyDeleted else { return nil }
     guard task.project == nil else { return nil }
 
-    // Inbox (triage band): inbox → area or project.
-    if task.isInTriageBand {
+    // Inbox → area or project. Both populations that share the Today Inbox card
+    // get the filing capsule: agent proposals (triage band) AND loose manual
+    // captures the user quick-added (project/area-less, `today == true`, so
+    // *not* in the band — but still unfiled work that wants a folding hint).
+    if task.isInTriageBand || isLooseTodayInboxCapture(task) {
       if let top = suggestionEngine.topSuggestion(for: task.id) {
         let ranked = suggestionEngine.suggestions[task.id] ?? [top]
         return suggestionAlreadyMatches(task, ranked.first) ? nil : ranked
