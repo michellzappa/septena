@@ -4,50 +4,55 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1390,
-      "date": "2026-07-09",
+      "build": 1394,
+      "date": "2026-07-10",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture uses on-device analysis to read the plate and prefill macros and blank fields for you.",
+          "detail": "Photo-first meal capture uses on-device analysis to prefill the name, macros, and ingredient breakdown, with a fallback when the read fails.",
           "section": "nutrition"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "A new Recently Deleted view keeps removed tasks for 30 days with one-tap restore, plus undo toasts for delete, move, and defer.",
+          "title": "Your calendar now shows up in Today and Upcoming",
+          "detail": "Events weave into your task lists as a quiet agenda row, showing only what's still ahead, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar lives in Tasks",
-          "detail": "Upcoming calendar events now weave into Today and Upcoming, showing only what's still ahead.",
+          "title": "A faster, tidier way to organize tasks",
+          "detail": "Drag tasks onto Today to re-home them, add section headings inside projects, multi-select for bulk actions, and pick dates from a redesigned quick-pick sheet.",
           "section": "tasks"
         },
         {
-          "title": "Organize projects with section headings",
-          "detail": "Group tasks under headings inside a project, drag to re-home them, and import structure straight from a Things export.",
+          "title": "Recover deleted tasks and undo mistakes",
+          "detail": "A Recently Deleted view keeps tasks for 30 days with restore, and edits like delete, move, and defer now show an undo toast.",
           "section": "tasks"
         },
         {
-          "title": "Sharper training feedback",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and a rest timer that auto-advances with a Live Activity.",
-          "section": "training"
+          "title": "Import your tasks from Things",
+          "detail": "Bring over a Things database export, with native headings mapped to project sections.",
+          "section": "tasks"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep any measurable goal in view as a tile on the week dashboard.",
+          "title": "Pin the goals that matter to your dashboard",
+          "detail": "Any measurable goal can be pinned to the week dashboard as its own tile.",
           "section": "goals"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded telemetry levels let you pick off, minimal, balanced, or full, with a plain view of exactly what's sent.",
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and an auto-advancing rest flow with a Live Activity on the watch.",
+          "section": "training"
+        },
+        {
+          "title": "Home-screen widgets for Next and Today",
+          "detail": "New widgets share the app's tiles and heatmap so your day is a glance away.",
           "section": null
         },
         {
-          "title": "Septask, a focused task app",
-          "detail": "A dedicated app for just your tasks over the same private data, on iPhone and Mac.",
-          "section": "tasks"
+          "title": "See and control what analytics you share",
+          "detail": "Choose a graded telemetry level from off to full, with a plain view of exactly what's sent and a recently-sent log.",
+          "section": null
         }
       ]
     },
