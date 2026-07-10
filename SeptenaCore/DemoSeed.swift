@@ -46,6 +46,9 @@ public enum DemoSeed {
     }
 
     seedTasks(ctx, &rng)
+    if ProcessInfo.processInfo.arguments.contains("-SeptenaTaskContractSeed") {
+      seedTaskKeyboardContract(ctx)
+    }
     seedHabits(ctx, &rng)
     seedSupplements(ctx, &rng)
     seedChores(ctx, &rng)
@@ -140,6 +143,21 @@ public enum DemoSeed {
                               area: area, project: project, position: pos))
         n += 1; pos += 1024
       }
+    }
+  }
+
+  /// Dense Today list used only by executable keyboard-contract UI tests. The
+  /// normal curated demo stays compact for screenshots; this opt-in launch
+  /// argument guarantees traversal must cross the visible viewport.
+  private static func seedTaskKeyboardContract(_ ctx: ModelContext) {
+    for index in 0..<48 {
+      let ordinal = String(format: "%02d", index + 1)
+      ctx.insert(TaskEntity(
+        id: "demo-keyboard-task-\(index)",
+        title: "Keyboard Contract \(ordinal)",
+        today: true,
+        position: 1_000_000 + Double(index) * 1_024
+      ))
     }
   }
 
