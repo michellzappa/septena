@@ -1,30 +1,23 @@
 import XCTest
 
-/// The regular-width iPad counterpart to the macOS keyboard contract. On an
-/// iPhone compact width rows intentionally open directly, so the test skips
-/// there rather than treating a different interaction model as a failure.
+/// Septask owns the same task surface, so it receives the same executable
+/// keyboard contract as the full app. This catches target-membership drift in
+/// shared task UI code.
 final class TaskKeyboardContractTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
 
   @MainActor
-  func testRegularWidthKeyboardSelectionRevealsRows() throws {
+  func testKeyboardSelectionRevealsRowsAndUsesCommandKToComplete() throws {
     let app = XCUIApplication()
     app.launchArguments = ["-SeptenaSeed", "demo", "-SeptenaTaskContractSeed",
                            "-septena.security.appLock", "NO"]
     app.launch()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20))
 
-    let window = app.windows.firstMatch
-    XCTAssertTrue(window.waitForExistence(timeout: 10))
-    try XCTSkipIf(window.frame.width < 700,
-                  "This contract applies to the regular-width iPad selection model.")
-
-    clickRequired(app, labels: ["Tasks"])
     clickRequired(app, labels: ["Today"])
-
     let first = taskRow(app, id: "demo-keyboard-task-0")
     XCTAssertTrue(first.waitForExistence(timeout: 10))
-    first.tap()
+    first.click()
     for _ in 0..<35 { app.typeKey(.downArrow, modifierFlags: []) }
 
     let target = taskRow(app, id: "demo-keyboard-task-35")
@@ -47,7 +40,7 @@ final class TaskKeyboardContractTests: XCTestCase {
     for label in labels {
       let candidates = [app.buttons[label], app.staticTexts[label], app.cells[label]]
       for element in candidates where element.waitForExistence(timeout: 4) && element.isHittable {
-        element.tap()
+        element.click()
         return
       }
     }

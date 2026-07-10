@@ -10,7 +10,8 @@ final class TaskKeyboardContractTests: XCTestCase {
   @MainActor
   func testKeyboardSelectionRevealsRowsAndUsesCommandKToComplete() throws {
     let app = XCUIApplication()
-    app.launchArguments = ["-SeptenaSeed", "demo", "-SeptenaTaskContractSeed"]
+    app.launchArguments = ["-SeptenaSeed", "demo", "-SeptenaTaskContractSeed",
+                           "-septena.security.appLock", "NO"]
     app.launch()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20))
 
