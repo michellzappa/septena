@@ -120,10 +120,11 @@ import Foundation
   // isn't compiled into this test bundle.)
 
   @Test func wakeFractionLookupByCivilDate() {
+    let expected = Double(6 * 60 + 40) / 1440
     let w = WakingDay(enabled: true, cutoffHour: 4, wakeFractionByDate: [
-      "2026-06-15": (6 * 60 + 40) / 1440.0,
+      "2026-06-15": expected,
     ])
-    #expect(w.wakeFraction(forCivilDate: key("2026-06-15"), calendar: cal) == (6 * 60 + 40) / 1440.0)
+    #expect(w.wakeFraction(forCivilDate: key("2026-06-15"), calendar: cal) == expected)
     #expect(w.wakeFraction(forCivilDate: key("2026-06-14"), calendar: cal) == nil)
   }
 
