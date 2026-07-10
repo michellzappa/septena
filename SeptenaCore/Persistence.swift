@@ -3618,6 +3618,7 @@ enum LocalCache {
   /// ~open rows instead of the full logbook.
   @MainActor
   private static func fetchEntities(for filter: TaskFilter,
+                                    limit: Int? = nil,
                                     in context: ModelContext) -> [TaskEntity] {
     switch filter {
     case .recentlyDeleted:
@@ -3625,12 +3626,18 @@ enum LocalCache {
         predicate: #Predicate { $0.deletedAt != nil }
       ))) ?? []
     case .logbook:
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      // The archive can be thousands of rows long. Sort and limit in
+      // SwiftData before materializing DTOs; `TaskListView` grows this page on
+      // demand instead of rebuilding the whole history on every sync pulse.
+      var descriptor = FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion &&
           (e.statusRaw == "done" || e.statusRaw == "cancelled")
-        }
-      ))) ?? []
+        },
+        sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
+      )
+      if let limit { descriptor.fetchLimit = limit }
+      return (try? context.fetch(descriptor)) ?? []
     case .project(let pid):
       let projectId = pid
       return (try? context.fetch(FetchDescriptor<TaskEntity>(
@@ -3656,7 +3663,8 @@ enum LocalCache {
 
   @MainActor
   static func tasks(in context: ModelContext,
-                    filter: TaskFilter) -> [SeptenaTask] {
+                    filter: TaskFilter,
+                    limit: Int? = nil) -> [SeptenaTask] {
     // Manual order is the single source of truth (Things-style): order by
     // `TaskOrder.key` — the explicit `position` once a row has been dragged,
     // otherwise its creation instant. Nothing re-sorts by status, name, or
@@ -3672,7 +3680,7 @@ enum LocalCache {
     // click (TaskListView's `items` getter + `load()`), which is where the
     // macOS click latency came from. Filtering first sorts only the rows
     // the view keeps, over plain tuple fields.
-    let rows = fetchEntities(for: filter, in: context)
+    let rows = fetchEntities(for: filter, limit: limit, in: context)
     let today = SeptenaDate.today
     let result = rows
       .compactMap { e -> (key: Double, id: String, task: SeptenaTask)? in
