@@ -954,10 +954,10 @@
         }
       }
     },
-    "A focused, private task manager — calm lists, careful keyboarding, and an AI that answers to you." : {
+    "A focused task app" : {
 
     },
-    "A one-time migration from a Things database export. Your Things data is never modified." : {
+    "A focused, private task manager — calm lists, careful keyboarding, and an AI that answers to you." : {
 
     },
     "A public, read-only version of this board — handy for sharing." : {
@@ -995,10 +995,7 @@
         }
       }
     },
-    "About Septask" : {
-
-    },
-    "About Septena" : {
+    "About" : {
 
     },
     "Accent" : {
@@ -1522,6 +1519,9 @@
         }
       }
     },
+    "Always your choice" : {
+
+    },
     "Amber" : {
       "localizations" : {
         "pt-BR" : {
@@ -1635,9 +1635,6 @@
     "App Lock" : {
 
     },
-    "App-local things stay local: each app has its own welcome, view preferences, and window setup." : {
-
-    },
     "Appended to how this coach talks." : {
       "localizations" : {
         "pt-BR" : {
@@ -1647,6 +1644,9 @@
           }
         }
       }
+    },
+    "Appends your Next feed — suggestions, chores, habits, supplements, and today's log — as a foldable section at the end of Today. Everything checks off here exactly like in Septena." : {
+
     },
     "Apple" : {
       "localizations" : {
@@ -2002,6 +2002,9 @@
     "Both" : {
 
     },
+    "Both apps read and write the same tasks, areas, projects, and task conversations in your private iCloud. Add or change something in either app and it appears in the other — one dataset, two first-class ways to use it." : {
+
+    },
     "Breakfast" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2012,6 +2015,9 @@
           }
         }
       }
+    },
+    "Bring Reminders into your Inbox, weave calendar events into Today and Upcoming, or make a one-time migration from Things. Your source data is never modified." : {
+
     },
     "Bring your steps and movement in from Apple Health" : {
       "extractionState" : "manual",
@@ -2199,7 +2205,7 @@
         }
       }
     },
-    "Choose how far AI may reach and how tasks created by Claude arrive — as proposals to review in the inbox, or committed to the list you specify." : {
+    "Choose how AI can help with tasks and connect Claude through your own gateway token." : {
 
     },
     "Choose how far AI may reach, connect Claude through MCP, and review the skills that teach models how to use your sections." : {
@@ -2375,6 +2381,7 @@
       }
     },
     "Connect Apple Health in Settings → Integrations to turn this on." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -2418,6 +2425,9 @@
       }
     },
     "Connected" : {
+
+    },
+    "Connected Apps" : {
 
     },
     "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Add the connector in Claude using mcp.septena.app." : {
@@ -2793,7 +2803,7 @@
     "Deleted tasks appear here for 30 days before being permanently removed." : {
 
     },
-    "Deleting either app never deletes your data — it lives in your iCloud, not in the app. And hiding the Tasks section inside Septena never turns Septask off." : {
+    "Deleting either app does not delete your data, and hiding Tasks in Septena does not turn Septask off. Your data stays in your iCloud, not in an account or on a server of ours." : {
 
     },
     "Despondent" : {
@@ -3018,6 +3028,9 @@
         }
       }
     },
+    "Each app keeps its own welcome, view preferences, and window setup, so you can use either one without rearranging the other." : {
+
+    },
     "Each brief teaches a model how to use one section through the MCP — tools available, conventions, examples." : {
       "localizations" : {
         "pt-BR" : {
@@ -3094,9 +3107,6 @@
           }
         }
       }
-    },
-    "Edits made in either app appear in the other, usually within seconds when both are open. Your task accent color and task behavior settings travel too." : {
-
     },
     "Effort scale" : {
 
@@ -3450,6 +3460,9 @@
         }
       }
     },
+    "Focused tasks, in your iCloud" : {
+
+    },
     "Format" : {
       "localizations" : {
         "pt-BR" : {
@@ -3662,10 +3675,8 @@
         }
       }
     },
-    "Good to know" : {
-
-    },
     "Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3674,6 +3685,9 @@
           }
         }
       }
+    },
+    "Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So the app refreshes the connection automatically when you open it, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open either app to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch." : {
+
     },
     "Grant Access" : {
       "localizations" : {
@@ -4186,6 +4200,9 @@
         }
       }
     },
+    "Inbox, Today, areas, and projects" : {
+
+    },
     "Include related goals" : {
 
     },
@@ -4457,6 +4474,9 @@
           }
         }
       }
+    },
+    "Label which model answers in each AI spot — a temporary beta aid." : {
+
     },
     "lag %@d · n=%@" : {
       "localizations" : {
@@ -5124,6 +5144,9 @@
         }
       }
     },
+    "Neither app is a lesser version of the other. Septask makes task work the whole experience; Septena puts that same work in a wider personal picture." : {
+
+    },
     "Never" : {
       "localizations" : {
         "pt-BR" : {
@@ -5734,6 +5757,9 @@
     "One dataset, two apps" : {
 
     },
+    "One private dataset" : {
+
+    },
     "one time" : {
       "localizations" : {
         "pt-BR" : {
@@ -5743,9 +5769,6 @@
           }
         }
       }
-    },
-    "One-time migration from a Things database export. Your Things data is not modified." : {
-
     },
     "Only a Claude Code running on this Mac can connect." : {
       "localizations" : {
@@ -5858,6 +5881,9 @@
           }
         }
       }
+    },
+    "Part of Septena" : {
+
     },
     "Paste a Septena JSON export below." : {
       "localizations" : {
@@ -6039,6 +6065,9 @@
           }
         }
       }
+    },
+    "Private Cloud Compute" : {
+
     },
     "PROGRESS" : {
       "localizations" : {
@@ -6335,9 +6364,6 @@
         }
       }
     },
-    "Reminders for task deadlines are planned — they'll live here." : {
-
-    },
     "Remove" : {
       "localizations" : {
         "pt-BR" : {
@@ -6586,6 +6612,9 @@
         }
       }
     },
+    "See the wider picture" : {
+
+    },
     "See what's due today and capture the rest" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6624,10 +6653,13 @@
     "Send" : {
 
     },
-    "Septask is a focused window onto your tasks: everything lives in your iCloud, synced by CloudKit, readable by no one else. No accounts, no hosted inference, no servers of ours." : {
+    "Septask" : {
 
     },
-    "Septask is the focused task app from Septena, a private life operating system. Both apps read and write the same tasks, areas, and projects — one dataset in your iCloud, two first-class windows onto it." : {
+    "Septask gives your task life a dedicated, calm home: Inbox, Today, Upcoming, areas, projects, and task conversations. It stands on its own for the days when tasks are all you want to think about." : {
+
+    },
+    "Septask is part of Septena, the private app for the things you choose to track across your life. Septena adds optional sections for habits, training, nutrition, sleep, mood, health, and more — then lets you see those pieces together over time." : {
 
     },
     "Septask keeps your tasks in your private iCloud — nothing lives on a server of ours." : {
@@ -6642,9 +6674,6 @@
           }
         }
       }
-    },
-    "Septena adds the rest of life around your tasks — habits, training, nutrition, health, dashboards, and a daily Next list — each an optional section you can enable or hide." : {
-
     },
     "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
       "localizations" : {
@@ -6738,6 +6767,9 @@
         }
       }
     },
+    "Septena reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device." : {
+
+    },
     "Septena summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
       "localizations" : {
         "pt-BR" : {
@@ -6749,6 +6781,7 @@
       }
     },
     "Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -6757,9 +6790,6 @@
           }
         }
       }
-    },
-    "septena.app" : {
-
     },
     "Septena+ membership" : {
       "extractionState" : "stale",
@@ -6856,7 +6886,7 @@
     "Sets per muscle" : {
 
     },
-    "Sets the app's text size. Per-device — it doesn't change Septena." : {
+    "Sets the app's text size on this device. It doesn't change Septena." : {
 
     },
     "Settings" : {
@@ -6999,6 +7029,9 @@
       }
     },
     "Show in Spotlight & Siri" : {
+
+    },
+    "Show model labels" : {
 
     },
     "Show this goal at the top of the Week dashboard. Goals with a metric show live progress; habit goals show their streak." : {
@@ -7571,7 +7604,7 @@
         }
       }
     },
-    "Task export and shareable project links are planned — they'll live here." : {
+    "Task Data" : {
 
     },
     "Tasks" : {
@@ -7604,6 +7637,9 @@
         }
       }
     },
+    "Tasks is always on in Septask. Set its color and behavior here; shared task settings carry over to Septena." : {
+
+    },
     "Tasks tab" : {
       "localizations" : {
         "pt-BR" : {
@@ -7626,6 +7662,9 @@
           }
         }
       }
+    },
+    "Tell us what feels great, what gets in the way, or what would make Septask more useful. Your email app opens with a Septask feedback subject." : {
+
     },
     "Temperance" : {
       "localizations" : {
@@ -7729,9 +7768,6 @@
     "The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this." : {
 
     },
-    "The full picture" : {
-
-    },
     "The greeting at the top of the home tab — your name, tone, and how aware of your day it is." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7783,10 +7819,16 @@
         }
       }
     },
+    "The reminder is scheduled by whichever app you last used, so reconnecting works entirely from Septask. Reminders for task deadlines are planned — they'll live here." : {
+
+    },
     "The seven discs unfurl in foil — the Septena+ thank-you" : {
 
     },
     "The seven discs unfurl in the rainbow — everyday, in-app" : {
+
+    },
+    "These controls are shared across Septena. Open one to change its canonical setting without leaving this section's context." : {
 
     },
     "These four groups are the raw material for the north-star and commitments." : {
@@ -7812,7 +7854,11 @@
         }
       }
     },
+    "This area was deleted or is no longer available." : {
+
+    },
     "This category is turned off in Apple Health. To allow it, open Health → Profile → Apps → Septena." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -7856,6 +7902,9 @@
       }
     },
     "This Mac can't use App Attest, so community features verify you with a one-time Sign in with Apple instead. It ties contributions to your Apple ID — nothing in your data changes, and you can sign out any time." : {
+
+    },
+    "This project was deleted or is no longer available." : {
 
     },
     "This section doesn't yet have MCP tools. A skill will appear here when it does." : {
@@ -8103,6 +8152,9 @@
     "Turn off to drop your Readwise highlights from the rotation without disconnecting — your imported highlights, packs, and own quotes stay." : {
 
     },
+    "Turn on only after the PCC entitlement is granted. Without it, requests fail and coaching falls back on-device." : {
+
+    },
     "Turn values into goals" : {
       "localizations" : {
         "pt-BR" : {
@@ -8250,6 +8302,9 @@
     "Use generic placeholders when exact prescriptions should be entered manually later." : {
 
     },
+    "Use Private Cloud Compute" : {
+
+    },
     "Used to personalize the greeting. With Apple Intelligence it's freshly written through the day." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8284,6 +8339,9 @@
           }
         }
       }
+    },
+    "Version %@" : {
+
     },
     "Version %@ (%@)" : {
       "localizations" : {
@@ -8393,7 +8451,7 @@
     "Weave your calendar's events into Today and Upcoming." : {
 
     },
-    "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar." : {
+    "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Related Settings below." : {
 
     },
     "Week" : {
@@ -8501,9 +8559,6 @@
       }
     },
     "What should we call you?" : {
-
-    },
-    "What syncs" : {
 
     },
     "What the dots mean" : {
@@ -8774,6 +8829,9 @@
           }
         }
       }
+    },
+    "Your tasks already sync privately through iCloud. Export and shareable project links will appear here when they are ready." : {
+
     },
     "Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud." : {
 

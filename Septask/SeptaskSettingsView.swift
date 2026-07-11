@@ -2,25 +2,32 @@ import SwiftUI
 import SwiftData
 
 /// Septask's Settings — the full app's architecture (`SettingsView`) at
-/// task-app scale (docs/SEPTASK.md P3): an identity header card, then
-/// intent-grouped `ColoredGlyph` rows into real panes, then About set apart
-/// with disc tiles — the same shape as Septena, stripped to what a task app
-/// needs. Shell-only composition: behavior lives in shared files
+/// task-app scale (docs/SEPTASK.md P3): the same root taxonomy as Septena,
+/// with a profile card, intent-grouped `ColoredGlyph` rows, and About set
+/// apart with a disc tile. The task app keeps its own focused sub-options,
+/// but the first level is deliberately identical so moving between the two
+/// apps feels natural. Shell-only composition: behavior lives in shared files
 /// (`TaskSettingsSections`, `ClaudeAISettingsPane`, `ThingsImportView`,
 /// `SettingsMirror`, `SettingsStore`, `SettingsChrome`, `ProfileAvatar`);
 /// only app-local surfaces (the About pages, task privacy copy) are here.
 struct SeptaskSettingsView: View {
   enum Destination: Hashable {
     case account
-    case general
+    // Same root destinations, in the same order, as `SettingsView`.
+    case sections
+    case home
     case notifications
+    case connectionsAI
+    case sharingData
+    case privacy
+    case feedback
+    case about
+    // Focused task-app sub-pages. These are intentionally not root entries.
+    case tasks
     case claudeAI
     case calendar
     case reminders
-    case data
-    case privacy
-    case aboutSeptask
-    case aboutSeptena
+    case thingsImport
   }
 
   @Environment(\.dismiss) private var dismiss
@@ -29,7 +36,7 @@ struct SeptaskSettingsView: View {
   @State private var path: [Destination] = []
   /// Detail selection for the macOS split view (a sidebar+detail Settings
   /// window, matching `SettingsView`). Unused on iOS, which pushes via `path`.
-  @State private var selection: Destination? = .general
+  @State private var selection: Destination? = .sections
 
   var body: some View {
     #if os(macOS)
@@ -37,31 +44,33 @@ struct SeptaskSettingsView: View {
     // Escape-closable like SettingsView — hosted in a real Settings window
     // (SeptaskApp), so it carries native traffic lights, not a Done button.
     NavigationSplitView {
+      // Let the native source-list material render — no gradient wash behind a
+      // macOS sidebar (matches SettingsView's macOS sidebar). The iOS branch
+      // below keeps the gradient, where it's a sheet, not a source list.
       List(selection: $selection) { listContent(selectable: true) }
-        .scrollContentBackground(.hidden)
-        .background(SettingsTopGradient())
         .navigationTitle("Settings")
+        .toolbar(removing: .sidebarToggle)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
     } detail: {
-      NavigationStack { pane(selection ?? .general) }
+      NavigationStack {
+        pane(selection ?? .sections)
+          .navigationDestination(for: Destination.self) { pane($0) }
+      }
     }
-    .frame(width: 700, height: 560)
+    .frame(width: 820, height: 600)
     .onExitCommand { dismiss() }
     #else
-    // iOS/iPad: the same list, pushed in a NavigationStack sheet with a Done
-    // button — matching SettingsView's compact presentation.
+    // iOS/iPad: the same list, pushed in a NavigationStack sheet — matching
+    // SettingsView's compact presentation and its drag-to-dismiss affordance.
     NavigationStack(path: $path) {
       List { listContent(selectable: false) }
         .scrollContentBackground(.hidden)
         .background(SettingsTopGradient())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-          ToolbarItem(placement: .confirmationAction) {
-            Button("Done") { dismiss() }
-          }
-        }
         .navigationDestination(for: Destination.self) { pane($0) }
     }
+    .presentationDragIndicator(.visible)
     #endif
   }
 
@@ -88,33 +97,29 @@ struct SeptaskSettingsView: View {
       }
     }
 
+    // Keep this root in lockstep with Septena's SettingsView. The destinations
+    // below each row can stay task-specific; the familiar scan pattern cannot.
     Section {
-      entry(.general, selectable: selectable) { row("General", icon: "slider.horizontal.3", tint: 0) }
-      entry(.notifications, selectable: selectable) { row("Notifications", icon: "bell.badge", tint: 4) }
-    }
-
-    Section {
-      entry(.claudeAI, selectable: selectable) { row("AI & Claude", icon: "brain.head.profile", tint: 5) }
-      entry(.calendar, selectable: selectable) { row("Calendar", icon: "calendar", tint: 6) }
-      entry(.reminders, selectable: selectable) { row("Reminders", icon: "checklist", tint: 2) }
-    }
-
-    Section {
-      entry(.data, selectable: selectable) { row("Sharing & Data", icon: "square.and.arrow.up", tint: 1) }
-      entry(.privacy, selectable: selectable) { row("Privacy", icon: "hand.raised", tint: 3) }
-    }
-
-    // About rows, set apart below the intent groups like the full app:
-    // Septena wears its colorful mark (it points at the bigger app);
-    // Septask's own About wears the white-on-gray discs — its icon.
-    Section {
-      entry(.aboutSeptena, selectable: selectable) {
-        Label { Text("About Septena") } icon: { SeptenaDiscTile(size: glyphSize, colored: true) }
-      }
-      entry(.aboutSeptask, selectable: selectable) {
-        Label { Text("About Septask") } icon: { SeptenaDiscTile(size: glyphSize) }
+      ForEach(rootDestinations, id: \.self) { destination in
+        entry(destination, selectable: selectable) { rootRow(destination) }
       }
     }
+
+    // About is set apart below the intent groups exactly as it is in Septena.
+    // The white-on-gray discs are Septask's own mark.
+    Section {
+      entry(.about, selectable: selectable) {
+        Label { Text("About") } icon: { SeptenaDiscTile(size: glyphSize) }
+      }
+    }
+  }
+
+  /// Septena's root Settings order. Keep this list parallel with
+  /// `SettingsView.staticDestinations` so colors, labels, and muscle memory
+  /// remain aligned between the focused and full apps.
+  private var rootDestinations: [Destination] {
+    [.sections, .home, .notifications, .connectionsAI,
+     .sharingData, .privacy, .feedback]
   }
 
   /// One list row, as either a selectable tag (macOS split view) or a
@@ -138,33 +143,80 @@ struct SeptaskSettingsView: View {
   }
 
   /// The full app's static-row anatomy: label + `ColoredGlyph` tile, tinted
-  /// from the shared root palette by row order.
-  private func row(_ title: String, icon: String, tint index: Int) -> some View {
-    let color = SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count]
+  /// from the shared root palette by the identical root-row order.
+  private func rootRow(_ destination: Destination) -> some View {
+    let color = tint(for: destination)
     return Label {
-      Text(title)
+      Text(title(for: destination))
     } icon: {
       #if os(macOS)
-      ColoredGlyph(icon: icon, color: color, size: 20, glyphRatio: 0.48)
+      ColoredGlyph(icon: icon(for: destination), color: color, size: 20, glyphRatio: 0.48)
       #else
-      ColoredGlyph(icon: icon, color: color, size: 29, glyphRatio: 0.38)
+      ColoredGlyph(icon: icon(for: destination), color: color, size: 29, glyphRatio: 0.38)
       #endif
     }
+  }
+
+  private func title(for destination: Destination) -> String {
+    switch destination {
+    case .account:       return "Account"
+    case .sections:      return "Sections"
+    case .home:          return "Home"
+    case .notifications: return "Notifications"
+    case .connectionsAI: return "Connections & AI"
+    case .sharingData:   return "Sharing & Data"
+    case .privacy:       return "Privacy"
+    case .feedback:      return "Feedback"
+    case .about:         return "About"
+    case .tasks:         return "Tasks"
+    case .claudeAI:      return "AI"
+    case .calendar:      return "Calendar"
+    case .reminders:     return "Reminders"
+    case .thingsImport:  return "Import from Things"
+    }
+  }
+
+  private func icon(for destination: Destination) -> String {
+    switch destination {
+    case .account:       return "person.crop.circle"
+    case .sections:      return "square.grid.2x2"
+    case .home:          return "house"
+    case .notifications: return "bell.badge"
+    case .connectionsAI: return "brain.head.profile"
+    case .sharingData:   return "square.and.arrow.up"
+    case .privacy:       return "hand.raised"
+    case .feedback:      return "bubble.left.and.bubble.right"
+    case .about:         return "info.circle"
+    case .tasks:         return "checklist"
+    case .claudeAI:      return "brain.head.profile"
+    case .calendar:      return "calendar"
+    case .reminders:     return "checklist"
+    case .thingsImport:  return "square.and.arrow.down"
+    }
+  }
+
+  private func tint(for destination: Destination) -> Color {
+    guard let index = rootDestinations.firstIndex(of: destination) else { return .gray }
+    return SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count]
   }
 
   @ViewBuilder
   private func pane(_ destination: Destination) -> some View {
     switch destination {
-    case .account:      SeptaskAccountPane()
-    case .general:      SeptaskGeneralPane()
+    case .account:       SeptaskAccountPane()
+    case .sections:      SeptaskSectionsPane()
+    case .home:          SeptaskHomePane()
     case .notifications: SeptaskNotificationsPane()
-    case .claudeAI:     ClaudeAISettingsPane().navigationTitle("AI & Claude")
-    case .calendar:     CalendarDetail().navigationTitle("Calendar")
-    case .reminders:    RemindersInboxDetail().navigationTitle("Reminders")
-    case .data:         SeptaskDataPane()
-    case .privacy:      SeptaskPrivacyPane()
-    case .aboutSeptask: SeptaskAboutPane()
-    case .aboutSeptena: AboutSeptenaPane()
+    case .connectionsAI: SeptaskConnectionsAISettingsPane()
+    case .sharingData:   SeptaskSharingDataPane()
+    case .privacy:       SeptaskPrivacyPane()
+    case .feedback:      SeptaskFeedbackPane()
+    case .about:         SeptaskAboutPane()
+    case .tasks:         SeptaskTaskSettingsPane()
+    case .claudeAI:      ClaudeAISettingsPane().navigationTitle(title(for: destination))
+    case .calendar:      CalendarDetail().navigationTitle(title(for: destination))
+    case .reminders:     RemindersInboxDetail().navigationTitle(title(for: destination))
+    case .thingsImport:  ThingsImportView().navigationTitle(title(for: destination))
     }
   }
 }
@@ -234,16 +286,63 @@ private struct SeptaskAccountPane: View {
   }
 }
 
-// MARK: - General (the task app's "home" settings)
+// MARK: - Sections
 
-/// The task settings promoted to General — accent, the shared task toggles,
-/// and the logging-animation switch. This is the "Tasks section becomes the
-/// Home settings" move: in a task app, the task knobs ARE the general knobs.
-private struct SeptaskGeneralPane: View {
+/// Septena's Sections root condensed to Septask's one always-on domain. This
+/// preserves the same route (Settings → Sections → Tasks) without implying
+/// that the focused app can add, remove, or configure life domains.
+private struct SeptaskSectionsPane: View {
+  @Environment(SectionTheme.self) private var theme
+
+  var body: some View {
+    Form {
+      Section {
+        NavigationLink(value: SeptaskSettingsView.Destination.tasks) {
+          HStack(spacing: 12) {
+            ColoredGlyph(icon: "checklist", color: theme.color(for: "tasks"),
+                         size: glyphSize, glyphRatio: glyphRatio)
+            VStack(alignment: .leading, spacing: 2) {
+              Text("Tasks")
+              Text("Inbox, Today, areas, and projects")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+          }
+        }
+      } footer: {
+        Text("Tasks is always on in Septask. Set its color and behavior here; shared task settings carry over to Septena.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Sections")
+  }
+
+  private var glyphSize: CGFloat {
+    #if os(macOS)
+    20
+    #else
+    29
+    #endif
+  }
+
+  private var glyphRatio: CGFloat {
+    #if os(macOS)
+    0.48
+    #else
+    0.38
+    #endif
+  }
+}
+
+// MARK: - Tasks
+
+/// The single section detail in the focused app. Septena exposes these same
+/// controls at Settings → Sections → Tasks; the route stays parallel even
+/// though Septask has no other sections to list.
+private struct SeptaskTaskSettingsPane: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SectionTheme.self) private var theme
-  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var loggingAnimations = true
 
   var body: some View {
     Form {
@@ -261,6 +360,23 @@ private struct SeptaskGeneralPane: View {
         Text("The accent is shared with Septena — changing it here recolors Tasks there too.")
       }
 
+      TaskSettingsSections()
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Tasks")
+  }
+}
+
+// MARK: - Home
+
+/// Septask's Home counterpart: presentation preferences for its focused task
+/// home, rather than the full app's dashboard-layout controls.
+private struct SeptaskHomePane: View {
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var loggingAnimations = true
+  @AppStorage(SeptaskNextFold.showInTodayKey) private var showNextInToday = true
+
+  var body: some View {
+    Form {
       Section {
         NavigationLink {
           TextSizeSettingsPane()
@@ -268,10 +384,16 @@ private struct SeptaskGeneralPane: View {
           Label("Text Size", systemImage: "textformat.size")
         }
       } footer: {
-        Text("Sets the app's text size. Per-device — it doesn't change Septena.")
+        Text("Sets the app's text size on this device. It doesn't change Septena.")
       }
 
-      TaskSettingsSections()
+      Section {
+        Toggle(isOn: $showNextInToday) {
+          Label("Next in Today", systemImage: "arrow.right")
+        }
+      } footer: {
+        Text("Appends your Next feed — suggestions, chores, habits, supplements, and today's log — as a foldable section at the end of Today. Everything checks off here exactly like in Septena.")
+      }
 
       Section {
         Toggle(isOn: $loggingAnimations) {
@@ -282,7 +404,7 @@ private struct SeptaskGeneralPane: View {
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("General")
+    .navigationTitle("Home")
   }
 }
 
@@ -318,36 +440,115 @@ private struct SeptaskNotificationsPane: View {
       } header: {
         Text("Nudges")
       } footer: {
-        Text("Reminders for task deadlines are planned — they'll live here.")
+        Text("The reminder is scheduled by whichever app you last used, so reconnecting works entirely from Septask. Reminders for task deadlines are planned — they'll live here.")
       }
     }
     .formStyle(.grouped)
     .navigationTitle("Notifications")
+    // Like Septena, ask only once the user intentionally opens this screen —
+    // never as a surprise during Septask launch.
+    .task {
+      guard claudeNudge else { return }
+      await ClaudeReconnectNudge.shared.requestAuthorizationIfNeeded()
+    }
+    .onChange(of: claudeNudge) { _, enabled in
+      Task { @MainActor in
+        if enabled {
+          await ClaudeReconnectNudge.shared.requestAuthorizationIfNeeded()
+        }
+        ClaudeReconnectNudge.shared.reconcile()
+      }
+    }
   }
 }
 
-// MARK: - Data
+// MARK: - Connections & AI
 
-private struct SeptaskDataPane: View {
+/// Septena's connection hub narrowed to the services a task-focused app can
+/// actually use. Keeping them here removes Calendar and Reminders from the
+/// root while preserving the same mental model as the full app.
+private struct SeptaskConnectionsAISettingsPane: View {
   var body: some View {
     Form {
       Section {
-        NavigationLink {
-          ThingsImportView()
-        } label: {
-          Label("Import from Things", systemImage: "square.and.arrow.down")
+        NavigationLink(value: SeptaskSettingsView.Destination.claudeAI) {
+          Label("AI Mode & Claude", systemImage: "brain.head.profile")
         }
       } footer: {
-        Text("A one-time migration from a Things database export. Your Things data is never modified.")
+        Text("Choose how AI can help with tasks and connect Claude through your own gateway token.")
       }
+
       Section {
-        EmptyView()
+        NavigationLink(value: SeptaskSettingsView.Destination.reminders) {
+          Label("Reminders", systemImage: "checklist")
+        }
+        NavigationLink(value: SeptaskSettingsView.Destination.calendar) {
+          Label("Calendar", systemImage: "calendar")
+        }
+        NavigationLink(value: SeptaskSettingsView.Destination.thingsImport) {
+          Label("Things", systemImage: "square.and.arrow.down")
+        }
+      } header: {
+        Text("Connected Apps")
       } footer: {
-        Text("Task export and shareable project links are planned — they'll live here.")
+        Text("Bring Reminders into your Inbox, weave calendar events into Today and Upcoming, or make a one-time migration from Things. Your source data is never modified.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Connections & AI")
+  }
+}
+
+// MARK: - Sharing & Data
+
+/// The matching root exists before the task app has a broad export surface.
+/// It gives imports, exports, and future project links one stable home instead
+/// of making the root taxonomy diverge as those capabilities arrive.
+private struct SeptaskSharingDataPane: View {
+  var body: some View {
+    Form {
+      Section {
+        availabilityRow("Task export", icon: "square.and.arrow.up")
+        availabilityRow("Project links", icon: "link")
+      } header: {
+        Text("Task Data")
+      } footer: {
+        Text("Your tasks already sync privately through iCloud. Export and shareable project links will appear here when they are ready.")
       }
     }
     .formStyle(.grouped)
     .navigationTitle("Sharing & Data")
+  }
+
+  private func availabilityRow(_ title: String, icon: String) -> some View {
+    HStack {
+      Label(title, systemImage: icon)
+      Spacer()
+      Text("Coming soon")
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+// MARK: - Feedback
+
+/// Septena's feedback root, task-app specific for now. The full app owns the
+/// connected community surfaces; Septask still gives task users a clear, named
+/// place to send product feedback instead of burying that route under About.
+private struct SeptaskFeedbackPane: View {
+  var body: some View {
+    Form {
+      Section {
+        Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septask%20feedback")!) {
+          Label("Send task feedback", systemImage: "paperplane")
+        }
+      } footer: {
+        Text("Tell us what feels great, what gets in the way, or what would make Septask more useful. Your email app opens with a Septask feedback subject.")
+      }
+    }
+    .formStyle(.grouped)
+    .navigationTitle("Feedback")
   }
 }
 
@@ -407,64 +608,58 @@ private struct SeptaskPrivacyPane: View {
   }
 }
 
-// MARK: - About Septask
+// MARK: - About
 
 private struct SeptaskAboutPane: View {
   @AppStorage(SeptaskWelcome.completedKey) private var welcomeCompleted = false
-
-  var body: some View {
-    Form {
-      Section {
-        LabeledContent("Version", value: SeptaskAbout.versionString)
-      } footer: {
-        Text("Septask is a focused window onto your tasks: everything lives in your iCloud, synced by CloudKit, readable by no one else. No accounts, no hosted inference, no servers of ours.")
-      }
-      Section {
-        Button("Show Welcome Again") { welcomeCompleted = false }
-      }
-    }
-    .formStyle(.grouped)
-    .navigationTitle("About Septask")
-  }
-}
-
-enum SeptaskAbout {
-  static var versionString: String {
-    let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-    return "\(short) (\(build))"
-  }
-}
-
-// MARK: - About Septena (the relationship page)
-
-/// Explains how the two apps relate — the product facts docs/SEPTASK.md
-/// commits to, in user language. No marketing invention: every claim below
-/// traces to a plan invariant (same data, both first-class, hiding ≠
-/// deleting, sync scope).
-private struct AboutSeptenaPane: View {
   @Environment(\.openURL) private var openURL
 
   var body: some View {
     Form {
       Section {
-        Text("Septask is the focused task app from Septena, a private life operating system. Both apps read and write the same tasks, areas, and projects — one dataset in your iCloud, two first-class windows onto it.")
-      } header: {
-        Text("One dataset, two apps")
+        VStack(spacing: 6) {
+          SeptenaDiscTile(size: 72)
+            .padding(.bottom, 6)
+          Text("Septask")
+            .font(.title2.weight(.semibold))
+          Text("Focused tasks, in your iCloud")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+          Text("Version \(SeptaskAbout.versionString)")
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .listRowBackground(Color.clear)
       }
 
       Section {
-        Text("Edits made in either app appear in the other, usually within seconds when both are open. Your task accent color and task behavior settings travel too.")
-        Text("App-local things stay local: each app has its own welcome, view preferences, and window setup.")
+        Text("Septask gives your task life a dedicated, calm home: Inbox, Today, Upcoming, areas, projects, and task conversations. It stands on its own for the days when tasks are all you want to think about.")
+      } header: {
+        Text("A focused task app")
+      }
+
+      Section {
+        Text("Septask is part of Septena, the private app for the things you choose to track across your life. Septena adds optional sections for habits, training, nutrition, sleep, mood, health, and more — then lets you see those pieces together over time.")
+        Text("Neither app is a lesser version of the other. Septask makes task work the whole experience; Septena puts that same work in a wider personal picture.")
           .foregroundStyle(.secondary)
       } header: {
-        Text("What syncs")
+        Text("Part of Septena")
       }
 
       Section {
-        Text("Septena adds the rest of life around your tasks — habits, training, nutrition, health, dashboards, and a daily Next list — each an optional section you can enable or hide.")
+        Text("Both apps read and write the same tasks, areas, projects, and task conversations in your private iCloud. Add or change something in either app and it appears in the other — one dataset, two first-class ways to use it.")
+        Text("Each app keeps its own welcome, view preferences, and window setup, so you can use either one without rearranging the other.")
+          .foregroundStyle(.secondary)
+      } header: {
+        Text("One private dataset")
+      }
+
+      Section {
         Button {
-          // Opens Septena when installed; otherwise the website.
+          // Open the full app when it is installed; otherwise point to the
+          // website so the relationship never turns into a dead end.
           openURL(URL(string: "septena://")!) { accepted in
             if !accepted {
               openURL(URL(string: "https://www.septena.app")!)
@@ -474,18 +669,28 @@ private struct AboutSeptenaPane: View {
           Label("Open Septena", systemImage: "arrow.up.forward.app")
         }
       } header: {
-        Text("The full picture")
+        Text("See the wider picture")
       }
 
       Section {
-        Text("Deleting either app never deletes your data — it lives in your iCloud, not in the app. And hiding the Tasks section inside Septena never turns Septask off.")
+        Text("Deleting either app does not delete your data, and hiding Tasks in Septena does not turn Septask off. Your data stays in your iCloud, not in an account or on a server of ours.")
       } header: {
-        Text("Good to know")
-      } footer: {
-        Text("septena.app")
+        Text("Always your choice")
+      }
+
+      Section {
+        Button("Show Welcome Again") { welcomeCompleted = false }
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("About Septena")
+    .navigationTitle("About")
+  }
+}
+
+enum SeptaskAbout {
+  static var versionString: String {
+    let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+    return "\(short) (\(build))"
   }
 }

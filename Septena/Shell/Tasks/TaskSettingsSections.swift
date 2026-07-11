@@ -5,10 +5,9 @@ import SwiftData
 // Settings ▸ Sections ▸ Tasks (`TasksDetailContent` in TasksPlugin) and
 // Septask inside its dedicated Settings sheet — extracted per docs/SEPTASK.md
 // so the toggles can't drift between the apps. Full-app-only rows (the
-// drawer/tab "Open in" choice, the Next-feed toggle, the SettingsView
-// deep-link to AI) are `#if !SEPTASK`-gated: they configure surfaces Septask
-// doesn't ship, and they ride SettingsStore / SettingsView types Septask
-// doesn't compile.
+// drawer/tab "Open in" choice and the Next-feed toggle) are `#if !SEPTASK`-
+// gated: they configure surfaces Septask doesn't ship and ride SettingsStore
+// types Septask doesn't compile.
 struct TaskSettingsSections: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
@@ -128,32 +127,14 @@ struct TaskSettingsSections: View {
       #if SEPTASK
       Text("Weave your calendar's events into Today and Upcoming.")
       #else
-      Text("Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Settings → Integrations → Calendar.")
+      Text("Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Related Settings below.")
       #endif
     }
-    // Septask hoists the import entry to its Settings root (its own row
-    // beside AI & Claude); here it stays nested in the tasks pane.
     #if !SEPTASK
-    Section {
-      NavigationLink {
-        ThingsImportView()
-      } label: {
-        Label("Import from Things", systemImage: "square.and.arrow.down")
-      }
-    } footer: {
-      Text("One-time migration from a Things database export. Your Things data is not modified.")
-    }
     Section {
       Text("Areas and projects are managed in the Tasks tab.")
         .font(.callout)
         .foregroundStyle(.secondary)
-    }
-    Section {
-      NavigationLink(value: SettingsView.SettingsDestination.claudeAI) {
-        Label("AI & Claude for tasks", systemImage: "brain.head.profile")
-      }
-    } footer: {
-      Text("Choose how far AI may reach and how tasks created by Claude arrive — as proposals to review in the inbox, or committed to the list you specify.")
     }
     #endif
   }

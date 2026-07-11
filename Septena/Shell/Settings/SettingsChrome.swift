@@ -18,19 +18,14 @@ enum SettingsAccentPalette {
   ]
 }
 
-/// The Settings-row icon for the About page: the seven Septena discs in
-/// white on a neutral gray tile, matching `ColoredGlyph`'s shape and sheen
-/// (white glyph on a saturated fill) so it sits flush with the colored rows
-/// above it. Gray (not a brand accent) marks About as a utility row, while
-/// the white discs keep it unmistakably the app's own mark. Disc placement
-/// reuses the shared `SeptenaPlus` constants so the emblem can't drift.
+/// The Settings-row icon for an About page: the seven Septena discs in white
+/// on a neutral gray tile, matching `ColoredGlyph`'s shape and sheen (white
+/// glyph on a saturated fill) so it sits flush with the colored rows above it.
+/// Gray (not a brand accent) marks About as a utility row, while the white
+/// discs keep it unmistakably the app's own mark. Disc placement reuses the
+/// shared `SeptenaPlus` constants so the emblem can't drift.
 struct SeptenaDiscTile: View {
   var size: CGFloat = 29
-  /// `true` paints the discs in their canonical section colors instead of
-  /// white — Septask's Settings uses it for the "About Septena" row (the
-  /// colorful mark points at the full app; the white-on-gray default IS
-  /// Septask's own icon design and marks its About row).
-  var colored: Bool = false
   @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
@@ -44,9 +39,9 @@ struct SeptenaDiscTile: View {
           startPoint: .top, endPoint: .bottom
         )
       )
-      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
+      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { _, center in
         Circle()
-          .fill(colored ? SeptenaPlus.discColors[index] : Color.white)
+          .fill(Color.white)
           .frame(width: size * 0.168, height: size * 0.168)
           .position(x: size * center.x, y: size * center.y)
       }
