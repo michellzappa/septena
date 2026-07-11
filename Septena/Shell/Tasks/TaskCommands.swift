@@ -62,9 +62,8 @@ struct TaskCommandsMenu: View {
   var body: some View {
     // ⌘N lives in the File menu via `NewTaskCommand` so it works even when no
     // task list is focused. Edit is ⌘R — a MODIFIER menu shortcut, the only
-    // reliable keyboard path on macOS: unmodified Space activates the row's
-    // checkbox (completes it) and Return is stolen by the sidebar. Disabled
-    // (so ⌘R falls through to any focused text field) when `editDetails` is nil.
+    // reliable keyboard path on macOS. Disabled (so ⌘R falls through to any
+    // focused text field) when `editDetails` is nil.
     Button("Edit Details…") { actions?.editDetails?() }
       .keyboardShortcut(TaskRowShortcuts.editDetails)
       .disabled(actions?.editDetails == nil)
@@ -134,13 +133,20 @@ extension FocusedValues {
 /// row), matching the menu-bar entry and iOS Home Screen Quick Action.
 struct NewTaskCommand: View {
   @FocusedValue(\.taskActions) private var actions
+  #if SEPTASK
+  @FocusedValue(\.septaskNavigationActions) private var septaskNavigation
+  #endif
 
   var body: some View {
     Button("New To-Do") {
       if let actions {
         actions.newTask()
       } else {
+        #if SEPTASK
+        septaskNavigation?.newTask()
+        #else
         OpenNewTaskRouting.dispatch()
+        #endif
       }
     }
     .keyboardShortcut("n", modifiers: .command)
