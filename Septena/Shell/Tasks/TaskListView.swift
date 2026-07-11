@@ -560,25 +560,28 @@ struct TaskListView: View {
         }
       }
       #endif
-
-      #if SEPTASK
-      // Septask's Today list is its home surface. Match Septena's dashboard
-      // affordance: when Claude needs a user-authenticated refresh, show the
-      // same top-bar control rather than hiding recovery in Settings.
-      #if os(iOS)
-      if !embedded {
-        ToolbarItem(placement: .topBarTrailing) {
-          ClaudeReconnectCue(.pill)
-        }
-      }
-      #endif
-      #endif
     }
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded, recentlyDeleted: filter == .recentlyDeleted))
+    #if SEPTASK
+    // Septask's Today list is its home surface. Match Septena's dashboard
+    // affordance: when Claude needs a user-authenticated refresh, show the
+    // same top-bar control rather than hiding recovery in Settings. Applied
+    // AFTER the standalone chrome's own `.toolbar` (which owns "+") so it
+    // composes leading of "+" in the trailing group — face/plus, not plus/face.
+    #if os(iOS)
+    .toolbar {
+      if !embedded {
+        ToolbarItem(placement: .topBarTrailing) {
+          ClaudeReconnectCue(.pill)
+        }
+      }
+    }
+    #endif
+    #endif
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
