@@ -5,15 +5,17 @@ import Foundation
 // provider (the user's Claude). One entry point — `advance(task:)`. Press-to-
 // advance: a UI affordance calls this; nothing auto-runs.
 //
-// PCC drop-in (Xcode 27): register a `PCCReasoningProvider()` under
-// `if #available(iOS 27, *)` in `syncProviders` — the router already prefers it
-// over Claude when `AIPolicy` admits it. Nothing else changes.
+// PCC (iOS 27, Xcode 27 builds only): `PCCReasoningProvider` registers below —
+// the router already prefers it over Claude when `AIPolicy` admits it. On the
+// 26 toolchain the guarded line vanishes and nothing else changes.
 
 @MainActor
 enum ConversationEngine {
   private static var syncProviders: [AIProviderKind: any ReasoningProvider] {
     var p: [AIProviderKind: any ReasoningProvider] = [.onDevice: OnDeviceReasoningProvider()]
-    // if #available(iOS 27, *) { p[.applePCC] = PCCReasoningProvider() }   // Xcode 27 drop-in
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, macOS 27.0, *) { p[.applePCC] = PCCReasoningProvider() }
+    #endif
     return p
   }
 

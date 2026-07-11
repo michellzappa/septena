@@ -401,24 +401,53 @@ every backend, one tool layer.
 1. **Account actions, start immediately (lead-time gated):** enroll the
    developer account in the **App Store Small Business Program**; submit the
    **PCC entitlement request** (§1d). Everything in Track A waits on this.
-2. Install **Xcode 27 beta**; smoke-test all 9 FM files against the rebuilt
-   on-device model (Apple's explicit re-test warning); confirm
-   `MealPhotoModelAnalyzer` activates (`#if compiler(>=6.4)` flips on).
+   ***(OPEN — the remaining Phase-0/1 blocker.)***
+2. ~~Install Xcode 27 beta; smoke-test~~ **DONE 2026-07-11:** Xcode 27.0 beta
+   (27A5218g) was already installed as `Xcode-beta.app`; the whole tree builds
+   clean under it (`DEVELOPER_DIR=/Applications/Xcode-beta.app scripts/build.sh`,
+   0 errors; only pre-existing new-SDK warnings, e.g. the
+   ModelContext/@_implementationOnly diagnostics). `MealPhotoModelAnalyzer`'s
+   `#if compiler(>=6.4)` path now compiles. Runtime prompt re-testing against
+   the rebuilt model still needs a device on the 27 beta (user).
 3. **Adoptable pre-27:** D6 evaluations for existing prompt services; D4's
    token budgeting via the **iOS 26.4** `contextSize`/`tokenCount` APIs.
 
 **Phase 1 — PCC wiring (the stubbed seams; needs entitlement)**
-4. A1 Coach PCC: `PrivateCloudComputeBackend` at `CoachBackend.swift:161-164`;
-   entitlement added by hand to every `*.entitlements`; escalation policy =
-   `AIPolicy` (`auto` prefers PCC when available; `onDeviceOnly` never);
-   `.light` reasoning for streaming chat, `.deep` for goal/commitment
-   proposals; on-device fallback on daily-limit exhaustion, surfaced honestly.
-5. Task conversations: flip `ProviderAvailability.pccAvailable`
-   (`ReasoningProvider.swift:55`), register the PCC provider in
-   `ConversationEngine.syncProviders` (`ConversationEngine.swift:16`) —
-   `.decide` turns resolve inline instead of parking for Claude.
-6. A3 `OnDeviceAI` + Settings ▸ AI status board grow a PCC row (available /
-   needs-network / limit-hit / no-entitlement), including the iCloud+ nuance.
+   ***(CODE DONE 2026-07-11 — written dormant behind `#if compiler(>=6.4)` +
+   `#available(iOS 27/macOS 27)`; compiles under both toolchains; lights up
+   at runtime only once the entitlement lands. Wire format + both MCP servers
+   updated in lockstep (`ConvoTurn.Provider` gained `applePCC` + tolerant
+   decode; catalog + gateway enums). Still to do when the entitlement is
+   granted: add `com.apple.developer.private-cloud-compute` to the
+   hand-maintained `*.entitlements`, then device-verify.)***
+   ***(CRASH-GUARD 2026-07-11: on a beta device with Apple Intelligence, PCC
+   `availability` reports `.available` even WITHOUT the entitlement, but
+   constructing/using a PCC `LanguageModelSession` without it TRAPS — an
+   uncatchable crash that took down Coach on open. Fix: routing is now gated on
+   an explicit opt-in `PCCConfig.routingEnabled` (default OFF, Settings ▸ Claude
+   & AI ▸ "Use Private Cloud Compute"), checked FIRST so `&&` short-circuits
+   before any PCC symbol is touched. So availability ≠ routing: the status row
+   can show "Available — not in use" (amber) while Coach safely stays
+   on-device. Flip the toggle ON only after the entitlement is granted +
+   added to `*.entitlements`.)***
+4. A1 Coach PCC: `PrivateCloudComputeBackend` in `CoachBackend.swift`;
+   escalation policy = `AIPolicy.admissibleProviders` (`auto` prefers PCC;
+   `onDeviceOnly`/`useMyClaude` never reach it; dev force-provider works);
+   reasoning depth is ONE user knob — `PCCConfig.reasoning` (Light/Balanced/
+   Thorough → `.light`/`.moderate`/`.deep`, **default Balanced/`.moderate`**),
+   mapped once by `PCCReasoning.contextOptions` and applied to every PCC call
+   (Coach chat + proposals + the conversation `decide` step) so quality/
+   latency/quota is a single choice, set in Settings ▸ Claude & AI; quota/
+   network exhaustion degrades to a spoken line + on-device on next open. Follow-up chips deliberately stay on-device (don't spend
+   PCC quota on a meta-question).
+5. Task conversations: `ProviderAvailability.pccAvailable` is real (shared
+   `PCCModel` handle in `ReasoningProvider.swift`); `PCCReasoningProvider`
+   (confirm + decide, `.moderate` reasoning) registered in
+   `ConversationEngine.syncProviders` — `.decide` turns resolve inline
+   instead of parking for Claude.
+6. A3 Settings ▸ AI status board has the PCC row (`OnDeviceAI.pccStatus`).
+   Remaining polish: needs-network / limit-hit / iCloud+ nuance once real
+   states are observable with the entitlement.
 7. A2: Purpose/Virtue/Values move deep-reflection calls to PCC (32K window
    fits the whole Examined Week evidence; on-device + `fallbackReadings`
    remain underneath).

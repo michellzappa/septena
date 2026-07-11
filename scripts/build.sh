@@ -43,7 +43,10 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
 # "No code signature found." Give CLI builds their own per-repo DerivedData
 # (keyed by path, like the cron's $CRON_DERIVED) so they can never poison the
 # IDE's products. Worktrees, already on distinct paths, stay isolated too.
-DERIVED="/tmp/septena-agent-derived/$(printf '%s' "$REPO" | shasum | cut -c1-12)"
+# Also key by toolchain (DEVELOPER_DIR): a beta-Xcode build sharing the stable
+# toolchain's incremental state corrupts it (e.g. actool/simulator-runtime
+# mismatches seen 2026-07-11), so each toolchain gets its own cache.
+DERIVED="/tmp/septena-agent-derived/$(printf '%s' "$REPO|${DEVELOPER_DIR:-default}" | shasum | cut -c1-12)"
 
 echo "build.sh: building $SCHEME [$DEST] in $REPO (derived: $DERIVED)"
 ( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration Debug \

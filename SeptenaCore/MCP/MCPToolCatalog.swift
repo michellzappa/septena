@@ -131,7 +131,7 @@ enum MCPToolCatalog {
                 "turn": ["type": "object", "required": ["role", "step"], "properties": [
                   "role": ["type": "string", "enum": ["user", "provider"]],
                   "step": ["type": "string", "enum": ["confirm", "ground", "scope", "decide", "work"]],
-                  "provider": ["type": "string", "enum": ["onDevice", "claude"]],
+                  "provider": ["type": "string", "enum": ["onDevice", "claude", "applePCC"]],
                   "confidence": ["type": "number"],
                   "question": ["type": "string"],
                   "options": ["type": "array", "items": ["type": "string"]],

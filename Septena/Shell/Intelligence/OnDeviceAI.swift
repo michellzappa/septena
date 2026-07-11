@@ -44,6 +44,28 @@ enum OnDeviceAI {
     return false
   }
 
+  /// Private Cloud Compute status for the Settings board: a short label plus
+  /// whether it's usable. `nil` below iOS 27 (or on the 26 toolchain), where
+  /// the row is simply not shown. Until the PCC entitlement is granted and
+  /// shipped in `*.entitlements`, expect this to report unavailable.
+  static var pccStatus: (label: String, available: Bool)? {
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, macOS 27.0, *) {
+      switch PCCModel.shared.availability {
+      case .available:
+        return ("Available", true)
+      case .unavailable(let reason):
+        switch reason {
+        case .deviceNotEligible: return ("Not supported", false)
+        case .systemNotReady:    return ("Preparing", false)
+        @unknown default:        return ("Unavailable", false)
+        }
+      }
+    }
+    #endif
+    return nil
+  }
+
   static var unavailableReason: String? {
     switch availability {
     case .available:

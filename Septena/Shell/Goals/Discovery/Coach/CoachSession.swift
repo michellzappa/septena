@@ -77,6 +77,9 @@ final class CoachSession {
   /// Whether the coach can actually converse (vs. the echo fallback).
   var isLive: Bool { OnDeviceAI.isAvailable }
 
+  /// Which model answers in this session — for the "which model" caption.
+  var modelTag: AIModelTag { backend.modelTag }
+
   /// True while a reply is streaming but no text has arrived yet — drives
   /// the "Thinking…" row, which gives way to the bubble once tokens flow.
   var awaitingFirstToken: Bool {

@@ -110,6 +110,11 @@ struct ConversationCard: View {
           .help("How AI helps with your tasks")
       }
 
+      // Beta diagnostic: which model raised this question (hidden when off).
+      if q.provider != nil {
+        AIModelTagBadge(tag: AIModelTag(q.provider))
+      }
+
       // Options as content-width pills (wrap), with "Other" opening a field.
       FlowLayout(spacing: 8) {
         ForEach(q.options ?? [], id: \.self) { option in

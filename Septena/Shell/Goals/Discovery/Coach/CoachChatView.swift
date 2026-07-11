@@ -147,6 +147,16 @@ struct CoachChatView: View {
          !domain.handPicksContext || anyInScope(session) {
         starterStrip(session)
       }
+      // Beta diagnostic: name the model answering here (hidden when the toggle
+      // is off, or when there's no live model).
+      if session.isLive {
+        HStack {
+          AIModelTagBadge(tag: session.modelTag)
+          Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 2)
+      }
       inputBar(session)
     }
   }

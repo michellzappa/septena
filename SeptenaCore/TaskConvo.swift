@@ -31,7 +31,22 @@ struct ConvoTurn: Codable, Hashable {
 
   enum Role: String, Codable { case user, provider }
   enum Step: String, Codable { case confirm, ground, scope, decide, work }
-  enum Provider: String, Codable { case onDevice, claude }
+
+  /// Which model authored a provider turn. Decoding is tolerant: a provider
+  /// string minted by a newer build (or the gateway) must never make the whole
+  /// conversation undecodable here — `conversationJSON` syncs across the
+  /// user's devices, which won't all run the same app version — so unknown
+  /// strings map to `.unknown` instead of throwing.
+  enum Provider: String, Codable {
+    case onDevice, claude
+    case applePCC        // Apple Private Cloud Compute (iOS 27+)
+    case unknown         // decode fallback only — no provider writes it
+
+    init(from decoder: Decoder) throws {
+      let raw = try decoder.singleValueContainer().decode(String.self)
+      self = Provider(rawValue: raw) ?? .unknown
+    }
+  }
 }
 
 /// What an `agent_assisted` task PRODUCED (research, a table, a draft) — the

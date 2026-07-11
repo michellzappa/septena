@@ -15,6 +15,9 @@ import UIKit
 // flips the toggle), so it's re-sampled on appear and on scene activation.
 struct ClaudeAISettingsPane: View {
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
+  @AppStorage(AIModelTag.visibilityKey) private var showModelTags = true
+  @AppStorage(PCCConfig.routingEnabledKey) private var pccRouting = false
+  @AppStorage(PCCConfig.reasoningKey) private var pccReasoning = PCCConfig.Reasoning.balanced.rawValue
   @State private var showExplainer = false
   @State private var aiStatus: OnDeviceAI.Status = .unknown
   @State private var claudeProvider = ClaudeGatewayProvider.shared
@@ -168,14 +171,66 @@ struct ClaudeAISettingsPane: View {
         Spacer(minLength: 0)
         Circle().fill(statusColor).frame(width: 10, height: 10)
       }
+      // Private Cloud Compute — only present on iOS/macOS 27+ builds. Shows the
+      // system availability PLUS a routing switch: availability alone does NOT
+      // mean the app may use PCC (the entitlement must be granted first, or a
+      // PCC session traps), so routing is opt-in and off by default.
+      if let pcc = OnDeviceAI.pccStatus {
+        HStack(spacing: 12) {
+          Image(systemName: "cloud")
+            .font(.title3)
+            .foregroundStyle(.secondary)
+            .frame(width: 28)
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Private Cloud Compute")
+            Text(pccSublabel(pcc)).font(.footnote).foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 0)
+          Circle().fill(pccDotColor(pcc)).frame(width: 10, height: 10)
+        }
+        Toggle(isOn: $pccRouting) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Use Private Cloud Compute")
+            Text("Turn on only after the PCC entitlement is granted. Without it, requests fail and coaching falls back on-device.")
+              .font(.footnote).foregroundStyle(.secondary)
+          }
+        }
+        .disabled(!pcc.available)
+        Picker("Reasoning", selection: $pccReasoning) {
+          ForEach(PCCConfig.Reasoning.allCases, id: \.self) { r in
+            Text(r.title).tag(r.rawValue)
+          }
+        }
+        .disabled(!pccRouting)
+      }
       if aiStatus == .notEnabled {
         Button("Open Settings", action: openSystemSettings)
+      }
+      Toggle(isOn: $showModelTags) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text("Show model labels")
+          Text("Label which model answers in each AI spot — a temporary beta aid.")
+            .font(.footnote).foregroundStyle(.secondary)
+        }
       }
     } header: {
       Text("On-device intelligence")
     } footer: {
       Text(statusFooter)
     }
+  }
+
+  /// PCC sublabel: reflects both system availability AND whether we route to it.
+  private func pccSublabel(_ pcc: (label: String, available: Bool)) -> String {
+    guard pcc.available else { return pcc.label }
+    return pccRouting ? "In use" : "Available — not in use"
+  }
+
+  /// Green only when available AND actually routed to; amber when available but
+  /// routing is off (the pre-entitlement state); gray when unavailable.
+  private func pccDotColor(_ pcc: (label: String, available: Bool)) -> Color {
+    guard pcc.available else { return .gray }
+    return pccRouting ? .green : .orange
   }
 
   private var statusLabel: String {
