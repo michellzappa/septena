@@ -147,9 +147,8 @@ final class SeptenaServices {
       // touches Next, so every data source (tasks, checklist, training,
       // nutrition, mood, intake) stays in sync without each mutator opting in.
       // Compile-gated, not just profile-gated: Septask ships no watch/widgets
-      // and excludes WatchSnapshotPublisher.swift + NextFeed.swift entirely
-      // (NextFeed reaches up into shell types the Septask target doesn't
-      // compile — see project.yml).
+      // and excludes WatchSnapshotPublisher.swift entirely (NextFeed.swift now
+      // compiles into Septask for the embedded Next fold — see project.yml).
       #if !SEPTASK
       WatchSnapshotPublisher.install(context: context)
       #endif
@@ -192,26 +191,31 @@ final class SeptenaServices {
       projectsMutator.bind(ckEngine: ckEngine)
       // Lets project deletion cascade-clear the link on referencing tasks.
       projectsMutator.taskMutator = taskMutator
+      // The Next feed's write set binds in BOTH profiles: Septask embeds the
+      // full Next feed at the foot of Today (SeptaskNextFold), so the trio
+      // toggles (checklist), inline intake nudges, and the Done Today
+      // edit/delete paths (gut / nutrition; mood needs no engine) must reach
+      // CloudKit from the tasks-only shell too.
+      checklistMutator.bind(ckEngine: ckEngine)
+      gutMutator.bind(ckEngine: ckEngine)
+      intakeMutator.bind(ckEngine: ckEngine)
+      nutritionMutator.bind(ckEngine: ckEngine)
       // Everything below is life-OS-only. In the tasks-only profile (Septask)
-      // the non-task mutators stay unbound — their write paths are never
-      // reachable from a task-only shell, and an unbound mutator dropping a
-      // write loudly beats one silently queueing changes the shell can't show.
+      // these mutators stay unbound — their write paths are never reachable
+      // from a task-only shell, and an unbound mutator dropping a write loudly
+      // beats one silently queueing changes the shell can't show.
       // The provider stores (Oura / Withings / Readwise) also stay cold so a
       // tasks-only process never talks to third-party APIs.
       if !RuntimeProfile.current.isTasksOnly {
-        checklistMutator.bind(ckEngine: ckEngine)
         goalMutator.bind(ckEngine: ckEngine)
         milestoneMutator.bind(ckEngine: ckEngine)
         coachVoiceMutator.bind(ckEngine: ckEngine)
         coachMessageMutator.bind(ckEngine: ckEngine)
-        gutMutator.bind(ckEngine: ckEngine)
         activityMutator.bind(ckEngine: ckEngine)
         symptomsMutator.bind(ckEngine: ckEngine)
         medicationsMutator.bind(ckEngine: ckEngine)
-        intakeMutator.bind(ckEngine: ckEngine)
         groceryMutator.bind(ckEngine: ckEngine)
         trainingMutator.bind(ckEngine: ckEngine)
-        nutritionMutator.bind(ckEngine: ckEngine)
         OuraStore.shared.bind(ckEngine: ckEngine)
         WithingsStore.shared.bind(ckEngine: ckEngine)
         QuoteStore.shared.bind(ckEngine: ckEngine)

@@ -680,7 +680,9 @@ struct NextSuggestionsSection: View {
   }
 }
 
-private struct NextSuggestionRow: View {
+/// Internal (not private): Septask's embedded Next fold renders the same rows
+/// under the Tasks card chrome (see SeptaskNextFold).
+struct NextSuggestionRow: View {
   let suggestion: NextSuggestion
   var model: NextSuggestionsModel
   let nav: NavigationState
