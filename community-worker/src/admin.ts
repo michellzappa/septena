@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { verifyAccessJwt } from "./access";
 import { json } from "./http";
 
 interface InstallSummary {
@@ -67,7 +68,7 @@ export async function telemetryAdmin(req: Request, env: Env): Promise<Response> 
     });
   }
 
-  const auth = authorizeAdmin(req, env);
+  const auth = await authorizeAdmin(req, env);
   if (!auth.ok) {
     return adminUnauthorized(auth.reason);
   }
@@ -76,20 +77,25 @@ export async function telemetryAdmin(req: Request, env: Env): Promise<Response> 
   return html(renderTelemetryDashboard(data, auth.label), 200);
 }
 
-function authorizeAdmin(req: Request, env: Env): { ok: true; label: string } | { ok: false; reason: string } {
+async function authorizeAdmin(req: Request, env: Env): Promise<{ ok: true; label: string } | { ok: false; reason: string }> {
   const token = bearerToken(req) ?? cookieToken(req);
   if (token && authorizedByToken(req, env, token)) {
     return { ok: true, label: "Admin token" };
   }
 
-  const email = req.headers.get("CF-Access-Authenticated-User-Email")?.trim().toLowerCase() ?? "";
+  // Cloudflare Access path: the identity comes from the VERIFIED JWT, never
+  // from CF-Access-Authenticated-User-Email — that header is spoofable by any
+  // client that reaches the worker without passing through Access.
   const accessJwt = req.headers.get("CF-Access-Jwt-Assertion");
   const allowedEmails = (env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (email && accessJwt && allowedEmails.includes(email)) {
-    return { ok: true, label: email };
+  if (accessJwt && allowedEmails.length > 0) {
+    const verified = await verifyAccessJwt(env, accessJwt);
+    if (verified.ok && allowedEmails.includes(verified.email)) {
+      return { ok: true, label: verified.email };
+    }
   }
   if (!env.ADMIN_DASHBOARD_TOKEN && allowedEmails.length === 0) {
     return { ok: false, reason: "Admin access is not configured." };

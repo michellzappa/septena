@@ -1,6 +1,7 @@
+import type { AccessEnv } from "./access";
 import type { AttestEnv } from "./attest";
 
-export interface Env extends AttestEnv {
+export interface Env extends AttestEnv, AccessEnv {
   DB: D1Database;
   USER_HASH_SALT?: string;
   TELEMETRY_HASH_SALT?: string;
