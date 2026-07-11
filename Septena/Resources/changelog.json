@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1430,
+      "build": 1433,
       "date": "2026-07-11",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Point your camera at a plate and Septena reads the food on-device to prefill the meal, with an optional ingredient breakdown.",
+          "title": "Your calendar now lives inside Today and Upcoming",
+          "detail": "System calendar events weave into your task lists, showing only what's still ahead, with hidden-calendar choices synced across devices",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo of your meal to log it",
+          "detail": "Photo-first meal capture reads the plate on-device and prefills the macros for you to confirm",
           "section": "nutrition"
         },
         {
-          "title": "Your calendar, woven into Tasks",
-          "detail": "Events from your system calendar now appear alongside Today and Upcoming so your whole day is in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Organize tasks the way you think",
-          "detail": "Group work with project section headings, drag tasks onto Today to re-home them, select several at once for bulk actions, and import an existing Things database.",
-          "section": "tasks"
-        },
-        {
           "title": "Recover deleted tasks",
-          "detail": "Deleted tasks now rest in Recently Deleted for 30 days with one-tap restore before they purge.",
+          "detail": "A Recently Deleted view restores tasks for 30 days before they auto-purge, with undo on delete, move, and defer",
           "section": "tasks"
         },
         {
-          "title": "A smarter training session flow",
-          "detail": "Rest timers auto-advance with a watch Live Activity, sets offer one-tap progression hints, and a post-session review shows effort-weighted volume by muscle.",
-          "section": "training"
+          "title": "Organize bigger projects with headings and Things import",
+          "detail": "Group work under section headings inside a project, multi-select for bulk actions, and bring your lists over from a Things export",
+          "section": "tasks"
         },
         {
-          "title": "Home-screen widgets for Next and Today",
-          "detail": "Keep your next actions and today's list glanceable right on your home screen.",
-          "section": null
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Any measurable goal can now ride along as a tile on the week dashboard.",
+          "title": "Pin the goals that matter to your dashboard",
+          "detail": "Any measurable goal can ride along as a tile on the week dashboard",
           "section": "goals"
         },
         {
-          "title": "Choose exactly what you share",
-          "detail": "Privacy settings now offer graded analytics levels and show you what has recently been sent, fully anonymized.",
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, one-tap progression hints, and a hands-free auto-advance rest flow with a watch Live Activity",
+          "section": "training"
+        },
+        {
+          "title": "See exactly what analytics you share",
+          "detail": "Graded telemetry levels from off to full, a plain-language checklist of what's sent, and a recently-sent log",
+          "section": null
+        },
+        {
+          "title": "Quick-add straight from your wrist",
+          "detail": "Tap intake summary tiles on the watch to log a dose, with per-row action drawers and a time-of-day sky behind the Next feed",
           "section": null
         }
       ]
