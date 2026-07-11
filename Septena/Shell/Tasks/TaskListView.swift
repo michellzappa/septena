@@ -4129,6 +4129,19 @@ struct TaskListRowContextMenu: View {
 
     Menu {
       Button {
+        onOpenMove(target)
+      } label: {
+        Label("More…", systemImage: "ellipsis")
+      }
+      // ⌘M lives on the sheet-opening item, not the parent Menu: a shortcut on
+      // the Menu container propagates to every submenu row (Inbox, each area,
+      // each project, More…), so all of them showed ⌘M. Attaching it here — the
+      // action that mirrors the menu-bar "Move…" — marks only the one item.
+      .keyboardShortcut(TaskRowShortcuts.move)
+
+      Divider()
+
+      Button {
         onMoveTo(target, nil, nil)
       } label: {
         Label("Inbox", systemImage: "tray")
@@ -4154,17 +4167,6 @@ struct TaskListRowContextMenu: View {
           }
         }
       }
-      Divider()
-      Button {
-        onOpenMove(target)
-      } label: {
-        Label("More…", systemImage: "ellipsis")
-      }
-      // ⌘M lives on the sheet-opening item, not the parent Menu: a shortcut on
-      // the Menu container propagates to every submenu row (Inbox, each area,
-      // each project, More…), so all of them showed ⌘M. Attaching it here — the
-      // action that mirrors the menu-bar "Move…" — marks only the one item.
-      .keyboardShortcut(TaskRowShortcuts.move)
     } label: {
       Label(moveLabel, systemImage: "folder")
     }
