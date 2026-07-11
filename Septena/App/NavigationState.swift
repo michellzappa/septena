@@ -3,8 +3,10 @@ import SwiftUI
 enum Route: Hashable {
   case filter(TaskFilter)
   case next
-  case project(Project)
-  case area(Area)
+  /// Navigation carries durable identity, never a stale model snapshot. Detail
+  /// destinations resolve the live SwiftData record when they render.
+  case project(id: String)
+  case area(id: String)
 }
 
 extension Route {
@@ -17,8 +19,8 @@ extension Route {
     switch self {
     case .filter(let f):  return "filter.\(Self.filterKey(f))"
     case .next:           return "next"
-    case .project(let p): return "project.\(p.id)"
-    case .area(let a):    return "area.\(a.id)"
+    case .project(let id): return "project.\(id)"
+    case .area(let id):    return "area.\(id)"
     }
   }
 
@@ -30,8 +32,8 @@ extension Route {
     switch self {
     case .filter(let f):  return f.title
     case .next:           return String(localized: "Next")
-    case .project(let p): return p.title
-    case .area(let a):    return a.title
+    case .project:        return String(localized: "Project")
+    case .area:           return String(localized: "Area")
     }
   }
 
@@ -44,12 +46,6 @@ extension Route {
     case .project:        return "number"
     case .area:           return "folder"
     }
-  }
-
-  /// The area's user-assigned glyph, when set — used in place of `icon`.
-  var emoji: String? {
-    if case .area(let a) = self, let e = a.emoji, !e.isEmpty { return e }
-    return nil
   }
 
   private static func filterKey(_ f: TaskFilter) -> String {
@@ -144,6 +140,14 @@ enum TaskDestinations {
 final class NavigationState {
   var path: [Route] = []
 
+  /// One-shot request from task search. The receiving task list waits until it
+  /// has loaded the matching route, then reveals the exact row and clears it.
+  struct TaskReveal: Equatable {
+    let taskID: String
+    let routeID: String
+  }
+  var pendingTaskReveal: TaskReveal?
+
   /// The single navigation entry point. The app is conceptually flat, so a
   /// destination tap REPLACES the path (`push: false`, the default); only the
   /// iPhone area → project drill-in pushes onto the stack. Centralized here so
@@ -153,12 +157,28 @@ final class NavigationState {
     Haptics.tap()
     if push { path.append(route) } else { path = [route] }
   }
+
+  /// Navigate to a task's owning list and reveal that specific task once the
+  /// destination has rendered. Search uses this rather than merely opening the
+  /// containing project or smart list.
+  func revealTask(id: String, in route: Route) {
+    go(to: route)
+    pendingTaskReveal = TaskReveal(taskID: id, routeID: route.id)
+  }
   /// One-shot trigger: when set to true, the currently-visible
   /// TaskListView starts a new inline task (same flow as Command-N) on its
   /// next render. TaskListView resets it to false after consuming. Used
   /// by toolbar `+` actions and the sidebar Menu's New To-Do entry, so
   /// 'new task' never opens a modal sheet — always inline, like Things.
   var shouldStartCreating = false
+
+  /// One-shot triggers for the sidebar's "New Project" / "New Area" sheets,
+  /// set by the macOS menu bar's Task menu (there's no toolbar "···" on macOS —
+  /// see `SeptenaPage`). `SidebarView` observes each, opens its sheet, and
+  /// resets the flag. iOS reaches the same sheets through the sidebar overflow,
+  /// so these stay false there.
+  var shouldCreateProject = false
+  var shouldCreateArea = false
 
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`

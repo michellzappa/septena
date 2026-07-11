@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
   @Environment(NavigationState.self) private var nav
@@ -61,6 +62,9 @@ struct ContentView: View {
         .toolbar(removing: .sidebarToggle)
         #endif
     }
+    // A task manager needs its sidebar to reserve real layout space: opening
+    // it should push the list/detail across, rather than floating over and
+    // obscuring active work. This is the standard balanced split-view behavior.
     .navigationSplitViewStyle(.balanced)
     .iPadReportsNavDepth(id: "tasks", atRoot: true)
     // Split surfaces always show a detail pane, so the sidebar must always
@@ -94,8 +98,51 @@ struct ContentView: View {
       #else
       NextView()
       #endif
-    case .project(let p): ProjectDetailView(project: p).id(p.id)
-    case .area(let a):    AreaDetailView(area: a).id(a.id)
+    case .project(let id): ProjectRouteDestination(id: id).id(route.id)
+    case .area(let id):    AreaRouteDestination(id: id).id(route.id)
+  }
+}
+
+/// Resolve an ID route from the live SwiftData mirror. Routes intentionally do
+/// not carry record snapshots: a rename, move, or cross-app sync should update
+/// an open detail rather than leave its navigation payload stale.
+private struct ProjectRouteDestination: View {
+  let id: String
+  @Query private var projects: [ProjectEntity]
+
+  init(id: String) {
+    self.id = id
+    _projects = Query(filter: #Predicate<ProjectEntity> { $0.id == id })
+  }
+
+  var body: some View {
+    if let project = projects.first {
+      ProjectDetailView(project: Project(project))
+    } else {
+      ContentUnavailableView("Project Unavailable",
+                             systemImage: "number",
+                             description: Text("This project was deleted or is no longer available."))
     }
   }
+}
+
+private struct AreaRouteDestination: View {
+  let id: String
+  @Query private var areas: [AreaEntity]
+
+  init(id: String) {
+    self.id = id
+    _areas = Query(filter: #Predicate<AreaEntity> { $0.id == id })
+  }
+
+  var body: some View {
+    if let area = areas.first {
+      AreaDetailView(area: Area(area))
+    } else {
+      ContentUnavailableView("Area Unavailable",
+                             systemImage: "folder",
+                             description: Text("This area was deleted or is no longer available."))
+    }
+  }
+}
 }

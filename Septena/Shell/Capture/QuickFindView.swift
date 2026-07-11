@@ -113,6 +113,7 @@ struct QuickFindView: View {
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "t:\(t.id)",
+        taskID: t.id,
         kind: .task(done: t.status == .done, today: t.today),
         title: t.title,
         subtitle: taskSubtitle(t),
@@ -125,11 +126,12 @@ struct QuickFindView: View {
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "p:\(p.id)",
+        taskID: nil,
         kind: .project(done: p.status == .done),
         title: p.title,
         subtitle: areaTitle(forId: p.area),
         score: s + 1 + (p.status == .done ? -3 : 0),
-        route: .project(Project(p))
+        route: .project(id: p.id)
       ))
     }
     for a in areas {
@@ -137,11 +139,12 @@ struct QuickFindView: View {
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "a:\(a.id)",
+        taskID: nil,
         kind: .area,
         title: a.title,
         subtitle: nil,
         score: s + 1,
-        route: .area(Area(a))
+        route: .area(id: a.id)
       ))
     }
 
@@ -174,10 +177,10 @@ struct QuickFindView: View {
 
   private func routeForTask(_ t: TaskEntity) -> Route {
     if let pid = t.project, let p = projects.first(where: { $0.id == pid }) {
-      return .project(Project(p))
+      return .project(id: p.id)
     }
     if let aid = t.area, let a = areas.first(where: { $0.id == aid }) {
-      return .area(Area(a))
+      return .area(id: a.id)
     }
     if t.isOnToday { return .filter(.today) }
     if t.scheduled != nil || t.deadline != nil { return .filter(.upcoming) }
@@ -215,7 +218,12 @@ struct QuickFindView: View {
   private func activateSelected() {
     let rows = hits
     guard rows.indices.contains(selection) else { return }
-    nav.go(to: rows[selection].route)
+    let hit = rows[selection]
+    if let taskID = hit.taskID {
+      nav.revealTask(id: taskID, in: hit.route)
+    } else {
+      nav.go(to: hit.route)
+    }
     dismiss()
   }
 
@@ -241,6 +249,8 @@ private struct QuickFindHit: Identifiable, Hashable {
     case area
   }
   let id: String
+  /// Non-nil only for a task result. Areas and projects navigate normally.
+  let taskID: String?
   let kind: Kind
   let title: String
   let subtitle: String?

@@ -188,6 +188,13 @@ struct AreaDetailView: View {
       Text(errorMessage ?? "")
     }
     .task(id: area.id) { await load() }
+    .onChange(of: area) { old, fresh in
+      // ID routes resolve the live record. Adopt an external rename only when
+      // this detail has no local title draft in flight.
+      if draftName == old.title {
+        draftName = fresh.title
+      }
+    }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       Task { await load() }
     }
@@ -207,9 +214,9 @@ struct AreaDetailView: View {
   /// the flat replace.
   private func openProject(_ project: Project) {
     #if os(macOS)
-    nav.go(to: .project(project))
+    nav.go(to: .project(id: project.id))
     #else
-    nav.go(to: .project(project), push: hSize == .compact)
+    nav.go(to: .project(id: project.id), push: hSize == .compact)
     #endif
   }
 
@@ -488,6 +495,24 @@ struct ProjectDetailView: View {
       await loadProgress()
       await loadAreas()
       await rehydrateNotes()
+    }
+    .onChange(of: project) { old, fresh in
+      // Avoid clobbering an in-flight inline title edit, but reflect changes
+      // synced from Septena or another device as soon as the local draft is
+      // still the old stored value.
+      if draftName == old.title {
+        draftName = fresh.title
+        originalName = fresh.title
+      }
+      if !notesFocused, draftNotes == (old.notes ?? "") {
+        let notes = fresh.notes ?? ""
+        draftNotes = notes
+        originalNotes = notes
+      }
+      if !showingAttachmentEditor, draftAttachment == old.attachment {
+        draftAttachment = fresh.attachment
+      }
+      status = fresh.status
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
       Task {

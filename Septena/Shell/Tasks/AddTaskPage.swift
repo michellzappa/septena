@@ -9,18 +9,8 @@ private enum TaskBucket {
   case inbox
   case today
   case upcoming
-  case area(Area)
-  case project(Project)
-
-  var label: String {
-    switch self {
-    case .inbox:               return "Inbox"
-    case .today:               return "Today"
-    case .upcoming:            return "Upcoming"
-    case .area(let a):         return a.title
-    case .project(let p):      return p.title
-    }
-  }
+  case area(String)
+  case project(String)
 }
 
 struct AddTaskPage: View {
@@ -28,6 +18,7 @@ struct AddTaskPage: View {
   @Environment(TaskMutator.self) private var mutator
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
+  @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
   @State private var todays: [SeptenaTask] = []
@@ -42,9 +33,21 @@ struct AddTaskPage: View {
       case .upcoming: return .upcoming
       default:        return .inbox
       }
-    case .project(let p): return .project(p)
-    case .area(let a):    return .area(a)
+    case .project(let id): return .project(id)
+    case .area(let id):    return .area(id)
     case .next:           return .inbox
+    }
+  }
+
+  private var bucketLabel: String {
+    switch bucket {
+    case .inbox: return "Inbox"
+    case .today: return "Today"
+    case .upcoming: return "Upcoming"
+    case .area(let id):
+      return LocalCache.areas(in: modelContext).first(where: { $0.id == id })?.title ?? "Area"
+    case .project(let id):
+      return LocalCache.projects(in: modelContext).first(where: { $0.id == id })?.title ?? "Project"
     }
   }
 
@@ -58,7 +61,7 @@ struct AddTaskPage: View {
       Section {
         HStack(spacing: 6) {
           Text("Adding to").foregroundStyle(.secondary)
-          Text(bucket.label).fontWeight(.medium)
+          Text(bucketLabel).fontWeight(.medium)
           Spacer()
         }
         .font(.footnote)
@@ -69,7 +72,7 @@ struct AddTaskPage: View {
           Button { commit(title: trimmed) } label: {
             AddInfoRow(
               title: "Add: “\(trimmed)”",
-              subtitle: bucket.label,
+              subtitle: bucketLabel,
               systemImage: "plus.circle.fill",
               tint: tint
             )
@@ -115,8 +118,8 @@ struct AddTaskPage: View {
       return nil
     }()
     let today: Bool = { if case .today = bucket { return true }; return false }()
-    let area: String? = { if case .area(let a) = bucket { return a.id }; return nil }()
-    let project: String? = { if case .project(let p) = bucket { return p.id }; return nil }()
+    let area: String? = { if case .area(let id) = bucket { return id }; return nil }()
+    let project: String? = { if case .project(let id) = bucket { return id }; return nil }()
     mutator.create(
       title: title,
       area: area,

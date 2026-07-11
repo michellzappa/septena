@@ -14,7 +14,7 @@ import SwiftData
 //
 // Pure native `Menu` + `Button`s (no popover, no custom focus handling) per
 // the "use default SwiftUI, never get creative" rule. Search lives in Quick
-// Find (⌘K); this stays a pure *jump* affordance, so a `Menu` is enough.
+// Find (⌘⇧F); this stays a pure *jump* affordance, so a `Menu` is enough.
 
 /// The destination dropdown. The caller supplies the `label` (the visible
 /// trigger): the smart-list screens pass a `ScreenTitle`-shaped label, while
@@ -60,14 +60,14 @@ struct TaskNavMenu<Trigger: View>: View {
 
     if !topLevel.isEmpty {
       Divider()
-      ForEach(topLevel) { destButton(.project($0)) }
+      ForEach(topLevel) { destButton(.project(id: $0.id), title: $0.title) }
     }
 
     ForEach(areas) { area in
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       Divider()
-      destButton(.area(area))
-      ForEach(areaProjects) { destButton(.project($0)) }
+      destButton(.area(id: area.id), title: area.title)
+      ForEach(areaProjects) { destButton(.project(id: $0.id), title: $0.title) }
     }
 
     if !LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).isEmpty {
@@ -92,10 +92,10 @@ struct TaskNavMenu<Trigger: View>: View {
   /// `Label`s keep every destination a normal, left-aligned item. (The sidebar
   /// still shows emoji.)
   @ViewBuilder
-  private func destButton(_ route: Route) -> some View {
+  private func destButton(_ route: Route, title: String? = nil) -> some View {
     let isCurrent = nav.path.last?.sameDestination(as: route) == true
     Toggle(isOn: Binding(get: { isCurrent }, set: { if $0 { nav.go(to: route) } })) {
-      Label(route.title, systemImage: route.icon)
+      Label(title ?? route.title, systemImage: route.icon)
     }
   }
 }
