@@ -74,6 +74,13 @@ public final class ClaudeGatewayProvider {
   /// Don't trust calibration off a single lucky sample.
   private static let calibrationMinSamples = 3
 
+  /// How many of the most recent samples feed the floor. A rolling window
+  /// (not all-time min) so growth keeps climbing as recent evidence
+  /// accumulates instead of being permanently capped by one old, possibly
+  /// anomalous early sample — while a genuinely tighter recent expiry still
+  /// pulls the floor back down immediately.
+  private static let calibrationWindow = 5
+
   /// Below this age a freshly-minted token is trusted without a network probe —
   /// no point asking CloudKit about a token minted minutes ago on every
   /// foreground. Past it we close the loop and verify the real verdict.
@@ -243,6 +250,35 @@ public final class ClaudeGatewayProvider {
     }
   }
 
+  public enum ConnectionTestResult { case valid, expired, inconclusive }
+
+  /// On-demand version of the closed-loop check `refreshIfNeeded` runs on
+  /// foreground — but always probes CloudKit regardless of `probeAfter`, so
+  /// Settings can offer a "Test Connection" button that answers right now
+  /// instead of waiting on the natural foreground cadence. Also feeds
+  /// calibration exactly like the automatic path, so manual tests are a way
+  /// to manufacture `measure.samples` on demand rather than waiting hours
+  /// between organic ones.
+  @discardableResult
+  public func testConnection() async -> ConnectionTestResult {
+    reloadSharedState()
+    guard isEnabled, let age = lastRefreshAt.map({ Date().timeIntervalSince($0) }) else {
+      return .inconclusive
+    }
+    switch await probeStoredToken() {
+    case .some(true):
+      needsReauth = false
+      recordMeasurement(ageSec: age, valid: true)
+      return .valid
+    case .some(false):
+      needsReauth = true
+      recordMeasurement(ageSec: age, valid: false)
+      return .expired
+    case .none:
+      return .inconclusive
+    }
+  }
+
   /// Closed-loop validity check: ask CloudKit (the same authority Claude's
   /// gateway depends on) whether the last token we minted + pushed is still
   /// accepted on the private DB. Returns `true` (valid), `false`
@@ -281,12 +317,16 @@ public final class ClaudeGatewayProvider {
   // MARK: Lifetime measurement (calibration)
   //
   // Each token cycle, track the largest age the probe still saw the token as
-  // valid (`lastValid`) and the age at which it first saw it expired
-  // (`expiredBy`). The true CloudKit lifetime lies in (lastValid, expiredBy].
-  // Finalized samples are appended to `samplesKey` so they outlive the `.info`
-  // logs, AND feed `calibratedValidFloor()` below so `refreshInterval` /
-  // `probeAfter` self-tune upward as real data accumulates — no hand-editing
-  // needed. To eyeball the raw samples:
+  // valid (`lastValid`). A cycle finalizes into one `measure.samples` line
+  // either when the probe catches a real expiry (also records `expiredBy`,
+  // the tighter bound) OR — far more common in practice — when the NEXT
+  // reconnect rolls the cycle over, so an ordinary "I tapped reconnect" still
+  // teaches calibration `lastValid` for whatever age the old token was last
+  // confirmed good at. Waiting only for observed expiry starves calibration:
+  // most tokens get replaced by a manual reconnect long before the probe ever
+  // catches them dead. Samples feed `calibratedValidFloor()` below so
+  // `refreshInterval` / `probeAfter` self-tune upward as real data
+  // accumulates — no hand-editing needed. To eyeball the raw samples:
   //   defaults read com.septena.cloud.mac septena.claudeGateway.measure.samples
   private static let measureCycleKey = "septena.claudeGateway.measure.cycleRefreshAt"
   private static let measureValidKey = "septena.claudeGateway.measure.lastValidAge"
@@ -300,17 +340,18 @@ public final class ClaudeGatewayProvider {
     return max(refreshIntervalFloor, floor - calibrationSafetyMargin)
   }
 
-  /// The smallest "still valid" age ever confirmed by the closed-loop probe,
-  /// parsed back out of the finalized `measure.samples` lines (each looks
-  /// like "minted … | lastValid 27000s | expiredBy 28800s"). This is a safe
-  /// lower bound on the real CloudKit token lifetime — every sample is a
-  /// case where the token was independently verified still accepted at that
-  /// age. `nil` until `calibrationMinSamples` samples have accumulated, so a
+  /// The smallest "still valid" age confirmed by the closed-loop probe across
+  /// the last `calibrationWindow` samples, parsed back out of the finalized
+  /// `measure.samples` lines (each looks like "minted … | lastValid 27000s"
+  /// or "… | lastValid 27000s | expiredBy 28800s"). This is a safe lower
+  /// bound on the real CloudKit token lifetime — every sample is a case
+  /// where the token was independently verified still accepted at that age.
+  /// `nil` until `calibrationMinSamples` samples have accumulated, so a
   /// device fresh off the default keeps the conservative floor.
   private static func calibratedValidFloor() -> TimeInterval? {
     let samples = UserDefaults.standard.stringArray(forKey: measureSamplesKey) ?? []
     guard samples.count >= calibrationMinSamples else { return nil }
-    let lastValids: [Double] = samples.compactMap { line in
+    let lastValids: [Double] = samples.suffix(calibrationWindow).compactMap { line in
       for part in line.split(separator: "|") {
         let trimmed = part.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("lastValid "), trimmed.hasSuffix("s") {
@@ -326,8 +367,15 @@ public final class ClaudeGatewayProvider {
     guard let last = lastRefreshAt else { return }
     let d = UserDefaults.standard
     let cycle = last.timeIntervalSince1970
-    // New token cycle → reset the running lower bound.
-    if d.double(forKey: Self.measureCycleKey) != cycle {
+    let priorCycle = d.double(forKey: Self.measureCycleKey)
+    // New token cycle (a reconnect just happened) → finalize whatever the
+    // PREVIOUS cycle proved before resetting the running lower bound. This is
+    // what lets the window grow from ordinary use, not just from watching a
+    // token actually die: most reconnects happen because the user tapped
+    // "reconnect" or reopened the app, never because the probe caught a real
+    // expiry, so waiting only for `valid == false` starves calibration.
+    if priorCycle != cycle {
+      finalizeIfNeeded(cycle: priorCycle, d: d)
       d.set(cycle, forKey: Self.measureCycleKey)
       d.set(0, forKey: Self.measureValidKey)
     }
@@ -337,14 +385,26 @@ public final class ClaudeGatewayProvider {
       }
       return
     }
-    // First expiry seen for this cycle → finalize one sample (dedup the
-    // repeated foregrounds that keep seeing the same dead token).
-    guard d.double(forKey: Self.measureFinalizedKey) != cycle else { return }
-    d.set(cycle, forKey: Self.measureFinalizedKey)
+    // An observed expiry is tighter evidence than a rollover guess — finalize
+    // immediately with the real expiredBy instead of waiting for the next
+    // reconnect to roll the cycle over.
+    finalizeIfNeeded(cycle: cycle, d: d, expiredAt: ageSec)
+  }
+
+  /// Append one calibration sample for `cycle`, if it hasn't been finalized
+  /// yet and we actually learned something (a confirmed-valid age, an
+  /// observed expiry, or both). No-ops for `cycle == 0` (nothing tracked yet)
+  /// and de-dupes repeated foregrounds that keep seeing the same dead token.
+  private func finalizeIfNeeded(cycle: Double, d: UserDefaults, expiredAt: Double? = nil) {
+    guard cycle > 0, d.double(forKey: Self.measureFinalizedKey) != cycle else { return }
     let lastValid = Int(d.double(forKey: Self.measureValidKey))
-    let minted = ISO8601DateFormatter().string(from: last)
+    guard lastValid > 0 || expiredAt != nil else { return }
+    d.set(cycle, forKey: Self.measureFinalizedKey)
+    let minted = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: cycle))
+    var line = "minted \(minted) | lastValid \(lastValid)s"
+    if let expiredAt { line += " | expiredBy \(Int(expiredAt))s" }
     var samples = d.stringArray(forKey: Self.measureSamplesKey) ?? []
-    samples.append("minted \(minted) | lastValid \(lastValid)s | expiredBy \(Int(ageSec))s")
+    samples.append(line)
     d.set(Array(samples.suffix(12)), forKey: Self.measureSamplesKey)
   }
 

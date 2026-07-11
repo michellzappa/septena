@@ -15,6 +15,8 @@ import SwiftUI
 struct ClaudeGatewayDetail: View {
   @State private var provider = ClaudeGatewayProvider.shared
   @State private var urlCopied = false
+  @State private var isTesting = false
+  @State private var testResult: ClaudeGatewayProvider.ConnectionTestResult?
 
   /// The exact custom-connector address Claude expects (the JSON-RPC MCP
   /// transport endpoint). NOT the bare domain — Claude needs the `/mcp` path.
@@ -92,6 +94,26 @@ struct ClaudeGatewayDetail: View {
             }
           }
           .disabled(provider.isRefreshing)
+          Button {
+            Task {
+              isTesting = true
+              testResult = await provider.testConnection()
+              isTesting = false
+            }
+          } label: {
+            HStack {
+              Label("Test Connection", systemImage: "antenna.radiowaves.left.and.right")
+              Spacer()
+              if isTesting {
+                ProgressView().controlSize(.small)
+              } else if let testResult {
+                Text(testResultLabel(testResult))
+                  .font(.caption)
+                  .foregroundStyle(testResultColor(testResult))
+              }
+            }
+          }
+          .disabled(isTesting)
           if let err = provider.lastError {
             Text(err)
               .font(.caption)
@@ -122,6 +144,22 @@ struct ClaudeGatewayDetail: View {
       }
     }
     .formStyle(.grouped)
+  }
+
+  private func testResultLabel(_ result: ClaudeGatewayProvider.ConnectionTestResult) -> String {
+    switch result {
+    case .valid: return "Valid"
+    case .expired: return "Expired"
+    case .inconclusive: return "Couldn’t tell — offline?"
+    }
+  }
+
+  private func testResultColor(_ result: ClaudeGatewayProvider.ConnectionTestResult) -> Color {
+    switch result {
+    case .valid: return .green
+    case .expired: return .orange
+    case .inconclusive: return .secondary
+    }
   }
 
   @ViewBuilder
