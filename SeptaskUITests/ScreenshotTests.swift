@@ -7,11 +7,12 @@ import XCTest
 ///     -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=26.0' \
 ///     -only-testing:SeptaskUITests
 ///
-/// On compact iPhone Septask presents a system TabView (Tasks · Today ·
-/// Upcoming · New To-Do — see SeptaskRootView.systemTabView), NOT a sidebar, so
-/// navigation is tab-bar driven like Septena's ScreenshotTests. Only the task
-/// screens are shot. Basenames are the contract with appstore/panels.septask.mjs:
-/// tasks-today · tasks-upcoming · tasks-project. Every navigation is best-effort.
+/// On compact iPhone Septask presents a TabView with a custom floating tab
+/// control (Tasks · Today · Upcoming, plus a separate New To-Do button), NOT a
+/// sidebar. Navigation is tab-bar driven like Septena's ScreenshotTests. Only
+/// the task screens are shot. Basenames are the contract with
+/// appstore/panels.septask.mjs: tasks-today · tasks-upcoming · tasks-project.
+/// Every navigation is best-effort.
 final class ScreenshotTests: XCTestCase {
   override func setUpWithError() throws { continueAfterFailure = false }
 
@@ -46,11 +47,13 @@ final class ScreenshotTests: XCTestCase {
 
   // MARK: - navigation
 
-  /// Tap a tab-bar item by label (compact iPhone). Falls back to a same-named
-  /// button/cell so a relabel degrades to a skip, never a failure.
+  /// Tap a custom floating-tab item first, then fall back to the system tab bar
+  /// and same-named controls so a relabel degrades to a skip, never a failure.
   @MainActor private func tapTab(_ app: XCUIApplication, _ label: String) {
+    let customTab = app.buttons["septask.tab.\(label.lowercased())"]
+    if customTab.waitForExistence(timeout: 2), customTab.isHittable { customTab.tap(); return }
     let tab = app.tabBars.buttons[label]
-    if tab.waitForExistence(timeout: 4), tab.isHittable { tab.tap(); return }
+    if tab.waitForExistence(timeout: 2), tab.isHittable { tab.tap(); return }
     for el in [app.buttons[label], app.cells[label]] {
       if el.waitForExistence(timeout: 2), el.isHittable { el.tap(); return }
     }
