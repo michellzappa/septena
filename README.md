@@ -24,7 +24,7 @@ Scaffold. OAuth + Apple bridge wired end-to-end with KV storage; the initial tas
 | | |
 |---|---|
 | `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata for client discovery |
-| `POST /oauth/register` | RFC 7591 Dynamic Client Registration |
+| `POST /oauth/register` | RFC 7591 Dynamic Client Registration (https-only redirect URIs, pinned to known client hosts) |
 | `GET /oauth/authorize` | claude.ai sends user here → we redirect to Apple |
 | `GET /auth/apple/callback` | Apple lands here with `ckWebAuthToken`; we mint a code |
 | `POST /oauth/token` | claude.ai exchanges code + PKCE verifier for access token |

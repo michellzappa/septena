@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { Env } from "../env.js";
 import { getClient, putState } from "../storage.js";
 import { logEvent, randomId } from "../util.js";
+import { validateRedirectUri } from "./redirects.js";
 
 // /oauth/authorize — claude.ai sends user's browser here.
 // We stash the PKCE+state in KV under a random id, set that id as a
@@ -22,7 +23,7 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
   // copy so you can eyeball styling without going through claude.ai's full
   // flow. Signing in 400s ("missing session") since no state cookie is set.
   if (url.searchParams.get("preview") === "1") {
-    return new Response(consentPage("claude.ai"), {
+    return new Response(consentPage("claude.ai", "claude.ai"), {
       status: 200,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -48,6 +49,15 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
   if (!client.redirectUris.includes(redirectUri)) {
     return c.text("redirect_uri not registered", 400);
   }
+  // Re-validate against the current policy, not just the registration:
+  // clients registered before host pinning existed (or with a since-removed
+  // host) must not receive auth codes.
+  const rejection = validateRedirectUri(redirectUri);
+  if (rejection) {
+    logEvent("oauth_authorize", { clientId, ok: false, error: "redirect_rejected", reason: rejection });
+    return c.text(`redirect_uri rejected: ${rejection}`, 400);
+  }
+  const redirectHost = new URL(redirectUri).host;
 
   const stateId = randomId(24);
   await putState(c.env, stateId, {
@@ -64,8 +74,8 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
   // tokens, but it works. The CloudKit.js path (/oauth/signin) is still
   // deployed for separate debugging but is no longer in the OAuth path.
   const clientName = escapeHtml(client.name ?? clientId);
-  logEvent("oauth_authorize", { clientId, path: "consent" });
-  return new Response(consentPage(clientName), {
+  logEvent("oauth_authorize", { clientId, path: "consent", redirectHost });
+  return new Response(consentPage(clientName, escapeHtml(redirectHost)), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -75,7 +85,7 @@ export async function authorize(c: Context<{ Bindings: Env }>) {
   });
 }
 
-function consentPage(clientName: string): string {
+function consentPage(clientName: string, redirectHost: string): string {
   // Inline CSS — Workers don't serve static assets here. System font
   // stack matches Apple's sign-in look. Respects dark mode.
   return `<!doctype html>
@@ -133,6 +143,20 @@ function consentPage(clientName: string): string {
     margin: 8px 0 20px;
   }
   .scope-list strong { font-weight: 600; }
+  .redirect-note {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #4a4a4a;
+    margin: 0 0 16px;
+  }
+  .redirect-note code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: #f5f5f7;
+    border: 1px solid #e5e5e5;
+    border-radius: 5px;
+    padding: 1px 5px;
+  }
   button, .secondary {
     display: block;
     width: 100%;
@@ -175,6 +199,8 @@ function consentPage(clientName: string): string {
     h1 { color: #f5f5f5; }
     p { color: #b5b5b5; }
     .scope-list { background: #1f1f1f; border-color: #2a2a2a; }
+    .redirect-note { color: #b5b5b5; }
+    .redirect-note code { background: #1f1f1f; border-color: #2a2a2a; }
     .footer { color: #888; }
   }
 </style>
@@ -199,6 +225,8 @@ function consentPage(clientName: string): string {
       • Read and write your habits, supplements, chores, and goals<br>
       • Read and write your app settings
     </div>
+    <p class="redirect-note">After you sign in, your browser will be sent back to
+    <code>${redirectHost}</code>. If that isn't where you started, don't continue.</p>
     <form method="POST" action="/oauth/continue">
       <button type="submit">Continue with iCloud</button>
     </form>
