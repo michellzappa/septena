@@ -4,49 +4,59 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1405,
-      "date": "2026-07-10",
+      "build": 1410,
+      "date": "2026-07-11",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a photo of your meal and Septena reads the food and prefills macros on-device, with a fast label fallback.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Nutrition now captures meals from a photo and uses on-device analysis to prefill the name and macros, with an optional ingredient breakdown and percentage scaling when you re-log.",
           "section": "nutrition"
         },
         {
-          "title": "Project headings and drag-to-organize tasks",
-          "detail": "Group work with section headings inside a project, and drag tasks onto Today groups or areas to re-home them.",
+          "title": "A big Tasks overhaul",
+          "detail": "Group work under project headings, multi-select for bulk actions, a redesigned date picker with quick-pick pills, inline editing everywhere, and drag tasks onto Today to re-home them.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted with restore",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days with one-tap undo before they auto-purge.",
+          "title": "Your calendar lives inside Tasks",
+          "detail": "System calendar events now appear alongside Today and Upcoming, showing only what's still ahead.",
           "section": "tasks"
         },
         {
-          "title": "Calendar events in your day",
-          "detail": "Your system calendar now weaves into Today and Upcoming so meetings sit alongside tasks.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view with undo and restore, auto-purging after 30 days.",
           "section": "tasks"
         },
         {
-          "title": "Multi-select and bulk task actions",
-          "detail": "Select several tasks to complete, move, copy, or file them at once, with an undo toast for delete, move, and defer.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring in a Things database export, with headings mapped to project sections.",
           "section": "tasks"
         },
         {
-          "title": "A stronger training review",
-          "detail": "Effort-weighted muscle volume, a post-session weekly review, one-tap progression hints, and an auto-advancing rest flow with a Live Activity.",
+          "title": "Smarter training progress",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, one-tap progression hints on strength sets, and a rest timer that auto-advances with a watch Live Activity.",
           "section": "training"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Pin any measurable goal to keep it front and center as a tile on the week dashboard.",
+          "detail": "Any measurable goal can be pinned to the week dashboard so its progress is always in view.",
           "section": "goals"
         },
         {
-          "title": "Graded privacy controls",
-          "detail": "Choose exactly how much analytics you share across Off, Minimal, Balanced, and Full, and see a log of what was recently sent.",
+          "title": "See and control what you share",
+          "detail": "Graded telemetry levels from Off to Full, a plain-language ladder of what each level sends, and a log of recently-sent, anonymized data.",
+          "section": null
+        },
+        {
+          "title": "A richer wrist experience",
+          "detail": "The watch Next feed floats over a live time-of-day sky, with long-press action drawers, tap-to-quick-add intake tiles, and expanded meal and ring rendering.",
+          "section": null
+        },
+        {
+          "title": "The Week tab is now Today",
+          "detail": null,
           "section": null
         }
       ]
