@@ -33,15 +33,22 @@ app.get("/skill.md", (c) =>
 
 app.get("/health", (c) => c.json({ ok: true }));
 
-// Apple App Site Association — lets the Septena app claim mcp.septena.app
+// Apple App Site Association — lets Septena AND Septask claim mcp.septena.app
 // via the Associated Domains `webcredentials` service, which is what
 // ASWebAuthenticationSession's HTTPS callback (.https) requires before it
 // will hand the /auth/apple/callback redirect (carrying ckWebAuthToken)
-// back to the app. webcredentials only — we deliberately do NOT add
-// applinks (no universal-link hijacking of the landing page).
+// back to the app. Both iOS apps ship the same webcredentials:mcp.septena.app
+// entitlement — every App ID needs to be listed here or iOS silently refuses
+// the association (webAuth.start() returns false, no sheet ever shows).
+// webcredentials only — we deliberately do NOT add applinks (no
+// universal-link hijacking of the landing page).
 app.get("/.well-known/apple-app-site-association", (c) =>
   c.json(
-    { webcredentials: { apps: ["992N457T8D.com.septena.cloud"] } },
+    {
+      webcredentials: {
+        apps: ["992N457T8D.com.septena.cloud", "992N457T8D.com.septena.tasks"],
+      },
+    },
     200,
     { "Cache-Control": "public, max-age=3600" },
   ),
