@@ -48,6 +48,7 @@ struct EditNutritionEntrySheet: View {
   @State private var photoEdited: Bool = false
   @State private var analyzing = false
   @State private var analysisNote: String? = nil
+  @State private var analysisTag: AIModelTag? = nil
 
   var body: some View {
     AdaptiveEditScaffold(title: original == nil ? "New Meal" : "Edit Meal",
@@ -119,6 +120,7 @@ struct EditNutritionEntrySheet: View {
             photoAssetID = nil
             photoEdited = true
             analysisNote = nil
+            analysisTag = nil
           } label: {
             Text("Remove").font(.caption)
           }
@@ -132,7 +134,10 @@ struct EditNutritionEntrySheet: View {
         Text("Reading the photo…").font(.caption).foregroundStyle(.secondary)
       }
     } else if let analysisNote {
-      Text(analysisNote).font(.caption).foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(analysisNote).font(.caption).foregroundStyle(.secondary)
+        if let analysisTag { AIModelTagBadge(tag: analysisTag) }
+      }
     }
   }
 
@@ -155,6 +160,7 @@ struct EditNutritionEntrySheet: View {
     await MainActor.run {
       prefill(from: draft)
       analysisNote = draft.note ?? "Couldn't identify nutrition from this photo — fill the fields below"
+      analysisTag = draft.isEmpty ? nil : draft.modelTag
       analyzing = false
     }
   }
@@ -288,7 +294,7 @@ struct EditNutritionEntrySheet: View {
         AddInfoSection.nutrition.notifyTilesChanged()
       }
     } else {
-      NutritionPlugin.commitMeal(
+      NutritionCommit.commitMeal(
         loggedAt: time,
         today: clock.today,
         accent: theme.color(for: "nutrition"),

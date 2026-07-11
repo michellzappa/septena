@@ -724,6 +724,7 @@ struct NextOpenSection: View {
           let tag = NextRowTag.chore(chore.id)
           ChoreRow(chore: chore, model: model, checklistMutator: checklistMutator,
                    tint: theme.color(for: "chores"),
+                   showsTodayBadge: false,
                    isListSelected: selection.contains(tag))
             .septenaNextRow(tag: tag, isSelected: selection.contains(tag),
                             index: idx, count: chores.count)
@@ -1233,6 +1234,9 @@ struct ChoreRow: View {
   var model: NextItemsModel
   let checklistMutator: ChecklistMutator
   let tint: Color
+  /// The Next feeds already group these under Chores, so a due-today chip
+  /// repeats the context. Other hosts can retain it where it is informative.
+  var showsTodayBadge: Bool = true
   var onDelete: (() -> Void)? = nil
   /// Native `List(selection:)` cursor — dark ink on the gray capsule.
   var isListSelected: Bool = false
@@ -1267,7 +1271,7 @@ struct ChoreRow: View {
           }
         } else if let label = deferLabel {
           StatusBadge(text: label)
-        } else {
+        } else if chore.daysOverdue != 0 || showsTodayBadge {
           choreOverdueBadge(chore.daysOverdue)
         }
       },

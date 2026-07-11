@@ -25,7 +25,10 @@ enum HydrationPlugin: SectionPlugin {
   /// happens to record `waterMl`. Both contribute to the daily total;
   /// only the marker produces a Today event under "hydration" (the
   /// meal contributes under "nutrition" instead).
-  static let waterFoodsMarker: [String] = ["Water"]
+  // Definition lives in `NutritionCommit` (nutrition owns the entry shape and
+  // its fast-break read compiles into Septask); this forward keeps the many
+  // hydration call sites unchanged.
+  static let waterFoodsMarker: [String] = NutritionCommit.waterFoodsMarker
 
   static func isHydrationOnly(_ entry: NutritionEntry) -> Bool {
     entry.foods == waterFoodsMarker

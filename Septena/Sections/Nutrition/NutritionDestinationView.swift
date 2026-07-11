@@ -314,7 +314,7 @@ struct NutritionDestinationView: View {
   /// Re-log an existing meal at the current moment.
   private func logAgainNow(_ entry: NutritionEntry,
                            percent: Int = NutritionRelogging.defaultPercent) {
-    NutritionPlugin.commitMeal(
+    NutritionCommit.commitMeal(
       loggedAt: .now,
       today: clock.today,
       accent: accent,

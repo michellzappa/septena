@@ -69,6 +69,10 @@ struct TaskListView: View {
   /// not be decoded, sorted, and rendered just to open the Logbook.
   private static let logbookPageSize = 100
   @State private var logbookLimit = logbookPageSize
+  /// A task search can target an older completed row outside the initial
+  /// archive page. Expand only for that explicit reveal; normal Logbook opens
+  /// keep their bounded, fast materialization path.
+  @State private var logbookRevealAll = false
 
   @State private var areas: [Area]
   @State private var projects: [Project]
@@ -133,7 +137,7 @@ struct TaskListView: View {
     LocalCache.tasks(
       in: modelContext,
       filter: filter,
-      limit: filter == .logbook ? logbookLimit : nil
+      limit: filter == .logbook && !logbookRevealAll ? logbookLimit : nil
     )
   }
 
@@ -556,13 +560,26 @@ struct TaskListView: View {
         }
       }
       #endif
+
+      #if SEPTASK
+      // Septask's Today list is its home surface. Match Septena's dashboard
+      // affordance: when Claude needs a user-authenticated refresh, show the
+      // same top-bar control rather than hiding recovery in Settings.
+      #if os(iOS)
+      if !embedded {
+        ToolbarItem(placement: .topBarTrailing) {
+          ClaudeReconnectCue(.pill)
+        }
+      }
+      #endif
+      #endif
     }
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded, recentlyDeleted: filter == .recentlyDeleted))
-    // (Keyboard navigation — ↑↓ traversal, Return/Space/Esc, focus reclaim —
+    // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
     // Only attach top-level nav chrome on the standalone tab versions.
@@ -661,7 +678,10 @@ struct TaskListView: View {
     // the right data for `filter` synchronously, so we only need to clear
     // session-scoped state and re-trigger the network refresh.
     .onChange(of: filter) { old, _ in
-      if old == .logbook { logbookLimit = Self.logbookPageSize }
+      if old == .logbook {
+        logbookLimit = Self.logbookPageSize
+        logbookRevealAll = false
+      }
       sessionDoneIds = []
       sessionCreatedIds = []
       settle.cancelAll()
@@ -686,6 +706,9 @@ struct TaskListView: View {
       // correctness the `items`/`storageFilter` getter already gives the rows.
       refreshCalendarEvents()
       Task { await load() }
+    }
+    .onChange(of: nav.pendingTaskReveal) { _, _ in
+      consumePendingTaskReveal()
     }
     // Leaving reorder edit mode drops the selection so nothing stale lingers.
     .onChange(of: isEditMode) { _, editing in
@@ -1021,6 +1044,13 @@ struct TaskListView: View {
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
       scopeLoggedSection()
+      #if SEPTASK
+      // Septask embeds the full Next feed (suggestions, chores / habits /
+      // supplements, Done Today) at the foot of Today so the day's rituals
+      // live one scroll away instead of one app away. One foldable section,
+      // gated by Settings ▸ General ▸ "Show Next in Today".
+      if filter == .today { SeptaskNextFold() }
+      #endif
       taskListFooter
     }
     // Commit a rename the moment its field loses the cursor — the iOS analog of
@@ -1153,20 +1183,6 @@ struct TaskListView: View {
     beginEdit(task)
   }
 
-  /// Space on the cursor row → toggle complete (all selected rows when multi).
-  private func toggleRow(_ id: String) {
-    let ids = orderedActionIDsForKeyboard(fallback: id)
-    for sid in ids {
-      guard let task = currentTask(id: sid) else { continue }
-      toggle(task)
-    }
-  }
-
-  private func orderedActionIDsForKeyboard(fallback: String) -> [String] {
-    let scoped = orderedActionIDs()
-    return scoped.isEmpty ? [fallback] : scoped
-  }
-
   /// True once this filter's data has loaded and there are no rows to show.
   private var showsEmptyTaskList: Bool {
     loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty
@@ -1200,6 +1216,19 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var taskListHeader: some View {
+    #if SEPTASK
+    #if os(macOS)
+    // Septena shows the expanded reconnect card at the top of its macOS
+    // dashboard. Septask's equivalent landing surface is Today, so use the
+    // exact same cue there (not on every project/detail page).
+    if filter == .today {
+      ClaudeReconnectCue(.card)
+        .padding(.horizontal, TaskCardMetrics.margin)
+        .padding(.top, 10)
+        .plainListChrome()
+    }
+    #endif
+    #endif
     titleRow
     todayCalendarRow
     newTodosBannerRow
@@ -1221,10 +1250,7 @@ struct TaskListView: View {
     // work — the Inbox header should appear for either source. The quick-add line
     // always lives at the foot of this card (capture drops into the band).
     if filter == .today {
-      let looseToday = (items + review).filter {
-        $0.project == nil && $0.area == nil && ($0.status == .open || settle.isSettling($0.id))
-      }
-      let allInbox = excludingQuickAddCapture(triageItems + looseToday)
+      let allInbox = renderedTodayInboxRows
       if allowsInlineCreate || !allInbox.isEmpty || quickAddDraftId != nil {
         Section {
           if !inboxCollapsed {
@@ -1824,6 +1850,36 @@ struct TaskListView: View {
     showsQuickAddTriggerRow ? [Self.quickAddScrollID] : []
   }
 
+  /// The exact visible task rows in Today's Inbox. Keep this separate from the
+  /// classified-list pool so pointer rendering and keyboard traversal cannot
+  /// drift when a completed row settles or the Inbox is folded.
+  private var todayOpenTaskPool: [SeptenaTask] {
+    (items + review).filter { $0.status == .open || settle.isSettling($0.id) }
+  }
+
+  private var todayLooseInboxRows: [SeptenaTask] {
+    todayOpenTaskPool.filter { $0.project == nil && $0.area == nil }
+  }
+
+  private var renderedTodayInboxRows: [SeptenaTask] {
+    excludingQuickAddCapture(triageItems + todayLooseInboxRows)
+  }
+
+  /// `quickAddLine` replaces the sentinel with the real draft row while the
+  /// Inbox editor is active. A draft created from an area/project header stays
+  /// in that classified group instead, so it never occupies the Inbox cursor.
+  private var todayInboxKeyboardIDs: [String] {
+    guard !inboxCollapsed else { return [] }
+    var ids = renderedTodayInboxRows.map(\.id)
+    if let draft = quickAddCaptureTask,
+       quickAddGroupTarget == nil || quickAddGroupTarget == .inbox {
+      ids.append(draft.id)
+    } else {
+      ids.append(contentsOf: quickAddOrderedIds)
+    }
+    return ids
+  }
+
   /// Flat ordered list of task IDs in the same order they're rendered.
   /// Drives ↑/↓ and ⌘↑/⌘↓ traversal. The quick-add trigger (`quickAddOrderedIds`)
   /// is spliced in at the render position of its "New task" row.
@@ -1834,9 +1890,7 @@ struct TaskListView: View {
       // the main list. The quick-add line sits at the foot of the Inbox card,
       // so its sentinel follows the loose rows. Classified tasks follow —
       // grouped or flat per setting.
-      let todayPool = items + review
-      let looseToday = todayPool.filter { $0.project == nil && $0.area == nil }
-      let classified = todayPool.filter { $0.project != nil || $0.area != nil }
+      let classified = todayOpenTaskPool.filter { $0.project != nil || $0.area != nil }
       let classifiedIds: [String]
       if todayGroupByList {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
@@ -1846,8 +1900,7 @@ struct TaskListView: View {
           .sorted(by: SeptenaTask.compareNextPageOrder)
           .map(\.id)
       }
-      return triageItems.map(\.id) + looseToday.map(\.id)
-        + quickAddOrderedIds + classifiedIds
+      return todayInboxKeyboardIDs + classifiedIds
     case .unscheduled:
       return review.map(\.id) + orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
@@ -2891,7 +2944,7 @@ struct TaskListView: View {
                       areaEmoji: area.emoji,
                       onTap: {
                         if closeActiveEditIfNeeded() { return }
-                        nav.path = [.area(area)]
+                        nav.go(to: .area(id: area.id))
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(areaId: area.id) } : nil,
@@ -2912,7 +2965,7 @@ struct TaskListView: View {
                         projectProgress: progressByProject[project.id],
                         onTap: {
                           if closeActiveEditIfNeeded() { return }
-                          nav.path = [.project(project)]
+                          nav.go(to: .project(id: project.id))
                         },
                         onAdd: showsGroupedHeaderQuickAdd
                           ? { startCreate(projectId: project.id) } : nil,
@@ -2937,7 +2990,7 @@ struct TaskListView: View {
                       projectProgress: progressByProject[project.id],
                       onTap: {
                         if closeActiveEditIfNeeded() { return }
-                        nav.path = [.project(project)]
+                        nav.go(to: .project(id: project.id))
                       },
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(projectId: project.id) } : nil,
@@ -3593,7 +3646,50 @@ struct TaskListView: View {
       newTodosDismissed = (last == clock.today)
     }
     refreshCalendarEvents()
+    consumePendingTaskReveal()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
+  }
+
+  /// Select and reveal a searched task only in the list that owns its route.
+  /// Other still-mounted tab panes must leave the one-shot alone for the active
+  /// destination to consume.
+  private func consumePendingTaskReveal() {
+    guard let reveal = nav.pendingTaskReveal,
+          reveal.routeID == navigationRouteID else { return }
+
+    if currentTask(id: reveal.taskID) != nil {
+      selection = [reveal.taskID]
+      scrollToTargetID = reveal.taskID
+      scrollToTargetTick += 1
+      nav.pendingTaskReveal = nil
+      return
+    }
+
+    // Search can find a completed task beyond the first Logbook page. Do the
+    // one intentionally-unbounded read needed to locate it, never on a normal
+    // archive open.
+    if filter == .logbook,
+       !logbookRevealAll,
+       LocalCache.taskMatches(id: reveal.taskID, filter: filter, in: modelContext) {
+      logbookRevealAll = true
+      Task { await load() }
+      return
+    }
+
+    // The current mirror has finished loading this destination and the row no
+    // longer belongs to it (for example, it was deleted or re-filed remotely).
+    // Consume the request rather than leaving it to affect a later visit.
+    if loadedFilters.contains(filter) {
+      nav.pendingTaskReveal = nil
+    }
+  }
+
+  private var navigationRouteID: String {
+    switch filter {
+    case .project(let id): return Route.project(id: id).id
+    case .area(let id):    return Route.area(id: id).id
+    default:               return Route.filter(filter).id
+    }
   }
 
   /// Scoped local changes can skip an unrelated task list; unscoped CloudKit

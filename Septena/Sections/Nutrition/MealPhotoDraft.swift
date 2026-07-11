@@ -58,6 +58,17 @@ struct MealPhotoDraft: Equatable {
     [proteinG, fatG, carbsG, kcal].compactMap { $0 }.count
   }
 
+  /// Which on-device model produced this draft — for the "which model" caption.
+  /// `.model` is the on-device multimodal Foundation Model; `.label` is
+  /// deterministic Vision OCR/barcode; `.mixed` is both, led by the model.
+  /// Never PCC: meal photos are analyzed on-device only.
+  var modelTag: AIModelTag {
+    switch source {
+    case .model, .mixed: return .onDevice
+    case .label:         return .onDeviceVision
+    }
+  }
+
   /// Combine two drafts, preferring `self`'s values and taking `other`'s only
   /// where `self` is missing. Used to layer the label rung under the model rung.
   func merging(_ other: MealPhotoDraft) -> MealPhotoDraft {

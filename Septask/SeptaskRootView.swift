@@ -6,7 +6,7 @@ import SwiftUI
 /// the trailing `+` is an action, not a destination — it presents quick-add
 /// and selection never actually moves to it.
 enum SeptaskTab: Hashable {
-  case tasks, today, upcoming, add
+  case tasks, today, upcoming
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -61,21 +61,35 @@ struct SeptaskRootView: View {
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
-      // task-relevant subset only. Full-app modals (training, mood, section
-      // sheets) have no Septask entry points; if one is ever set anyway the
-      // sheet shows empty rather than crashing.
+      // subset with a Septask surface. The embedded Next fold (Today's foot)
+      // added two: the mood check-in and the nutrition new-meal sheet, both
+      // suggestion destinations. Training stays out (its destination is the
+      // live-session surface Septask doesn't compile — the fold filters that
+      // suggestion). Anything else ever set shows empty rather than crashing.
       .sheet(item: $nav.presentedModal) { modal in
         switch modal {
         case .quickFind:
           withEnvironment(QuickFindView())
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 560, macHeight: 420)
-        case .addInfo:
+        case .addInfo(let section):
           // Septask's quick capture IS the task composer — no multi-section
-          // palette here (the tasks-only twin of AddInfoSheet).
-          withEnvironment(SeptaskQuickAdd())
-            .septenaModalSheet(detents: [.medium, .large],
-                               macWidth: 560, macHeight: 520)
+          // palette here (the tasks-only twin of AddInfoSheet). The one
+          // exception: the Next fold's fast-break suggestion targets
+          // nutrition, which opens the new-meal sheet directly.
+          if section == .nutrition {
+            withEnvironment(NewNutritionEntrySheet())
+              .septenaModalSheet(macWidth: 560, macHeight: 600)
+          } else {
+            withEnvironment(SeptaskQuickAdd())
+              .septenaModalSheet(detents: [.medium, .large],
+                                 macWidth: 560, macHeight: 520)
+          }
+        case .moodCheckin:
+          // The Next fold's mood suggestion — same check-in page as
+          // Septena's tab root (RootTabView.modalSheet).
+          withEnvironment(AddMoodPage(anchorTime: dayClock.now, date: dayClock.today))
+            .septenaModalSheet(macWidth: 560, macHeight: 600)
         case .keyboardShortcuts:
           withEnvironment(KeyboardShortcutsView())
             .septenaModalSheet(detents: [.medium, .large],
@@ -129,40 +143,117 @@ struct SeptaskRootView: View {
   }
 
   #if os(iOS)
-  /// Standard iOS 26 `TabView`, the full app's pattern (RootTabView):
-  /// system tab items, minimize-on-scroll, accent tint. The `+` rides the
-  /// separated trailing slot; selecting it presents quick-add and the
-  /// binding swallows the change so the current tab stays put.
+  /// The three navigation destinations remain a real `TabView`, but its
+  /// system bar is replaced with a compact glass cluster plus a detached,
+  /// circular quick-add button. This keeps the `+` visually and semantically
+  /// separate from navigation.
   private var systemTabView: some View {
-    TabView(selection: Binding(
-      get: { selection },
-      set: { newValue in
-        if newValue == .add {
-          // Route through the shared modal state so the tab-bar `+`, ⌘K,
-          // and any future entry point all present the same sheet.
-          nav.presentAddInfo(section: .tasks)
-        } else {
-          selection = newValue
-        }
-      })) {
+    TabView(selection: $selection) {
+      // ContentView self-tints to `theme.accent` (ink), so the Tasks tab's
+      // chrome/content stays black; the reset on Today/Upcoming does the same
+      // for the tabs that don't host ContentView. Only the bar's SELECTED item
+      // picks up the Tasks color, from the `.tint` on the TabView below.
       Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
         ContentView()
       }
       Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
-        NavigationStack { TaskListView(filter: .today) }
+        NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
       }
       Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
-        NavigationStack { TaskListView(filter: .upcoming) }
-      }
-      Tab("New To-Do", systemImage: "plus", value: SeptaskTab.add, role: .search) {
-        Color.clear
+        NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
       }
     }
-    .tabBarMinimizeBehavior(.onScrollDown)
-    .tint(theme.accent)
+    .toolbar(.hidden, for: .tabBar)
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      SeptaskFloatingTabBar(selection: $selection, tint: theme.color(for: "tasks")) {
+        // Use the shared modal state so the floating `+`, ⌘K, and any future
+        // entry point all present the same task composer.
+        nav.presentAddInfo(section: .tasks)
+      }
+      .padding(.horizontal, 16)
+      .padding(.top, 8)
+      .padding(.bottom, 8)
+    }
   }
   #endif
 }
+
+#if os(iOS)
+/// Septask's iPhone tab control: a navigation capsule and a deliberately
+/// separate circular floating action button. The split makes the create action
+/// read as an action rather than a fourth destination.
+private struct SeptaskFloatingTabBar: View {
+  @Binding var selection: SeptaskTab
+  let tint: Color
+  let addTask: () -> Void
+  @Namespace private var selectionBubble
+
+  private let tabs: [(tab: SeptaskTab, title: String, systemImage: String)] = [
+    (.tasks, "Tasks", "checkmark"),
+    (.today, "Today", "sun.max.fill"),
+    (.upcoming, "Upcoming", "calendar")
+  ]
+
+  var body: some View {
+    GlassEffectContainer {
+      HStack(spacing: 10) {
+        HStack(spacing: 2) {
+          ForEach(tabs, id: \.tab) { tab in
+            tabButton(tab)
+          }
+        }
+        .padding(4)
+        .glassSegmentTrack()
+
+        Button(action: addTask) {
+          Image(systemName: "plus")
+            .font(.body.weight(.bold))
+            .frame(width: 48, height: 48)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .glassCircle(tint: tint)
+        .accessibilityLabel("New To-Do")
+        .accessibilityHint("Creates a new task")
+      }
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  private func tabButton(_ tab: (tab: SeptaskTab, title: String, systemImage: String)) -> some View {
+    let isSelected = selection == tab.tab
+    return Button {
+      guard !isSelected else { return }
+      withAnimation(.snappy(duration: 0.28)) {
+        selection = tab.tab
+      }
+    } label: {
+      VStack(spacing: 2) {
+        Image(systemName: tab.systemImage)
+          .font(.caption.weight(.semibold))
+        Text(tab.title)
+          .font(.caption2.weight(.medium))
+          .lineLimit(1)
+      }
+      .frame(minWidth: 62, minHeight: 48)
+      .foregroundStyle(isSelected ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
+      .glassSegmentSelectionUnderlay(
+        isSelected: isSelected,
+        tint: tint,
+        in: selectionBubble,
+        id: "septaskFloatingTabSelection"
+      )
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(tab.title)
+    .accessibilityIdentifier("septask.tab.\(tab.tab)")
+    .accessibilityValue(isSelected ? "Selected" : "")
+    .glassEffectID(tab.tab, in: selectionBubble)
+  }
+}
+#endif
 
 /// Quick-add sheet: a fresh router per presentation so the draft never
 /// leaks between opens. Sizing comes from the host's `septenaModalSheet`.

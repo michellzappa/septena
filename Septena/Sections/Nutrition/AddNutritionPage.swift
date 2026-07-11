@@ -123,7 +123,7 @@ struct AddNutritionPage: View {
   }
 
   private func duplicate(_ entry: NutritionEntry) {
-    NutritionPlugin.commitMeal(
+    NutritionCommit.commitMeal(
       loggedAt: .now,
       today: clock.today,
       accent: AddInfoSection.nutrition.accent(theme: theme),

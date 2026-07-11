@@ -193,11 +193,11 @@ final class SeptenaServices {
       projectsMutator.taskMutator = taskMutator
       // The Next feed's write set binds in BOTH profiles: Septask embeds the
       // full Next feed at the foot of Today (SeptaskNextFold), so the trio
-      // toggles (checklist), inline intake nudges, and the Done Today
-      // edit/delete paths (gut / nutrition; mood needs no engine) must reach
-      // CloudKit from the tasks-only shell too.
+      // toggles (checklist), inline intake nudges, and the fast-break new-meal
+      // suggestion (nutrition) must reach CloudKit from the tasks-only shell
+      // too. (Mood needs no engine binding; gut isn't written by the fold —
+      // the Done Today log that read/edited it was cut, so gut stays full-only.)
       checklistMutator.bind(ckEngine: ckEngine)
-      gutMutator.bind(ckEngine: ckEngine)
       intakeMutator.bind(ckEngine: ckEngine)
       nutritionMutator.bind(ckEngine: ckEngine)
       // Everything below is life-OS-only. In the tasks-only profile (Septask)
@@ -211,6 +211,7 @@ final class SeptenaServices {
         milestoneMutator.bind(ckEngine: ckEngine)
         coachVoiceMutator.bind(ckEngine: ckEngine)
         coachMessageMutator.bind(ckEngine: ckEngine)
+        gutMutator.bind(ckEngine: ckEngine)
         activityMutator.bind(ckEngine: ckEngine)
         symptomsMutator.bind(ckEngine: ckEngine)
         medicationsMutator.bind(ckEngine: ckEngine)

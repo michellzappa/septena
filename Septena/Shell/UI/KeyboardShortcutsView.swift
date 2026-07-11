@@ -67,7 +67,6 @@ enum KeyboardShortcutsCatalogue {
     ]),
     KeyboardShortcutGroup(title: "Task list", shortcuts: [
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
-      KeyboardShortcut2(keys: ["Space"], label: "Toggle complete"),
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),

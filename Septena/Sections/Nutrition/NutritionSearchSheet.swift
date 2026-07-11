@@ -131,7 +131,7 @@ struct NutritionSearchSheet: View {
 
   /// Duplicate a historical meal, logging it at the current time.
   private func duplicate(_ entry: NutritionEntry) {
-    NutritionPlugin.commitMeal(
+    NutritionCommit.commitMeal(
       loggedAt: .now,
       today: clock.today,
       accent: AddInfoSection.nutrition.accent(theme: theme),

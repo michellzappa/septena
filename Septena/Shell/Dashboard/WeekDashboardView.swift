@@ -1856,7 +1856,7 @@ struct WeekDashboardView: View {
 
   /// Duplicate a meal at the current time via NutritionMutator.
   private func commitNutritionDuplicate(_ entry: NutritionEntry) {
-    NutritionPlugin.commitMeal(
+    NutritionCommit.commitMeal(
       loggedAt: .now,
       today: clock.today,
       accent: theme.color(for: "nutrition"),
