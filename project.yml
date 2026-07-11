@@ -201,12 +201,11 @@ targets:
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
-          # Next-feed composition reaches UP into shell types
-          # (NextSuggestionsModel in Shell/Dashboard) — fine when core+shell
-          # share a target, unresolvable here. Next is out of Septask's
-          # surface, so both the feed and its one core dependent are cut;
-          # the call site in SeptenaServices is `#if !SEPTASK`-gated.
-          - NextFeed.swift
+          # Septask ships no watch/widgets; the publisher's call site in
+          # SeptenaServices is `#if !SEPTASK`-gated. NextFeed.swift compiles
+          # here now — its upward reach (NextSuggestionsModel) is satisfied by
+          # the Next files below, included for the embedded Next fold
+          # (SeptaskNextFold at the foot of Today).
           - WatchSnapshotPublisher.swift
       # P1 (docs/SEPTASK.md): the real task UI, by source inclusion — the same
       # files the full app compiles, never copies. TasksDestinationView is the
@@ -256,6 +255,31 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
+      # The embedded Next fold (SeptaskNextFold, Today's foot): the Next feed's
+      # models + rows, plus the suggestion destinations (mood check-in, new
+      # meal) and the Done Today editors (mood / gut / nutrition). Included by
+      # file, never by folder — the rest of Shell/Dashboard and the section
+      # folders reach into surfaces Septask doesn't compile.
+      - path: Septena/Shell/Dashboard/MirrorReader.swift
+      # Shared reconnect cue: Septask puts the same direct recovery affordance
+      # on Today that Septena shows on its dashboard.
+      - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
+      - path: Septena/Shell/Dashboard/NextItemsSection.swift
+      - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
+      - path: Septena/Sections/Mood/MoodCatalog.swift
+      - path: Septena/Sections/Mood/MoodCommitAnimation.swift
+      - path: Septena/Sections/Mood/AddMoodPage.swift
+      - path: Septena/Sections/Nutrition/EditNutritionEntrySheet.swift
+      - path: Septena/Sections/Nutrition/NewNutritionEntrySheet.swift
+      - path: Septena/Sections/Nutrition/NutritionCommit.swift
+      - path: Septena/Sections/Nutrition/MealCameraPicker.swift
+      - path: Septena/Sections/Nutrition/MealPhotoAnalyzer.swift
+      - path: Septena/Sections/Nutrition/MealPhotoModelAnalyzer.swift
+      - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
+    dependencies:
+      # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
+      # FoundationModels — same dependency the other three app targets carry.
+      - sdk: FoundationModels.framework
     info:
       path: Septask/Info.plist
       properties:
@@ -269,6 +293,7 @@ targets:
           - es
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
+        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
         UILaunchScreen: {}
         # Scene lifecycle so Home Screen Quick Actions land: the cold-launch
         # item rides UIScene.ConnectionOptions, delivered to SeptaskSceneDelegate
@@ -330,7 +355,6 @@ targets:
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
-          - NextFeed.swift
           - WatchSnapshotPublisher.swift
       - path: Septena/Shell/Tasks
         excludes:
@@ -366,6 +390,20 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
+      # Embedded Next fold — same file set as the Septask target (lockstep).
+      - path: Septena/Shell/Dashboard/MirrorReader.swift
+      - path: Septena/Shell/Dashboard/NextItemsSection.swift
+      - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
+      - path: Septena/Sections/Mood/MoodCatalog.swift
+      - path: Septena/Sections/Mood/MoodCommitAnimation.swift
+      - path: Septena/Sections/Mood/AddMoodPage.swift
+      - path: Septena/Sections/Nutrition/EditNutritionEntrySheet.swift
+      - path: Septena/Sections/Nutrition/NewNutritionEntrySheet.swift
+      - path: Septena/Sections/Nutrition/NutritionCommit.swift
+      - path: Septena/Sections/Nutrition/MealCameraPicker.swift
+      - path: Septena/Sections/Nutrition/MealPhotoAnalyzer.swift
+      - path: Septena/Sections/Nutrition/MealPhotoModelAnalyzer.swift
+      - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
       # Standalone icns generated from the same disc geometry + Septena's
       # icns alpha mask (identical corner rounding) — see the SeptenaMac
       # comment for why a pre-built icns and not the asset catalog.
@@ -386,6 +424,7 @@ targets:
           - es
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
+        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
         CFBundleIconFile: AppIcon
         NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
