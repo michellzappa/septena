@@ -2230,7 +2230,7 @@ struct TrainingSessionView: View {
     VStack(alignment: .leading, spacing: 2) {
       HStack(alignment: .firstTextBaseline, spacing: 2) {
         Text(value)
-          .font(.system(.title2, design: .rounded).weight(.semibold))
+          .font(.septenaHeroMetric())
           .foregroundStyle(accent)
         if let unit {
           Text(unit).font(.subheadline).foregroundStyle(.secondary)
@@ -2252,8 +2252,7 @@ struct TrainingSessionView: View {
       let secs = start.map { max(0, Int(ctx.date.timeIntervalSince($0))) } ?? 0
       VStack(alignment: .leading, spacing: 2) {
         Text(clock(secs))
-          .font(.system(.title2, design: .rounded).weight(.semibold))
-          .monospacedDigit()
+          .font(.septenaHeroMetric())
           .foregroundStyle(accent)
         Text("elapsed").font(.caption).foregroundStyle(.secondary)
       }
@@ -3207,7 +3206,7 @@ struct TrainingExerciseEditorBody: View {
                       difficulty: r.difficulty)
           }
         }
-        .font(.system(.footnote, design: .rounded).monospacedDigit())
+        .font(.septenaMeta)
       }
     }
   }
@@ -3305,8 +3304,7 @@ struct TrainingExerciseEditorBody: View {
         } label: {
           VStack(spacing: 2) {
             Text(TrainingEffort.pillNumber(for: rung, scale: scale))
-              .font(.system(.title2, design: .rounded).weight(.bold))
-              .monospacedDigit()
+              .font(.septenaHeroMetric())
             if scale != .rir {
               Text(rung.short.uppercased())
                 .font(.caption2.weight(.semibold))
@@ -3407,7 +3405,7 @@ struct TrainingExerciseEditorBody: View {
             .focused($fieldFocused)
             .multilineTextAlignment(.center)
             .textFieldStyle(.plain)
-            .font(.system(.title3, design: .rounded).weight(.medium))
+            .font(.septenaHeroMetric(.title3))
           if let unit {
             Text(unit).font(.caption2).foregroundStyle(.secondary)
           }

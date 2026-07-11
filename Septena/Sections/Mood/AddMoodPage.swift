@@ -119,7 +119,7 @@ struct AddMoodPage: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
           Text(emotion.displayWord)
-            .font(.system(.largeTitle, design: .rounded).weight(.bold))
+            .font(.largeTitle.weight(.bold))
             .foregroundStyle(emotion.quadrant.color)
             // Pop-in: scale-spring keyed by the emotion word, so each
             // pick produces a fresh bounce rather than a cross-fade.
@@ -135,7 +135,7 @@ struct AddMoodPage: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
           Text(quadrant.title)
-            .font(.system(.title2, design: .rounded).weight(.semibold))
+            .font(.title2.weight(.semibold))
             .foregroundStyle(quadrant.color)
             .multilineTextAlignment(.center)
           Text("Tap a word to refine, or just Log")
@@ -584,7 +584,7 @@ private struct QuadrantBubble: View {
         )
       VStack(spacing: 4) {
         Text(quadrant.title)
-          .font(.system(.callout, design: .rounded).weight(.semibold))
+          .font(.callout.weight(.semibold))
           .foregroundStyle(.black.opacity(0.85))
           .multilineTextAlignment(.center)
           .padding(.horizontal, 12)
@@ -749,7 +749,7 @@ private struct EmotionChip: View {
         .strokeBorder(.white.opacity(outlineOpacity),
                       lineWidth: outlineWidth)
       Text(emotion.displayWord)
-        .font(.system(.footnote, design: .rounded).weight(.semibold))
+        .font(.footnote.weight(.semibold))
         .foregroundStyle(textColor)
         .multilineTextAlignment(.center)
         .minimumScaleFactor(0.7)

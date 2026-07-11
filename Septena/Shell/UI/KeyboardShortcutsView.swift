@@ -133,8 +133,7 @@ private struct KeycapView: View {
 
   var body: some View {
     Text(key)
-      .font(.system(.callout, design: .rounded).weight(.medium))
-      .monospacedDigit()
+      .font(.system(.callout, design: .monospaced).weight(.medium))
       .frame(minWidth: 22)
       .padding(.horizontal, 6)
       .padding(.vertical, 3)
