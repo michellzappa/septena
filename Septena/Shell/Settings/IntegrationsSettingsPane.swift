@@ -29,48 +29,28 @@ struct ConnectedAppsSettingsSections: View {
 
   var body: some View {
     Section {
-      NavigationLink {
-        RemindersInboxDetail()
-          .navigationTitle("Reminders")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.reminders)) {
         stateRow(title: "Reminders",
                  systemImage: "checklist",
                  state: remindersAccessLabel,
                  isGranted: remindersBridge.access == .granted)
       }
 
-      NavigationLink {
-        ThingsImportView()
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.things)) {
         stateRow(title: "Things",
                  systemImage: "square.and.arrow.down",
                  state: "One-time import",
                  isGranted: true)
       }
 
-      NavigationLink {
-        CalendarDetail()
-          .navigationTitle("Calendar")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.calendar)) {
         stateRow(title: "Calendar",
                  systemImage: "calendar",
                  state: calendarAccessLabel,
                  isGranted: calendarBridge.access == .granted)
       }
 
-      NavigationLink {
-        AppleHealthDetail()
-          .navigationTitle("Apple Health")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.appleHealth)) {
         stateRow(title: "Apple Health",
                  systemImage: "heart.text.square",
                  state: healthAccessLabel,
@@ -80,13 +60,7 @@ struct ConnectedAppsSettingsSections: View {
       // Photos — used to attach thumbnails to nutrition (meal) entries.
       // Access is requested lazily by the picker too, but surfacing it
       // here gives denied users a fix path (and a way to grant up front).
-      NavigationLink {
-        PhotosDetail()
-          .navigationTitle("Photos")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.photos)) {
         stateRow(title: "Photos",
                  systemImage: "photo",
                  state: photosAccessLabel,
@@ -115,13 +89,7 @@ struct ConnectedAppsSettingsSections: View {
     Section {
       // Oura — direct iOS client (Personal Access Token). Replaces the
       // old FastAPI proxy at /api/health/oura.
-      NavigationLink {
-        OuraIntegrationDetail()
-          .navigationTitle("Oura")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.oura)) {
         stateRow(title: "Oura",
                  systemImage: "circle.circle",
                  state: ouraProvider.hasToken ? "Connected" : "Grant",
@@ -130,13 +98,7 @@ struct ConnectedAppsSettingsSections: View {
 
       // Withings — direct iOS client (OAuth2). Replaces the old
       // FastAPI proxy at /api/health/withings.
-      NavigationLink {
-        WithingsIntegrationDetail()
-          .navigationTitle("Withings")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.withings)) {
         stateRow(title: "Withings",
                  systemImage: "scalemass",
                  state: withingsProvider.hasTokens ? "Connected" : "Connect",
@@ -146,26 +108,14 @@ struct ConnectedAppsSettingsSections: View {
       // GitHub — read-only contribution calendar via the GraphQL API.
       // Static token (Keychain); syncs across the user's devices via iCloud
       // Keychain, never to CloudKit or a Septena server.
-      NavigationLink {
-        GitHubIntegrationDetail()
-          .navigationTitle("GitHub")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.github)) {
         stateRow(title: "GitHub",
                  systemImage: "chevron.left.forwardslash.chevron.right",
                  state: githubProvider.hasToken ? "Connected" : "Connect",
                  isGranted: githubProvider.hasToken)
       }
 
-      NavigationLink {
-        ReadwiseConnectView()
-          .navigationTitle("Readwise")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
+      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.readwise)) {
         stateRow(title: "Readwise",
                  systemImage: "highlighter",
                  state: readwiseProvider.hasToken ? "Connected" : "Connect",
@@ -246,6 +196,29 @@ struct ConnectedAppsSettingsSections: View {
   }
 }
 
+/// Hosts the one canonical settings page for a connected app. Both the
+/// Connected Apps list and contextual links from individual sections route
+/// here, so an integration's permission, token, and import controls are
+/// implemented exactly once.
+struct ConnectedAppSettingsPane: View {
+  let app: ConnectedAppDestination
+
+  @ViewBuilder
+  var body: some View {
+    switch app {
+    case .reminders:   RemindersInboxDetail()
+    case .things:      ThingsImportView()
+    case .calendar:    CalendarDetail()
+    case .appleHealth: AppleHealthDetail()
+    case .photos:      PhotosDetail()
+    case .oura:        OuraIntegrationDetail()
+    case .withings:    WithingsIntegrationDetail()
+    case .github:      GitHubIntegrationDetail()
+    case .readwise:    ReadwiseConnectView()
+    }
+  }
+}
+
 // MARK: - Apple Health Detail
 
 /// Full-screen integration settings for Apple Health. Shown after tapping the
@@ -253,6 +226,7 @@ struct ConnectedAppsSettingsSections: View {
 /// per-section write toggles — each toggle syncs through CloudKit so the
 /// user's preference follows them across devices.
 struct AppleHealthDetail: View {
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.modelContext)    private var modelContext
   @Environment(CKEngine.self)     private var ckEngine
   @Environment(SettingsStore.self) private var store
@@ -290,7 +264,7 @@ struct AppleHealthDetail: View {
           }
         }
       } footer: {
-        Text("Septena writes your logged data to Apple Health so it appears alongside data from your other apps and devices.")
+        Text("Septena reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device.")
       }
 
       // ── Write Toggles (shown once the user has been through the sheet) ───
@@ -318,6 +292,11 @@ struct AppleHealthDetail: View {
     .task {
       if healthBridge.isAvailable {
         _ = await healthBridge.requestAccess()
+        healthBridge.refreshShareStatuses()
+      }
+    }
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active {
         healthBridge.refreshShareStatuses()
       }
     }
@@ -398,6 +377,7 @@ struct AppleHealthDetail: View {
 // When access is denied, meal thumbnails silently fall back to a
 // placeholder — this screen explains why and points to iOS Settings.
 private struct PhotosDetail: View {
+  @Environment(\.scenePhase) private var scenePhase
   @State private var bridge = PhotosBridge.shared
   @State private var access: PhotosBridge.Access = .notDetermined
 
@@ -433,6 +413,9 @@ private struct PhotosDetail: View {
     }
     .formStyle(.grouped)
     .onAppear(perform: refresh)
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { refresh() }
+    }
   }
 
   private func refresh() {

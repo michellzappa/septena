@@ -47,6 +47,49 @@ enum NutritionHeatmapMetric: String, CaseIterable, Identifiable {
   var label: String { self == .protein ? String(localized: "Protein", comment: "Nutrition heatmap metric") : String(localized: "Fasting hours", comment: "Nutrition heatmap metric") }
 }
 
+/// A leaf in the canonical Connected Apps hierarchy. Keeping these routes
+/// typed lets a section link directly to the one integration it depends on,
+/// without reimplementing its controls or making people hunt through the hub.
+enum ConnectedAppDestination: String, Hashable {
+  case reminders
+  case things
+  case calendar
+  case appleHealth
+  case photos
+  case oura
+  case withings
+  case github
+  case readwise
+
+  var title: String {
+    switch self {
+    case .reminders:   return "Reminders"
+    case .things:      return "Things"
+    case .calendar:    return "Calendar"
+    case .appleHealth: return "Apple Health"
+    case .photos:      return "Photos"
+    case .oura:        return "Oura"
+    case .withings:    return "Withings"
+    case .github:      return "GitHub"
+    case .readwise:    return "Readwise"
+    }
+  }
+
+  var systemImage: String {
+    switch self {
+    case .reminders:   return "checklist"
+    case .things:      return "square.and.arrow.down"
+    case .calendar:    return "calendar"
+    case .appleHealth: return "heart.text.square"
+    case .photos:      return "photo"
+    case .oura:        return "circle.circle"
+    case .withings:    return "scalemass"
+    case .github:      return "chevron.left.forwardslash.chevron.right"
+    case .readwise:    return "highlighter"
+    }
+  }
+}
+
 enum AppIconOption: String, CaseIterable, Identifiable {
   case `default` = "AppIcon"
   case red       = "AppIconRed"
@@ -212,6 +255,7 @@ struct SettingsView: View {
     case nextFeed        // Next list: suggestions, carry-over, per-section visibility
     case quickActions, appIcon, textSize
     case skills, localMcp, motionGallery, dataTools
+    case connectedApp(ConnectedAppDestination)
     case support
     case communityProfile   // public username / display name / bio (community Worker)
     case communityRoadmap   // feature-request board (community Worker)
@@ -410,6 +454,7 @@ struct SettingsView: View {
     case .whatsNew:     return "What's New"
     case .advanced:     return "Advanced"
     case .dataTools:    return "Data Tools"
+    case .connectedApp(let app): return app.title
     case .motionGallery: return "Motion Gallery"
     case .milestonePreview: return "Milestones (preview)"
     case .localMcp:     return "MCP Server"
@@ -454,6 +499,7 @@ struct SettingsView: View {
     case .whatsNew:     return "megaphone"
     case .advanced:     return "wrench.and.screwdriver"
     case .dataTools:    return "stethoscope"
+    case .connectedApp(let app): return app.systemImage
     case .motionGallery: return "wand.and.rays"
     case .milestonePreview: return "flag.checkered"
     case .localMcp:     return "server.rack"
@@ -498,6 +544,7 @@ struct SettingsView: View {
     case .communityRoadmap:  CommunityRoadmapPane()
     case .communityTestimonial: CommunityTestimonialPane()
     case .dataTools:         ImportExportSettingsPane(mode: .dataTools)
+    case .connectedApp(let app): ConnectedAppSettingsPane(app: app)
     case .skills:            SkillsSettingsPane()
     case .siriShortcuts:     SiriShortcutsSettingsPane()
     case .privacy:           PrivacySettingsPane()
@@ -539,4 +586,3 @@ struct SectionEntry: Identifiable, Hashable {
   /// renders muted so it's clear the section isn't active.
   var isEnabled: Bool { server.isEnabled }
 }
-

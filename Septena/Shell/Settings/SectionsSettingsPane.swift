@@ -137,6 +137,7 @@ struct SectionDetailPane: View {
     Form {
       identitySection
       sectionSpecific
+      SectionContextualSettings(sectionKey: sectionKey)
       // Contextual "Ask Siri" tip for this section's primary log action.
       // Centralized here (not per-plugin) so all 13 sections are covered in
       // one place; iOS-only, renders nothing for sections without an action.

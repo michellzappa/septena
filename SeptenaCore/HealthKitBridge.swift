@@ -112,7 +112,9 @@ final class HealthKitBridge {
   /// once. Drives the Settings headline (Connect vs. Connected).
   var hasRequestedWrite: Bool {
     WritableKind.allCases.contains {
-      let s = liveShareStatus($0)
+      // Reading the observable cache here is deliberate: the connection
+      // section must redraw as soon as the authorization sheet finishes.
+      let s = shareStatuses[$0] ?? liveShareStatus($0)
       return s == .authorized || s == .denied
     }
   }

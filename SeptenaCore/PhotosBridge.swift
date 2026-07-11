@@ -12,7 +12,9 @@ import SwiftUI
 final class PhotosBridge {
   static let shared = PhotosBridge()
 
-  private init() {}
+  private init() {
+    refreshAccess()
+  }
 
   enum Access {
     case granted          // .authorized or .limited — we can read assets
@@ -20,13 +22,26 @@ final class PhotosBridge {
     case notDetermined
   }
 
-  var access: Access {
-    switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+  /// Observable snapshot for integration settings. PhotoKit's static status
+  /// query is otherwise invisible to SwiftUI when permission changes.
+  private(set) var access: Access = .notDetermined
+
+  private static func currentAccess() -> Access {
+    access(for: PHPhotoLibrary.authorizationStatus(for: .readWrite))
+  }
+
+  private static func access(for status: PHAuthorizationStatus) -> Access {
+    switch status {
     case .authorized, .limited: return .granted
     case .denied, .restricted:  return .denied
     case .notDetermined:        return .notDetermined
     @unknown default:           return .denied
     }
+  }
+
+  /// Re-check after the picker, the system permission sheet, or Settings.
+  func refreshAccess() {
+    access = Self.currentAccess()
   }
 
   /// True when we can read picked assets' thumbnails. Callers that fetch
@@ -36,11 +51,10 @@ final class PhotosBridge {
 
   @discardableResult
   func requestAccess() async -> Bool {
-    let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-    switch status {
-    case .authorized, .limited: return true
-    default:                    return false
-    }
+    // Unlike a subsequent class-level status query, the result delivered by
+    // PhotoKit is already the user's current decision.
+    access = Self.access(for: await PHPhotoLibrary.requestAuthorization(for: .readWrite))
+    return access == .granted
   }
 
   /// Prompt only if the user hasn't decided yet, then report whether reads are
@@ -50,6 +64,7 @@ final class PhotosBridge {
   /// bridge's view of the state.
   @discardableResult
   func ensureAccess() async -> Bool {
+    refreshAccess()
     if access == .notDetermined { _ = await requestAccess() }
     return canRead
   }

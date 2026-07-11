@@ -9,6 +9,7 @@ import SwiftData
 import EventKit
 
 struct RemindersInboxDetail: View {
+  @Environment(\.scenePhase) private var scenePhase
   @State private var bridge = RemindersBridge.shared
   @State private var access: RemindersBridge.Access = .notDetermined
   @State private var lists: [EKCalendar] = []
@@ -73,6 +74,9 @@ struct RemindersInboxDetail: View {
     }
     .formStyle(.grouped)
     .onAppear(perform: refresh)
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { refresh() }
+    }
   }
 
   @ViewBuilder
@@ -141,6 +145,7 @@ struct RemindersInboxDetail: View {
 }
 
 struct CalendarDetail: View {
+  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.modelContext)    private var modelContext
   @Environment(CKEngine.self)     private var ckEngine
   @Environment(SettingsStore.self) private var store
@@ -190,6 +195,9 @@ struct CalendarDetail: View {
     }
     .formStyle(.grouped)
     .onAppear(perform: refresh)
+    .onChange(of: scenePhase) { _, phase in
+      if phase == .active { refresh() }
+    }
   }
 
   private func calendarRow(_ cal: EKCalendar) -> some View {

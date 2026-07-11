@@ -23,8 +23,6 @@ enum MoodPlugin: SectionPlugin {
 
   static func destinationView() -> AnyView? { AnyView(MoodDestinationView()) }
 
-  static func detailPaneContent() -> AnyView? { AnyView(MoodDetailContent()) }
-
   // MARK: - MCP / agent contract
 
   static var mcpSkill: SectionSkill? {
@@ -170,13 +168,5 @@ enum MoodPlugin: SectionPlugin {
     let body = "Haven’t checked in this \(bucket.rawValue) yet — tap to note how you’re feeling."
     return NotificationPlan(descriptorID: descriptorID, title: "Mood",
                             body: body, threadID: "mood", minuteOfDay: minute)
-  }
-}
-
-private struct MoodDetailContent: View {
-  var body: some View {
-    HKSyncSection(label: "Write to Apple Health",
-                  icon: "heart.text.square",
-                  kind: .mood)
   }
 }

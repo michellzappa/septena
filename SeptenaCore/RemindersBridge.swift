@@ -13,7 +13,9 @@ final class RemindersBridge {
 
   let store = EKEventStore()
 
-  private init() {}
+  private init() {
+    refreshAccess()
+  }
 
   // MARK: - Auth
 
@@ -24,7 +26,12 @@ final class RemindersBridge {
     case notDetermined
   }
 
-  var access: Access {
+  /// Observable permission snapshot. EventKit's class-level authorization
+  /// query does not participate in SwiftUI observation on its own, so pages
+  /// must read this value rather than querying EventKit directly.
+  private(set) var access: Access = .notDetermined
+
+  private static func currentAccess() -> Access {
     let status = EKEventStore.authorizationStatus(for: .reminder)
     if #available(iOS 17.0, macOS 14.0, *) {
       switch status {
@@ -47,14 +54,28 @@ final class RemindersBridge {
     }
   }
 
+  /// Re-check after a system permission sheet or a trip through Settings.
+  /// Publishing the new value keeps both the detail page and its parent
+  /// integration row honest without requiring navigation to be recreated.
+  func refreshAccess() {
+    access = Self.currentAccess()
+  }
+
   func requestAccess() async -> Bool {
     do {
+      let granted: Bool
       if #available(iOS 17.0, macOS 14.0, *) {
-        return try await store.requestFullAccessToReminders()
+        granted = try await store.requestFullAccessToReminders()
       } else {
-        return try await store.requestAccess(to: .reminder)
+        granted = try await store.requestAccess(to: .reminder)
       }
+      // The request result is the authoritative immediate answer. EventKit's
+      // process-wide status can lag a run-loop turn behind the completion, so
+      // publishing it directly prevents the settings page looking unchanged.
+      access = granted ? .granted : Self.currentAccess()
+      return access == .granted
     } catch {
+      refreshAccess()
       return false
     }
   }

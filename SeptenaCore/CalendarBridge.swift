@@ -13,7 +13,9 @@ final class CalendarBridge {
 
   let store = EKEventStore()
 
-  private init() {}
+  private init() {
+    refreshAccess()
+  }
 
   // MARK: - Hidden calendars
   //
@@ -87,7 +89,11 @@ final class CalendarBridge {
     case notDetermined
   }
 
-  var access: Access {
+  /// Observable permission snapshot. EventKit's class-level authorization
+  /// query does not by itself invalidate SwiftUI views.
+  private(set) var access: Access = .notDetermined
+
+  private static func currentAccess() -> Access {
     let status = EKEventStore.authorizationStatus(for: .event)
     if #available(iOS 17.0, macOS 14.0, *) {
       switch status {
@@ -107,14 +113,25 @@ final class CalendarBridge {
     }
   }
 
+  /// Re-check after a system permission sheet or a trip through Settings.
+  func refreshAccess() {
+    access = Self.currentAccess()
+  }
+
   func requestAccess() async -> Bool {
     do {
+      let granted: Bool
       if #available(iOS 17.0, macOS 14.0, *) {
-        return try await store.requestFullAccessToEvents()
+        granted = try await store.requestFullAccessToEvents()
       } else {
-        return try await store.requestAccess(to: .event)
+        granted = try await store.requestAccess(to: .event)
       }
+      // The request result is the authoritative immediate answer. EventKit's
+      // process-wide status can lag a run-loop turn behind the completion.
+      access = granted ? .granted : Self.currentAccess()
+      return access == .granted
     } catch {
+      refreshAccess()
       return false
     }
   }
