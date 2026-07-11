@@ -34,26 +34,40 @@ export interface Env extends AttestEnv {
   ATTEST_MODE?: string;
 }
 
+/** Tokens are app-minted lowercase hex (ReportModels.newToken: 40 chars from
+ *  two UUIDs; older links may be 32). Anything else is rejected before it can
+ *  become a KV key. */
+const TOKEN_RE = /^[0-9a-f]{32,64}$/;
+/** Cap on a PUT body (payload JSON + rendered HTML). */
+const MAX_BODY_BYTES = 1 << 20; // 1 MiB
+/** Served report pages carry no scripts and load no external resources
+ *  (mirror of the Swift ReportHTMLRenderer output), so stored HTML gets a CSP
+ *  that forbids scripts, form posts, and any outbound loads. */
+const REPORT_CSP =
+  "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
 /**
  * Gate a write. In "audit" it verifies + logs but always allows; in "enforce"
- * it rejects missing/invalid assertions. Rate limit always applies.
+ * it rejects missing/invalid assertions. Rate limit always applies. `keyId`
+ * is set only when the assertion actually verified — it's what report
+ * ownership binds to.
  */
 async function attestGate(
   env: Env, headers: Headers, bodyBytes: Uint8Array
-): Promise<{ allow: boolean; status: string }> {
+): Promise<{ allow: boolean; status: string; keyId: string }> {
   const mode = env.ATTEST_MODE ?? "enforce";
   const keyId = headers.get("X-Attest-Key-Id") ?? "";
   const assertion = headers.get("X-Attest-Assertion") ?? "";
   const challenge = headers.get("X-Attest-Challenge") ?? "";
   const rlId = keyId || headers.get("CF-Connecting-IP") || "anon";
-  if (await rateLimited(env, rlId)) return { allow: false, status: "ratelimited" };
-  if (mode === "off") return { allow: true, status: "off" };
+  if (await rateLimited(env, rlId)) return { allow: false, status: "ratelimited", keyId: "" };
+  if (mode === "off") return { allow: true, status: "off", keyId: "" };
   if (!keyId || !assertion || !challenge) {
-    return { allow: mode !== "enforce", status: "missing-assertion" };
+    return { allow: mode !== "enforce", status: "missing-assertion", keyId: "" };
   }
   const res = await verifyAssertion(env, { keyId, assertionB64: assertion, challenge, body: bodyBytes });
-  if (res.ok) return { allow: true, status: "verified" };
-  return { allow: mode !== "enforce", status: `failed:${res.reason}` };
+  if (res.ok) return { allow: true, status: "verified", keyId };
+  return { allow: mode !== "enforce", status: `failed:${res.reason}`, keyId: "" };
 }
 
 interface StoredReport {
@@ -65,6 +79,10 @@ interface StoredReport {
   html?: string;
   /** ISO8601 instant after which the link 404s. Omitted = never expires. */
   expiresAt?: string;
+  /** App Attest keyId that created the report. Once set, only assertions from
+   *  the same key may overwrite or revoke this token. Absent on legacy blobs
+   *  written before ownership binding. */
+  ownerKeyId?: string;
   updatedAt: string;
 }
 
@@ -112,14 +130,27 @@ export default {
     if (req.method === "PUT" && path.startsWith("/api/reports/")) {
       try {
         const bytes = new Uint8Array(await req.arrayBuffer());
+        if (bytes.length > MAX_BODY_BYTES) return json({ error: "payload too large" }, 413);
         const gate = await attestGate(env, req.headers, bytes);
         console.log(`attest.put status=${gate.status} allow=${gate.allow}`);
         if (!gate.allow) return json({ error: `attestation ${gate.status}` }, 403);
         const body = JSON.parse(new TextDecoder().decode(bytes)) as { token?: string; payload?: ReportPayload; html?: string; expiresAt?: string };
         if (!body.token || !body.payload) return json({ error: "token and payload required" }, 400);
+        if (!TOKEN_RE.test(body.token)) return json({ error: "invalid token" }, 400);
+        // Ownership: once a token is bound to an attest key, only that key may
+        // overwrite it. Legacy blobs without ownerKeyId get claimed by the
+        // first verified writer.
+        const existingRaw = await env.REPORTS.get(body.token);
+        if (existingRaw) {
+          const existing = JSON.parse(existingRaw) as StoredReport;
+          if (existing.ownerKeyId && existing.ownerKeyId !== gate.keyId) {
+            return json({ error: "token owned by another key" }, 403);
+          }
+        }
         const stored: StoredReport = {
           token: body.token, payload: body.payload, html: body.html,
-          expiresAt: body.expiresAt, updatedAt: new Date().toISOString(),
+          expiresAt: body.expiresAt, ownerKeyId: gate.keyId || undefined,
+          updatedAt: new Date().toISOString(),
         };
         await env.REPORTS.put(body.token, JSON.stringify(stored));
         return json({ ok: true, url: `${url.origin}/r/${body.token}` });
@@ -131,17 +162,33 @@ export default {
     // DELETE /api/reports/:token  → revoke (remove the blob; link 404s).
     if (req.method === "DELETE" && path.startsWith("/api/reports/")) {
       const token = path.slice("/api/reports/".length);
+      if (!TOKEN_RE.test(token)) return json({ error: "invalid token" }, 400);
       // Revoke binds its assertion to the token bytes (no JSON body).
       const gate = await attestGate(env, req.headers, new TextEncoder().encode(token));
       console.log(`attest.delete status=${gate.status} allow=${gate.allow}`);
       if (!gate.allow) return json({ error: `attestation ${gate.status}` }, 403);
-      if (token) await env.REPORTS.delete(token);
+      const raw = await env.REPORTS.get(token);
+      if (raw) {
+        const stored = JSON.parse(raw) as StoredReport;
+        if (stored.ownerKeyId && stored.ownerKeyId !== gate.keyId) {
+          return json({ error: "token owned by another key" }, 403);
+        }
+        await env.REPORTS.delete(token);
+      }
       return json({ ok: true });
     }
 
     // GET /r/:token  → render the report HTML.
     if (req.method === "GET" && path.startsWith("/r/")) {
       const token = path.slice(3);
+      if (!TOKEN_RE.test(token)) {
+        return new Response("Report not found, expired, or revoked.", { status: 404 });
+      }
+      // Per-IP rate limit so tokens can't be brute-forced through this path.
+      const ip = req.headers.get("CF-Connecting-IP") ?? "anon";
+      if (await rateLimited(env, `read:${ip}`, 60, 60)) {
+        return new Response("Too many requests.", { status: 429, headers: { "retry-after": "60" } });
+      }
       const raw = await env.REPORTS.get(token);
       if (!raw) return new Response("Report not found, expired, or revoked.", { status: 404 });
       const stored = JSON.parse(raw) as StoredReport;
@@ -153,7 +200,13 @@ export default {
       // minimal in-Worker render only for blobs pushed without html.
       const out = stored.html && stored.html.length > 0 ? stored.html : renderHTML(stored.payload);
       return new Response(out, {
-        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "content-security-policy": REPORT_CSP,
+          "x-content-type-options": "nosniff",
+          "referrer-policy": "no-referrer",
+        },
       });
     }
 
