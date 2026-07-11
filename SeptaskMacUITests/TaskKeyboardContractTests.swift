@@ -36,6 +36,25 @@ final class TaskKeyboardContractTests: XCTestCase {
   }
 
   @MainActor
+  func testKeyboardTraversalSkipsInvisibleCompletedTodayRows() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["-SeptenaSeed", "demo", "-SeptenaTaskContractSeed",
+                           "-septena.security.appLock", "NO"]
+    app.launch()
+    XCTAssertTrue(app.wait(for: .runningForeground, timeout: 20))
+
+    clickRequired(app, labels: ["Today"])
+    let first = taskRow(app, id: "demo-keyboard-task-0")
+    XCTAssertTrue(first.waitForExistence(timeout: 10))
+    first.click()
+    for _ in 0..<3 { app.typeKey(.downArrow, modifierFlags: []) }
+
+    let expected = taskRow(app, id: "demo-keyboard-task-3")
+    XCTAssertEqual(expected.value as? String, "selected, open")
+    XCTAssertFalse(taskRow(app, id: "demo-keyboard-hidden-completed").exists)
+  }
+
+  @MainActor
   private func clickRequired(_ app: XCUIApplication, labels: [String]) {
     for label in labels {
       let candidates = [app.buttons[label], app.staticTexts[label], app.cells[label]]

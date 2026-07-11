@@ -159,6 +159,17 @@ public enum DemoSeed {
         position: 1_000_000 + Double(index) * 1_024
       ))
     }
+    // Today intentionally renders loose completed work only in the Logbook,
+    // not in its Inbox card. Keep one at a real position between two open rows
+    // so the keyboard contract catches any invisible cursor slot.
+    ctx.insert(TaskEntity(
+      id: "demo-keyboard-hidden-completed",
+      title: "Hidden keyboard-contract completion",
+      statusRaw: TaskStatus.done.rawValue,
+      today: true,
+      completedAt: day(0),
+      position: 1_000_000 + 2_560
+    ))
   }
 
   private static func seedHabits(_ ctx: ModelContext, _ rng: inout SeededRNG) {
