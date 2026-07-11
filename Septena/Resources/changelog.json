@@ -4,60 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1410,
+      "build": 1414,
       "date": "2026-07-11",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Nutrition now captures meals from a photo and uses on-device analysis to prefill the name and macros, with an optional ingredient breakdown and percentage scaling when you re-log.",
+          "title": "Septask, a focused task app",
+          "detail": "A dedicated Tasks-only app over the same private data, on iPhone, iPad, and Mac.",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo of your meal",
+          "detail": "Photo-first meal capture analyzes the picture on-device and prefills macros, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "A big Tasks overhaul",
-          "detail": "Group work under project headings, multi-select for bulk actions, a redesigned date picker with quick-pick pills, inline editing everywhere, and drag tasks onto Today to re-home them.",
+          "title": "A much richer Tasks experience",
+          "detail": "Import from Things, organize projects with section headings, drag tasks to re-home them, select several at once for bulk actions, and recover anything from Recently Deleted for 30 days.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar lives inside Tasks",
-          "detail": "System calendar events now appear alongside Today and Upcoming, showing only what's still ahead.",
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events now appear woven into your task agenda, with per-device hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view with undo and restore, auto-purging after 30 days.",
-          "section": "tasks"
-        },
-        {
-          "title": "Import your tasks from Things",
-          "detail": "Bring in a Things database export, with headings mapped to project sections.",
-          "section": "tasks"
-        },
-        {
-          "title": "Smarter training progress",
-          "detail": "Effort-weighted muscle volume with a post-session weekly review, one-tap progression hints on strength sets, and a rest timer that auto-advances with a watch Live Activity.",
+          "title": "Smarter strength training",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and a rest timer that auto-advances with a watch Live Activity.",
           "section": "training"
         },
         {
+          "title": "A calmer, more capable watch",
+          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers on rows, and tap-to-quick-add intake tiles.",
+          "section": null
+        },
+        {
+          "title": "Choose how much you share",
+          "detail": "Graded analytics levels from Off to Full, with a plain view of exactly what's sent and a log of recent activity.",
+          "section": null
+        },
+        {
           "title": "Pin goals to your dashboard",
-          "detail": "Any measurable goal can be pinned to the week dashboard so its progress is always in view.",
+          "detail": "Keep the goals that matter most in view as tiles on the week dashboard.",
           "section": "goals"
-        },
-        {
-          "title": "See and control what you share",
-          "detail": "Graded telemetry levels from Off to Full, a plain-language ladder of what each level sends, and a log of recently-sent, anonymized data.",
-          "section": null
-        },
-        {
-          "title": "A richer wrist experience",
-          "detail": "The watch Next feed floats over a live time-of-day sky, with long-press action drawers, tap-to-quick-add intake tiles, and expanded meal and ring rendering.",
-          "section": null
-        },
-        {
-          "title": "The Week tab is now Today",
-          "detail": null,
-          "section": null
         }
       ]
     },
