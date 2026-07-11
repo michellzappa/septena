@@ -537,8 +537,8 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
   if (!tokenRec) return unauthorized("access_token not found in KV");
   const { ckWebAuthToken, createdAt, lastUsedAt, userRecordName } = tokenRec;
 
-  // Bump lastUsedAt (throttled, non-blocking) so the cleanup cron can tell
-  // this token is alive. One KV write per TOUCH_INTERVAL_MS at most.
+  // Bump lastUsedAt (throttled, non-blocking) for observability — expiry
+  // itself is TTL-driven now. One KV write per TOUCH_INTERVAL_MS at most.
   if (Date.now() - lastUsedAt > TOUCH_INTERVAL_MS) {
     c.executionCtx.waitUntil(touchAccessToken(c.env, accessToken));
   }

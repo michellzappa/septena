@@ -5,6 +5,7 @@ import { register } from "./oauth/register.js";
 import { authorize } from "./oauth/authorize.js";
 import { continueAuth } from "./oauth/continue.js";
 import { token } from "./oauth/token.js";
+import { revoke } from "./oauth/revoke.js";
 import { appleCallback } from "./auth/appleCallback.js";
 import { ingestCkToken } from "./ingest/ckToken.js";
 import { mcpHandler } from "./mcp.js";
@@ -55,10 +56,12 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
     authorization_endpoint: `${base}/oauth/authorize`,
     token_endpoint: `${base}/oauth/token`,
     registration_endpoint: `${base}/oauth/register`,
+    revocation_endpoint: `${base}/oauth/revoke`,
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
+    revocation_endpoint_auth_methods_supported: ["none"],
   });
 });
 
@@ -82,6 +85,7 @@ app.post("/oauth/register", register);
 app.get("/oauth/authorize", authorize);
 app.post("/oauth/continue", continueAuth);
 app.post("/oauth/token", token);
+app.post("/oauth/revoke", revoke);
 
 app.get("/auth/apple/callback", appleCallback);
 
@@ -92,10 +96,10 @@ app.post("/mcp", mcpHandler);
 // pushed token is validated against CloudKit's users/current.
 app.post("/ingest/ck-token", ingestCkToken);
 
-// Access tokens never expire in KV (the CloudKit token inside them does),
-// so prune records idle longer than this to avoid unbounded accumulation
-// and zombie health-check traffic. CloudKit tokens die within hours, so a
-// week of idleness means definitely dead.
+// Access/refresh tokens now carry KV TTLs and self-expire; this cron is
+// belt-and-braces for what doesn't: legacy raw-keyed token records from
+// before the hashed-key cutover, and per-user cktoken: records (no TTL).
+// CloudKit tokens die within hours, so a week of idleness means dead.
 const TOKEN_MAX_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default {

@@ -380,6 +380,9 @@ export async function touchAccessToken(env: Env, accessToken: string): Promise<v
   const raw = await env.TOKENS.get(key);
   if (!raw) return;
   const rec = JSON.parse(raw) as AccessTokenRecord;
+  // KV rejects expirations under 60s out; a nearly-dead token isn't worth
+  // stamping anyway.
+  if (rec.expiresAt - Date.now() < 60_000) return;
   rec.lastUsedAt = Date.now();
   // Absolute expiration so the rewrite can't extend the token's KV lifetime.
   await env.TOKENS.put(key, JSON.stringify(rec), {
