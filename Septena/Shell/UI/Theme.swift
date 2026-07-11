@@ -15,8 +15,9 @@ enum Theme {
 
   // MARK: - Accent
   //
-  // The app accent is the asset-catalog `AccentColor` — a standalone brand
-  // tint, intentionally independent of any section color. Reminders-style
+  // The app accent is the asset-catalog `AccentColor` — a monochrome label
+  // ink (black in light, white in dark), intentionally hue-free so color
+  // stays reserved for section meaning. Reminders-style
   // per-list/section tints come from `SectionTheme.color(for:)`, applied with
   // `.tint(...)`; any view inside that scope picks the tint up via
   // `Color.accentColor`. Read `Color.accentColor` (or `SectionTheme.accent`)

@@ -91,10 +91,15 @@ final class SectionTheme {
   /// Neutral fallback — inherits from the asset catalog's AccentColor.
   static let fallback = Color.accentColor
 
-  /// The app's primary accent — the asset-catalog `AccentColor`, a standalone
-  /// brand tint intentionally independent of any section color. Applied at the
-  /// app root via `.tint(theme.accent)`, so `Color.accentColor` inherits it
-  /// app-wide. Per-section colors come from `color(for:)`, never this.
+  /// The app's primary accent — the asset-catalog `AccentColor`, deliberately
+  /// monochrome (adaptive label ink: black in light, white in dark) so hue
+  /// stays reserved for section meaning. Applied at the app root via
+  /// `.tint(theme.accent)`, so `Color.accentColor` inherits it app-wide: every
+  /// nav-bar chrome button and body control reads as ink, never a hue. The one
+  /// place hue is intentionally allowed is Septask's tab bar SELECTED item,
+  /// which is tinted with the live Tasks color at the `TabView` itself (the tab
+  /// content is reset back to this ink) — see `SeptaskRootView`. Per-section
+  /// colors elsewhere come from `color(for:)`, never this.
   let accent: Color = SectionTheme.fallback
   /// All section accents keyed by Septena section id (`tasks`, `habits`,
   /// `chores`, `supplements`, ...). Populated by `refresh()`.
