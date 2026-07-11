@@ -145,7 +145,7 @@ enum SeptenaPlus {
           title: "A Supporter badge",
           detail: "A quiet mark on your profile and a foil ring on your avatar. Just for you — it changes nothing about what the app can do."),
     .init(id: "earlyaccess",
-          icon: "sparkles",
+          icon: "bolt",
           title: "Get new versions first",
           detail: "Opt into TestFlight and get new builds weeks before they reach the App Store — first to try what's next. Every feature still lands free for everyone; you just get it sooner."),
     .init(id: "thanks",

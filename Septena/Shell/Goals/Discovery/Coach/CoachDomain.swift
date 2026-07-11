@@ -45,7 +45,7 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     case .training:       return "figure.run"
     case .food:           return "fork.knife"
     case .accountability: return "checklist"
-    case .wholeLife:      return "sparkles"
+    case .wholeLife:      return "square.grid.2x2"
     case .custom:         return "slider.horizontal.3"
     }
   }

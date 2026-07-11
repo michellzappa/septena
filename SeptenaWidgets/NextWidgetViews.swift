@@ -192,7 +192,7 @@ private func kindIcon(_ kind: String) -> String {
   case "chore":      return "house"
   case "habit":      return "repeat"
   case "supplement": return "pills"
-  case "suggestion": return "sparkles"
+  case "suggestion": return "lightbulb"
   default:           return "circle"
   }
 }

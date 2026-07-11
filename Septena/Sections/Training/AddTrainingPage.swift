@@ -37,7 +37,7 @@ struct AddTrainingPage: View {
             AddInfoRow(
               title: suggested.type,
               subtitle: suggested.reason,
-              systemImage: "sparkles",
+              systemImage: "lightbulb",
               tint: tint
             )
           }

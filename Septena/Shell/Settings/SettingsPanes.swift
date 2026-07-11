@@ -608,7 +608,7 @@ struct NextSettingsPane: View {
     Form {
       Section {
         Toggle(isOn: $suggestionsEnabled) {
-          Label("Suggestions", systemImage: "sparkles")
+          Label("Suggestions", systemImage: "lightbulb")
         }
         if suggestionsEnabled {
           Toggle("Workouts", isOn: $suggestTraining)
