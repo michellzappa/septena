@@ -118,7 +118,7 @@ struct ClaudeGatewayDetail: View {
       } header: {
         Text("How it works")
       } footer: {
-        Text("Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So Septena refreshes the connection automatically when you open the app, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open Septena to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch.")
+        Text("Good to know: Apple only issues short-lived keys for private iCloud data — a few hours, with no server-side renewal. So the app refreshes the connection automatically when you open it, and the “Keep Claude connected” reminder nudges you before it lapses. If it does lapse, Claude simply asks you to open either app to refresh — you won't need to reconnect from claude.ai, and it resumes on its own. Refreshing happens on iPhone and Mac only, not the watch.")
       }
     }
     .formStyle(.grouped)

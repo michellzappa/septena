@@ -28,7 +28,8 @@ import AppKit
 // Apple prompt at most ~once per token when you open the app.
 //
 // The HTTPS callback (.https) requires Associated Domains `webcredentials`
-// for mcp.septena.app (Septena.entitlements + the gateway's AASA file).
+// for mcp.septena.app (both app targets' entitlements + the gateway's AASA
+// file).
 @MainActor
 @Observable
 public final class ClaudeGatewayProvider {
@@ -54,21 +55,50 @@ public final class ClaudeGatewayProvider {
   /// Flip to "production" (with the gateway) for TestFlight/App Store builds.
   private static let ckEnvironment = "development"
 
-  /// Re-mint when the last push is older than this — comfortably under the
-  /// ~8h token lifetime. Still drives the proactive pre-expiry nudge
-  /// (`nudgeFireDate`); the foreground `needsReauth` decision no longer relies
-  /// on it as a guess — see `probeStoredToken`.
-  private static let refreshInterval: TimeInterval = 7 * 60 * 60
+  /// Conservative starting guess — used until `measure.samples` has enough
+  /// data to calibrate. Re-mint when the last push is older than this. Still
+  /// drives the proactive pre-expiry nudge (`nudgeFireDate`); the foreground
+  /// `needsReauth` decision no longer relies on it as a guess — see
+  /// `probeStoredToken`.
+  private static let refreshIntervalFloor: TimeInterval = 7 * 60 * 60
+
+  /// Conservative starting guess for the no-probe trust window — see
+  /// `probeAfter` below for the calibrated value actually used.
+  private static let probeAfterFloor: TimeInterval = 5 * 60 * 60
+
+  /// Stay this far under the smallest confirmed-still-valid age we've ever
+  /// measured, so one slow sample or a bit of clock skew never flips a token
+  /// that's actually still live.
+  private static let calibrationSafetyMargin: TimeInterval = 30 * 60
+
+  /// Don't trust calibration off a single lucky sample.
+  private static let calibrationMinSamples = 3
 
   /// Below this age a freshly-minted token is trusted without a network probe —
   /// no point asking CloudKit about a token minted minutes ago on every
   /// foreground. Past it we close the loop and verify the real verdict.
-  /// Conservatively under any observed CloudKit lifetime.
-  private static let probeAfter: TimeInterval = 5 * 60 * 60
+  /// Self-tunes upward from `probeAfterFloor` once `measure.samples` has
+  /// enough data — see `calibratedValidFloor`.
+  private static var probeAfter: TimeInterval {
+    guard let floor = calibratedValidFloor() else { return probeAfterFloor }
+    return max(probeAfterFloor, floor - calibrationSafetyMargin)
+  }
 
   // MARK: Persisted state
+  //
+  // Septena and Septask are separate processes and bundle identifiers, but
+  // they are equal peers for the hosted Claude connection. Keep the *account
+  // state* in their shared App Group so opening either app can see that Claude
+  // is connected and can re-mint the gateway token. The token itself remains
+  // in each app's private Keychain: it is device-local and a force refresh in
+  // either app simply replaces the gateway's current short-lived token.
+  public static let connectionAppGroup = "group.com.septena.cloud"
+  private static let connectionDefaults =
+    UserDefaults(suiteName: connectionAppGroup) ?? .standard
   private static let enabledKey = "septena.claudeGateway.enabled"
   private static let lastRefreshKey = "septena.claudeGateway.lastRefreshAt"
+  private static let nudgeOwnerKey = "septena.claudeGateway.nudgeOwner"
+  private static let stateChangedDarwinName = "com.septena.claudeGateway.changed"
   /// Keychain account for the last token we minted+pushed, kept so we can ask
   /// CloudKit whether it's still valid (the closed-loop expiry check). A
   /// rotating, device-specific credential → device-local (not iCloud-synced),
@@ -95,7 +125,7 @@ public final class ClaudeGatewayProvider {
   }
 
   public var isEnabled: Bool {
-    didSet { UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey) }
+    didSet { Self.connectionDefaults.set(isEnabled, forKey: Self.enabledKey) }
   }
 
   // MARK: Observable status (for Settings UI)
@@ -118,18 +148,62 @@ public final class ClaudeGatewayProvider {
     cfg.timeoutIntervalForRequest = 20
     cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
     self.session = URLSession(configuration: cfg)
-    self.isEnabled = UserDefaults.standard.bool(forKey: Self.enabledKey)
-    let stamp = UserDefaults.standard.double(forKey: Self.lastRefreshKey)
+
+    // One-release migration from Septena's bundle-local defaults. Do not seed
+    // an absent value as `false`: if Septask launches first, that would mask a
+    // real existing Septena connection before Septena gets to migrate it.
+    if Self.connectionDefaults.object(forKey: Self.enabledKey) == nil,
+       let legacyEnabled = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool {
+      Self.connectionDefaults.set(legacyEnabled, forKey: Self.enabledKey)
+      let legacyStamp = UserDefaults.standard.double(forKey: Self.lastRefreshKey)
+      if legacyStamp > 0 {
+        Self.connectionDefaults.set(legacyStamp, forKey: Self.lastRefreshKey)
+      }
+    }
+    self.isEnabled = Self.connectionDefaults.bool(forKey: Self.enabledKey)
+    let stamp = Self.connectionDefaults.double(forKey: Self.lastRefreshKey)
     self.lastRefreshAt = stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
   }
 
   // MARK: API
+
+  /// Adopt the shared connection state written by Septena or Septask. Callers
+  /// do this on foreground before deciding whether the current app should
+  /// surface or schedule a reconnect.
+  public func reloadSharedState() {
+    let sharedEnabled = Self.connectionDefaults.bool(forKey: Self.enabledKey)
+    let stamp = Self.connectionDefaults.double(forKey: Self.lastRefreshKey)
+    let sharedRefresh = stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
+    if isEnabled != sharedEnabled { isEnabled = sharedEnabled }
+    if lastRefreshAt != sharedRefresh { lastRefreshAt = sharedRefresh }
+    if !sharedEnabled {
+      needsReauth = false
+      lastError = nil
+    }
+  }
+
+  /// Make this foreground app responsible for the one pending reconnect
+  /// reminder. The other app observes the Darwin notification and withdraws
+  /// its duplicate while it is running.
+  public static func claimReconnectNudge() {
+    guard let bundleID = Bundle.main.bundleIdentifier,
+          connectionDefaults.string(forKey: nudgeOwnerKey) != bundleID
+    else { return }
+    connectionDefaults.set(bundleID, forKey: nudgeOwnerKey)
+    postStateChanged()
+  }
+
+  public static var currentAppOwnsReconnectNudge: Bool {
+    guard let bundleID = Bundle.main.bundleIdentifier else { return true }
+    return connectionDefaults.string(forKey: nudgeOwnerKey) == bundleID
+  }
 
   /// Auto path (foreground). NEVER presents UI — a sign-in sheet can only
   /// be shown from an explicit user action. Here we just decide whether the
   /// token is stale and set `needsReauth` so the homepage can show a subtle
   /// reconnect cue. `force` (a user action) does present and re-mint.
   public func refreshIfNeeded(force: Bool = false) async {
+    reloadSharedState()
     guard isEnabled else { return }
     if force {
       await refreshNow()
@@ -210,13 +284,43 @@ public final class ClaudeGatewayProvider {
   // valid (`lastValid`) and the age at which it first saw it expired
   // (`expiredBy`). The true CloudKit lifetime lies in (lastValid, expiredBy].
   // Finalized samples are appended to `samplesKey` so they outlive the `.info`
-  // logs — read them back in a few days with:
+  // logs, AND feed `calibratedValidFloor()` below so `refreshInterval` /
+  // `probeAfter` self-tune upward as real data accumulates — no hand-editing
+  // needed. To eyeball the raw samples:
   //   defaults read com.septena.cloud.mac septena.claudeGateway.measure.samples
-  // and calibrate `refreshInterval` / `probeAfter` to the observed minimum.
   private static let measureCycleKey = "septena.claudeGateway.measure.cycleRefreshAt"
   private static let measureValidKey = "septena.claudeGateway.measure.lastValidAge"
   private static let measureFinalizedKey = "septena.claudeGateway.measure.finalizedCycle"
   private static let measureSamplesKey = "septena.claudeGateway.measure.samples"
+
+  /// Re-mint when the last push is older than this. Self-tunes upward from
+  /// `refreshIntervalFloor` once `measure.samples` has enough data.
+  private static var refreshInterval: TimeInterval {
+    guard let floor = calibratedValidFloor() else { return refreshIntervalFloor }
+    return max(refreshIntervalFloor, floor - calibrationSafetyMargin)
+  }
+
+  /// The smallest "still valid" age ever confirmed by the closed-loop probe,
+  /// parsed back out of the finalized `measure.samples` lines (each looks
+  /// like "minted … | lastValid 27000s | expiredBy 28800s"). This is a safe
+  /// lower bound on the real CloudKit token lifetime — every sample is a
+  /// case where the token was independently verified still accepted at that
+  /// age. `nil` until `calibrationMinSamples` samples have accumulated, so a
+  /// device fresh off the default keeps the conservative floor.
+  private static func calibratedValidFloor() -> TimeInterval? {
+    let samples = UserDefaults.standard.stringArray(forKey: measureSamplesKey) ?? []
+    guard samples.count >= calibrationMinSamples else { return nil }
+    let lastValids: [Double] = samples.compactMap { line in
+      for part in line.split(separator: "|") {
+        let trimmed = part.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("lastValid "), trimmed.hasSuffix("s") {
+          return Double(trimmed.dropFirst("lastValid ".count).dropLast())
+        }
+      }
+      return nil
+    }
+    return lastValids.min()
+  }
 
   private func recordMeasurement(ageSec: Double, valid: Bool) {
     guard let last = lastRefreshAt else { return }
@@ -250,6 +354,7 @@ public final class ClaudeGatewayProvider {
   /// recording an error.
   @discardableResult
   public func refreshNow() async -> Bool {
+    reloadSharedState()
     guard isEnabled else { return false }
     guard !isRefreshing else { return false }
     isRefreshing = true
@@ -264,9 +369,9 @@ public final class ClaudeGatewayProvider {
       lastError = nil
       needsReauth = false
       lastRefreshAt = Date()
-      UserDefaults.standard.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
+      Self.connectionDefaults.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
       // Re-arm the pre-expiry reconnect nudge off the fresh timestamp.
-      NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
+      Self.postStateChanged()
       logger.info("Claude gateway token refreshed")
       return true
     } catch GatewayError.cancelled {
@@ -282,17 +387,31 @@ public final class ClaudeGatewayProvider {
   }
 
   public func connect() async {
+    reloadSharedState()
     isEnabled = true
+    // Publish immediately as well as after a successful mint: if the user
+    // dismisses the sign-in sheet, the sibling still knows this account has
+    // opted into Claude and can offer its own reconnect path.
+    Self.postStateChanged()
     await refreshNow()
   }
 
   public func disconnect() {
+    reloadSharedState()
     isEnabled = false
     lastError = nil
     needsReauth = false
     KeychainStore.delete(account: Self.tokenKeychainAccount)
     // Withdraw any pending reconnect nudge.
+    Self.postStateChanged()
+  }
+
+  private static func postStateChanged() {
     NotificationCenter.default.post(name: .septenaClaudeGatewayChanged, object: nil)
+    CFNotificationCenterPostNotification(
+      CFNotificationCenterGetDarwinNotifyCenter(),
+      CFNotificationName(stateChangedDarwinName as CFString),
+      nil, nil, true)
   }
 
   // MARK: Internals
@@ -362,7 +481,7 @@ public final class ClaudeGatewayProvider {
         self.anchorProvider = nil
         cont.resume(throwing: GatewayError.server(
           0,
-          "couldn’t start sign-in — check Associated Domains for com.septena.cloud and that the AASA is reachable"
+          "couldn’t start sign-in — check this app's Associated Domains and that the AASA is reachable"
         ))
       }
     }

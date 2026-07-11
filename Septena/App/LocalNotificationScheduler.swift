@@ -36,13 +36,6 @@ final class LocalNotificationScheduler {
   /// requests this scheduler owns.
   private static let requestPrefix = "septena.notify.req."
 
-  /// Identifier for the Claude pre-expiry reconnect nudge. Deliberately
-  /// *outside* `requestPrefix` so the descriptor-driven `apply()` cleanup
-  /// never treats it as stale — unlike the section nudges (daily hour:minute,
-  /// data-driven), this one fires once at `lastRefreshAt + ~7h` and is owned
-  /// entirely by `applyClaudeNudge`.
-  private static let claudeNudgeID = "septena.claude.connectionNudge"
-
   /// Quiet window — no nudges fire between these hours (except descriptors
   /// flagged `quietHoursExempt`, e.g. the bedtime wind-down).
   private static let quietStartHour = 21   // 21:00
@@ -73,11 +66,6 @@ final class LocalNotificationScheduler {
   /// Debounce guard — coalesces a burst of data changes into one reconcile
   /// (the full plugin walk) a beat later, instead of one walk per edit.
   private var reconcileScheduled = false
-  /// The fire date the Claude reconnect nudge is currently armed for. Used to
-  /// log only on *transitions* — reconcile runs on every data change, so we'd
-  /// otherwise spam the console with identical "armed" lines.
-  private var claudeNudgeArmedFor: Date?
-
   private init() {}
 
   // MARK: Lifecycle
@@ -97,7 +85,6 @@ final class LocalNotificationScheduler {
     // Other wakeups carry no section scope; route through the same debounce.
     let names: [Notification.Name] = [
       .septenaTasksChanged, .septenaOuraChanged,
-      .septenaClaudeGatewayChanged,
       UserDefaults.didChangeNotification,
     ]
     for name in names {
@@ -106,6 +93,9 @@ final class LocalNotificationScheduler {
       })
     }
     registerCategories()
+    // Claude is not a section nudge: the shared core scheduler lets either
+    // Septena or Septask own the pending reconnect alert.
+    ClaudeReconnectNudge.shared.start()
     reconcile()
   }
 
@@ -141,14 +131,6 @@ final class LocalNotificationScheduler {
                                                  options: []))
       }
     }
-    // The Claude reconnect nudge isn't a section descriptor; register its
-    // single "Reconnect" action here. Tapping it foregrounds the app and the
-    // AppDelegate handler re-mints the token.
-    categories.insert(UNNotificationCategory(
-      identifier: Self.claudeNudgeID,
-      actions: [UNNotificationAction(identifier: NotificationActionID.claudeReconnect,
-                                     title: "Reconnect", options: [.foreground])],
-      intentIdentifiers: [], options: []))
     UNUserNotificationCenter.current().setNotificationCategories(categories)
     #endif
   }
@@ -168,9 +150,6 @@ final class LocalNotificationScheduler {
 
   func reconcile() {
     #if canImport(UIKit)
-    // The Claude nudge is context-free (driven by the gateway's token age,
-    // not the local store), so re-arm it even before `start` binds a context.
-    reconcileClaudeNudge()
     guard let context = contextRef else { return }
     let nudges = Self.masterEnabled ? computeNudges(context: context) : []
     Task { await apply(nudges: nudges) }
@@ -308,78 +287,6 @@ final class LocalNotificationScheduler {
     }
   }
 
-  // MARK: Claude reconnect nudge
-  //
-  // A one-shot, relative-time nudge: fire once at `lastRefreshAt + ~7h`, just
-  // before the CloudKit token (which Claude rides on) expires, so the user can
-  // re-mint *while Claude is still connected* — staying in the painless
-  // refresh path instead of having to reconnect from claude.ai. Owns a single
-  // request id outside `requestPrefix`, so the descriptor pipeline never
-  // touches it. Re-armed on every gateway change via `.septenaClaudeGatewayChanged`.
-
-  func reconcileClaudeNudge() {
-    Task { await applyClaudeNudge() }
-  }
-
-  private func applyClaudeNudge() async {
-    let center = UNUserNotificationCenter.current()
-    // Always clear first, so a toggle-off, disconnect, or past-due fire date
-    // withdraws the pending request.
-    center.removePendingNotificationRequests(withIdentifiers: [Self.claudeNudgeID])
-
-    // The absolute moment we want to nudge — nil if the nudge shouldn't be
-    // armed at all (master off, gateway off, toggle off, never authed, or
-    // already past the refresh horizon).
-    let provider = ClaudeGatewayProvider.shared
-    let target: Date? = {
-      guard Self.masterEnabled,
-            provider.isEnabled,
-            ClaudeGatewayProvider.connectionNudgeEnabled,
-            let fireDate = provider.nudgeFireDate,
-            fireDate.timeIntervalSinceNow > 0
-      else { return nil }
-      return fireDate
-    }()
-
-    guard let target else {
-      if claudeNudgeArmedFor != nil {
-        Self.logger.info("Claude reconnect nudge withdrawn")
-        claudeNudgeArmedFor = nil
-      }
-      return
-    }
-
-    let status = await center.notificationSettings().authorizationStatus
-    guard status == .authorized || status == .provisional else {
-      if claudeNudgeArmedFor != nil {
-        Self.logger.info("Claude reconnect nudge withdrawn (notifications not authorized)")
-        claudeNudgeArmedFor = nil
-      }
-      return
-    }
-
-    let content = UNMutableNotificationContent()
-    content.title = "Keep Claude connected"
-    content.body = "Your Claude session is about to expire. Tap to refresh while it's still live."
-    content.threadIdentifier = "septena.claude"
-    content.sound = .default
-    // Time-sensitive (the session is about to expire), so it stays an alert —
-    // unlike the passive daily nudges — and can break through on the wrist.
-    content.interruptionLevel = .timeSensitive
-    content.categoryIdentifier = Self.claudeNudgeID
-    content.userInfo = ["claudeReconnect": true]
-
-    // Re-add each reconcile with a freshly-computed interval so the absolute
-    // fire moment stays put as `now` advances. Only log when the target moves
-    // (i.e. after a real refresh), not on every idle reconcile.
-    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: target.timeIntervalSinceNow, repeats: false)
-    let request = UNNotificationRequest(identifier: Self.claudeNudgeID, content: content, trigger: trigger)
-    try? await center.add(request)
-    if claudeNudgeArmedFor != target {
-      Self.logger.info("Claude reconnect nudge armed in \(Int(target.timeIntervalSinceNow), privacy: .public)s")
-      claudeNudgeArmedFor = target
-    }
-  }
   #endif
 
   // MARK: Toggle reads
