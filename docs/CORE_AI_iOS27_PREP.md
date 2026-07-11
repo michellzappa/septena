@@ -1,9 +1,18 @@
 # Core AI & iOS 27 Preparation Plan
 
-Status: **planning only — no code yet** (Xcode 27 beta to be installed later).
-Date: 2026-06-09. Source: WWDC 2026 + the Core AI / Foundation Models
-documentation. This file is the agent + human cheat-sheet for the iOS 27 AI
-push. Verify every "(news)"-tagged claim against the SDK once the beta lands.
+Status: **research-verified, pre-implementation** (Xcode 27 beta not yet
+installed). Date: 2026-06-09; **updated 2026-07-11** after a verification pass
+against Apple's shipped first-party pages: the [PCC developer page]
+(https://developer.apple.com/private-cloud-compute/), the [WWDC26 Apple
+Intelligence guide](https://developer.apple.com/wwdc26/guides/apple-intelligence/),
+and session notes for 241 ("What's new in the Foundation Models framework"),
+339 ("Bring an LLM provider to the Foundation Models framework"), 319 ("Build
+with the new Apple Foundation Model on Private Cloud Compute"), 324/325 (Core
+AI), 298/299 (Evaluations), 334/335 (fm CLI / prompt hill-climbing), 240/295/
+343/344/345 (App Intents & Siri). Facts tagged *(verified 2026-07-11)* are
+confirmed first-party; remaining "(news)" tags still need the beta. This file
+is the agent + human cheat-sheet AND the sequenced plan (§8) for the iOS 27 AI
+push.
 
 ---
 
@@ -48,26 +57,58 @@ artifacts — specialization is expensive), `InferenceFunction`,
 `AssetError`. **Availability: iOS/iPadOS/macOS/visionOS 27.0+ (beta).**
 On-device, offline, no per-inference cost.
 
-### 1b. Foundation Models — what's new for iOS 27 (confirmed — Apple docs)
-The framework we already use (`import FoundationModels`). New surface:
+### 1b. Foundation Models — what's new for iOS 27 *(verified 2026-07-11)*
+The framework we already use (`import FoundationModels`). Verified new surface:
 
-- **Private Cloud Compute routing** — `PrivateCloudComputeLanguageModel`, gated
-  by the `com.apple.developer.private-cloud-compute` entitlement. Larger context
-  + stronger reasoning, same privacy guarantees. **This is the drop-in our Coach
-  factory already stubbed.**
-- **Multimodal prompting** — `Attachment`, `AttachmentContent`,
-  `ImageAttachmentContent`, `ImageReference`. **Text + image into the on-device
-  model.** This is the easy food-photo path.
-- **Dynamic profiles / instructions** — `LanguageModelSession.DynamicProfile`,
-  `DynamicInstructions`, `SessionProperty` — runtime adaptation of behavior.
-- **Custom LLM provider** — `LanguageModelExecutor` (+ `…GenerationChannel`,
-  `…GenerationRequest`): plug a different backend behind the same session API.
-- **Agentic workflows**, cross-session **KV-cache** reuse, **Instruments**
-  profiling support.
-- (news) Bigger base model (Gemini-distilled), expanded context window,
-  **on-device private fine-tuning**.
-- Platform floors: iOS/iPadOS/macOS/visionOS **26.0+**; **watchOS 27.0+** (so
-  Foundation Models on the watch is *new* and unlocks a watch Coach).
+- **`LanguageModel` protocol** — any model can back a `LanguageModelSession`
+  via `LanguageModelSession(model:)`. Confirmed conformers:
+  `SystemLanguageModel` (on-device), `PrivateCloudComputeLanguageModel`
+  (Apple's server model), open-source `CoreAILanguageModel` (local models on
+  the ANE) and `MLXLanguageModel` (Mac GPU), **plus first-party Swift packages
+  from Anthropic and Google** so frontier cloud models drop into the same
+  session/tool/@Generable APIs (auth via OAuth, token in Keychain, billed
+  per-token to the *user's* account). Session 339 also names a
+  `LanguageModelExecutor` protocol as the provider extension point.
+- **Private Cloud Compute routing** — `PrivateCloudComputeLanguageModel`:
+  **32,000-token context**, reasoning-capable, per-request
+  `ContextOptions(reasoningLevel: .light / .deep)`, and a usage-accounting API
+  (`response.usage.input.totalTokenCount / .cachedTokenCount`,
+  `output.totalTokenCount / .reasoningTokenCount`). No API key, no account
+  setup; prompts not stored. **This is the drop-in our Coach factory already
+  stubbed.** Eligibility & limits → §1d.
+- **Multimodal prompting** — image attachments to the on-device model:
+  `Attachment(UIImage/NSImage/CGImage/CIImage/CVPixelBuffer/fileURL)` inline in
+  the prompt builder. Any size/aspect; bigger images cost tokens + latency.
+  This is the easy food-photo path (our `MealPhotoModelAnalyzer` is already
+  written against it).
+- **System tools the model can call** — Vision-backed **`OCRTool`** (structured
+  text from images) and **`BarcodeReaderTool`**, plus a **Spotlight search
+  tool** enabling *fully local RAG* over the Core Spotlight index (our
+  `SpotlightIndexer` already donates entities — rare head start).
+- **`LanguageModelSession.DynamicProfile`** — declarative, SwiftUI-style
+  `body: some DynamicProfile` composing `Profile { Instructions {…} + tools }`
+  with `switch`-driven mode changes and per-branch `.model(…)` /
+  `.reasoningLevel(…)` modifiers. **One session keeps its conversation history
+  across profile/model/tool swaps.** Also `GenerationOptions.ToolCallingMode`
+  for finer tool-calling control.
+- **Introspection (shipped in iOS 26.4 — usable NOW at our 26.0 floor via
+  #available(26.4))** — `SystemLanguageModel.contextSize` (**8,192 tokens**
+  on-device — not 4,096) and `tokenCount(for:)`. iOS 26.4 also shipped an
+  improved on-device model + relaxed guardrail false-positives.
+- **Rebuilt on-device model in the 27 SDK** — better logic/instruction
+  following/tool calling, native vision. Apple explicitly warns to **re-test
+  every prompt against the new model** (our 9 FM files, all prompt services).
+- **Evaluations framework** (sessions 298/299) — verify AI features "across
+  dynamic conditions, beyond unit tests"; plus **`fm` CLI + Python SDK**
+  (334) and prompt hill-climbing workflow (335); Foundation Models
+  **Instruments** template (243).
+- **Open-sourcing** — the core framework goes open source (runs wherever Swift
+  runs, incl. Linux servers); a faster-moving *utilities* package carries
+  experimental blocks: Profile modifiers for transcript management, a **Skill
+  API** for procedural knowledge, and a Chat-Completions-standard server
+  interface.
+- Platform floors: iOS/iPadOS/macOS/visionOS **26.0+**; **watchOS 27.0+**
+  brings Foundation Models *and PCC* to the watch (unlocks a watch Coach).
 
 ### 1c. System MCP, Siri 2.0, Extensions *(news — verify in beta)*
 - An **MCP client is now in a system framework**; users/MDM **register MCP
@@ -75,6 +116,28 @@ The framework we already use (`import FoundationModels`). New surface:
 - **Extensions framework**: users pick a preferred AI provider (Gemini / Claude
   / ChatGPT) in Settings; system AI requests route there.
 - Siri 2.0: multi-turn, on-screen awareness, file analysis, cross-app steps.
+
+### 1d. PCC third-party access — eligibility & mechanics *(verified 2026-07-11)*
+Source: developer.apple.com/private-cloud-compute/ + session 241.
+
+- **Cost: zero.** "No cloud API cost" for eligible developers.
+- **Eligibility (ALL three):** (1) enrolled in the **App Store Small Business
+  Program**; (2) **fewer than 2 million first-time App Store downloads** across
+  all the account's apps; (3) the **Private Cloud Compute entitlement**
+  assigned to the account (request form:
+  developer.apple.com/contact/request/private-cloud-compute/). Septena
+  trivially clears (2); (1) and (3) are **account actions to start now** —
+  they gate everything in Track A.
+- **User-side limits:** users get daily PCC usage; **iCloud+ subscribers get
+  higher limits**. Design for limit exhaustion (fall back to on-device, say so
+  honestly in the UI).
+- **Testing:** TestFlight and ad-hoc installs are allowed and **do not count**
+  toward the 2M first-time-download threshold.
+- **Privacy:** prompts not stored; independently verifiable — consistent with
+  our "zero inference cost to Septena, nothing leaves the user's trust
+  boundary" admissibility rule in `AIPolicy`.
+- **Platforms:** "where Apple Intelligence is available"; PCC explicitly
+  reaches **watchOS 27**.
 
 ---
 
@@ -180,15 +243,24 @@ effort, no current video capture path — park unless prioritized.
 
 ## 5. Track C — System MCP & assistant positioning *(SPECULATIVE — see status)*
 
-> **STATUS (checked against shipped docs, 2026-06-09):** "Siri/Core AI calls
-> your app's MCP server" is **NOT** in the iOS 27 or Xcode 27 release notes.
-> MCP in Apple's shipped docs is **Xcode/developer-tooling only** (LLDB
-> `lldb-mcp`, the Xcode MCP server, String Catalog tools, Agent Client Protocol,
-> plugin-defined MCP servers). iOS 27 release notes don't mention MCP at all;
-> App Intents remains the only documented Siri surface. The only signal for
-> system MCP-in-App-Intents is reverse-engineered **iOS 26.1 beta code** (Sept
-> 2025, via 9to5Mac/AppleInsider) — in development, undocumented. **Treat
-> Track C as a bet, not a roadmap; do Track C0 (App Intents) regardless.**
+> **STATUS (checked against shipped docs, 2026-06-09; re-checked 2026-07-11):**
+> "Siri/Core AI calls your app's MCP server" is **NOT** in the iOS 27 or Xcode
+> 27 release notes. MCP in Apple's shipped docs is **Xcode/developer-tooling
+> only** (LLDB `lldb-mcp`, the Xcode MCP server, String Catalog tools, Agent
+> Client Protocol, plugin-defined MCP servers). iOS 27 release notes don't
+> mention MCP at all; App Intents remains the only documented Siri surface —
+> and the 2026-07-11 verification pass of the WWDC26 Apple Intelligence guide
+> confirms it: the documented Siri surface is **App Intents schemas** (entity
+> schemas feeding the Spotlight semantic index; intent schemas for
+> natural-language actions with "no specific phrases to define"), the new
+> **View Annotations API** (map views to entities for on-screen awareness:
+> `NSUserActivity` primary entity, per-view `.appEntityIdentifier`, List
+> selection annotations), and the new **AppIntentsTesting framework** (session
+> 295 — validate Siri/Shortcuts/Spotlight through real system pathways). The
+> only signal for system MCP-in-App-Intents remains reverse-engineered **iOS
+> 26.1 beta code** (Sept 2025). **Treat C1+ as a bet, not a roadmap; Track C0
+> (App Intents schemas + annotations + testing) is now the confirmed, richer
+> path — do it regardless.**
 
 Septena already has the rare asset everyone else will be scrambling to build: a
 working MCP server over its own data (`MCPToolCatalog` + `MCPDispatch` +
@@ -243,6 +315,54 @@ CloudKit; MCP/App Intents are façades over them.
 
 ---
 
+## 5.5 Track D — Unified model architecture *(new 2026-07-11, all verified APIs)*
+
+The 2026 framework turns our hand-rolled provider plumbing into platform
+primitives. This is the "integrated" consolidation track: one session API,
+every backend, one tool layer.
+
+- **D1. Collapse backends onto the `LanguageModel` protocol.** Today we carry
+  bespoke seams: `CoachBackend` (3 conformances), `ReasoningProvider` +
+  `ReasoningRouter`, `ClaudeGatewayProvider` for in-app Claude. The platform
+  now provides the same abstraction: `LanguageModelSession(model:)` over
+  `SystemLanguageModel` / `PrivateCloudComputeLanguageModel` / **Anthropic's
+  Swift package**. Target state: `AIPolicy` resolves a `any LanguageModel`
+  (onDeviceOnly → system; auto → PCC-else-system; useMyClaude → Anthropic
+  package with the user's own OAuth token in Keychain, billed to *their*
+  account — preserving the zero-inference-cost-to-Septena rule), and Coach /
+  prompt services / task conversations all consume plain sessions. Keep the
+  thin domain protocols only where they add scope enforcement; delete the
+  transport code. NOTE: the hosted MCP *gateway* is the opposite direction
+  (external Claude → Septena data) and stays.
+- **D2. Coach on `DynamicProfile`.** Personas become profile branches;
+  escalation becomes `.model(pcc).reasoningLevel(.deep)` on the branch that
+  proposes goals/commitments while chat stays streaming-light — one session,
+  history preserved across swaps (today a persona/model change means a fresh
+  session).
+- **D3. Task Conversations steps as profile modes.** `confirm / ground /
+  scope / decide / work` map 1:1 to profile branches with per-step tools and
+  models — `.confirm` on-device, `.decide`/`.work` on PCC when admissible;
+  park-for-Claude remains the fallback disposition.
+- **D4. Tool-calling instead of prompt-stuffing.** `CoachContextBuilder` (576
+  lines) precomputes and inlines everything into an 8K-token window. Give
+  sessions read-only FM `Tool`s generated from the same shapes as
+  `MCPToolCatalog` (list tools only, `MCPAccessScope`-filtered by `CoachScope`)
+  so the model fetches what it needs; budget with
+  `tokenCount(for:)`/`contextSize` (26.4 APIs — adoptable before iOS 27).
+  **Do not fork a third tool definition** — derive from the existing catalog
+  (MCP-lockstep rule extends to this surface).
+- **D5. Local RAG via the Spotlight tool.** `SpotlightIndexer` already donates
+  entities; attaching the Spotlight search tool gives Coach/conversations
+  retrieval over the user's own index with zero new infrastructure. Honor the
+  Spotlight opt-out setting.
+- **D6. Evaluations harness.** Stand up Evaluations-framework suites for the
+  regression-prone prompt services (Virtue readings, meal estimate, coach
+  goal/commitment proposals, convo confirm) + `fm` CLI for offline prompt
+  iteration. This is how we absorb Apple's "the model changes under you every
+  OS release — re-test" warning permanently, not just once.
+
+---
+
 ## 6. Deployment-target & availability strategy
 
 - Floor stays **26.0** (project.yml). Do **not** bump to 27.0 — that strands
@@ -261,29 +381,69 @@ CloudKit; MCP/App Intents are façades over them.
 
 1. **Macro-from-photo accuracy** — the make-or-break for B1; measure before
    committing to B1b.
-2. **PCC entitlement provisioning** — approval process, availability in dev
-   builds, behavior on PCC-ineligible devices/regions.
+2. **PCC entitlement provisioning** — criteria + request form now known (§1d);
+   still unknown: approval latency, behavior in dev builds before approval,
+   and on PCC-ineligible devices/regions. Also NEW: daily user limits are
+   real — UX must degrade to on-device gracefully mid-conversation.
 3. **System MCP registration API** — exact API, entitlement, security model;
    currently only news, not in the docs we read.
 4. **Multimodal cost/latency on-device** — image prompts may be slow on older
    eligible hardware; need the confirm-gate UX to tolerate latency.
-5. **Foundation Models behavior changes** — bigger model may shift `@Generable`
-   output; re-test every existing prompt service against the new model.
+5. **Foundation Models behavior changes** — the on-device model is *rebuilt*
+   for 27 (and was already refreshed in 26.4); Apple explicitly warns output
+   shifts across OS versions. Re-test every prompt service — and make it
+   permanent via the Evaluations framework (D6), not a one-off.
 6. **App-size + specialization time** if we ship a Core AI `.aimodel` (B1b).
 
-## 8. Recommended sequencing
+## 8. Recommended sequencing (rewritten 2026-07-11 post-verification)
 
-1. **Now (no Xcode 27):** this doc; design the `MealEstimate` schema + confirm
-   UX on paper; spec the `PrivateCloudComputeBackend` conformance; list
-   entitlement changes. *(done / in progress)*
-2. **Beta day 1:** smoke-test existing FM features against the new model;
-   confirm Core AI vs Foundation Models split holds; check the PCC entitlement
-   and system-MCP registration APIs actually exist as the news described.
-3. **First build:** Track A1 (Coach PCC) — smallest, the seam exists.
-4. **Headline:** Track B1a (food photo → macros via FM multimodal). Ship behind
-   availability + confirm-gate. Measure accuracy → decide on B1b.
-5. **Then:** B3 (correlation narration), C1 (register MCP with system), A2/A4.
-6. **Backlog:** B2, B4, B5, B6, C2/C3, B1b.
+**Phase 0 — unblock (now; mostly account/no-Xcode-27 work)**
+1. **Account actions, start immediately (lead-time gated):** enroll the
+   developer account in the **App Store Small Business Program**; submit the
+   **PCC entitlement request** (§1d). Everything in Track A waits on this.
+2. Install **Xcode 27 beta**; smoke-test all 9 FM files against the rebuilt
+   on-device model (Apple's explicit re-test warning); confirm
+   `MealPhotoModelAnalyzer` activates (`#if compiler(>=6.4)` flips on).
+3. **Adoptable pre-27:** D6 evaluations for existing prompt services; D4's
+   token budgeting via the **iOS 26.4** `contextSize`/`tokenCount` APIs.
+
+**Phase 1 — PCC wiring (the stubbed seams; needs entitlement)**
+4. A1 Coach PCC: `PrivateCloudComputeBackend` at `CoachBackend.swift:161-164`;
+   entitlement added by hand to every `*.entitlements`; escalation policy =
+   `AIPolicy` (`auto` prefers PCC when available; `onDeviceOnly` never);
+   `.light` reasoning for streaming chat, `.deep` for goal/commitment
+   proposals; on-device fallback on daily-limit exhaustion, surfaced honestly.
+5. Task conversations: flip `ProviderAvailability.pccAvailable`
+   (`ReasoningProvider.swift:55`), register the PCC provider in
+   `ConversationEngine.syncProviders` (`ConversationEngine.swift:16`) —
+   `.decide` turns resolve inline instead of parking for Claude.
+6. A3 `OnDeviceAI` + Settings ▸ AI status board grow a PCC row (available /
+   needs-network / limit-hit / no-entitlement), including the iCloud+ nuance.
+7. A2: Purpose/Virtue/Values move deep-reflection calls to PCC (32K window
+   fits the whole Examined Week evidence; on-device + `fallbackReadings`
+   remain underneath).
+
+**Phase 2 — the headline (multimodal nutrition)**
+8. B1a food photo → macros: activate the written analyzer, run the D6 eval on
+   real meal photos, ship confirm-gated. Measure accuracy → gate B1b.
+9. B2 label/barcode capture: same session gains `OCRTool` +
+   `BarcodeReaderTool` (packaged-food path; barcode → item identity is new
+   leverage the June plan didn't have).
+
+**Phase 3 — integration refactor (Track D)**
+10. D2/D3 DynamicProfile for Coach + conversation steps; D1 backend collapse
+    (incl. `useMyClaude` via the Anthropic Swift package replacing bespoke
+    in-app Claude transport); D4 tool-calling Coach; D5 Spotlight RAG.
+
+**Phase 4 — reach**
+11. A4 watch Coach/reflection (FM + PCC on watchOS 27); C0 App Intents
+    schemas + View Annotations + AppIntentsTesting; close the
+    Appendix-B intent coverage gaps.
+12. B3 correlation narration (engine stays statistical); B4 gut free-text →
+    structure; B5 goal decomposition.
+
+**Backlog / gated:** B1b Core AI custom model (only on measured B1a accuracy
+gap), B6 video form analysis, C1–C3 system-MCP bets (re-check each beta).
 
 ---
 
@@ -300,10 +460,25 @@ CloudKit; MCP/App Intents are façades over them.
 - **Confirmed — iOS 27 release notes:** Private Cloud Compute (HomeKit, Apple
   Intelligence Report). App Intents/Siri known issues (W-1/W-2/W-3 in the App
   Intents backlog). **No MCP mention at all.**
-- **NOT in any shipped doc (rumor/contradicted):** "Siri/Core AI calls your
-  app's MCP server" — only iOS 26.1 beta code analysis (Sept 2025). Gemini-as-
-  Siri, bigger on-device model, on-device fine-tuning, Extensions provider
-  picker — WWDC coverage, not release-noted. Treat as bets (§1c, Track C).
+- **Verified 2026-07-11 (first-party pages, added in this revision):** PCC
+  third-party eligibility triple + zero cost + TestFlight rules (§1d);
+  `PrivateCloudComputeLanguageModel` 32K context + `reasoningLevel` +
+  usage-accounting API; `LanguageModel` protocol + Anthropic/Google Swift
+  packages + open-source `CoreAILanguageModel`/`MLXLanguageModel`;
+  `DynamicProfile` with `.model()`/`.reasoningLevel()` modifiers +
+  history-preserving swaps; `OCRTool`/`BarcodeReaderTool`/Spotlight RAG tool;
+  iOS 26.4 `contextSize` (8,192 on-device) + `tokenCount(for:)`; rebuilt
+  on-device model with vision; Evaluations framework + `fm` CLI + Python SDK;
+  FM open-sourcing + utilities package (Skill API, Chat Completions bridge);
+  watchOS 27 FM + PCC; App Intents schemas + View Annotations +
+  AppIntentsTesting as the confirmed Siri surface; Core AI framework
+  (3B–70B models, TorchConverter, AOT compile, Instruments).
+- **STILL corrected/rumor:** on-device model context is **8,192** tokens, not
+  4,096; "Gemini-distilled" base model was never confirmed (Apple says
+  "rebuilt from the ground up"); on-device private fine-tuning — not in any
+  verified page. "Siri/Core AI calls your app's MCP server" — still only iOS
+  26.1 beta code analysis (Sept 2025). Gemini-as-Siri, Extensions provider
+  picker — WWDC coverage, not release-noted. Treat as bets (§1c, Track C1+).
 
 ---
 
