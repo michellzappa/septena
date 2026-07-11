@@ -43,6 +43,15 @@ takes a shared `mkdir` lock at `/tmp/septena-build.lock.d` so builds serialize
 across every session and the cron. The compile is the only green gate before the
 cron pushes — a tree that doesn't build must never be left behind.
 
+**Do NOT test — the user tests.** The compile above is the ONLY verification an
+agent runs. Never launch the app, boot a simulator, run UI tests, screenshot, or
+otherwise "verify it works" — when the change is built, report it and **ask the
+user to test**. And **NEVER download anything to unblock a build or test**
+(SDKs, simulator runtimes, platform components, packages, tools — e.g.
+`xcodebuild -downloadPlatform`) unless the user explicitly asked for that
+download. If the toolchain is missing something, stop and tell the user; a
+multi-GB platform download is their call, never the agent's.
+
 Debug builds use `SWIFT_OPTIMIZATION_LEVEL: -Osize` on purpose: plain `-Onone`
 makes SwiftUI/SwiftData/Observation 10–50× slower on-device. Trade-off:
 step-debugging is imprecise (locals "optimized out"). For a true breakpoint
