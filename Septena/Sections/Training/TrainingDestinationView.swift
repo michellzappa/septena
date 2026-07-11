@@ -2341,6 +2341,13 @@ struct TrainingExerciseRow: View {
   /// Loaded lazily on appear (one query per row) and only drawn at 2+ points.
   @State private var spark: TrainingProgressSeries? = nil
 
+  // Presentation state for the long-press menu's sheet-backed actions, hosted by
+  // `.trainingExerciseActionSheets` below (shared with the editor drawer).
+  @State private var showSwitch = false
+  @State private var showNote = false
+  @State private var noteDraft = ""
+  @State private var showRemoveConfirm = false
+
   var body: some View {
     header
       .padding(12)
@@ -2352,7 +2359,27 @@ struct TrainingExerciseRow: View {
       .opacity(opacityFor(entry.status))
       .contentShape(Rectangle())
       .onTapGesture { onTap() }
+      // Long-press (right-click on Mac) surfaces the same per-exercise actions as
+      // the drawer's ⋯ menu, without drilling in first. Same builder, so the two
+      // menus can't drift.
+      .contextMenu {
+        trainingExerciseMenuButtons(
+          index: index, entry: entry, store: store,
+          showNote: $showNote, noteDraft: $noteDraft,
+          showSwitch: $showSwitch, showRemoveConfirm: $showRemoveConfirm,
+          onDismiss: {}, removeNow: removeThisEntry)
+      }
+      .trainingExerciseActionSheets(
+        exercise: entry.exercise, index: index, accent: accent,
+        showNote: $showNote, noteDraft: $noteDraft,
+        showSwitch: $showSwitch, showRemoveConfirm: $showRemoveConfirm,
+        onSwitched: { _ in }, removeNow: removeThisEntry)
       .task(id: entry.exercise) { loadSpark() }
+  }
+
+  private func removeThisEntry() {
+    store.removeEntry(at: index, mutator: SeptenaServices.shared.trainingMutator)
+    Haptics.tick()
   }
 
   // MARK: Header
@@ -2487,6 +2514,187 @@ struct TrainingExerciseRow: View {
   }
 }
 
+// MARK: - Shared per-exercise menu + action sheets
+
+/// The per-exercise action set — add/edit note, switch, skip / unskip / move to
+/// end, remove — emitted as bare `Button`s so the SAME menu can sit inside both
+/// the drawer's ⋯ toolbar `Menu` and the row's long-press (right-click on Mac)
+/// `.contextMenu`. One builder, so the two surfaces can't drift. The actions
+/// that need a sheet/dialog (note, switch, remove-when-logged) are hosted by
+/// `.trainingExerciseActionSheets(...)`, which this drives through bindings.
+/// `onDismiss` closes an open drawer after a reordering action (a no-op for the
+/// row, which has none).
+@MainActor @ViewBuilder
+func trainingExerciseMenuButtons(
+  index: Int?,
+  entry: DraftEntry?,
+  store: TrainingDraftStore,
+  showNote: Binding<Bool>,
+  noteDraft: Binding<String>,
+  showSwitch: Binding<Bool>,
+  showRemoveConfirm: Binding<Bool>,
+  onDismiss: @escaping () -> Void,
+  removeNow: @escaping () -> Void
+) -> some View {
+  Button {
+    noteDraft.wrappedValue = entry?.note ?? ""
+    showNote.wrappedValue = true
+  } label: {
+    Label((entry?.note.isEmpty == false) ? "Edit note" : "Add note",
+          systemImage: "note.text")
+  }
+  Button { showSwitch.wrappedValue = true } label: {
+    Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
+  }
+  if let st = entry?.status {
+    if st == .skipped {
+      Button { if let index { store.unskip(index: index); Haptics.tick() } } label: {
+        Label("Unskip", systemImage: "arrow.uturn.left")
+      }
+    } else if st != .done && st != .saving {
+      Button {
+        if let index { store.markSkipped(index: index) }
+        onDismiss(); Haptics.tick()
+      } label: {
+        Label("Skip", systemImage: "forward.end")
+      }
+    }
+    let isLast: Bool = {
+      guard let entries = store.draft?.entries, let index else { return true }
+      return index == entries.count - 1
+    }()
+    if st != .done && st != .saving && !isLast {
+      Button {
+        if let index { store.moveToEnd(at: index) }
+        onDismiss(); Haptics.tick()
+      } label: {
+        Label("Move to end", systemImage: "arrow.down.to.line")
+      }
+    }
+    if st != .saving {
+      Divider()
+      Button(role: .destructive) {
+        if st == .done { showRemoveConfirm.wrappedValue = true } else { removeNow() }
+      } label: {
+        Label("Remove", systemImage: "trash")
+      }
+    }
+  }
+}
+
+/// Hosts the sheets/dialog the per-exercise menu drives — the note editor, the
+/// switch-exercise picker, and the remove-when-logged confirmation — so the
+/// drawer and the row present them identically. Attach once per surface; the
+/// menu buttons flip the bindings. `onSwitched` re-points an open drawer at the
+/// swapped-in exercise (no-op for the row).
+private struct TrainingExerciseActionSheets: ViewModifier {
+  @Environment(TrainingDraftStore.self) private var store
+  @Environment(\.modelContext) private var modelContext
+
+  let exercise: String
+  let index: Int?
+  let accent: Color
+  @Binding var showNote: Bool
+  @Binding var noteDraft: String
+  @Binding var showSwitch: Bool
+  @Binding var showRemoveConfirm: Bool
+  var onSwitched: (String) -> Void
+  var removeNow: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .sheet(isPresented: $showSwitch) {
+        ExercisePickerSheet(
+          selectionMode: .single,
+          disabledNames: otherSessionNames,
+          alternativesTo: exercise,
+          onPick: { def in
+            guard let index else { return }
+            store.switchExercise(at: index, to: def.name, context: modelContext)
+            onSwitched(def.name)
+            Haptics.tick()
+          }
+        )
+      }
+      .sheet(isPresented: $showNote) { noteEditor }
+      .confirmationDialog(
+        "Remove \(displayName)?",
+        isPresented: $showRemoveConfirm,
+        titleVisibility: .visible
+      ) {
+        Button("Remove and delete log", role: .destructive) { removeNow() }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text("This exercise is already logged. Removing it deletes the saved entry.")
+      }
+  }
+
+  private var displayName: String {
+    CanonicalExerciseName.display(exercise, catalog: store.exerciseNameByKey)
+  }
+
+  private var otherSessionNames: Set<String> {
+    guard let entries = store.draft?.entries else { return [] }
+    return Set(entries.enumerated()
+      .filter { $0.offset != index }
+      .map { $0.element.exercise })
+  }
+
+  private var noteEditor: some View {
+    NavigationStack {
+      Form {
+        TextField("Note", text: $noteDraft, axis: .vertical)
+          .lineLimit(3...8)
+      }
+      .formStyle(.grouped)
+      .navigationTitle("Note")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { showNote = false }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Save") {
+            if let index { store.update { $0.entries[index].note = noteDraft } }
+            showNote = false
+          }
+          .tint(accent)
+        }
+      }
+    }
+    #if os(iOS)
+    .presentationDetents([.medium])
+    .presentationDragIndicator(.visible)
+    #else
+    .frame(width: 440, height: 300)
+    #endif
+  }
+}
+
+extension View {
+  /// Attaches the per-exercise note / switch / remove-confirm presentations that
+  /// `trainingExerciseMenuButtons` drives. See `TrainingExerciseActionSheets`.
+  func trainingExerciseActionSheets(
+    exercise: String,
+    index: Int?,
+    accent: Color,
+    showNote: Binding<Bool>,
+    noteDraft: Binding<String>,
+    showSwitch: Binding<Bool>,
+    showRemoveConfirm: Binding<Bool>,
+    onSwitched: @escaping (String) -> Void,
+    removeNow: @escaping () -> Void
+  ) -> some View {
+    modifier(TrainingExerciseActionSheets(
+      exercise: exercise, index: index, accent: accent,
+      showNote: showNote, noteDraft: noteDraft,
+      showSwitch: showSwitch, showRemoveConfirm: showRemoveConfirm,
+      onSwitched: onSwitched, removeNow: removeNow))
+  }
+}
+
 // MARK: - Exercise editor (drawer)
 
 /// Focused editor for a single exercise, presented as a drawer (sheet on
@@ -2548,31 +2756,14 @@ struct TrainingExerciseEditor: View {
     // Grabber on the iPhone sheet so it reads as swipe-to-dismiss; ignored by
     // the iPad/Mac docked inspector.
     .presentationDragIndicator(.visible)
-    .sheet(isPresented: $showSwitch) {
-      ExercisePickerSheet(
-        selectionMode: .single,
-        disabledNames: otherSessionNames,
-        alternativesTo: exercise,
-        onPick: { def in
-          guard let index else { return }
-          store.switchExercise(at: index, to: def.name, context: modelContext)
-          // Re-point the drawer at the swapped-in exercise (selection keys by name).
-          selection = EditingExercise(exercise: def.name)
-          Haptics.tick()
-        }
-      )
-    }
-    .sheet(isPresented: $showNote) { noteEditor }
-    .confirmationDialog(
-      "Remove \(displayName(exercise))?",
-      isPresented: $showRemoveConfirm,
-      titleVisibility: .visible
-    ) {
-      Button("Remove and delete log", role: .destructive) { removeThisEntry() }
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text("This exercise is already logged. Removing it deletes the saved entry.")
-    }
+    // The note / switch / remove-confirm presentations are shared with the row's
+    // long-press menu (see `trainingExerciseActionSheets`), so they can't drift.
+    .trainingExerciseActionSheets(
+      exercise: exercise, index: index, accent: accent,
+      showNote: $showNote, noteDraft: $noteDraft,
+      showSwitch: $showSwitch, showRemoveConfirm: $showRemoveConfirm,
+      onSwitched: { selection = EditingExercise(exercise: $0) },
+      removeNow: removeThisEntry)
   }
 
   // MARK: Contextual ⋯ menu
@@ -2583,48 +2774,11 @@ struct TrainingExerciseEditor: View {
   @ViewBuilder
   private var contextMenu: some View {
     Menu {
-      Button {
-        noteDraft = entry?.note ?? ""
-        showNote = true
-      } label: {
-        Label((entry?.note.isEmpty == false) ? "Edit note" : "Add note",
-              systemImage: "note.text")
-      }
-      Button { showSwitch = true } label: {
-        Label("Switch exercise", systemImage: "arrow.triangle.2.circlepath")
-      }
-      if let st = entry?.status {
-        if st == .skipped {
-          Button { if let index { store.unskip(index: index); Haptics.tick() } } label: {
-            Label("Unskip", systemImage: "arrow.uturn.left")
-          }
-        } else if st != .done && st != .saving {
-          Button {
-            if let index { store.markSkipped(index: index) }
-            selection = nil
-            Haptics.tick()
-          } label: {
-            Label("Skip", systemImage: "forward.end")
-          }
-        }
-        if st != .done && st != .saving && !isLastEntry {
-          Button {
-            if let index { store.moveToEnd(at: index) }
-            selection = nil
-            Haptics.tick()
-          } label: {
-            Label("Move to end", systemImage: "arrow.down.to.line")
-          }
-        }
-        if st != .saving {
-          Divider()
-          Button(role: .destructive) {
-            if st == .done { showRemoveConfirm = true } else { removeThisEntry() }
-          } label: {
-            Label("Remove", systemImage: "trash")
-          }
-        }
-      }
+      trainingExerciseMenuButtons(
+        index: index, entry: entry, store: store,
+        showNote: $showNote, noteDraft: $noteDraft,
+        showSwitch: $showSwitch, showRemoveConfirm: $showRemoveConfirm,
+        onDismiss: { selection = nil }, removeNow: removeThisEntry)
     } label: {
       Image(systemName: "ellipsis")
         .accessibilityLabel("Exercise options")
@@ -2632,56 +2786,10 @@ struct TrainingExerciseEditor: View {
     .tint(accent)
   }
 
-  // MARK: Note editor
-
-  private var noteEditor: some View {
-    NavigationStack {
-      Form {
-        TextField("Note", text: $noteDraft, axis: .vertical)
-          .lineLimit(3...8)
-      }
-      .formStyle(.grouped)
-      .navigationTitle("Note")
-      #if os(iOS)
-      .navigationBarTitleDisplayMode(.inline)
-      #endif
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { showNote = false }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
-            if let index { store.update { $0.entries[index].note = noteDraft } }
-            showNote = false
-          }
-          .tint(accent)
-        }
-      }
-    }
-    #if os(iOS)
-    .presentationDetents([.medium])
-    .presentationDragIndicator(.visible)
-    #else
-    .frame(width: 440, height: 300)
-    #endif
-  }
-
   private func removeThisEntry() {
     if let index { store.removeEntry(at: index, mutator: trainingMutator) }
     selection = nil
     Haptics.tick()
-  }
-
-  private var isLastEntry: Bool {
-    guard let entries = store.draft?.entries, let index else { return true }
-    return index == entries.count - 1
-  }
-
-  private var otherSessionNames: Set<String> {
-    guard let entries = store.draft?.entries else { return [] }
-    return Set(entries.enumerated()
-      .filter { $0.offset != index }
-      .map { $0.element.exercise })
   }
 
   /// After logging: a fresh completion advances to the next still-pending
