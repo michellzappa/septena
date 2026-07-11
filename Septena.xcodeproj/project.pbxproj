@@ -574,6 +574,7 @@
 		6333196E0D4D21B3870B208F /* WatchSnapshotPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EDE23D823F6238C9977BF16 /* WatchSnapshotPublisher.swift */; };
 		63BDFE20DBBB08795FD135AE /* CorrelationFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD69A204D1E2CF4993DE291 /* CorrelationFeatures.swift */; };
 		641309DD6450D733D02A94BF /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105A64B4FE28BF5907996A17 /* HomeChrome.swift */; };
+		64592E46449E0F89D303F282 /* BiometrySymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */; };
 		647C90AB1FA017FC9B77EFBB /* ThingsImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DFB5D438977C9BCC02A5468 /* ThingsImportSupport.swift */; };
 		64E8C89F947B43745F012B35 /* ChartCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 897582825DAD287035D24A7A /* ChartCard.swift */; };
 		64FF6F24087F235CF7FDA3FB /* ClaudeGatewayDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CF49F51756CC59FB1792FFF /* ClaudeGatewayDetail.swift */; };
@@ -950,6 +951,7 @@
 		A7DC150F03AAF93F61060775 /* SeptaskApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0467D2DA1BB37F2A941122 /* SeptaskApp.swift */; };
 		A7DF25FF671361E6CF73F911 /* AboutAdvancedSettingsPanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD2AE59CEB5186649277BDD1 /* AboutAdvancedSettingsPanes.swift */; };
 		A7F3580380663FA1FA645ED0 /* SectionManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27161C741F9EC6CFC1F83CE0 /* SectionManifest.swift */; };
+		A839DC8AB64737DCB77C99CC /* BiometrySymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */; };
 		A85638088D55886CFDB2AA71 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		A86C58F32169E2C160958B0F /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
 		A88E57D87F444354C18F15D2 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B801EA98E8CDE0DB13784C /* SettingsStore.swift */; };
@@ -1114,6 +1116,7 @@
 		C48320FAFDDFE4BA50351EAF /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = BC28ED53CB3851082AE51E3B /* AppIcon.icns */; };
 		C4CDFDADFE30B34C6A81F2FC /* AddSupplementPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1122B52B5A42A03C8EECA08 /* AddSupplementPage.swift */; };
 		C51E996667A33A090A84197B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
+		C525942B24A7AE0305D3BB73 /* BiometrySymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */; };
 		C54E2FFB072378F72D591866 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
 		C56021A4E1FC17E397982E04 /* NutritionDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81343F3928D8840CA63ED54 /* NutritionDestinationView.swift */; };
 		C626BA99FC02063FE78E5306 /* SectionBreakdownList.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5164A150174D1594699944E /* SectionBreakdownList.swift */; };
@@ -1191,6 +1194,7 @@
 		D491C952B51CA8162D54340B /* NextSuggestionsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F860B3F85F363EA485CCB25 /* NextSuggestionsSection.swift */; };
 		D4A2F78654555D44137F5088 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
 		D4B1495C0BDE3AF22A629505 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */; };
+		D4ED8729A002FD40E9AD60B0 /* ClaudeReconnectCue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A683578906E475EE99C87424 /* ClaudeReconnectCue.swift */; };
 		D4F38C66817C3036A92F03C7 /* Accessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */; };
 		D5107E3C346DA99A8FDF6F2E /* SeptenaPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */; };
 		D520448E97327EB6F37A8559 /* MedicationsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71DC3593DE47124290BBA69 /* MedicationsDestinationView.swift */; };
@@ -1336,6 +1340,7 @@
 		EAE4AB69A960836806A8CB62 /* TileWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1219E0D834281035101CA52F /* TileWidgetWire.swift */; };
 		EAFD460A329DA750A52B1A9F /* DenseHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB6D91927FD06EA4ADE4F4A2 /* DenseHomepageView.swift */; };
 		EB3390DEE09E32954CFD6A08 /* SectionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F5D91D0DD8D10477AA80C49 /* SectionDrawer.swift */; };
+		EBFED2F66833EA729CE5BDFC /* BiometrySymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */; };
 		EC21FD42651F4816A08EE36E /* HeatmapTileRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48DAE5A44C7592290FF2B87D /* HeatmapTileRow.swift */; };
 		EC38A70961397FA90BF5E0D8 /* TrainingLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A2AA1777B672AFC02F29BF /* TrainingLiveActivity.swift */; };
 		EC5016C92D4E1C9F2C380D0D /* ThingsImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807BF5EB0443AFEB40FD0D94 /* ThingsImportParser.swift */; };
@@ -1900,6 +1905,7 @@
 		AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksWidgetWire.swift; sourceTree = "<group>"; };
 		AC73E3C47279C3C704276A0A /* MoodPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodPlugin.swift; sourceTree = "<group>"; };
 		AC8097428CC41A32EA96B120 /* MacroTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroTargetMigration.swift; sourceTree = "<group>"; };
+		ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometrySymbol.swift; sourceTree = "<group>"; };
 		AD295FAB7B881CAC43EE8C34 /* Outbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Outbox.swift; sourceTree = "<group>"; };
 		AD6B66F3172A26B693C3094E /* TrainingPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingPlugin.swift; sourceTree = "<group>"; };
 		ADCDCE95E0DA23E5FD2E4953 /* SeptaskMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptaskMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2898,6 +2904,7 @@
 				26ED5AC7B6F2400A0A4B378C /* Accessibility.swift */,
 				8762430430AD2D537B72935A /* AIModelTagBadge.swift */,
 				7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */,
+				ACF162DBE22DD1E9A2437C4F /* BiometrySymbol.swift */,
 				9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */,
 				E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */,
 				32A70DB5FE3A7F04BE3E7BAC /* DayBucketHeader.swift */,
@@ -3679,6 +3686,7 @@
 				93C38FFB6DF0530D2979F97D /* AreasProjectsView.swift in Sources */,
 				B1C86C9E9AEE925E4C01A743 /* AttachmentFeed.swift in Sources */,
 				20C6DB9A044F923B88022ACE /* BadgeManager.swift in Sources */,
+				A839DC8AB64737DCB77C99CC /* BiometrySymbol.swift in Sources */,
 				CADE46F283A33D3459262E04 /* CKEngine.swift in Sources */,
 				8AAFE48C3652AB776D97FEF2 /* CalendarBridge.swift in Sources */,
 				774A71D6218272E5CBF12D25 /* CalendarEventRow.swift in Sources */,
@@ -3937,6 +3945,7 @@
 				9B37CDE704E4EED5E1FB869B /* AreasProjectsView.swift in Sources */,
 				CD59E2AD1A1DC022733BFE8C /* AttachmentFeed.swift in Sources */,
 				72A830B71AAF7B411E6CBCD0 /* BadgeManager.swift in Sources */,
+				C525942B24A7AE0305D3BB73 /* BiometrySymbol.swift in Sources */,
 				3DB2D34E5D04E32E0E83E012 /* CKEngine.swift in Sources */,
 				0B611029E6EE84B1A18D5AAB /* CalendarBridge.swift in Sources */,
 				976FA17B8309126F1A64C7AC /* CalendarEventRow.swift in Sources */,
@@ -3945,6 +3954,7 @@
 				338614EF21105A691BB7DC26 /* ChecklistMirror.swift in Sources */,
 				2FC4C4D31FE568792AA4A6F6 /* ClaudeGatewayDetail.swift in Sources */,
 				C7D5D8C59AA7955E3B7E2E34 /* ClaudeGatewayProvider.swift in Sources */,
+				D4ED8729A002FD40E9AD60B0 /* ClaudeReconnectCue.swift in Sources */,
 				AC4A1F6214E0D9E1451FE4EF /* ClaudeReconnectNudge.swift in Sources */,
 				A6F952F9FD67AF4521F93FF5 /* CloudKitRecordRegistry.swift in Sources */,
 				299444520068C69D2AB78A1D /* CoachMessageRecord.swift in Sources */,
@@ -4189,6 +4199,7 @@
 				6F57829A6E98A79B04CCA884 /* BackfillHabitsSheet.swift in Sources */,
 				D9723D91628B03674BBC00C4 /* BackfillSupplementsSheet.swift in Sources */,
 				0ED59BE06DEBD263BBFA0D91 /* BadgeManager.swift in Sources */,
+				64592E46449E0F89D303F282 /* BiometrySymbol.swift in Sources */,
 				C69F364723C44FE9F240239A /* BodyDestinationView.swift in Sources */,
 				69BFF74C1A9BE3280CF48E0E /* BodyPlugin.swift in Sources */,
 				AA180D6CF5C6326D64004622 /* BrowseGutDaySheet.swift in Sources */,
@@ -4690,6 +4701,7 @@
 				3D7D10D1B1E3CCBB8D8ACD14 /* BackfillHabitsSheet.swift in Sources */,
 				2062DECFE8C3FA1BD4668E60 /* BackfillSupplementsSheet.swift in Sources */,
 				56E87EA383673A4ACE86F2CD /* BadgeManager.swift in Sources */,
+				EBFED2F66833EA729CE5BDFC /* BiometrySymbol.swift in Sources */,
 				4A14A3B8F875A6E4CC374781 /* BodyDestinationView.swift in Sources */,
 				D04821116D671B07FF860D8B /* BodyPlugin.swift in Sources */,
 				BFAFA1121DC35073F6D352F6 /* BrowseGutDaySheet.swift in Sources */,

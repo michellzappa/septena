@@ -392,6 +392,7 @@ targets:
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
       # Embedded Next fold — same file set as the Septask target (lockstep).
       - path: Septena/Shell/Dashboard/MirrorReader.swift
+      - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
       - path: Septena/Shell/Dashboard/NextItemsSection.swift
       - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
       - path: Septena/Sections/Mood/MoodCatalog.swift

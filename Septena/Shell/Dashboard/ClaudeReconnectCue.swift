@@ -95,7 +95,7 @@ struct ClaudeReconnectCue: View {
       // Biometry mark (Face/Touch/Optic ID), tinted Claude by the button's
       // `.tint`: the connection lapsed by design and re-authenticating is the
       // security boundary, not a problem to alarm about.
-      Image(systemName: AppLock.biometrySymbolName)
+      Image(systemName: BiometrySymbol.systemName)
     }
   }
 
@@ -140,7 +140,7 @@ struct ClaudeReconnectCue: View {
         .foregroundStyle(.orange)
     } else {
       // Biometry mark, not an alarm dot: a lapsed token is an auth checkpoint.
-      Image(systemName: AppLock.biometrySymbolName)
+      Image(systemName: BiometrySymbol.systemName)
         .font(.subheadline)
         .foregroundStyle(Color.claudeAccent)
     }

@@ -179,16 +179,7 @@ final class AppLock {
   /// SF Symbol matching the device's enrolled biometry — `faceid` / `touchid` /
   /// `opticid`, or a neutral lock when none is enrolled. Lets surfaces frame an
   /// auth checkpoint as "verify it's you" rather than an error.
-  static var biometrySymbolName: String {
-    let context = LAContext()
-    _ = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) // populates biometryType
-    switch context.biometryType {
-    case .faceID:  return "faceid"
-    case .touchID: return "touchid"
-    case .opticID: return "opticid"
-    default:       return "lock.fill"
-    }
-  }
+  static var biometrySymbolName: String { BiometrySymbol.systemName }
 
   /// Toggle label, e.g. "Require Face ID" — or "Require passcode" when no
   /// biometry is enrolled.
