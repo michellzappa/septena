@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1435,
+      "build": 1439,
       "date": "2026-07-11",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Point your camera at a plate and Septena reads the meal on-device and prefills the details for you.",
+          "title": "A rebuilt Tasks experience",
+          "detail": "Drag tasks onto Today to re-home them, multi-select for bulk actions, project section headings, a redesigned date picker with quick-pick pills, and undo toasts for delete, move, and defer.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "System calendar events now weave into your task lists so your day and your agenda live in one place.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import from Things",
+          "detail": "Bring your tasks over from a Things database export, with headings mapped to project sections.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and on-device analysis prefills the macros; add an ingredient breakdown and scale re-logged meals by amount.",
           "section": "nutrition"
         },
         {
-          "title": "Organize projects with headings and import from Things",
-          "detail": "Group tasks under section headings inside a project, and bring your existing lists over from a Things export.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recover tasks you deleted",
-          "detail": "Deleted tasks now rest in Recently Deleted for 30 days so you can restore anything removed by mistake.",
-          "section": "tasks"
-        },
-        {
-          "title": "See your calendar alongside your tasks",
-          "detail": "Your day's events now appear in Today and Upcoming so nothing slips between apps.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as tiles on your week dashboard.",
-          "section": "goals"
-        },
-        {
-          "title": "A smarter training companion",
-          "detail": "Sessions flow hands-free with auto-advance and a watch Live Activity, plus a weekly muscle-volume review once you finish.",
+          "title": "Smarter training insight",
+          "detail": "Effort-weighted muscle volume with a post-session weekly review, a progress chart with top-weight toggle and live today marker, and one-tap progression hints on strength sets.",
           "section": "training"
         },
         {
-          "title": "A richer feed on your watch",
-          "detail": "The Next feed floats over a live time-of-day sky, with tap-to-log intake tiles and quick action drawers.",
-          "section": null
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep any measurable goal front and center as a tile on the week dashboard.",
+          "section": "goals"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded privacy levels let you see exactly what usage data is sent and dial it from off to full.",
+          "title": "Graded privacy controls",
+          "detail": "Choose exactly how much analytics you share across four levels, and see a plain-language log of what was recently sent.",
           "section": null
         }
       ]
