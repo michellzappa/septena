@@ -124,17 +124,11 @@ struct SleepDestinationView: View {
     return StatTile {
       VStack(spacing: 6) {
         ZStack {
-          Circle()
-            .stroke(Color.secondary.opacity(0.2), lineWidth: 4)
-          Circle()
-            .trim(from: 0, to: pct)
-            .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-            .rotationEffect(.degrees(-90))
+          ProjectProgressIcon(progress: pct, tint: color, diameter: 56, lineWidth: 4)
           Text(value.map(String.init) ?? "—")
             .font(.septenaHeroMetric(.title3))
             .foregroundStyle(color)
         }
-        .frame(width: 56, height: 56)
         Text(label)
           .font(.caption)
           .foregroundStyle(.secondary)

@@ -59,18 +59,16 @@ private struct RingDomainCell: View {
 
     VStack(spacing: 8) {
       ZStack {
-        Circle()
-          .stroke(data.accent.opacity(0.15), lineWidth: lineWidth)
-        Circle()
-          .trim(from: 0, to: max(0.0001, fill.value))
-          .stroke(
-            // Goal-backed rings read in full accent; derived
-            // week-activity rings sit back at reduced opacity so the
-            // ring never implies a target the domain doesn't have.
-            data.accent.opacity(fill.hasTarget ? 1 : 0.5),
-            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-          )
-          .rotationEffect(.degrees(-90))
+        ProjectProgressIcon(
+          progress: max(0.0001, fill.value),
+          tint: data.accent,
+          diameter: ringSize,
+          lineWidth: lineWidth,
+          // Goal-backed rings read in full accent; derived week-activity
+          // rings sit back at reduced opacity so the ring never implies a
+          // target the domain doesn't have.
+          arcTint: data.accent.opacity(fill.hasTarget ? 1 : 0.5)
+        )
         Text(fill.centerLabel)
           .font(.subheadline.weight(.semibold).monospacedDigit())
           .foregroundStyle(.primary)
