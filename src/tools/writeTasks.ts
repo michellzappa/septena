@@ -319,7 +319,7 @@ export interface ConvoTurn {
   seq: number;
   role: "user" | "provider";          // propose (provider) vs choose (user) are separate turns
   step: "confirm" | "ground" | "scope" | "decide" | "work";
-  provider?: "onDevice" | "claude";   // omitted = deterministic compute (no model)
+  provider?: "onDevice" | "claude" | "applePCC";   // omitted = deterministic compute (no model)
   confidence?: number;                // provider turns; the escalation trigger
   question?: string;
   options?: string[];
@@ -393,7 +393,7 @@ export const threadAppendJsonSchema = {
       properties: {
         role: { type: "string", enum: ["user", "provider"] },
         step: { type: "string", enum: ["confirm", "ground", "scope", "decide", "work"] },
-        provider: { type: "string", enum: ["onDevice", "claude"] },
+        provider: { type: "string", enum: ["onDevice", "claude", "applePCC"] },
         confidence: { type: "number" },
         question: { type: "string" },
         options: { type: "array", items: { type: "string" } },
