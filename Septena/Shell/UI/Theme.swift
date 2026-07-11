@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 // Septena visual tokens.
 //
@@ -440,10 +443,13 @@ enum Theme {
 
 // MARK: - Typography
 //
-// Three-family system (see docs/DesignSpec.md §5):
+// Four-family system (see docs/DesignSpec.md §5):
 //   - SF Pro (system)         → UI body, controls, labels, buttons, most titles
 //   - New York/system serif   → restrained editorial display moments
-//   - System mono             → numerics / metrics (tabular)
+//   - System mono             → inline / tabular numerics (timestamps, counts, list values)
+//   - SF Rounded              → the large, standalone hero metric ONLY (ring
+//                               centers, day totals, celebration counts). One
+//                               narrow job — see `septenaHeroMetric`.
 
 // The editorial face uses SwiftUI's system serif design, which maps to Apple's
 // New York on Apple platforms. Titles/body/metrics are one semantic set; the
@@ -473,6 +479,34 @@ extension Font {
   static var septenaMeta: Font         { .system(size: SeptenaTypeScale.size(.footnote)).monospacedDigit() }
   static var septenaMetaStrong: Font   { .system(size: SeptenaTypeScale.size(.footnote), weight: .semibold).monospacedDigit() }
   static var septenaMetric: Font       { .system(size: SeptenaTypeScale.size(.body), design: .monospaced).monospacedDigit() }
+
+  /// Hero metric — the large, standalone, glanceable number. See the iOS
+  /// definition below for the rationale; this is the macOS (explicit-size) path.
+  static func septenaHeroMetric(_ style: Font.TextStyle = .title2) -> Font {
+    .system(size: SeptenaTypeScale.size(style.nsTextStyle), weight: .semibold, design: .rounded)
+      .monospacedDigit()
+  }
+}
+
+private extension Font.TextStyle {
+  /// macOS explicit-size path: map a SwiftUI text style to its AppKit peer so
+  /// `SeptenaTypeScale.size(_:)` can read a base point size. (`.title` → `.title1`.)
+  var nsTextStyle: NSFont.TextStyle {
+    switch self {
+    case .largeTitle:  return .largeTitle
+    case .title:       return .title1
+    case .title2:      return .title2
+    case .title3:      return .title3
+    case .headline:    return .headline
+    case .subheadline: return .subheadline
+    case .callout:     return .callout
+    case .footnote:    return .footnote
+    case .caption:     return .caption1
+    case .caption2:    return .caption2
+    case .body:        return .body
+    @unknown default:  return .body
+    }
+  }
 }
 #else
 extension Font {
@@ -507,6 +541,19 @@ extension Font {
   static let septenaMeta         = Font.system(.footnote).monospacedDigit()
   static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold).monospacedDigit()
   static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
+
+  // MARK: Hero metric (SF Rounded, tabular)
+  /// The large, standalone, glanceable number — and the ONLY sanctioned use of
+  /// the rounded design (see DesignSpec §5): ring centers, day totals,
+  /// celebration counts, big stat values. Rounded + semibold + tabular figures,
+  /// so a single glanceable number reads warm (the Apple Fitness/Health idiom)
+  /// while columns still align. Small, inline, or tabular numbers use
+  /// `septenaMetric` / `septenaMeta` (mono) instead — don't reach for rounded
+  /// there. Pass the text style to size it (`.title2` default; `.largeTitle` for
+  /// a page's single biggest figure).
+  static func septenaHeroMetric(_ style: Font.TextStyle = .title2) -> Font {
+    .system(style, design: .rounded).weight(.semibold).monospacedDigit()
+  }
 }
 #endif
 

@@ -216,7 +216,7 @@ private struct HydrationDestinationView: View {
     DrawerSection("Today") {
       VStack(alignment: .leading, spacing: 10) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text("\(vol.display(dayMl))").font(.system(.largeTitle, design: .rounded).weight(.semibold))
+          Text("\(vol.display(dayMl))").font(.septenaHeroMetric(.largeTitle))
           Text(vol.suffix).font(.body).foregroundStyle(.secondary)
           Spacer()
           Text("of \(vol.display(targetMl))")
@@ -236,7 +236,7 @@ private struct HydrationDestinationView: View {
   private var pastDayHeader: some View {
     DrawerSection {
       HStack(alignment: .firstTextBaseline, spacing: 6) {
-        Text("\(vol.display(dayMl))").font(.system(.title, design: .rounded).weight(.semibold))
+        Text("\(vol.display(dayMl))").font(.septenaHeroMetric(.title))
         Text(vol.suffix).font(.body).foregroundStyle(.secondary)
         Spacer()
         Text(viewingDate)

@@ -532,7 +532,7 @@ struct NutritionDestinationView: View {
           .foregroundStyle(.secondary)
         Spacer(minLength: 0)
         Text(spec.formatValue(consumed))
-          .font(.system(.title3, design: .rounded).weight(.semibold).monospacedDigit())
+          .font(.septenaHeroMetric(.title3))
           .foregroundStyle(consumed > 0 ? color : Color.secondary)
         Text(unit).font(.caption2).foregroundStyle(.secondary)
       }

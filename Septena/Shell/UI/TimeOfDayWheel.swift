@@ -682,8 +682,8 @@ struct TimeOfDayWheel: View {
       Text(date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
         .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
       Text(date.formatted(.dateTime.day()))
-        .font(.system(.title3, design: .rounded).weight(.semibold))
-        .monospacedDigit().foregroundStyle(.primary)
+        .font(.septenaHeroMetric(.title3))
+        .foregroundStyle(.primary)
       Text(date.formatted(.dateTime.month(.abbreviated)).uppercased())
         .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
     }

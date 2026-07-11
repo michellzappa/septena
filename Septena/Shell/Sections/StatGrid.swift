@@ -64,7 +64,7 @@ struct StatTile<Content: View>: View {
     StatTile {
       VStack(spacing: 4) {
         Text("7h 24m")
-          .font(.system(.title2, design: .rounded).weight(.semibold))
+          .font(.septenaHeroMetric())
         Text("Total Sleep").font(.caption).foregroundStyle(.secondary)
         Text("7–9 h").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
       }
@@ -72,7 +72,7 @@ struct StatTile<Content: View>: View {
     StatTile {
       VStack(spacing: 4) {
         Text("85")
-          .font(.system(.title2, design: .rounded).weight(.semibold))
+          .font(.septenaHeroMetric())
         Text("Sleep Score").font(.caption).foregroundStyle(.secondary)
         Text("85+").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
       }

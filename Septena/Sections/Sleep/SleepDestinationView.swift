@@ -131,7 +131,7 @@ struct SleepDestinationView: View {
             .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
             .rotationEffect(.degrees(-90))
           Text(value.map(String.init) ?? "—")
-            .font(.system(.title3, design: .rounded).weight(.semibold))
+            .font(.septenaHeroMetric(.title3))
             .foregroundStyle(color)
         }
         .frame(width: 56, height: 56)
@@ -149,7 +149,7 @@ struct SleepDestinationView: View {
     StatTile(verticalPadding: 14) {
       VStack(spacing: 4) {
         Text(value ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold))
+          .font(.septenaHeroMetric())
           .foregroundStyle(color)
         Text(label)
           .font(.caption)
@@ -169,14 +169,14 @@ struct SleepDestinationView: View {
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
           Text(latest(\.bedtime) ?? "—")
-            .font(.system(.body, design: .rounded).weight(.semibold))
+            .font(.septenaMetric)
         }
         VStack(spacing: 1) {
           Text("WAKE")
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
           Text(latest(\.wakeTime) ?? "—")
-            .font(.system(.body, design: .rounded).weight(.semibold))
+            .font(.septenaMetric)
         }
       }
     }
@@ -189,7 +189,7 @@ struct SleepDestinationView: View {
     return StatTile(verticalPadding: 14) {
       VStack(spacing: 4) {
         Text(mins.map { "\($0)m" } ?? "—")
-          .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+          .font(.septenaHeroMetric())
           .foregroundStyle(accent)
         Text("Stress")
           .font(.caption)

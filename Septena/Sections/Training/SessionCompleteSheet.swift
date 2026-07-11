@@ -218,7 +218,7 @@ struct SessionCompleteSheet: View {
         .scaledFont(size: 44, weight: .semibold, relativeTo: .largeTitle)
         .foregroundStyle(accent)
       Text("Nice work.")
-        .font(.system(.title, design: .rounded).weight(.semibold))
+        .font(.title.weight(.semibold))
       let skippedSuffix = stats.skippedCount > 0 ? ", \(stats.skippedCount) skipped" : ""
       Text("\(stats.routineLabel) — \(stats.doneCount) of \(stats.totalCount) exercises done\(skippedSuffix)")
         .font(.subheadline)
@@ -290,9 +290,8 @@ struct SessionCompleteSheet: View {
         .tracking(0.5)
         .foregroundStyle(.secondary)
       Text(value)
-        .font(.system(.title2, design: .rounded).weight(.semibold))
+        .font(.septenaHeroMetric())
         .foregroundStyle(prominent ? accent : .primary)
-        .monospacedDigit()
       if let sub {
         Text(sub).font(.caption2).foregroundStyle(.secondary)
       }

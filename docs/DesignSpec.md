@@ -68,13 +68,16 @@ Unknown sections fall back to a neutral gray (`SectionTheme.color(for:)`). The u
 
 ## 5. Typography
 
-Three families, used by role:
+Four families, used by role:
 
 - **SF Pro** (system) — all UI body, controls, labels, buttons, and almost every title (section, card, and tile titles included). Stays the system font so nav bars, alerts, and Dynamic Type behave natively.
 - **New York / system serif** — restrained editorial display moments: the Dashboard welcome greeting (`septenaWelcomeTitle`), the app wordmark (`septenaWordmark`), and goal names (`septenaGoalTitle`). Implemented with `Font.system(..., design: .serif)` so it maps to Apple's New York on Apple platforms while keeping Dynamic Type native. Interior destination headers use SF Pro.
-- **SF Mono** (system monospaced, `Font.system(design: .monospaced)`) — numerics, units, timestamps, counts, metrics. Tabular figures (`.monospacedDigit()`) so columns of numbers align.
+- **SF Mono** (system monospaced, `Font.system(design: .monospaced)`) — **inline and tabular** numerics: timestamps, counts, units, list values, anything in a row/column that must align or sit beside a label. Tabular figures (`.monospacedDigit()`) so columns of numbers align. This is the *default* face for numbers.
+- **SF Rounded** (`design: .rounded`, via `septenaHeroMetric(_:)`) — the **large, standalone, glanceable hero metric only**: a ring center, a day total, a celebration count, a big stat value. Warm and glanceable (the Apple Fitness/Health idiom) for a number you read *once*. Not for anything small, inline, or tabular — those stay mono.
 
-New York-as-accent plus mono-for-numbers is what carries the brand; SF Pro carries the OS feel. Don't replace SF Pro for UI body — it regresses accessibility and breaks consistency with system chrome.
+**Mono vs. Rounded — the line.** A number you *scan or compare* against other numbers (a column, a table, running text) is **mono**. A number that stands alone as *the* figure on a card or page, sized `title2` and up, is a **hero metric** and uses **rounded**. Rough threshold: `title2`+ and standalone → rounded; `body` and below or in-context → mono. When unsure, default to mono — rounded is the exception, earned by size and isolation.
+
+New York-as-accent, mono-for-numbers, and rounded-for-the-hero-figure are what carry the brand; SF Pro carries the OS feel. Don't replace SF Pro for UI body — it regresses accessibility and breaks consistency with system chrome. Rounded has exactly one job; if you're tempted to use it for a label or a small number, that's the signal to use mono or SF Pro instead.
 
 Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `.font(.title)` calls, no fixed point sizes outside these styles. Every style is built on a system text style so Dynamic Type scales.
 
@@ -87,6 +90,8 @@ Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `
 - `.septenaTileTitle` — dashboard tile header (SF Pro; `title3` on iOS, `headline` on macOS)
 - `.septenaTaskTitle` / `.septenaSidebarRow` — UI body (SF Pro, `body`)
 - `.septenaNotes` — secondary body (SF Pro, `subheadline`)
+- `.septenaMetric` / `.septenaMeta` — inline & tabular numbers (SF Mono, tabular figures)
+- `septenaHeroMetric(_:)` — the large standalone hero number (SF Rounded semibold, tabular; pass the text style, default `title2`)
 - `.septenaButton` — action labels (SF Pro, `subheadline.semibold`)
 - `.septenaLabel` — small labels (SF Pro, `footnote.medium`)
 - `.septenaBadge` — status pills (SF Pro, `caption2.semibold`)

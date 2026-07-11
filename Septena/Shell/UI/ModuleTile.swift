@@ -99,7 +99,7 @@ struct ModuleTile: View {
             .textCase(.uppercase)
           HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text(stat.value)
-              .font(.system(.title, design: .rounded).weight(.semibold))
+              .font(.septenaHeroMetric(.title))
               .foregroundStyle(accent)
               // Quick-add updates the value; .numericText() tween the
               // digit transition (5 → 6, 14 → 15) instead of a hard cut.
@@ -557,7 +557,7 @@ struct DomainTile: View {
                 .lineLimit(1)
               HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(stat.value)
-                  .font(.system(.title2, design: .rounded).weight(.semibold))
+                  .font(.septenaHeroMetric())
                   .foregroundStyle(accent)
                   #if !WIDGET_EXTENSION
                   .contentTransition(.numericText())

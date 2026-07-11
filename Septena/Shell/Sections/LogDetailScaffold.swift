@@ -138,7 +138,7 @@ struct LogDetailBody: View {
         StatTile {
           VStack(spacing: 4) {
             Text(stat.value)
-              .font(.system(.title3, design: .rounded).weight(.semibold))
+              .font(.septenaHeroMetric(.title3))
               .foregroundStyle(color(for: stat.tone))
               .multilineTextAlignment(.center)
               .lineLimit(1)

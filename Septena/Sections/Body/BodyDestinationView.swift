@@ -143,7 +143,7 @@ struct BodyDestinationView: View {
       VStack(spacing: 4) {
         HStack(alignment: .firstTextBaseline, spacing: 2) {
           Text(value ?? "—")
-            .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+            .font(.septenaHeroMetric())
             .foregroundStyle(color)
           Text(unit)
             .font(.caption2)
@@ -170,7 +170,7 @@ struct BodyDestinationView: View {
       VStack(spacing: 4) {
         HStack(alignment: .firstTextBaseline, spacing: 2) {
           Text(formatted ?? "—")
-            .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+            .font(.septenaHeroMetric())
             .foregroundStyle(color)
           Text(weightUnit.suffix)
             .font(.caption2)

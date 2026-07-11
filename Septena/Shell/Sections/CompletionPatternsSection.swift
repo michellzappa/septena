@@ -101,7 +101,7 @@ struct CompletionPatternsSection: View {
   private func stat(_ value: String, _ caption: String) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(value)
-        .font(.system(.title2, design: .rounded).weight(.semibold).monospacedDigit())
+        .font(.septenaHeroMetric())
         .foregroundStyle(accent)
       Text(caption)
         .font(.caption)
