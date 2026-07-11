@@ -1,5 +1,6 @@
 import type { Env } from "./env.js";
 import { decrypt, encrypt } from "./crypto.js";
+import { randomId, sha256Base64Url } from "./util.js";
 
 // KV-backed records. All keys are random IDs (not deterministic from user
 // data) so a KV listing leak doesn't reveal anything about who has signed up.
@@ -136,12 +137,26 @@ export async function getUserSections(
   }
 }
 
-// ---- Access tokens ----
+// ---- Access + refresh tokens ----
 // A bearer binds to a CloudKit user (`userRecordName`) and resolves to
 // that user's latest app-pushed token. `ckWebAuthTokenEnc` is kept as a
 // bootstrap/fallback: the token captured at connect time, used until the
 // app's first push arrives (and for legacy bearers issued before the
 // identity binding existed).
+//
+// Tokens are finite-lived: access tokens expire after ACCESS_TOKEN_TTL and
+// clients stay connected by rotating a refresh token at /oauth/token. KV
+// records are keyed by sha256(token), never the raw token, so a KV leak
+// doesn't yield usable bearers. Every record carries a KV expirationTtl,
+// so revocation aside, nothing outlives its logical lifetime.
+//
+// Refresh rotation keeps the spent record around (marked `rotatedAt`) for
+// its original lifetime. Presenting a spent token is a replay — either the
+// legitimate client or a thief holds a stale copy — so the whole family
+// (current refresh + access token) is revoked and the user re-auths.
+
+const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;                // 1h
+const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;     // 30d, slides on rotation
 
 export interface AccessTokenRecord {
   userRecordName?: string;     // preferred: track the app-refreshed token
@@ -149,24 +164,166 @@ export interface AccessTokenRecord {
   clientId: string;
   createdAt: number;
   lastUsedAt: number;
+  expiresAt: number;           // ms epoch; checked on read, enforced by KV TTL
 }
 
-export async function putAccessToken(
+interface RefreshTokenRecord {
+  userRecordName?: string;
+  ckWebAuthTokenEnc?: string;
+  clientId: string;
+  familyId: string;            // links successive rotations of one grant
+  createdAt: number;
+  expiresAt: number;           // ms epoch
+  rotatedAt?: number;          // set once spent; any later use is a replay
+}
+
+// Points at the family's *current* tokens so a replay or a refresh-token
+// revocation can kill them without listing KV.
+interface RefreshFamilyRecord {
+  refreshHash: string;
+  accessHash: string;
+  updatedAt: number;
+}
+
+const accessKey = async (raw: string) => `token:${await sha256Base64Url(raw)}`;
+const refreshKey = async (raw: string) => `refresh:${await sha256Base64Url(raw)}`;
+const familyKey = (id: string) => `rtfamily:${id}`;
+
+export interface TokenGrant {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number; // access-token lifetime, seconds
+}
+
+/// Mint a fresh access + refresh token pair. Pass the plaintext CloudKit
+/// token on the initial grant (encrypted here) or the already-encrypted
+/// blob when rotating. `familyId` ties a rotation to its original grant.
+export async function issueTokenPair(
   env: Env,
-  accessToken: string,
-  ckWebAuthToken: string,
-  clientId: string,
-  userRecordName?: string,
-): Promise<void> {
-  const enc = await encrypt(ckWebAuthToken, env.TOKEN_ENC_KEY);
-  const rec: AccessTokenRecord = {
-    userRecordName,
-    ckWebAuthTokenEnc: enc,
-    clientId,
-    createdAt: Date.now(),
-    lastUsedAt: Date.now(),
+  opts: {
+    clientId: string;
+    userRecordName?: string;
+    ckWebAuthToken?: string;
+    ckWebAuthTokenEnc?: string;
+    familyId?: string;
+  },
+): Promise<TokenGrant> {
+  const ckWebAuthTokenEnc = opts.ckWebAuthTokenEnc
+    ?? (opts.ckWebAuthToken ? await encrypt(opts.ckWebAuthToken, env.TOKEN_ENC_KEY) : undefined);
+
+  const accessToken = randomId(32);
+  const refreshToken = randomId(32);
+  const familyId = opts.familyId ?? randomId(16);
+  const now = Date.now();
+
+  const accessRec: AccessTokenRecord = {
+    userRecordName: opts.userRecordName,
+    ckWebAuthTokenEnc,
+    clientId: opts.clientId,
+    createdAt: now,
+    lastUsedAt: now,
+    expiresAt: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
   };
-  await env.TOKENS.put(`token:${accessToken}`, JSON.stringify(rec));
+  const refreshRec: RefreshTokenRecord = {
+    userRecordName: opts.userRecordName,
+    ckWebAuthTokenEnc,
+    clientId: opts.clientId,
+    familyId,
+    createdAt: now,
+    expiresAt: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
+  };
+  const refreshHash = await refreshKey(refreshToken);
+  const accessHash = await accessKey(accessToken);
+  const familyRec: RefreshFamilyRecord = { refreshHash, accessHash, updatedAt: now };
+
+  await Promise.all([
+    env.TOKENS.put(accessHash, JSON.stringify(accessRec), { expirationTtl: ACCESS_TOKEN_TTL_SECONDS }),
+    env.TOKENS.put(refreshHash, JSON.stringify(refreshRec), { expirationTtl: REFRESH_TOKEN_TTL_SECONDS }),
+    env.TOKENS.put(familyKey(familyId), JSON.stringify(familyRec), { expirationTtl: REFRESH_TOKEN_TTL_SECONDS }),
+  ]);
+
+  return { accessToken, refreshToken, expiresIn: ACCESS_TOKEN_TTL_SECONDS };
+}
+
+/// Delete a family's current tokens. Used on replay detection and on
+/// refresh-token revocation (RFC 7009 §2.1: revoking a refresh token
+/// SHOULD revoke the access tokens issued with it).
+async function revokeFamily(env: Env, familyId: string): Promise<void> {
+  const raw = await env.TOKENS.get(familyKey(familyId));
+  if (raw) {
+    const fam = JSON.parse(raw) as RefreshFamilyRecord;
+    await Promise.all([
+      env.TOKENS.delete(fam.refreshHash),
+      env.TOKENS.delete(fam.accessHash),
+    ]);
+  }
+  await env.TOKENS.delete(familyKey(familyId));
+}
+
+export type RefreshRedemption =
+  | ({ ok: true; clientId: string } & TokenGrant)
+  | { ok: false; reason: "not_found" | "expired" | "replayed" | "client_mismatch" };
+
+/// Rotate a refresh token: validate, spend it, mint a new pair in the same
+/// family. The old access token is left to its (short) natural expiry so
+/// in-flight requests don't 401 mid-rotation.
+export async function redeemRefreshToken(
+  env: Env,
+  rawRefreshToken: string,
+  expectedClientId: string,
+): Promise<RefreshRedemption> {
+  const key = await refreshKey(rawRefreshToken);
+  const raw = await env.TOKENS.get(key);
+  if (!raw) return { ok: false, reason: "not_found" };
+  const rec = JSON.parse(raw) as RefreshTokenRecord;
+
+  if (rec.rotatedAt) {
+    // Replay of a spent token — someone (client or thief) has a stale copy.
+    // Kill the whole family; the legitimate user just re-auths.
+    await revokeFamily(env, rec.familyId);
+    await env.TOKENS.delete(key);
+    return { ok: false, reason: "replayed" };
+  }
+  if (rec.clientId !== expectedClientId) return { ok: false, reason: "client_mismatch" };
+  if (Date.now() > rec.expiresAt) {
+    await env.TOKENS.delete(key);
+    return { ok: false, reason: "expired" };
+  }
+
+  const grant = await issueTokenPair(env, {
+    clientId: rec.clientId,
+    userRecordName: rec.userRecordName,
+    ckWebAuthTokenEnc: rec.ckWebAuthTokenEnc,
+    familyId: rec.familyId,
+  });
+
+  // Keep the spent record (for replay detection) until its original expiry.
+  const spent: RefreshTokenRecord = { ...rec, rotatedAt: Date.now() };
+  await env.TOKENS.put(key, JSON.stringify(spent), {
+    expiration: Math.ceil(rec.expiresAt / 1000),
+  });
+
+  return { ok: true, clientId: rec.clientId, ...grant };
+}
+
+/// RFC 7009 revocation. Tries the token as an access token, then as a
+/// refresh token (which also revokes the family's current access token).
+/// Returns what was revoked, for logging only — the endpoint always 200s.
+export async function revokeToken(env: Env, rawToken: string): Promise<"access" | "refresh" | "none"> {
+  const aKey = await accessKey(rawToken);
+  if (await env.TOKENS.get(aKey)) {
+    await env.TOKENS.delete(aKey);
+    return "access";
+  }
+  const rKey = await refreshKey(rawToken);
+  const raw = await env.TOKENS.get(rKey);
+  if (raw) {
+    const rec = JSON.parse(raw) as RefreshTokenRecord;
+    await revokeFamily(env, rec.familyId);
+    await env.TOKENS.delete(rKey); // in case the family pointer was stale
+    return "refresh";
+  }
+  return "none";
 }
 
 export async function getCkTokenForAccessToken(
@@ -182,9 +339,13 @@ export async function getCkTokenForAccessToken(
   // legacy bootstrap-only bearers, which truly need an OAuth re-run.
   userRecordName?: string;
 } | null> {
-  const raw = await env.TOKENS.get(`token:${accessToken}`);
+  // Keyed by sha256(token) — legacy raw-keyed records simply never match
+  // and age out via the cleanup cron. KV TTL enforces expiry; the explicit
+  // expiresAt check covers KV's eventual-deletion window.
+  const raw = await env.TOKENS.get(await accessKey(accessToken));
   if (!raw) return null;
   const rec = JSON.parse(raw) as AccessTokenRecord;
+  if (Date.now() > rec.expiresAt) return null;
   // Preferred: serve the freshest token the app has pushed for this user.
   if (rec.userRecordName) {
     const user = await getUserCkToken(env, rec.userRecordName);
@@ -210,16 +371,20 @@ export async function getCkTokenForAccessToken(
   return null; // stale bearer with no usable token → reconnect
 }
 
-/// Refresh lastUsedAt so the cleanup cron can tell live tokens from dead
-/// ones. Preserves the encrypted CloudKit token; only bumps the timestamp.
+/// Bump lastUsedAt — observability only now that expiry is TTL-driven;
+/// a busy token still dies at expiresAt and the client refresh-rotates.
 /// Call behind a throttle (see TOUCH_INTERVAL_MS) and via waitUntil so it
 /// never blocks the request.
 export async function touchAccessToken(env: Env, accessToken: string): Promise<void> {
-  const raw = await env.TOKENS.get(`token:${accessToken}`);
+  const key = await accessKey(accessToken);
+  const raw = await env.TOKENS.get(key);
   if (!raw) return;
   const rec = JSON.parse(raw) as AccessTokenRecord;
   rec.lastUsedAt = Date.now();
-  await env.TOKENS.put(`token:${accessToken}`, JSON.stringify(rec));
+  // Absolute expiration so the rewrite can't extend the token's KV lifetime.
+  await env.TOKENS.put(key, JSON.stringify(rec), {
+    expiration: Math.ceil(rec.expiresAt / 1000),
+  });
 }
 
 /// Delete access-token records idle longer than maxIdleMs. The underlying
