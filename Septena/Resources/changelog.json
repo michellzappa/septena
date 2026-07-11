@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1414,
+      "build": 1430,
       "date": "2026-07-11",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app",
-          "detail": "A dedicated Tasks-only app over the same private data, on iPhone, iPad, and Mac.",
-          "section": "tasks"
-        },
-        {
-          "title": "Snap a photo of your meal",
-          "detail": "Photo-first meal capture analyzes the picture on-device and prefills macros, with an optional ingredient breakdown.",
+          "title": "Snap a photo to log a meal",
+          "detail": "Point your camera at a plate and Septena reads the food on-device to prefill the meal, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "A much richer Tasks experience",
-          "detail": "Import from Things, organize projects with section headings, drag tasks to re-home them, select several at once for bulk actions, and recover anything from Recently Deleted for 30 days.",
+          "title": "Your calendar, woven into Tasks",
+          "detail": "Events from your system calendar now appear alongside Today and Upcoming so your whole day is in one place.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events now appear woven into your task agenda, with per-device hidden-calendar choices synced across devices.",
+          "title": "Organize tasks the way you think",
+          "detail": "Group work with project section headings, drag tasks onto Today to re-home them, select several at once for bulk actions, and import an existing Things database.",
           "section": "tasks"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and a rest timer that auto-advances with a watch Live Activity.",
+          "title": "Recover deleted tasks",
+          "detail": "Deleted tasks now rest in Recently Deleted for 30 days with one-tap restore before they purge.",
+          "section": "tasks"
+        },
+        {
+          "title": "A smarter training session flow",
+          "detail": "Rest timers auto-advance with a watch Live Activity, sets offer one-tap progression hints, and a post-session review shows effort-weighted volume by muscle.",
           "section": "training"
         },
         {
-          "title": "A calmer, more capable watch",
-          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers on rows, and tap-to-quick-add intake tiles.",
-          "section": null
-        },
-        {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels from Off to Full, with a plain view of exactly what's sent and a log of recent activity.",
+          "title": "Home-screen widgets for Next and Today",
+          "detail": "Keep your next actions and today's list glanceable right on your home screen.",
           "section": null
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as tiles on the week dashboard.",
+          "detail": "Any measurable goal can now ride along as a tile on the week dashboard.",
           "section": "goals"
+        },
+        {
+          "title": "Choose exactly what you share",
+          "detail": "Privacy settings now offer graded analytics levels and show you what has recently been sent, fully anonymized.",
+          "section": null
         }
       ]
     },
