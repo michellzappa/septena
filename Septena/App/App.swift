@@ -145,6 +145,9 @@ struct SeptenaApp: App {
             // Re-arm nudges: absorbs a backgrounded-across-midnight rollover
             // and any completions made on another device while we were away.
             LocalNotificationScheduler.shared.reconcile()
+            // Whichever sibling is foregrounded owns the one pending Claude
+            // reconnect alert, so this app can restore the gateway on its own.
+            ClaudeReconnectNudge.shared.activate()
             Task {
               await TelemetryClient.shared.trackAppOpen()
               let sections = await MainActor.run {
@@ -468,7 +471,15 @@ struct SeptenaApp: App {
       // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`.
       // Items disable themselves when no task list is focused, which also
       // gates the shortcut so ⌘T can't fire from an unrelated screen.
-      CommandMenu("Task") { TaskCommandsMenu() }
+      CommandMenu("Task") {
+        // New Project / New Area lead the Task menu (macOS has no toolbar
+        // "···" — see SeptenaPage); they flip one-shots the sidebar consumes
+        // to open its create sheets.
+        Button("New Project") { navigation.shouldCreateProject = true }
+        Button("New Area") { navigation.shouldCreateArea = true }
+        Divider()
+        TaskCommandsMenu()
+      }
       // ⌘/ toggles the sidebar. Lives in the standard View > Sidebar group
       // so macOS shows it alongside the built-in column-visibility items.
       CommandGroup(after: .sidebar) {

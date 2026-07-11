@@ -102,6 +102,9 @@ struct PageAddButton: View {
       Image(systemName: "plus")
     }
     .accessibilityLabel("Add")
+    // Chrome glyph is always ink — the accent lives on the tab bar, not the
+    // nav-bar actions (toolbar buttons inherit the TabView tint, so pin here).
+    .tint(.primary)
   }
 }
 
@@ -447,7 +450,17 @@ private struct PageChromeModifier: ViewModifier {
     }
     #else
     if id == "tasks" {
-      ToolbarItem(placement: .navigation) { macTasksLeadingChrome }
+      // macOS split-view Tasks: the SIDEBAR column (no "+" action) owns the one
+      // leading search; the DETAIL column (which carries the "+") draws only the
+      // trailing add. Result is a unified toolbar of [search] … [+] rather than
+      // the two overflow menus each column used to publish. New Project / New
+      // Area live in the menu bar's Task menu and Settings is ⌘, — so the Tasks
+      // toolbar needs no "···" on macOS at all.
+      if addClosure == nil {
+        ToolbarItem(placement: .navigation) {
+          QuickFindToolbarButton().help("Quick Find (⌘⇧F)")
+        }
+      }
     } else if showsGlobal {
       ToolbarItem(placement: .navigation) { overflowMenu }
     }
@@ -488,22 +501,4 @@ private struct PageChromeModifier: ViewModifier {
   }
   #endif
 
-  #if os(macOS)
-  /// macOS Tasks: sidebar publishes "···" only; detail adds Quick Find beside
-  /// Settings (or beside index "···" when `localActions` is set).
-  @ViewBuilder
-  private var macTasksLeadingChrome: some View {
-    HStack(spacing: 12) {
-      if localActions() == nil {
-        QuickFindToolbarButton()
-          .help("Quick Find (⌘K)")
-      }
-      if localActions() != nil {
-        overflowMenu
-      } else if showsGlobal {
-        overflowMenu
-      }
-    }
-  }
-  #endif
 }

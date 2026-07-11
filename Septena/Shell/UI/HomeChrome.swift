@@ -29,6 +29,10 @@ struct OverflowMenu<Content: View>: View {
       Image(systemName: systemImage)
     }
     .accessibilityLabel("More")
+    // Chrome glyphs are always ink — the tab bar owns the accent, not the
+    // nav-bar actions. Toolbar buttons inherit tint from the TabView, not the
+    // content, so pin it here at the button (see SectionTheme.accent).
+    .tint(.primary)
   }
 }
 
@@ -42,5 +46,6 @@ struct QuickFindToolbarButton: View {
       Image(systemName: "magnifyingglass")
     }
     .accessibilityLabel("Search")
+    .tint(.primary)
   }
 }

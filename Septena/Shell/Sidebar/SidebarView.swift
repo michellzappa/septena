@@ -189,7 +189,7 @@ struct SidebarRootView: View {
   /// project being closed is the one open in the detail, bounce to Today.
   private func setProjectStatus(_ project: Project, to status: ProjectStatus) {
     Haptics.tick()
-    if status != .active, case .project(let p) = nav.path.last, p.id == project.id {
+    if status != .active, case .project(let id) = nav.path.last, id == project.id {
       nav.path = [.filter(.today)]
     }
     Task {
@@ -206,7 +206,7 @@ struct SidebarRootView: View {
     Haptics.warning()
     // If the user was viewing the project that just got deleted, bounce them
     // to Today so they aren't stranded on a 404.
-    if case .project(let p) = nav.path.last, p.id == project.id {
+    if case .project(let id) = nav.path.last, id == project.id {
       nav.path = [.filter(.today)]
     }
     Task {
@@ -221,7 +221,7 @@ struct SidebarRootView: View {
 
   private func deleteArea(_ area: Area) {
     Haptics.warning()
-    if case .area(let a) = nav.path.last, a.id == area.id {
+    if case .area(let id) = nav.path.last, id == area.id {
       nav.path = [.filter(.today)]
     }
     Task {
@@ -269,8 +269,8 @@ struct SidebarRootView: View {
     .modifier(sidebarBehavior)
   }
 
-  /// macOS layout: full-bleed scroll list — chrome matches iPad (··· + search via
-  /// `.pageChrome`, not a separate sidebar toolbar). Detail pane owns "+".
+  /// macOS layout: a native source-list sidebar in a balanced split view, so
+  /// opening it reserves space for navigation instead of covering the detail.
   @ViewBuilder
   private var sidebarMac: some View {
     sidebarListContent()
@@ -280,9 +280,10 @@ struct SidebarRootView: View {
   /// The Tasks home, standardized onto a system `List`: the smart-list tiles as
   /// a borderless first section, then real grouped sections per area / top-level
   /// project. `List` supplies the grouped "bubble" cards, the inter-row
-  /// separators, and (on macOS) the native source-list look — replacing the
-  /// hand-built `sectionCard` / `inCardDivider` / bare-VStack scaffolding this
-  /// used to be. insetGrouped on iOS; `.sidebar` on macOS.
+  /// separators, while the surrounding navigation container supplies the
+  /// platform-appropriate navigation material. This replaces the hand-built
+  /// `sectionCard` / `inCardDivider` / bare-VStack scaffolding it used to use:
+  /// iOS uses `insetGrouped`; macOS uses its native Liquid Glass sidebar.
   private func sidebarListContent() -> some View {
     Group {
       #if os(iOS)
@@ -311,9 +312,9 @@ struct SidebarRootView: View {
         add: usesPushNavigation ? .action { nav.shouldStartCreating = true } : nil
       )
       #else
-      // macOS: native `.sidebar` `List(selection:)` for arrow-key traversal,
-      // but row highlight is our neutral fill (see `compactRow`) — not the
-      // system accent capsule / ring.
+      // Let SwiftUI supply the macOS sidebar material, row metrics, active
+      // state, and selection behavior. Inset/card styling here creates nested
+      // opaque surfaces that fight the system sidebar material.
       List(selection: sidebarSelection) {
         smartListSection
         areaProjectSections()
@@ -329,6 +330,14 @@ struct SidebarRootView: View {
     }
     .onAppear { reconcileSidebarSelection() }
     .onChange(of: usesPushNavigation) { _, _ in reconcileSidebarSelection() }
+    // macOS menu bar → sidebar sheets. The Task menu's New Project / New Area
+    // set these one-shots (macOS has no toolbar "···"); consume + reset here.
+    .onChange(of: nav.shouldCreateProject) { _, want in
+      if want { showingNewProject = true; nav.shouldCreateProject = false }
+    }
+    .onChange(of: nav.shouldCreateArea) { _, want in
+      if want { showingNewArea = true; nav.shouldCreateArea = false }
+    }
   }
 
   // MARK: - Smart lists section
@@ -559,8 +568,8 @@ struct SidebarRootView: View {
   /// `Route.id` tag back to its full `Route` for the selection binding.
   private var selectableRoutes: [Route] {
     var routes = TaskDestinations.smartListRoutes
-    routes += areas.map(Route.area)
-    routes += projects.filter { $0.status == .active }.map(Route.project)
+    routes += areas.map { .area(id: $0.id) }
+    routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
     if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
     return routes
   }
@@ -649,7 +658,7 @@ struct SidebarRootView: View {
     if !topLevelProjects.isEmpty {
       Section {
         ForEach(topLevelProjects) { project in
-          compactRow(route: .project(project)) { projectRow(project, parent: nil) }
+          compactRow(route: .project(id: project.id)) { projectRow(project, parent: nil) }
         }
       }
     }
@@ -657,12 +666,12 @@ struct SidebarRootView: View {
       let areaProjects = projects.filter { $0.area == area.id && $0.status == .active }
       let collapsed = collapsedAreas.contains(area.id)
       Section {
-        compactRow(route: .area(area)) {
+        compactRow(route: .area(id: area.id)) {
           areaRow(area, hasProjects: !areaProjects.isEmpty, collapsed: collapsed)
         }
         if !collapsed {
           ForEach(areaProjects) { project in
-            compactRow(route: .project(project)) { projectRow(project, parent: area.id) }
+            compactRow(route: .project(id: project.id)) { projectRow(project, parent: area.id) }
           }
         }
       }
@@ -685,8 +694,8 @@ struct SidebarRootView: View {
   /// Tightens a sidebar list row to Reminders-like density. The row views carry
   /// their own height (`Theme.sidebar*RowHeight`), so the List's default vertical
   /// inset otherwise stacks on top and makes rows too tall — we zero it and keep
-  /// a 16pt horizontal inset for the insetGrouped cards. iPhone + iPad share this
-  /// rhythm (iPad used to run a tighter `.sidebar` source-list metric set).
+  /// a 16pt horizontal inset for the iOS grouped cards. macOS uses the system
+  /// sidebar's row metrics, which respond to the person's sidebar size setting.
   @ViewBuilder
   private func compactRow<V: View>(route: Route? = nil,
                                    @ViewBuilder _ row: () -> V) -> some View {
@@ -694,11 +703,17 @@ struct SidebarRootView: View {
     row()
       #if os(iOS)
       .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-      #endif
-      // Custom neutral fill only — suppress UIKit/AppKit's accent capsule /
-      // selection ring so rows don't grow or glow on tap (same pattern as the
-      // task-list detail).
+      // Custom neutral fill only — suppress UIKit's accent capsule / selection
+      // ring so rows don't grow or glow on tap (same pattern as the task-list
+      // detail).
       .listRowBackground(SelectableListRowBackground(isSelected: selected))
+      #else
+      // macOS: unselected rows stay transparent so the native `.sidebar` Liquid
+      // Glass material shows through; the selected row gets the app's
+      // `listSelectionFill` as an inset capsule. Suppress AppKit's accent ring
+      // so that fill is the only highlight.
+      .listRowBackground(SidebarMacRowBackground(isSelected: selected))
+      #endif
       .septenaSuppressListCellSelection()
   }
 
@@ -707,7 +722,7 @@ struct SidebarRootView: View {
   /// its section's grouped card, projects underneath.
   @ViewBuilder
   private func areaRow(_ area: Area, hasProjects: Bool, collapsed: Bool) -> some View {
-    navRow(.area(area)) {
+    navRow(.area(id: area.id)) {
       SidebarAreaRow(name: area.title, emoji: area.emoji, count: areaOpenCount[area.id] ?? 0,
                      isCollapsed: hasProjects ? collapsed : nil,
                      onToggleCollapse: hasProjects ? { toggleAreaCollapsed(area.id) } : nil)
@@ -730,7 +745,7 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
-    navRow(.project(project)) {
+    navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
                         count: projectOpenCount[project.id] ?? 0)
@@ -1399,6 +1414,11 @@ struct ProjectProgressIcon: View {
   /// (e.g. the larger glyph next to a project's screen title).
   var diameter: CGFloat? = nil
   var lineWidth: CGFloat? = nil
+  /// Optional color for the progress arc when it should read differently
+  /// from the track's base `tint` — e.g. a derived, target-less ring dimmed
+  /// to half so it never implies a goal the domain doesn't have. Defaults to
+  /// `tint`; the faint track always derives from `tint`.
+  var arcTint: Color? = nil
 
   // House ring: small + thick. Shared with the habit/supplement completion
   // ring (`CompletionRateBadge`) so projects and habits read identically.
@@ -1416,7 +1436,7 @@ struct ProjectProgressIcon: View {
         .stroke(tint.opacity(0.22), lineWidth: resolvedLineWidth)
       Circle()
         .trim(from: 0, to: clamped)
-        .stroke(tint,
+        .stroke(arcTint ?? tint,
                 style: StrokeStyle(lineWidth: resolvedLineWidth,
                                    lineCap: .round))
         .rotationEffect(.degrees(-90))

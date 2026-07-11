@@ -250,6 +250,31 @@ struct SelectableListRowBackground: View {
   }
 }
 
+#if os(macOS)
+/// Row background for the macOS Tasks source list. Unselected rows are fully
+/// transparent so the native `.listStyle(.sidebar)` Liquid Glass material shows
+/// through (the app used to paint an opaque `cardSurface` here, which hid the
+/// sidebar material and made the column read as a flat white panel). Selected
+/// rows get the app's canonical `listSelectionFill` drawn as an inset,
+/// continuous rounded capsule — the same selection token the task-list detail
+/// uses (`TaskCardChrome`), so there's still exactly one selection language,
+/// now shaped like the native inset selection instead of a full-bleed bar.
+struct SidebarMacRowBackground: View {
+  let isSelected: Bool
+
+  var body: some View {
+    if isSelected {
+      RoundedRectangle(cornerRadius: 6, style: .continuous)
+        .fill(Theme.listSelectionFill)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 1)
+    } else {
+      Color.clear
+    }
+  }
+}
+#endif
+
 /// Row background for the custom scroll list (the task-list detail). The
 /// grouped-card chrome (`TaskCardChrome`) now paints both the card surface AND
 /// the selected-cell fill — edge-to-edge within the card, with the card's own
