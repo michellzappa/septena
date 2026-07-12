@@ -31,6 +31,8 @@ struct SidebarRootView: View {
   @State private var areas: [Area]
   @State private var projects: [Project]
   @State private var counts: TasksCounts? = nil
+  /// Tasks completed today — drives the Logbook tile/row count.
+  @State private var doneTodayCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
 
   // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
@@ -63,10 +65,12 @@ struct SidebarRootView: View {
                                            context: ctx)
       var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx), today: SeptenaDate.today)
       agg.counts = stats.counts
+      agg.doneTodayCount = stats.history.daily.last?.done ?? 0
       SidebarSeed.aggregate = agg
       return agg
     }()
     _counts = State(initialValue: agg.counts)
+    _doneTodayCount = State(initialValue: agg.doneTodayCount)
     _projectProgress = State(initialValue: agg.projectProgress)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
@@ -537,7 +541,8 @@ struct SidebarRootView: View {
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.upcoming):    return counts?.upcomingCount
     case .filter(.unscheduled): return counts?.unscheduledCount
-    default:                    return nil                  // Completed
+    case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
+    default:                    return nil
     }
   }
 
@@ -981,6 +986,7 @@ struct SidebarRootView: View {
                                          context: modelContext)
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
+    agg.doneTodayCount = stats.history.daily.last?.done ?? 0
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
     recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
@@ -989,6 +995,7 @@ struct SidebarRootView: View {
 
   fileprivate struct Aggregate {
     var counts: TasksCounts
+    var doneTodayCount: Int = 0
     var projectProgress: [String: Double]
     var projectOpenCount: [String: Int]
     var areaOpenCount: [String: Int]
@@ -1056,6 +1063,7 @@ struct SidebarRootView: View {
 
   private func apply(aggregate agg: Aggregate) {
     counts = agg.counts
+    doneTodayCount = agg.doneTodayCount
     projectProgress = agg.projectProgress
     projectOpenCount = agg.projectOpenCount
     areaOpenCount = agg.areaOpenCount
