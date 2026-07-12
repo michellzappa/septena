@@ -124,6 +124,7 @@ private struct SeptaskMainWindow: View {
         #endif
 
         await services.start()
+        SharedTaskCaptureImporter.importPending(using: services.taskMutator)
         ClaudeReconnectNudge.shared.start()
         Task { @MainActor in
           await ClaudeGatewayProvider.shared.refreshIfNeeded()
@@ -149,6 +150,10 @@ private struct SeptaskMainWindow: View {
       }
       .onChange(of: scenePhase) { _, phase in
         if phase == .active {
+          Task { @MainActor in
+            await services.start()
+            SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+          }
           #if os(iOS)
           SeptaskAppDelegate.navigation = navigation
           #endif

@@ -51,6 +51,9 @@ targets:
         excludes:
           - "**/.DS_Store"
     dependencies:
+      - target: SeptenaShare
+        embed: true
+        codeSign: true
       - target: SeptenaWatch
         embed: true
         codeSign: true
@@ -277,6 +280,9 @@ targets:
       - path: Septena/Sections/Nutrition/MealPhotoModelAnalyzer.swift
       - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
     dependencies:
+      - target: SeptaskShare
+        embed: true
+        codeSign: true
       # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
       # FoundationModels — same dependency the other three app targets carry.
       - sdk: FoundationModels.framework
@@ -340,6 +346,64 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG SEPTASK"
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
+
+  SeptenaShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension/ShareViewController.swift
+      - path: SeptenaCore/SharedTaskCapture.swift
+    info:
+      path: ShareExtension/SeptenaShare-Info.plist
+      properties:
+        CFBundleDisplayName: Septena
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.share
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptenaShare.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: SHARE_EXTENSION
+
+  SeptaskShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension/ShareViewController.swift
+      - path: SeptenaCore/SharedTaskCapture.swift
+    info:
+      path: ShareExtension/SeptaskShare-Info.plist
+      properties:
+        CFBundleDisplayName: Septask
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.share
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ShareExtension/SeptaskShare.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SHARE_EXTENSION SHARE_DESTINATION_SEPTASK"
 
   # Native macOS sibling, following the Septena / SeptenaMac pattern (separate
   # target, not a multiplatform destination). Same source list as Septask —

@@ -134,6 +134,10 @@ struct SeptenaApp: App {
           // dropped by APNs, so foregrounding must be a reliable
           // refresh path independent of push delivery.
           if phase == .active {
+            Task { @MainActor in
+              await services.start()
+              SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+            }
             // Present the support moment armed in a prior session — before the
             // fresh milestone check below, so a thank-you ask and a brand-new
             // celebration never land on top of each other.
@@ -223,6 +227,7 @@ struct SeptenaApp: App {
           // the first frame paints from the SwiftData mirror without
           // waiting on any network round-trip.
           await PerfTrace.span("app.servicesStart") { await services.start() }
+          SharedTaskCaptureImporter.importPending(using: services.taskMutator)
           #if DEBUG
           // Catch section identity↔behavior drift in dev: every manifest row
           // must have a plugin and vice versa (the join is a runtime string).
