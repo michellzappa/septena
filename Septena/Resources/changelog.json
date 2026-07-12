@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1439,
-      "date": "2026-07-11",
+      "build": 1443,
+      "date": "2026-07-12",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A rebuilt Tasks experience",
-          "detail": "Drag tasks onto Today to re-home them, multi-select for bulk actions, project section headings, a redesigned date picker with quick-pick pills, and undo toasts for delete, move, and defer.",
+          "title": "Meet Septask, a focused app for just your tasks",
+          "detail": "A streamlined companion app for iPhone and Mac that works over the same private task data as Septena, so your to-dos stay in sync.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events now weave into your task lists so your day and your agenda live in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they purge.",
-          "section": "tasks"
-        },
-        {
-          "title": "Import from Things",
-          "detail": "Bring your tasks over from a Things database export, with headings mapped to project sections.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and on-device analysis prefills the macros; add an ingredient breakdown and scale re-logged meals by amount.",
+          "title": "Snap a photo of your meal to log it",
+          "detail": "Photo-first meal capture analyzes the picture on-device and prefills the macros and details for you to adjust.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training insight",
-          "detail": "Effort-weighted muscle volume with a post-session weekly review, a progress chart with top-weight toggle and live today marker, and one-tap progression hints on strength sets.",
-          "section": "training"
+          "title": "Organize tasks with headings, drag, and bulk actions",
+          "detail": "Group work under project headings, drag tasks onto Today to schedule them, and select several at once to move, copy, or file them.",
+          "section": "tasks"
+        },
+        {
+          "title": "Your calendar now shows up in Today and Upcoming",
+          "detail": "Events from your system calendar appear alongside tasks so the day reads as one agenda.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recover deleted tasks for 30 days",
+          "detail": "A new Recently Deleted view lets you restore or permanently purge tasks, with an undo on every delete.",
+          "section": "tasks"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep any measurable goal front and center as a tile on the week dashboard.",
+          "detail": "Keep any measurable goal front and center on the week dashboard, with quick actions and its own accent color.",
           "section": "goals"
         },
         {
-          "title": "Graded privacy controls",
-          "detail": "Choose exactly how much analytics you share across four levels, and see a plain-language log of what was recently sent.",
+          "title": "Smoother training sessions",
+          "detail": "Rest timers auto-advance between sets with a Live Activity on the watch, and strength sets suggest a one-tap progression.",
+          "section": "training"
+        },
+        {
+          "title": "See and control exactly what analytics you share",
+          "detail": "Choose from graded telemetry levels, view a log of what was recently sent, and opt out while staying anonymous.",
           "section": null
         }
       ]
