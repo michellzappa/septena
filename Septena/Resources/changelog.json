@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1443,
+      "build": 1449,
       "date": "2026-07-12",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused app for just your tasks",
-          "detail": "A streamlined companion app for iPhone and Mac that works over the same private task data as Septena, so your to-dos stay in sync.",
-          "section": "tasks"
+          "title": "Septask, a focused task app",
+          "detail": "A dedicated Tasks app for iPhone, iPad, Mac, and Apple Watch that works over the same private data as Septena, with its own Today, Upcoming, and Next views.",
+          "section": null
         },
         {
           "title": "Snap a photo of your meal to log it",
-          "detail": "Photo-first meal capture analyzes the picture on-device and prefills the macros and details for you to adjust.",
+          "detail": "Photo-first meal capture analyzes the picture on-device and prefills the macros so you can log a meal in seconds.",
           "section": "nutrition"
         },
         {
-          "title": "Organize tasks with headings, drag, and bulk actions",
-          "detail": "Group work under project headings, drag tasks onto Today to schedule them, and select several at once to move, copy, or file them.",
+          "title": "Your calendar, woven into Today",
+          "detail": "System calendar events now appear alongside tasks in Today and Upcoming, showing only what's still ahead.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar now shows up in Today and Upcoming",
-          "detail": "Events from your system calendar appear alongside tasks so the day reads as one agenda.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks for 30 days",
-          "detail": "A new Recently Deleted view lets you restore or permanently purge tasks, with an undo on every delete.",
+          "title": "Reorganize tasks by drag, headings, and bulk actions",
+          "detail": "Drag tasks onto Today or between areas and projects, group work under project section headings, and select multiple tasks to move, copy, or file at once.",
           "section": "tasks"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep any measurable goal front and center on the week dashboard, with quick actions and its own accent color.",
+          "detail": "Pin any measurable goal to the week dashboard as a tile, and toggle habit-backed goals right from the tile.",
           "section": "goals"
         },
         {
-          "title": "Smoother training sessions",
-          "detail": "Rest timers auto-advance between sets with a Live Activity on the watch, and strength sets suggest a one-tap progression.",
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and a rest flow that auto-advances with a Live Activity on your watch.",
           "section": "training"
         },
         {
-          "title": "See and control exactly what analytics you share",
-          "detail": "Choose from graded telemetry levels, view a log of what was recently sent, and opt out while staying anonymous.",
+          "title": "Choose how much you share",
+          "detail": "Graded privacy levels let you pick exactly what anonymized telemetry is sent, with a plain-language ladder and a log of what was recently sent.",
           "section": null
         }
       ]
