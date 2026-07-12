@@ -1385,6 +1385,10 @@ struct WeekDashboardView: View {
   @ViewBuilder
   private func quickAddMenu(for item: HomepageDomainData) -> some View {
     if let goalID = PinnedGoalTiles.goalID(from: item) {
+      if let entity = pinnedGoals.first(where: { $0.id == goalID }) {
+        let goal = Goal(entity)
+        pinnedGoalActions(for: goal)
+      }
       Button { unpinGoal(id: goalID) } label: {
         Label("Unpin from dashboard", systemImage: "pin.slash")
       }
@@ -1394,6 +1398,40 @@ struct WeekDashboardView: View {
       intakeQuickAddMenu(for: tile)
     } else {
       quickAddMenu(for: item.domain)
+    }
+  }
+
+  /// A pinned goal borrows the canonical action surface of the data it
+  /// measures. Concrete item mutations lead; broader/additive goals reuse the
+  /// owning section's existing quick-add menu. Read-only sections deliberately
+  /// contribute no action rather than guessing a value.
+  @ViewBuilder
+  private func pinnedGoalActions(for goal: Goal) -> some View {
+    if let habitID = PinnedGoalTiles.habitID(from: goal),
+         let habit = ChecklistMirror.loadHabitsDay(context: modelContext, date: clock.today)?
+           .grouped.values.flatMap { $0 }.first(where: { $0.id == habitID }) {
+      Button {
+        checklistMutator.toggleHabit(id: habitID, date: clock.today, done: !habit.done)
+        Haptics.tick()
+      } label: {
+        Label(habit.done ? "Mark not done" : "Mark habit done",
+              systemImage: habit.done ? "arrow.uturn.backward.circle" : "checkmark.circle")
+      }
+    }
+
+    if let kindID = PinnedGoalTiles.intakeKindID(from: goal),
+       let tile = intakeTiles.first(where: { $0.id == kindID }) {
+      intakeQuickAddMenu(for: tile)
+      Divider()
+    } else if let domain = PinnedGoalTiles.actionDomain(from: goal) {
+      switch domain {
+      case .tasks, .habits, .training, .chores, .supplements, .nutrition,
+           .hydration, .groceries, .gut, .mood, .symptoms, .medications:
+        quickAddMenu(for: domain)
+        Divider()
+      case .sleep, .body, .activity, .github, .intake:
+        EmptyView()
+      }
     }
   }
 

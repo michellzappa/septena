@@ -30,7 +30,9 @@ enum PinnedGoalTiles {
     let goal = Goal(entity)
     let sectionKey = goal.metricKey.flatMap { GoalMetricCatalog.sectionKey(for: $0) }
       ?? goal.sections.first
-    let accent = sectionKey.map { theme.color(for: $0) } ?? .secondary
+    let accent = goal.color.map(parseHexColor)
+      ?? sectionKey.map { theme.color(for: $0) }
+      ?? .secondary
     let icon = sectionKey.map { theme.icon(for: $0) } ?? "target"
     let domain = sectionKey.flatMap(HomepageDomain.init(rawValue:)) ?? .habits
 
@@ -62,11 +64,34 @@ enum PinnedGoalTiles {
     )
   }
 
-  private static func habitHistory(for goal: Goal, context: ModelContext,
-                                   today: String, now: Date) -> HistorySeries? {
+  static func habitID(from goal: Goal) -> String? {
     guard let key = goal.metricKey,
           key.hasPrefix("habits."), key.hasSuffix(".done_week") else { return nil }
-    let habitID = String(key.dropFirst("habits.".count).dropLast(".done_week".count))
+    return String(key.dropFirst("habits.".count).dropLast(".done_week".count))
+  }
+
+  /// Section whose canonical dashboard quick-add menu can safely serve this
+  /// goal. A metric is authoritative; tagged free-text goals may also inherit
+  /// a section action, while entirely unscoped goals intentionally get none.
+  static func actionDomain(from goal: Goal) -> HomepageDomain? {
+    let sectionKey = goal.metricKey.flatMap { GoalMetricCatalog.sectionKey(for: $0) }
+      ?? goal.sections.first
+    return sectionKey.flatMap(HomepageDomain.init(rawValue:))
+  }
+
+  /// Intake metrics encode their dynamic tracker as
+  /// `intake.<kindID>.<metric>`. Keeping the parser here beside habit identity
+  /// prevents the dashboard menu from learning metric-key formats.
+  static func intakeKindID(from goal: Goal) -> String? {
+    guard let key = goal.metricKey else { return nil }
+    let parts = key.split(separator: ".", omittingEmptySubsequences: false)
+    guard parts.count >= 3, parts[0] == "intake", !parts[1].isEmpty else { return nil }
+    return String(parts[1])
+  }
+
+  private static func habitHistory(for goal: Goal, context: ModelContext,
+                                   today: String, now: Date) -> HistorySeries? {
+    guard let habitID = habitID(from: goal) else { return nil }
     let done = Set(ChecklistMirror.habitCompletionDates(context: context, habitID: habitID))
     let cal = Calendar.current
     let anchor = SeptenaDate.startOfDay(for: today) ?? now

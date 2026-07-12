@@ -862,6 +862,15 @@ final class GoalMutator {
     commit(entity, op: "pin")
   }
 
+  /// Set a goal-specific dashboard accent. Nil restores the section-derived
+  /// color used by older goals.
+  func setColor(id: String, color: String?) {
+    guard let entity = fetchGoal(id: id), entity.color != color else { return }
+    entity.color = color
+    entity.updatedAt = .now
+    commit(entity, op: "set color")
+  }
+
   func deleteGoal(id: String) {
     guard let entity = fetchGoal(id: id) else { return }
     context.delete(entity)

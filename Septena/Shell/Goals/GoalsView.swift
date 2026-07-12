@@ -334,6 +334,7 @@ struct EditGoalSheet: View {
   @State private var showDeleteConfirm = false
   /// Pin this goal to the top of the Week dashboard. Applied on Save.
   @State private var pinned: Bool
+  @State private var color: String
 
   // Optional measurement attachment — UI state for the disclosure section.
   // V1 ships a single metric (weekly training sessions); the picker is a
@@ -354,6 +355,12 @@ struct EditGoalSheet: View {
   /// setting elsewhere while the sheet is open.
   @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
   private var weightUnit: WeightUnit { WeightUnit(rawValue: weightUnitRaw) ?? .kg }
+
+  private var inheritedColorHex: String {
+    selectedSections.compactMap { key in
+      availableSections.first(where: { $0.key == key })?.color
+    }.first ?? sectionPalette.first?.hex ?? "#6366f1"
+  }
 
   /// Unit suffix to show beside the target fields for a given metric — the
   /// weight preference for kg-stored body metrics, the catalog label otherwise.
@@ -377,6 +384,7 @@ struct EditGoalSheet: View {
     _text = State(initialValue: goal.text == "New goal" ? "" : goal.text)
     _selectedSections = State(initialValue: Set(goal.sections))
     _pinned = State(initialValue: goal.pinned)
+    _color = State(initialValue: goal.color ?? "")
     let hasMetric = goal.metricKey != nil
     _trackMetric = State(initialValue: hasMetric)
     // Default to the first metric in the catalog (currently training
@@ -553,6 +561,14 @@ struct EditGoalSheet: View {
           Toggle(isOn: $pinned) {
             Label("Pin to dashboard", systemImage: "pin")
           }
+          HStack {
+            Label("Tile color", systemImage: "paintpalette")
+            Spacer()
+            PaletteSwatchButton(selectedHex: color.isEmpty ? inheritedColorHex : color) { color = $0 }
+          }
+          if !color.isEmpty {
+            Button("Use section color") { color = "" }
+          }
         } footer: {
           Text("Show this goal at the top of the Week dashboard. Goals with a metric show live progress; habit goals show their streak.")
         }
@@ -620,6 +636,7 @@ struct EditGoalSheet: View {
     let sections = Array(selectedSections)
     mutator.updateGoal(id: goal.id, text: clean, sections: sections)
     mutator.setPinned(id: goal.id, pinned: pinned)
+    mutator.setColor(id: goal.id, color: color.isEmpty ? nil : color)
 
     // Metric: write only if the user toggled it on AND provided a valid
     // target. Toggling off (or invalid target) clears all four fields.

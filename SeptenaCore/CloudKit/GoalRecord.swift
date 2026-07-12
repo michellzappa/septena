@@ -41,6 +41,7 @@ enum GoalCloudKitSchema {
     // Pinned-to-dashboard flag, stored in the reservedInt1 slot (1 = pinned,
     // 0/absent = not) so no new named field is needed.
     static let pinned = "reservedInt1"
+    static let color = "reservedString1"
 
     // Reserved for foreseeable additions without bumping the record type.
     static let reservedString1 = "reservedString1"
@@ -70,6 +71,7 @@ extension GoalEntity: CloudKitSystemFieldsBacked {
     record[GoalCloudKitSchema.Field.metricBaseline] = metricBaseline
     record[GoalCloudKitSchema.Field.metricTargetUpper] = metricTargetUpper
     record[GoalCloudKitSchema.Field.pinned] = pinned ? 1 : 0
+    record[GoalCloudKitSchema.Field.color] = color
     return record
   }
 }
@@ -89,6 +91,7 @@ extension GoalEntity {
     metricBaseline = record[GoalCloudKitSchema.Field.metricBaseline] as? Double
     metricTargetUpper = record[GoalCloudKitSchema.Field.metricTargetUpper] as? Double
     pinned = (record[GoalCloudKitSchema.Field.pinned] as? Int ?? 0) == 1
+    color = optionalGoalString(record[GoalCloudKitSchema.Field.color])
     updatedAt = .now
     captureCloudKitSystemFields(from: record)
   }

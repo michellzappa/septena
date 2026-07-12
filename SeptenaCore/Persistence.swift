@@ -580,6 +580,9 @@ final class GoalEntity {
   /// default so SwiftData's lightweight migration can backfill on-disk rows
   /// without a store-migration crash. Stored in CloudKit `reservedInt1`.
   var pinned: Bool = false
+  /// Optional dashboard accent override. Nil inherits the attached section's
+  /// color. Stored in CloudKit's reservedString1 slot.
+  var color: String? = nil
 
   init(id: String,
        text: String,
@@ -594,7 +597,8 @@ final class GoalEntity {
        metricTarget: Double? = nil,
        metricBaseline: Double? = nil,
        metricTargetUpper: Double? = nil,
-       pinned: Bool = false) {
+       pinned: Bool = false,
+       color: String? = nil) {
     self.id = id
     self.text = text
     self.sections = sections
@@ -609,6 +613,7 @@ final class GoalEntity {
     self.metricBaseline = metricBaseline
     self.metricTargetUpper = metricTargetUpper
     self.pinned = pinned
+    self.color = color
   }
 }
 
@@ -1827,7 +1832,8 @@ extension Goal {
               metricTarget: e.metricTarget,
               metricBaseline: e.metricBaseline,
               metricTargetUpper: e.metricTargetUpper,
-              pinned: e.pinned)
+              pinned: e.pinned,
+              color: e.color)
   }
 }
 

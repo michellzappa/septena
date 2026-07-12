@@ -1734,6 +1734,9 @@ struct Goal: Identifiable, Codable, Hashable {
   /// Pinned to the top of the Week dashboard. Defaulted so existing decoders
   /// and call sites (and any cached JSON without the key) stay valid.
   var pinned: Bool = false
+  /// Optional hex accent for the pinned dashboard tile. Nil inherits the
+  /// metric/section accent.
+  var color: String? = nil
 }
 
 // MARK: - Date helpers (Septena uses YYYY-MM-DD strings)
