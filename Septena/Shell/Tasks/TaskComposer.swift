@@ -363,14 +363,14 @@ struct TaskComposerCard: View {
   }
 
   private var titleField: some View {
-    // Single-line field (no `axis: .vertical`) so the title sits on the same
-    // baseline as the closed row — a vertical-axis field reserves blank space
-    // above the cursor/placeholder and reads as a few px too low.
-    TextField("", text: $draft.title)
+    // Start at the closed row's one-line rhythm, then grow only when the title
+    // actually wraps. Two lines matches the read-only row without letting a
+    // long title take over the composer.
+    TextField("", text: $draft.title, axis: .vertical)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
       .focused($focus, equals: .title)
-      .lineLimit(1)
+      .lineLimit(1...2)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
       .onSubmit { if draft.canSave { commit() } }
