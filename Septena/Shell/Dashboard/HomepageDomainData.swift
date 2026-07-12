@@ -51,8 +51,8 @@ enum DomainTapAction {
   /// Open one intake tracker's page directly (no switcher hop) — the
   /// per-kind tiles are peers of section tiles, so they deep-open like one.
   case openIntakeKind(String)
-  /// Open a pinned goal's editor — emitted by pinned goal tiles prepended to
-  /// the section grid in `WeekDashboardView`.
+  /// Pinned goal tile tap — habit-backed goals toggle that habit; others
+  /// open the goal editor. Emitted by tiles prepended in `WeekDashboardView`.
   case openGoal(String)
 }
 

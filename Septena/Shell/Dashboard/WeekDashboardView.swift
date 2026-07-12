@@ -1313,8 +1313,14 @@ struct WeekDashboardView: View {
     case .switchToTasksTab:        openTasksFromTile()
     case .openIntakeKind(let id):  openIntakeKind(id)
     case .openGoal(let id):
-      if let entity = pinnedGoals.first(where: { $0.id == id }) {
-        editingGoal = Goal(entity)
+      guard let entity = pinnedGoals.first(where: { $0.id == id }) else { return }
+      let goal = Goal(entity)
+      // Habit-backed goals are today's check-off target — tap toggles THAT
+      // habit; every other pinned goal opens the editor.
+      if let habit = habitItem(for: goal) {
+        commitHabitToggle(habit)
+      } else {
+        editingGoal = goal
       }
     }
   }
@@ -1358,6 +1364,16 @@ struct WeekDashboardView: View {
     Haptics.tick()
   }
 
+  /// Resolve the one habit a pinned goal measures, when its metric is
+  /// `habits.<id>.done_week`. Falls back to a mirror read when dailies
+  /// hasn't painted yet.
+  private func habitItem(for goal: Goal) -> HabitDayItem? {
+    guard let habitID = PinnedGoalTiles.habitID(from: goal) else { return nil }
+    if let habit = dailies.habits.first(where: { $0.id == habitID }) { return habit }
+    return ChecklistMirror.loadHabitsDay(context: modelContext, date: clock.today)?
+      .grouped.values.flatMap { $0 }.first(where: { $0.id == habitID })
+  }
+
   /// Single entry point for "user tapped the Tasks tile on the homepage."
   /// Every dashboard layout (Tiles direct tap, Dense + Heatmap via
   /// `DomainTapAction.switchToTasksTab`) routes through here so the
@@ -1388,6 +1404,9 @@ struct WeekDashboardView: View {
       if let entity = pinnedGoals.first(where: { $0.id == goalID }) {
         let goal = Goal(entity)
         pinnedGoalActions(for: goal)
+        Button { editingGoal = goal } label: {
+          Label("Edit goal", systemImage: "pencil")
+        }
       }
       Button { unpinGoal(id: goalID) } label: {
         Label("Unpin from dashboard", systemImage: "pin.slash")
@@ -1407,20 +1426,13 @@ struct WeekDashboardView: View {
   /// contribute no action rather than guessing a value.
   @ViewBuilder
   private func pinnedGoalActions(for goal: Goal) -> some View {
-    if let habitID = PinnedGoalTiles.habitID(from: goal),
-         let habit = ChecklistMirror.loadHabitsDay(context: modelContext, date: clock.today)?
-           .grouped.values.flatMap { $0 }.first(where: { $0.id == habitID }) {
-      Button {
-        checklistMutator.toggleHabit(id: habitID, date: clock.today, done: !habit.done)
-        Haptics.tick()
-      } label: {
+    if let habit = habitItem(for: goal) {
+      Button { commitHabitToggle(habit) } label: {
         Label(habit.done ? "Mark not done" : "Mark habit done",
               systemImage: habit.done ? "arrow.uturn.backward.circle" : "checkmark.circle")
       }
-    }
-
-    if let kindID = PinnedGoalTiles.intakeKindID(from: goal),
-       let tile = intakeTiles.first(where: { $0.id == kindID }) {
+    } else if let kindID = PinnedGoalTiles.intakeKindID(from: goal),
+              let tile = intakeTiles.first(where: { $0.id == kindID }) {
       intakeQuickAddMenu(for: tile)
       Divider()
     } else if let domain = PinnedGoalTiles.actionDomain(from: goal) {
