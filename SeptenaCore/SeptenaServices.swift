@@ -146,10 +146,11 @@ final class SeptenaServices {
       // republish on any `.septenaDataChanged` / `.septenaTasksChanged` that
       // touches Next, so every data source (tasks, checklist, training,
       // nutrition, mood, intake) stays in sync without each mutator opting in.
-      // Compile-gated, not just profile-gated: Septask ships no watch/widgets
-      // and excludes WatchSnapshotPublisher.swift entirely (NextFeed.swift now
-      // compiles into Septask for the embedded Next fold — see project.yml).
-      #if !SEPTASK
+      // Compile-gated: Septask ships a task-only watch snapshot publisher;
+      // the full-app Next snapshot publisher stays out of the Septask target.
+      #if SEPTASK
+      TasksWatchSnapshotPublisher.install(context: context)
+      #else
       WatchSnapshotPublisher.install(context: context)
       #endif
 

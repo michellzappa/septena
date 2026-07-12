@@ -204,11 +204,8 @@ targets:
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
-          # Septask ships no watch/widgets; the publisher's call site in
-          # SeptenaServices is `#if !SEPTASK`-gated. NextFeed.swift compiles
-          # here now — its upward reach (NextSuggestionsModel) is satisfied by
-          # the Next files below, included for the embedded Next fold
-          # (SeptaskNextFold at the foot of Today).
+          # Septask ships no widgets; the full-app Next snapshot publisher stays
+          # out — `TasksWatchSnapshotPublisher` compiles instead for the watch.
           - WatchSnapshotPublisher.swift
       # P1 (docs/SEPTASK.md): the real task UI, by source inclusion — the same
       # files the full app compiles, never copies. TasksDestinationView is the
@@ -281,6 +278,9 @@ targets:
       - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
     dependencies:
       - target: SeptaskShare
+        embed: true
+        codeSign: true
+      - target: SeptaskWatch
         embed: true
         codeSign: true
       # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
@@ -614,6 +614,67 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: SeptenaWatchComplication/SeptenaWatchComplication.entitlements
 
+  SeptaskWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: SeptaskWatch
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptenaCore/TasksWatchWire.swift
+    dependencies:
+      - target: SeptaskWatchComplication
+        embed: true
+        codeSign: true
+    info:
+      path: SeptaskWatch/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDisplayName: Septask
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.septena.tasks
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptaskWatch/SeptaskWatch.entitlements
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG SEPTASK"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "SEPTASK"
+
+  SeptaskWatchComplication:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: SeptaskWatchComplication
+        excludes:
+          - "**/.DS_Store"
+          - "**/*.entitlements"
+      - path: SeptaskWatch/TasksTodayComplicationData.swift
+    info:
+      path: SeptaskWatchComplication/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Base.xcconfig
+      Release: Config/Base.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.watchkitapp.today
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SeptaskWatchComplication/SeptaskWatchComplication.entitlements
+
   SeptenaLiveActivitiesExtension:
     type: app-extension
     platform: iOS
@@ -866,6 +927,19 @@ schemes:
     build:
       targets:
         SeptenaWatch: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  SeptaskWatch:
+    build:
+      targets:
+        SeptaskWatch: all
     run:
       config: Debug
     profile:
