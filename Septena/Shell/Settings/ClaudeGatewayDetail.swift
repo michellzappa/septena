@@ -72,8 +72,8 @@ struct ClaudeGatewayDetail: View {
           HStack {
             Label("Status", systemImage: "antenna.radiowaves.left.and.right")
             Spacer()
-            Text(provider.needsReauth ? "Reconnect needed" : (provider.lastError == nil ? "Connected" : "Needs attention"))
-              .foregroundStyle(provider.needsReauth || provider.lastError != nil ? .orange : .green)
+            Text(provider.connectionDisplayState.label)
+              .foregroundStyle(claudeConnectionStatusColor(provider.connectionDisplayState))
           }
           if let last = provider.lastRefreshAt {
             ClaudeConnectionTimer(lastRefreshAt: last, dueAt: provider.nudgeFireDate)
@@ -228,5 +228,13 @@ private struct ClaudeConnectionTimer: View {
     if h > 0 { return "\(h)h \(m)m" }
     if m > 0 { return String(format: "%dm %02ds", m, s) }
     return "\(s)s"
+  }
+}
+
+func claudeConnectionStatusColor(_ state: ClaudeGatewayProvider.ConnectionDisplayState) -> Color {
+  switch state {
+  case .connected: return .green
+  case .disconnected: return .secondary
+  case .reconnectNeeded, .needsAttention: return .orange
   }
 }

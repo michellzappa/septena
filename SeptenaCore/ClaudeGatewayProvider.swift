@@ -145,6 +145,31 @@ public final class ClaudeGatewayProvider {
   /// sign-in. Cleared on a successful refresh.
   public private(set) var needsReauth = false
 
+  /// Settings-facing connection summary — one source of truth for the overview
+  /// row and the gateway detail pane so they never disagree.
+  public enum ConnectionDisplayState: Equatable {
+    case disconnected
+    case connected
+    case reconnectNeeded
+    case needsAttention
+
+    public var label: String {
+      switch self {
+      case .disconnected: return "Connect"
+      case .connected: return "Connected"
+      case .reconnectNeeded: return "Reconnect needed"
+      case .needsAttention: return "Needs attention"
+      }
+    }
+  }
+
+  public var connectionDisplayState: ConnectionDisplayState {
+    guard isEnabled else { return .disconnected }
+    if needsReauth { return .reconnectNeeded }
+    if lastError != nil { return .needsAttention }
+    return .connected
+  }
+
   private let session: URLSession
   // Retained for the duration of a sign-in.
   private var authSession: ASWebAuthenticationSession?
@@ -491,6 +516,12 @@ public final class ClaudeGatewayProvider {
 
   /// Ask CloudKit (unauthenticated) for the Apple sign-in URL.
   private func fetchSignInRedirectURL() async throws -> URL {
+    guard !Self.webServicesAPIToken.isEmpty else {
+      throw GatewayError.server(
+        0,
+        "CloudKit Web API token not configured — add CLOUDKIT_WEB_API_TOKEN to Config/Secrets.xcconfig and rebuild"
+      )
+    }
     var comps = URLComponents(
       string: "https://api.apple-cloudkit.com/database/1/\(SeptenaCloudKit.containerIdentifier)/\(Self.ckEnvironment)/private/users/current"
     )!
@@ -579,15 +610,21 @@ public final class ClaudeGatewayProvider {
   }
 }
 
-// Supplies the window ASWebAuthenticationSession presents over.
+// Supplies the window ASWebAuthenticationSession presents over. Match the
+// Withings OAuth anchor: fall back to any scene window (not an empty anchor)
+// so `start()` doesn't fail when SwiftUI hasn't marked a key window yet —
+// common when the reconnect cue lives in the iPad overlay bar.
 private final class AuthAnchorProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
   func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
     #if os(iOS)
-    let window = UIApplication.shared.connectedScenes
+    let scenes = UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
-      .flatMap { $0.windows }
-      .first { $0.isKeyWindow }
-    return window ?? ASPresentationAnchor()
+    let window = scenes
+      .flatMap(\.windows)
+      .first(where: \.isKeyWindow)
+      ?? scenes.flatMap(\.windows).first
+      ?? UIWindow()
+    return window
     #elseif os(macOS)
     return NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first ?? ASPresentationAnchor()
     #else

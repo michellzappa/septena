@@ -67,7 +67,10 @@ struct ClaudeAISettingsPane: View {
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showExplainer) { AIExplainerView() }
-    .onAppear { aiStatus = OnDeviceAI.status }
+    .onAppear {
+      aiStatus = OnDeviceAI.status
+      claudeProvider.reloadSharedState()
+    }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { aiStatus = OnDeviceAI.status }
     }
@@ -96,9 +99,9 @@ struct ClaudeAISettingsPane: View {
           }
           .foregroundStyle(.primary)
           Spacer()
-          Text(claudeProvider.isEnabled ? "Connected" : "Connect")
+          Text(claudeProvider.connectionDisplayState.label)
             .font(.subheadline)
-            .foregroundStyle(claudeProvider.isEnabled ? Color.green : .secondary)
+            .foregroundStyle(claudeConnectionStatusColor(claudeProvider.connectionDisplayState))
         }
       }
 
