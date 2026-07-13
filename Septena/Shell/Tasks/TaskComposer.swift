@@ -173,6 +173,13 @@ struct TaskComposerCard: View {
     return nil
   }
 
+  /// Whether the notes field is present. It starts collapsed so the composer
+  /// opens as a single title line (create *and* edit) and only appears once the
+  /// task actually has notes or the user reveals it via the Notes pill. When
+  /// hidden, the rail shows an elective "Notes" pill instead (see
+  /// `TaskAttributeBar`).
+  private var showsNotesField: Bool { !draft.notes.isEmpty || focus == .notes }
+
   private var headerTitle: String { isEditing ? "Edit To-Do" : "New Task" }
   private var saveTitle: String { isEditing ? "Save" : "Add" }
 
@@ -292,7 +299,10 @@ struct TaskComposerCard: View {
       titleNotesCard
 
       Group {
-        notesField
+        if showsNotesField {
+          notesField
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
 
         quickEntryChips
 
@@ -332,6 +342,7 @@ struct TaskComposerCard: View {
     }
     .onKeyPress(.space) { activateFocused() }
     .onKeyPress(.return) { activateFocused() }
+    .animation(.snappy(duration: 0.22), value: showsNotesField)
   }
 
   // MARK: - Title / notes
@@ -346,18 +357,27 @@ struct TaskComposerCard: View {
       // plain field, no boxed background — so the expanded row reads as the same
       // line you clicked, now editable, instead of a heavy input card.
       HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-        if let task = editingTask, let onToggleComplete {
-          // Derived from the SAME `TaskCheckboxModel` the closed row uses, so the
-          // box is identical in view and edit modes (tint, Today gating, proposal
-          // dashing, tenure dial, unread-context dot — all shared, never re-rolled).
-          TaskCheckbox(
-            model: TaskCheckboxModel(task: task, accent: accent,
-                                     showsTodayIndicator: showsTodayIndicator),
-            onToggle: onToggleComplete
-          )
-          .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
-          .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        Group {
+          if let task = editingTask, let onToggleComplete {
+            // Derived from the SAME `TaskCheckboxModel` the closed row uses, so the
+            // box is identical in view and edit modes (tint, Today gating, proposal
+            // dashing, tenure dial, unread-context dot — all shared, never re-rolled).
+            TaskCheckbox(
+              model: TaskCheckboxModel(task: task, accent: accent,
+                                       showsTodayIndicator: showsTodayIndicator),
+              onToggle: onToggleComplete
+            )
+          } else {
+            // Create mode: a plain empty, non-interactive box so the new-task row
+            // reads like a real task row (matching the closed rows above/below it)
+            // instead of a title floating with no checkbox. There's nothing to
+            // toggle until the task is committed, so it ignores hits.
+            TaskCheckbox(isDone: false, onToggle: {})
+              .allowsHitTesting(false)
+          }
         }
+        .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
+        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
         VStack(alignment: .leading, spacing: 4) {
           titleField
         }
@@ -395,10 +415,12 @@ struct TaskComposerCard: View {
       .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
   }
 
-  /// Notes — an always-editable multi-line field sitting directly under the
-  /// title (Things-style), no box and no Clear button. Replaces the old Notes
-  /// pill + expanding panel. Return inserts a newline here (it's prose), so —
-  /// unlike the title — there's no Return-to-save; Tab still cycles focus.
+  /// Notes — a multi-line field sitting directly under the title (Things-style),
+  /// no box and no Clear button. It's collapsed by default (`showsNotesField`)
+  /// so the composer opens on a single title line; it appears once the task has
+  /// notes or the Notes pill reveals it. Return inserts a newline here (it's
+  /// prose), so — unlike the title — there's no Return-to-save; Tab still
+  /// cycles focus.
   private var notesField: some View {
     TaskMarkdownNotesEditor(text: $draft.notes, focus: $focus)
       // A little extra right margin so wrapped prose doesn't run to the card edge.
@@ -677,7 +699,10 @@ struct TaskComposerCard: View {
 
   /// Tab order: title → every pill (including Discuss when edit mode offers it).
   private var focusOrder: [TaskEditFocus] {
-    var order: [TaskEditFocus] = [.title, .notes]
+    // Notes is either the revealed field (`.notes`) or, when collapsed, the
+    // rail's elective pill (`.pill(.notes)`) — never both.
+    var order: [TaskEditFocus] = [.title]
+    order.append(showsNotesField ? .notes : .pill(.notes))
     order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
     if isEditing { order.append(.pill(.attachments)) }
     if discussKickoffVisible {
@@ -1231,9 +1256,12 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    // Notes is NOT a pill — it's an always-editable field above the rail (see
-    // `TaskComposerCard.notesField`).
-    case when, deadline, repeatRule, list, attachments
+    // Notes IS an elective, but a special one: its pill only shows while notes
+    // are empty/unrevealed; selecting it reveals the multi-line notes field
+    // above the rail (see `TaskComposerCard.showsNotesField`) rather than
+    // expanding an inline panel. Not part of `draftCases` — it's rendered
+    // conditionally, like `.attachments`.
+    case notes, when, deadline, repeatRule, list, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
@@ -1243,6 +1271,7 @@ struct TaskAttributeBar: View {
 
     var icon: String {
       switch self {
+      case .notes:      "text.alignleft"
       case .when:       "calendar"
       case .deadline:   "flag"
       case .repeatRule: "repeat"
@@ -1253,6 +1282,7 @@ struct TaskAttributeBar: View {
     }
     var label: String {
       switch self {
+      case .notes:      "Notes"
       case .when:       "When"
       case .deadline:   "Deadline"
       case .repeatRule: "Repeat"
@@ -1296,6 +1326,16 @@ struct TaskAttributeBar: View {
       // When control (quick chip) instead of duplicating the rail. Flat
       // capsule fills (no floating glass) — these sit inline on the form card.
       FlowLayout(spacing: 8) {
+        // Notes lead the rail, but only while collapsed — once the field is
+        // revealed (notes present or focused) it hosts the notes instead, so
+        // the pill and the field are never both on screen.
+        if draft.notes.isEmpty, focus != .notes {
+          AttributePill(icon: Attribute.notes.icon, label: Attribute.notes.label,
+                        value: nil, isSet: false, isActive: false,
+                        isFocused: focus == .pill(.notes),
+                        accent: accent, neutral: neutral) { revealNotes() }
+            .focused($focus, equals: .pill(.notes))
+        }
         ForEach(Attribute.draftCases) { attr in
           AttributePill(icon: attr.icon, label: attr.label,
                         value: value(for: attr), isSet: isSet(attr),
@@ -1355,6 +1395,7 @@ struct TaskAttributeBar: View {
   /// values are derived from the draft — the single read-side of the rail.
   private func value(for attr: Attribute) -> String? {
     switch attr {
+    case .notes: return nil
     case .discuss: return nil
     case .attachments: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
@@ -1376,6 +1417,7 @@ struct TaskAttributeBar: View {
   /// Whether a pill counts as "filled" — drives the accent tint.
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
+    case .notes:      !draft.notes.isEmpty
     case .discuss:    discussWorking
     case .attachments: discussTask.map { !SeptenaServices.shared.taskAttachmentStore.attachments(taskID: $0.id).isEmpty } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
@@ -1397,7 +1439,8 @@ struct TaskAttributeBar: View {
       }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      case .discuss, .list, .none: EmptyView()
+      // Notes reveals a field above the rail, not an inline panel here.
+      case .notes, .discuss, .list, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1423,6 +1466,13 @@ struct TaskAttributeBar: View {
         expanded = (expanded == attr) ? nil : attr
       }
     }
+  }
+
+  /// Reveal the notes field above the rail and drop the keyboard cursor into
+  /// it. `showsNotesField` keys off `focus == .notes`, so this both shows the
+  /// field and focuses it in one move.
+  private func revealNotes() {
+    withAnimation(.snappy(duration: 0.22)) { focus = .notes }
   }
 
   private func startDiscuss() {
