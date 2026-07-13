@@ -535,6 +535,22 @@ struct TaskListView: View {
     #endif
   }
 
+  private var showsEmbeddedNewTaskToolbar: Bool {
+    #if os(iOS)
+    embedded && filter != .recentlyDeleted && !usesPushNavigation
+    #else
+    embedded && filter != .recentlyDeleted
+    #endif
+  }
+
+  private var showsClaudeReconnectToolbar: Bool {
+    #if SEPTASK && os(iOS)
+    !embedded
+    #else
+    false
+    #endif
+  }
+
   private var taskList: some View {
     taskListContent
     // Deep task-list rhythm runs denser than the drawer's: task rows read
@@ -544,44 +560,14 @@ struct TaskListView: View {
     // keyboard nav now all live inside `SelectableScrollList`.)
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
-    .toolbar {
-      // Embedded (Project/Area detail) keeps a local "+" on iPhone only; on iPad
-      // the window overlay's "+" is always the source of truth.
-      #if os(iOS)
-      if embedded && filter != .recentlyDeleted && !usesPushNavigation {
-        ToolbarItem(placement: .primaryAction) {
-          TaskListNewTaskButton()
-        }
-      }
-      #else
-      if embedded && filter != .recentlyDeleted {
-        ToolbarItem(placement: .primaryAction) {
-          TaskListNewTaskButton()
-        }
-      }
-      #endif
-    }
+    .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar))
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded, recentlyDeleted: filter == .recentlyDeleted))
-    #if SEPTASK
-    // Septask's Today list is its home surface. Match Septena's dashboard
-    // affordance: when Claude needs a user-authenticated refresh, show the
-    // same top-bar control rather than hiding recovery in Settings. Applied
-    // AFTER the standalone chrome's own `.toolbar` (which owns "+") so it
-    // composes leading of "+" in the trailing group — face/plus, not plus/face.
-    #if os(iOS)
-    .toolbar {
-      if !embedded {
-        ToolbarItem(placement: .topBarTrailing) {
-          ClaudeReconnectCue(.pill)
-        }
-      }
-    }
-    #endif
-    #endif
+    // Applied after standalone chrome so Septask retains its face/plus order.
+    .modifier(TaskListClaudeReconnectToolbar(shows: showsClaudeReconnectToolbar))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
@@ -721,16 +707,9 @@ struct TaskListView: View {
     // opening the contextual inline quick-add (Inbox on Today, foot line on
     // project/area, composer on Upcoming).
     .onChange(of: nav.shouldStartCreating) { _, _ in
-      guard nav.shouldStartCreating else { return }
-      nav.shouldStartCreating = false
-      openContextualQuickAdd()
+      consumeStartCreatingRequest()
     }
-    .onAppear {
-      if nav.shouldStartCreating {
-        nav.shouldStartCreating = false
-        openContextualQuickAdd()
-      }
-    }
+    .onAppear(perform: consumeStartCreatingRequest)
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
     // tap / (i) button). The app's standard adaptive edit drawer (sheet on
     // iPhone, inspector on iPad/macOS). Commits through `TaskDraft` so the
@@ -769,9 +748,10 @@ struct TaskListView: View {
   }
 
   /// Spawn a new task in this list's context and open the Things-style inline
-  /// editor on it. Creatable lists insert a local `deferPush` draft (no CloudKit
-  /// push until the title commits) at the foot of the list; Upcoming falls back
-  /// to the drawer composer.
+  /// editor on it. Creatable lists insert a local `deferPush` placeholder (no
+  /// CloudKit push until the title commits) at the foot of the list. The shared
+  /// composer still treats this as CREATE, not edit, so its behavior is in
+  /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
     guard filter != .recentlyDeleted else { return }
     guard !closeActiveEditIfNeeded() else { return }
@@ -829,6 +809,16 @@ struct TaskListView: View {
     case .project(let id): startCreate(projectId: id)
     default:               startCreate()
     }
+  }
+
+  /// Consume the app-global create request from both first appearance and
+  /// subsequent command deliveries. Keeping this imperative work outside the
+  /// already-large SwiftUI modifier expression also gives every target the
+  /// same small, compiler-friendly entry point.
+  private func consumeStartCreatingRequest() {
+    guard nav.shouldStartCreating else { return }
+    nav.shouldStartCreating = false
+    openContextualQuickAdd()
   }
 
   // MARK: - Inline editing
@@ -2355,6 +2345,7 @@ struct TaskListView: View {
       projects: projects,
       accent: theme.color(for: "tasks"),
       presentation: .inline,
+      deferredCreate: draftEditIds.contains(task.id),
       onClose: { collapseEdit() },
       onToggleComplete: { toggle(task) },
       titleMatchID: "edit-title-\(task.id)",
@@ -3875,6 +3866,43 @@ struct TaskListNewTaskButton: View {
     .buttonStyle(.glassProminent)
     .tint(theme.color(for: "tasks"))
     .accessibilityLabel("New Task")
+  }
+}
+
+/// Presentation-only toolbar for a task list. Keeping this outside the deep
+/// `TaskListView.taskList` modifier tree makes the host chrome independently
+/// type-checkable; it never owns task draft or persistence behavior.
+private struct TaskListToolbarChrome: ViewModifier {
+  let showsEmbeddedNewTask: Bool
+
+  func body(content: Content) -> some View {
+    content.toolbar {
+      if showsEmbeddedNewTask {
+        ToolbarItem(placement: .primaryAction) {
+          TaskListNewTaskButton()
+        }
+      }
+    }
+  }
+}
+
+/// Septask's reconnect affordance intentionally composes after the standalone
+/// page chrome so the trailing controls retain their established face/plus order.
+private struct TaskListClaudeReconnectToolbar: ViewModifier {
+  let shows: Bool
+
+  func body(content: Content) -> some View {
+    #if SEPTASK && os(iOS)
+    content.toolbar {
+      if shows {
+        ToolbarItem(placement: .topBarTrailing) {
+          ClaudeReconnectCue(.pill)
+        }
+      }
+    }
+    #else
+    content
+    #endif
   }
 }
 
