@@ -31,6 +31,7 @@ final class SeptenaServices {
 
   let ckEngine: CKEngine
   let taskMutator: TaskMutator
+  let taskAttachmentStore: TaskAttachmentStore
   let checklistMutator: ChecklistMutator
   let goalMutator: GoalMutator
   let coachVoiceMutator: CoachVoiceMutator
@@ -56,6 +57,7 @@ final class SeptenaServices {
     let context = LocalStore.shared.container.mainContext
     self.ckEngine = CKEngine()
     self.taskMutator = TaskMutator(context: context, ckEngine: nil)
+    self.taskAttachmentStore = TaskAttachmentStore(context: context, engine: self.ckEngine)
     self.checklistMutator = ChecklistMutator(context: context, ckEngine: nil)
     self.goalMutator = GoalMutator(context: context, ckEngine: nil)
     self.coachVoiceMutator = CoachVoiceMutator(context: context, ckEngine: nil)

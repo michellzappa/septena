@@ -684,6 +684,7 @@ targets:
           - "**/.DS_Store"
           - "**/*.entitlements"
       - path: SeptenaCore/TrainingLiveActivity.swift
+      - path: SeptenaCore/AdaptiveColor.swift
     info:
       path: SeptenaLiveActivitiesExtension/Info.plist
       properties:

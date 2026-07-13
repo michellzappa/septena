@@ -304,6 +304,7 @@ final class CloudKitTasksBackend {
   /// durable and retried until success; an offline purge drains on reconnect.
   func purge(id: String) {
     guard let entity = fetch(id: id) else { return }
+    purgeAttachments(taskID: id)
     let neverPushed = entity.cloudKitSystemFields == nil
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
@@ -313,6 +314,16 @@ final class CloudKitTasksBackend {
       TaskChange.post(id)
     } else {
       commitAndPush(staged, op: "purge", deletion: true)
+    }
+  }
+
+  private func purgeAttachments(taskID: String) {
+    let rows = ((try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [])
+      .filter { $0.taskID == taskID }
+    for attachment in rows {
+      if let url = TaskAttachmentFiles.url(for: attachment) { try? FileManager.default.removeItem(at: url) }
+      context.delete(attachment)
+      engine.noteTaskAttachmentDeletion(id: attachment.id)
     }
   }
 

@@ -66,6 +66,7 @@ promoted to Prod unless the Console already shows them):
 | 13 | **New field** `reservedString1` on `Project` + `reservedString2` on `Area` — carry the JSON-encoded `AreaAttachment` (the one read-only context feed: repo/calendar/feed pointer). First write of these reserved slots. | `Project`, `Area` | `reservedString1` / `reservedString2` | String |
 | 14 | **New fields** `kind` + `heading` — project section dividers ("headings"). `kind == "heading"` marks a divider row (a `Task` record); `heading` is the FK from a member task to its divider. Both conditional-write. See `TaskKind`. | `Task` | `kind` / `heading` | String |
 | 15 | **New field** `reservedInt1` — synced sidebar sort order (`position`) for areas & projects; renumbered 1…N on Move Up/Down, conditional-write (0 = unset). First write of this reserved int slot. See `docs/DRAG_AND_DROP.md` §5 gap #2. | `Area`, `Project` | `reservedInt1` | Int(64) |
+| 16 | **New record type** `TaskAttachment` — one owned file per record, with metadata and a CloudKit asset. | `TaskAttachment` | all | — |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -190,6 +191,17 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `kind` | String | `String` (`kind`) | conditional | row shape; `"heading"` = project section divider, else absent. Written only when `== "heading"`. See `TaskKind` |
 | `heading` | String | `String?` (`heading`) | Yes | FK to owning heading's `id` for a task filed under one; absent otherwise |
 | `parentTaskId`, `remindAt`, `reservedDate1`, `reservedDate2`, `reservedString1`, `reservedInt1` | — | reserved | — | over-provisioned slots; never encoded/decoded |
+
+#### TaskAttachment — recordName `task-attachment:{id}`
+| Field | CK type | Swift | Nullable | Notes |
+|---|---|---|---|---|
+| `taskID` | String | `String` | No | owning task id |
+| `filename` | String | `String` | No | original display filename |
+| `contentType` | String | `String` | No | UTType identifier / MIME-style identifier |
+| `byteCount` | Int(64) | `Int64` | No | original file size |
+| `createdAt` | Timestamp | `Date` | No | |
+| `position` | Double | `Double` | No | stable display order |
+| `asset` | Asset | `CKAsset` | No | owned file bytes; copied into Application Support after fetch |
 
 #### Area  — recordName `area:{id}`
 | Field | CK type | Swift | Nullable | Notes |

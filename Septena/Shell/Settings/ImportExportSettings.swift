@@ -39,6 +39,7 @@ struct ImportExportSettingsPane: View {
     Form {
       switch mode {
       case .full:
+        storageSection
         exportSection
         importSection
         formatSection
@@ -59,6 +60,20 @@ struct ImportExportSettingsPane: View {
   }
 
   // MARK: Export
+
+  @ViewBuilder
+  private var storageSection: some View {
+    let summary = SeptenaServices.shared.taskAttachmentStore.storageSummary
+    Section {
+      LabeledContent("Task attachments", value: "\(summary.count)")
+      LabeledContent("Attachment data",
+                     value: ByteCountFormatter.string(fromByteCount: summary.bytes, countStyle: .file))
+    } header: {
+      Text("Storage")
+    } footer: {
+      Text("Attachments are private, synced through iCloud, and included in Everything and Tasks exports.")
+    }
+  }
 
   @ViewBuilder
   private var exportSection: some View {
@@ -683,6 +698,8 @@ enum ImportExportService {
         for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryItem":
         for r in rows { try upsertGroceryItem(r, ctx: ctx, engine: engine); applied += 1 }
+      case "task_attachment":
+        for r in rows { try upsertTaskAttachment(r, ctx: ctx, engine: engine); applied += 1 }
       default:
         skipped += rows.count
       }
@@ -690,6 +707,39 @@ enum ImportExportService {
     try ctx.save()
     return ApplyResult(applied: applied, skipped: skipped)
   }
+}
+
+@MainActor
+private func upsertTaskAttachment(_ r: [String: Any],
+                                  ctx: ModelContext,
+                                  engine: CKEngine) throws {
+  guard let id = r["id"] as? String,
+        let taskID = r["taskID"] as? String,
+        let filename = r["filename"] as? String,
+        let contentType = r["contentType"] as? String,
+        let encoded = r["dataBase64"] as? String,
+        let data = Data(base64Encoded: encoded)
+  else { throw ImportExportService.ImportError.malformed("task_attachment row is missing file data or metadata") }
+  guard data.count <= TaskAttachmentFiles.maxBytes else {
+    throw ImportExportService.ImportError.malformed("attachment \(filename) is larger than 25 MB")
+  }
+  let existing = try ctx.fetch(FetchDescriptor<TaskAttachmentEntity>(
+    predicate: #Predicate { $0.id == id })).first
+  let entity = existing ?? TaskAttachmentEntity(id: id, taskID: taskID, filename: filename,
+    contentType: contentType, byteCount: Int64(data.count))
+  if existing == nil { ctx.insert(entity) }
+  entity.taskID = taskID
+  entity.filename = filename
+  entity.contentType = contentType
+  entity.byteCount = Int64(data.count)
+  entity.position = r["position"] as? Double ?? 0
+  if let stamp = r["createdAt"] as? String, let date = ISO8601DateFormatter().date(from: stamp) {
+    entity.createdAt = date
+  }
+  let owned = TaskAttachmentFiles.ownedFilename(id: id, original: filename)
+  try data.write(to: TaskAttachmentFiles.directory.appendingPathComponent(owned), options: .atomic)
+  entity.localFilename = owned
+  engine.noteTaskAttachmentChange(id: id)
 }
 
 // MARK: - Entity → dict mappers

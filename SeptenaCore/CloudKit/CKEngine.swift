@@ -258,6 +258,8 @@ func noteCoachVoiceChange(id: String) { noteChange(recordName: CoachVoiceCloudKi
 func noteCoachVoiceDeletion(id: String) { noteDeletion(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
 func noteCoachMessageChange(id: String) { noteChange(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
 func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
+func noteTaskAttachmentChange(id: String) { noteChange(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
+func noteTaskAttachmentDeletion(id: String) { noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {
