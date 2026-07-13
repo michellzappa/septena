@@ -4,50 +4,60 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1449,
-      "date": "2026-07-12",
+      "build": 1454,
+      "date": "2026-07-13",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Septask, a focused task app",
-          "detail": "A dedicated Tasks app for iPhone, iPad, Mac, and Apple Watch that works over the same private data as Septena, with its own Today, Upcoming, and Next views.",
-          "section": null
+          "detail": "A dedicated, streamlined companion app for just your tasks that shares the same private data, on iPhone, iPad, Mac, and Watch",
+          "section": "tasks"
         },
         {
-          "title": "Snap a photo of your meal to log it",
-          "detail": "Photo-first meal capture analyzes the picture on-device and prefills the macros so you can log a meal in seconds.",
+          "title": "Snap a photo of your meal",
+          "detail": "Capture a meal from a photo and let on-device analysis prefill the details",
           "section": "nutrition"
         },
         {
-          "title": "Your calendar, woven into Today",
-          "detail": "System calendar events now appear alongside tasks in Today and Upcoming, showing only what's still ahead.",
+          "title": "Attach files and share into tasks",
+          "detail": "Add attachments to tasks and send text, links, and files straight into Septena from other apps",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days with one-tap restore before they auto-purge.",
+          "detail": "Deleted tasks now rest in a Recently Deleted view with undo and a 30-day auto-purge, so nothing vanishes by accident",
           "section": "tasks"
         },
         {
-          "title": "Reorganize tasks by drag, headings, and bulk actions",
-          "detail": "Drag tasks onto Today or between areas and projects, group work under project section headings, and select multiple tasks to move, copy, or file at once.",
+          "title": "Your calendar in Today and Upcoming",
+          "detail": "Weave system calendar events alongside your tasks, with hidden-calendar choices synced across devices",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Pin any measurable goal to the week dashboard as a tile, and toggle habit-backed goals right from the tile.",
+          "title": "Drag, multi-select, and file faster",
+          "detail": "Re-home tasks by dragging them onto Today groups, act on several at once, and get filing suggestions for loose captures",
+          "section": "tasks"
+        },
+        {
+          "title": "Pinned goals on your dashboard",
+          "detail": "Pin any goal to the week dashboard as a tile you can act on with a tap",
           "section": "goals"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints on strength sets, and a rest flow that auto-advances with a Live Activity on your watch.",
+          "title": "Sharper training reviews",
+          "detail": "See effort-weighted muscle volume and a weekly review after sessions, with one-tap progression hints and a rest timer that auto-advances",
           "section": "training"
         },
         {
           "title": "Choose how much you share",
-          "detail": "Graded privacy levels let you pick exactly what anonymized telemetry is sent, with a plain-language ladder and a log of what was recently sent.",
+          "detail": "Graded analytics levels let you pick exactly what telemetry is sent, with a log of what went out",
           "section": null
+        },
+        {
+          "title": "A redesigned date picker",
+          "detail": "Quick-pick pills and a calendar popover make scheduling a task quicker",
+          "section": "tasks"
         }
       ]
     },
