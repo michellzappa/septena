@@ -55,7 +55,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8A11EAFC5E0423AE7543DD3B"
             BuildableName = "SeptaskWatch.app"
-            BlueprintName = "SeptaskWatch"
             ReferencedContainer = "container:Septena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -72,7 +71,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "8A11EAFC5E0423AE7543DD3B"
             BuildableName = "SeptaskWatch.app"
-            BlueprintName = "SeptaskWatch"
             ReferencedContainer = "container:Septena.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

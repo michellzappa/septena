@@ -2278,6 +2278,13 @@
 			path = Septask;
 			sourceTree = "<group>";
 		};
+		08CA0F18308AF5306F9096BB /* Pages */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Pages;
+			sourceTree = "<group>";
+		};
 		0B92FD5AED2B7EED0BC952CD /* Components */ = {
 			isa = PBXGroup;
 			children = (
@@ -3347,6 +3354,7 @@
 				10F9726633BA57A3660E3B81 /* AddInfoRow.swift */,
 				052BBEE4E640F3B46CCF8550 /* AddInfoSection.swift */,
 				AA692E5BCB5D687D42C9B2C7 /* AddInfoSheet.swift */,
+				08CA0F18308AF5306F9096BB /* Pages */,
 			);
 			name = AddInfo;
 			path = Septena/Shell/Capture/AddInfo;
