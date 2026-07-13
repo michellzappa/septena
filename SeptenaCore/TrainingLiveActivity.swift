@@ -23,5 +23,9 @@ struct TrainingActivityAttributes: ActivityAttributes {
   /// at start so the widget shows the same session glyph as the in-app
   /// tab-bar accessory without needing the routine catalog in-process.
   var sessionIcon: String
+  /// Authored Training section accent carried into the extension, which
+  /// cannot read the app's `SectionTheme` directly. Optional so an activity
+  /// restored across an app update still renders with the default accent.
+  var accentToken: String?
 }
 #endif
