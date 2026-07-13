@@ -125,6 +125,14 @@ private struct SeptaskMainWindow: View {
 
         await services.start()
         SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+        // Publish the watch snapshot as soon as the runtime is up — don't wait
+        // for a foreground bounce; the watch shows "error fetching record" until
+        // this record exists in CloudKit.
+        #if os(iOS)
+        TasksWatchSnapshotPublisher.schedule(
+          context: localStore.container.mainContext,
+          date: dayClock.today)
+        #endif
         ClaudeReconnectNudge.shared.start()
         Task { @MainActor in
           await ClaudeGatewayProvider.shared.refreshIfNeeded()
@@ -162,6 +170,9 @@ private struct SeptaskMainWindow: View {
             try? await services.ckEngine.fetchChanges()
             await ClaudeGatewayProvider.shared.refreshIfNeeded()
             ClaudeReconnectNudge.shared.reconcile()
+            TasksWatchSnapshotPublisher.schedule(
+              context: localStore.container.mainContext,
+              date: dayClock.today)
           }
         }
       }
