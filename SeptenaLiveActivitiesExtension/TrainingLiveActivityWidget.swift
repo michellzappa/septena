@@ -32,6 +32,7 @@ struct TrainingLiveActivityWidget: Widget {
           VStack(alignment: .leading, spacing: 6) {
             ProgressView(value: Double(context.state.doneCount),
                          total: Double(max(context.state.totalCount, 1)))
+              .tint(trainingAccent(context.attributes))
             if let exercise = activeExerciseName(context.state) {
               Text(exercise)
                 .font(.caption)
@@ -134,6 +135,7 @@ private struct TrainingLockScreenView: View {
 
       ProgressView(value: Double(context.state.doneCount),
                    total: Double(max(context.state.totalCount, 1)))
+        .tint(trainingAccent(context.attributes))
 
       HStack(spacing: 18) {
         metric(progressText(context.state), "done")
@@ -162,6 +164,12 @@ private func activeExerciseName(_ state: TrainingActivityAttributes.ContentState
 
 private func progressText(_ state: TrainingActivityAttributes.ContentState) -> String {
   "\(state.doneCount)/\(max(state.totalCount, 1))"
+}
+
+private func trainingAccent(_ attributes: TrainingActivityAttributes) -> Color {
+  AdaptiveColor.adaptive(attributes.accentToken)
+    ?? AdaptiveColor.adaptive("#f97316")
+    ?? .orange
 }
 
 private func sessionTimer(startedAt: Date, font: Font) -> some View {
