@@ -4,60 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1454,
+      "build": 1457,
       "date": "2026-07-13",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app",
-          "detail": "A dedicated, streamlined companion app for just your tasks that shares the same private data, on iPhone, iPad, Mac, and Watch",
+          "title": "Introducing Septask, a focused task app",
+          "detail": "A streamlined companion app for your tasks that shares the same private data as Septena, on iPhone, iPad, Mac, and Apple Watch.",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo of your meal",
-          "detail": "Capture a meal from a photo and let on-device analysis prefill the details",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a photo of your meal and Septena analyzes it on-device to prefill the name and macros.",
           "section": "nutrition"
         },
         {
           "title": "Attach files and share into tasks",
-          "detail": "Add attachments to tasks and send text, links, and files straight into Septena from other apps",
+          "detail": "Add attachments to any task and send links, text, or files straight to Septena from the share sheet.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view with undo and a 30-day auto-purge, so nothing vanishes by accident",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore anything by mistake.",
           "section": "tasks"
         },
         {
           "title": "Your calendar in Today and Upcoming",
-          "detail": "Weave system calendar events alongside your tasks, with hidden-calendar choices synced across devices",
+          "detail": "Events from your system calendar now appear alongside tasks so your day reads in one place.",
           "section": "tasks"
         },
         {
-          "title": "Drag, multi-select, and file faster",
-          "detail": "Re-home tasks by dragging them onto Today groups, act on several at once, and get filing suggestions for loose captures",
-          "section": "tasks"
-        },
-        {
-          "title": "Pinned goals on your dashboard",
-          "detail": "Pin any goal to the week dashboard as a tile you can act on with a tap",
-          "section": "goals"
-        },
-        {
-          "title": "Sharper training reviews",
-          "detail": "See effort-weighted muscle volume and a weekly review after sessions, with one-tap progression hints and a rest timer that auto-advances",
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, an auto-advancing rest flow, and a live progress chart.",
           "section": "training"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "Graded analytics levels let you pick exactly what telemetry is sent, with a log of what went out",
-          "section": null
+          "title": "Organize with headings, drag, and Things import",
+          "detail": "Group tasks under project headings, drag them onto Today to reschedule, and import an existing Things database.",
+          "section": "tasks"
         },
         {
-          "title": "A redesigned date picker",
-          "detail": "Quick-pick pills and a calendar popover make scheduling a task quicker",
-          "section": "tasks"
+          "title": "Pin goals to your dashboard",
+          "detail": "Pin any measurable goal to the week dashboard and log habit-backed goals with a tap on the tile.",
+          "section": "goals"
         }
       ]
     },
