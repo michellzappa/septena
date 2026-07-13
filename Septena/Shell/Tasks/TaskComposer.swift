@@ -45,6 +45,10 @@ struct TaskComposerCard: View {
   let projects: [Project]
   let accent: Color
   let presentation: Presentation
+  /// The inline host already inserted this edit-mode task as a local-only
+  /// placeholder for row identity. Intent remains CREATE; this storage detail
+  /// must not enable edit-only behavior or disable create-only behavior.
+  let deferredCreate: Bool
   /// Inline collapse hook — how the form asks its host row to fold shut (Return
   /// to save, etc.). The scaffold/`.adaptiveDetail` owns closing in `.drawer`.
   let onClose: (() -> Void)?
@@ -123,7 +127,8 @@ struct TaskComposerCard: View {
   @State private var discussKickoffVisible = false
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
-       presentation: Presentation = .drawer, onClose: (() -> Void)? = nil,
+       presentation: Presentation = .drawer, deferredCreate: Bool = false,
+       onClose: (() -> Void)? = nil,
        onToggleComplete: (() -> Void)? = nil,
        titleMatchID: String? = nil, checkboxMatchID: String? = nil,
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
@@ -135,6 +140,7 @@ struct TaskComposerCard: View {
     self.projects = projects
     self.accent = accent
     self.presentation = presentation
+    self.deferredCreate = deferredCreate
     self.onClose = onClose
     self.onToggleComplete = onToggleComplete
     self.titleMatchID = titleMatchID
@@ -152,12 +158,18 @@ struct TaskComposerCard: View {
   }
 
   private var isEditing: Bool {
-    if case .edit = mode { return true }
+    if !deferredCreate, case .edit = mode { return true }
+    return false
+  }
+
+  private var isCreating: Bool {
+    if deferredCreate { return true }
+    if case .create = mode { return true }
     return false
   }
 
   private var editingTask: SeptenaTask? {
-    if case .edit(let task) = mode { return task }
+    if isEditing, case .edit(let task) = mode { return task }
     return nil
   }
 
@@ -298,7 +310,7 @@ struct TaskComposerCard: View {
 
         // Edit mode only — a not-yet-created task has no id/conversation.
         // docs/TASK_CONVERSATIONS_PHASE1.md.
-        if case .edit(let task) = mode {
+        if let task = editingTask {
           ConversationSection(task: task, accent: accent)
         }
       }
@@ -334,7 +346,7 @@ struct TaskComposerCard: View {
       // plain field, no boxed background — so the expanded row reads as the same
       // line you clicked, now editable, instead of a heavy input card.
       HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
-        if case .edit(let task) = mode, let onToggleComplete {
+        if let task = editingTask, let onToggleComplete {
           // Derived from the SAME `TaskCheckboxModel` the closed row uses, so the
           // box is identical in view and edit modes (tint, Today gating, proposal
           // dashing, tenure dial, unread-context dot — all shared, never re-rolled).
@@ -412,7 +424,7 @@ struct TaskComposerCard: View {
       suggestedList = nil
       return
     }
-    guard case .create = mode else { return }
+    guard isCreating else { return }
     if draft.projectId != nil || draft.areaId != nil {
       suggestedList = nil
     } else {
@@ -426,7 +438,7 @@ struct TaskComposerCard: View {
   /// limited to ones whose field isn't already set. Create-mode only — parsing
   /// an existing title on edit would surface noise.
   private var detectedTokens: [DetectedToken] {
-    guard case .create = mode else { return [] }
+    guard isCreating else { return [] }
     return TaskTitleParser.detect(in: draft.title, projects: projects, areas: areas)
       .filter(isUnset)
   }
@@ -564,6 +576,12 @@ struct TaskComposerCard: View {
       // Tapping the title focuses it and the system promotes the sheet then.
       // In the iPad/macOS inspector there's no detent to protect, so keep the
       // keyboard-driven "open row with Return, edit immediately" focus.
+      if deferredCreate, TaskRowFlags.filingSuggestionsEnabled {
+        SuggestionEngine.shared.prepare(
+          allTasks: LocalCache.trainingTasks(in: modelContext),
+          projects: projects, areas: areas
+        )
+      }
       if useInspector || presentation == .inline {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
       }
@@ -594,6 +612,15 @@ struct TaskComposerCard: View {
       draft.create(via: mutator)
       AddInfoSection.tasks.notifyTilesChanged()
     case .edit(let task):
+      if deferredCreate {
+        // Same create pipeline as the drawer, except the inline host already
+        // inserted a push-deferred entity for layout identity. Updating its
+        // title releases the first CloudKit push.
+        for token in detectedTokens where isUnset(token) { applyToken(token) }
+        draft.update(task, via: mutator)
+        AddInfoSection.tasks.notifyTilesChanged()
+        return
+      }
       // Ratify (acknowledge → leave the Inbox) only when this save actually
       // (re)placed the task — gave it a project/area, a date, or a Today pin
       // (the same fields that take a row out of the triage band). A bare title /
@@ -652,6 +679,7 @@ struct TaskComposerCard: View {
   private var focusOrder: [TaskEditFocus] {
     var order: [TaskEditFocus] = [.title, .notes]
     order += TaskAttributeBar.Attribute.draftCases.map { .pill($0) }
+    if isEditing { order.append(.pill(.attachments)) }
     if discussKickoffVisible {
       order.append(.pill(.discuss))
     }
@@ -1205,7 +1233,7 @@ struct TaskAttributeBar: View {
   enum Attribute: Identifiable {
     // Notes is NOT a pill — it's an always-editable field above the rail (see
     // `TaskComposerCard.notesField`).
-    case when, deadline, repeatRule, list
+    case when, deadline, repeatRule, list, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
@@ -1219,6 +1247,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "flag"
       case .repeatRule: "repeat"
       case .list:       "folder"
+      case .attachments:"paperclip"
       case .discuss:    "bubble.left.and.bubble.right"
       }
     }
@@ -1228,6 +1257,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "Deadline"
       case .repeatRule: "Repeat"
       case .list:       "List"
+      case .attachments:"Attachments"
       case .discuss:    "Discuss"
       }
     }
@@ -1273,6 +1303,16 @@ struct TaskAttributeBar: View {
                         accent: accent, neutral: neutral) { select(attr) }
             .focused($focus, equals: .pill(attr))
         }
+        if let task = discussTask {
+          let count = SeptenaServices.shared.taskAttachmentStore.attachments(taskID: task.id).count
+          AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
+                        value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
+                        isSet: count > 0, isActive: expanded == .attachments,
+                        isFocused: focus == .pill(.attachments), accent: accent, neutral: neutral) {
+            select(.attachments)
+          }
+          .focused($focus, equals: .pill(.attachments))
+        }
         if showsDiscuss {
           AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
                         value: discussWorking ? "Thinking…" : nil,
@@ -1316,6 +1356,7 @@ struct TaskAttributeBar: View {
   private func value(for attr: Attribute) -> String? {
     switch attr {
     case .discuss: return nil
+    case .attachments: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
     case .when:
@@ -1336,6 +1377,7 @@ struct TaskAttributeBar: View {
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
     case .discuss:    discussWorking
+    case .attachments: discussTask.map { !SeptenaServices.shared.taskAttachmentStore.attachments(taskID: $0.id).isEmpty } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
     case .repeatRule: draft.recurrence != nil
@@ -1353,6 +1395,8 @@ struct TaskAttributeBar: View {
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent) {
         withAnimation(.snappy(duration: 0.22)) { expanded = nil }
       }
+      case .attachments:
+        if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
       case .discuss, .list, .none: EmptyView()
       }
     }

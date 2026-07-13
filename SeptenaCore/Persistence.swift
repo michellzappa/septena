@@ -3466,7 +3466,7 @@ final class LocalStore {
   let container: ModelContainer
 
   private init() {
-    let schema = Schema([TaskEntity.self, ProjectEntity.self, AreaEntity.self,
+    let schema = Schema([TaskEntity.self, TaskAttachmentEntity.self, ProjectEntity.self, AreaEntity.self,
                          SettingsEntity.self, SectionEntity.self,
                          HabitDefinitionEntity.self, HabitDayStateEntity.self,
                          SupplementDefinitionEntity.self, SupplementDayStateEntity.self,

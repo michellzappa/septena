@@ -1767,6 +1767,9 @@
     "Attach…" : {
 
     },
+    "Attachments are private, synced through iCloud, and included in Everything and Tasks exports." : {
+
+    },
     "auto-refresh in %@" : {
       "localizations" : {
         "pt-BR" : {
@@ -7286,6 +7289,9 @@
           }
         }
       }
+    },
+    "Storage" : {
+
     },
     "Strained" : {
       "localizations" : {

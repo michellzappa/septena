@@ -55,6 +55,18 @@ struct AddTaskPage: View {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// Quick capture deliberately has less UI than the full editor, but it must
+  /// derive defaults and persist through the exact same draft contract.
+  private var taskFilter: TaskFilter {
+    switch bucket {
+    case .inbox:           return .triage
+    case .today:           return .today
+    case .upcoming:        return .upcoming
+    case .area(let id):    return .area(id)
+    case .project(let id): return .project(id)
+    }
+  }
+
   var body: some View {
     let tint = AddInfoSection.tasks.accent(theme: theme)
     List {
@@ -111,22 +123,9 @@ struct AddTaskPage: View {
 
   private func commit(title: String) {
     guard !working else { return }
-    let scheduled: Date? = {
-      if case .upcoming = bucket {
-        return Calendar.current.date(byAdding: .day, value: 1, to: .now)
-      }
-      return nil
-    }()
-    let today: Bool = { if case .today = bucket { return true }; return false }()
-    let area: String? = { if case .area(let id) = bucket { return id }; return nil }()
-    let project: String? = { if case .project(let id) = bucket { return id }; return nil }()
-    mutator.create(
-      title: title,
-      area: area,
-      project: project,
-      scheduled: scheduled,
-      today: today
-    )
+    var draft = TaskDraft(filter: taskFilter)
+    draft.title = title
+    draft.create(via: mutator)
     AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()
     dismiss()

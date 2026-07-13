@@ -114,6 +114,13 @@ actor CloudKitRecordRegistry {
   }
 
   private static func makeHandlers() -> [Handler] {
+    let taskAttachment = entityHandler(
+      recordType: TaskAttachmentCloudKitSchema.recordType, impact: .tasks,
+      matchesRecordName: { $0.hasPrefix(TaskAttachmentCloudKitSchema.prefix) },
+      entityID: TaskAttachmentCloudKitSchema.entityID,
+      lookup: { id, context in one(context, FetchDescriptor<TaskAttachmentEntity>(predicate: #Predicate { $0.id == id })) },
+      make: { TaskAttachmentEntity(cloudKit: $0) }, encode: { $0.toCloudKitRecord() }, merge: { $0.apply($1) }
+    )
     let task = entityHandler(
       recordType: TaskCloudKitSchema.recordType, impact: .tasks,
       matchesRecordName: { _ in true }, entityID: { $0 },
@@ -333,6 +340,6 @@ actor CloudKitRecordRegistry {
             gut, mood, symptomsDefinition, symptomsEvent, medicationDefinition, medicationDose,
             oura, quote, withings, intakeKind, intakeItem, intakeEvent,
             groceryItem, groceryCategory, exerciseEntry, exerciseDefinition, sessionType,
-            nutritionEntry, nutritionDay, activityDay, task]
+            nutritionEntry, nutritionDay, activityDay, taskAttachment, task]
   }
 }

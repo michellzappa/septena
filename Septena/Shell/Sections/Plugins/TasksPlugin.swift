@@ -34,6 +34,12 @@ enum TasksPlugin: SectionPlugin {
           .opt("recurrenceInterval", "int"),
           .opt("recurrenceAfterCompletion", "bool"),
         ]),
+        SchemaTable(name: "task_attachment", purpose: "a file copied into and owned by a task", fields: [
+          .req("id", "string"), .req("taskID", "string"),
+          .req("filename", "string"), .req("contentType", "string"),
+          .req("byteCount", "int"), .req("createdAt", "timestamp"),
+          .req("dataBase64", "string", "the complete file contents encoded as base64"),
+        ]),
         SchemaTable(name: "project", purpose: "a project grouping tasks", fields: [
           .req("id", "string"), .req("title", "string"),
           .opt("status", "string", "active | completed | cancelled"),
@@ -51,10 +57,12 @@ enum TasksPlugin: SectionPlugin {
         // them as tasks (see `TaskEntity.isHeading`).
         let tasks    = try ctx.fetch(FetchDescriptor<TaskEntity>())
                           .filter { !$0.isHeading }
+        let attachments = try ctx.fetch(FetchDescriptor<TaskAttachmentEntity>())
         let projects = try ctx.fetch(FetchDescriptor<ProjectEntity>())
         let areas    = try ctx.fetch(FetchDescriptor<AreaEntity>())
         return [
           "task":    tasks.map(taskExportDict),
+          "task_attachment": attachments.compactMap(taskAttachmentExportDict),
           "project": projects.map(projectExportDict),
           "area":    areas.map(areaExportDict),
         ]
@@ -80,6 +88,16 @@ enum TasksPlugin: SectionPlugin {
     // Brief relocated to Shell/Tasks/TasksSkill.swift (shared with Septask).
     TasksSkill.skill
   }
+}
+
+@MainActor func taskAttachmentExportDict(_ e: TaskAttachmentEntity) -> [String: Any]? {
+  guard let url = TaskAttachmentFiles.url(for: e), let data = try? Data(contentsOf: url) else { return nil }
+  return compact([
+    "id": e.id, "taskID": e.taskID, "filename": e.filename,
+    "contentType": e.contentType, "byteCount": e.byteCount,
+    "createdAt": ISO8601DateFormatter().string(from: e.createdAt),
+    "position": e.position, "dataBase64": data.base64EncodedString(),
+  ])
 }
 
 // Thin full-app adapter: the actual rows live in Shell/Tasks/
