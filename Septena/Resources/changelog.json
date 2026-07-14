@@ -4,50 +4,60 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1457,
-      "date": "2026-07-13",
+      "build": 1459,
+      "date": "2026-07-14",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Introducing Septask, a focused task app",
-          "detail": "A streamlined companion app for your tasks that shares the same private data as Septena, on iPhone, iPad, Mac, and Apple Watch.",
+          "title": "Septask, a focused app just for tasks",
+          "detail": "A separate app on iPhone, iPad, Mac and Watch that opens straight into your tasks, using the same private data as Septena.",
+          "section": "tasks"
+        },
+        {
+          "title": "Tasks got a full working-over",
+          "detail": "Inline editing and quick-add, project headings, drag to re-home, multi-select bulk actions, attachments, a redesigned date picker, Recently Deleted with 30-day restore, and Things import.",
+          "section": "tasks"
+        },
+        {
+          "title": "Keyboard and pointer navigation everywhere",
+          "detail": "Native selection, arrow-key traversal and standard shortcuts across task lists, the sidebar and the Next feed, plus hover effects on iPad and Mac.",
           "section": "tasks"
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a photo of your meal and Septena analyzes it on-device to prefill the name and macros.",
+          "detail": "Snap a meal and Septena reads it on-device to prefill the details, with an optional ingredient breakdown and percentage scaling when you re-log.",
           "section": "nutrition"
         },
         {
-          "title": "Attach files and share into tasks",
-          "detail": "Add attachments to any task and send links, text, or files straight to Septena from the share sheet.",
+          "title": "Your calendar shows up in Today",
+          "detail": "Events weave into Today and Upcoming, with hidden-calendar choices syncing across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore anything by mistake.",
-          "section": "tasks"
+          "title": "Pinned goals live on the dashboard",
+          "detail": "Pin any measurable goal to the week dashboard and tap the tile to log habit-backed goals directly.",
+          "section": "goals"
         },
         {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "Events from your system calendar now appear alongside tasks so your day reads in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, an auto-advancing rest flow, and a live progress chart.",
+          "title": "Training rebuilt around effort",
+          "detail": "Effort-weighted muscle volume with a weekly review after each session, one-tap progression hints, auto-advance between sets, and a live activity on the wrist.",
           "section": "training"
         },
         {
-          "title": "Organize with headings, drag, and Things import",
-          "detail": "Group tasks under project headings, drag them onto Today to reschedule, and import an existing Things database.",
-          "section": "tasks"
+          "title": "A calmer, clearer home",
+          "detail": "The day dial sits under a real sky wash that tracks the time of day, tiles share their rendering with new home-screen widgets, and section color is reserved for meaning.",
+          "section": null
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Pin any measurable goal to the week dashboard and log habit-backed goals with a tap on the tile.",
-          "section": "goals"
+          "title": "The watch does more on its own",
+          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers, intake summary tiles you can tap to log, and complications that stay right through midnight and mid-fast.",
+          "section": null
+        },
+        {
+          "title": "You can see exactly what telemetry leaves",
+          "detail": "Analytics is now a graded ladder from off to full, with a checklist of what is sent and a log of what recently went out.",
+          "section": null
         }
       ]
     },
