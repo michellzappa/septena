@@ -125,6 +125,12 @@ struct TaskComposerCard: View {
   @State private var suggestedList: SuggestionEngine.Suggestion?
   /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
   @State private var discussKickoffVisible = false
+  /// Inline-only: the title column width for wrap detection and whether the
+  /// draft title currently needs a second line. A vertical-axis `TextField`
+  /// with `lineLimit(1...2)` reserves two lines even when empty — so inline
+  /// create/edit stays single-line until the title actually wraps.
+  @State private var inlineTitleColumnWidth: CGFloat = 0
+  @State private var inlineTitleWraps = false
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -238,6 +244,7 @@ struct TaskComposerCard: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
         }
+        refreshInlineTitleWrap()
         updateSuggestion()
       }
   }
@@ -356,7 +363,7 @@ struct TaskComposerCard: View {
       // Mirror the static row: a baseline-aligned checkbox + the title as a
       // plain field, no boxed background — so the expanded row reads as the same
       // line you clicked, now editable, instead of a heavy input card.
-      HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
+      HStack(alignment: .rowTitleCenter, spacing: Theme.iconTextGap) {
         Group {
           if let task = editingTask, let onToggleComplete {
             // Derived from the SAME `TaskCheckboxModel` the closed row uses, so the
@@ -377,11 +384,16 @@ struct TaskComposerCard: View {
           }
         }
         .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
-        .alignmentGuide(.firstTextBaseline) { d in d[VerticalAlignment.center] + 5 }
+        .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         VStack(alignment: .leading, spacing: 4) {
           titleField
+            .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { _, width in
+          inlineTitleColumnWidth = width
+          refreshInlineTitleWrap()
+        }
         .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       }
     } else {
@@ -394,25 +406,42 @@ struct TaskComposerCard: View {
     }
   }
 
+  @ViewBuilder
   private var titleField: some View {
-    // Start at the closed row's one-line rhythm, then grow only when the title
-    // actually wraps. Two lines matches the read-only row without letting a
-    // long title take over the composer.
-    TextField("", text: $draft.title, axis: .vertical)
-      .textFieldStyle(.plain)
-      .font(.septenaTaskTitle)
-      .focused($focus, equals: .title)
-      .lineLimit(1...2)
-      // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
-      // newline-as-save trick never triggers there) — commit here instead.
-      .onSubmit { if draft.canSave { commit() } }
-      // The field would otherwise swallow Tab, so carry the same focus-cycling
-      // handler here too.
-      .onKeyPress(keys: [.tab]) { press in
-        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+    // Inline: a vertical-axis field reserves blank space for its max line count
+    // even when empty, so stay single-line until the title actually wraps.
+    // Drawer: no checkbox to align — grow freely from the start.
+    Group {
+      if presentation == .inline, !inlineTitleWraps {
+        TextField("", text: $draft.title)
+          .lineLimit(1)
+      } else {
+        TextField("", text: $draft.title, axis: .vertical)
+          .lineLimit(1...2)
       }
-      .septenaOnEscape(requestKeyboardCancel)
-      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
+    }
+    .textFieldStyle(.plain)
+    .font(.septenaTaskTitle)
+    .focused($focus, equals: .title)
+    // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
+    // newline-as-save trick never triggers there) — commit here instead.
+    .onSubmit { if draft.canSave { commit() } }
+    // The field would otherwise swallow Tab, so carry the same focus-cycling
+    // handler here too.
+    .onKeyPress(keys: [.tab]) { press in
+      moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
+    }
+    .septenaOnEscape(requestKeyboardCancel)
+    .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
+  }
+
+  /// Recompute whether the inline title needs a second line so the field can
+  /// switch between single-line and vertical-axis modes without reserving two
+  /// blank lines on an empty new task.
+  private func refreshInlineTitleWrap() {
+    guard presentation == .inline else { return }
+    inlineTitleWraps = TaskTitleMetrics.wraps(
+      text: draft.title, width: inlineTitleColumnWidth)
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
@@ -733,6 +762,29 @@ struct TaskComposerCard: View {
     default:
       return .ignored
     }
+  }
+}
+
+// MARK: - Inline title wrap metrics
+
+/// Width-aware single-line vs. wrapped detection for the inline composer title.
+/// Keeps new tasks at one line until the title actually needs two.
+private enum TaskTitleMetrics {
+  static func wraps(text: String, width: CGFloat) -> Bool {
+    guard !text.isEmpty, width > 0 else { return false }
+    #if os(macOS)
+    let font = NSFont.systemFont(ofSize: SeptenaTypeScale.size(.body))
+    let oneLine = font.ascender - font.descender + font.leading
+    #else
+    let font = UIFont.systemFont(ofSize: SeptenaTypeScale.size(.body))
+    let oneLine = font.lineHeight
+    #endif
+    let rect = (text as NSString).boundingRect(
+      with: CGSize(width: width, height: .greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin, .usesFontLeading],
+      attributes: [.font: font],
+      context: nil)
+    return rect.height > oneLine * 1.05
   }
 }
 
