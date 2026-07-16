@@ -173,6 +173,11 @@ final class CloudKitTasksBackend {
     let id = uniqueTaskID()
     let todayIso = SeptenaDate.today
     let effectiveArea = project != nil ? nil : area
+    // Trim at the write boundary so every caller (Siri dictation, MCP, Reminders
+    // import — none of which trim) is self-defending against stray whitespace.
+    // Trim-only, never reject empty: deferred inline-editor drafts are created
+    // with an empty title on purpose and get their real title on first update.
+    let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
     // An explicit position (synced) rather than relying on the createdAt
     // fallback. App/MCP captures default to the top; the Tasks foot quick-add
     // passes `atBottom` so inline captures land above the "New task" row.
@@ -181,7 +186,7 @@ final class CloudKitTasksBackend {
       : TaskOrder.topPosition(in: context)
     let entity = TaskEntity(
       id: id,
-      title: title,
+      title: trimmedTitle,
       statusRaw: TaskStatus.open.rawValue,
       created: todayIso,
       scheduled: SeptenaDate.format(scheduled),
@@ -206,7 +211,7 @@ final class CloudKitTasksBackend {
     // update() path when the user commits.
     if deferPush {
       do { try context.save() } catch { SeptenaLog.error("CK backend: context.save failed", error) }
-      SeptenaLog.info("[CK] create(deferred) id=\(id) title=\"\(title)\" — engine push held until first update")
+      SeptenaLog.info("[CK] create(deferred) id=\(id) title=\"\(trimmedTitle)\" — engine push held until first update")
       TaskChange.post(id)
     } else {
       commitAndPush(entity, op: "create")

@@ -104,8 +104,8 @@ struct TaskDraft: Equatable {
     // time you merely opened and closed the editor. Now a true no-op peek
     // writes nothing.
     let prior = TaskDraft(task: original)
-    if trimmedTitle != original.title || notes != (original.notes ?? "") {
-      mutator.update(id: id, title: trimmedTitle, notes: notes)
+    if trimmedTitle != original.title || trimmedNotes != (original.notes ?? "") {
+      mutator.update(id: id, title: trimmedTitle, notes: trimmedNotes)
     }
 
     if storedScheduled != prior.storedScheduled {
