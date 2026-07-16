@@ -253,6 +253,28 @@ final class TaskMutator {
     cloudBackend.setHeading(id: id, heading: heading)
   }
 
+  /// Clone a task into a brand-new one (new id) carrying the same fields —
+  /// area/project/heading placement, schedule, deadline, Today, notes, and
+  /// recurrence. The clone-field list lives HERE, beside `create`, so a new task
+  /// field can't be silently dropped by a duplicate path (heading membership was,
+  /// in two divergent view-layer copies of this).
+  @discardableResult
+  func duplicate(_ task: SeptenaTask, source: String = TaskSource.app) -> SeptenaTask {
+    let copy = create(
+      title: task.title,
+      area: task.area,
+      project: task.project,
+      scheduled: SeptenaDate.parse(task.scheduled),
+      deadline: SeptenaDate.parse(task.deadline),
+      today: task.today,
+      notes: task.notes,
+      source: source
+    )
+    if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
+    if let rule = task.recurrence { setRecurrence(id: copy.id, recurrence: rule) }
+    return copy
+  }
+
   func update(id: String, title: String? = nil, notes: String? = nil) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)
