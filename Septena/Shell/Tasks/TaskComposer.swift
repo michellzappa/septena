@@ -131,6 +131,12 @@ struct TaskComposerCard: View {
   /// create/edit stays single-line until the title actually wraps.
   @State private var inlineTitleColumnWidth: CGFloat = 0
   @State private var inlineTitleWraps = false
+  // The effective body point size for wrap measurement on iOS. `@ScaledMetric`
+  // tracks the ambient `dynamicTypeSize` — including the app's ±2 Text Size step,
+  // which is applied as an environment shift at the root — so the measurement
+  // font matches the size the title actually renders at. (macOS has no Dynamic
+  // Type; there the size comes from `SeptenaTypeScale` / `FontScale` instead.)
+  @ScaledMetric(relativeTo: .body) private var scaledTitleSize: CGFloat = 17
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -406,33 +412,32 @@ struct TaskComposerCard: View {
     }
   }
 
-  @ViewBuilder
   private var titleField: some View {
-    // Inline: a vertical-axis field reserves blank space for its max line count
-    // even when empty, so stay single-line until the title actually wraps.
-    // Drawer: no checkbox to align — grow freely from the start.
-    Group {
-      if presentation == .inline, !inlineTitleWraps {
-        TextField("", text: $draft.title)
-          .lineLimit(1)
-      } else {
-        TextField("", text: $draft.title, axis: .vertical)
-          .lineLimit(1...2)
+    // ONE field identity across the single-line ↔ wrapped transition: a
+    // vertical-axis `TextField` whose lineLimit *value* flips, never the view
+    // itself. (An earlier `if/else` swapped a plain field for a vertical-axis one
+    // at the wrap threshold, tearing down and rebuilding the focused field
+    // mid-keystroke — the Text↔TextField identity-swap trap that clobbers focus
+    // and cursor.) A range lineLimit reserves blank space for its MAX line count
+    // even when empty, so single-line mode caps at `1...1` to avoid a phantom
+    // second line on a new task; it opens to `1...2` only once the text wraps.
+    // Drawer: no checkbox to align against, so it may grow to two lines freely.
+    let singleLine = presentation == .inline && !inlineTitleWraps
+    return TextField("", text: $draft.title, axis: .vertical)
+      .lineLimit(singleLine ? 1...1 : 1...2)
+      .textFieldStyle(.plain)
+      .font(.septenaTaskTitle)
+      .focused($focus, equals: .title)
+      // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
+      // newline-as-save trick never triggers there) — commit here instead.
+      .onSubmit { if draft.canSave { commit() } }
+      // The field would otherwise swallow Tab, so carry the same focus-cycling
+      // handler here too.
+      .onKeyPress(keys: [.tab]) { press in
+        moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
-    }
-    .textFieldStyle(.plain)
-    .font(.septenaTaskTitle)
-    .focused($focus, equals: .title)
-    // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
-    // newline-as-save trick never triggers there) — commit here instead.
-    .onSubmit { if draft.canSave { commit() } }
-    // The field would otherwise swallow Tab, so carry the same focus-cycling
-    // handler here too.
-    .onKeyPress(keys: [.tab]) { press in
-      moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
-    }
-    .septenaOnEscape(requestKeyboardCancel)
-    .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
+      .septenaOnEscape(requestKeyboardCancel)
+      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
   }
 
   /// Recompute whether the inline title needs a second line so the field can
@@ -440,8 +445,15 @@ struct TaskComposerCard: View {
   /// blank lines on an empty new task.
   private func refreshInlineTitleWrap() {
     guard presentation == .inline else { return }
+    #if os(macOS)
+    // No Dynamic Type on macOS — the title renders at the FontScale-scaled body
+    // size, so measure with the same.
+    let bodySize = SeptenaTypeScale.size(.body)
+    #else
+    let bodySize = scaledTitleSize
+    #endif
     inlineTitleWraps = TaskTitleMetrics.wraps(
-      text: draft.title, width: inlineTitleColumnWidth)
+      text: draft.title, width: inlineTitleColumnWidth, bodyPointSize: bodySize)
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
@@ -770,13 +782,16 @@ struct TaskComposerCard: View {
 /// Width-aware single-line vs. wrapped detection for the inline composer title.
 /// Keeps new tasks at one line until the title actually needs two.
 private enum TaskTitleMetrics {
-  static func wraps(text: String, width: CGFloat) -> Bool {
+  /// `bodyPointSize` is the effective rendered size of `.septenaTaskTitle` on the
+  /// caller's platform (Dynamic-Type-scaled on iOS, FontScale-scaled on macOS),
+  /// so the measurement font matches what the field draws at any Text Size step.
+  static func wraps(text: String, width: CGFloat, bodyPointSize: CGFloat) -> Bool {
     guard !text.isEmpty, width > 0 else { return false }
     #if os(macOS)
-    let font = NSFont.systemFont(ofSize: SeptenaTypeScale.size(.body))
+    let font = NSFont.systemFont(ofSize: bodyPointSize)
     let oneLine = font.ascender - font.descender + font.leading
     #else
-    let font = UIFont.systemFont(ofSize: SeptenaTypeScale.size(.body))
+    let font = UIFont.systemFont(ofSize: bodyPointSize)
     let oneLine = font.lineHeight
     #endif
     let rect = (text as NSString).boundingRect(

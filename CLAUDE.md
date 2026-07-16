@@ -254,19 +254,38 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   tap-gesture selection — it suppresses native keyboard nav and the List's
   click-to-focus); `@FocusState`+`.focused()` to claim detail focus; **modifier
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
-  complete = `⌘K`); double-click / right-click for mouse. Do NOT bind unmodified
-  Space/Return, and do NOT bring back the `NSEvent` monitors or hidden shortcut
-  buttons that were tried for this and removed.
-- **No inline `TextField` swapped into a *selectable* macOS `List` row.**
+  complete = `⌘K`, move = `⌘⇧M`); double-click / right-click for mouse. Do NOT
+  bind unmodified Space/Return. The shared shortcut map is `TaskRowShortcuts` in
+  `Septena/Shell/Tasks/TaskCommands.swift` — avoid system-reserved equivalents
+  there (bare `⌘M` = Minimize, bare `⌘.` = Cancel; both carry a `⇧`).
+  **Two sanctioned exceptions on the task surfaces** (both deliberate,
+  documented, and NOT to be "fixed" back to the naive form):
+  1. The deep task lists do NOT use native `List` — they use
+     `SelectableScrollList` (`Septena/Shell/UI/SelectableScrollList.swift`), a
+     `ScrollView`/`LazyVStack` that re-earns native selection + arrow-nav
+     (reusing the canonical selection token, reclaiming focus on release, never
+     binding Space) *because* it can host inline-editable content that a native
+     `List` can't. Native-`List` surfaces (sidebar, Next) keep the pure-native
+     path via `ListKeyboardNavigation`. So "never hand-rolled tap-gesture
+     selection" holds for native `List`; `SelectableScrollList` is the vetted
+     container when a surface needs both selection AND inline editing.
+  2. On iPad, row-level shortcuts ARE published via **gated hidden zero-frame
+     buttons** (`rowCommandShortcutsEnabled`), the one place the "no hidden
+     shortcut buttons" rule is intentionally inverted — because publishing
+     `.focusedSceneValue(\.taskActions)` from a split-view detail SIGKILLs iPad
+     (so those publishers stay `#if os(macOS)`).
+  Otherwise the ban stands: no `NSEvent` monitors, no ungated hidden buttons.
+- **No inline `TextField` swapped into a *selectable* native `List` row.**
   Replacing a row's `Text` with a focusable `TextField` (then removing it) on
-  edit corrupts the `List`'s focus/selection on macOS — after the edit ends,
+  edit corrupts a native `List`'s focus/selection on macOS — after the edit ends,
   clicks stop selecting, ↑/↓ die, and the field's selected text lingers. Every
   focus workaround just moves the breakage (claim focus → dead clicks; don't →
-  orphaned focus after edit). So on macOS, **rename a task in the composer**
-  (a separate inspector where the field behaves), leaving the `List` pure-native.
+  orphaned focus after edit). So on macOS, **task title editing happens in the
+  composer** — expand-in-place inline (in `SelectableScrollList`, which tolerates
+  the field) or the drawer inspector — never a raw `Text`→`TextField` swap in a
+  row, and native-`List` surfaces (sidebar) rename via an alert/the composer.
   Inline-edit-in-row is fine on iOS (no split-view focus war) and fine for a
-  *non-selectable* dedicated row (the quick-add line), just not for a selectable
-  row's in-place rename.
+  *non-selectable* dedicated row (the quick-add line).
 
 ## Where truth lives (priority order)
 
