@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1461,
+      "build": 1469,
       "date": "2026-07-16",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Septask, a focused app just for tasks",
-          "detail": "A separate app for iPhone, iPad, Mac and Apple Watch that opens straight onto your tasks, using the same private data as Septena.",
+          "detail": "A second app over the same private task data, with its own iPhone tab bar, Mac window, watch complication, settings, and Home Screen quick actions.",
           "section": "tasks"
         },
         {
-          "title": "Tasks got a serious workover",
-          "detail": "Edit titles inline, add attachments and markdown notes, drag tasks onto Today, select several at once for bulk actions, group project work under headings, and undo a delete for longer.",
+          "title": "Tasks got a full workover",
+          "detail": "Inline editing, multi-select bulk actions, project headings, task attachments, drag onto Today, a redesigned date picker, undo toasts, Recently Deleted with 30-day purge, and Things import.",
           "section": "tasks"
         },
         {
-          "title": "Keyboard and pointer navigation everywhere",
-          "detail": "Arrow keys, ⌘K to complete, Quick Find, and hover highlights work consistently across Mac and iPad task lists.",
+          "title": "Keyboard and pointer navigation that behaves",
+          "detail": "Native selection, arrow-key traversal, Quick Find, and consistent shortcuts across the Tasks sidebar, lists, and the Next feed on iPad and Mac.",
           "section": "tasks"
         },
         {
-          "title": "Photograph a meal and let the app fill in the details",
-          "detail": "On-device analysis reads the photo and prefills blank fields, with an optional ingredient breakdown and re-logging scaled by portion.",
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and let on-device analysis prefill the fields, with optional ingredient breakdowns and percentage scaling when you re-log.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions guide themselves",
-          "detail": "Auto-advance replaces the rest timer, a Live Activity follows along on the wrist, and a weekly muscle review lands after each session.",
+          "title": "Training sessions that flow",
+          "detail": "Auto-advance replaces the rest timer, a watch Live Activity rides along in the Smart Stack, and per-exercise menus, progression hints, and effort-weighted muscle volume land in the progress chart.",
           "section": "training"
         },
         {
-          "title": "The watch feed feels like a real app",
-          "detail": "A vertically paged Next feed sits over the current sky, with long-press action drawers, quick-add for intake, and complications that stay fresh across midnight.",
+          "title": "A calmer, more coherent look",
+          "detail": "A monochrome app accent that reserves color for sections, a live sky wash behind the day dial, grouped card lists, and unified page chrome across every platform.",
           "section": null
         },
         {
-          "title": "The dashboard reflects the actual time of day",
-          "detail": "The day dial rolls on a sky wash matched to the sun, and pinned goals now appear as tiles you can act on directly.",
+          "title": "Pinned goals on the dashboard",
+          "detail": "Pin a goal to the week dashboard as a tile, then tap to toggle habit-backed goals or reach its contextual actions.",
           "section": "goals"
         },
         {
-          "title": "Clearer control over what leaves your device",
-          "detail": "Telemetry now has graded levels with a plain list of what gets sent, a recently-sent log, and a full opt-out.",
+          "title": "Privacy you can inspect",
+          "detail": "Graded telemetry levels from off to full, a checklist of exactly what gets sent, and a log of what was recently sent.",
           "section": null
         }
       ]
