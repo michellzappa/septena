@@ -1377,7 +1377,9 @@ struct SidebarProjectRow: View {
   let name: String
   /// Fraction of tasks done (0...1). 0 → empty ring, 1 → filled disc.
   var progress: Double = 0
-  var tint: Color = Theme.iconMuted
+  // Keep the project completion glyph consistent with the rest of the
+  // project/area UI (group headers, area rows, project detail).
+  var tint: Color = Theme.inkSecondary
   /// Open task count — muted gray, right-aligned alongside the pie.
   var count: Int = 0
 
