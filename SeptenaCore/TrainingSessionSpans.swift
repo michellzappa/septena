@@ -12,7 +12,8 @@ enum TrainingSessionSpans {
   /// One exercise row's contribution to a session span.
   struct Entry: Sendable, Hashable {
     let date: String           // YYYY-MM-DD
-    let concludedAt: String?   // local ISO8601 "YYYY-MM-DDTHH:MM:SS"
+    let concludedAt: String?   // local ISO8601 session start
+    let endedAt: String?       // local ISO8601 session end (concluding entry)
     let loggedAt: String?      // UTC ISO8601 "…Z"
     let durationMin: Double?
     /// Fallback start when `concludedAt` is absent (pre-migration / manual rows).
@@ -20,11 +21,13 @@ enum TrainingSessionSpans {
 
     init(date: String,
          concludedAt: String? = nil,
+         endedAt: String? = nil,
          loggedAt: String? = nil,
          durationMin: Double? = nil,
          occurredAt: Date? = nil) {
       self.date = date
       self.concludedAt = concludedAt
+      self.endedAt = endedAt
       self.loggedAt = loggedAt
       self.durationMin = durationMin
       self.occurredAt = occurredAt
@@ -52,7 +55,11 @@ enum TrainingSessionSpans {
     let cardioEnd = (entry.durationMin ?? 0) > 0
       ? startH + (entry.durationMin ?? 0) / 60
       : startH
-    let end = max(startH, cardioEnd, loggedH ?? startH)
+    var end = max(startH, cardioEnd, loggedH ?? startH)
+    if let ended = entry.endedAt, ended.count >= 16,
+       let endedH = parseHHMM(String(ended.dropFirst(11).prefix(5))) {
+      end = max(end, endedH)
+    }
     return Span(startHour: startH, endHour: end)
   }
 

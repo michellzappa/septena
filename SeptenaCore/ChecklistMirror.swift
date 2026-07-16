@@ -890,6 +890,7 @@ enum ChecklistMirror {
       entity.distanceM = row.distanceM
       entity.level = row.level
       entity.concludedAt = row.concludedAt
+      entity.endedAt = row.endedAt
       entity.loggedAt = row.loggedAt
       entity.occurredAt = EventTimestamp.from(date: row.date, time: Self.deriveTime(from: row.concludedAt))
       entity.updatedAt = .now
@@ -1188,6 +1189,7 @@ enum ChecklistMirror {
                   level: e.level,
                   file: e.id,
                   concludedAt: e.concludedAt,
+                  endedAt: e.endedAt,
                   loggedAt: e.loggedAt,
                   note: e.note)
   }

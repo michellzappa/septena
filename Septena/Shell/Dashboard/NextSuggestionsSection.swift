@@ -528,10 +528,11 @@ final class NextSuggestionsModel {
         training
           .filter { $0.date < today }
           .compactMap { entry -> Int? in
-            guard let ended = entry.concludedAt else { return nil }
-            // concludedAt is an ISO timestamp; the HH:MM substring sits at offset 11..16
-            guard ended.count >= 16 else { return nil }
-            let hhmm = String(ended.dropFirst(11).prefix(5))
+            // Prefer session end when logged; fall back to start (`concludedAt`).
+            let stamp = entry.endedAt ?? entry.concludedAt
+            guard let stamp else { return nil }
+            guard stamp.count >= 16 else { return nil }
+            let hhmm = String(stamp.dropFirst(11).prefix(5))
             return NextScoring.parseHHMM(hhmm)
           }
       )

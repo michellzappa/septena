@@ -662,7 +662,8 @@ enum MCPToolCatalog {
       "distanceM": ["type": "number", "description": "Distance in meters."],
       "level": ["type": "number", "description": "Machine resistance / incline level."],
       "note": ["type": "string"],
-      "concludedAt": ["type": "string", "description": "ISO8601 timestamp when the set/session finished."],
+      "concludedAt": ["type": "string", "description": "ISO8601 local wall-clock session start (YYYY-MM-DDTHH:mm:ss)."],
+      "endedAt": ["type": "string", "description": "ISO8601 local wall-clock session end (YYYY-MM-DDTHH:mm:ss); concluding entry only."],
     ]
   }
 

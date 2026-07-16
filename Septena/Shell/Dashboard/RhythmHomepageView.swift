@@ -285,6 +285,7 @@ enum RhythmData {
       r.training = rows.map {
         TrainingRow(date: $0.date,
                     concludedAt: $0.concludedAt,
+                    endedAt: $0.endedAt,
                     loggedAt: $0.loggedAt,
                     durationMin: $0.durationMin,
                     occurredAt: $0.occurredAt)

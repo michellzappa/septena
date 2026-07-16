@@ -757,6 +757,27 @@ enum EventTimestamp {
     f.dateFormat = "HH:mm"
     return f.string(from: instant)
   }
+
+  /// Local wall-clock ISO8601 without zone suffix — matches `concludedAt` /
+  /// `endedAt` on exercise entries (`YYYY-MM-DDTHH:mm:ss`).
+  static func localISO(from instant: Date) -> String {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .iso8601)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    return f.string(from: instant)
+  }
+
+  /// Parse a local ISO stamp written by `localISO(from:)`.
+  static func fromLocalISO(_ stamp: String) -> Date? {
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .iso8601)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    return f.date(from: stamp)
+  }
 }
 
 /// Event entities whose `occurredAt` can be repaired from their `date` string.

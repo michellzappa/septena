@@ -185,6 +185,7 @@ struct EditExerciseEntrySheet: View {
       level: isCardio ? parseInt(level).map(Double.init) : nil,
       file: id,
       concludedAt: original.concludedAt,
+      endedAt: original.endedAt,
       loggedAt: original.loggedAt
     )
     onSave(updated)

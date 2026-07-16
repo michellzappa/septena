@@ -22,6 +22,16 @@ import Foundation
     #expect(span?.endHour == 7)
   }
 
+  @Test func strengthSpanUsesEndedAtWhenPresent() {
+    let span = TrainingSessionSpans.entrySpan(.init(
+      date: "2026-06-15",
+      concludedAt: "2026-06-15T07:00:00",
+      endedAt: "2026-06-15T08:30:00"
+    ))
+    #expect(span?.startHour == 7)
+    #expect(span?.endHour == 8.5)
+  }
+
   @Test func mergeJoinsNearAdjacentSpans() {
     let a = TrainingSessionSpans.Span(startHour: 7, endHour: 8)
     let b = TrainingSessionSpans.Span(startHour: 8.5, endHour: 9)

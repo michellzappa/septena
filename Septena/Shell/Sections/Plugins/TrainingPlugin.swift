@@ -45,7 +45,8 @@ enum TrainingPlugin: SectionPlugin {
           .opt("reps", "string"), .opt("difficulty", "string"),
           .opt("durationMin", "double"), .opt("distanceM", "double"),
           .opt("level", "double"), .opt("note", "string"),
-          .opt("concludedAt", "timestamp"), .opt("loggedAt", "timestamp"),
+          .opt("concludedAt", "timestamp", "session start"), .opt("endedAt", "timestamp", "session end"),
+          .opt("loggedAt", "timestamp"),
         ]),
       ],
       collect: { ctx in
@@ -99,9 +100,9 @@ enum TrainingPlugin: SectionPlugin {
         SectionSkill.Tool("training_entries_list",   "List exercise entries by day or range",
               inputs: "optional: date, from, to, exercise (filter to one canonical name), limit"),
         SectionSkill.Tool("training_entry_log",      "Log a set. Strength: weight/sets/reps. Cardio: durationMin/distanceM. Difficulty/note optional",
-              inputs: "required: sessionType (id e.g. 'upper'), exercise (canonical NAME — e.g. 'Chest press') · optional: date (default today), time (HH:MM), weight (kg), sets (int or 'AMRAP'), reps, difficulty, durationMin, distanceM, level, note, concludedAt (ISO8601)"),
+              inputs: "required: sessionType (id e.g. 'upper'), exercise (canonical NAME — e.g. 'Chest press') · optional: date (default today), time (HH:MM), weight (kg), sets (int or 'AMRAP'), reps, difficulty, durationMin, distanceM, level, note, concludedAt (session start ISO8601), endedAt (session end ISO8601)"),
         SectionSkill.Tool("training_entry_update",   "Patch any subset of fields (rename/retag supported; only fields you pass change)",
-              inputs: "required: id · optional: date, time, sessionType, exercise, weight, sets, reps, difficulty, durationMin, distanceM, level, note, concludedAt"),
+              inputs: "required: id · optional: date, time, sessionType, exercise, weight, sets, reps, difficulty, durationMin, distanceM, level, note, concludedAt, endedAt"),
         SectionSkill.Tool("training_exercises_list", "Exercise catalog (definitions)",
               inputs: "optional: type (strength|cardio|mobility|core), archived (default false), limit"),
         SectionSkill.Tool("training_exercise_create", "Add an exercise definition. id defaults to slugified name",
@@ -306,7 +307,7 @@ private struct SessionStarter: Identifiable, Hashable {
     "weight": e.weight, "sets": e.sets, "reps": e.reps,
     "difficulty": e.difficulty, "durationMin": e.durationMin,
     "distanceM": e.distanceM, "level": e.level, "note": e.note,
-    "concludedAt": e.concludedAt, "loggedAt": e.loggedAt,
+    "concludedAt": e.concludedAt, "endedAt": e.endedAt, "loggedAt": e.loggedAt,
     "updatedAt": isoDate(e.updatedAt),
   ])
 }

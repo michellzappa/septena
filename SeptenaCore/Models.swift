@@ -174,7 +174,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// one in-place treatment where only the box's *fill opacity* changes, never
   /// its shape. The arrival day is transparent (silent — a fresh task shouldn't
   /// shout); each carried-over day adds one seventh, deepening the gold until it
-  /// tops out (the renderer caps the opacity at ~90% so it never reads as a
+  /// tops out (the renderer caps the opacity at ~70% so it never reads as a
   /// solid/done box). Returns `nil` until the task has carried over at least once
   /// (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived today all stay
   /// transparent. Derived, no stored state; self-clears when the task leaves
@@ -898,6 +898,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
   var level: Double?
   var file: String?
   var concludedAt: String?
+  var endedAt: String?
   var loggedAt: String?
   /// Free-text note. Used as a per-session note (stored on the session's
   /// concluding entry), surfaced in the session view and practitioner reports.
@@ -922,6 +923,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     level = try c.decodeIfPresent(Double.self, forKey: .level)
     file = try c.decodeIfPresent(String.self, forKey: .file)
     concludedAt = try c.decodeIfPresent(String.self, forKey: .concludedAt)
+    endedAt = try c.decodeIfPresent(String.self, forKey: .endedAt)
     loggedAt = try c.decodeIfPresent(String.self, forKey: .loggedAt)
     note = try c.decodeIfPresent(String.self, forKey: .note)
   }
@@ -937,6 +939,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     case durationMin = "duration_min"
     case distanceM = "distance_m"
     case concludedAt = "concluded_at"
+    case endedAt = "ended_at"
     case loggedAt = "logged_at"
   }
 
@@ -954,6 +957,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
        level: Double?,
        file: String?,
        concludedAt: String?,
+       endedAt: String? = nil,
        loggedAt: String?,
        note: String? = nil) {
     self.date = date
@@ -968,6 +972,7 @@ struct ExerciseEntry: Codable, Identifiable, Hashable {
     self.level = level
     self.file = file
     self.concludedAt = concludedAt
+    self.endedAt = endedAt
     self.loggedAt = loggedAt
     self.note = note
   }

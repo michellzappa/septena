@@ -2280,7 +2280,8 @@ final class TrainingMutator {
                    distanceM: Double?? = nil,
                    level: Double?? = nil,
                    note: String?? = nil,
-                   concludedAt: String?? = nil) -> [String] {
+                   concludedAt: String?? = nil,
+                   endedAt: String?? = nil) -> [String] {
     guard let entity = fetchEntry(id: id) else { return [] }
     var changed: [String] = []
     if let date { entity.date = date; changed.append("date") }
@@ -2295,6 +2296,7 @@ final class TrainingMutator {
     if let v = level { entity.level = v; changed.append("level") }
     if let v = note { entity.note = v; changed.append("note") }
     if let v = concludedAt { entity.concludedAt = v; changed.append("concludedAt") }
+    if let v = endedAt { entity.endedAt = v; changed.append("endedAt") }
     if date != nil || time != nil {
       let t = time ?? EventTimestamp.hhmm(from: entity.occurredAt)
       entity.occurredAt = EventTimestamp.from(date: entity.date, time: t)
@@ -2313,13 +2315,35 @@ final class TrainingMutator {
   /// note clears it. Returns true if an entry was found to write to.
   @discardableResult
   func setSessionNote(date: String, sessionType: String, note: String) -> Bool {
-    let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
-      predicate: #Predicate { $0.date == date && $0.sessionType == sessionType }
-    ))) ?? []
-    guard let concluding = entries.max(by: { $0.occurredAt < $1.occurredAt }) else { return false }
+    guard let concluding = concludingEntry(date: date, sessionType: sessionType) else { return false }
     let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
     updateEntry(id: concluding.id, note: .some(trimmed.isEmpty ? nil : trimmed))
     return true
+  }
+
+  /// Persist session end time on the concluding entry. Local ISO8601 wall-clock
+  /// (`YYYY-MM-DDTHH:mm:ss`), same format as `concludedAt`. Nil clears.
+  @discardableResult
+  func setSessionEndedAt(date: String, sessionType: String, endedAt: String?) -> Bool {
+    guard let concluding = concludingEntry(date: date, sessionType: sessionType) else { return false }
+    let trimmed = endedAt?.trimmingCharacters(in: .whitespacesAndNewlines)
+    updateEntry(id: concluding.id, endedAt: .some(trimmed?.isEmpty == true ? nil : trimmed))
+    return true
+  }
+
+  /// Bulk-set session start (`concludedAt`) on every entry in the bucket.
+  @discardableResult
+  func setSessionStartedAt(date: String, sessionType: String, startedAt: String) -> Int {
+    let entries = sessionEntries(date: date, sessionType: sessionType)
+    guard !entries.isEmpty else { return 0 }
+    for entity in entries {
+      entity.concludedAt = startedAt
+      entity.updatedAt = .now
+      ckEngine?.noteExerciseEntryChange(id: entity.id)
+    }
+    saveContext("CK exercise session start \(date)")
+    postChanged()
+    return entries.count
   }
 
   func deleteEntry(id: String) {
@@ -2444,6 +2468,17 @@ final class TrainingMutator {
   }
 
   // MARK: - Helpers
+
+  private func sessionEntries(date: String, sessionType: String) -> [ExerciseEntryEntity] {
+    (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(
+      predicate: #Predicate { $0.date == date && $0.sessionType == sessionType }
+    ))) ?? []
+  }
+
+  private func concludingEntry(date: String, sessionType: String) -> ExerciseEntryEntity? {
+    sessionEntries(date: date, sessionType: sessionType)
+      .max(by: { $0.occurredAt < $1.occurredAt })
+  }
 
   private func fetchEntry(id: String) -> ExerciseEntryEntity? {
     try? context.fetch(FetchDescriptor<ExerciseEntryEntity>(predicate: #Predicate { $0.id == id })).first

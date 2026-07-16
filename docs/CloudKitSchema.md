@@ -67,6 +67,7 @@ promoted to Prod unless the Console already shows them):
 | 14 | **New fields** `kind` + `heading` — project section dividers ("headings"). `kind == "heading"` marks a divider row (a `Task` record); `heading` is the FK from a member task to its divider. Both conditional-write. See `TaskKind`. | `Task` | `kind` / `heading` | String |
 | 15 | **New field** `reservedInt1` — synced sidebar sort order (`position`) for areas & projects; renumbered 1…N on Move Up/Down, conditional-write (0 = unset). First write of this reserved int slot. See `docs/DRAG_AND_DROP.md` §5 gap #2. | `Area`, `Project` | `reservedInt1` | Int(64) |
 | 16 | **New record type** `TaskAttachment` — one owned file per record, with metadata and a CloudKit asset. | `TaskAttachment` | all | — |
+| 17 | **New field** `endedAt` (optional session end, local ISO8601 string on concluding entry) | `ExerciseEntry` | `endedAt` | String |
 
 `MoodEvent` reuses the CloudKit record slot vacated by the retired `AirReading` type
 (Air section removed in the same merge). It is a *new* type from Production's point of
@@ -569,7 +570,8 @@ recordName is e.g. `quote:readwise:456`.
 | `distanceM` | Double | `Double?` | Yes | |
 | `level` | Double | `Double?` | Yes | |
 | `note` | String | `String?` | Yes | |
-| `concludedAt` | **String** | `String?` | Yes | ISO8601 **string** despite the name |
+| `concludedAt` | **String** | `String?` | Yes | ISO8601 local wall-clock **session start** |
+| `endedAt` | **String** | `String?` | Yes | ISO8601 local wall-clock **session end** (concluding entry only) |
 | `loggedAt` | **String** | `String?` | Yes | ISO8601 **string** despite the name — NOT a Timestamp |
 | `occurredAt` | Timestamp | `Date` | No | **⚠ PENDING PROD DEPLOY** · the only true Timestamp here · default `.distantPast` |
 

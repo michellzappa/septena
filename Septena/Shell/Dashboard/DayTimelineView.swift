@@ -466,6 +466,7 @@ struct DayTimelineView: View, Equatable {
     let entries = training.map { e in
       TrainingSessionSpans.Entry(date: e.date,
                                  concludedAt: e.concludedAt,
+                                 endedAt: e.endedAt,
                                  loggedAt: e.loggedAt,
                                  durationMin: e.durationMin)
     }
