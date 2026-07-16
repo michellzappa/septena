@@ -4,59 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1459,
-      "date": "2026-07-14",
+      "build": 1461,
+      "date": "2026-07-16",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Septask, a focused app just for tasks",
-          "detail": "A separate app on iPhone, iPad, Mac and Watch that opens straight into your tasks, using the same private data as Septena.",
+          "detail": "A separate app for iPhone, iPad, Mac and Apple Watch that opens straight onto your tasks, using the same private data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Tasks got a full working-over",
-          "detail": "Inline editing and quick-add, project headings, drag to re-home, multi-select bulk actions, attachments, a redesigned date picker, Recently Deleted with 30-day restore, and Things import.",
+          "title": "Tasks got a serious workover",
+          "detail": "Edit titles inline, add attachments and markdown notes, drag tasks onto Today, select several at once for bulk actions, group project work under headings, and undo a delete for longer.",
           "section": "tasks"
         },
         {
           "title": "Keyboard and pointer navigation everywhere",
-          "detail": "Native selection, arrow-key traversal and standard shortcuts across task lists, the sidebar and the Next feed, plus hover effects on iPad and Mac.",
+          "detail": "Arrow keys, ⌘K to complete, Quick Find, and hover highlights work consistently across Mac and iPad task lists.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and Septena reads it on-device to prefill the details, with an optional ingredient breakdown and percentage scaling when you re-log.",
+          "title": "Photograph a meal and let the app fill in the details",
+          "detail": "On-device analysis reads the photo and prefills blank fields, with an optional ingredient breakdown and re-logging scaled by portion.",
           "section": "nutrition"
         },
         {
-          "title": "Your calendar shows up in Today",
-          "detail": "Events weave into Today and Upcoming, with hidden-calendar choices syncing across your devices.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pinned goals live on the dashboard",
-          "detail": "Pin any measurable goal to the week dashboard and tap the tile to log habit-backed goals directly.",
-          "section": "goals"
-        },
-        {
-          "title": "Training rebuilt around effort",
-          "detail": "Effort-weighted muscle volume with a weekly review after each session, one-tap progression hints, auto-advance between sets, and a live activity on the wrist.",
+          "title": "Training sessions guide themselves",
+          "detail": "Auto-advance replaces the rest timer, a Live Activity follows along on the wrist, and a weekly muscle review lands after each session.",
           "section": "training"
         },
         {
-          "title": "A calmer, clearer home",
-          "detail": "The day dial sits under a real sky wash that tracks the time of day, tiles share their rendering with new home-screen widgets, and section color is reserved for meaning.",
+          "title": "The watch feed feels like a real app",
+          "detail": "A vertically paged Next feed sits over the current sky, with long-press action drawers, quick-add for intake, and complications that stay fresh across midnight.",
           "section": null
         },
         {
-          "title": "The watch does more on its own",
-          "detail": "A time-of-day sky behind a paged Next feed, long-press action drawers, intake summary tiles you can tap to log, and complications that stay right through midnight and mid-fast.",
-          "section": null
+          "title": "The dashboard reflects the actual time of day",
+          "detail": "The day dial rolls on a sky wash matched to the sun, and pinned goals now appear as tiles you can act on directly.",
+          "section": "goals"
         },
         {
-          "title": "You can see exactly what telemetry leaves",
-          "detail": "Analytics is now a graded ladder from off to full, with a checklist of what is sent and a log of what recently went out.",
+          "title": "Clearer control over what leaves your device",
+          "detail": "Telemetry now has graded levels with a plain list of what gets sent, a recently-sent log, and a full opt-out.",
           "section": null
         }
       ]
