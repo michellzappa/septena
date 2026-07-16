@@ -157,21 +157,24 @@ agent sort pill  ▸  date / today chip  ▸  (recurrence · notes glyphs)
   itself (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`), not two
   devices in two places. It folds together what used to be split — the amber
   *box fill* for "arrived today" (`showsArrivedToday`, day 0) and a separate
-  *carry-age ring* (day 1+) — into a single treatment where **only the box's
-  fill opacity changes, never its shape**: the interior tints `Theme.todayAccent`
-  gold, transparent on the arrival day and a seventh more opaque each carried
-  day, capped just shy of opaque (~90%) so an aged task never reads as a
+  *carry-age ring* (day 1+) — into a single treatment where the interior
+  fill opacity changes and, in language v2, the open outline warms in sync
+  (no shape changes). The interior tints `Theme.todayAccent` gold,
+  transparent on the arrival day and a seventh more opaque each carried
+  day, capped at ~70% opacity so an aged task never reads as a
   solid/done box. It shows only once earned — a task that has carried over undone
   (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived-today rows stay
   transparent. The box's amber *stroke* still means "this is on Today" (presence)
-  on off-Today surfaces (`isToday`); on the Today/Next surfaces the fill is the
-  sole temporal mark.
+  on off-Today surfaces (`isToday`); on the Today/Next surfaces the aging tint
+  fades in the outline alongside the fill.
 
 ### 3.3 Color rules (the cleanup)
 
-- **Remove `isToday` tinting from `TaskCheckbox`.** The box no longer turns
-  amber. Today is communicated solely by the right-side chip. The checkbox stays
-  neutral so *form* alone carries readiness.
+- **Remove `isToday` tinting from the checkbox fill.** The checkbox stays gray
+  unless Today tenure (carried-over days) should be visually expressed: in
+  language v2, the fill opacity (and the open outline) warm in sync with
+  `tenureFill`. Today/overdue itself is still communicated via the right-side
+  chip.
 - The only colors on a row: section/area **identity** accents (the dot, the sort
   pill's destination tint) and the **temporal** chip (today/overdue). Nothing
   else encodes state with color.
@@ -323,7 +326,7 @@ Ship behind a feature flag; one green build via `scripts/build.sh`.
   temporal axis is now a gold **tenure fill** of the checkbox interior (§3.2),
   which unifies arrived-today (day 0) and carry-age (day 1+) into one in-place
   treatment — only the fill *opacity* grows with days-on-Today (transparent →
-  ~90%), the shape never changes. The box's amber *stroke* is presence-only
+  ~70%), the shape never changes. The box's amber *stroke* is presence-only
   (`isToday`, off-Today surfaces).
 - **Awaiting state.** Dropped from v1. Re-add the dimmed box later if "don't poke
   this, it's mid-processing" proves needed.

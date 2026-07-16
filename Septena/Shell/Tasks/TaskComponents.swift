@@ -264,19 +264,17 @@ struct TaskCheckbox: View {
   #endif
   /// Tenure fill never reaches full opacity — a hair of translucency keeps an
   /// aged Today task from reading as a solid/"done" box.
-  private static let tenureMaxOpacity: Double = 0.9
+  private static let tenureMaxOpacity: Double = 0.7
 
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
   /// and fill to `Theme.todayAccent`.
   private var boxStrokeColor: Color {
     // Legacy: amber box meant "is on Today" on off-Today surfaces.
     if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    // Language v2: the box stroke turns amber for a Today task — either seen on
-    // an off-Today surface (project/area), where it marks "this is on Today"
-    // (presence, `isToday`), or once it has carried over and carries a tenure
-    // fill, so the warming gold interior reads against an amber edge rather than
-    // a neutral one.
-    if TaskRowFlags.languageV2, isToday || tenureFill != nil { return Theme.todayAccent }
+    // Language v2: outline is "presence" amber when the surface wants it
+    // (i.e. `isToday` is true). For aging, we fade an amber overlay in sync
+    // with `tenureFill` below (no step-change on day 1+).
+    if TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
     return Theme.checkboxStroke
   }
   private var boxFillColor: Color {
@@ -310,7 +308,8 @@ struct TaskCheckbox: View {
         // days-on-Today (see `tenureFill`): transparent on the arrival day, a
         // seventh more each carried day, capped just shy of opaque so an aged
         // task never reads as a solid/done box. Shape never changes — only the
-        // fill's opacity. Sits behind the open stroke; hidden once done.
+        // fill's opacity (and, in language v2, the open outline warms in sync).
+        // Sits behind the open stroke; hidden once done.
         if TaskRowFlags.languageV2, !isDone, let tenureFill {
           let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
           RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
@@ -341,6 +340,19 @@ struct TaskCheckbox: View {
           .opacity(isDone ? 0 : 1)
           .a11yAnimation(Theme.Motion.quick, value: isDone)
           .a11yAnimation(Theme.Motion.quick, value: isToday)
+
+        // Language v2 aging: fade the outline from gray → yellow in lockstep
+        // with the Today tenure fill, so we don't have a step change when
+        // `tenureFill` becomes non-nil.
+        if TaskRowFlags.languageV2, !isDone, !isToday, let tenureFill {
+          let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
+          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
+            .strokeBorder(Theme.todayAccent.opacity(strength * Self.tenureMaxOpacity),
+                          lineWidth: Self.boxStroke)
+            .frame(width: Self.boxSize, height: Self.boxSize)
+            .opacity(isDone ? 0 : 1)
+            .a11yAnimation(Theme.Motion.quick, value: strength)
+        }
         // Fill + check, grouped so the feel choreography (drop, squash, dip)
         // moves them as one body. The fill pops with a touch of overshoot;
         // the check stamps in from smaller, reading as follow-through.
@@ -1519,7 +1531,7 @@ struct MovePickerSheet: View {
   var body: some View {
     NavigationStack {
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
           if matches("Inbox") {
             row(.inbox, title: "Inbox",
@@ -1635,9 +1647,15 @@ struct MovePickerSheet: View {
       }
       .padding(.leading, indent ? Theme.hPadding + 24 : Theme.hPadding)
       .padding(.trailing, Theme.hPadding)
-      .frame(height: 38)
+      .padding(.vertical, 2)
+      .frame(minHeight: 40)
       .contentShape(Rectangle())
-      .background(selected ? Theme.mutedSurface : Color.clear)
+      .background {
+        if selected {
+          RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(Theme.mutedSurface)
+        }
+      }
     }
     .buttonStyle(PlainHoverRowButtonStyle())
   }
@@ -1655,7 +1673,7 @@ struct MovePickerSheet: View {
       // Pie glyph — same component as sidebar / detail page, driven by the
       // project's real done/open ratio.
       ProjectProgressIcon(progress: projectId.flatMap { progressByProject[$0] } ?? 0,
-                          tint: Theme.iconMuted, diameter: 14)
+                          tint: Theme.inkSecondary, diameter: 14)
     }
   }
 }
@@ -1886,21 +1904,9 @@ struct TaskRowActions: ViewModifier {
     onChange?()
   }
 
-  // Mirrors `TaskListView.duplicate` — clone into a new open task (new id).
   private func duplicateTask(_ task: SeptenaTask) {
     Haptics.tick()
-    let copy = mutator.create(
-      title: task.title,
-      area: task.area,
-      project: task.project,
-      scheduled: SeptenaDate.parse(task.scheduled),
-      deadline: SeptenaDate.parse(task.deadline),
-      today: task.today,
-      notes: task.notes
-    )
-    if let rule = task.recurrence {
-      mutator.setRecurrence(id: copy.id, recurrence: rule)
-    }
+    mutator.duplicate(task)
     onChange?()
   }
 
