@@ -3603,8 +3603,9 @@ struct TaskListView: View {
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
     // the local cache is authoritative — no network round-trip needed.
-    projects = LocalCache.projects(in: modelContext)
-    areas = LocalCache.areas(in: modelContext)
+    let structure = StructureCache.snapshot(in: modelContext)
+    projects = structure.projects
+    areas = structure.areas
     // Per-project completion ratio for the project pie glyph in mixed-list
     // headers. Aggregate raw entities rather than projecting the whole
     // historical corpus into row DTOs on every refresh.

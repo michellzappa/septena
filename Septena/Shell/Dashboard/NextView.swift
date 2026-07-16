@@ -482,8 +482,9 @@ struct NextView: View {
       EditNutritionEntrySheet(original: entry, onDone: {})
     }
     .task {
-      areas = LocalCache.areas(in: modelContext)
-      projects = LocalCache.projects(in: modelContext)
+      let structure = StructureCache.snapshot(in: modelContext)
+      areas = structure.areas
+      projects = structure.projects
       model.paintFromCache(today: clock.today)
       tasksModel.paintFromCache()
       suggestionsModel.paintFromCache(today: clock.today)

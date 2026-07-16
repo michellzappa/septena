@@ -1354,7 +1354,8 @@ final class ExerciseEntryEntity {
   var distanceM: Double?
   var level: Double?
   var note: String?
-  var concludedAt: String?   // ISO8601
+  var concludedAt: String?   // local ISO8601 session start (shared across bucket)
+  var endedAt: String? = nil // local ISO8601 session end (concluding entry only)
   var loggedAt: String?      // ISO8601
   var updatedAt: Date
   var cloudKitSystemFields: Data?
@@ -1372,6 +1373,7 @@ final class ExerciseEntryEntity {
        level: Double? = nil,
        note: String? = nil,
        concludedAt: String? = nil,
+       endedAt: String? = nil,
        loggedAt: String? = nil,
        updatedAt: Date = .now,
        cloudKitSystemFields: Data? = nil) {
@@ -1388,6 +1390,7 @@ final class ExerciseEntryEntity {
     self.level = level
     self.note = note
     self.concludedAt = concludedAt
+    self.endedAt = endedAt
     self.loggedAt = loggedAt
     self.updatedAt = updatedAt
     self.cloudKitSystemFields = cloudKitSystemFields
@@ -2272,6 +2275,7 @@ enum ExerciseEntryCloudKitSchema {
     static let level = "level"
     static let note = "note"
     static let concludedAt = "concludedAt"
+    static let endedAt = "endedAt"
     static let loggedAt = "loggedAt"
     static let occurredAt = "occurredAt"
   }
@@ -3205,6 +3209,7 @@ extension ExerciseEntryEntity: CloudKitSystemFieldsBacked {
     record[ExerciseEntryCloudKitSchema.Field.level] = level
     record[ExerciseEntryCloudKitSchema.Field.note] = note
     record[ExerciseEntryCloudKitSchema.Field.concludedAt] = concludedAt
+    record[ExerciseEntryCloudKitSchema.Field.endedAt] = endedAt
     record[ExerciseEntryCloudKitSchema.Field.loggedAt] = loggedAt
     record[ExerciseEntryCloudKitSchema.Field.occurredAt] = occurredAt as NSDate
     return record
@@ -3223,6 +3228,7 @@ extension ExerciseEntryEntity: CloudKitSystemFieldsBacked {
     level = record[ExerciseEntryCloudKitSchema.Field.level] as? Double
     note = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.note])
     concludedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.concludedAt])
+    endedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.endedAt])
     loggedAt = optionalChecklistString(record[ExerciseEntryCloudKitSchema.Field.loggedAt])
     if let v = record[ExerciseEntryCloudKitSchema.Field.occurredAt] as? Date { occurredAt = v }
     updatedAt = .now
@@ -3921,6 +3927,10 @@ enum LocalCache {
 /// the first read per process fetches, later ones return the cached snapshot,
 /// and any structure change (local mutation or CloudKit batch — both post
 /// `.septenaStructureChanged`) drops the cache so the next read is fresh.
+///
+/// Snapshots are returned in sidebar order (`TaskStructureOrder`) so every
+/// consumer — sidebar, move pickers, grouped list headers, MCP list endpoints —
+/// shares one ordering without re-sorting at each call site.
 @MainActor
 enum StructureCache {
   private static var cached: (areas: [Area], projects: [Project])?
@@ -3929,8 +3939,10 @@ enum StructureCache {
   static func snapshot(in context: ModelContext) -> (areas: [Area], projects: [Project]) {
     installObserverIfNeeded()
     if let cached { return cached }
-    let snap = (areas: LocalCache.areas(in: context),
-                projects: LocalCache.projects(in: context))
+    let snap = (
+      areas: TaskStructureOrder.orderedAreas(LocalCache.areas(in: context)),
+      projects: TaskStructureOrder.orderedProjects(LocalCache.projects(in: context))
+    )
     cached = snap
     return snap
   }

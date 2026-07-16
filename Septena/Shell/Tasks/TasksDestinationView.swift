@@ -317,8 +317,9 @@ struct TasksDestinationView: View {
 
   private func reload() {
     settle.cancelAll()
-    areas = LocalCache.areas(in: modelContext)
-    projects = LocalCache.projects(in: modelContext)
+    let structure = StructureCache.snapshot(in: modelContext)
+    areas = structure.areas
+    projects = structure.projects
     // The band is the unratified layer; Today is what's left after it. The
     // `.today` filter already excludes band members (`convert`), so a row that
     // satisfies both predicates lands only in the band — Today stays clean.

@@ -107,8 +107,25 @@ struct AreaDetailView: View {
     // Seed area + project lists from cache before first render so the
     // project rows are present immediately on navigate-in.
     let ctx = LocalStore.shared.container.mainContext
-    _areas = State(initialValue: LocalCache.areas(in: ctx))
-    _projects = State(initialValue: LocalCache.projects(in: ctx))
+    let structure = StructureCache.snapshot(in: ctx)
+    _areas = State(initialValue: structure.areas)
+    _projects = State(initialValue: structure.projects)
+    // Seed project rings from the local mirror so the first paint matches the
+    // sidebar / project detail — don't flash empty rings while load() runs.
+    _projectProgress = State(initialValue:
+      Self.cachedProjectProgress(areaId: area.id, context: ctx))
+  }
+
+  /// done / (done + open) per project in this area. Tasks filed in a project
+  /// carry `project`, not `area`, so area-scoped task lists miss them — read
+  /// the same entity aggregate the sidebar uses instead.
+  private static func cachedProjectProgress(areaId: String,
+                                            context: ModelContext) -> [String: Double] {
+    let ratios = LocalCache.projectCompletionRatios(in: context)
+    let ids = Set(LocalCache.projects(in: context)
+      .filter { $0.area == areaId && $0.status == .active }
+      .map(\.id))
+    return ratios.filter { ids.contains($0.key) }
   }
 
   var body: some View {
@@ -263,17 +280,10 @@ struct AreaDetailView: View {
   }
 
   private func load() async {
-    // Paint from cache first so the area screen isn't blank on cold open.
-    let cachedAreas = LocalCache.areas(in: modelContext)
-    let cachedProjects = LocalCache.projects(in: modelContext)
-    if !cachedAreas.isEmpty { areas = cachedAreas }
-    if !cachedProjects.isEmpty { projects = cachedProjects }
-
-    async let allInArea = TaskReads.list(view: "all", area: area.id,
-                                         today: clock.today, now: clock.now,
-                                         context: modelContext)
-    areas = LocalCache.areas(in: modelContext)
-    projects = LocalCache.projects(in: modelContext)
+    let structure = StructureCache.snapshot(in: modelContext)
+    areas = structure.areas
+    projects = structure.projects
+    projectProgress = Self.cachedProjectProgress(areaId: area.id, context: modelContext)
 
     // Rehydrate the notes field from the freshly-loaded area record. The
     // route in nav.path holds the snapshot from when the sidebar last
@@ -304,23 +314,6 @@ struct AreaDetailView: View {
       draftAttachment = fresh.attachment
     }
 
-    // Group tasks by project to compute progress per project.
-    do {
-      let items = await allInArea.items
-      var done: [String: Int] = [:]
-      var total: [String: Int] = [:]
-      for t in items {
-        guard let pid = t.project else { continue }
-        switch t.status {
-        case .done:                 done[pid, default: 0] += 1; total[pid, default: 0] += 1
-        case .open:                 total[pid, default: 0] += 1
-        case .cancelled:            break
-        }
-      }
-      projectProgress = total.reduce(into: [:]) { acc, kv in
-        acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
-      }
-    }
   }
 
   private func commitName(_ trimmed: String) {
@@ -575,7 +568,7 @@ struct ProjectDetailView: View {
   }
 
   private func loadAreas() async {
-    areas = LocalCache.areas(in: modelContext)
+    areas = StructureCache.snapshot(in: modelContext).areas
   }
 
   /// The project struct in nav.path is the snapshot from when the sidebar

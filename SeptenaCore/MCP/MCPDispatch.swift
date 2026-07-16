@@ -357,9 +357,10 @@ enum MCPDispatch {
   /// so the calling model can self-correct against `tasks_list_areas/projects`.
   private static func validateContainer(_ kind: String, _ id: String?) throws {
     guard let id, !id.isEmpty else { return }
+    let structure = StructureCache.snapshot(in: ctx)
     let valid: [(String, String)] = kind == "area"
-      ? LocalCache.areas(in: ctx).map { ($0.id, $0.title) }
-      : LocalCache.projects(in: ctx).map { ($0.id, $0.title) }
+      ? structure.areas.map { ($0.id, $0.title) }
+      : structure.projects.map { ($0.id, $0.title) }
     guard !valid.contains(where: { $0.0 == id }) else { return }
     let known = valid.map { "\($0.0) (\($0.1))" }.joined(separator: ", ")
     throw MCPError.badArgument(
@@ -533,7 +534,8 @@ enum MCPDispatch {
   private static func tasksListProjects(_ args: MCPArgs) -> Any {
     let status = args.string("status") ?? "active"
     let limit = args.int("limit") ?? 200
-    let projects = LocalCache.projects(in: ctx)
+    let structure = StructureCache.snapshot(in: ctx)
+    let projects = structure.projects
       .filter { status == "all" || $0.status.rawValue == status }
       .prefix(limit)
       .map { ["id": $0.id, "title": $0.title, "status": $0.status.rawValue, "area": $0.area ?? ""] }
@@ -542,7 +544,7 @@ enum MCPDispatch {
 
   private static func tasksListAreas(_ args: MCPArgs) -> Any {
     let limit = args.int("limit") ?? 100
-    return ["areas": LocalCache.areas(in: ctx).prefix(limit).map { ["id": $0.id, "title": $0.title] }]
+    return ["areas": StructureCache.snapshot(in: ctx).areas.prefix(limit).map { ["id": $0.id, "title": $0.title] }]
   }
 
   private static func taskJSON(_ t: SeptenaTask) -> [String: Any] {
@@ -1371,7 +1373,8 @@ enum MCPDispatch {
       reps: args.stringField("reps"), difficulty: args.stringField("difficulty"),
       durationMin: args.doubleField("durationMin"), distanceM: args.doubleField("distanceM"),
       level: args.doubleField("level"), note: args.stringField("note"),
-      concludedAt: args.stringField("concludedAt"))
+      concludedAt: args.stringField("concludedAt"),
+      endedAt: args.stringField("endedAt"))
     return ["id": id, "updated": updated]
   }
 

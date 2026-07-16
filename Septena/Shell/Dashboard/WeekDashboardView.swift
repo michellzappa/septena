@@ -482,10 +482,11 @@ struct WeekDashboardView: View {
     // Anchored on the top-level screen (not the Tasks/Mood tile) so it presents
     // regardless of which tiles are enabled or materialized in the lazy grid.
     .taskComposerDrawer(isPresented: $creatingTask) {
+      let structure = StructureCache.snapshot(in: modelContext)
       TaskComposerCard(
         mode: .create(.triage),
-        areas: LocalCache.areas(in: modelContext),
-        projects: LocalCache.projects(in: modelContext),
+        areas: structure.areas,
+        projects: structure.projects,
         accent: theme.color(for: "tasks"),
         onDone: { Task { await refreshTasks() } }
       )

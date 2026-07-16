@@ -979,8 +979,8 @@ struct SidebarRootView: View {
     // structure memo read, one live-task pass for roll-ups, one combined
     // counts+history scan for smart-list badges.
     let structure = StructureCache.snapshot(in: modelContext)
-    areas = TaskDestinations.orderedAreas(structure.areas)
-    projects = TaskDestinations.orderedProjects(structure.projects)
+    areas = structure.areas
+    projects = structure.projects
     let stats = TaskReads.dashboardStats(today: clock.today,
                                          now: clock.now,
                                          context: modelContext)

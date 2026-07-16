@@ -7,8 +7,8 @@ import SwiftData
 // via `NavigationState.go(to:)` on tap, so you can jump anywhere WITHOUT the
 // sidebar — collapsed via ⌘/ on macOS, and only a back-tap away on iPhone.
 //
-// Single-source: destinations come from `TaskDestinations` (the same smart-list
-// set and persisted area/project order the sidebar uses), and every label /
+// Single-source: destinations come from `StructureCache` (sidebar order via
+// `TaskStructureOrder`) and `TaskDestinations.smartListRoutes`; every label /
 // icon / selection check reads off `Route`, so the menu can never disagree
 // with the sidebar about what's navigable, in what order, or what's current.
 //
@@ -52,8 +52,8 @@ struct TaskNavMenu<Trigger: View>: View {
   @ViewBuilder
   private var menuContent: some View {
     let snapshot = StructureCache.snapshot(in: modelContext)
-    let areas = TaskDestinations.orderedAreas(snapshot.areas)
-    let projects = TaskDestinations.orderedProjects(snapshot.projects)
+    let areas = snapshot.areas
+    let projects = snapshot.projects
     let topLevel = projects.filter { $0.area == nil && $0.status == .active }
 
     ForEach(TaskDestinations.smartListRoutes, id: \.id) { destButton($0) }
