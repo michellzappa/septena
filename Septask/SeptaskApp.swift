@@ -111,6 +111,11 @@ private struct SeptaskMainWindow: View {
       .environment(iPadChrome)
       .modelContainer(localStore.container)
       .septenaTextSize()
+      // Ungated on iPad on purpose (unlike the task-list publishers, which are
+      // `#if os(macOS)`): the iPad `.focusedSceneValue` crash came from publishing
+      // inside a NavigationSplitView *detail* column. This is at the WindowGroup
+      // content root, above the split view, so it's safe — and iPad Septask needs
+      // these window-level actions (⌘N etc.) in the shortcut HUD.
       .focusedSceneValue(\.septaskNavigationActions, navigationActions)
       .task {
         #if os(iOS)

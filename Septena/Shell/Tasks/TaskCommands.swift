@@ -10,8 +10,14 @@ enum TaskRowShortcuts {
   static let toggleToday = KeyboardShortcut("t", modifiers: .command)
   static let when = KeyboardShortcut("s", modifiers: .command)
   static let deadline = KeyboardShortcut("d", modifiers: [.command, .shift])
-  static let move = KeyboardShortcut("m", modifiers: .command)
-  static let clearSchedule = KeyboardShortcut(".", modifiers: .command)
+  // ⌘⇧M, not ⌘M: bare ⌘M is the system Window ▸ Minimize equivalent, so a plain
+  // ⌘M here would shadow Minimize whenever a task list is focused (Things uses
+  // ⌘⇧M for exactly this reason).
+  static let move = KeyboardShortcut("m", modifiers: [.command, .shift])
+  // ⌘⇧., not ⌘.: bare ⌘. is the universal system Cancel / iPad hardware-Escape
+  // key, so a plain ⌘. would silently unschedule selected rows when a user hits
+  // it to "escape".
+  static let clearSchedule = KeyboardShortcut(".", modifiers: [.command, .shift])
   static let delete = KeyboardShortcut(.delete, modifiers: .command)
 }
 
