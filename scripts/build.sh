@@ -1,6 +1,6 @@
 #!/bin/bash
 # Locked Xcode build — serializes builds across parallel agent sessions and the
-# hourly commit-cron (~/Library/Scripts/septena-git-commit.sh shares this lock).
+# hourly commit-cron (~/Library/Scripts/auto-git-commit.sh shares this lock).
 #
 # Why a lock: 3–5 Claude sessions + the cron can otherwise run concurrent
 # xcodebuild/xcodegen against shared state and corrupt incremental builds.
@@ -11,7 +11,7 @@
 #   defaults: Septena (iOS, embeds watch+widgets+live activity), generic/platform=iOS
 set -o pipefail
 
-LOCKDIR="/tmp/septena-build.lock.d"
+LOCKDIR="/tmp/auto-build.lock.d"
 STALE=3600          # steal the lock if older than 1h (a hung build/cron)
 MAX_WAIT=1800       # give up after 30m of waiting
 

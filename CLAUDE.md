@@ -39,7 +39,7 @@ run **one** verifying build before leaving the tree green — not after every fi
 touch. With 3–5 parallel sessions plus the hourly commit-cron, concurrent
 `xcodebuild`/`xcodegen` against shared state corrupts incremental builds, so
 **build through `scripts/build.sh`** (defaults to the iOS `Septena` scheme): it
-takes a shared `mkdir` lock at `/tmp/septena-build.lock.d` so builds serialize
+takes a shared `mkdir` lock at `/tmp/auto-build.lock.d` so builds serialize
 across every session and the cron. The compile is the only green gate before the
 cron pushes — a tree that doesn't build must never be left behind.
 
