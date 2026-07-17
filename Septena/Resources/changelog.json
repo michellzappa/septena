@@ -4,49 +4,64 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1469,
-      "date": "2026-07-16",
+      "build": 1471,
+      "date": "2026-07-17",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused app just for tasks",
-          "detail": "A second app over the same private task data, with its own iPhone tab bar, Mac window, watch complication, settings, and Home Screen quick actions.",
+          "title": "A focused Tasks app: Septask",
+          "detail": "Septask is a new standalone app for iPhone, iPad, and Mac that works on the same private task data as Septena, with its own settings, windows, quick actions, and a watch app with a today-tasks complication.",
           "section": "tasks"
         },
         {
-          "title": "Tasks got a full workover",
-          "detail": "Inline editing, multi-select bulk actions, project headings, task attachments, drag onto Today, a redesigned date picker, undo toasts, Recently Deleted with 30-day purge, and Things import.",
+          "title": "Tasks got a full rework",
+          "detail": "Inline editing, multi-select bulk actions, drag onto Today, project headings, task attachments, a Recently Deleted view with 30-day purge and undo, a redesigned date picker, markdown-aware notes, and Things import.",
           "section": "tasks"
         },
         {
-          "title": "Keyboard and pointer navigation that behaves",
-          "detail": "Native selection, arrow-key traversal, Quick Find, and consistent shortcuts across the Tasks sidebar, lists, and the Next feed on iPad and Mac.",
+          "title": "Calendar events in Today and Upcoming",
+          "detail": "Your system calendar now weaves into the task lists as quiet agenda rows, read-only and opt-in, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and let on-device analysis prefill the fields, with optional ingredient breakdowns and percentage scaling when you re-log.",
+          "detail": "Snap a meal and Septena analyzes it on-device to prefill the macros, with an optional ingredient breakdown and re-logged meals scaled by percentage.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions that flow",
-          "detail": "Auto-advance replaces the rest timer, a watch Live Activity rides along in the Smart Stack, and per-exercise menus, progression hints, and effort-weighted muscle volume land in the progress chart.",
+          "title": "Training sessions that guide the set",
+          "detail": "Auto-advance replaces the rest timer, sessions carry a real span with a watch Live Activity, and a post-session weekly review shows effort-weighted muscle volume alongside one-tap progression hints.",
           "section": "training"
         },
         {
-          "title": "A calmer, more coherent look",
-          "detail": "A monochrome app accent that reserves color for sections, a live sky wash behind the day dial, grouped card lists, and unified page chrome across every platform.",
+          "title": "The home screen follows the real sky",
+          "detail": "The day dial sits under a wash of the actual sky outside, and the dashboard now hosts pinned goals as tiles you can act on directly.",
           "section": null
         },
         {
-          "title": "Pinned goals on the dashboard",
-          "detail": "Pin a goal to the week dashboard as a tile, then tap to toggle habit-backed goals or reach its contextual actions.",
-          "section": "goals"
+          "title": "The watch feed grew up",
+          "detail": "A vertically paged Next feed over a time-of-day sky, long-press action drawers, intake summary tiles you can tap to quick-add, and a fasting complication that morphs overnight.",
+          "section": null
         },
         {
-          "title": "Privacy you can inspect",
-          "detail": "Graded telemetry levels from off to full, a checklist of exactly what gets sent, and a log of what was recently sent.",
+          "title": "Home screen widgets",
+          "detail": "Next, Today, and dashboard tiles are now widgets that share the app's rendering, on a native container surface.",
+          "section": null
+        },
+        {
+          "title": "Keyboard-first on Mac and iPad",
+          "detail": "Native selection and arrow navigation across the sidebar, task lists, and Next feed, plus a consistent shortcut map, Quick Find, and per-window command menus.",
+          "section": "tasks"
+        },
+        {
+          "title": "Privacy telemetry you can read",
+          "detail": "Analytics moved to graded levels (off, minimal, balanced, full) with a checklist of what each sends and a log of what was recently sent.",
+          "section": null
+        },
+        {
+          "title": "Claude connection, clarified",
+          "detail": "One connection status, a shared reconnect nudge across both apps, the local MCP token stored in Keychain, and new mood and training-routine tools.",
           "section": null
         }
       ]
