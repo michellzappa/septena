@@ -4,54 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1473,
+      "build": 1479,
       "date": "2026-07-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A dedicated, streamlined app for your tasks on iPhone, iPad, Mac, and Watch, working over the same private data as Septena",
+          "title": "Septask, a focused app just for tasks",
+          "detail": "A dedicated task app on iPhone, iPad, Mac and Watch over the same private data, with its own tabs, search, quick capture and Today feed",
           "section": null
         },
         {
-          "title": "A faster, richer way to work with tasks",
-          "detail": "Edit titles inline, select and act on several tasks at once, drag tasks onto Today, group projects with section headings, and add notes and attachments",
+          "title": "A rebuilt task experience",
+          "detail": "Inline editing, drag to re-home, multi-select bulk actions, a redesigned date picker, and undo toasts for delete, move and defer",
           "section": "tasks"
         },
         {
-          "title": "Calendar events in Today and Upcoming",
-          "detail": "Your agenda now appears alongside tasks, with only remaining events shown",
+          "title": "Recently Deleted for tasks",
+          "detail": "Removed tasks land in a Recently Deleted view with restore and a 30-day auto-purge",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks",
-          "detail": "Recently Deleted keeps tasks for 30 days with one-tap restore before they purge",
+          "title": "Your calendar woven into Today",
+          "detail": "Optional read-only calendar events appear alongside tasks in Today and Upcoming",
           "section": "tasks"
         },
         {
-          "title": "Snap a photo of your meal",
-          "detail": "Photo-first meal capture analyzes the picture on-device to prefill macros, with an optional ingredient breakdown",
+          "title": "Photo-first meal logging",
+          "detail": "Snap a meal and have it analyzed on-device to prefill the details, with optional ingredient breakdowns and percentage-scaled re-logging",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, a live progress chart, and an auto-advancing rest flow with a Watch Live Activity",
+          "detail": "Editable start and end times, an effort-weighted weekly muscle review, a live progress chart, one-tap progression hints, and a rest timer that auto-advances with a watch Live Activity",
           "section": "training"
         },
         {
           "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter front and center on the week dashboard and toggle habit-backed goals right from their tile",
+          "detail": "Pin any measurable goal to the week dashboard as its own tile with contextual actions",
           "section": "goals"
         },
         {
-          "title": "You decide what's shared",
-          "detail": "Graded privacy levels let you choose exactly how much anonymized telemetry is sent, with a log of what recently left your device",
-          "section": null
-        },
-        {
-          "title": "Home-screen widgets and a richer Watch",
-          "detail": "New Today and Next widgets, plus a Watch feed with a time-of-day sky, quick-add intake tiles, and updated ring complications",
+          "title": "Clearer privacy controls",
+          "detail": "Graded analytics levels from off to full, a plain view of exactly what is sent, and a recently-sent log",
           "section": null
         }
       ]
