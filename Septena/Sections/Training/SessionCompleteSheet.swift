@@ -12,11 +12,11 @@ struct SessionStats: Identifiable {
   let routineLabel: String
   let kind: SessionKind
   /// The session bucket (date + type) so the completion sheet can persist a
-  /// note via TrainingMutator.setSessionNote.
+  /// note and end time via TrainingMutator.
   let date: String
   let sessionType: String
   let startedAt: Date?
-  let concludedAt: Date
+  let endedAt: Date
   let doneCount: Int
   let skippedCount: Int
   let totalCount: Int
@@ -35,7 +35,7 @@ struct SessionStats: Identifiable {
 
   var durationSeconds: Double? {
     guard let start = startedAt else { return nil }
-    return max(0, concludedAt.timeIntervalSince(start))
+    return max(0, endedAt.timeIntervalSince(start))
   }
 
   /// Build the snapshot from a live draft. PR flags are computed by
@@ -48,7 +48,7 @@ struct SessionStats: Identifiable {
     self.kind = kind
     self.date = draft.date
     self.sessionType = draft.sessionType
-    self.concludedAt = Date()
+    self.endedAt = Date()
 
     let isoF = ISO8601DateFormatter()
     isoF.formatOptions = [.withInternetDateTime]
@@ -106,16 +106,16 @@ struct SessionStats: Identifiable {
 struct SessionCompleteSheet: View {
   let stats: SessionStats
   let accent: Color
+  /// Persist session note + end time on dismiss. Empty note is a no-op.
+  var onFinish: (String, Date) -> Void = { _, _ in }
   let onDone: () -> Void
-  /// Persist an optional session note (how it felt, niggles…). Called on
-  /// "Back to dashboard" with the field's current text (empty clears).
-  var onSaveNote: (String) -> Void = { _ in }
 
   /// Bumped on appear → fires the completion flourish. One celebration
   /// per presentation; no looping.
   @Environment(\.modelContext) private var context
   @State private var celebrate = 0
   @State private var note = ""
+  @State private var finishedAt = Date()
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
   @AppStorage(WeightUnit.defaultsKey) private var weightUnitRaw = WeightUnit.kg.rawValue
   private var weightUnit: WeightUnit { WeightUnit.resolve(weightUnitRaw) }
@@ -137,7 +137,7 @@ struct SessionCompleteSheet: View {
         }
         weeklyReview
         noteField
-        Button(action: { onSaveNote(note); onDone() }) {
+        Button(action: { onFinish(note, finishedAt); onDone() }) {
           Text("Back to dashboard")
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -161,6 +161,7 @@ struct SessionCompleteSheet: View {
                      trigger: celebrate)
     }
     .onAppear {
+      finishedAt = stats.endedAt
       // Motion-matched: the burst's pop at the same intensity the visual
       // plays — not a flat generic buzz.
       Haptics.play(completionMotion.hapticSpec(intensity: completionIntensity))
@@ -236,13 +237,36 @@ struct SessionCompleteSheet: View {
   private var statsGrid: some View {
     VStack(spacing: 10) {
       LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
-        statTile(label: "Duration", value: formatDuration(stats.durationSeconds), prominent: true)
+        statTile(label: "Duration", value: formatDuration(currentDurationSeconds), prominent: true)
         statTile(label: "Exercises", value: "\(stats.doneCount)/\(stats.totalCount)")
         statTile(label: "Started", value: formatTime(stats.startedAt))
-        statTile(label: "Finished", value: formatTime(stats.concludedAt))
+        finishedTile
       }
       categorySpecificTiles
     }
+  }
+
+  private var currentDurationSeconds: Double? {
+    guard let start = stats.startedAt else { return nil }
+    return max(0, finishedAt.timeIntervalSince(start))
+  }
+
+  /// Editable finish time — defaults to now at sheet open; persisted on dismiss.
+  private var finishedTile: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text("FINISHED")
+        .font(.caption2.weight(.semibold))
+        .tracking(0.5)
+        .foregroundStyle(.secondary)
+      SteppedDatePicker(selection: $finishedAt, displayedComponents: .hourAndMinute)
+        .font(.septenaHeroMetric())
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(14)
+    .background(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Theme.cardSurface)
+    )
   }
 
   @ViewBuilder

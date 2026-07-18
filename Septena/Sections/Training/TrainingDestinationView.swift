@@ -2024,14 +2024,16 @@ struct TrainingSessionView: View {
       // a type. We wait until after `refreshCatalog` so the lookup can
       // resolve labels → SessionTypeConfig. Cleared immediately so a
       // dismiss-and-reopen doesn't loop.
-      if let pending = nav.pendingTrainingType,
-         store.draft == nil,
-         let match = store.sessionTypes.first(where: {
-           $0.id.caseInsensitiveCompare(pending) == .orderedSame ||
-           $0.label.caseInsensitiveCompare(pending) == .orderedSame
-         }) {
-        nav.pendingTrainingType = nil
-        store.start(type: match, context: modelContext, today: clock.today)
+      if let pending = nav.pendingTrainingType, store.draft == nil {
+        let match = store.sessionTypes.first { type in
+          let byID = type.id.caseInsensitiveCompare(pending) == .orderedSame
+          let byLabel = type.label.caseInsensitiveCompare(pending) == .orderedSame
+          return byID || byLabel
+        }
+        if let match {
+          nav.pendingTrainingType = nil
+          store.start(type: match, context: modelContext, today: clock.today)
+        }
       }
     }
     .sheet(item: $completionStats) { stats in
@@ -2042,10 +2044,15 @@ struct TrainingSessionView: View {
           completionStats = nil
           dismiss()
         },
-        onSaveNote: { text in
-          guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-          SeptenaServices.shared.trainingMutator.setSessionNote(
-            date: stats.date, sessionType: stats.sessionType, note: text)
+        onFinish: { text, finishedAt in
+          let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+          if !trimmed.isEmpty {
+            SeptenaServices.shared.trainingMutator.setSessionNote(
+              date: stats.date, sessionType: stats.sessionType, note: trimmed)
+          }
+          SeptenaServices.shared.trainingMutator.setSessionEndedAt(
+            date: stats.date, sessionType: stats.sessionType,
+            endedAt: EventTimestamp.localISO(from: finishedAt))
         })
       #if os(iOS)
       .presentationDetents([.large])
