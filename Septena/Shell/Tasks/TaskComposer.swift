@@ -243,10 +243,14 @@ struct TaskComposerCard: View {
       // the one teardown event so purge can never front-run the autosave.
       .onDisappear { persistOnce(); onVanish?() }
       .onChange(of: draft.title) { _, newValue in
-        // Return inserts a newline, which we treat as "save". Strip it and commit
-        // (or just tidy it away when there's nothing to save yet).
+        // A vertical-axis TextField turns Return into a newline at the cursor;
+        // we treat that as "save". Remove the newline ENTIRELY (not a space) so
+        // the title is exactly what it was before Enter — replacing it with a
+        // space, then only trimming the ends, left a stray space wherever the
+        // cursor sat mid-title. A single-line title never keeps a newline, so
+        // this also flattens a pasted multi-line string.
         if newValue.contains("\n") {
-          draft.title = newValue.replacingOccurrences(of: "\n", with: " ")
+          draft.title = newValue.replacingOccurrences(of: "\n", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
         }
