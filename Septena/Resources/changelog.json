@@ -4,50 +4,55 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1481,
+      "build": 1483,
       "date": "2026-07-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask: a focused app for just your tasks",
-          "detail": "A dedicated task app for iPhone, iPad, Mac, and Watch that works over the same private data as Septena.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A dedicated, streamlined app for your tasks that shares the same private data as Septena, on iPhone, iPad, Mac, and Watch.",
           "section": "tasks"
         },
         {
           "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture reads the label on-device and prefills the details for you.",
+          "detail": "Photo-first meal capture analyzes the picture on-device and prefills the name and macros for you to confirm.",
           "section": "nutrition"
         },
         {
-          "title": "Your calendar now lives in Today",
-          "detail": "System calendar events weave into the Today and Upcoming task views so your whole day is in one place.",
-          "section": "tasks"
-        },
-        {
-          "title": "Organize projects with headings",
-          "detail": "Group tasks under section headings inside a project, and bring them over cleanly when importing from Things.",
+          "title": "A big upgrade to tasks",
+          "detail": "Attach files to tasks, drag them onto Today to reschedule, select several at once for bulk actions, and pick dates with a faster redesigned picker.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest for 30 days with one-tap restore before they auto-purge.",
+          "detail": "Deleted tasks now rest in a Recently Deleted view for 30 days so you can restore anything you removed by mistake.",
           "section": "tasks"
         },
         {
-          "title": "Drag, multi-select, and file tasks faster",
-          "detail": "Drop tasks onto Today, act on many at once, and get filing suggestions with an undo toast for every change.",
+          "title": "Your calendar, woven into Today",
+          "detail": "System calendar events now appear alongside your tasks in Today and Upcoming so you see the whole day in one place.",
           "section": "tasks"
         },
         {
-          "title": "Pin goals to your week dashboard",
-          "detail": "Pin any measurable goal to see it front and center and act on it right from the tile.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring tasks over from a Things export, with headings mapped into project sections to keep long projects organized.",
+          "section": "tasks"
+        },
+        {
+          "title": "Smarter training sessions",
+          "detail": "Edit session start and end times, get one-tap progression hints on strength sets, and review effort-weighted muscle volume after each week, with a hands-free auto-advance flow and Live Activity.",
+          "section": "training"
+        },
+        {
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter most in view as tiles on your week dashboard, with quick actions right from the tile.",
           "section": "goals"
         },
         {
-          "title": "Richer training sessions",
-          "detail": "Edit session start and end times, get one-tap progression hints on strength sets, and follow an auto-advancing rest flow with a Live Activity.",
-          "section": "training"
+          "title": "Clearer privacy controls",
+          "detail": "Choose how much anonymous usage data you share across a graded ladder, and see exactly what was sent in a recent-activity log.",
+          "section": null
         }
       ]
     },
