@@ -184,6 +184,15 @@ struct TaskListView: View {
   /// local-store rebuild. A short generation debounce collapses a burst into
   /// the newest read while keeping optimistic row patches immediate.
   @State private var loadGeneration: UInt = 0
+  /// A background refresh (`.septenaTasksChanged` / `.septenaStructureChanged`)
+  /// arrived while an inline editor / quick-add / composer owned the keyboard.
+  /// Reassigning `items` under an open editor re-diffs the `LazyVStack` and drops
+  /// the field's first-responder mid-keystroke (the "type one char, lose focus"
+  /// bug — the create that opens the quick-add posts its own change notification
+  /// whose debounced reload lands just as you start typing). So we hold the
+  /// reload here and run it once the editor folds (`listInputActive` falling
+  /// edge), the way Things/Reminders never reshuffle the list while you type.
+  @State private var pendingReloadWhileEditing = false
 
   /// IDs of tasks completed during this view's lifetime. On Project / Area
   /// pages we want to hide historical completions but keep just-completed
@@ -629,11 +638,17 @@ struct TaskListView: View {
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
       .filter { taskChangeMayAffectCurrentList($0) }
       .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-      Task { await load() }
+      reloadOrDeferWhileEditing()
     }
     .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
       .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-      Task { await load() }
+      reloadOrDeferWhileEditing()
+    }
+    // The moment an inline editor / quick-add / composer folds, catch up on any
+    // background refresh we held back so the list never reshuffles under a
+    // focused title field (the "type one char, lose focus" bug).
+    .onChange(of: listInputActive) { _, active in
+      if !active { flushDeferredReloadIfNeeded() }
     }
     // EventKit fires this when calendar data changes (an event added/edited in
     // Calendar, a remote calendar sync). Re-read so the woven agenda stays live
@@ -666,6 +681,7 @@ struct TaskListView: View {
       quickAddDraftId = nil
       quickAddDraftAtTop = false
       quickAddGroupTarget = nil
+      pendingReloadWhileEditing = false
       // Re-fetch the woven calendar agenda SYNCHRONOUSLY, in the same
       // transaction as the filter change. The view is reused across filter
       // swaps, so without this the body re-renders for the new filter while
@@ -3403,6 +3419,26 @@ struct TaskListView: View {
       if let i = rows.firstIndex(where: { $0.id == id }) { rows[i].status = .done }
     }
     return (rows, done)
+  }
+
+  /// Reload the list UNLESS an editor owns the keyboard. Background refreshes
+  /// (sibling/remote task changes, structure changes) must never replace `items`
+  /// while an inline title field is focused — the array swap re-diffs the
+  /// `LazyVStack` and steals first-responder mid-keystroke. Deferred reloads
+  /// coalesce into a single `load()` when the editor folds (see
+  /// `flushDeferredReloadIfNeeded`).
+  private func reloadOrDeferWhileEditing() {
+    guard !listInputActive else { pendingReloadWhileEditing = true; return }
+    Task { await load() }
+  }
+
+  /// Run a reload that was held back while an editor was open. Fired on the
+  /// `listInputActive` falling edge so the list catches up to any background
+  /// changes the moment the field lets go of the keyboard.
+  private func flushDeferredReloadIfNeeded() {
+    guard pendingReloadWhileEditing, !listInputActive else { return }
+    pendingReloadWhileEditing = false
+    Task { await load() }
   }
 
   private func load() async {
