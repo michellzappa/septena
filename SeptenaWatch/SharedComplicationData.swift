@@ -74,17 +74,31 @@ struct FastingComplication: Codable, Hashable {
   /// the post-dinner case (Case B, gated on the evening hour + grace). Elapsed is
   /// always derived from the real `lastMealAt`, so it stays exact regardless.
   func liveState(now: Date) -> (isFasting: Bool, elapsed: TimeInterval) {
+    let elapsed = max(0, now.timeIntervalSince(lastMealAt))
     let cal = Calendar.current
+    // Bucket the anchor by whole-day distance, not just "same day?". The phone
+    // anchors to the most recent meal in the last 2 days, so a skipped/unlogged
+    // day leaves an anchor that is 2+ days old. Collapsing that into the
+    // "yesterday" branch made Case A assert a live fast while elapsed ballooned
+    // across the gap (the phantom 37h counter). Only today (Case B) or a genuine
+    // yesterday (Case A) is a credible live fast; an older anchor is a data gap,
+    // so revert to macros.
+    let dayGap = cal.dateComponents(
+      [.day], from: cal.startOfDay(for: lastMealAt),
+      to: cal.startOfDay(for: now)).day ?? 0
     let inputs: FastingStateInputs
-    if cal.isDate(lastMealAt, inSameDayAs: now) {
+    switch dayGap {
+    case 0:
       inputs = FastingStateInputs(todayLatestMeal: sinceLabel,
                                   todayMealCount: 1, yesterdayLastMeal: nil)
-    } else {
+    case 1:
       inputs = FastingStateInputs(todayLatestMeal: nil,
                                   todayMealCount: 0, yesterdayLastMeal: sinceLabel)
+    default:
+      return (false, elapsed)
     }
     let fasting = computeFastingState(inputs: inputs, now: now).isFasting
-    return (fasting, max(0, now.timeIntervalSince(lastMealAt)))
+    return (fasting, elapsed)
   }
 }
 
