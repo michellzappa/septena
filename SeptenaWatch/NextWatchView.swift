@@ -661,7 +661,7 @@ struct NextItemRow: View {
 
   private var rowBody: some View {
     HStack(spacing: 9) {
-      Image(systemName: done ? "checkmark.circle.fill" : kindIcon)
+      Image(systemName: done ? "checkmark.square.fill" : kindIcon)
         .font(.body)
         .foregroundStyle(iconColor)
         .frame(width: 18)
@@ -722,14 +722,15 @@ struct NextItemRow: View {
   }
 
   // The leading glyph. Completable rows (task / habit / supplement / chore) all
-  // collapse to a plain `circle` — a real checkbox that the caller fills to a
-  // green `checkmark.circle.fill` when done. The per-kind symbols (repeat.circle
-  // / pill / house …) were redundant once each section became its own titled
-  // page: every row under "Habits" wore the same habit glyph the title already
-  // names. Suggestions aren't completable, so they keep an indicative `lightbulb`
-  // rather than a checkbox that would imply they can be ticked off.
+  // collapse to a plain `square` — a real checkbox (matching the phone's square
+  // checkbox) that the caller fills to a green `checkmark.square.fill` when done.
+  // The per-kind symbols (repeat.circle / pill / house …) were redundant once
+  // each section became its own titled page: every row under "Habits" wore the
+  // same habit glyph the title already names. Suggestions aren't completable, so
+  // they keep an indicative `lightbulb` rather than a checkbox that would imply
+  // they can be ticked off.
   private var kindIcon: String {
-    isSuggestion ? "lightbulb" : "circle"
+    isSuggestion ? "lightbulb" : "square"
   }
 }
 
