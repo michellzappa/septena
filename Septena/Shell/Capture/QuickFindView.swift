@@ -8,6 +8,11 @@ import SwiftData
 // launch other sections.
 
 struct QuickFindView: View {
+  /// Hosted as a real Search TAB (Septask's iOS 26 separated trailing slot)
+  /// rather than a modal palette: drop the Cancel button and don't `dismiss()`
+  /// on activation — routing to a result just switches tabs. Default `false`
+  /// keeps the modal (⌘K / menu) behavior everywhere else.
+  var embedded: Bool = false
   @Environment(\.dismiss) private var dismiss
   @Environment(NavigationState.self) private var nav
   @Environment(\.a11yMotion) private var motion
@@ -30,8 +35,10 @@ struct QuickFindView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-          ToolbarItem(placement: .cancellationAction) {
-            Button("Cancel") { dismiss() }
+          if !embedded {
+            ToolbarItem(placement: .cancellationAction) {
+              Button("Cancel") { dismiss() }
+            }
           }
         }
         #if os(iOS)
@@ -224,7 +231,9 @@ struct QuickFindView: View {
     } else {
       nav.go(to: hit.route)
     }
-    dismiss()
+    // Modal palette closes itself; the search TAB stays put — routing already
+    // switched the frontmost tab to the result's list.
+    if !embedded { dismiss() }
   }
 
   // MARK: - Empty state

@@ -3,10 +3,12 @@ import SwiftUI
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
 /// module" in both apps; Today and Upcoming are first-class smart-list tabs;
-/// the trailing `+` is an action, not a destination — it presents quick-add
-/// and selection never actually moves to it.
+/// the trailing `search` tab is a genuine Search destination — the ONLY thing
+/// iOS 26 renders in the tab bar's detached trailing slot (a `role: .search`
+/// tab). Quick-add is NOT a tab: every list already carries a nav-bar `+`
+/// (`pageChrome`) and ⌘N, so capture lives there, not in the bar.
 enum SeptaskTab: Hashable {
-  case tasks, today, upcoming, add
+  case tasks, today, upcoming, search
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -143,18 +145,13 @@ struct SeptaskRootView: View {
   }
 
   #if os(iOS)
-  /// Standard iOS 26 `TabView`, with the `+` in the system's separated trailing
-  /// slot. Selecting it presents quick-add while preserving the current tab.
+  /// Standard iOS 26 `TabView`. The detached trailing slot is a real Search tab
+  /// (`role: .search`) — the only content iOS 26 pulls out of the tab cluster
+  /// into its own separated slot; a plain action tab just renders inline. So the
+  /// slot is genuine search (wired to `QuickFindView`), and quick-add moved to
+  /// the per-list nav-bar `+` / ⌘N.
   private var systemTabView: some View {
-    TabView(selection: Binding(
-      get: { selection },
-      set: { newValue in
-        if newValue == .add {
-          nav.presentAddInfo(section: .tasks)
-        } else {
-          selection = newValue
-        }
-      })) {
+    TabView(selection: $selection) {
       // ContentView self-tints to `theme.accent` (ink), so the Tasks tab's
       // chrome/content stays black; the reset on Today/Upcoming does the same
       // for the tabs that don't host ContentView. Only the bar's SELECTED item
@@ -168,8 +165,13 @@ struct SeptaskRootView: View {
       Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
         NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
       }
-      Tab("New To-Do", systemImage: "plus", value: SeptaskTab.add, role: .search) {
-        Color.clear
+      // The iOS 26 detached trailing slot. A genuine Search tab (searchable
+      // `QuickFindView`, hosted `embedded` so it has no modal Cancel) — this is
+      // what actually separates from the other tabs; a `role: .search` tab with
+      // non-search content renders inline instead.
+      Tab("Search", systemImage: "magnifyingglass",
+          value: SeptaskTab.search, role: .search) {
+        QuickFindView(embedded: true)
       }
     }
     .tabBarMinimizeBehavior(.onScrollDown)
