@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1479,
+      "build": 1481,
       "date": "2026-07-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused app just for tasks",
-          "detail": "A dedicated task app on iPhone, iPad, Mac and Watch over the same private data, with its own tabs, search, quick capture and Today feed",
-          "section": null
+          "title": "Septask: a focused app for just your tasks",
+          "detail": "A dedicated task app for iPhone, iPad, Mac, and Watch that works over the same private data as Septena.",
+          "section": "tasks"
         },
         {
-          "title": "A rebuilt task experience",
-          "detail": "Inline editing, drag to re-home, multi-select bulk actions, a redesigned date picker, and undo toasts for delete, move and defer",
+          "title": "Snap a photo to log a meal",
+          "detail": "Photo-first meal capture reads the label on-device and prefills the details for you.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Your calendar now lives in Today",
+          "detail": "System calendar events weave into the Today and Upcoming task views so your whole day is in one place.",
+          "section": "tasks"
+        },
+        {
+          "title": "Organize projects with headings",
+          "detail": "Group tasks under section headings inside a project, and bring them over cleanly when importing from Things.",
           "section": "tasks"
         },
         {
           "title": "Recently Deleted for tasks",
-          "detail": "Removed tasks land in a Recently Deleted view with restore and a 30-day auto-purge",
+          "detail": "Deleted tasks rest for 30 days with one-tap restore before they auto-purge.",
           "section": "tasks"
         },
         {
-          "title": "Your calendar woven into Today",
-          "detail": "Optional read-only calendar events appear alongside tasks in Today and Upcoming",
+          "title": "Drag, multi-select, and file tasks faster",
+          "detail": "Drop tasks onto Today, act on many at once, and get filing suggestions with an undo toast for every change.",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal logging",
-          "detail": "Snap a meal and have it analyzed on-device to prefill the details, with optional ingredient breakdowns and percentage-scaled re-logging",
-          "section": "nutrition"
-        },
-        {
-          "title": "Smarter training sessions",
-          "detail": "Editable start and end times, an effort-weighted weekly muscle review, a live progress chart, one-tap progression hints, and a rest timer that auto-advances with a watch Live Activity",
-          "section": "training"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Pin any measurable goal to the week dashboard as its own tile with contextual actions",
+          "title": "Pin goals to your week dashboard",
+          "detail": "Pin any measurable goal to see it front and center and act on it right from the tile.",
           "section": "goals"
         },
         {
-          "title": "Clearer privacy controls",
-          "detail": "Graded analytics levels from off to full, a plain view of exactly what is sent, and a recently-sent log",
-          "section": null
+          "title": "Richer training sessions",
+          "detail": "Edit session start and end times, get one-tap progression hints on strength sets, and follow an auto-advancing rest flow with a Live Activity.",
+          "section": "training"
         }
       ]
     },
