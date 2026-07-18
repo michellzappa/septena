@@ -2040,10 +2040,6 @@ struct TrainingSessionView: View {
       SessionCompleteSheet(
         stats: stats,
         accent: accent,
-        onDone: {
-          completionStats = nil
-          dismiss()
-        },
         onFinish: { text, finishedAt in
           let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
           if !trimmed.isEmpty {
@@ -2053,6 +2049,10 @@ struct TrainingSessionView: View {
           SeptenaServices.shared.trainingMutator.setSessionEndedAt(
             date: stats.date, sessionType: stats.sessionType,
             endedAt: EventTimestamp.localISO(from: finishedAt))
+        },
+        onDone: {
+          completionStats = nil
+          dismiss()
         })
       #if os(iOS)
       .presentationDetents([.large])
