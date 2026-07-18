@@ -4,64 +4,54 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1471,
-      "date": "2026-07-17",
+      "build": 1473,
+      "date": "2026-07-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "A focused Tasks app: Septask",
-          "detail": "Septask is a new standalone app for iPhone, iPad, and Mac that works on the same private task data as Septena, with its own settings, windows, quick actions, and a watch app with a today-tasks complication.",
-          "section": "tasks"
+          "title": "Meet Septask, a focused task app",
+          "detail": "A dedicated, streamlined app for your tasks on iPhone, iPad, Mac, and Watch, working over the same private data as Septena",
+          "section": null
         },
         {
-          "title": "Tasks got a full rework",
-          "detail": "Inline editing, multi-select bulk actions, drag onto Today, project headings, task attachments, a Recently Deleted view with 30-day purge and undo, a redesigned date picker, markdown-aware notes, and Things import.",
+          "title": "A faster, richer way to work with tasks",
+          "detail": "Edit titles inline, select and act on several tasks at once, drag tasks onto Today, group projects with section headings, and add notes and attachments",
           "section": "tasks"
         },
         {
           "title": "Calendar events in Today and Upcoming",
-          "detail": "Your system calendar now weaves into the task lists as quiet agenda rows, read-only and opt-in, with hidden-calendar choices synced across devices.",
+          "detail": "Your agenda now appears alongside tasks, with only remaining events shown",
           "section": "tasks"
         },
         {
-          "title": "Photo-first meal capture",
-          "detail": "Snap a meal and Septena analyzes it on-device to prefill the macros, with an optional ingredient breakdown and re-logged meals scaled by percentage.",
+          "title": "Recover deleted tasks",
+          "detail": "Recently Deleted keeps tasks for 30 days with one-tap restore before they purge",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo of your meal",
+          "detail": "Photo-first meal capture analyzes the picture on-device to prefill macros, with an optional ingredient breakdown",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions that guide the set",
-          "detail": "Auto-advance replaces the rest timer, sessions carry a real span with a watch Live Activity, and a post-session weekly review shows effort-weighted muscle volume alongside one-tap progression hints.",
+          "title": "Smarter training sessions",
+          "detail": "Effort-weighted muscle volume with a weekly review, one-tap progression hints, a live progress chart, and an auto-advancing rest flow with a Watch Live Activity",
           "section": "training"
         },
         {
-          "title": "The home screen follows the real sky",
-          "detail": "The day dial sits under a wash of the actual sky outside, and the dashboard now hosts pinned goals as tiles you can act on directly.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep the goals that matter front and center on the week dashboard and toggle habit-backed goals right from their tile",
+          "section": "goals"
+        },
+        {
+          "title": "You decide what's shared",
+          "detail": "Graded privacy levels let you choose exactly how much anonymized telemetry is sent, with a log of what recently left your device",
           "section": null
         },
         {
-          "title": "The watch feed grew up",
-          "detail": "A vertically paged Next feed over a time-of-day sky, long-press action drawers, intake summary tiles you can tap to quick-add, and a fasting complication that morphs overnight.",
-          "section": null
-        },
-        {
-          "title": "Home screen widgets",
-          "detail": "Next, Today, and dashboard tiles are now widgets that share the app's rendering, on a native container surface.",
-          "section": null
-        },
-        {
-          "title": "Keyboard-first on Mac and iPad",
-          "detail": "Native selection and arrow navigation across the sidebar, task lists, and Next feed, plus a consistent shortcut map, Quick Find, and per-window command menus.",
-          "section": "tasks"
-        },
-        {
-          "title": "Privacy telemetry you can read",
-          "detail": "Analytics moved to graded levels (off, minimal, balanced, full) with a checklist of what each sends and a log of what was recently sent.",
-          "section": null
-        },
-        {
-          "title": "Claude connection, clarified",
-          "detail": "One connection status, a shared reconnect nudge across both apps, the local MCP token stored in Keychain, and new mood and training-routine tools.",
+          "title": "Home-screen widgets and a richer Watch",
+          "detail": "New Today and Next widgets, plus a Watch feed with a time-of-day sky, quick-add intake tiles, and updated ring complications",
           "section": null
         }
       ]
