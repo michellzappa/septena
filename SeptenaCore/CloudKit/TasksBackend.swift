@@ -391,18 +391,20 @@ final class CloudKitTasksBackend {
     guard let entity = fetch(id: id) else { return }
     // Deadline is rendering-only (Things-style): the Today filter unions
     // `due <= today` rows at view time, so a deadline-today task already shows
-    // in Today without mutating `today`. We intentionally do NOT auto-pin when
-    // *setting* a deadline — pinning made inclusion sticky, so pushing the
-    // deadline back out later left a stale row stranded in Today.
+    // in Today without mutating `today`. We do NOT auto-pin merely because a
+    // deadline lands *on* Today — the deadline itself carries it there, and
+    // pinning made inclusion sticky (a later push-out then stranded the row).
     //
-    // Clearing the deadline is the exception. A due/overdue task that lived in
-    // Today solely because of its deadline would silently vanish when you strip
-    // the due date — which isn't what removing a date implies. So if the task
-    // is in Today *only* because of this deadline (not pinned, no scheduled
-    // date holding it there), pin it so it stays. The user can still un-Today
-    // it explicitly. See `LocalCache.tasks(.today)`.
-    if date == nil, !entity.today, entity.isOnToday,
-       !(entity.scheduled.map { $0 <= SeptenaDate.today } ?? false) {
+    // But a row already living on Today must not silently vanish just because
+    // you *change* its deadline. If the task is in Today *only* because of its
+    // (old) deadline — not pinned, no scheduled date holding it there — and the
+    // new deadline no longer places it on Today (cleared, or moved to a future
+    // day), pin it so it stays. Re-dating a due-today row to tomorrow keeps it
+    // in Today; the user can still un-Today it explicitly. See
+    // `LocalCache.tasks(.today)`.
+    let heldByScheduled = entity.scheduled.map { $0 <= SeptenaDate.today } ?? false
+    let newDeadlineOnToday = SeptenaDate.format(date).map { $0 <= SeptenaDate.today } ?? false
+    if !entity.today, entity.isOnToday, !heldByScheduled, !newDeadlineOnToday {
       entity.today = true
       entity.todaySetOn = SeptenaDate.today
     }
