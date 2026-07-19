@@ -26,50 +26,76 @@ struct QuickFindView: View {
 
   private static let resultLimit = 12
 
+  private static let searchPrompt = "Search tasks, projects, areas…"
+
   var body: some View {
-    NavigationStack {
-      content
-        .background(Theme.paperBackground)
-        .navigationTitle("Search")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-          if !embedded {
-            ToolbarItem(placement: .cancellationAction) {
-              Button("Cancel") { dismiss() }
-            }
+    searchHost
+      .onChange(of: query) { selection = 0 }
+  }
+
+  /// Two hosting contracts for the SAME search UI:
+  ///  • Modal palette (⌘K / menu): the search bar is pinned in the nav-bar
+  ///    drawer and focus is forced on appear, so the palette opens type-ready.
+  ///  • Search TAB (Septask's iOS 26 detached slot): the tab morphs into the
+  ///    system's own search field, which requires `.searchable` on the
+  ///    `NavigationStack` with DEFAULT placement. Forcing `.navigationBarDrawer`
+  ///    + on-appear focus inside a `role: .search` tab collides with that
+  ///    system presentation, which aborts the search session ("Unable to
+  ///    search" / a cancelled search) even though results still render. So the
+  ///    tab lets the system own placement and focus.
+  @ViewBuilder
+  private var searchHost: some View {
+    if embedded {
+      NavigationStack { stackContent }
+        .searchable(text: $query, prompt: Self.searchPrompt)
+    } else {
+      NavigationStack {
+        stackContent
+          #if os(iOS)
+          .searchable(
+            text: $query,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Self.searchPrompt
+          )
+          #else
+          .searchable(text: $query, prompt: Self.searchPrompt)
+          #endif
+          .searchFocused($searchFocused)
+      }
+      .onAppear {
+        // Reliably focus the search field on open (macOS doesn't auto-focus
+        // `.searchable` the way iOS does), so you can type immediately.
+        searchFocused = true
+      }
+    }
+  }
+
+  private var stackContent: some View {
+    content
+      .background(Theme.paperBackground)
+      .navigationTitle("Search")
+      #if os(iOS)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        if !embedded {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
           }
         }
-        #if os(iOS)
-        .searchable(
-          text: $query,
-          placement: .navigationBarDrawer(displayMode: .always),
-          prompt: "Search tasks, projects, areas…"
-        )
-        #else
-        .searchable(
-          text: $query,
-          prompt: "Search tasks, projects, areas…"
-        )
-        #endif
-        .searchFocused($searchFocused)
-        .onSubmit(of: .search, activateSelected)
-        .onKeyPress(.upArrow) {
-          selection = max(0, selection - 1)
-          return .handled
-        }
-        .onKeyPress(.downArrow) {
-          selection = min(max(0, hits.count - 1), selection + 1)
-          return .handled
-        }
-    }
-    .onAppear {
-      // Reliably focus the search field on open (macOS doesn't auto-focus
-      // `.searchable` the way iOS does), so you can type immediately.
-      searchFocused = true
-    }
-    .onChange(of: query) { selection = 0 }
+      }
+      // `.onSubmit(of: .search)` sits inside the stack for both contracts — the
+      // `.searchable` environment (whether on the stack or its content) reaches
+      // here either way.
+      .onSubmit(of: .search, activateSelected)
+      .onKeyPress(.upArrow) {
+        selection = max(0, selection - 1)
+        return .handled
+      }
+      .onKeyPress(.downArrow) {
+        selection = min(max(0, hits.count - 1), selection + 1)
+        return .handled
+      }
   }
 
   @ViewBuilder
