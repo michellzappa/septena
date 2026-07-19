@@ -431,6 +431,22 @@ struct TaskComposerCard: View {
       .lineLimit(singleLine ? 1...1 : 1...2)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
+      // Match the closed row's title `Text` box so the two center-align to the
+      // same place: `.fixedSize` gives the field the same tight vertical box a
+      // `Text` has, and the shared band (`Theme.checkboxTap`, centered) makes the
+      // closed `Text` and this `TextField` occupy an identical box on the same
+      // checkbox line. This is the closest reliable match (a plain `TextField`
+      // still differs from `Text` sub-pixel; baseline alignment was worse because
+      // SwiftUI mis-reports a vertical-axis field's baseline). Inline only.
+      .fixedSize(horizontal: false, vertical: true)
+      .frame(minHeight: presentation == .inline ? Theme.checkboxTap : 0,
+             alignment: .center)
+      // Edit mode renders the title a few points HIGHER than the closed row's
+      // `Text` — the UITextView text-container inset. Since open/close is now
+      // instant (no animation to smear it), a fixed downward shift plants the
+      // editing glyphs back on the closed-row line. Visual-only. Tune the one
+      // constant until it sits still. Inline only.
+      .offset(y: presentation == .inline ? Self.editModeTitleDrop : 0)
       .focused($focus, equals: .title)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
@@ -442,6 +458,19 @@ struct TaskComposerCard: View {
       }
       .septenaOnEscape(requestKeyboardCancel)
       .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
+  }
+
+  /// How far to drop the inline edit-mode title so its glyphs land on the closed
+  /// row's text line (counters the UITextView text-container inset). The single
+  /// tuning knob for the view↔edit jump — raise if the title still sits high in
+  /// edit mode, lower if it now sits low. Points, positive = down. iOS only for
+  /// now (macOS's field editor has a different inset and hasn't shown the jump).
+  private static var editModeTitleDrop: CGFloat {
+    #if os(iOS)
+    return 1
+    #else
+    return 0
+    #endif
   }
 
   /// Recompute whether the inline title needs a second line so the field can

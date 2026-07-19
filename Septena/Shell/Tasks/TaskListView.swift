@@ -275,11 +275,14 @@ struct TaskListView: View {
   @State private var headingRenameTarget: SeptenaTask?
   @State private var headingDeleteTarget: SeptenaTask?
   @State private var headingDraftTitle: String = ""
-  /// Shared namespace for the title hero-glide: the closed row's title and the
-  /// open inline editor's title field carry the same `matchedGeometryEffect` id,
-  /// so on expand/collapse the title moves between the two positions instead of
-  /// cross-fading. See `CheckableRow.titleMatchID` / `editTitleMatchID`.
-  @Namespace private var editTitleNS
+  // The title/checkbox hero-glide (`matchedGeometryEffect`) was removed: it
+  // ANIMATED the title's position between the closed row and the inline editor,
+  // and because a `Text` and a `TextField` never sit at a pixel-identical
+  // baseline, that glide is exactly what made the title travel (down-then-up on
+  // open, down again on blur). Opening the editor now cross-fades opacity in
+  // place — no position animation — so the title cannot move. The residual
+  // static `Text`↔`TextField` baseline gap is absorbed by the field's own
+  // `.offset` compensation (see `TaskComposerCard.titleField`).
 
   // Upcoming-only: the multi-day grid has no single list context, so ⌘N / + fall
   // back to the drawer composer (pick a day). Every other creatable list spawns
@@ -837,10 +840,15 @@ struct TaskListView: View {
   /// `TextField` on macOS without the List focus/selection corruption.
   private func beginEdit(_ task: SeptenaTask) {
     guard !closeActiveEditIfNeeded(except: task.id) else { return }
-    withAnimation(.snappy(duration: 0.22)) {
-      selection = [task.id]
-      expandedEditId = task.id
-    }
+    // Open INSTANTLY — no animated transaction. An animated open cross-faded the
+    // closed `Text` row and the editor `TextField` row (both carry
+    // `.transition(.opacity)`): the dim mid-fade was the "flash", and the spring
+    // animated the residual `Text`↔`TextField` baseline delta as visible title
+    // travel. With no animation, neither transition plays, so the title swaps in
+    // place — the equal title band (`CheckableRow.titleBandHeight`) keeps its
+    // position identical, giving no flash and no move.
+    selection = [task.id]
+    expandedEditId = task.id
   }
 
   /// Fold the inline editor shut (its `.onDisappear` autosaves). Called by the
@@ -854,11 +862,12 @@ struct TaskListView: View {
   private func collapseEdit() {
     let closingId = expandedEditId
     if let closingId { clearQuickAddCaptureSlot(for: closingId) }
-    withAnimation(.snappy(duration: 0.22)) {
-      expandedEditId = nil
-      if let closingId, selection.isEmpty || selection == [closingId] {
-        selection = [closingId]
-      }
+    // Close INSTANTLY too — a matching, un-animated fold so the editor→closed
+    // swap doesn't cross-fade (the "flash" on blur) or animate the baseline
+    // delta (the drop). See `beginEdit`.
+    expandedEditId = nil
+    if let closingId, selection.isEmpty || selection == [closingId] {
+      selection = [closingId]
     }
     // Dropping an untouched inline-create draft is owned by the editor's
     // `onVanish` (fired right after its autosave on teardown) — never a timed
@@ -2253,7 +2262,7 @@ struct TaskListView: View {
       onToggleComplete: { toggle(task) },
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
-      heroMatchNS: editTitleNS,
+      heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
       heroMatchIsSource: expandedEditId == task.id,
       showsTodayIndicator: filter != .today,
       onDone: {
@@ -2386,7 +2395,7 @@ struct TaskListView: View {
       accessory: accessory,
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
-      heroMatchNS: editTitleNS,
+      heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
       heroMatchIsSource: expandedEditId != task.id,
       onToggle: { toggle(task) },
       onTap: nil

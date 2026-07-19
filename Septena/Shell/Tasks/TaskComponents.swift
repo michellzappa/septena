@@ -640,6 +640,14 @@ struct CheckableRow<Trailing: View>: View {
   /// end of the title text — never in the right-aligned trailing slot.
   var showsNotesGlyph: Bool = false
   var subtitle: String? = nil
+  /// Fixed minimum height for the title's single-line box, centered on the
+  /// checkbox line. Task rows opt in (via `TaskRow`) so the CLOSED row's title
+  /// `Text` and the OPEN inline editor's `TextField` occupy an IDENTICAL,
+  /// centered box on the same checkbox line — the closest reliable match between
+  /// the two (they still differ sub-pixel; baseline alignment was worse because
+  /// SwiftUI mis-reports a vertical-axis field's baseline). nil (non-task rows)
+  /// keeps the intrinsic height. See `TaskComposerCard.titleField`.
+  var titleBandHeight: CGFloat? = nil
   /// Neutral selection capsule while this row's detail/edit modal is open
   /// (drawer surfaces — the deep list paints via `listRowBackground` instead).
   var isSelected: Bool = false
@@ -718,6 +726,9 @@ struct CheckableRow<Trailing: View>: View {
 
       VStack(alignment: .leading, spacing: 4) {
         titleLine
+          // Equal, centered title box across view ↔ edit (see `titleBandHeight`).
+          // `minHeight: 0` (non-task rows) is a no-op, preserving intrinsic size.
+          .frame(minHeight: titleBandHeight ?? 0, alignment: .center)
           .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         if let subtitle {
           Text(subtitle)
@@ -954,6 +965,10 @@ struct TaskRow: View {
       title: task.title,
       showsNotesGlyph: hasNotes,
       subtitle: subtitle,
+      // Pin the title box to the checkbox band so it matches the inline editor's
+      // field (closest reliable view↔edit match). Normal rows already stand at
+      // this height (the checkbox sets it), so nothing visibly changes here.
+      titleBandHeight: Theme.checkboxTap,
       isSelected: isSelected,
       isListSelected: isListSelected,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),
