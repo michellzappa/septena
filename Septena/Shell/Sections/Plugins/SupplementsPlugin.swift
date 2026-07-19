@@ -105,6 +105,15 @@ enum SupplementsPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "supplements.days_active_week", sectionKey: "supplements",
+                    text: "Take supplements every day",
+                    comparator: "gte", target: 7, upper: nil,
+                    window: "calendarWeek", unitLabel: "days", recommended: true),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }

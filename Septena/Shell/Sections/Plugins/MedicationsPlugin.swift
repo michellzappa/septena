@@ -126,6 +126,15 @@ enum MedicationsPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "medications.skipped_week", sectionKey: "medications",
+                    text: "Never skip a dose",
+                    comparator: "lte", target: 0, upper: nil,
+                    window: "calendarWeek", unitLabel: "doses", recommended: true),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }

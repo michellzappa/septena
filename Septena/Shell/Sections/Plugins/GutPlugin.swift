@@ -106,6 +106,15 @@ enum GutPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "gut.bristol_avg", sectionKey: "gut",
+                    text: "Keep Bristol type in the 3–4 range",
+                    comparator: "range", target: 3, upper: 4,
+                    window: "calendarWeek", unitLabel: "bristol", recommended: false),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }

@@ -119,6 +119,15 @@ enum SymptomsPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "symptoms.avg_severity", sectionKey: "symptoms",
+                    text: "Keep average severity at 3/10 or under",
+                    comparator: "lte", target: 3, upper: nil,
+                    window: "calendarWeek", unitLabel: "/10", recommended: false),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }

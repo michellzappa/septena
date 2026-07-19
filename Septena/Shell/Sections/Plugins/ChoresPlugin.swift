@@ -104,6 +104,15 @@ enum ChoresPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "chores.completed_week", sectionKey: "chores",
+                    text: "Finish 5 chores a week",
+                    comparator: "gte", target: 5, upper: nil,
+                    window: "calendarWeek", unitLabel: "chores", recommended: false),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }

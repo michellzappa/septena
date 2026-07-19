@@ -97,6 +97,15 @@ enum MoodPlugin: SectionPlugin {
     ]
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "mood.entry_count_week", sectionKey: "mood",
+                    text: "Log your mood 5 days a week",
+                    comparator: "gte", target: 5, upper: nil,
+                    window: "calendarWeek", unitLabel: "entries", recommended: true),
+    ]
+  }
+
   // MARK: - Settings detail pane
 
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {

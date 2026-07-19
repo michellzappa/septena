@@ -159,6 +159,15 @@ enum HabitsPlugin: SectionPlugin {
     return metrics
   }
 
+  static func suggestedGoals(context: ModelContext) -> [SuggestedGoal] {
+    [
+      SuggestedGoal(metricKey: "habits.days_active_week", sectionKey: "habits",
+                    text: "Keep habits going 6 days a week",
+                    comparator: "gte", target: 6, upper: nil,
+                    window: "calendarWeek", unitLabel: "days", recommended: true),
+    ]
+  }
+
   static func evaluateAim(metric: GoalMetric, context: ModelContext, now: Date) -> Double? {
     guard let (startStr, endStr) = GoalMetricWindow.dateStringRange(for: metric.window, now: now)
     else { return 0 }
