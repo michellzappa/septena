@@ -454,11 +454,16 @@ enum DashboardTileBuilder {
         let last = ctx.ouraNights.first
         let lastH = last?.totalH ?? 0
         let score = last?.sleepScore.map { "\($0)" } ?? "—"
-        // Oura only records completed nights, so the array ends at yesterday.
-        // Append a 0 for today (no sleep recorded yet) so buildLevelMap anchors
-        // bars[0] to today-90 instead of today-89, giving the week-rounded first
-        // column's Monday cell an actual data entry rather than a phantom gap.
-        let bars = ctx.ouraNights.reversed().map { $0.sleepScore ?? 0 } + [0]
+        // Oura dates each night to the *morning you woke up*, so last night's
+        // sleep is already dated today and sits at ouraNights.first — the array
+        // ends at today, not yesterday. So map positionally with no phantom
+        // today slot: the last bar lands on today's heatmap column, showing the
+        // night that just ended. (An earlier `+ [0]` here assumed the array
+        // stopped at yesterday, which planted an empty today and shoved every
+        // real night back a day.) Today's night may still be unsynced (nil →
+        // 0); the sparkline trims that trailing zero via trailingTodayPending,
+        // and the heatmap just shows today empty until the ring syncs.
+        let bars = ctx.ouraNights.reversed().map { $0.sleepScore ?? 0 }
         return HomepageDomainData(
           domain: .sleep,
           title: String(localized: "Sleep", comment: "Section name"),
