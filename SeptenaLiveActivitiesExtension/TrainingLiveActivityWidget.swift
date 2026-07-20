@@ -42,11 +42,13 @@ struct TrainingLiveActivityWidget: Widget {
         }
       } compactLeading: {
         Image(systemName: context.attributes.sessionIcon)
+          .foregroundStyle(trainingAccent(context.attributes))
       } compactTrailing: {
         sessionTimer(startedAt: context.attributes.startedAt, font: .caption2)
           .frame(maxWidth: 44)
       } minimal: {
         Image(systemName: context.attributes.sessionIcon)
+          .foregroundStyle(trainingAccent(context.attributes))
       }
       .widgetURL(URL(string: "septena://training/active"))
     }
@@ -63,7 +65,11 @@ private struct TrainingActivityRootView: View {
     Group {
       switch activityFamily {
       case .small:
+        // The Smart Stack card gives us no inset of its own, so the glyph would
+        // otherwise sit on the card's left edge.
         TrainingWatchStackView(context: context)
+          .padding(.leading, 10)
+          .padding(.trailing, 6)
       default:
         TrainingLockScreenView(context: context)
           .padding(16)
@@ -81,7 +87,7 @@ private struct TrainingWatchStackView: View {
     HStack(alignment: .center, spacing: 8) {
       Image(systemName: context.attributes.sessionIcon)
         .font(.body.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(trainingAccent(context.attributes))
 
       VStack(alignment: .leading, spacing: 1) {
         Text(headline)
