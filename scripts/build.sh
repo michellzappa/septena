@@ -22,6 +22,40 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" \
   || { echo "build.sh: not inside a git repo"; exit 1; }
 
+# Fail fast on the watchOS SDK/runtime gap, BEFORE taking the lock. The iOS
+# `Septena` scheme embeds the watch app, so xcodebuild resolves a watch
+# destination; if no installed simulator runtime matches the watchOS SDK the
+# active Xcode ships, it dies — either at the scheme precondition ("watchOS X
+# must be installed") or deeper down in actool compiling the complication's
+# asset catalog. Both are the same mismatch wearing different hats, and neither
+# says what to do about it. Checking here costs ~200ms and saves a full build
+# cycle plus a lock hold that the cron and 3-5 parallel sessions are queued on.
+# NEVER auto-install the runtime: that's a multi-GB download and the user's call.
+# Only `Septena` embeds SeptenaWatch (see the target's `dependencies:` in
+# project.yml) — SeptenaMac / Septask / SeptaskMac don't, and must not be gated.
+if [ "$SCHEME" = "Septena" ]; then
+  want="$(xcodebuild -showsdks 2>/dev/null \
+          | sed -n 's/.*-sdk watchsimulator\([0-9][0-9.]*\).*/\1/p' | head -1)"
+  if [ -n "$want" ] && ! xcrun simctl list runtimes 2>/dev/null \
+       | grep -q "watchOS $want"; then
+    have="$(xcrun simctl list runtimes 2>/dev/null \
+            | sed -n 's/^watchOS \([0-9][0-9.]*\) .*/\1/p' | paste -sd', ' -)"
+    cat >&2 <<EOF
+build.sh: can't build '$SCHEME' — no watchOS simulator runtime matches this Xcode.
+  Xcode ships watchOS SDK: $want
+  Installed runtimes:      ${have:-none}
+This scheme embeds the watch app, and there is no flag to skip an embedded
+target. Nothing is wrong with the project — Xcode.app works because you pick a
+concrete destination it can resolve.
+  * Change doesn't touch watch code? Gate it on macOS instead:
+        scripts/build.sh SeptenaMac 'platform=macOS'
+  * Change DOES touch watch code? Stop and tell the user: only they can decide
+    to install the watchOS $want runtime (multi-GB). Do not download it.
+EOF
+    exit 2
+  fi
+fi
+
 waited=0
 until mkdir "$LOCKDIR" 2>/dev/null; do
   age=$(( $(date +%s) - $(stat -f%m "$LOCKDIR" 2>/dev/null || date +%s) ))
