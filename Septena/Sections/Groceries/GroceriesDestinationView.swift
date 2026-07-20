@@ -20,6 +20,7 @@ struct GroceriesDestinationView: View {
   @State private var loading = true
   @State private var editing: GroceryItem? = nil
   @State private var creating = false
+  @State private var copied = false
 
   private var accent: Color { theme.color(for: "groceries") }
 
@@ -82,6 +83,15 @@ struct GroceriesDestinationView: View {
           HStack {
             Text("Shopping list")
             Spacer()
+            Button { copyList() } label: {
+              Label(copied ? "Copied" : "Copy",
+                    systemImage: copied ? "checkmark" : "doc.on.doc")
+                .labelStyle(.titleAndIcon)
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(accent)
+            .buttonStyle(.plain)
+            .inlineHover()
             Button("Mark all bought") { markAllBought() }
               .font(.subheadline.weight(.medium))
               .foregroundStyle(accent)
@@ -170,6 +180,20 @@ struct GroceriesDestinationView: View {
     grocery.setLow(id: item.id, low: !item.low)
     Task { await reload() }
     Haptics.tap()
+  }
+
+  /// Put the shopping list on the pasteboard as a plain message — one item
+  /// name per line, already in aisle order (`low` sorts by category rank), but
+  /// with no category headings or emoji so it pastes cleanly into a chat.
+  private func copyList() {
+    guard !low.isEmpty else { return }
+    SeptenaPasteboard.copy(low.map(\.name).joined(separator: "\n"))
+    Haptics.tap()
+    copied = true
+    Task {
+      try? await Task.sleep(for: .seconds(2))
+      copied = false
+    }
   }
 
   /// Clear the whole shopping list in one shot — marks every low item
