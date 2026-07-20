@@ -1,6 +1,13 @@
 # Training PT Spec — a sensible-minimum "coach brain"
 
-Status: **spec / not built.** Scope agreed 2026-06-25.
+Status: **partially built.** Scope agreed 2026-06-25.
+
+- **Verb 3 (Progress) ships**, but as a *simpler model than §3 describes* — see
+  [§3](#3-progress--reps-before-load-as-built). Read that section, not the
+  original double-progression sketch, for what actually runs.
+- Verbs 1 (Plan) and 2 (Prescribe) are still unbuilt: there is no plan/template
+  layer, so nothing stores a per-exercise rep range or load increment.
+- Verb 4 (Review) ships as the weekly muscle-balance block.
 
 ## Why
 
@@ -16,7 +23,7 @@ A PT does four verbs. Today the app does ~half of one:
 |---|---|---|
 | **Plan** | sets a weekly structure | nothing |
 | **Prescribe** | "do *this* today" | weakly — `nextPendingIndex` walks a fixed routine |
-| **Progress** | "add a rep / 2.5 kg vs last time" | has e1RM history, doesn't act on it |
+| **Progress** | "add a rep / 2.5 kg vs last time" | ✅ built — `TrainingProgression` |
 | **Review** | "back is lagging — fix it" | data exists (`MuscleVolume`), passive |
 
 The win is that the hard math already exists — effort-weighted hard sets per
@@ -92,25 +99,63 @@ For each `(Muscle, setTarget)` slot, pick one exercise where:
 Reuses the alternatives logic already in `ExercisePickerSheet.isAlternative`.
 The session is still fully user-mutable afterward — swap, add, skip as today.
 
-### 3. Progress — one linear rule (double progression)
+### 3. Progress — reps before load (as built)
 
-Per exercise, the plan stores a **rep range** and a **load increment**. The rule
-runs at session start to set today's target, and is shown as a hint:
+Implemented in
+[`TrainingProgression`](../Septena/Sections/Training/TrainingProgression.swift);
+rendered as the "Aim 62.5 kg × 5" nudge row with a one-tap **Apply** inside each
+exercise card's expanded editor in
+[`TrainingDestinationView`](../Septena/Sections/Training/TrainingDestinationView.swift).
 
-- Logged last time **at the top of the rep range** with **RIR ≤ 1**
-  (`hard`/`max`) → **add one load increment**, reset reps to bottom of range.
-- Logged in-range but not at the top → **keep load, aim +1 rep**.
-- Missed the bottom of the range, or RIR ≥ 2 across the board → **hold** (repeat
-  same target; flag a possible deload after N holds — *v2*).
+**Why it diverges from the original sketch above.** That sketch needed a stored
+per-exercise **rep range**, which lives in the plan/template layer — verb 1,
+still unbuilt. Rather than invent a global rep range (wrong for a 3-rep squat
+*and* a 15-rep lateral raise), the shipped rule keeps the same *principle* —
+reps get earned before load moves — using only what the frozen snapshot knows.
 
-Increments (default, user-editable in Settings): **+2.5 kg upper / +5 kg lower**;
-bodyweight movements progress on reps only. This is textbook beginner linear /
-double progression — deliberately the simplest honest model. No autoregulation,
-no RPE math, no fatigue model in v1.
+The rule, off `lastByExercise` (frozen at session start so hints can't shift
+mid-set) plus `recentByExercise` for stall detection:
 
-Data is already there: `DraftSession.lastByExercise`, `prBaselines`,
-`recentByExercise` are frozen pre-session snapshots, and `difficulty` carries the
-RIR-equivalent effort. The rule is pure function of those.
+| Last set rated | Suggestion | Why |
+|---|---|---|
+| **unrated** | repeat load & reps | no evidence of room; asks for a rating |
+| **max** (RIR 0) | +1 rep, same load | already at this load's ceiling |
+| **hard** (RIR 1), load stalling | +1 rep, same load | two sessions at this load already |
+| **hard** (RIR 1) | +1 load step | the one case with room for a plate |
+| **moderate** (RIR 2) | +1 rep, same load | reps have room, not the load |
+| **easy** (RIR 3+) | +2 load steps | well within reserve |
+
+Three guards that make it a coach rather than a ratchet:
+
+1. **Unrated never adds load.** A bare `default:` branch swept unrated in with
+   `hard` and added a plate every session forever. Unrated is now its own case.
+2. **Proportional cap** (`maxJumpFraction = 0.10`). The equipment step is an
+   absolute number of kilos, so an unguarded +5 kg machine step is 5% on a
+   100 kg leg press and 25% on a 20 kg cable fly. Multi-step jumps are trimmed
+   to ~10% of the last load. One step is always allowed — you can't add less
+   than the smallest thing on the rack.
+3. **Stall detection.** Two logged sessions at the same load means the load
+   isn't the thing to change; earn a rep instead.
+
+The **load step** is the equipment's natural increment from
+[`WeightCadence`](../Septena/Shell/UI/WeightCadence.swift) — barbell 2.5 kg,
+dumbbell 2 kg, machine 5 kg, micro 1 kg, inferred from the exercise name. This
+replaces the sketch's "+2.5 upper / +5 lower": equipment predicts the addable
+increment better than body region does, and it's the same step the weight
+stepper already uses.
+
+**Non-destructive by construction.** The hint never auto-fills the entry — an
+aspirational load in a log the user might Save unchanged would corrupt the
+history the rule reads from. The bump is a deliberate tap.
+
+**Setting:** Training ▸ Session ▸ *Progression hints* (on by default,
+`training.progressionHints`, device-local like the effort scale). One toggle is
+the whole surface — the increment isn't user-editable because per-exercise
+increments belong to the plan layer, not a global override.
+
+Still deferred: per-exercise rep ranges and increments (needs verb 1), deload
+prescription after repeated stalls, bodyweight-movement progression (reps-only
+lifts have no `weight`, so they get no hint today).
 
 ### 4. Review — on the session-conclusion page
 
@@ -195,7 +240,8 @@ targets-as-goals bridge).
 - ❌ Calendar scheduling / "rest day" enforcement (just show what's next)
 
 Deferred to v2: deload suggestion after repeated holds; smarter substitution
-ranking; per-session readiness from sleep/HRV; cardio plan.
+ranking; per-session readiness from sleep/HRV; cardio plan; per-exercise rep
+ranges and load increments (blocked on the plan/template layer, verb 1).
 
 ---
 

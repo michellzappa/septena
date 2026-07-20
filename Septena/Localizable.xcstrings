@@ -7,6 +7,9 @@
     " " : {
 
     },
+    "–" : {
+
+    },
     "—" : {
 
     },
@@ -328,6 +331,12 @@
           }
         }
       }
+    },
+    "%@ min" : {
+
+    },
+    "%@ min total" : {
+
     },
     "%@ ml" : {
       "shouldTranslate" : false
@@ -5618,6 +5627,9 @@
         }
       }
     },
+    "Nothing logged." : {
+
+    },
     "Nothing on Today" : {
       "localizations" : {
         "pt-BR" : {
@@ -7366,6 +7378,9 @@
       }
     },
     "Suggestions" : {
+
+    },
+    "Suggests a target for each strength set based on last time and how hard you rated it. Reps come before weight: load only goes up when the last set had room. Nothing is filled in for you until you tap Apply." : {
 
     },
     "Summarized from %@ sections." : {

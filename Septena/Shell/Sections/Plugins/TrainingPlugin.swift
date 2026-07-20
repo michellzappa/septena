@@ -246,6 +246,8 @@ enum TrainingPlugin: SectionPlugin {
 private struct TrainingDetailContent: View {
   @AppStorage(EffortScale.storageKey) private var effortScaleRaw = EffortScale.difficulty.rawValue
   @AppStorage(TrainingDraftStore.autoAdvanceKey) private var autoAdvanceNext = TrainingDraftStore.defaultAutoAdvance
+  @AppStorage(TrainingProgression.enabledKey)
+  private var progressionHintsOn = TrainingProgression.defaultEnabled
 
   var body: some View {
     Section("Training") {
@@ -270,6 +272,10 @@ private struct TrainingDetailContent: View {
     Section {
       Toggle("Auto-advance to next exercise", isOn: $autoAdvanceNext)
       Text("After saving a set, open the next pending exercise automatically. Turn off to stay on the session list.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Toggle("Progression hints", isOn: $progressionHintsOn)
+      Text("Suggests a target for each strength set based on last time and how hard you rated it. Reps come before weight: load only goes up when the last set had room. Nothing is filled in for you until you tap Apply.")
         .font(.caption)
         .foregroundStyle(.secondary)
     } header: {

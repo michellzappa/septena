@@ -43,6 +43,8 @@ struct TrainingDestinationView: View {
   @State private var mode: DrawerMode = .remembered(for: "training", default: .log)
   /// Whether the one-shot empty-state nudge has run for this appearance.
   @State private var didNudge = false
+  /// Session whose editor (category + start/end + exercises) is open.
+  @State private var editingSession: SessionEditContext?
 
   private var accent: Color { theme.color(for: "training") }
 
@@ -175,6 +177,15 @@ struct TrainingDestinationView: View {
         onSave: { updated in applyLocalUpdate(updated) }
       )
     }
+    .adaptiveDetail(item: $editingSession) { ctx in
+      EditSessionSheet(
+        context: ctx,
+        title: exerciseTitle,
+        detail: { detailLine($0) ?? "" },
+        onSave: { newType in applySessionRetag(date: ctx.date, to: newType) },
+        onEntryUpdated: { updated in applyLocalUpdate(updated) }
+      )
+    }
   }
 
   /// One day+session block: a tappable session-type header with the
@@ -184,7 +195,7 @@ struct TrainingDestinationView: View {
   private func sessionBlockView(_ block: SessionBlock) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack {
-        sessionTypeMenu(for: block)
+        sessionHeaderButton(for: block)
         Spacer()
         Text(friendlyDate(block.date))
           .foregroundStyle(.secondary)
@@ -239,61 +250,40 @@ struct TrainingDestinationView: View {
     ResponseCache.save(entries, forKey: CacheKey.entries)
   }
 
-  /// Tappable session-type picker shown in each day's section header.
-  /// Picking a new value bulk-retags every entry on that date — both in
-  /// SwiftData (via `trainingMutator.retagSession`) and in the local
-  /// `entries` array so the chart and grouping refresh immediately.
+  /// Each day's section header. Tapping opens the session editor (category,
+  /// start / end, and the session's exercises) rather than the old retag-only
+  /// dropdown — one tap target, one place to change everything about a session.
   @ViewBuilder
-  private func sessionTypeMenu(for block: SessionBlock) -> some View {
+  private func sessionHeaderButton(for block: SessionBlock) -> some View {
     let current = block.session
     let activeType = draftStore.sessionTypes.first { $0.id == current }
     let label = activeType?.label ?? (current.isEmpty ? "Untagged" : current.capitalized)
     let icon = activeType?.kind.icon ?? (current.isEmpty ? "questionmark.circle" : nil)
-    Menu {
-      // Use the routine catalog the user has configured (upper/lower/cardio/
-      // yoga/…), with a final "Untagged" option for clearing.
-      ForEach(draftStore.sessionTypes.filter { !$0.archived }, id: \.id) { st in
-        Button {
-          retag(date: block.date, to: st.id)
-        } label: {
-          // Show the routine's SF Symbol; SwiftUI Menus auto-render a
-          // trailing checkmark when the button is the active selection
-          // (no need to manually swap the systemImage).
-          Label(st.label, systemImage: st.kind.icon)
-        }
-      }
-      Divider()
-      Button {
-        retag(date: block.date, to: "")
-      } label: {
-        Label("Untagged", systemImage: "questionmark.circle")
-      }
+    Button {
+      editingSession = SessionEditContext(
+        date: block.date, session: block.session, entries: block.entries)
     } label: {
       HStack(spacing: 4) {
         if let icon { Image(systemName: icon) }
         Text(label)
-        Image(systemName: "chevron.down")
+        Image(systemName: "chevron.right")
           .font(.caption2.weight(.semibold))
           .foregroundStyle(.secondary)
       }
       .contentShape(Rectangle())
     }
-    .menuStyle(.button)
     .buttonStyle(.plain)
     .tint(accent)
   }
 
-  /// Apply a session-type change to every entry on `date`: SwiftData write
-  /// + CK sync via the mutator, plus an in-place patch of `entries` so the
+  /// Patch a session-type change into the local `entries` array after the
+  /// editor has written it through `trainingMutator.retagSession`, so the
   /// daily list and chart series re-bucket without waiting for a reload.
-  private func retag(date: String, to newSessionType: String) {
-    let count = trainingMutator.retagSession(date: date, to: newSessionType)
-    guard count > 0 else { return }
+  private func applySessionRetag(date: String, to newSessionType: String) {
     for idx in entries.indices where entries[idx].date == date {
       entries[idx].session = newSessionType
     }
     ResponseCache.save(entries, forKey: CacheKey.entries)
-    Haptics.tick()
   }
 
   private func delete(_ entry: ExerciseEntry) {
@@ -2834,6 +2824,8 @@ struct TrainingExerciseEditorBody: View {
   /// (weight×reps), true = top weight actually lifted. Tapping the chart flips
   /// it; remembered app-wide like the effort scale. No effect on cardio/mobility.
   @AppStorage("training.strength.chartTopWeight") private var strengthTopWeight = false
+  @AppStorage(TrainingProgression.enabledKey)
+  private var progressionHintsOn = TrainingProgression.defaultEnabled
 
   let index: Int
   let entry: DraftEntry
@@ -3024,36 +3016,25 @@ struct TrainingExerciseEditorBody: View {
       for: entry.exercise, metric: progressMetric, in: modelContext, today: clock.today)
   }
 
-  /// A one-tap "do a little more than last time" target for a strength set.
-  struct ProgressionHint: Equatable {
-    let weightKg: Double
-    let reps: String
-    let reason: String
-  }
+  typealias ProgressionHint = TrainingProgression.Hint
 
-  /// Linear, effort-gated progression off the frozen "last time" values
-  /// (`lastByExercise`, captured at session start so it can't shift mid-set).
-  /// The natural equipment step (`WeightCadence`) is the load increment — the
-  /// same one the weight stepper uses. Effort just gates the aggression:
-  /// - easy (RIR 3+): well within reserve → jump two steps
-  /// - max (RIR 0, to failure): at the load's ceiling → hold load, add a rep
-  /// - otherwise (hard/moderate/unrated): standard one-step load bump
-  /// Strength only; nil when there's no comparable weighted history.
+  /// Today's target off the frozen "last time" values (`lastByExercise` /
+  /// `recentByExercise`, captured at session start so they can't shift
+  /// mid-set). The rule itself lives in `TrainingProgression` so it stays a
+  /// pure function of that snapshot. Strength only; nil when there's no
+  /// comparable weighted history, or when the user turned hints off.
   private var progressionHint: ProgressionHint? {
-    guard !entry.isCardio, !entry.isMobility,
+    guard progressionHintsOn,
+          !entry.isCardio, !entry.isMobility,
           let last = store.draft?.lastByExercise[exerciseKey(entry.exercise)],
-          let w = last.weight, w > 0,
-          let repsStr = last.reps, let reps = Int(repsStr), reps > 0
+          let w = last.weight,
+          let repsStr = last.reps, let reps = Int(repsStr)
     else { return nil }
-    let inc = WeightCadence.resolve(forExercise: entry.exercise).step(.kg)
-    switch TrainingEffort.canonicalKey(last.difficulty) {
-    case "easy":
-      return ProgressionHint(weightKg: w + 2 * inc, reps: "\(reps)", reason: "last set was easy")
-    case "max":
-      return ProgressionHint(weightKg: w, reps: "\(reps + 1)", reason: "to failure last time — earn a rep before more load")
-    default:
-      return ProgressionHint(weightKg: w + inc, reps: "\(reps)", reason: "steady progress")
-    }
+    return TrainingProgression.hint(exercise: entry.exercise,
+                                    lastWeightKg: w,
+                                    lastReps: reps,
+                                    lastDifficulty: last.difficulty,
+                                    recents: recents)
   }
 
   /// The suggested target as a compact "62.5 kg × 5" string in the user's unit.
