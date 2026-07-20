@@ -4,50 +4,48 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1489,
-      "date": "2026-07-19",
+      "build": 1491,
+      "date": "2026-07-20",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Log a meal from a photo",
-          "detail": "Snap a picture of what you're eating and Septena analyzes it on-device to prefill the meal and its macros",
+          "title": "Septask, a focused app just for tasks",
+          "detail": "A second app on the same private data, with its own iPhone, iPad, Mac and Watch experience, settings, quick actions and Today feed.",
+          "section": "tasks"
+        },
+        {
+          "title": "Tasks got a thorough overhaul",
+          "detail": "Inline editing, multi-select bulk actions, project headings, task attachments, drag to re-home, a redesigned date picker, undo toasts and a 30-day Recently Deleted.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events woven into Today and Upcoming",
+          "detail": "Your day's remaining events sit quietly alongside tasks, with hidden-calendar choices synced across devices.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal capture",
+          "detail": "Snap a meal and Septena analyzes it on device to prefill the details, with optional ingredient breakdowns and percentage re-logging.",
           "section": "nutrition"
         },
         {
-          "title": "Organize projects with section headings",
-          "detail": "Group tasks inside a project under headings, with support for importing them from a Things export",
-          "section": "tasks"
-        },
-        {
-          "title": "Drag, multi-select, and bulk-edit tasks",
-          "detail": "Drag tasks onto Today to reschedule them, and select several at once to move, file, or copy in one step",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks rest in a Recently Deleted view for 30 days so you can restore anything you didn't mean to remove",
-          "section": "tasks"
-        },
-        {
-          "title": "Your calendar in Today and Upcoming",
-          "detail": "System calendar events now appear alongside your tasks so your whole day is in one place",
-          "section": "tasks"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep the goals that matter most in view as dashboard tiles you can act on directly",
-          "section": "goals"
-        },
-        {
-          "title": "A weekly training review",
-          "detail": "Sessions now track effort-weighted muscle volume and offer a post-session review of your week, plus progression hints on strength sets",
+          "title": "Training sessions you can shape after the fact",
+          "detail": "Editable start and end times, a per-exercise long-press menu, progression hints on strength sets, and effort-weighted muscle volume with a weekly review.",
           "section": "training"
         },
         {
-          "title": "Choose how much you share",
-          "detail": "New graded analytics levels let you see exactly what telemetry is sent and dial it from off to full",
-          "section": null
+          "title": "A calmer, more coherent look",
+          "detail": "A monochrome app accent that reserves color for sections, a real sky wash behind the day dial, unified list and widget surfaces, and pointer hover throughout."
+        },
+        {
+          "title": "Watch feed you can act on",
+          "detail": "A time-of-day sky behind paged Next, long-press action drawers, intake summary tiles you can tap to log, and clamped complication rings.",
+          "section": "activity"
+        },
+        {
+          "title": "More control over privacy and connections",
+          "detail": "Graded telemetry levels with a log of what was sent, consolidated connected-app settings, and Sign in with Apple on Mac."
         }
       ]
     },
