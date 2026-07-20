@@ -4,48 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1491,
+      "build": 1496,
       "date": "2026-07-20",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused app just for tasks",
-          "detail": "A second app on the same private data, with its own iPhone, iPad, Mac and Watch experience, settings, quick actions and Today feed.",
+          "title": "A big overhaul of Tasks",
+          "detail": "Inline editing and quick-add, drag onto Today to re-home, project section headings, multi-select bulk actions, calendar events woven into Today and Upcoming, and a redesigned date picker.",
           "section": "tasks"
         },
         {
-          "title": "Tasks got a thorough overhaul",
-          "detail": "Inline editing, multi-select bulk actions, project headings, task attachments, drag to re-home, a redesigned date picker, undo toasts and a 30-day Recently Deleted.",
-          "section": "tasks"
-        },
-        {
-          "title": "Calendar events woven into Today and Upcoming",
-          "detail": "Your day's remaining events sit quietly alongside tasks, with hidden-calendar choices synced across devices.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks now rest in a Recently Deleted view with one-tap restore and a 30-day auto-purge, plus a longer completion undo window.",
           "section": "tasks"
         },
         {
           "title": "Photo-first meal capture",
-          "detail": "Snap a meal and Septena analyzes it on device to prefill the details, with optional ingredient breakdowns and percentage re-logging.",
+          "detail": "Snap a meal and have it analyzed on-device to prefill the details, with optional ingredient breakdowns and one-tap re-logging scaled by amount.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions you can shape after the fact",
-          "detail": "Editable start and end times, a per-exercise long-press menu, progression hints on strength sets, and effort-weighted muscle volume with a weekly review.",
+          "title": "Smarter training sessions",
+          "detail": "Reps-before-load progression hints on strength sets, editable start and end times, a redesigned progress chart, and an auto-advance rest flow with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "A calmer, more coherent look",
-          "detail": "A monochrome app accent that reserves color for sections, a real sky wash behind the day dial, unified list and widget surfaces, and pointer hover throughout."
+          "title": "Weekly training review",
+          "detail": "Effort-weighted muscle volume adds up into a post-session weekly review so you can see what you've been working.",
+          "section": "training"
         },
         {
-          "title": "Watch feed you can act on",
-          "detail": "A time-of-day sky behind paged Next, long-press action drawers, intake summary tiles you can tap to log, and clamped complication rings.",
-          "section": "activity"
+          "title": "Suggested goals for more of your life",
+          "detail": "Goal suggestions now cover chores, gut, habits, medications, mood, supplements, and symptoms, and you can pin any goal to the dashboard.",
+          "section": "goals"
         },
         {
-          "title": "More control over privacy and connections",
-          "detail": "Graded telemetry levels with a log of what was sent, consolidated connected-app settings, and Sign in with Apple on Mac."
+          "title": "Watch feed refresh",
+          "detail": "A time-of-day sky behind the Next feed, tappable intake tiles for quick logging, an action drawer for Next rows, and a fasting complication that morphs overnight.",
+          "section": null
+        },
+        {
+          "title": "Clearer privacy controls and a What's New screen",
+          "detail": "Choose from graded analytics levels and see exactly what's sent, plus a new What's New changelog in Settings. You can also copy your grocery list to the clipboard.",
+          "section": null
         }
       ]
     },
