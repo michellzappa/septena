@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1498,
+      "build": 1500,
       "date": "2026-07-25",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "Photo-first meal capture reads the picture on-device and prefills the macros, with an optional ingredient breakdown and one-tap re-logging.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Your calendar now shows up in Today and Upcoming",
-          "detail": "Opt in to weave your device calendar events alongside tasks, with hidden-calendar choices that sync across your devices.",
+          "title": "Introducing Septask, a focused tasks app",
+          "detail": "A dedicated to-do app built on your Septena task data, with its own widgets, watch complication, and Home Screen quick actions.",
           "section": "tasks"
         },
         {
-          "title": "Organize projects with headings and drag to plan your day",
-          "detail": "Group tasks under section headings inside a project and drag any task onto Today to reschedule it.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recover deleted tasks",
-          "detail": "A Recently Deleted view keeps removed tasks for 30 days with restore and undo before they purge.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep any measurable goal front and center as a dashboard tile, with quick actions and habit toggles right from the tile.",
-          "section": "goals"
-        },
-        {
-          "title": "Smarter training sessions",
-          "detail": "Reps-before-load progression hints, editable start and end times, an auto-advancing rest flow with a watch Live Activity, and a weekly muscle-group review.",
+          "title": "Smarter strength training",
+          "detail": "Progression hints suggest when to add reps or load, sessions gained editable start/end times, and the session editor was reworked with a live progress-chart marker.",
           "section": "training"
         },
         {
-          "title": "Suggested targets across more of your life",
-          "detail": "First-run goal suggestions now cover chores, gut, habits, medications, mood, supplements, and symptoms.",
-          "section": "goals"
+          "title": "Photo-based meal logging",
+          "detail": "Snap a meal photo for on-device analysis that prefills macros, and re-log past meals scaled to a new portion.",
+          "section": "nutrition"
         },
         {
-          "title": "Choose exactly how much you share",
-          "detail": "Graded analytics levels with a plain-language breakdown of what is sent and a log of recent activity, all anonymized.",
+          "title": "Recently Deleted for tasks",
+          "detail": "Deleted tasks stick around for 30 days with one-tap restore, instead of vanishing immediately.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import tasks from Things",
+          "detail": "Bring in a Things database export, including project section headings.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events in Today and Upcoming",
+          "detail": "Your system calendar events now appear alongside tasks in the Today and Upcoming views.",
+          "section": "tasks"
+        },
+        {
+          "title": "Copy the grocery list",
+          "detail": "A new button copies your shopping list to the clipboard for pasting elsewhere.",
+          "section": "groceries"
+        },
+        {
+          "title": "Clearer privacy controls",
+          "detail": "See exactly what's sent at each telemetry level and review a log of recently sent data.",
           "section": null
         }
       ]
