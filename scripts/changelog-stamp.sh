@@ -32,6 +32,10 @@ CHANGELOG="Septena/Resources/changelog.json"
 XCCONFIG="Config/Base.xcconfig"
 TODAY="$(date +%F)"
 CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude 2>/dev/null || echo /Users/mz/.local/bin/claude)}"
+# Summarizing commit subjects into release-note highlights doesn't need a frontier model,
+# and this runs unattended from the committer-cron — pin it instead of inheriting the CLI
+# default. The cron passes its own value through; override for a one-off release cut.
+CLAUDE_MODEL="${CLAUDE_MODEL:-claude-sonnet-5}"
 
 [ -f "$CHANGELOG" ] || { echo "changelog-stamp: $CHANGELOG not found" >&2; exit 1; }
 [ -f "$XCCONFIG" ]  || { echo "changelog-stamp: $XCCONFIG not found"  >&2; exit 1; }
@@ -77,7 +81,7 @@ Rules:
 
 Commits:
 $SUBJECTS"
-  OUT="$("$CLAUDE_BIN" -p "$PROMPT" 2>/dev/null || true)"
+  OUT="$("$CLAUDE_BIN" --model "$CLAUDE_MODEL" -p "$PROMPT" 2>/dev/null || true)"
   # Tolerate stray code fences around the array.
   OUT="$(printf '%s' "$OUT" | sed -e 's/^[[:space:]]*```json[[:space:]]*$//' -e 's/^[[:space:]]*```[[:space:]]*$//')"
   if printf '%s' "$OUT" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
