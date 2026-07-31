@@ -20,7 +20,7 @@ enum MCPToolCatalog {
   /// The date/from/to/limit shape every event-list tool shares.
   private static func eventListSchema(defaultLimit: Int) -> [String: Any] {
     ["type": "object", "properties": [
-      "date": ["type": "string", "description": "YYYY-MM-DD filter. Omit to return the last 7 days."],
+      "date": ["type": "string", "description": "YYYY-MM-DD filter. Omit to return the last 30 days."],
       "from": ["type": "string", "description": "YYYY-MM-DD range start (inclusive). Ignored if date is set."],
       "to": ["type": "string", "description": "YYYY-MM-DD range end (inclusive). Defaults to today."],
       "limit": ["type": "integer", "minimum": 1, "maximum": 500, "default": defaultLimit],
@@ -381,10 +381,10 @@ enum MCPToolCatalog {
                 "id": ["type": "string"],
               ]]),
       MCPTool(name: "intake_events_list",
-              description: "List one tracker's logged events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              description: "List one tracker's logged events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
               inputSchema: ["type": "object", "required": ["kind"], "properties": [
                 "kind": ["type": "string", "description": "Tracker id or unique name."],
-                "date": ["type": "string", "description": "YYYY-MM-DD filter. Omit for last 7 days."],
+                "date": ["type": "string", "description": "YYYY-MM-DD filter. Omit for last 30 days."],
                 "from": ["type": "string", "description": "YYYY-MM-DD range start (inclusive)."],
                 "to": ["type": "string", "description": "YYYY-MM-DD range end (inclusive). Defaults to today."],
                 "limit": ["type": "integer", "default": 100],
@@ -409,7 +409,7 @@ enum MCPToolCatalog {
     ],
     "gut": [
       MCPTool(name: "gut_events_list",
-              description: "List gut/digestive events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              description: "List gut/digestive events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
               inputSchema: eventListSchema(defaultLimit: 100)),
       MCPTool(name: "gut_event_log",
               description: "Log a new gut event with Bristol Stool Scale type. Cramping, discomfort or blood are symptoms — log them with symptoms_log instead.",
@@ -423,7 +423,7 @@ enum MCPToolCatalog {
     ],
     "mood": [
       MCPTool(name: "mood_list",
-              description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 30 days; pass date for a single day or from/to for a range.",
               inputSchema: eventListSchema(defaultLimit: 100)),
       MCPTool(name: "mood_log",
               description: "Log a mood. Provide emotion — a word from the canonical grid (e.g. 'Anxious', 'Content', 'Calm', 'Excited'); its quadrant / arousal / valence are derived automatically.",
@@ -436,7 +436,7 @@ enum MCPToolCatalog {
     ],
     "symptoms": [
       MCPTool(name: "symptoms_list",
-              description: "List symptom definitions and logged symptom events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              description: "List symptom definitions and logged symptom events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
               inputSchema: eventListSchema(defaultLimit: 100)),
       MCPTool(name: "symptoms_create",
               description: "Create a symptom definition for reuse when logging symptom events.",
@@ -464,7 +464,7 @@ enum MCPToolCatalog {
     ],
     "medications": [
       MCPTool(name: "medications_list",
-              description: "List medication definitions and dose events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+              description: "List medication definitions and dose events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
               inputSchema: eventListSchema(defaultLimit: 100)),
       MCPTool(name: "medications_create",
               description: "Create a medication definition for reuse when logging doses.",
@@ -498,7 +498,7 @@ enum MCPToolCatalog {
     ],
     "nutrition": [
       MCPTool(name: "nutrition_entries_list",
-              description: "List nutrition (meal/food) entries. Defaults to last 7 days; pass date for a single day or from/to for a range. Each entry includes loggedAt, foods (newline-separated), macros (proteinG/fatG/carbsG), and optional micros.",
+              description: "List nutrition (meal/food) entries. Defaults to last 30 days; pass date for a single day or from/to for a range. Each entry includes loggedAt, foods (newline-separated), macros (proteinG/fatG/carbsG), and optional micros.",
               inputSchema: eventListSchema(defaultLimit: 200)),
       MCPTool(name: "nutrition_entry_log",
               description: "Log a new meal / food entry. Required: foods (newline-separated list). Macros default to 0 if omitted; kcal is computed from 4P+9F+4C+7A unless overridden.",
@@ -514,7 +514,7 @@ enum MCPToolCatalog {
     ],
     "training": [
       MCPTool(name: "training_entries_list",
-              description: "List exercise entries. Defaults to last 14 days; pass date for a single day, from/to for a range, or exercise to filter.",
+              description: "List exercise entries. Defaults to last 30 days; pass date for a single day, from/to for a range, or exercise to filter.",
               inputSchema: ["type": "object", "properties": [
                 "date": ["type": "string", "description": "YYYY-MM-DD single-day filter."],
                 "from": ["type": "string", "description": "YYYY-MM-DD range start (inclusive). Ignored if date is set."],
@@ -597,7 +597,7 @@ enum MCPToolCatalog {
               description: "Today's total water ml + the list of water-only entries. Total INCLUDES water recorded on real meal entries.",
               inputSchema: emptySchema),
       MCPTool(name: "hydration_history",
-              description: "Per-day water totals over a range. Defaults to last 7 days.",
+              description: "Per-day water totals over a range. Defaults to last 30 days.",
               inputSchema: ["type": "object", "properties": [
                 "from": ["type": "string", "description": "YYYY-MM-DD range start. Inclusive."],
                 "to": ["type": "string", "description": "YYYY-MM-DD range end. Defaults to today."],

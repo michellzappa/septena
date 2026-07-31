@@ -331,9 +331,26 @@ enum MCPDispatch {
     return SeptenaDate.format(d) ?? today
   }
 
+  /// How far back an event-list tool reaches when the caller passes neither
+  /// `date` nor `from`/`to`. Inclusive of today, so 30 = today + the previous 29.
+  ///
+  /// The budget here is the model's context, not query cost: a month of dense
+  /// rows (nutrition especially) is useful, a quarter mostly crowds it out.
+  /// Callers wanting more say so explicitly with `from`/`to`.
+  ///
+  /// MIRROR: DEFAULT_LOOKBACK_DAYS in ../septena-mcp-gateway/src/tz.ts.
+  ///
+  /// NOT the dashboard's "week = trailing 7 days" convention — that is
+  /// `sinceDate(daysBack: 6)` on the stats surfaces and is deliberately
+  /// unrelated to what Claude sees by default.
+  static let defaultLookbackDays = 30
+
   /// Resolve date/from/to args into an inclusive YMD range. `date` pins a single
   /// day; otherwise from defaults to N days back and to defaults to today.
-  private static func range(_ args: MCPArgs, daysBack: Int) -> (from: String, to: String) {
+  private static func range(
+    _ args: MCPArgs,
+    daysBack: Int = defaultLookbackDays - 1
+  ) -> (from: String, to: String) {
     if let d = args.string("date") { return (d, d) }
     return (args.string("from") ?? ymd(daysBack: daysBack), args.string("to") ?? today)
   }
@@ -993,7 +1010,7 @@ enum MCPDispatch {
 
   private static func intakeEventsList(_ args: MCPArgs) throws -> Any {
     let kind = try resolveIntakeKind(args)
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 100
     let itemNames = Dictionary(
       ((try? ctx.fetch(FetchDescriptor<IntakeItemEntity>())) ?? []).map { ($0.id, $0.name) },
@@ -1054,7 +1071,7 @@ enum MCPDispatch {
   // MARK: - Gut
 
   private static func gutList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 100
     let rows = (try? ctx.fetch(FetchDescriptor<GutEventEntity>()))?
       .filter { $0.date >= from && $0.date <= to }
@@ -1095,7 +1112,7 @@ enum MCPDispatch {
   }
 
   private static func moodList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 100
     let rows = (try? ctx.fetch(FetchDescriptor<MoodEventEntity>()))?
       .filter { $0.date >= from && $0.date <= to }
@@ -1125,7 +1142,7 @@ enum MCPDispatch {
   }
 
   private static func symptomsList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 100
     let definitions = symptomDefinitions()
     let titleByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.title) })
@@ -1206,7 +1223,7 @@ enum MCPDispatch {
   }
 
   private static func medicationsList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 100
     let definitions = medicationDefinitions()
     let titleByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.title) })
@@ -1338,7 +1355,7 @@ enum MCPDispatch {
   }
 
   private static func nutritionList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 6)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 200
     let iso = ISO8601DateFormatter()
     let rows = nutritionEntities(from, to).prefix(limit).map { nutritionEntryWire($0, iso: iso) }
@@ -1414,7 +1431,7 @@ enum MCPDispatch {
   // MARK: - Training
 
   private static func trainingList(_ args: MCPArgs) -> Any {
-    let (from, to) = range(args, daysBack: 13)
+    let (from, to) = range(args)
     let limit = args.int("limit") ?? 200
     let exercise = args.string("exercise")?.lowercased()
     let rows = (try? ctx.fetch(FetchDescriptor<ExerciseEntryEntity>()))?
@@ -1651,7 +1668,7 @@ enum MCPDispatch {
   }
 
   private static func hydrationHistory(_ args: MCPArgs) -> Any {
-    let days = args.int("days") ?? 7
+    let days = args.int("days") ?? defaultLookbackDays
     let to = args.string("to") ?? today
     let from = args.string("from") ?? ymd(daysBack: days - 1)
     var byDate: [String: Double] = [:]

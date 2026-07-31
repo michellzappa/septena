@@ -137,7 +137,7 @@ enum IntakePlugin: SectionPlugin {
               inputs: "optional: includeArchived"),
         SectionSkill.Tool("intake_event_log", "Log an event against a tracker",
               inputs: "required: kind (id or name), method (token or label) · optional: date, time, amount, count, item, note"),
-        SectionSkill.Tool("intake_events_list", "One tracker's events. Defaults to last 7 days",
+        SectionSkill.Tool("intake_events_list", "One tracker's events. Defaults to last 30 days",
               inputs: "required: kind · optional: date, from, to, limit"),
         SectionSkill.Tool("intake_event_delete", "Remove an event (correction)",
               inputs: "required: id"),

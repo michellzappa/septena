@@ -572,7 +572,7 @@ public extension SectionSkill {
 
   ### Universal conventions
   - **Dates**: `YYYY-MM-DD` (local time). Omit `date` to mean today.
-  - **Ranges**: pass `from`/`to` (inclusive). Neither + no `date` → last 7 days.
+  - **Ranges**: pass `from`/`to` (inclusive). Neither + no `date` → last 30 days.
   - **Times**: `HH:MM:SS` for health events; `HH:MM` for habits/supplements.
   - **IDs**: opaque short strings. Always list, then act — never fabricate.
   - **Catalog → event**: `*_beans_list` / `*_strains_list` first, then log.

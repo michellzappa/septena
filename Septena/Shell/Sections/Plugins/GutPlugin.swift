@@ -74,7 +74,7 @@ enum GutPlugin: SectionPlugin {
       key: "gut",
       summary: "Digestive event log.",
       tools: [
-        SectionSkill.Tool("gut_events_list",  "By day or range. Defaults to last 7 days",
+        SectionSkill.Tool("gut_events_list",  "By day or range. Defaults to last 30 days",
               inputs: "optional: date, from, to, limit"),
         SectionSkill.Tool("gut_event_log",    "Log an event",
               inputs: "required: bristol (1-7) · optional: date (default today), time (HH:MM:SS), volume (small|medium|large), note"),

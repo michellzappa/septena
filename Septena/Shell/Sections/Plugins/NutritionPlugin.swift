@@ -82,7 +82,7 @@ enum NutritionPlugin: SectionPlugin {
       key: "nutrition",
       summary: "Meal + macro log with auto-computed daily totals.",
       tools: [
-        SectionSkill.Tool("nutrition_entries_list", "By day or range. Defaults to last 7 days",
+        SectionSkill.Tool("nutrition_entries_list", "By day or range. Defaults to last 30 days",
               inputs: "optional: date, from, to, limit"),
         SectionSkill.Tool("nutrition_entry_log",    "Log a meal. foods is newline-separated; macros default to 0; kcal auto-computed if omitted; source auto-tagged 'mcp'",
               inputs: """
