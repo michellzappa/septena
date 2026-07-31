@@ -8,6 +8,24 @@ const SERVER_VERSION = pkg.version;
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
 import { getCkTokenForAccessToken, touchAccessToken, putUserSections, getUserSections } from "./storage.js";
 import { logEvent } from "./util.js";
+import {
+  type Era,
+  MODERN_VERSION,
+  SUPPORTED_VERSIONS,
+  DISCOVER_TTL_MS,
+  TOOLS_LIST_TTL_MS,
+  ERR_HEADER_MISMATCH,
+  ERR_UNSUPPORTED_PROTOCOL_VERSION,
+  decorateResult,
+  detectEra,
+  isSupportedVersion,
+  metaProtocolVersion,
+  negotiateLegacyVersion,
+  validateModernHeaders,
+} from "./protocol.js";
+
+/// Identity reported in `serverInfo`, on both eras.
+const SERVER_INFO = { name: "septena-mcp-gateway", version: SERVER_VERSION };
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -522,7 +540,13 @@ function buildToolList(sectionOrder: string[] | null): Tool[] {
   // appear ONLY when its key is in the (enabled-gated) list. null/empty →
   // globals only, never the full set. We never expose every section's tools
   // as a fallback — that would leak tools for sections the user disabled.
-  const keys = sectionOrder ?? [];
+  //
+  // Order is DETERMINISTIC (sorted section key), not the user's
+  // `section_order`. The spec asks for a stable ordering so clients can cache
+  // tools/list and so the tool block hits the model's prompt cache; keying off
+  // user-reorderable settings would reshuffle the manifest — and bust both
+  // caches — every time they dragged a section in Settings.
+  const keys = [...(sectionOrder ?? [])].sort();
   const sectionTools = keys.flatMap(key => SECTION_TOOLS[key] ?? []);
   return [...GLOBAL_TOOLS, ...sectionTools];
 }
@@ -555,25 +579,80 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
     return new Response(null, { status: 202 });
   }
 
+  // --- Protocol era (see src/protocol.ts) ---------------------------------
+  // Modern (2026-07-28) requests declare their version per-request and are
+  // served statelessly; legacy clients keep the `initialize` handshake. A
+  // request never changes era mid-flight, so this is decided once, here.
+  const era: Era = detectEra(req.method, req.params, c.req.header("MCP-Protocol-Version"));
+
+  if (era === "modern") {
+    // Header/body agreement is a MUST: an intermediary may route on the
+    // header while we execute the body, so a mismatch is a security bug, not
+    // a nicety. Legacy callers never send these and are never checked.
+    const reason = validateModernHeaders(name => c.req.header(name), req.method, req.params);
+    if (reason) {
+      logEvent("header_mismatch", { method: req.method, reason });
+      return rpcError(req.id, ERR_HEADER_MISMATCH, `Header mismatch: ${reason}`, era, 400);
+    }
+
+    // Version support is now answered honestly. We used to echo whatever
+    // version string the client sent, which claimed support for revisions we
+    // do not implement; the modern reply is an explicit error naming what we
+    // actually serve so the client can retry on a mutually supported one.
+    const declared = metaProtocolVersion(req.params) ?? c.req.header("MCP-Protocol-Version");
+    if (declared !== undefined && !isSupportedVersion(declared)) {
+      return rpcError(
+        req.id,
+        ERR_UNSUPPORTED_PROTOCOL_VERSION,
+        "Unsupported protocol version",
+        era,
+        400,
+        { supported: SUPPORTED_VERSIONS, requested: declared },
+      );
+    }
+  }
+
   const client = new CloudKitClient(c.env, ckWebAuthToken);
 
   try {
     switch (req.method) {
+      case "server/discover":
+        // MUST be implemented by every modern server. Pure identity — no
+        // CloudKit call, no user data — so it is the same for every caller
+        // and caches publicly.
+        return rpcResult(
+          req.id,
+          {
+            supportedVersions: SUPPORTED_VERSIONS,
+            capabilities: { tools: {} },
+            instructions:
+              "Septena is a private life-tracking app. These tools read and write the " +
+              "signed-in user's own data (tasks, goals, habits, nutrition, training, and " +
+              "the other sections they have enabled). The advertised tool set reflects " +
+              "which sections that user turned on, so call tools/list before assuming a " +
+              "section is available.",
+            ttlMs: DISCOVER_TTL_MS,
+            cacheScope: "public",
+          },
+          era,
+        );
       case "initialize": {
-        // Echo the client's requested protocol version when present so we
-        // stay forward-compatible as the MCP spec advances.
+        // Legacy handshake. Retained deliberately: Claude's connector has not
+        // shipped 2026-07-28 support, so removing this takes the live
+        // connector offline. Answer with a version we genuinely serve rather
+        // than echoing the client's request blindly.
         const requested = (req.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
-        const protocolVersion = typeof requested === "string" ? requested : "2024-11-05";
         return rpcResult(req.id, {
-          protocolVersion,
+          protocolVersion: negotiateLegacyVersion(requested),
           capabilities: { tools: {} },
-          serverInfo: { name: "septena-mcp-gateway", version: SERVER_VERSION },
-        });
+          serverInfo: SERVER_INFO,
+        }, era);
       }
       case "ping":
-        // Liveness/health probe — must be a fast empty result and never
-        // touches CloudKit, or clients may judge the connector unhealthy.
-        return rpcResult(req.id, {});
+        // Removed in 2026-07-28, kept for legacy clients that health-probe
+        // with it. Must be a fast empty result that never touches CloudKit,
+        // or clients judge the connector unhealthy.
+        return rpcResult(req.id, {}, era);
       case "tools/list": {
         // Source of truth for "which sections this user has enabled" is
         // the per-section `Section.isEnabled` flag the iOS app writes.
@@ -654,7 +733,16 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
           enabled: Array.from(enabledKeys),
           names: tools.map(t => t.name),
         });
-        return rpcResult(req.id, { tools });
+        // cacheScope is "private": the manifest is scoped to THIS user's
+        // enabled sections, so a shared intermediary must never hand it to
+        // another caller. (Varying by the request's authorization is
+        // explicitly allowed — what the spec forbids is varying by connection
+        // state, which this server has none of.)
+        return rpcResult(req.id, {
+          tools,
+          ttlMs: TOOLS_LIST_TTL_MS,
+          cacheScope: "private",
+        }, era);
       }
       case "tools/call": {
         const params = (req.params ?? {}) as {
@@ -663,7 +751,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         };
         const startedAt = Date.now();
         try {
-          const res = await callTool(client, req.id, params);
+          const res = await callTool(client, req.id, params, era);
           logEvent("tool_call", { name: params.name ?? "?", ok: true, ms: Date.now() - startedAt });
           return res;
         } catch (err) {
@@ -678,7 +766,16 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         }
       }
       default:
-        return rpcError(req.id, -32601, `Method not found: ${req.method}`);
+        // Modern transport pins an unknown method to HTTP 404 (with the
+        // JSON-RPC body distinguishing us from a legacy server that simply
+        // doesn't host this endpoint). Legacy clients keep the 200 they expect.
+        return rpcError(
+          req.id,
+          -32601,
+          `Method not found: ${req.method}`,
+          era,
+          era === "modern" ? 404 : 200,
+        );
     }
   } catch (err) {
     if (err instanceof CloudKitError && err.isAuthExpired) {
@@ -713,7 +810,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         return rpcResult(req.id, {
           isError: true,
           content: [{ type: "text", text: AUTH_EXPIRED_MESSAGE }],
-        });
+        }, era);
       }
       // Legacy bootstrap-only bearer (no identity binding): the only recovery
       // is an OAuth re-run, so emit the spec-correct discovery 401.
@@ -725,7 +822,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
       logEvent("cloudkit_error", { method: req.method, status: err.status, ckBody: err.body.slice(0, 300) });
     }
     const msg = err instanceof Error ? err.message : String(err);
-    return rpcError(req.id, -32603, msg);
+    return rpcError(req.id, -32603, msg, era);
   }
 }
 
@@ -733,7 +830,12 @@ async function callTool(
   client: CloudKitClient,
   id: JsonRpcRequest["id"],
   params: { name?: string; arguments?: Record<string, unknown> },
+  era: Era,
 ): Promise<Response> {
+  // Shadow the module-level builder so every `rpcResult(id, …)` below carries
+  // this request's era without threading it through ~100 call sites.
+  const rpcResult = (rid: JsonRpcRequest["id"], result: Record<string, unknown>) =>
+    baseRpcResult(rid, result, era);
 
   switch (params.name) {
     case "tasks_list": {
@@ -1051,12 +1153,37 @@ const AUTH_EXPIRED_MESSAGE =
   "I'll be able to read and write your data again with no need to reconnect from " +
   "claude.ai.";
 
-function rpcResult(id: JsonRpcRequest["id"], result: unknown): Response {
-  return Response.json({ jsonrpc: "2.0", id, result });
+/// Success envelope. Modern results additionally carry `resultType` and the
+/// server's identity in `_meta`; legacy results are byte-identical to what
+/// this gateway has always emitted. Aliased as `baseRpcResult` at the one call
+/// site that shadows it (`callTool`).
+function rpcResult(
+  id: JsonRpcRequest["id"],
+  result: Record<string, unknown>,
+  era: Era = "legacy",
+): Response {
+  return Response.json({
+    jsonrpc: "2.0",
+    id,
+    result: decorateResult(result, era, SERVER_INFO),
+  });
 }
+const baseRpcResult = rpcResult;
 
-function rpcError(id: JsonRpcRequest["id"], code: number, message: string): Response {
-  return Response.json({ jsonrpc: "2.0", id, error: { code, message } });
+/// Error envelope. `status` exists because the modern transport maps certain
+/// protocol errors onto HTTP status codes (400 for version/header failures,
+/// 404 for an unknown method) — that status is how a dual-era CLIENT tells a
+/// modern server from a legacy one, so it is load-bearing, not cosmetic.
+function rpcError(
+  id: JsonRpcRequest["id"],
+  code: number,
+  message: string,
+  era: Era = "legacy",
+  status = 200,
+  data?: unknown,
+): Response {
+  const error = data === undefined ? { code, message } : { code, message, data };
+  return Response.json({ jsonrpc: "2.0", id, error }, { status: era === "modern" ? status : 200 });
 }
 
 function unauthorized(reason?: string): Response {

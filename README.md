@@ -30,6 +30,37 @@ Scaffold. OAuth + Apple bridge wired end-to-end with KV storage; the initial tas
 | `POST /oauth/token` | code + PKCE → 1h access token + rotating 30d refresh token; also serves the `refresh_token` grant |
 | `POST /oauth/revoke` | RFC 7009 revocation (access or refresh token; refresh revokes the pair) |
 | `POST /mcp` | JSON-RPC MCP transport (Authorization: Bearer required) |
+| `GET`/`DELETE` `/mcp` | `405` — the GET stream and session-DELETE were removed in MCP `2026-07-28` |
+
+## Protocol revisions
+
+The gateway is **dual-era** (`src/protocol.ts`), serving both shapes of MCP on
+the one `/mcp` endpoint:
+
+- **Modern — `2026-07-28`.** Stateless. No handshake: every request declares
+  its protocol version, client identity, and capabilities in `params._meta`,
+  mirrored into `MCP-Protocol-Version` / `Mcp-Method` / `Mcp-Name` headers that
+  the server validates against the body (mismatch ⇒ `400` + `-32020`). Results
+  carry `resultType: "complete"` and `_meta` `serverInfo`; `tools/list` carries
+  `ttlMs` + `cacheScope`. `server/discover` is implemented, as the spec
+  requires.
+- **Legacy — `2025-11-25` and earlier.** The `initialize` /
+  `notifications/initialized` handshake, answered as before.
+
+**Do not delete the legacy path.** Claude's connector has not shipped modern
+support, so a modern-only gateway would take the live connector offline the day
+it deploys. The era is decided per request from how the client opens, which is
+what the spec prescribes for a dual-era server.
+
+We never implemented sessions (`Mcp-Session-Id`), the GET stream, SSE
+resumability, roots, sampling, or logging — so the removals and deprecations in
+`2026-07-28` cost this gateway nothing.
+
+`tools/list` still varies by user (it reflects their enabled sections). That is
+explicitly legal: the spec forbids varying by *connection state*, and permits
+varying by "the authorization presented on the request". It is served
+`cacheScope: "private"` so no shared intermediary can hand one user's manifest
+to another.
 
 ## Local development
 

@@ -34,6 +34,11 @@ export async function appleCallback(c: Context<{ Bindings: Env }>) {
   const back = new URL(state.redirectUri);
   back.searchParams.set("code", code);
   back.searchParams.set("state", state.oauthState);
+  // RFC 9207 issuer identification, which MCP 2026-07-28 asks authorization
+  // servers to send: it lets the client confirm the code came from the issuer
+  // it started the flow with, defeating mix-up attacks when a client talks to
+  // several authorization servers. Clients that see it MUST validate it.
+  back.searchParams.set("iss", c.env.PUBLIC_URL);
 
   return new Response(null, {
     status: 302,

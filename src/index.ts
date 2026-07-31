@@ -69,6 +69,10 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     revocation_endpoint_auth_methods_supported: ["none"],
+    // RFC 9207: we return `iss` on the authorization response, so advertise it
+    // and let conforming clients validate it (MCP 2026-07-28 requires them to
+    // when present).
+    authorization_response_iss_parameter_supported: true,
   });
 });
 
@@ -97,6 +101,14 @@ app.post("/oauth/revoke", revoke);
 app.get("/auth/apple/callback", appleCallback);
 
 app.post("/mcp", mcpHandler);
+
+// Revision 2026-07-28 removed the GET stream endpoint and protocol-level
+// sessions (which were torn down with DELETE). A server on this revision
+// answers both with 405, so an older client fails fast and falls back instead
+// of reading a 404 as "there is no MCP endpoint here at all".
+app.on(["GET", "DELETE"], "/mcp", (c) =>
+  c.text("Method Not Allowed", 405, { Allow: "POST" }),
+);
 
 // The app pushes freshly-minted ckWebAuthTokens here so bearers serve a
 // live token without the user re-authing every ~8h. Self-securing: the
