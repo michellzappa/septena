@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMM, localToEpochMs, epochMsToHHMM } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, defaultLookbackStart, nowHHMM, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 6): string {
@@ -71,7 +71,7 @@ function moodBucket(time: string): string {
 export const listMoodEventsJsonSchema = {
   type: "object",
   properties: {
-    date:  { type: "string", description: "YYYY-MM-DD filter. Omit to return the last 7 days." },
+    date:  { type: "string", description: "YYYY-MM-DD filter. Omit to return the last 30 days." },
     from:  { type: "string", description: "YYYY-MM-DD range start (inclusive). Ignored if date is set." },
     to:    { type: "string", description: "YYYY-MM-DD range end (inclusive). Defaults to today." },
     limit: { type: "integer", minimum: 1, maximum: 500, default: 100 },
@@ -98,7 +98,7 @@ export interface LogMoodEventInput { date?: string; time?: string; emotion: stri
 
 export async function listMoodEvents(client: CloudKitClient, input: ListMoodEventsInput) {
   const tz = await getEffectiveTimezone(client);
-  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const from = input.date ?? input.from ?? defaultLookbackStart(tz);
   const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   const records = await queryByDateRange(client, {

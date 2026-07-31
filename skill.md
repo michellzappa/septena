@@ -42,7 +42,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 ## Conventions across all tools
 
 - **Dates** are `YYYY-MM-DD` strings (local time). When a tool accepts `date`, omitting it means **today**.
-- **Date ranges**: event-list tools (`*_events_list`, `nutrition_entries_list`) accept either `date` (single day) or `from`/`to` (inclusive range). Omitting both returns the **last 7 days**.
+- **Date ranges**: event-list tools (`*_events_list`, `nutrition_entries_list`) accept either `date` (single day) or `from`/`to` (inclusive range). Omitting both returns the **last 30 days**.
 - **Times** are `HH:MM:SS` (24-hour) for health events, `HH:MM` for habits/supplements. Default to "now" when not given.
 - **IDs** are short, opaque strings. Always echo back the `id` from a create call before referencing in update/delete.
 - **Catalog/definition vs. event pattern**: `intake` trackers have a *catalog* (kinds + items), and `symptoms`/`medications` have *definitions*, each referenced by id from their events. Always call the relevant `*_list` first to resolve a name → id before logging an event against it.
@@ -271,7 +271,7 @@ Hydration is a **UX layer over Nutrition** — every water log is stored as a `N
 
 - `hydration_log({ml})` → creates the water-only entry. Use this for plain water; don't reach for `nutrition_entry_log`.
 - `hydration_today()` → today's total ml + the list of water-only entries. The total **includes water recorded on real meals** (e.g. a salad entry with `waterMl: 250` counts toward the day), so it matches the iOS Hydration view.
-- `hydration_history({from, to, days})` → per-day totals over a range. Defaults to last 7 days.
+- `hydration_history({from, to, days})` → per-day totals over a range. Defaults to last 30 days.
 
 ```
 # "I drank 500ml of water"

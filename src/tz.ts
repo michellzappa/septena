@@ -123,6 +123,25 @@ export function ymdNDaysAgo(n: number, tz: string): string {
 }
 
 /**
+ * How far back an event-list tool reaches when the caller passes neither
+ * `date` nor `from`/`to`. Inclusive of today, so 30 = today + the previous 29.
+ *
+ * Widening this costs no extra CloudKit work — `queryByDateRange` already
+ * scans the full record set for the type and filters the window client-side
+ * (see BACKLOG.md). The real budget is the model's context: a month of dense
+ * rows (nutrition especially) is useful, a quarter mostly crowds it out.
+ * Callers wanting more say so explicitly with `from`/`to`.
+ *
+ * MIRROR: MCPDispatch.defaultLookbackDays in ../septena-cloud.
+ */
+export const DEFAULT_LOOKBACK_DAYS = 30;
+
+/** Start of the default lookback window in `tz`, "YYYY-MM-DD". */
+export function defaultLookbackStart(tz: string): string {
+  return ymdNDaysAgo(DEFAULT_LOOKBACK_DAYS - 1, tz);
+}
+
+/**
  * A local wall-clock (`ymd` + `hhmm`, in `tz`) → UTC epoch milliseconds.
  * Mirrors the app's EventTimestamp.from: combine date + time in local tz; when
  * no time is given default to local noon (not midnight) so a day-only event

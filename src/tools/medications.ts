@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, defaultLookbackStart, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 function newId(len = 4): string {
@@ -82,7 +82,7 @@ async function fetchDefinitions(client: CloudKitClient): Promise<MedicationDefin
 export const listMedicationsJsonSchema = {
   type: "object",
   properties: {
-    date:  { type: "string", description: "YYYY-MM-DD filter. Omit to return the last 7 days of doses." },
+    date:  { type: "string", description: "YYYY-MM-DD filter. Omit to return the last 30 days of doses." },
     from:  { type: "string", description: "YYYY-MM-DD range start (inclusive). Ignored if date is set." },
     to:    { type: "string", description: "YYYY-MM-DD range end (inclusive). Defaults to today." },
     limit: { type: "integer", minimum: 1, maximum: 500, default: 100 },
@@ -163,7 +163,7 @@ export interface LogMedicationInput {
 
 export async function listMedications(client: CloudKitClient, input: ListMedicationsInput) {
   const tz = await getEffectiveTimezone(client);
-  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const from = input.date ?? input.from ?? defaultLookbackStart(tz);
   const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   const definitions = await fetchDefinitions(client);

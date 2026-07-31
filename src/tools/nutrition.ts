@@ -1,5 +1,5 @@
 import type { CloudKitClient } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, addDaysYMD, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, defaultLookbackStart, addDaysYMD, localToEpochMs } from "../tz.js";
 
 function newUUID(): string {
   return crypto.randomUUID();
@@ -47,7 +47,7 @@ interface CKLookupResponse {
 export const listNutritionEntriesJsonSchema = {
   type: "object",
   properties: {
-    date:  { type: "string", description: "YYYY-MM-DD filter — returns all meals on this day. Omit to use from/to or default to last 7 days." },
+    date:  { type: "string", description: "YYYY-MM-DD filter — returns all meals on this day. Omit to use from/to or default to last 30 days." },
     from:  { type: "string", description: "YYYY-MM-DD range start (inclusive). Ignored if date is set." },
     to:    { type: "string", description: "YYYY-MM-DD range end (inclusive). Defaults to today." },
     limit: { type: "integer", minimum: 1, maximum: 500, default: 200 },
@@ -130,7 +130,7 @@ export interface GetNutritionDaySummaryInput { date?: string }
 
 export async function listNutritionEntries(client: CloudKitClient, input: ListNutritionEntriesInput) {
   const tz = await getEffectiveTimezone(client);
-  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const from = input.date ?? input.from ?? defaultLookbackStart(tz);
   const to   = input.date ?? input.to   ?? todayYMD(tz);
 
   // loggedAt is a Date/TIMESTAMP field — filter on epoch milliseconds.

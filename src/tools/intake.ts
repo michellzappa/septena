@@ -1,5 +1,5 @@
 import { queryByDateRange, type CloudKitClient, type CKRecord } from "../cloudkit.js";
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, defaultLookbackStart, nowHHMMSS, localToEpochMs, epochMsToHHMM } from "../tz.js";
 
 // Generic consumable ("intake") tools. The tracker — a "kind" — is an
 // ARGUMENT resolved by id or unique case-insensitive name, never part of a
@@ -227,7 +227,7 @@ export const listIntakeEventsJsonSchema = {
   required: ["kind"],
   properties: {
     kind: { type: "string", description: "Tracker id or unique name." },
-    date: { type: "string", description: "YYYY-MM-DD filter. Omit for last 7 days." },
+    date: { type: "string", description: "YYYY-MM-DD filter. Omit for last 30 days." },
     from: { type: "string", description: "YYYY-MM-DD range start (inclusive)." },
     to: { type: "string", description: "YYYY-MM-DD range end (inclusive). Defaults to today." },
     limit: { type: "integer", minimum: 1, maximum: 500, default: 100 },
@@ -399,7 +399,7 @@ export async function deleteIntakeItem(client: CloudKitClient, input: { id: stri
 export async function listIntakeEvents(client: CloudKitClient, input: ListIntakeEventsInput) {
   const kind = await resolveKind(client, input.kind);
   const tz = await getEffectiveTimezone(client);
-  const from = input.date ?? input.from ?? ymdNDaysAgo(6, tz);
+  const from = input.date ?? input.from ?? defaultLookbackStart(tz);
   const to = input.date ?? input.to ?? todayYMD(tz);
 
   const records = await queryByDateRange(client, {

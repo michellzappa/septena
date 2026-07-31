@@ -12,7 +12,7 @@ import type { CloudKitClient } from "../cloudkit.js";
 // contributes correctly. The water-only entry list is filtered to the
 // marker shape for the "what did I log under hydration?" view.
 
-import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, addDaysYMD, localToEpochMs } from "../tz.js";
+import { getEffectiveTimezone, todayYMD, ymdNDaysAgo, DEFAULT_LOOKBACK_DAYS, addDaysYMD, localToEpochMs } from "../tz.js";
 
 function newUUID(): string {
   return crypto.randomUUID();
@@ -196,7 +196,7 @@ export async function hydrationToday(client: CloudKitClient) {
 export async function hydrationHistory(client: CloudKitClient, input: HydrationHistoryInput) {
   const tz = await getEffectiveTimezone(client);
   const to   = input.to ?? todayYMD(tz);
-  const from = input.from ?? ymdNDaysAgo((input.days ?? 7) - 1, tz);
+  const from = input.from ?? ymdNDaysAgo((input.days ?? DEFAULT_LOOKBACK_DAYS) - 1, tz);
 
   const res = await queryNutritionRange(client, from, to, tz, 1000);
 

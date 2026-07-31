@@ -343,7 +343,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   symptoms: [
     {
       name: "symptoms_list",
-      description: "List symptom definitions plus logged events. Defaults to the last 7 days of events; pass date for a single day or from/to for a range. Call this FIRST to get a symptomID, then log by id.",
+      description: "List symptom definitions plus logged events. Defaults to the last 30 days of events; pass date for a single day or from/to for a range. Call this FIRST to get a symptomID, then log by id.",
       inputSchema: listSymptomsJsonSchema,
     },
     {
@@ -360,7 +360,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   medications: [
     {
       name: "medications_list",
-      description: "List medication definitions plus logged doses. Defaults to the last 7 days of doses; pass date for a single day or from/to for a range. Call this FIRST to get a medicationID, then log by id.",
+      description: "List medication definitions plus logged doses. Defaults to the last 30 days of doses; pass date for a single day or from/to for a range. Call this FIRST to get a medicationID, then log by id.",
       inputSchema: listMedicationsJsonSchema,
     },
     {
@@ -397,7 +397,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
       description: "Remove a catalog variety (events keep displaying its name).",
       inputSchema: deleteIntakeItemJsonSchema },
     { name: "intake_events_list",
-      description: "List one tracker's logged events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+      description: "List one tracker's logged events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
       inputSchema: listIntakeEventsJsonSchema },
     { name: "intake_event_log",
       description: "Log an intake event against a tracker. Method accepts a token or label from the kind's methods.",
@@ -409,7 +409,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   gut: [
     {
       name: "gut_events_list",
-      description: "List gut/digestive events. Defaults to last 7 days; pass date for a single day or from/to for a range.",
+      description: "List gut/digestive events. Defaults to last 30 days; pass date for a single day or from/to for a range.",
       inputSchema: listGutEventsJsonSchema,
     },
     {
@@ -421,7 +421,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   mood: [
     {
       name: "mood_list",
-      description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 7 days; pass date for a single day or from/to for a range.",
+      description: "List mood check-ins (Russell circumplex: quadrant, arousal 1–3, valence 1–3, emotion word). Defaults to last 30 days; pass date for a single day or from/to for a range.",
       inputSchema: listMoodEventsJsonSchema,
     },
     {
@@ -433,7 +433,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   nutrition: [
     {
       name: "nutrition_entries_list",
-      description: "List nutrition (meal/food) entries. Defaults to last 7 days; pass date for a single day or from/to for a range. Each entry includes loggedAt, foods (newline-separated), macros (proteinG/fatG/carbsG), and optional micros.",
+      description: "List nutrition (meal/food) entries. Defaults to last 30 days; pass date for a single day or from/to for a range. Each entry includes loggedAt, foods (newline-separated), macros (proteinG/fatG/carbsG), and optional micros.",
       inputSchema: listNutritionEntriesJsonSchema,
     },
     {
@@ -455,7 +455,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
   training: [
     {
       name: "training_entries_list",
-      description: "List exercise entries. Defaults to last 14 days; pass date for a single day, from/to for a range, or exercise to filter.",
+      description: "List exercise entries. Defaults to last 30 days; pass date for a single day, from/to for a range, or exercise to filter.",
       inputSchema: listTrainingEntriesJsonSchema,
     },
     {
@@ -512,7 +512,7 @@ const SECTION_TOOLS: Record<string, Tool[]> = {
     },
     {
       name: "hydration_history",
-      description: "Per-day water totals over a range. Defaults to last 7 days. Each day's total sums waterMl across all nutrition entries (water-only + meal-attached).",
+      description: "Per-day water totals over a range. Defaults to last 30 days. Each day's total sums waterMl across all nutrition entries (water-only + meal-attached).",
       inputSchema: hydrationHistoryJsonSchema,
     },
   ],
