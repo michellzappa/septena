@@ -164,9 +164,14 @@ enum JSONRPC {
 
   /// A protocol-level error (bad request, method not found). Distinct from a
   /// *tool* error, which rides inside a successful `result` as `isError`.
-  static func error(id: Any?, code: Int, _ message: String) -> [String: Any] {
-    ["jsonrpc": "2.0", "id": id ?? NSNull(),
-     "error": ["code": code, "message": message]]
+  ///
+  /// `data` carries the structured payload some spec-defined errors require —
+  /// notably UnsupportedProtocolVersionError, whose `supported` list is how a
+  /// client picks a version to retry on.
+  static func error(id: Any?, code: Int, _ message: String, data: Any? = nil) -> [String: Any] {
+    var error: [String: Any] = ["code": code, "message": message]
+    if let data { error["data"] = data }
+    return ["jsonrpc": "2.0", "id": id ?? NSNull(), "error": error]
   }
 
   /// Wrap a tool's output as an MCP `tools/call` result. `payload` is encoded

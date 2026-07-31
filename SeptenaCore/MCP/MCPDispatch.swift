@@ -12,29 +12,102 @@ import SwiftData
 @MainActor
 enum MCPDispatch {
 
-  private static let defaultProtocolVersion = "2024-11-05"
   static let serverName = "septena-local"
   static let serverVersion = "0.2.0"
+
+  /// Identity reported in `serverInfo`, on both eras.
+  private static var serverInfo: [String: Any] {
+    ["name": serverName, "version": serverVersion]
+  }
 
   /// Gateway key aliases (canonicalize before gating / section writes).
   private static let keyAliases = ["exercise": "training"]
 
   // MARK: - JSON-RPC
 
-  static func handle(method: String, id: Any?, params: [String: Any]?) async -> [String: Any]? {
-    if id == nil || method.hasPrefix("notifications/") { return nil }
+  /// - Parameter header: case-insensitive lookup into the request's HTTP
+  ///   headers. The modern revision mirrors body fields into headers and
+  ///   requires the server to check they agree, so dispatch needs to see them.
+  static func handle(
+    method: String,
+    id: Any?,
+    params: [String: Any]?,
+    header: (String) -> String? = { _ in nil }
+  ) async -> MCPHTTPResponse {
+    if id == nil || method.hasPrefix("notifications/") { return .accepted }
+
+    // --- Protocol era (see MCPRevision.swift) ------------------------------
+    // Modern (2026-07-28) requests declare their version per-request and are
+    // served statelessly; legacy clients keep the `initialize` handshake. A
+    // request never changes era mid-flight, so this is decided once, here.
+    let era = MCPRevision.detectEra(
+      method: method, params: params, protocolHeader: header("MCP-Protocol-Version"))
+
+    if era == .modern {
+      // Header/body agreement is a MUST: an intermediary may route on the
+      // header while we execute the body, so a mismatch is a security bug,
+      // not a nicety. Legacy callers never send these and are never checked.
+      if let reason = MCPRevision.validateModernHeaders(
+        header: header, method: method, params: params) {
+        return MCPHTTPResponse(
+          status: 400,
+          body: JSONRPC.error(
+            id: id, code: MCPRevision.errHeaderMismatch, "Header mismatch: \(reason)"))
+      }
+
+      // Version support is now answered honestly. We used to echo whatever
+      // version string the client sent, which claimed support for revisions
+      // we do not implement; the modern reply is an explicit error naming
+      // what we actually serve so the client can retry on a supported one.
+      let declared = MCPRevision.metaProtocolVersion(params) ?? header("MCP-Protocol-Version")
+      if let declared, !MCPRevision.isSupportedVersion(declared) {
+        return MCPHTTPResponse(
+          status: 400,
+          body: JSONRPC.error(
+            id: id,
+            code: MCPRevision.errUnsupportedProtocolVersion,
+            "Unsupported protocol version",
+            data: ["supported": MCPRevision.supportedVersions, "requested": declared]))
+      }
+    }
+
+    func result(_ payload: [String: Any]) -> MCPHTTPResponse {
+      .ok(JSONRPC.result(id: id, MCPRevision.decorate(payload, era: era, serverInfo: serverInfo)))
+    }
 
     switch method {
-    case "initialize":
-      let requested = (params?["protocolVersion"] as? String) ?? defaultProtocolVersion
-      return JSONRPC.result(id: id, [
-        "protocolVersion": requested,
+    case "server/discover":
+      // MUST be implemented by every modern server. Pure identity — no store
+      // access, no user data — so it is the same for every caller and caches
+      // publicly.
+      return result([
+        "supportedVersions": MCPRevision.supportedVersions,
         "capabilities": ["tools": [:] as [String: Any]],
-        "serverInfo": ["name": serverName, "version": serverVersion],
+        "instructions": """
+          Septena is a private life-tracking app. These tools read and write \
+          this Mac's signed-in user's own data (tasks, goals, habits, \
+          nutrition, training, and the other sections they have enabled). The \
+          advertised tool set reflects which sections that user turned on, so \
+          call tools/list before assuming a section is available.
+          """,
+        "ttlMs": MCPRevision.discoverTTLms,
+        "cacheScope": "public",
+      ])
+
+    case "initialize":
+      // Legacy handshake. Retained deliberately: every existing
+      // `claude mcp add` registration on this Mac speaks it. Answer with a
+      // version we genuinely serve rather than echoing the request blindly.
+      return result([
+        "protocolVersion": MCPRevision.negotiateLegacyVersion(params?["protocolVersion"]),
+        "capabilities": ["tools": [:] as [String: Any]],
+        "serverInfo": serverInfo,
       ])
 
     case "ping":
-      return JSONRPC.result(id: id, [:] as [String: Any])
+      // Removed in 2026-07-28, kept for legacy clients that health-probe with
+      // it.
+      return result([:])
 
     case "tools/list":
       // Reads section config from the local mirror — must NOT block on the
@@ -42,21 +115,33 @@ enum MCPDispatch {
       // the whole connector look dead). start() is already kicked off at app
       // launch and by LocalMCPServer.start().
       let enabled = enabledSections()
-      return JSONRPC.result(id: id, ["tools": MCPToolCatalog.manifest(enabledSections: enabled).map(\.listEntry)])
+      // cacheScope is "private": the manifest is scoped to the signed-in
+      // user's enabled sections, so it must never be served to another caller
+      // from a shared cache.
+      return result([
+        "tools": MCPToolCatalog.manifest(enabledSections: enabled).map(\.listEntry),
+        "ttlMs": MCPRevision.toolsListTTLms,
+        "cacheScope": "private",
+      ])
 
     case "tools/call":
       let name = (params?["name"] as? String) ?? ""
       let args = MCPArgs(params?["arguments"] as? [String: Any])
       do {
-        return JSONRPC.result(id: id, JSONRPC.toolResult(try await callTool(name: name, args: args)))
+        return result(JSONRPC.toolResult(try await callTool(name: name, args: args)))
       } catch let e as MCPError {
-        return JSONRPC.result(id: id, JSONRPC.toolResult(["error": e.message], isError: true))
+        return result(JSONRPC.toolResult(["error": e.message], isError: true))
       } catch {
-        return JSONRPC.result(id: id, JSONRPC.toolResult(["error": String(describing: error)], isError: true))
+        return result(JSONRPC.toolResult(["error": String(describing: error)], isError: true))
       }
 
     default:
-      return JSONRPC.error(id: id, code: -32601, "Method not found: \(method)")
+      // Modern transport pins an unknown method to HTTP 404 (with the
+      // JSON-RPC body distinguishing us from a legacy server that simply
+      // doesn't host this endpoint). Legacy clients keep the 200 they expect.
+      return MCPHTTPResponse(
+        status: era == .modern ? 404 : 200,
+        body: JSONRPC.error(id: id, code: -32601, "Method not found: \(method)"))
     }
   }
 

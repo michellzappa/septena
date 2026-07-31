@@ -177,7 +177,43 @@ final class LocalMCPServer {
     return (lines, body, body.count >= contentLength)
   }
 
+  /// Case-insensitive lookup over the raw header lines. Header *names* are
+  /// case-insensitive per RFC 9110 and clients vary (`Mcp-Method` vs
+  /// `MCP-Method`), so every read goes through here.
+  nonisolated private static func headerValue(_ name: String, in headers: [String]) -> String? {
+    let needle = name.lowercased() + ":"
+    guard let line = headers.first(where: { $0.lowercased().hasPrefix(needle) }),
+          let separator = line.firstIndex(of: ":") else { return nil }
+    let value = line[line.index(after: separator)...]
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return value.isEmpty ? nil : value
+  }
+
   nonisolated private func handle(headers: [String], body: Data, conn: NWConnection) async {
+    // --- Transport preconditions (MCP 2026-07-28 Streamable HTTP) ---------
+    //
+    // Origin validation is a spec MUST and a real hole for this server: it
+    // binds all interfaces (the tailnet scope can't be expressed as an
+    // interface restriction), so without this a web page the user visits
+    // could DNS-rebind to 127.0.0.1:7717 and drive their whole life database.
+    // No legitimate caller sends Origin — Claude Code's MCP client is not a
+    // browser — so any Origin at all is rejected.
+    if let origin = Self.headerValue("Origin", in: headers) {
+      SeptenaLog.error("[LocalMCP] rejected cross-origin request from \(origin)")
+      respond(conn, status: "403 Forbidden", json: ["error": "cross-origin requests are not allowed"])
+      return
+    }
+
+    // The GET stream and session-terminating DELETE were removed in
+    // 2026-07-28. Answer 405 rather than falling through to a JSON-RPC parse
+    // error, so an older client fails fast and falls back.
+    let requestLine = headers.first ?? ""
+    let verb = requestLine.split(separator: " ").first.map(String.init)?.uppercased() ?? ""
+    if verb == "GET" || verb == "DELETE" {
+      respond(conn, status: "405 Method Not Allowed", json: ["error": "use POST"])
+      return
+    }
+
     // --- Auth: require the configured bearer token on every request. ---
     guard let token = LocalMCPServer.token, !token.isEmpty else {
       respond(conn, status: "503 Service Unavailable",
@@ -203,13 +239,10 @@ final class LocalMCPServer {
     let id = obj["id"]
     let params = obj["params"] as? [String: Any]
 
-    let response = await MCPDispatch.handle(method: method, id: id, params: params)
-    if let response {
-      respond(conn, status: "200 OK", json: response)
-    } else {
-      // Notification: no body, bare 202 (matches the gateway).
-      respond(conn, status: "202 Accepted", json: nil)
-    }
+    let response = await MCPDispatch.handle(
+      method: method, id: id, params: params,
+      header: { Self.headerValue($0, in: headers) })
+    respond(conn, status: response.statusLine, json: response.body)
   }
 
   nonisolated private func respond(_ conn: NWConnection, status: String, json: [String: Any]?) {

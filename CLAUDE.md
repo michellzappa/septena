@@ -394,3 +394,15 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   never one without the others, or the two surfaces silently diverge. The
   gateway's `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so
   keep in-app section skill briefs in sync with the gateway's tools.
+- **Both MCP servers are DUAL-ERA and must stay that way.** MCP revision
+  `2026-07-28` made the protocol stateless (no `initialize`, no
+  `Mcp-Session-Id`, no GET stream; version + client identity ride in
+  `params._meta` and mirrored HTTP headers). Both servers implement it —
+  `server/discover`, `resultType`, `ttlMs`/`cacheScope`, header validation
+  (`-32020`), honest version negotiation (`-32022`) — **while still answering
+  the legacy `initialize` handshake**, because Claude's connector and every
+  existing `claude mcp add` registration still speak the old shape. Deleting
+  the legacy path takes the live connector offline. The era rules and constants
+  are mirrored in `SeptenaCore/MCP/MCPRevision.swift` ⇄
+  `../septena-mcp-gateway/src/protocol.ts` — edit in lockstep like everything
+  else MCP.
