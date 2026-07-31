@@ -6,7 +6,7 @@ import Foundation
 /// touches one case; a full reload (`loadAll`) touches `allCases`.
 enum DashSection: CaseIterable {
   case habits, chores, supplements, training, tasks
-  case nutrition, groceries, gut, mood, hydration
+  case nutrition, groceries, gut, mood, hydration, activity
 
   /// Map a capture section (the unit tile quick-adds notify in) onto the
   /// dashboard's read unit. `AddInfoSection` has no mood/hydration cases —
@@ -40,6 +40,7 @@ enum DashSection: CaseIterable {
     case "gut":         self = .gut
     case "mood":        self = .mood
     case "hydration":   self = .hydration
+    case "activity":    self = .activity
     default:            return nil
     }
   }
@@ -77,6 +78,8 @@ actor DashboardReader {
     var moodToday: MoodDayResponse?
     var moodHistory: [MoodHistoryPoint] = []
     var hydrationHistory: [Int] = []
+    var activitySteps: [Int] = []
+    var activityToday: ActivityDaySummary?
   }
 
   /// QuickAdd-menu-only data — the last consumable entry, recommendation
@@ -131,6 +134,10 @@ actor DashboardReader {
     }
     if sections.contains(.hydration) {
       s.hydrationHistory = ChecklistMirror.loadHydrationDailyMl(context: ctx, days: days, today: today)
+    }
+    if sections.contains(.activity) {
+      s.activitySteps = ChecklistMirror.loadActivityStepsDaily(context: ctx, days: days, today: today)
+      s.activityToday = ChecklistMirror.loadActivityDay(context: ctx, date: today)
     }
     return s
   }

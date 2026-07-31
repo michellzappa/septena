@@ -172,6 +172,13 @@ struct WeekDashboardView: View {
   /// Daily target shared with HydrationDestinationView via the same
   /// AppStorage key, so the tile's progress matches the section's.
   @AppStorage("hydration.dailyTargetMl") private var hydrationTargetMl: Int = 2000
+  /// Activity tile state: a 90-day step series (oldest→newest) plus today's
+  /// persisted row, both read through `DashboardReader` off the synced
+  /// `ActivityDayEntity` rows. Today's live numbers still come from the
+  /// observable `HealthKitBridge` on iPhone; these keep the *history* on the
+  /// same refresh path as every other tile.
+  @State private var activitySteps: [Int] = []
+  @State private var activityToday: ActivityDaySummary? = nil
   @State private var sheetDest: WeekDestination? = nil
   /// Today-scoped collections kept in state so DayTimelineView can read
   /// them. NextItemsModel already covers habits/supplements/chores and
@@ -710,6 +717,8 @@ struct WeekDashboardView: View {
     static let hydrationHistory   = "week.hydrationHistory"
     static let recentTraining     = "week.recentTraining"
     static let macroColors        = "week.macroColors"
+    static let activitySteps      = "week.activitySteps"
+    static let activityToday      = "week.activityToday"
   }
 
   /// Read every tile's last-known data out of disk-cached blobs and
@@ -746,6 +755,12 @@ struct WeekDashboardView: View {
     }
     if let v = ResponseCache.load([ExerciseEntry].self, forKey: CacheKey.recentTraining) { recentTraining = v }
     if let v = ResponseCache.load(MacroColors.self, forKey: CacheKey.macroColors) { macroColors = v }
+    if let v = ResponseCache.load([Int].self, forKey: CacheKey.activitySteps) { activitySteps = v }
+    if let v = ResponseCache.load(ActivityDaySummary.self, forKey: CacheKey.activityToday) {
+      // A cached row from an earlier day would put yesterday's totals under
+      // today's label — keep it only while it still IS today.
+      if v.date == clock.today { activityToday = v }
+    }
     // Heavy tiles read from `derived`, so prime it from the cache-loaded
     // inputs before first paint (session types arrive later via menu extras).
     recomputeDerived()
@@ -850,6 +865,12 @@ struct WeekDashboardView: View {
       hydrationHistory = s.hydrationHistory
       hydrationToday = s.hydrationHistory.last ?? 0
       ResponseCache.save(s.hydrationHistory, forKey: CacheKey.hydrationHistory)
+    }
+    if sections.contains(.activity) {
+      activitySteps = s.activitySteps
+      activityToday = s.activityToday
+      ResponseCache.save(s.activitySteps, forKey: CacheKey.activitySteps)
+      if let d = s.activityToday { ResponseCache.save(d, forKey: CacheKey.activityToday) }
     }
     // Training inputs (recentTraining) may have changed — refresh the cache.
     if sections.contains(.training) { recomputeDerived() }
@@ -1240,6 +1261,8 @@ struct WeekDashboardView: View {
       hydrationTargetMl: hydrationTargetMl,
       intakeTiles: intakeTiles,
       recentTraining: recentTraining,
+      activitySteps: activitySteps,
+      activityToday: activityToday,
       derived: derived
     )
   }

@@ -41,6 +41,13 @@ struct DashboardTileContext {
   var hydrationTargetMl: Int
   var intakeTiles: [IntakeTileDTO]
   var recentTraining: [ExerciseEntry]
+  /// Steps per day over the 90-day window, oldest → newest, gap-filled with
+  /// 0. Loaded through `DashboardReader` like every other tile series — the
+  /// Activity tile used to fetch `ActivityDayEntity` inline during body
+  /// evaluation, which had no refresh trigger, so the bars showed whatever
+  /// the store held the last time SwiftUI happened to re-run that cell.
+  var activitySteps: [Int]
+  var activityToday: ActivityDaySummary?
   var derived: DashboardTileDerived
 
   var weeklySessionCount: Int {
@@ -57,8 +64,16 @@ struct DashboardTileContext {
 @MainActor
 enum DashboardTileBuilder {
   static let historyDays = 90
+  /// Day keys must be byte-identical to the ones `SeptenaDate` writes into
+  /// every entity — so pin calendar + locale here too. An unpinned formatter
+  /// follows the device Region and silently emits non-Gregorian years
+  /// ("2569-…") that match no stored row.
   static let ymdFormatter: DateFormatter = {
-    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    let f = DateFormatter()
+    f.calendar = Calendar(identifier: .gregorian)
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.dateFormat = "yyyy-MM-dd"
+    return f
   }()
   static let integerFormatter: NumberFormatter = {
     let f = NumberFormatter()
@@ -769,57 +784,58 @@ enum DashboardTileBuilder {
                           current: Double(min(snap.steps, stepsTarget)),
                           target: Double(stepsTarget)),
           // The heatmap / dense layouts render the full window, so feed the
-          // 90-day step series from the synced entity — NOT `snap.bars`, which is
-          // only the trailing 7 days the tile histogram needs. (This is why the
-          // drawer showed full history but the heatmap looked near-empty.)
+          // 90-day step series — the Tiles histogram slices its own trailing 7
+          // off the same array. (Feeding only 7 here is why the drawer showed
+          // full history while the heatmap looked near-empty.)
           history: .bars(activityStepBars(days: DashboardTileBuilder.historyDays)),
           tap: .openSheet(.activity)
         )
       }
 
-      /// Steps per day for the trailing `days`, oldest → newest, gap-filled with
-      /// 0, drawn from the persisted `ActivityDayEntity` rows. Feeds the homepage
-      /// heatmap/dense modes (90-day window) the same way other sections do.
+      /// Steps per day for the trailing `days`, oldest → newest, gap-filled
+      /// with 0. Comes from the context's reader-loaded series (padded if the
+      /// window is shorter), so the tile repaints on `.septenaDataChanged`
+      /// like every other section instead of reading SwiftData mid-body.
       func activityStepBars(days: Int) -> [Int] {
-        let keys = lastNDays(days)
-        let rows = fetchActivityDays(from: keys.first ?? "", to: keys.last ?? "")
-        let byDate = Dictionary(rows.map { ($0.date, $0.stepCount ?? 0) },
-                                uniquingKeysWith: { a, _ in a })
-        return keys.map { byDate[$0] ?? 0 }
+        let series = ctx.activitySteps
+        var bars: [Int]
+        if series.count == days {
+          bars = series
+        } else if series.count > days {
+          bars = Array(series.suffix(days))
+        } else {
+          bars = Array(repeating: 0, count: days - series.count) + series
+        }
+        // Today's persisted row lags the live count — the HealthKit ingest
+        // writes it after `refresh()` publishes the numbers the headline
+        // shows. Overlay the live value so the emphasized last bar can't
+        // read 0 under a headline saying 6,000 steps.
+        let bridge = HealthKitBridge.shared
+        if bridge.isAvailable, bridge.hasLoaded, let last = bars.last {
+          bars[bars.count - 1] = max(last, bridge.stepsToday)
+        }
+        return bars
       }
 
-      /// Today's numbers + trailing-7-day step bars for the Activity surfaces.
-      /// Prefers the live HealthKit snapshot on iOS; falls back to the synced
-      /// `ActivityDayEntity` rows so macOS (no HealthKit) and a cold cache still
-      /// render. Returns nil only when there's genuinely nothing to show.
+      /// Today's numbers for the Activity surfaces. Prefers the live HealthKit
+      /// snapshot on iOS; falls back to the synced `ActivityDayEntity` row so
+      /// macOS (no HealthKit) still renders. Returns nil only when there's
+      /// genuinely nothing to show.
       struct ActivitySnapshot {
         let steps: Int
         let kcal: Double
         let exMin: Int
-        let bars: [Int]   // trailing 7 days, oldest → newest
       }
 
       func activitySnapshot() -> ActivitySnapshot? {
         let bridge = HealthKitBridge.shared
-        let dates = lastNDays(7)
-        let rows = fetchActivityDays(from: dates.first ?? "", to: dates.last ?? "")
-        guard bridge.isAvailable || !rows.isEmpty else { return nil }
-        let byDate = Dictionary(rows.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
-        let today = dates.last ?? ctx.clockToday
-        let todayRow = byDate[today]
-        let steps = bridge.isAvailable ? bridge.stepsToday           : (todayRow?.stepCount ?? 0)
+        let todayRow = ctx.activityToday
+        let hasRows = todayRow != nil || ctx.activitySteps.contains { $0 > 0 }
+        guard bridge.isAvailable || hasRows else { return nil }
+        let steps = bridge.isAvailable ? bridge.stepsToday           : (todayRow?.steps ?? 0)
         let kcal  = bridge.isAvailable ? bridge.activeKcalToday      : (todayRow?.activeKcal ?? 0)
         let exMin = bridge.isAvailable ? bridge.exerciseMinutesToday : (todayRow?.exerciseMinutes ?? 0)
-        let bars  = bridge.isAvailable ? Array(bridge.stepsHistory.suffix(7))
-                                       : dates.map { byDate[$0]?.stepCount ?? 0 }
-        return ActivitySnapshot(steps: steps, kcal: kcal, exMin: exMin, bars: bars)
-      }
-
-      func fetchActivityDays(from start: String, to end: String) -> [ActivityDayEntity] {
-        let descriptor = FetchDescriptor<ActivityDayEntity>(
-          predicate: #Predicate { $0.date >= start && $0.date <= end }
-        )
-        return (try? ctx.modelContext.fetch(descriptor)) ?? []
+        return ActivitySnapshot(steps: steps, kcal: kcal, exMin: exMin)
       }
 
       func lastNDays(_ n: Int) -> [String] {

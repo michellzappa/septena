@@ -991,6 +991,16 @@ struct CardioDay: Codable, Hashable {
   }
 }
 
+/// One day of Apple Health activity totals as the dashboard reads them —
+/// the value shape of `ActivityDayEntity`, so the tile never holds a
+/// SwiftData entity across actors. Nil fields mean "not recorded".
+struct ActivityDaySummary: Codable, Hashable, Sendable {
+  let date: String
+  var steps: Int?
+  var activeKcal: Double?
+  var exerciseMinutes: Int?
+}
+
 struct CardioHistoryResponse: Codable {
   let daily: [CardioDay]
   let targetWeeklyMin: Int

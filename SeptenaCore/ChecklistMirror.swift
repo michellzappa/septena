@@ -1365,6 +1365,45 @@ enum ChecklistMirror {
     return dayKeys.map { mlByDate[$0] ?? 0 }
   }
 
+  /// Steps per day for the trailing `days`, oldest → newest, gap-filled with
+  /// 0 (length == `days`, today is the last element). Read off the persisted
+  /// `ActivityDayEntity` rows — the only cross-platform source, since
+  /// HealthKit is iPhone-only and macOS sees these rows solely through
+  /// CloudKit. Day keys are built with `SeptenaDate` so they match exactly
+  /// the keys the HealthKit ingest writes.
+  static func loadActivityStepsDaily(context: ModelContext, days: Int, today: String) -> [Int] {
+    guard days > 0, let todayDate = SeptenaDate.parse(today) else { return [] }
+    let cal = Calendar.current
+    var dayKeys: [String] = []
+    for offset in stride(from: days - 1, through: 0, by: -1) {
+      if let d = cal.date(byAdding: .day, value: -offset, to: todayDate),
+         let s = SeptenaDate.format(d) {
+        dayKeys.append(s)
+      }
+    }
+    let startStr = dayKeys.first ?? today
+    let endStr = dayKeys.last ?? today
+    let rows = (try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+      predicate: #Predicate { $0.date >= startStr && $0.date <= endStr }
+    ))) ?? []
+    let byDate = Dictionary(rows.map { ($0.date, $0.stepCount ?? 0) },
+                            uniquingKeysWith: { a, _ in a })
+    return dayKeys.map { byDate[$0] ?? 0 }
+  }
+
+  /// One day's persisted activity totals, or nil when nothing was ever
+  /// recorded for that day. Backs the Activity tile's headline on surfaces
+  /// with no HealthKit (macOS) and on a cold cache.
+  static func loadActivityDay(context: ModelContext, date: String) -> ActivityDaySummary? {
+    guard let row = (try? context.fetch(FetchDescriptor<ActivityDayEntity>(
+      predicate: #Predicate { $0.date == date }
+    )))?.first else { return nil }
+    return ActivityDaySummary(date: row.date,
+                              steps: row.stepCount,
+                              activeKcal: row.activeKcal,
+                              exerciseMinutes: row.exerciseMinutes)
+  }
+
   static func loadNutritionSummaries(context: ModelContext, days: Int, today: String) -> [NutritionDailySummaryEntity] {
     guard let todayDate = SeptenaDate.parse(today) else { return [] }
     let start = Calendar.current.date(byAdding: .day, value: -(days - 1), to: todayDate) ?? todayDate
