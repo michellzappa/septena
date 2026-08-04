@@ -8,8 +8,8 @@ private struct MealCandidate: Identifiable {
   let id: String
   let representative: NutritionEntry
   let count: Int
-  /// Already logged today → shown with a check, grayed, and un-tappable so it
-  /// can't be re-logged by accident.
+  /// Already logged today → shown with a check and grayed so it reads as done,
+  /// but still tappable (same meal twice is common — coffee, snacks).
   let loggedToday: Bool
 }
 
@@ -51,8 +51,8 @@ struct AddNutritionPage: View {
               )
             }
             .buttonStyle(.plain)
-            .disabled(working || meal.loggedToday)
-            .opacity(meal.loggedToday ? 0.5 : 1)
+            .disabled(working)
+            .opacity(meal.loggedToday ? 0.55 : 1)
           }
         }
       }
@@ -84,10 +84,10 @@ struct AddNutritionPage: View {
   }
 
   private func dedup(_ entries: [NutritionEntry]) -> [MealCandidate] {
-    // Meals already logged today stay in the list but sink to the bottom, grayed
-    // and un-tappable (below), so the user sees them as done without re-logging
-    // by accident. Same dedup key (foods.first, lowercased); the flag clears
-    // tomorrow (or if today's entry is deleted).
+    // Meals already logged today stay in the list but sink to the bottom and
+    // gray with a check — visible as done, still tappable to log again. Same
+    // dedup key (foods.first, lowercased); the flag clears tomorrow (or if
+    // today's entry is deleted).
     let loggedToday = Set(
       entries.filter { $0.date == clock.today }.compactMap { $0.foods.first?.lowercased() })
     // Pick the most-recent representative per dedup key so the row's

@@ -177,10 +177,9 @@ struct NutritionDestinationView: View {
   /// ranked by frequency then recency. Feeds the "+" search-and-re-log
   /// sheet — no ≥2 threshold or cap, since search wants the full set.
   private var allDistinctMeals: [UsualMeal] {
-    // Meals already logged today stay in the list but sink to the bottom, grayed
-    // and un-tappable (see the row + button below), so the user sees them as
-    // done without re-logging by accident. The flag clears tomorrow (or if
-    // today's entry is deleted).
+    // Meals already logged today stay in the list but sink to the bottom and
+    // gray with a check — visible as done, still tappable to log again. The
+    // flag clears tomorrow (or if today's entry is deleted).
     let loggedToday = Set(entries.filter { $0.date == today }.map(mealSignature))
     var groups: [String: [NutritionEntry]] = [:]
     for e in entries {
@@ -990,8 +989,8 @@ struct UsualMeal: Identifiable {
   let signature: String
   let template: NutritionEntry
   let count: Int
-  /// Already logged today → the row is grayed, checked, and un-tappable so it
-  /// can't be re-logged by accident.
+  /// Already logged today → the row is grayed and checked so it reads as done,
+  /// but still tappable (same meal twice is common).
   let loggedToday: Bool
   var id: String { signature }
 }
@@ -1064,10 +1063,9 @@ struct MealRelogSearchView: View {
                 mealRow(meal)
               }
               .buttonStyle(.plain)
-              // Already logged today → grayed + un-tappable so a stray tap can't
-              // re-log it.
-              .disabled(meal.loggedToday)
-              .opacity(meal.loggedToday ? 0.5 : 1)
+              // Already logged today → grayed + checked so it reads as done,
+              // still tappable to log again.
+              .opacity(meal.loggedToday ? 0.55 : 1)
             }
           }
           .listStyle(.plain)
@@ -1141,7 +1139,7 @@ struct MealRelogSearchView: View {
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(meal.loggedToday
-      ? "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Already logged today."
+      ? "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Already logged today. Tap to log again."
       : "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Tap to log again now.")
   }
 }
