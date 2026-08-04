@@ -295,7 +295,7 @@ struct CorrelationsHomepageView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                   Text("q=\(pair.qValue.decimalString(3)) · r=\(CorrelationEngine.formatR(pair.r)) · n=\(pair.n) · lag \(pair.lag)d")
-                    .font(.caption.monospacedDigit())
+                    .font(.septenaMetaSmall)
                     .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -334,10 +334,10 @@ struct CorrelationsHomepageView: View {
               .lineLimit(1)
             Spacer()
             Text("Δ \(row.delta >= 0 ? "+" : "")\(String(format: "%.1f", row.delta))")
-              .font(.caption.monospacedDigit().weight(.semibold))
+              .font(.septenaMetaSmall.weight(.semibold))
               .foregroundStyle(supplementColor(row))
             Text("\(String(format: "%.1f", row.takenMean)) (\(row.takenN)d) vs \(String(format: "%.1f", row.offMean)) (\(row.offN)d)")
-              .font(.caption2.monospacedDigit())
+              .font(.septenaMetaMicro)
               .foregroundStyle(.secondary)
             Text(row.strength)
               .font(.caption2)
@@ -373,7 +373,7 @@ struct CorrelationsHomepageView: View {
           HStack {
             Text(i.spec.title).font(.caption).lineLimit(1)
             Spacer()
-            Text("n=\(i.n)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Text("n=\(i.n)").font(.septenaMetaSmall).foregroundStyle(.secondary)
           }
           .padding(.vertical, 2)
         }

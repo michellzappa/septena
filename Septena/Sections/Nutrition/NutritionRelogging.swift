@@ -55,7 +55,7 @@ struct NutritionMultiplierControl: View {
             step: NutritionRelogging.step) {
       LabeledContent("Amount") {
         Text("\(percent)%")
-          .font(.body.monospacedDigit())
+          .font(.septenaMetric)
       }
     }
     .accessibilityLabel("Meal amount")

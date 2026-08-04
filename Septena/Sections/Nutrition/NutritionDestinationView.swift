@@ -623,7 +623,7 @@ struct NutritionDestinationView: View {
       tone = color
     }
     return Text(text)
-      .font(.caption.monospacedDigit())
+      .font(.septenaMetaSmall)
       .foregroundStyle(tone)
       .lineLimit(1)
       .minimumScaleFactor(0.85)
@@ -726,7 +726,7 @@ struct NutritionDestinationView: View {
       Spacer()
       if let totals {
         Text("\(Int(totals.kcal.rounded())) kcal")
-          .font(.caption.monospacedDigit())
+          .font(.septenaMetaSmall)
           .foregroundStyle(kcalColor)
       }
     }
@@ -772,12 +772,12 @@ struct NutritionDestinationView: View {
             Text("·").foregroundStyle(.secondary.opacity(0.5))
             Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(kcalColor)
           }
-          .font(.caption.monospacedDigit().weight(.semibold))
+          .font(.septenaMetaSmall.weight(.semibold))
         }
       }
       VStack(alignment: .trailing, spacing: 4) {
         Text(e.time)
-          .font(.caption.monospacedDigit())
+          .font(.septenaMetaSmall)
           .foregroundStyle(.secondary)
         if let pid = e.photoAssetID, !pid.isEmpty {
           MealPhotoThumbnail(assetID: pid, size: 36)
@@ -850,7 +850,7 @@ struct NutritionDestinationView: View {
         HStack(spacing: 10) {
           Circle().fill(fastingColor).frame(width: 6, height: 6)
           Text(label)
-            .font(.caption.monospacedDigit().weight(.semibold))
+            .font(.septenaMetaSmall.weight(.semibold))
             .foregroundStyle(fastingColor)
           Spacer()
         }
@@ -1122,13 +1122,13 @@ struct MealRelogSearchView: View {
           Text("·").foregroundStyle(.secondary.opacity(0.5))
           Text("\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal").foregroundStyle(colors.kcal)
         }
-        .font(.caption2.monospacedDigit().weight(.semibold))
+        .font(.septenaMetaMicro.weight(.semibold))
         .lineLimit(1)
       }
       Spacer(minLength: 0)
       if meal.count > 1 {
         Text("×\(meal.count)")
-          .font(.caption2.monospacedDigit())
+          .font(.septenaMetaMicro)
           .foregroundStyle(.secondary)
       }
       // Done today → a green check instead of the re-log arrow.

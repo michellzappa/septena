@@ -52,7 +52,7 @@ struct TileView: View {
           Spacer()
           Text("q=\(pair.qValue.decimalString(3))")
         }
-        .font(.caption2.monospacedDigit())
+        .font(.septenaMetaMicro)
         .foregroundStyle(.secondary)
       }
     }
@@ -132,7 +132,7 @@ struct TierBadge: View {
       return pair.r >= 0 ? .green : .red
     }()
     Text(CorrelationEngine.formatR(pair.r))
-      .font(.caption2.monospacedDigit().weight(.semibold))
+      .font(.septenaMetaMicro.weight(.semibold))
       .padding(.horizontal, 5)
       .padding(.vertical, 1)
       .background(color.opacity(0.18), in: Capsule())
@@ -277,7 +277,7 @@ struct DetailSheet: View {
             .font(.caption.weight(.medium))
           ForEach(Array(zip(["Low", "Mid", "High"], pair.buckets)), id: \.0) { name, b in
             Text("\(name): x̄=\(format(b.centerX))\(unit(pair.spec.predictor.unit))  ·  ȳ=\(format(b.meanY))\(unit(pair.spec.target.unit))  ·  n=\(b.n)")
-              .font(.caption.monospacedDigit())
+              .font(.septenaMetaSmall)
               .foregroundStyle(.secondary)
           }
           if !pair.monotonic {
@@ -309,17 +309,17 @@ struct DetailSheet: View {
       }
       Divider()
       Text("r = \(CorrelationEngine.formatR(pair.r))  ·  p = \(pair.p.decimalString(3))  ·  q = \(pair.qValue.decimalString(3))  ·  permutations = \(CorrelationEngine.permutations)")
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(.secondary)
       Text("x̄ = \(format(pair.meanX))\(unit(pair.spec.predictor.unit))  ·  ȳ = \(format(pair.meanY))\(unit(pair.spec.target.unit))")
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(.secondary)
       Text("slope = \(pair.slope >= 0 ? "+" : "")\(format(pair.slope)) \(pair.spec.target.unit.isEmpty ? "pts" : pair.spec.target.unit) per +1 \(pair.spec.predictor.unit.isEmpty ? "unit" : pair.spec.predictor.unit) of \(pair.spec.predictor.label)")
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(.secondary)
       if pair.binary {
         Text("Binary predictor — \(pair.stateMinority) minority days vs \(pair.stateMajority) majority days")
-          .font(.caption.monospacedDigit())
+          .font(.septenaMetaSmall)
           .foregroundStyle(.secondary)
       }
       if let exp = pair.expectedSign.symbol {
@@ -337,7 +337,7 @@ struct DetailSheet: View {
       ForEach(CorrelationEngine.methodDefinitions(), id: \.term) { item in
         VStack(alignment: .leading, spacing: 1) {
           Text(item.term)
-            .font(.caption.monospacedDigit().weight(.semibold))
+            .font(.septenaMetaSmall.weight(.semibold))
           Text(item.explanation)
             .font(.caption)
             .foregroundStyle(.secondary)

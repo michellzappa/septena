@@ -276,7 +276,7 @@ struct IntakeKindPageView: View {
       HStack(spacing: 5) {
         ProjectProgressIcon(progress: Double(count) / Double(max(cap, 1)), tint: accent)
         Text("\(count)/\(cap)")
-          .font(.caption2.monospacedDigit())
+          .font(.septenaMetaMicro)
           .foregroundStyle(.secondary)
       }
     )

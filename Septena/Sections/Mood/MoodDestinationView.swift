@@ -266,7 +266,7 @@ private struct QuadrantBreakdownView: View {
           Text(q.title).font(.caption)
           Spacer()
           Text(total == 0 ? "0%" : "\(Int(round(Double(n) / Double(total) * 100)))%")
-            .font(.caption.monospacedDigit())
+            .font(.septenaMetaSmall)
             .foregroundStyle(.secondary)
         }
       }

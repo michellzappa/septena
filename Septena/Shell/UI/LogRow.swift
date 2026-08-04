@@ -51,7 +51,7 @@ struct LogRow: View {
       Spacer()
       if let trailing {
         Text(trailing)
-          .font(.septenaMeta.monospacedDigit())
+          .font(.septenaMeta)
           .foregroundStyle(Theme.inkSecondary)
       }
     }

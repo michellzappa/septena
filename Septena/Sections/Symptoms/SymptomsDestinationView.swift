@@ -306,7 +306,7 @@ private struct SymptomEventEditor: View {
             Text("Severity")
             Spacer()
             Text("\(Int(severity))/10")
-              .font(.body.monospacedDigit())
+              .font(.septenaMetric)
               .foregroundStyle(.secondary)
           }
           Slider(value: $severity, in: 0...10, step: 1)

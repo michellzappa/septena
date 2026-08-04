@@ -275,7 +275,7 @@ struct ImportExportSettingsPane: View {
             ProgressView().controlSize(.small)
           case .success(let records, let types):
             Text("\(records) records · \(types) types")
-              .font(.caption.monospacedDigit())
+              .font(.septenaMetaSmall)
               .foregroundStyle(.secondary)
           case .failure:
             Image(systemName: "exclamationmark.triangle")

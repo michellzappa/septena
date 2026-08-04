@@ -360,7 +360,7 @@ struct SessionCompleteSheet: View {
       }
       Spacer()
       Text(rowSummary(e))
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(.secondary)
     }
   }

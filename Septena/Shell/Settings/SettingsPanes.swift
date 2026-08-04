@@ -1646,7 +1646,7 @@ struct QuickActionsSettingsPane: View {
           Text("Sections")
           Spacer()
           Text("\(selected.count) / \(Self.limit)")
-            .font(.caption.monospacedDigit())
+            .font(.septenaMetaSmall)
             .foregroundStyle(.secondary)
         }
       } footer: {
