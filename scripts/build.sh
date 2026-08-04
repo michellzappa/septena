@@ -56,6 +56,17 @@ EOF
   fi
 fi
 
+# Design-system guardrail, BEFORE the lock (it's a grep — costs nothing, and a
+# convention violation shouldn't wait behind another session's compile). Blocks
+# only on the rules that have caused real bugs; typography notes are advisory.
+# SEPTENA_SKIP_LINT=1 bypasses.
+if [ -x "$REPO/scripts/lint-design.sh" ]; then
+  if ! "$REPO/scripts/lint-design.sh"; then
+    echo "build.sh: design lint failed — not building."
+    exit 3
+  fi
+fi
+
 waited=0
 until mkdir "$LOCKDIR" 2>/dev/null; do
   age=$(( $(date +%s) - $(stat -f%m "$LOCKDIR" 2>/dev/null || date +%s) ))

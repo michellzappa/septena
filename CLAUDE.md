@@ -374,6 +374,34 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   blue outline on the selected row and an accent fill on the drop-hover row) is a
   **bug**, full stop — it reads as chaos. If you catch yourself adding a
   highlight, first find what the surface already uses for emphasis and reuse it.
+  The three sanctioned shapes live in
+  `Septena/Shell/UI/SelectionLanguage.swift` (see `docs/DesignSpec.md` §4.5):
+  full-bleed `SelectableListRowBackground` for a list row, inset
+  `InsetSelectionBackground` for a palette / source-list row, and
+  `SelectableChip` for a chip / segment / filter. **An inset highlight on an
+  ordinary list row is the "selection floating on top of the row" bug** — inset
+  is only for palettes.
+- **The app accent is adaptive INK, not a hue — black in light, WHITE in dark.**
+  So `.background(Color.accentColor).foregroundStyle(.white)` is white-on-white
+  in dark mode and the control vanishes. This shipped twice (the training
+  effort-rung picker and the task week-strip day picker). Selected chips use a
+  **wash plus matching ink** (`SelectableChip` / `SelectableChipStyle`), which is
+  contrast-safe for any tint in both appearances. Related trap: `Color.accentColor`
+  only means "the section color" *inside* a `SectionDrawer` — a view pushed from a
+  settings pane inherits the monochrome ink instead, so it must read
+  `theme.color(for: "<key>")` explicitly.
+- **Motion is gated centrally — never bare `withAnimation` / `.animation(_:value:)`.**
+  Use `a11yAnimate(_:) { … }` (drop-in for `withAnimation`, no environment
+  needed), `A11yMotion.run` (when `@Environment(\.a11yMotion)` is already in
+  scope), or `.a11yAnimation(_:value:)`. `LogCommit.swift` and
+  `CommitMotion.swift` are the two documented exceptions — they gate once at the
+  overlay.
+- **`scripts/lint-design.sh` enforces the above and runs from `scripts/build.sh`
+  before the build lock.** A violation fails the build. Genuinely sanctioned
+  exceptions get `// septena-lint:allow <rule-id>` **on the offending line**,
+  with the reasoning in a comment above. Typography rules are advisory notes
+  (a drift budget being paid down), not blockers. When you rediscover a
+  convention the hard way, add a `scan` rule there as well as documenting it.
 - **All *app* documentation lives in `docs/`.** Any new `.md` — plan, handoff,
   spec, design note, feature write-up — goes in `docs/`, never the repo root. Root
   is reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,

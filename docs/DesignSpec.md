@@ -2,7 +2,7 @@
 
 The de-facto design system, written down. Derived from what the app already does — not aspirational. When something here conflicts with code, the code is wrong, not the spec.
 
-_Last verified against code: 2026-06-12._
+_Last verified against code: 2026-08-04._
 
 ## 1. Section model
 
@@ -64,7 +64,29 @@ Read-only historical entries use `LogRow` ([LogRow.swift](../Septena/Shell/UI/Lo
 
 All section accents live in [SectionTheme.swift](../SeptenaCore/SectionTheme.swift) `defaultPalette`. Per-section tint is applied with `.tint(theme.color(for: key))`. No hardcoded `Color(...)` literals in views.
 
-Unknown sections fall back to a neutral gray (`SectionTheme.color(for:)`). The user's Tasks-section color is the global app accent (`SectionTheme.accent`).
+Unknown sections fall back to a neutral gray (`SectionTheme.color(for:)`).
+
+**The app accent is adaptive ink, not a hue.** `SectionTheme.accent` is the asset-catalog `AccentColor` — pure black in light mode, **pure white in dark mode** — applied at the root so hue stays reserved for section meaning. Two consequences that have each caused a real bug:
+
+- **Never pair an accent fill with white ink.** `.background(Color.accentColor).foregroundStyle(.white)` renders white-on-white in dark mode and the control disappears. Use the wash-plus-matching-ink form (§4.5).
+- **`Color.accentColor` only means "the section color" inside a `SectionDrawer`**, which applies `.tint(resolvedAccent)`. A view pushed from a *settings* pane (e.g. the exercise catalog) is outside that scope and inherits the monochrome ink instead. Those views must read `theme.color(for: "<key>")` explicitly.
+
+## 4.5 Selection & emphasis
+
+There is exactly **one** visual treatment for "this is selected / active / current" on any surface. All three shapes are defined in [SelectionLanguage.swift](../Septena/Shell/UI/SelectionLanguage.swift); a new interaction reuses one, it never invents a second.
+
+| Container | Treatment |
+|---|---|
+| Row in a list | `Theme.listSelectionFill` **full-bleed** via `listRowBackground` (`SelectableListRowBackground` / `.selectableListRow(tag:isSelected:)`), native rings killed by `.septenaSuppressListCellSelection()` |
+| Row in a floating palette or source list | The same fill drawn **inset** — `InsetSelectionBackground` (macOS Tasks sidebar, ⌘K quick find) |
+| Chip / segment / filter | `SelectableChip` — a `tint.opacity(0.22)` wash under `tint` ink, semibold |
+
+Two failure modes to recognize:
+
+- **An inset highlight on an ordinary list row** reads as a chip floating *on top of* the row rather than the row itself being selected. Inset is only for palettes and source lists.
+- **Two competing highlight systems on one surface** (a blue outline on the selected row, an accent fill on the drop-hover row) is a bug, full stop. Drop targets and hover reuse the same token as selection.
+
+Chips use a wash plus *matching* ink rather than a saturated slab with white text, because that form is contrast-safe for any tint in both appearances — the fill is a low-opacity derivative of the ink it carries, so the two can never collide.
 
 ## 5. Typography
 
@@ -90,6 +112,8 @@ Use the named styles in [Theme.swift](../Septena/Shell/UI/Theme.swift). No raw `
 - `.septenaTileTitle` — dashboard tile header (SF Pro; `title3` on iOS, `headline` on macOS)
 - `.septenaTaskTitle` / `.septenaSidebarRow` — UI body (SF Pro, `body`)
 - `.septenaNotes` — secondary body (SF Pro, `subheadline`)
+- `.septenaCaption` — small secondary label (SF Pro, `caption`); the rung between `septenaLabel` and `septenaBadge`. If the text is a *number*, use `septenaMeta` instead
+- `septenaChip(isSelected:)` — `SelectableChip` label (SF Pro, `subheadline`); weight carries the selected state so the strip never reflows on tap
 - `.septenaMetric` / `.septenaMeta` — inline & tabular numbers (SF Mono, tabular figures)
 - `septenaHeroMetric(_:)` — the large standalone hero number (SF Rounded semibold, tabular; pass the text style, default `title2`)
 - `.septenaButton` — action labels (SF Pro, `subheadline.semibold`)
@@ -152,12 +176,15 @@ Shape and motion tokens live alongside the type and color tokens — like color,
 - **Corner radius** — `Theme.cornerRadius` (22pt, the iOS-26 "soft tile") and `Theme.cornerRadiusSmall` (6pt, chips and pills).
 - **Row rhythm** — `Theme.rowVPadding`, `iconTextGap`, `checkboxTap`, and the per-platform row/sidebar heights keep the icon column and text baseline aligned across every row type.
 
-**Motion is gated for accessibility, centrally.** Use the helpers in [Accessibility.swift](../Septena/Shell/UI/Accessibility.swift), not raw `withAnimation`:
+**Motion is gated for accessibility, centrally.** Use the helpers in [Accessibility.swift](../Septena/Shell/UI/Accessibility.swift) — never raw `withAnimation` or a raw `.animation(_:value:)`, both of which honor nothing:
 
-- `.a11yAnimation(_:value:)` — declarative; collapses to no animation under Reduce Motion.
-- `A11yMotion.run { … }` — the imperative analogue for state toggles.
+- `.a11yAnimation(_:value:)` — declarative; collapses to no animation under Reduce Motion. Drop-in for `.animation(_:value:)`.
+- `A11yMotion.run { … }` — imperative, reads the environment. Best when the view already holds `@Environment(\.a11yMotion)`, because the environment participates in invalidation.
+- `a11yAnimate(_:) { … }` — imperative, reads the platform directly, **drop-in for `withAnimation`**. For the many call sites that live in a plain method with no environment in scope.
 
 Any animation a user can trigger repeatedly — and every celebratory flourish (confetti, the mood-commit animation, symbol bounces) — must route through these so Reduce Motion is honored. A screen flash or a `repeatForever` that ignores Reduce Motion is a bug.
+
+The two sanctioned exceptions are `LogCommit.swift` and `CommitMotion.swift`, which gate once at the overlay so the primitives inside them can animate freely; both say so in a comment at the call site. Everything else is enforced by `scripts/lint-design.sh` (§14).
 
 ## 10. Data-viz primitives
 
@@ -188,6 +215,8 @@ Reusable building blocks. New surfaces compose these; they don't hand-roll equiv
 
 **Rows** — see §3 for anatomy. The components: `CheckableRow` (the actionable checkbox row behind `TaskRow`/`HabitRow`/`SupplementRow`/`ChoreRow`), `LogRow` (read-only record; optional `leading` status dot + `trailing` recency), `LogEntryRow` (`LogRow` + tap-to-edit + context menu), `TaskCheckbox`, `Hairline`.
 
+**Selection & chips** — see §4.5. `SelectableChip` (filter / segment / multi-select toggle, capsule or grid-packed `.roundedRect`), `SelectableChipStyle` (the fill/ink pair, for a call site with bespoke layout that still wants the canonical treatment), `InsetSelectionBackground` (palette + source-list rows), `SelectableListRowBackground` (ordinary list rows).
+
 **Badges, pills, glyphs**
 - `StatusBadge` — muted capsule for a row status word ("Done", "Skipped").
 - `CompletionRateBadge` — the 30-day completion ring in a checklist row (see §10).
@@ -215,3 +244,21 @@ The dashboard is one data set (`HomepageDomainData` per section) rendered throug
 - `DenseHomepageView` — compact icon + headline rows.
 
 A new mode consumes the same `HomepageDomainData` and reuses the §10 primitives; it must not invent a parallel data path.
+
+## 14. Enforcement
+
+Most of this spec is prose, and prose drifts. The rules that have actually cost us a bug are enforced by [scripts/lint-design.sh](../scripts/lint-design.sh), which `scripts/build.sh` runs before it takes the build lock — so a violation fails the build rather than shipping.
+
+**Blocking rules.** `motion-withanimation` and `motion-animation-modifier` (§9); `selection-white-on-fill` and `selection-accent-fill` (§4.5); `ring-rerolled` (§10).
+
+**Advisory notes** (printed, never fail): `type-raw-mono` and `type-raw-font` (§5). These are a drift budget — ~790 raw `.font(...)` calls predate the named styles. They're advisory so the count can only go down without blocking unrelated work; when a file is touched for other reasons, convert its fonts.
+
+A genuinely sanctioned exception is annotated **on the offending line**:
+
+```swift
+.strokeBorder(isSelected ? Color.white : .clear, lineWidth: 2)  // septena-lint:allow selection-white-on-fill
+```
+
+with the reasoning in a comment above it. `SEPTENA_SKIP_LINT=1` bypasses the whole check; if you need it, the rule is probably wrong — fix the rule.
+
+Adding a rule is cheap: one `scan` call in the script. When a convention gets rediscovered the hard way, encode it there as well as here.
