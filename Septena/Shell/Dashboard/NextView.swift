@@ -466,6 +466,10 @@ struct NextView: View {
         TaskComposerCard(mode: mode, areas: areas, projects: projects,
                          accent: theme.color(for: "tasks"),
                          onDone: { Task { await tasksModel.load(today: clock.today, now: clock.now) } })
+          // This host swaps the card between create and any edited task while
+          // the drawer stays up. Identity makes each subject a fresh view, so
+          // the seeded draft and save latch can never carry over.
+          .id(mode.identity)
       }
     }
     // "Done Today" editors hosted on the List container (NOT inside the

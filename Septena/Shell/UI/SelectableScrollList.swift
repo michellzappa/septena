@@ -20,8 +20,9 @@ import AppKit
 //     controls. Arrow keys
 //     nudge the cursor row into view only when it would clip — no viewport
 //     re-anchoring while the row is already on-screen.
-//   • The neutral selection capsule — reuses `SelectableListRowBackground`, the
-//     same view the `List` rows paint, so the highlight is pixel-identical.
+//   • The selection fill — painted by the surface's own row chrome (on tasks,
+//     `TaskCardChrome`, from the canonical `Theme.listSelectionFill` token), so
+//     there is exactly one highlight vocabulary per surface.
 //   • Accessibility — selected rows carry `.isSelected`.
 //
 // What we intentionally DON'T reproduce, because the migrated surfaces don't use
@@ -98,13 +99,12 @@ extension EnvironmentValues {
 // MARK: - Row modifier
 
 extension View {
-  /// Make a row inside a `SelectableScrollList` selectable: it paints the shared
-  /// neutral capsule when selected, takes the section accent-free highlight, is
-  /// tagged for `scrollTo`, exposes the `.isSelected` a11y trait, and routes
-  /// click (macOS) / tap (iOS) / double-click into the container's selection.
+  /// Make a row inside a `SelectableScrollList` selectable: it is tagged for
+  /// `scrollTo`, exposes the `.isSelected` a11y trait, and routes click (macOS) /
+  /// tap (iOS) / double-click into the container's selection.
   ///
-  /// The visual chrome is identical to a `List` row because it uses the very
-  /// same `SelectableListRowBackground`; only the container differs.
+  /// The selected-state FILL is not painted here — the surface's row chrome owns
+  /// it (see `TaskCardChrome`), so a row can never end up wearing two highlights.
   func selectableScrollRow(id: String,
                            isSelected: Bool,
                            isComplete: Bool? = nil) -> some View {
@@ -125,7 +125,10 @@ private struct SelectableScrollRowModifier: ViewModifier {
     content
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .background(ScrollRowSelectionBackground(isSelected: isSelected))
+      // No row-level selection fill here on purpose: the grouped-card chrome
+      // (`TaskCardChrome`) paints BOTH the card surface and the selected-cell
+      // fill, edge-to-edge within the card and with the card's own corners.
+      // A second fill at row level used to float as an inset bar on top of it.
       .background {
         GeometryReader { geo in
           Color.clear.preference(

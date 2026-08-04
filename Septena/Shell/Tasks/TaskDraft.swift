@@ -104,7 +104,11 @@ struct TaskDraft: Equatable {
     // time you merely opened and closed the editor. Now a true no-op peek
     // writes nothing.
     let prior = TaskDraft(task: original)
-    if trimmedTitle != original.title || trimmedNotes != (original.notes ?? "") {
+    // Compare trimmed-vs-trimmed. Comparing the trimmed draft against the RAW
+    // stored value meant a task whose title or notes carried stray leading /
+    // trailing whitespace read as changed on every save — an endless no-op
+    // write that churned CloudKit each time the editor merely opened and closed.
+    if trimmedTitle != prior.trimmedTitle || trimmedNotes != prior.trimmedNotes {
       mutator.update(id: id, title: trimmedTitle, notes: trimmedNotes)
     }
 
@@ -118,7 +122,7 @@ struct TaskDraft: Equatable {
     if deadline != prior.deadline {
       mutator.setDeadline(id: id, date: deadline)
     }
-    if recurrence != original.recurrence {
+    if recurrence != prior.recurrence {
       mutator.setRecurrence(id: id, recurrence: recurrence)
     }
     // Project and area are mutually exclusive: a project owns its area, and the
@@ -129,8 +133,8 @@ struct TaskDraft: Equatable {
     // `moveToProject` and clobber the just-set project back to its parent area.
     // (Invisible for area-less projects, whose pick carries a nil areaId — which
     // is why this only bit nested projects.)
-    if projectId != original.project { mutator.moveToProject(id: id, project: projectId) }
-    if projectId == nil, areaId != original.area { mutator.moveToArea(id: id, area: areaId) }
+    if projectId != prior.projectId { mutator.moveToProject(id: id, project: projectId) }
+    if projectId == nil, areaId != prior.areaId { mutator.moveToArea(id: id, area: areaId) }
   }
 
   /// Did this edit change a *placement* field — project, area, scheduled, due,

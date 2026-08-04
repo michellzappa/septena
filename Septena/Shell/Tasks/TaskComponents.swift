@@ -220,12 +220,6 @@ struct TaskCheckbox: View {
   /// Readiness form (language v2): a small haloed corner dot in this color marks
   /// a committed task carrying *unread context*. `nil` → no dot.
   var cornerDot: Color? = nil
-  /// Language v2: amber checkbox marking a task that newly *landed on Today on
-  /// its own* (a scheduled/due plan that rolled in at the day boundary —
-  /// Things-style "new on Today"). Transient; self-clears at the next rollover.
-  /// This is the one place amber rides the control: it's the app's temporal
-  /// identity color, and the trigger is recency, surfaced only as it arrives.
-  var arrivedToday: Bool = false
   /// When true (and not done), the checkbox stroke/fill switch to
   /// `Theme.todayAccent` to signal a task 'promoted to Today' — folding the
   /// today indicator into the checkbox itself, so it no longer sits as a
@@ -623,7 +617,6 @@ struct CheckableRow<Trailing: View>: View {
   /// `cornerDot` = unread-context marker on a committed task.
   var dashed: Bool = false
   var cornerDot: Color? = nil
-  var arrivedToday: Bool = false
   /// Forwarded to `TaskCheckbox`: fill (0…1) for the Today tenure dial, or nil.
   var tenureFill: Double? = nil
   /// The checkbox celebration this row plays on check (see `CheckFeel`).
@@ -710,7 +703,6 @@ struct CheckableRow<Trailing: View>: View {
         isDone: isDone,
         dashed: dashed,
         cornerDot: cornerDot,
-        arrivedToday: arrivedToday,
         isToday: isToday,
         tenureFill: tenureFill,
         promotePulseTrigger: promoteFlashTrigger,
@@ -834,7 +826,6 @@ struct TaskCheckboxModel {
   var isToday: Bool
   var dashed: Bool
   var cornerDot: Color?
-  var arrivedToday: Bool
   var tenureFill: Double?
 
   init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool) {
@@ -852,7 +843,6 @@ struct TaskCheckboxModel {
       if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
       return nil
     }()
-    arrivedToday = task.showsArrivedToday()
     tenureFill = TaskRowFlags.agingEnabled ? task.todayTenureFill() : nil
   }
 }
@@ -864,7 +854,7 @@ extension TaskCheckbox {
   init(model: TaskCheckboxModel, promotePulseTrigger: Int = 0, feel: CheckFeel = .stamp,
        onToggle: @escaping () -> Void) {
     self.init(tint: model.tint, isDone: model.isDone, dashed: model.dashed,
-              cornerDot: model.cornerDot, arrivedToday: model.arrivedToday,
+              cornerDot: model.cornerDot,
               isToday: model.isToday, tenureFill: model.tenureFill,
               promotePulseTrigger: promotePulseTrigger,
               feel: feel, onToggle: onToggle)
@@ -959,7 +949,6 @@ struct TaskRow: View {
       isToday: box.isToday,
       dashed: box.dashed,
       cornerDot: box.cornerDot,
-      arrivedToday: box.arrivedToday,
       tenureFill: box.tenureFill,
       isInactive: isInactive,
       title: task.title,
@@ -1533,6 +1522,8 @@ struct MovePickerSheet: View {
   let projects: [Project]
   var currentAreaId: String? = nil
   var currentProjectId: String? = nil
+  /// The Inbox row is not useful when every selected task is already there.
+  var hidesInboxTarget: Bool = false
   /// When moving multiple tasks, hides the single-row highlight and retitles the sheet.
   var bulkCount: Int = 1
   let onPick: (_ areaId: String?, _ projectId: String?) -> Void
@@ -1548,7 +1539,7 @@ struct MovePickerSheet: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 4) {
           // Inbox first — drop both area and project.
-          if matches("Inbox") {
+          if !hidesInboxTarget && matches("Inbox") {
             row(.inbox, title: "Inbox",
                 selected: showCurrentSelection && currentAreaId == nil && currentProjectId == nil) {
               onPick(nil, nil); dismiss()

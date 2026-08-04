@@ -21,6 +21,88 @@ enum TaskRowShortcuts {
   static let delete = KeyboardShortcut(.delete, modifiers: .command)
 }
 
+/// One row-level task command: its menu title, its binding, and which handler
+/// slot on `TaskActions` it drives.
+///
+/// This is the single registry every surface renders from — the macOS Task
+/// menu, the iPad hidden-shortcut buttons, the row context menu, and the
+/// human-facing Keyboard Shortcuts sheet. They used to each spell the list out
+/// by hand and had drifted: the catalogue advertised ⌘M for Move and ⌘. for
+/// Clear Schedule (the real bindings are ⌘⇧M / ⌘⇧., deliberately, see above),
+/// the context menu's Copy carried no shortcut at all, and the iPad buttons had
+/// empty titles so the hold-⌘ HUD showed blank rows. Add a command here and
+/// every surface picks it up.
+struct TaskRowCommand: Identifiable {
+  let id: String
+  let title: String
+  let shortcut: KeyboardShortcut
+  /// The handler slot on `TaskActions`. Nil there means "not available for the
+  /// current selection", which disables the menu item.
+  let handler: KeyPath<TaskActions, (() -> Void)?>
+  /// Also served by the Next checklist when no task list is focused.
+  var acceptsNextList: Bool = false
+  /// A menu separator precedes this item.
+  var separatorBefore: Bool = false
+
+  /// The shortcut rendered as keycap tokens, e.g. ["⌘", "⇧", "M"] — so the
+  /// Keyboard Shortcuts sheet displays the real binding rather than a
+  /// hand-copied guess at it.
+  var keycaps: [String] {
+    var caps: [String] = []
+    if shortcut.modifiers.contains(.control) { caps.append("⌃") }
+    if shortcut.modifiers.contains(.option)  { caps.append("⌥") }
+    if shortcut.modifiers.contains(.shift)   { caps.append("⇧") }
+    if shortcut.modifiers.contains(.command) { caps.append("⌘") }
+    caps.append(Self.keycap(for: shortcut.key))
+    return caps
+  }
+
+  /// Compare on `character` rather than the `KeyEquivalent` cases themselves so
+  /// this doesn't depend on `KeyEquivalent`'s (SDK-version-dependent)
+  /// `Equatable` conformance.
+  private static func keycap(for key: KeyEquivalent) -> String {
+    let c = key.character
+    if c == KeyEquivalent.delete.character     { return "⌫" }
+    if c == KeyEquivalent.escape.character     { return "esc" }
+    if c == KeyEquivalent.return.character     { return "return" }
+    if c == KeyEquivalent.space.character      { return "space" }
+    if c == KeyEquivalent.tab.character        { return "tab" }
+    if c == KeyEquivalent.upArrow.character    { return "↑" }
+    if c == KeyEquivalent.downArrow.character  { return "↓" }
+    if c == KeyEquivalent.leftArrow.character  { return "←" }
+    if c == KeyEquivalent.rightArrow.character { return "→" }
+    return String(c).uppercased()
+  }
+}
+
+enum TaskRowCommands {
+  /// Menu order. Mirrors the Task menu top to bottom.
+  static let all: [TaskRowCommand] = [
+    TaskRowCommand(id: "editDetails", title: "Edit Details…",
+                   shortcut: TaskRowShortcuts.editDetails, handler: \.editDetails),
+    TaskRowCommand(id: "copy", title: "Copy",
+                   shortcut: TaskRowShortcuts.copy, handler: \.copy),
+    TaskRowCommand(id: "duplicate", title: "Duplicate",
+                   shortcut: TaskRowShortcuts.duplicate, handler: \.duplicate),
+    TaskRowCommand(id: "markComplete", title: "Mark as Complete",
+                   shortcut: TaskRowShortcuts.markComplete, handler: \.toggleComplete,
+                   acceptsNextList: true),
+    TaskRowCommand(id: "toggleToday", title: "Toggle Today",
+                   shortcut: TaskRowShortcuts.toggleToday, handler: \.toggleToday),
+    TaskRowCommand(id: "when", title: "When…",
+                   shortcut: TaskRowShortcuts.when, handler: \.openWhen),
+    TaskRowCommand(id: "deadline", title: "Deadline…",
+                   shortcut: TaskRowShortcuts.deadline, handler: \.openDeadline),
+    TaskRowCommand(id: "move", title: "Move…",
+                   shortcut: TaskRowShortcuts.move, handler: \.openMove),
+    TaskRowCommand(id: "clearSchedule", title: "Clear Schedule",
+                   shortcut: TaskRowShortcuts.clearSchedule, handler: \.clearSchedule,
+                   separatorBefore: true),
+    TaskRowCommand(id: "delete", title: "Delete",
+                   shortcut: TaskRowShortcuts.delete, handler: \.delete),
+  ]
+}
+
 /// Commands published by the focused task list. The menu bar and the iPad
 /// shortcut HUD consume this shared contract; `TaskListView` supplies only the
 /// handlers for its current selection.
@@ -61,56 +143,26 @@ struct TaskCommandsMenu: View {
   @FocusedValue(\.taskActions) private var actions
   @FocusedValue(\.nextListActions) private var nextActions
 
-  private var markComplete: (() -> Void)? {
-    actions?.toggleComplete ?? nextActions?.toggleComplete
+  /// Resolve a command's handler from whatever is focused. Most come straight
+  /// from the task list; Mark as Complete also accepts the Next checklist.
+  private func handler(for command: TaskRowCommand) -> (() -> Void)? {
+    if let actions, let action = actions[keyPath: command.handler] { return action }
+    if command.acceptsNextList { return nextActions?.toggleComplete }
+    return nil
   }
 
   var body: some View {
     // ⌘N lives in the File menu via `NewTaskCommand` so it works even when no
     // task list is focused. Edit is ⌘R — a MODIFIER menu shortcut, the only
-    // reliable keyboard path on macOS. Disabled (so ⌘R falls through to any
-    // focused text field) when `editDetails` is nil.
-    Button("Edit Details…") { actions?.editDetails?() }
-      .keyboardShortcut(TaskRowShortcuts.editDetails)
-      .disabled(actions?.editDetails == nil)
-
-    Button("Copy") { actions?.copy?() }
-      .keyboardShortcut(TaskRowShortcuts.copy)
-      .disabled(actions?.copy == nil)
-
-    Button("Duplicate") { actions?.duplicate?() }
-      .keyboardShortcut(TaskRowShortcuts.duplicate)
-      .disabled(actions?.duplicate == nil)
-
-    Button("Mark as Complete") { markComplete?() }
-      .keyboardShortcut(TaskRowShortcuts.markComplete)
-      .disabled(markComplete == nil)
-
-    Button("Toggle Today") { actions?.toggleToday?() }
-      .keyboardShortcut(TaskRowShortcuts.toggleToday)
-      .disabled(actions?.toggleToday == nil)
-
-    Button("When…") { actions?.openWhen?() }
-      .keyboardShortcut(TaskRowShortcuts.when)
-      .disabled(actions?.openWhen == nil)
-
-    Button("Deadline…") { actions?.openDeadline?() }
-      .keyboardShortcut(TaskRowShortcuts.deadline)
-      .disabled(actions?.openDeadline == nil)
-
-    Button("Move…") { actions?.openMove?() }
-      .keyboardShortcut(TaskRowShortcuts.move)
-      .disabled(actions?.openMove == nil)
-
-    Divider()
-
-    Button("Clear Schedule") { actions?.clearSchedule?() }
-      .keyboardShortcut(TaskRowShortcuts.clearSchedule)
-      .disabled(actions?.clearSchedule == nil)
-
-    Button("Delete") { actions?.delete?() }
-      .keyboardShortcut(TaskRowShortcuts.delete)
-      .disabled(actions?.delete == nil)
+    // reliable keyboard path on macOS. Each item disables itself (so its key
+    // falls through to any focused text field) when its handler is nil.
+    ForEach(TaskRowCommands.all) { command in
+      if command.separatorBefore { Divider() }
+      let action = handler(for: command)
+      Button(command.title) { action?() }
+        .keyboardShortcut(command.shortcut)
+        .disabled(action == nil)
+    }
   }
 }
 

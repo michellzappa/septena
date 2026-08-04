@@ -53,7 +53,7 @@ struct TaskListView: View {
   /// on Today; the next 30 days on Upcoming; empty everywhere else.
   @State private var calendarEvents: [EKEvent] = []
 
-  // Items/review/doneToday are filter-scoped. We store them alongside the
+  // Items are filter-scoped. We store them alongside the
   // filter they correspond to; when the current `filter` doesn't match the
   // stored filter (a section swap just happened, .onChange hasn't run yet),
   // the getters fall back to the SwiftData cache for the *current* filter —
@@ -61,8 +61,6 @@ struct TaskListView: View {
   // the one-frame "wrong filter's data" / "Nothing here yet" flash that
   // happens when @State lags behind a prop change.
   @State private var itemsStorage: [SeptenaTask] = []
-  @State private var reviewStorage: [SeptenaTask] = []
-  @State private var doneTodayStorage: [SeptenaTask] = []
   @State private var triageStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
   /// The archive is deliberately incremental: 1,000 completed tasks should
@@ -141,11 +139,6 @@ struct TaskListView: View {
     )
   }
 
-  private var review: [SeptenaTask] {
-    get { storageFilter == filter ? reviewStorage : [] }
-    nonmutating set { reviewStorage = newValue; storageFilter = filter }
-  }
-
   /// The Inbox — the unratified layer rendered as a section above Today (only on
   /// the Today view; see `triageSection`). Backed by `triageStorage` (populated
   /// in `load()` with the same settle-preservation as `items`), with a live
@@ -161,21 +154,24 @@ struct TaskListView: View {
     return base.filter { $0.status == .open || settle.isSettling($0.id) }
   }
 
-  /// Review tasks that genuinely rolled in overnight — i.e. were scheduled
-  /// for a date strictly before today. Items the user scheduled *for* today
-  /// (scheduled == today) or that are merely due today don't count as "new"
-  /// because the user just placed them; the banner shouldn't nag about those.
+  /// Tasks that rolled into Today on their own — scheduled for a date strictly
+  /// before today, so a plan the user made earlier is now sitting here. Items
+  /// scheduled *for* today, or merely due today, don't count as "new": the user
+  /// just placed those. Drives the "You have N new to-dos" banner.
+  ///
+  /// Read from `items` — the rows already on Today. This used to filter a
+  /// separate `review` bucket that was only ever assigned `[]`, which is why the
+  /// banner could never appear. There is no second bucket to populate: a
+  /// rolled-in task IS a Today row, and rendering it twice (banner + its own
+  /// section) is exactly what we don't want.
   private var rolledInReview: [SeptenaTask] {
+    guard filter == .today else { return [] }
     let today = clock.today
-    return review.filter { task in
+    return items.filter { task in
+      guard task.status == .open else { return false }
       guard let s = task.scheduled, !s.isEmpty else { return false }
       return String(s.prefix(10)) < today
     }
-  }
-
-  private var doneToday: [SeptenaTask] {
-    get { storageFilter == filter ? doneTodayStorage : [] }
-    nonmutating set { doneTodayStorage = newValue; storageFilter = filter }
   }
 
   @State private var isLoading = false
@@ -215,11 +211,11 @@ struct TaskListView: View {
   @State private var scrollToTargetID: String?
   @State private var scrollToTargetTick = 0
 
-  /// Unified selection — the single source of truth for the keyboard cursor
-  /// and multi-select batch operations, bound straight to `List(selection:)`
-  /// on both platforms. macOS: native click / ⌘-click / ⇧-click / ↑↓.
-  /// iOS: native edit-mode multi-select (the `EditButton` drives `editMode`,
-  /// and tapping rows toggles the native selection circles).
+  /// Unified selection — the single source of truth for the keyboard cursor and
+  /// multi-select batch operations. Bound to `SelectableScrollList(selection:)`,
+  /// which reproduces the `List(selection:)` contract (click / ⌘-click /
+  /// ⇧-click / ↑↓) on a container that can also host the inline editor. NOT a
+  /// native `List` — see the header of `SelectableScrollList.swift` for why.
   @State private var selection: Set<String> = []
 
   #if os(iOS)
@@ -504,27 +500,14 @@ struct TaskListView: View {
     return withSnackbar
       .background {
         if rowCommandShortcutsEnabled {
-          Group {
-            Button("", action: editSelected)
-              .keyboardShortcut(TaskRowShortcuts.editDetails)
-            Button("", action: copySelected)
-              .keyboardShortcut(TaskRowShortcuts.copy)
-            Button("", action: duplicateSelected)
-              .keyboardShortcut(TaskRowShortcuts.duplicate)
-            Button("", action: toggleSelected)
-              .keyboardShortcut(TaskRowShortcuts.markComplete)
-            Button("", action: toggleTodayForSelected)
-              .keyboardShortcut(TaskRowShortcuts.toggleToday)
-            Button("", action: openWhenForSelected)
-              .keyboardShortcut(TaskRowShortcuts.when)
-            Button("", action: openDeadlineForSelected)
-              .keyboardShortcut(TaskRowShortcuts.deadline)
-            Button("", action: openMoveForSelected)
-              .keyboardShortcut(TaskRowShortcuts.move)
-            Button("", action: clearScheduleForSelected)
-              .keyboardShortcut(TaskRowShortcuts.clearSchedule)
-            Button("", action: deleteSelected)
-              .keyboardShortcut(TaskRowShortcuts.delete)
+          // Rendered from the shared `TaskRowCommands` registry so this list
+          // can't drift from the macOS menu. The titles are real (they used to
+          // be `""`), which is what the hold-⌘ HUD labels each row with.
+          ForEach(TaskRowCommands.all) { command in
+            let action = iPadRowCommandActions[keyPath: command.handler]
+            Button(command.title) { action?() }
+              .keyboardShortcut(command.shortcut)
+              .disabled(action == nil)
           }
           .opacity(0)
           .accessibilityHidden(true)
@@ -532,6 +515,27 @@ struct TaskListView: View {
       }
     #endif
   }
+
+  #if !os(macOS)
+  /// The same handler set macOS publishes through `focusedSceneValue`, built
+  /// here for the iPad hidden-button path (which exists because publishing a
+  /// focused scene value from a split-view detail SIGKILLs iPad — see above).
+  private var iPadRowCommandActions: TaskActions {
+    TaskActions(
+      newTask: { nav.shouldStartCreating = true },
+      toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
+      openWhen: selection.isEmpty ? nil : openWhenForSelected,
+      openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
+      openMove: selection.isEmpty ? nil : openMoveForSelected,
+      toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      delete: selection.isEmpty ? nil : deleteSelected,
+      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
+      editDetails: editDetailsSelectedAction,
+      duplicate: duplicateSelectedAction,
+      copy: copySelectedAction
+    )
+  }
+  #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
     #if os(iOS)
@@ -1019,11 +1023,8 @@ struct TaskListView: View {
     #endif
     #if os(macOS)
     .onCopyCommand {
-      guard usesSelectionModel, !listInputActive else { return [] }
-      let ids = orderedActionIDs()
-      guard !ids.isEmpty else { return [] }
-      let text = ids.compactMap { currentTask(id: $0)?.title }.joined(separator: "\n")
-      guard !text.isEmpty else { return [] }
+      guard usesSelectionModel, !listInputActive,
+            let text = copyPayload(for: orderedActionIDs()) else { return [] }
       return [NSItemProvider(object: text as NSString)]
     }
     #endif
@@ -1117,8 +1118,8 @@ struct TaskListView: View {
 
   /// True once this filter's data has loaded and there are no rows to show.
   private var showsEmptyTaskList: Bool {
-    loadedFilters.contains(filter) && visibleItems.isEmpty && review.isEmpty
-      && doneToday.isEmpty && triageItems.isEmpty && !isLoading
+    loadedFilters.contains(filter) && visibleItems.isEmpty
+      && triageItems.isEmpty && !isLoading
   }
 
   /// Inline quick-add under the title when a creatable list is empty. Today
@@ -1280,18 +1281,14 @@ struct TaskListView: View {
         ungroupedOpenItems
       }
     case .unscheduled:
-      reviewRows
       groupedOpenItems
     case .upcoming:
-      reviewRows
       groupedUpcomingItems
     case .recentlyDeleted:
       visibleRows
     case .project:
-      reviewRows
       projectGroupedRows
     default:
-      reviewRows
       visibleRows
     }
   }
@@ -1408,10 +1405,6 @@ struct TaskListView: View {
     }
   }
 
-  private var reviewRows: some View {
-    cardedRows(review)
-  }
-
   private var visibleRows: some View {
     cardedRows(visibleItems,
                quickMenu: { filingSuggestions[$0.id] != nil },
@@ -1429,19 +1422,22 @@ struct TaskListView: View {
     }
   }
 
-  /// A reorder drop landed on `target`: insert the dragged ids above (`before`)
-  /// or below it and persist new manual positions via the mutator. Neighbors
-  /// are read from the rendered order with the dragged rows removed, so a drop
-  /// one slot away from the original spot computes against the right keys.
-  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
-    let dragged = Set(ids)
-    guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
-    let rendered = excludingQuickAddCapture(visibleItems)
-    let remaining = rendered.filter { !dragged.contains($0.id) }
-    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
-    let insertion = before ? targetIdx : targetIdx + 1
-    let above = insertion > 0 ? remaining[insertion - 1].orderKey : nil
-    let below = insertion < remaining.count ? remaining[insertion].orderKey : nil
+  /// Persist a manual-order drop: give `ids` positions that place them at
+  /// `insertion` within `sequence` — which must ALREADY exclude the dragged rows.
+  ///
+  /// Fractional ordering normally just writes the midpoint slots. When the gap
+  /// between two neighbors is too small to subdivide (dozens of drops into the
+  /// same slot exhausts `Double` precision), those slots no longer sort strictly
+  /// between their neighbors, so the whole sequence is re-spaced at
+  /// `TaskOrder.gap` steps instead.
+  ///
+  /// Every reorder path shares this so none can forget the fallback.
+  /// `handleHeadingDrop` did forget it, and could write positions that don't
+  /// sort where the drop indicator promised — a heading silently landing in the
+  /// wrong place once a project's headings had been shuffled enough.
+  private func applyManualOrder(ids: [String], into sequence: [SeptenaTask], at insertion: Int) {
+    let above = insertion > 0 ? sequence[insertion - 1].orderKey : nil
+    let below = insertion < sequence.count ? sequence[insertion].orderKey : nil
     let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
     let strictlyPlaced =
       zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
@@ -1449,18 +1445,28 @@ struct TaskListView: View {
       && (below.map { slots.last! < $0 } ?? true)
     if strictlyPlaced {
       for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
-    } else {
-      // Midpoint precision exhausted in this gap (dozens of drops into the
-      // same slot) — re-space the whole visible list at `gap` steps anchored
-      // at its current top key, dragged rows spliced in place.
-      var final = remaining.map(\.id)
-      final.insert(contentsOf: ids, at: insertion)
-      let base = rendered.first?.orderKey ?? TaskOrder.gap
-      for (i, id) in final.enumerated() {
-        let pos = base + TaskOrder.gap * Double(i)
-        mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
-      }
+      return
     }
+    var final = sequence.map(\.id)
+    final.insert(contentsOf: ids, at: insertion)
+    let base = sequence.first?.orderKey ?? TaskOrder.gap
+    for (i, id) in final.enumerated() {
+      let pos = base + TaskOrder.gap * Double(i)
+      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+    }
+  }
+
+  /// A reorder drop landed on `target`: insert the dragged ids above (`before`)
+  /// or below it and persist new manual positions via the mutator. Neighbors
+  /// are read from the rendered order with the dragged rows removed, so a drop
+  /// one slot away from the original spot computes against the right keys.
+  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
+    let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
+    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
+    applyManualOrder(ids: ids, into: remaining,
+                     at: before ? targetIdx : targetIdx + 1)
     Haptics.tick()
     Task { await load() }
     return true
@@ -1594,29 +1600,11 @@ struct TaskListView: View {
     let byId = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
     let groupRows = visibleItems.filter { $0.heading == group && !dragged.contains($0.id) }
     guard let targetIdx = groupRows.firstIndex(where: { $0.id == target.id }) else { return false }
-    let insertion = before ? targetIdx : targetIdx + 1
-    let above = insertion > 0 ? groupRows[insertion - 1].orderKey : nil
-    let below = insertion < groupRows.count ? groupRows[insertion].orderKey : nil
-    let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
-    let strictlyPlaced =
-      zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
-      && (above.map { slots.first! > $0 } ?? true)
-      && (below.map { slots.last! < $0 } ?? true)
     for id in ids where byId[id]?.heading != group {
       mutator.setHeading(id: id, heading: group)
     }
-    if strictlyPlaced {
-      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
-    } else {
-      // Midpoint precision exhausted in this group — re-space it at `gap` steps.
-      var final = groupRows.map(\.id)
-      final.insert(contentsOf: ids, at: insertion)
-      let base = groupRows.first?.orderKey ?? TaskOrder.gap
-      for (i, id) in final.enumerated() {
-        let pos = base + TaskOrder.gap * Double(i)
-        mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
-      }
-    }
+    applyManualOrder(ids: ids, into: groupRows,
+                     at: before ? targetIdx : targetIdx + 1)
     Haptics.tick()
     Task { await load() }
     return true
@@ -1632,19 +1620,12 @@ struct TaskListView: View {
       // Reorder headings among themselves.
       let remaining = projectHeadingList.filter { !dragged.contains($0.id) }
       guard let ti = remaining.firstIndex(where: { $0.id == targetHeading.id }) else { return false }
-      let insertion = before ? ti : ti + 1
-      let above = insertion > 0 ? remaining[insertion - 1].orderKey : nil
-      let below = insertion < remaining.count ? remaining[insertion].orderKey : nil
-      let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
-      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+      applyManualOrder(ids: ids, into: remaining, at: before ? ti : ti + 1)
     } else {
       // Tasks dropped onto the label → file under this heading, above its first member.
       let members = visibleItems.filter { $0.heading == targetHeading.id && !dragged.contains($0.id) }
-      let slots = TaskOrder.positions(count: ids.count, above: nil, below: members.first?.orderKey)
-      for (id, pos) in zip(ids, slots) {
-        mutator.setHeading(id: id, heading: targetHeading.id)
-        mutator.reorder(id: id, toPosition: pos)
-      }
+      for id in ids { mutator.setHeading(id: id, heading: targetHeading.id) }
+      applyManualOrder(ids: ids, into: members, at: 0)
     }
     Haptics.tick()
     Task { await load() }
@@ -1737,7 +1718,7 @@ struct TaskListView: View {
   /// pre-fill its date and show "Update Deadline" / "Remove Deadline".
   private func currentDeadline(for id: String?) -> Date? {
     guard let id else { return nil }
-    let pool = items + review + doneToday
+    let pool = items
     return pool.first(where: { $0.id == id })?.deadline.flatMap(SeptenaDate.parse)
   }
 
@@ -1745,7 +1726,7 @@ struct TaskListView: View {
   /// pre-fill its date and show "Update Date" / "No Date".
   private func currentScheduled(for id: String?) -> Date? {
     guard let id else { return nil }
-    let pool = items + review + doneToday
+    let pool = items
     return pool.first(where: { $0.id == id })?.scheduled.flatMap(SeptenaDate.parse)
   }
 
@@ -1753,7 +1734,7 @@ struct TaskListView: View {
   /// can pre-fill its controls and show "Update Repeat" / "Don't Repeat".
   private func currentRecurrence(for id: String?) -> Recurrence? {
     guard let id else { return nil }
-    let pool = items + review + doneToday
+    let pool = items
     return pool.first(where: { $0.id == id })?.recurrence
   }
 
@@ -1763,7 +1744,7 @@ struct TaskListView: View {
     // but live outside `items`. Omitting them meant a selected Inbox task
     // couldn't be resolved, so keyboard commands fell back to the first row of
     // the first project/area (the "Space/⌘T acts on the wrong task" bug).
-    return (triageItems + items + review + doneToday).first(where: { $0.id == id })
+    return (triageItems + items).first(where: { $0.id == id })
   }
 
   // MARK: - Keyboard navigation
@@ -1786,7 +1767,7 @@ struct TaskListView: View {
   /// classified-list pool so pointer rendering and keyboard traversal cannot
   /// drift when a completed row settles or the Inbox is folded.
   private var todayOpenTaskPool: [SeptenaTask] {
-    (items + review).filter { $0.status == .open || settle.isSettling($0.id) }
+    items.filter { $0.status == .open || settle.isSettling($0.id) }
   }
 
   private var todayLooseInboxRows: [SeptenaTask] {
@@ -1834,19 +1815,19 @@ struct TaskListView: View {
       }
       return todayInboxKeyboardIDs + classifiedIds
     case .unscheduled:
-      return review.map(\.id) + orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
+      return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
-      return review.map(\.id) + upcomingBuckets().flatMap { $0.tasks.map(\.id) }
+      return upcomingBuckets().flatMap { $0.tasks.map(\.id) }
     case .project, .area:
       // Foot-of-card quick-add sits after the open rows, before the logged scope.
-      var ids = review.map(\.id) + visibleItems.map(\.id) + quickAddOrderedIds
+      var ids = visibleItems.map(\.id) + quickAddOrderedIds
       if isScopeLoggedExpanded {
         ids.append(contentsOf: loggedScopeItems.map(\.id))
       }
       return ids
     default:
-      return review.map(\.id) + visibleItems.map(\.id) + quickAddOrderedIds
+      return visibleItems.map(\.id) + quickAddOrderedIds
     }
   }
 
@@ -1883,7 +1864,10 @@ struct TaskListView: View {
     beginEdit(task)
   }
 
-  #if os(macOS)
+  // These three resolve a command to a handler-or-nil for the CURRENT selection.
+  // Both command surfaces use them — the macOS `focusedSceneValue` menu and the
+  // iPad hidden-shortcut buttons (`iPadRowCommandActions`) — so they are not
+  // platform-gated: a nil handler is what disables the item on either surface.
   /// The action behind the ⌘R "Edit Details…" menu command. Nil — so the menu
   /// item disables and ⌘R falls through — when a text field / picker sheet is
   /// active or no plain open row is selected. Uses an EXPLICIT selection (not
@@ -1920,12 +1904,21 @@ struct TaskListView: View {
     else { return nil }
     return { copyTasks(orderedActionIDs()) }
   }
-  #endif
+
+  /// The pasteboard text for a set of task ids — one title per line. The single
+  /// definition of what copying a task yields, shared by the ⌘C command path
+  /// (`copyTasks`, which writes the pasteboard directly) and macOS's
+  /// `.onCopyCommand` (which must hand back an item provider instead). The two
+  /// used to spell the same join out separately.
+  private func copyPayload(for ids: [String]) -> String? {
+    let titles = ids.compactMap { currentTask(id: $0)?.title }
+    guard !titles.isEmpty else { return nil }
+    return titles.joined(separator: "\n")
+  }
 
   private func copyTasks(_ ids: [String]) {
-    let titles = ids.compactMap { currentTask(id: $0)?.title }
-    guard !titles.isEmpty else { return }
-    SeptenaPasteboard.copy(titles.joined(separator: "\n"))
+    guard let text = copyPayload(for: ids) else { return }
+    SeptenaPasteboard.copy(text)
     Haptics.tick()
   }
 
@@ -1998,7 +1991,7 @@ struct TaskListView: View {
       func drop(_ list: inout [SeptenaTask]) {
         list.removeAll { ids.contains($0.id) }
       }
-      drop(&items); drop(&review); drop(&doneToday)
+      drop(&items)
     }
     Task { await load() }
   }
@@ -2654,15 +2647,15 @@ struct TaskListView: View {
 
   // MARK: - Selection
   //
-  // `selection` (a Set<String>) is bound to `List(selection:)` on both
-  // platforms and is the single source of truth. macOS drives it natively
-  // (click / ⌘ / ⇧ / arrows); iOS via native edit mode (EditButton). Every
-  // deselect path funnels through `clearSelection` so iOS edit mode can never
-  // desync from an empty selection.
+  // `selection` (a Set<String>) is bound to `SelectableScrollList(selection:)`
+  // on both platforms and is the single source of truth: the container drives
+  // it from click / ⌘ / ⇧ / arrows, reproducing the `List(selection:)` contract.
+  // Every deselect path funnels through `clearSelection` so iOS edit mode can
+  // never desync from an empty selection.
 
   /// Replace the selection with exactly one row. Used by right-click to make the
   /// context-menu target unambiguous; ordinary click / ⌘-click / ⇧-click / ↑↓
-  /// selection is now handled natively by `List(selection:)`.
+  /// selection is handled by the container.
   private func selectOnly(_ id: String) {
     selection = [id]
   }
@@ -2761,7 +2754,7 @@ struct TaskListView: View {
   /// card — Inbox stays above; each row shows its list as a subtitle.
   @ViewBuilder
   private var ungroupedOpenItems: some View {
-    let base = items + review
+    let base = items
     let pool = base.filter { $0.status == .open || settle.isSettling($0.id) }
     let classified = pool
       .filter { $0.project != nil || $0.area != nil }
@@ -2773,7 +2766,7 @@ struct TaskListView: View {
   /// real SwiftUI sections so group titles are headers, not selectable rows.
   @ViewBuilder
   private var groupedOpenItems: some View {
-    let base = (filter == .today) ? items + review : items
+    let base = items
     // Drop finished rows (completed or cancelled) except those still settling
     // (just checked / just cancelled), so a finished task lingers for the beat
     // then fades — instead of sitting struck through until the next reload.
@@ -3186,8 +3179,8 @@ struct TaskListView: View {
     case .scheduled:
       // Things-style mapping:
       //   • "Today" → pin to today (today=true), clear any scheduled date.
-      //     This makes the task appear under Today's pinned items, not
-      //     in the "review/scheduled-past" section.
+      //     A pinned task is one the user placed here deliberately, so it
+      //     never counts toward the "new to-dos" rolled-in banner.
       //   • Future date → today=false + scheduled=date. Server auto-
       //     surfaces the task on Today when that date arrives.
       //   • Nil ("No Date") → clear both flags.
@@ -3260,7 +3253,6 @@ struct TaskListView: View {
     if newStatus == .done {
       let clearedToday = filter == .today
         && !items.contains { $0.status == .open }
-        && !review.contains { $0.status == .open }
       TaskCelebration.completed(isToday: task.isOnToday || filter == .today,
                                 clearedToday: clearedToday,
                                 accent: theme.color(for: "tasks"),
@@ -3290,7 +3282,7 @@ struct TaskListView: View {
     // Include `triageStorage` so checking an Inbox row flips it to done in
     // place; the settle window then keeps it visible (struck-through) until it
     // fades — see `triageItems`.
-    apply(&items); apply(&review); apply(&doneToday); apply(&triageStorage)
+    apply(&items); apply(&triageStorage)
   }
 
   /// Drop the matching task from every visible bucket. Paired with
@@ -3301,31 +3293,36 @@ struct TaskListView: View {
     func drop(_ list: inout [SeptenaTask]) {
       list.removeAll { $0.id == id }
     }
-    drop(&items); drop(&review); drop(&doneToday); drop(&triageStorage)
+    drop(&items); drop(&triageStorage)
   }
 
-  /// Mutate title/notes on a visible row immediately — the same pattern as
-  /// `flipStatus` / `removeLocally`. The mutator + async `load()` still run,
-  /// but the closed row must repaint on the very next frame after the inline
-  /// editor folds, not after a round-trip through `LocalCache`.
-  private func patchLocally(id: String, title: String? = nil, notes: String? = nil) {
+  /// Replace a visible row wholesale — the same pattern as `flipStatus` /
+  /// `removeLocally`. The mutator + async `load()` still run, but the closed row
+  /// must repaint on the very next frame after the inline editor folds, not
+  /// after a round-trip through `LocalCache`.
+  private func patchLocally(_ fresh: SeptenaTask) {
     func apply(_ list: inout [SeptenaTask]) {
-      guard let i = list.firstIndex(where: { $0.id == id }) else { return }
-      if let title { list[i].title = title }
-      if let notes { list[i].notes = notes.isEmpty ? nil : notes }
+      guard let i = list.firstIndex(where: { $0.id == fresh.id }) else { return }
+      list[i] = fresh
     }
-    apply(&items); apply(&review); apply(&doneToday); apply(&triageStorage)
+    apply(&items); apply(&triageStorage)
   }
 
   /// Re-read one task from the local mirror and patch the visible buckets.
   /// Called from composer `onDone` after `persist()` has saved.
+  ///
+  /// This replaces the WHOLE row DTO rather than just title/notes. Patching two
+  /// fields left every other edited attribute (When, Deadline, Repeat, List) to
+  /// be picked up only by the debounced `load()`, so a save reliably rendered a
+  /// stale row for at least a beat — and not at all when that reload was held
+  /// back by another open editor (`reloadOrDeferWhileEditing`).
   private func repatchTask(id: String) {
     var descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.id == id }
     )
     descriptor.fetchLimit = 1
     guard let entity = try? modelContext.fetch(descriptor).first else { return }
-    patchLocally(id: id, title: entity.title, notes: entity.notes)
+    patchLocally(SeptenaTask(entity))
   }
 
   // MARK: - Load
@@ -3488,8 +3485,6 @@ struct TaskListView: View {
     let merged = preservingSettling(fresh: local, prior: ghost.rows)
     let arrived = remoteArrivingIDs(prior: prior, fresh: local)
     assignMerged(merged, ghosted: ghost.ghosted, arrived: arrived) { items = $0 }
-    review = []
-    doneToday = []
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
     // the local cache is authoritative — no network round-trip needed.
@@ -3582,7 +3577,7 @@ struct TaskListView: View {
   /// a point-read catches a row that just entered it.
   private func taskChangeMayAffectCurrentList(_ note: Notification) -> Bool {
     guard let ids = note.changedTaskIDs else { return true }
-    let visible = Set((triageItems + items + review + doneToday).map(\.id))
+    let visible = Set((triageItems + items).map(\.id))
     if !visible.isDisjoint(with: ids) { return true }
     return ids.contains { LocalCache.taskMatches(id: $0, filter: filter, in: modelContext) }
   }
@@ -3637,7 +3632,7 @@ struct TaskListView: View {
     // context menu (same `filingRankedSuggestions` path).
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     var seen = Set<String>()
-    let candidates = (triageItems + items + review).filter {
+    let candidates = (triageItems + items).filter {
       ($0.status == .open || settle.isSettling($0.id)) && seen.insert($0.id).inserted
     }
     for t in candidates {
@@ -3916,11 +3911,14 @@ struct TaskListModalPresenter: ViewModifier {
       .sheet(isPresented: $showingMoveSheet) {
         let firstId = moveTargetIds.first
         let target = currentTask(firstId)
+        let hidesInboxTarget = !moveTargetIds.isEmpty
+          && moveTargetIds.allSatisfy { currentTask($0)?.isInTriageBand == true }
         MovePickerSheet(
           areas: areas,
           projects: projects,
           currentAreaId: target?.area,
           currentProjectId: target?.project,
+          hidesInboxTarget: hidesInboxTarget,
           bulkCount: moveTargetIds.count
         ) { areaId, projectId in
           let ids = moveTargetIds
@@ -3989,6 +3987,7 @@ struct TaskListRowContextMenu: View {
       } label: {
         Label("Copy", systemImage: "doc.on.doc")
       }
+      .keyboardShortcut(TaskRowShortcuts.copy)
 
       Divider()
     } else if target.isBulk {
@@ -3997,6 +3996,7 @@ struct TaskListRowContextMenu: View {
       } label: {
         Label("Copy Titles", systemImage: "doc.on.doc")
       }
+      .keyboardShortcut(TaskRowShortcuts.copy)
 
       Divider()
     }
@@ -4058,12 +4058,14 @@ struct TaskListRowContextMenu: View {
       // action that mirrors the menu-bar "Move…" — marks only the one item.
       .keyboardShortcut(TaskRowShortcuts.move)
 
-      Divider()
+      if !target.tasks.allSatisfy(\.isInTriageBand) {
+        Divider()
 
-      Button {
-        onMoveTo(target, nil, nil)
-      } label: {
-        Label("Inbox", systemImage: "tray")
+        Button {
+          onMoveTo(target, nil, nil)
+        } label: {
+          Label("Inbox", systemImage: "tray")
+        }
       }
       if !moveAreas.isEmpty || !moveTopProjects.isEmpty {
         Divider()

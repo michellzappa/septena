@@ -30,6 +30,16 @@ enum TaskCardMetrics {
 /// Drop target decoration for filing task rows into Today/areas/projects.
 /// Kept independent of `TaskListView` so the task list owns only its drop
 /// policy, not the presentation and transferable-data plumbing.
+///
+/// There are exactly TWO drop vocabularies on the task surfaces, and they mean
+/// different things — do not "unify" them:
+///   • drop INTO a container (this modifier) emphasizes the row/header itself,
+///     so it reuses the canonical `Theme.listSelectionFill`, per the one
+///     selection/target-language rule in CLAUDE.md;
+///   • drop BETWEEN rows (`TaskReorderDrop`) marks a *position*, not a row, so
+///     it parts a gap and draws an accent insertion line — the platform-standard
+///     indicator, and the only way to show where in the order the drop lands.
+/// A row can never wear both at once: reorder targets a gap, filing targets a row.
 struct TaskMoveDrop: ViewModifier {
   let perform: ((_ ids: [String]) -> Bool)?
   @State private var isTargeted = false

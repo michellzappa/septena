@@ -31,6 +31,28 @@ struct TaskComposerCard: View {
   enum Mode {
     case create(TaskFilter)
     case edit(SeptenaTask)
+
+    /// Stable identity of the thing being composed. Every piece of composer
+    /// `@State` that describes the *subject* (the seeded draft, the dirty
+    /// baseline, the one-shot save latch) is keyed to this rather than to view
+    /// lifetime, because a host can hand one card instance a different mode
+    /// without SwiftUI ever tearing the view down — a docked inspector swapping
+    /// from one task to the next does exactly that. When that happened, the
+    /// old `seeded` / `savedOrSkipped` latches stayed set: the form kept
+    /// showing the previous task's draft and every later save returned early,
+    /// so an edit appeared to take in the editor and never reached the row.
+    var identity: String {
+      switch self {
+      case .create(let filter):
+        switch filter {
+        case .project(let id): return "create:project:\(id)"
+        case .area(let id):    return "create:area:\(id)"
+        default:               return "create:\(filter.serverView)"
+        }
+      case .edit(let task):
+        return "edit:\(task.id)"
+      }
+    }
   }
 
   /// How the same form is hosted. `.drawer` is the standard adaptive edit
@@ -93,7 +115,18 @@ struct TaskComposerCard: View {
   @Environment(\.rowHInset) private var rowHInset
   @Environment(\.rowVInset) private var rowVInset
   @State private var draft = TaskDraft()
-  @State private var seeded = false
+  /// Which `Mode.identity` the current `draft` was seeded from — the guard that
+  /// replaces a plain `seeded` bool. Nil until the first seed; re-seeding is
+  /// driven by this no longer matching `mode.identity`.
+  @State private var seededIdentity: String?
+  /// The mode the current `draft` was seeded from, and therefore the target
+  /// every save writes to. Deliberately NOT read from `mode`: when a host swaps
+  /// the composer to a different subject in place, the outgoing draft must be
+  /// flushed into the task it was actually edited against, never into the
+  /// incoming one.
+  @State private var seededMode: Mode?
+  /// `deferredCreate` as of the seed, for the same reason as `seededMode`.
+  @State private var seededDeferredCreate = false
   /// The create-mode draft exactly as seeded from the list's defaults — the
   /// baseline `isDirty` compares against so the pre-filled Today/project/area
   /// defaults don't read as user edits. Unused in edit mode.
@@ -201,6 +234,13 @@ struct TaskComposerCard: View {
   private func close() { (onClose ?? adaptiveClose ?? { dismiss() })() }
 
   private func requestKeyboardCancel() {
+    // One Escape keystroke can reach this from several handlers at once: the
+    // container's key press, the title field's own copy (a TextField would
+    // otherwise swallow it), and AppKit's exit command on macOS. So this has to
+    // be idempotent — once a cancel is in flight, the duplicates are no-ops.
+    // Previously the second call re-read `isDirty` after the first had already
+    // discarded and closed, which made the outcome depend on handler ordering.
+    guard !showingKeyboardDiscardConfirmation, !savedOrSkipped else { return }
     if isDirty {
       showingKeyboardDiscardConfirmation = true
     } else {
@@ -217,6 +257,14 @@ struct TaskComposerCard: View {
   var body: some View {
     presentedContent
       .onAppear(perform: seed)
+      // A host can point this same card at a different task without SwiftUI
+      // tearing it down (a docked inspector moving between rows). Flush the
+      // outgoing edit — `persist` writes to `seededMode`, so it lands on the
+      // task it was typed against — then re-seed for the new subject.
+      .onChange(of: mode.identity) { _, _ in
+        persistOnce()
+        seed()
+      }
       // A task editor is a normal form: Escape cancels rather than silently
       // saving. On macOS the field editor consumes Escape, so carry both the
       // AppKit exit command and SwiftUI key press forms.
@@ -456,8 +504,10 @@ struct TaskComposerCard: View {
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
+      // macOS only: the field editor consumes Escape before the container's
+      // handler sees it. `requestKeyboardCancel` is idempotent, so the overlap
+      // with the container binding is harmless.
       .septenaOnEscape(requestKeyboardCancel)
-      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
   }
 
   /// How far to drop the inline edit-mode title so its glyphs land on the closed
@@ -633,9 +683,17 @@ struct TaskComposerCard: View {
 
   // MARK: - Lifecycle
 
+  /// Seed the draft from `mode` — once per subject, not once per view lifetime.
+  /// Re-runs whenever `mode.identity` changes so a reused card instance always
+  /// shows (and commits) the task it is currently pointed at.
   private func seed() {
-    guard !seeded else { return }
-    seeded = true
+    guard seededIdentity != mode.identity else { return }
+    seededIdentity = mode.identity
+    seededMode = mode
+    seededDeferredCreate = deferredCreate
+    // A new subject gets a fresh save latch. Without this, a card instance that
+    // already saved once could never write again.
+    savedOrSkipped = false
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
@@ -696,23 +754,29 @@ struct TaskComposerCard: View {
     #endif
   }
 
+  /// Apply any quick-entry tokens the user didn't tap. The `isUnset` guard
+  /// means an earlier token (e.g. `!today`) wins over a later conflicting one
+  /// (a detected date) instead of being clobbered.
+  private func applyPendingTokens() {
+    for token in detectedTokens where isUnset(token) { applyToken(token) }
+  }
+
   /// Writes the draft through the mutator. The scaffold's Save runs this then
   /// closes; the title-newline path runs it through `commit()`.
   private func persist() {
-    switch mode {
+    // Commit against the mode the draft was SEEDED from (see `seededMode`), so
+    // a mid-flight subject swap flushes the outgoing edit into the right task.
+    switch seededMode ?? mode {
     case .create:
-      // Apply any quick-entry tokens the user didn't tap, then create. The
-      // isUnset guard means an earlier token (e.g. !today) wins over a later
-      // conflicting one (a detected date) instead of being clobbered.
-      for token in detectedTokens where isUnset(token) { applyToken(token) }
+      applyPendingTokens()
       draft.create(via: mutator)
       AddInfoSection.tasks.notifyTilesChanged()
     case .edit(let task):
-      if deferredCreate {
+      if seededDeferredCreate {
         // Same create pipeline as the drawer, except the inline host already
         // inserted a push-deferred entity for layout identity. Updating its
         // title releases the first CloudKit push.
-        for token in detectedTokens where isUnset(token) { applyToken(token) }
+        applyPendingTokens()
         draft.update(task, via: mutator)
         AddInfoSection.tasks.notifyTilesChanged()
         return

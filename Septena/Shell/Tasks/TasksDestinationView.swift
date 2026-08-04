@@ -56,7 +56,6 @@ struct TasksDestinationView: View {
   /// the surrounding SectionDrawer (which may be focused for another section's
   /// date navigation). This gives Mac and regular-width iPad the same arrows /
   /// Return / Space / Escape contract as the full Tasks tab.
-  @FocusState private var taskListFocused: Bool
   /// Keyboard traversal may move past the visible drawer viewport. Keep this
   /// separate from `selectedId` so pointer selection never re-anchors the
   /// scroll position just because a user clicked a row.
@@ -132,11 +131,6 @@ struct TasksDestinationView: View {
     openEdit(task)
   }
 
-  private func reclaimTaskListFocus() {
-    guard usesSelectionModel, !composerIsOpen else { return }
-    DispatchQueue.main.async { taskListFocused = true }
-  }
-
   private func scrollID(for taskID: String) -> String {
     "tasks-drawer-row-\(taskID)"
   }
@@ -171,13 +165,16 @@ struct TasksDestinationView: View {
     // Host the composer here so it stacks on top of the drawer sheet and
     // dismisses back to it.
       .taskComposerDrawer(isPresented: composerBinding) { composerCard }
-      .focusable(usesSelectionModel)
-      .focused($taskListFocused)
-      .focusEffectDisabled()
-      .onAppear { reclaimTaskListFocus() }
-      .onChange(of: composerIsOpen) { _, isOpen in
-        if !isOpen { reclaimTaskListFocus() }
-      }
+      // The shared focus + Return/Escape contract (`ListKeyboardNavigation`).
+      // Only ↑↓ stay local: this drawer's rows are `DrawerSection`s, not a
+      // native `List`, so there's no native traversal to inherit.
+      .listKeyboardNavigation(
+        inputActive: composerIsOpen,
+        focusable: usesSelectionModel,
+        hasSelection: selectedId != nil,
+        onReturn: activateSelection,
+        onEscape: { selectedId = nil }
+      )
       .onChange(of: keyboardScrollTarget) { _, id in
         guard let id else { return }
         // With no explicit anchor, ScrollViewReader performs the least
@@ -188,16 +185,6 @@ struct TasksDestinationView: View {
       .onKeyPress(keys: [.upArrow, .downArrow], phases: [.down, .repeat]) { press in
         guard usesSelectionModel, !composerIsOpen, mode == .log else { return .ignored }
         moveSelection(press.key == .downArrow ? 1 : -1)
-        return .handled
-      }
-      .onKeyPress(.return) {
-        guard usesSelectionModel, !composerIsOpen, mode == .log, selectedId != nil else { return .ignored }
-        activateSelection()
-        return .handled
-      }
-      .onKeyPress(.escape) {
-        guard usesSelectionModel, !composerIsOpen, selectedId != nil else { return .ignored }
-        selectedId = nil
         return .handled
       }
       #if os(macOS)
@@ -289,6 +276,10 @@ struct TasksDestinationView: View {
     if let mode = composerMode {
       TaskComposerCard(mode: mode, areas: areas, projects: projects, accent: accent,
                        onDone: { reload() })
+        // This host swaps the card between create and any edited task while the
+        // drawer stays up. Identity makes each subject a fresh view, so the
+        // seeded draft and save latch can never carry over.
+        .id(mode.identity)
     }
   }
   private var composerMode: TaskComposerCard.Mode? {

@@ -275,18 +275,6 @@ struct SidebarMacRowBackground: View {
 }
 #endif
 
-/// Row background for the custom scroll list (the task-list detail). The
-/// grouped-card chrome (`TaskCardChrome`) now paints both the card surface AND
-/// the selected-cell fill — edge-to-edge within the card, with the card's own
-/// corners — so the row's own background stays clear. (It used to draw an inset
-/// rounded capsule here, which floated as a separate bar on top of the card.)
-struct ScrollRowSelectionBackground: View {
-  let isSelected: Bool
-  var body: some View {
-    Color.clear
-  }
-}
-
 #if os(iOS)
 /// Applies `Theme.selectionNeutral` to selectable lists on iPad (regular width).
 private struct NeutralListSelectionOnPad: ViewModifier {

@@ -48,6 +48,23 @@ enum KeyboardShortcutsCatalogue {
     #endif
   }
 
+  /// Row commands are GENERATED from `TaskRowCommands` — the same registry the
+  /// Task menu and the iPad shortcut buttons render from — so this sheet can no
+  /// longer advertise a binding the app doesn't have. (It used to claim ⌘M for
+  /// Move and ⌘. for Clear Schedule; both are ⇧-modified in reality, and Copy
+  /// was missing entirely.) Only the keys that aren't row commands — the
+  /// selection/navigation keys the list handles itself — are listed by hand.
+  private static var taskList: KeyboardShortcutGroup {
+    KeyboardShortcutGroup(title: "Task list", shortcuts: [
+      KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
+      KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
+      KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
+      KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
+    ] + TaskRowCommands.all.map {
+      KeyboardShortcut2(keys: $0.keycaps, label: $0.title)
+    })
+  }
+
   private static var quickCaptureLabel: String {
     #if SEPTASK
     "New to-do — quick capture"
@@ -65,21 +82,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
       KeyboardShortcut2(keys: ["⌘", "⇧", "/"], label: "Keyboard shortcuts (this sheet)"),
     ]),
-    KeyboardShortcutGroup(title: "Task list", shortcuts: [
-      KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
-      KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
-      KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
-      KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
-      KeyboardShortcut2(keys: ["⌘", "R"], label: "Edit Details…"),
-      KeyboardShortcut2(keys: ["⌘", "D"], label: "Duplicate"),
-      KeyboardShortcut2(keys: ["⌘", "T"], label: "Toggle Today"),
-      KeyboardShortcut2(keys: ["⌘", "K"], label: "Mark as complete"),
-      KeyboardShortcut2(keys: ["⌘", "S"], label: "When…"),
-      KeyboardShortcut2(keys: ["⌘", "⇧", "D"], label: "Deadline…"),
-      KeyboardShortcut2(keys: ["⌘", "M"], label: "Move…"),
-      KeyboardShortcut2(keys: ["⌘", "."], label: "Clear schedule"),
-      KeyboardShortcut2(keys: ["⌘", "⌫"], label: "Delete"),
-    ]),
+    taskList,
     KeyboardShortcutGroup(title: "Edit & section sheets", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "N"], label: "Quick-add in an open section"),
       KeyboardShortcut2(keys: ["←"], label: "Time travel: previous day"),
