@@ -51,7 +51,10 @@ struct TaskListView: View {
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
   /// The fetched calendar events for the current filter's window. `todayEvents()`
   /// on Today; the next 30 days on Upcoming; empty everywhere else.
-  @State private var calendarEvents: [EKEvent] = []
+  /// The list's derived-data layer (calendar agenda, filing suggestions,
+  /// project progress). See `TaskListModel` — concerns move here one at a time
+  /// per docs/TASK_LIST_OBSERVATION_PLAN.md.
+  @State private var model = TaskListModel()
 
   // Items are filter-scoped. We store them alongside the
   // filter they correspond to; when the current `filter` doesn't match the
@@ -434,14 +437,12 @@ struct TaskListView: View {
   /// chip is on the first frame, not a beat late) and again inside `load()` on
   /// passive syncs. Held in @State (not read live off the @Observable engine)
   /// so the row chip renders reliably.
-  @State private var filingSuggestions: [String: SuggestionEngine.Suggestion] = [:]
 
   /// done / (done + open) per project, mirroring the sidebar's aggregate so the
   /// project pie glyph in mixed-list headers (Today / Unscheduled) reads the
   /// real completion ratio. Cancelled tasks count toward neither side.
   /// Snapshotted in `load()` from the full local corpus, since `items` is
   /// filter-scoped and never holds a project's done rows.
-  @State private var progressByProject: [String: Double] = [:]
 
   // "You have N new to-dos" banner — compact start-of-day welcome that
   // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
@@ -631,7 +632,7 @@ struct TaskListView: View {
       // beat later when the async load() resolves. This is the fresh-instance
       // case: arriving at Today from a Project/Area page (a different view
       // type) builds a brand-new TaskListView, so `.onChange(of: filter)`
-      // never fires and `calendarEvents` would otherwise stay empty until the
+      // never fires and `model.calendarEvents` would otherwise stay empty until the
       // load lands — a visible layout jump.
       refreshCalendarEvents()
       Task { await load() }
@@ -692,7 +693,7 @@ struct TaskListView: View {
       // Re-fetch the woven calendar agenda SYNCHRONOUSLY, in the same
       // transaction as the filter change. The view is reused across filter
       // swaps, so without this the body re-renders for the new filter while
-      // `calendarEvents` still holds the PREVIOUS filter's events — e.g.
+      // `model.calendarEvents` still holds the PREVIOUS filter's events — e.g.
       // Upcoming→Today briefly renders all 30 days of upcoming events as
       // today's agenda, then snaps when the async load() resolves. That stale
       // frame is the "weird rebuild between screens". Mirrors the synchronous
@@ -1188,7 +1189,7 @@ struct TaskListView: View {
         Section {
           if !inboxCollapsed {
             cardedRows(allInbox,
-                       quickMenu: { filingSuggestions[$0.id] != nil },
+                       quickMenu: { model.filingSuggestions[$0.id] != nil },
                        appendQuickAdd: showsQuickAddInInbox,
                        quickAddShowsEditor: quickAddInInboxShowsEditor,
                        moveDropTarget: .inbox)
@@ -1407,7 +1408,7 @@ struct TaskListView: View {
 
   private var visibleRows: some View {
     cardedRows(visibleItems,
-               quickMenu: { filingSuggestions[$0.id] != nil },
+               quickMenu: { model.filingSuggestions[$0.id] != nil },
                appendQuickAdd: attachesQuickAddToVisibleCard,
                reorderable: isManuallyOrderedList)
   }
@@ -1497,7 +1498,7 @@ struct TaskListView: View {
       return !headingIds.contains(h)
     }
     cardedRows(unheaded,
-               quickMenu: { filingSuggestions[$0.id] != nil },
+               quickMenu: { model.filingSuggestions[$0.id] != nil },
                appendQuickAdd: attachesQuickAddToVisibleCard,
                reorderable: true,
                grouped: true)
@@ -2714,12 +2715,12 @@ struct TaskListView: View {
 
   /// The one-tap row chip — same top pick as the context menu (snapshotted in `load()`).
   private func filingChipSuggestion(for task: SeptenaTask) -> SuggestionEngine.Suggestion? {
-    filingSuggestions[task.id]
+    model.filingSuggestions[task.id]
   }
 
   /// Top filing pick for implicit "not this" learning.
   private func topFilingSuggestion(for task: SeptenaTask) -> SuggestionEngine.Suggestion? {
-    filingSuggestions[task.id] ?? filingRankedSuggestions(for: task)?.first
+    model.filingSuggestions[task.id] ?? filingRankedSuggestions(for: task)?.first
   }
 
   /// Implicit "Not this" — fires when the user moves the task somewhere
@@ -2827,7 +2828,7 @@ struct TaskListView: View {
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
-                        projectProgress: progressByProject[project.id],
+                        projectProgress: model.progressByProject[project.id],
                         onTap: {
                           if closeActiveEditIfNeeded() { return }
                           nav.go(to: .project(id: project.id))
@@ -2852,7 +2853,7 @@ struct TaskListView: View {
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
-                      projectProgress: progressByProject[project.id],
+                      projectProgress: model.progressByProject[project.id],
                       onTap: {
                         if closeActiveEditIfNeeded() { return }
                         nav.go(to: .project(id: project.id))
@@ -3093,8 +3094,8 @@ struct TaskListView: View {
   /// under the screen title. White cards are reserved for tasks.
   @ViewBuilder
   private var todayCalendarRow: some View {
-    if filter == .today, showCalendarEvents, !calendarEvents.isEmpty {
-      calendarEventsBlock(calendarEvents)
+    if filter == .today, showCalendarEvents, !model.calendarEvents.isEmpty {
+      calendarEventsBlock(model.calendarEvents)
         .environment(\.rowHInset, TaskCardMetrics.contentInset)
         .padding(.horizontal, TaskCardMetrics.margin)
         .padding(.bottom, 8)
@@ -3159,7 +3160,7 @@ struct TaskListView: View {
 
     var eventsByDay: [String: [EKEvent]] = [:]
     if showCalendarEvents {
-      for event in calendarEvents {
+      for event in model.calendarEvents {
         // A multi-day event (e.g. an all-day "off" spanning a long weekend)
         // shows on every day it covers, not just its start day.
         for key in upcomingDayKeys(for: event) {
@@ -3509,11 +3510,7 @@ struct TaskListView: View {
     // Per-project completion ratio for the project pie glyph in mixed-list
     // headers. Aggregate raw entities rather than projecting the whole
     // historical corpus into row DTOs on every refresh.
-    if filter == .today || filter == .unscheduled {
-      progressByProject = LocalCache.projectCompletionRatios(in: modelContext)
-    } else if !progressByProject.isEmpty {
-      progressByProject = [:]
-    }
+    model.refreshProjectProgress(filter: filter, context: modelContext)
     if filter == .today {
       // Re-read the Inbox and merge back any just-checked row that's still
       // settling (the `.triage` query drops done tasks), so an accepted
@@ -3597,63 +3594,31 @@ struct TaskListView: View {
     return ids.contains { LocalCache.taskMatches(id: $0, filter: filter, in: modelContext) }
   }
 
-  /// Pull the day's calendar events for the lists that show them (Today,
-  /// Upcoming). No-ops to empty when the feature is off, access isn't granted,
-  /// or this isn't one of those lists — so the rest of the view can render
-  /// straight from `calendarEvents` without re-checking. `CalendarBridge` is
-  /// `@MainActor`, same as this method, so the read is a direct call.
+  /// Pull the day's calendar events for the lists that weave them in. Owned by
+  /// `TaskListModel`; kept as a one-line forwarder because several call sites
+  /// (appear, filter swap, EventKit change) refresh it synchronously.
   private func refreshCalendarEvents() {
-    guard showCalendarEvents,
-          filter == .today || filter == .upcoming,
-          CalendarBridge.shared.access == .granted
-    else {
-      if !calendarEvents.isEmpty { calendarEvents = [] }
-      return
-    }
-    calendarEvents = filter == .today
-      ? CalendarBridge.shared.remainingTodayEvents()
-      : CalendarBridge.shared.upcomingEvents(days: 30)
+    model.refreshCalendarEvents(filter: filter, enabled: showCalendarEvents)
   }
 
-  /// Rebuild the per-row filing-suggestion snapshot (`filingSuggestions`, the
-  /// "→ Suggested" capsule) SYNCHRONOUSLY, so the chip is on the first frame
-  /// instead of popping in a beat later when the async `load()` resolves — the
-  /// same beat `refreshCalendarEvents()` gives the woven agenda. This was the
-  /// last Inbox input still set only inside `load()`, so on every appear/return
-  /// the top Inbox rows rendered without their capsule for one frame, then
-  /// reflowed as it landed. Cheap to call eagerly: the classifier's model build
-  /// is memoized on a corpus signature (`SuggestionEngine.ensureModel`), so the
-  /// appear beat and the `load()` beat train the model at most once between them.
+  /// Rebuild the per-row filing-suggestion snapshot (the "→ Suggested"
+  /// capsule). Owned by `TaskListModel`; the candidate set and the ranking
+  /// closure come from here so the snapshot and the on-demand context-menu
+  /// path stay one code path.
   private func refreshFilingSuggestions() {
-    guard TaskRowFlags.filingSuggestionsEnabled,
-          filter != .logbook, filter != .recentlyDeleted else {
-      if !filingSuggestions.isEmpty { filingSuggestions = [:] }
-      return
-    }
-    // Train the classifier (memoized). Today's Inbox gets the richer per-id
-    // ranked picks; every other creatable list just primes the general model so
-    // `filingRankedSuggestions` can rank area-direct rows on demand.
-    if filter == .today {
-      suggestionEngine.refresh(inbox: LocalCache.tasks(in: modelContext, filter: .triage),
-                               allTasks: LocalCache.trainingTasks(in: modelContext),
-                               projects: projects,
-                               areas: areas)
-    } else {
-      suggestionEngine.prepare(allTasks: LocalCache.trainingTasks(in: modelContext),
-                               projects: projects,
-                               areas: areas)
-    }
-    // Snapshot the top pick per visible open row so the chip matches the
-    // context menu (same `filingRankedSuggestions` path).
-    var fresh: [String: SuggestionEngine.Suggestion] = [:]
     var seen = Set<String>()
     let candidates = (triageItems + items).filter {
       ($0.status == .open || settle.isSettling($0.id)) && seen.insert($0.id).inserted
     }
-    for t in candidates {
-      if let top = filingRankedSuggestions(for: t)?.first { fresh[t.id] = top }
-    }
-    filingSuggestions = fresh
+    model.refreshFilingSuggestions(
+      filter: filter,
+      context: modelContext,
+      engine: suggestionEngine,
+      projects: projects,
+      areas: areas,
+      candidates: candidates,
+      rankedTop: { filingRankedSuggestions(for: $0)?.first }
+    )
   }
 
   // MARK: - New-to-dos banner

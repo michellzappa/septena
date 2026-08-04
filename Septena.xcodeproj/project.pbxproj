@@ -76,6 +76,7 @@
 		0CA6C0F3CE60C8132A09CF51 /* MealPhotoDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B92A38DFB6CCF7EE034294E /* MealPhotoDraft.swift */; };
 		0CEBD7A4BC2763A2A643D7D5 /* TasksWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FC87654F413302D31832AE /* TasksWidgetSnapshotStore.swift */; };
 		0CFB810E7BAD2E4A01815BBD /* SeptaskNavigationCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB956EC9AB69D43ECF775E98 /* SeptaskNavigationCommands.swift */; };
+		0D1123E23F401A7FE4FACA64 /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */; };
 		0D173098848C45F953F3F0DF /* NextBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */; };
 		0D2BBEB77C7FF69784CB51F1 /* TileWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C95ED8217B0F2A498C53CC4F /* TileWidgetSnapshotStore.swift */; };
 		0D48D890C071C68736A38A7F /* SolarClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085456E2239FA343DA34D32 /* SolarClock.swift */; };
@@ -512,6 +513,7 @@
 		51B5D785192F411E5AAF941B /* GoalRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA64E4CD9F48DE7AFFA52D84 /* GoalRecord.swift */; };
 		51C9B7158B6526070ADDA49A /* GroceryStockHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30470A95ADD190585600055 /* GroceryStockHistory.swift */; };
 		52883300FBE8C0D226A43368 /* CommitMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6D3C89DD47424084AE32D1 /* CommitMotion.swift */; };
+		52A745BD8C72B17AF2A19566 /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */; };
 		52CA17C6216FE77817FE261E /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		52F20E3902FD8D231EFAD145 /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
@@ -594,6 +596,7 @@
 		6160FDCE0C2B1D67387C78FD /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B801EA98E8CDE0DB13784C /* SettingsStore.swift */; };
 		616C90B23EBD22005C6BBBAB /* AddGutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804ACCAA2E1FE43802EA25AB /* AddGutPage.swift */; };
 		61A2A2E7747913C0F1B53677 /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
+		61BBED897F983D5F94709201 /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */; };
 		61E246983243338B9A8D0ADA /* TaskAttributeBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985DC4E3BD4D9960526EFF8E /* TaskAttributeBar.swift */; };
 		61F53D9BF6F6BF79E57B77C3 /* SupportSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9321092AE095993F6AB02F /* SupportSettingsPane.swift */; };
 		620AD94FDB3EE952CF308E24 /* IkigaiQuadrantStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8568DA09F8C5545EBB0A2596 /* IkigaiQuadrantStep.swift */; };
@@ -1038,6 +1041,7 @@
 		AB68497A7AF5F88ED33EAB79 /* EditSupplementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F70E70D8BC6F8B767D06FF9 /* EditSupplementSheet.swift */; };
 		AB689CCEB13486AEB4AE05C8 /* IntensityGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7DF7DE41AF304A9324BC6E /* IntensityGlyph.swift */; };
 		ABA749CE9509490F7CB7D9F4 /* SectionTileWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3E066DC1C51CBAEDA71AB9 /* SectionTileWidget.swift */; };
+		ABC108658E94E4FA0F2C6D77 /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */; };
 		AC37E3750B3DEB5F00CD7979 /* CoachReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169846E5AAB2A89A91CD4290 /* CoachReply.swift */; };
 		AC4A1F6214E0D9E1451FE4EF /* ClaudeReconnectNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D0F38BDF095C455676498B /* ClaudeReconnectNudge.swift */; };
 		AC62BF900A5E05F94CCFF57E /* DashboardTileBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4355D680788E342587674F13 /* DashboardTileBuilder.swift */; };
@@ -2171,6 +2175,7 @@
 		D2ABB5641A551478BB6D1FE7 /* MilestoneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneEngine.swift; sourceTree = "<group>"; };
 		D2AF70B89A0D3FC41DAFAFE9 /* GutDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutDestinationView.swift; sourceTree = "<group>"; };
 		D30470A95ADD190585600055 /* GroceryStockHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryStockHistory.swift; sourceTree = "<group>"; };
+		D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListModel.swift; sourceTree = "<group>"; };
 		D380954A5F569C4A8FFA6F9A /* SupplementsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsPlugin.swift; sourceTree = "<group>"; };
 		D3885ECABB96F4419BAE7E6E /* TrainingEffort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingEffort.swift; sourceTree = "<group>"; };
 		D3A43D786998D198C9BCA480 /* CKEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CKEngine.swift; sourceTree = "<group>"; };
@@ -3096,6 +3101,7 @@
 				F5E298F308656C2236B1CC5E /* TaskInlineRows.swift */,
 				ECCD2FDB1AF74B2F5E38ED12 /* TaskListChrome.swift */,
 				2484F4EBDF38C7541E01181A /* TaskListContextMenu.swift */,
+				D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */,
 				8A47788C8D71A71AF7B75DB5 /* TaskListToolbars.swift */,
 				BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */,
 				6D9D41E890B5BEBFE6BA1A41 /* TaskNotesEditor.swift */,
@@ -4231,6 +4237,7 @@
 				447628AAC4B14DFBA275F8E9 /* TaskInlineRows.swift in Sources */,
 				2559185CB19022B19FBF651F /* TaskListChrome.swift in Sources */,
 				8C55E38577381F65D82819D9 /* TaskListContextMenu.swift in Sources */,
+				0D1123E23F401A7FE4FACA64 /* TaskListModel.swift in Sources */,
 				C38DC917C8E6DF4E6948FBC7 /* TaskListToolbars.swift in Sources */,
 				73DA8590E445FABBE2BCAD96 /* TaskListView.swift in Sources */,
 				059C8A11D111A1E4C20A388A /* TaskNavMenu.swift in Sources */,
@@ -4517,6 +4524,7 @@
 				3DE7DFFF8CFC7A8A74C03220 /* TaskInlineRows.swift in Sources */,
 				CE83897C550B4FDED9E6CAA0 /* TaskListChrome.swift in Sources */,
 				DE5D0E4C6FD4F91BB7CF81A4 /* TaskListContextMenu.swift in Sources */,
+				61BBED897F983D5F94709201 /* TaskListModel.swift in Sources */,
 				99E5B8408AE833BB79FDF066 /* TaskListToolbars.swift in Sources */,
 				A70ABEB3376EB0DEB4567CFC /* TaskListView.swift in Sources */,
 				B80577FE8F764070FB3DC3F2 /* TaskNavMenu.swift in Sources */,
@@ -4968,6 +4976,7 @@
 				940D9E3D0F05C57C05DC3855 /* TaskIntents.swift in Sources */,
 				B19D24F4BA0C2CBD11F78CB7 /* TaskListChrome.swift in Sources */,
 				FE9DF964B1F6A471DBD3BFF2 /* TaskListContextMenu.swift in Sources */,
+				52A745BD8C72B17AF2A19566 /* TaskListModel.swift in Sources */,
 				D89A21D468DEE0A4AE2DC08D /* TaskListToolbars.swift in Sources */,
 				6DEF721835395CBA52F670D4 /* TaskListView.swift in Sources */,
 				BD3F171ECA451BC6A72F660C /* TaskNavMenu.swift in Sources */,
@@ -5499,6 +5508,7 @@
 				8BC6BA26B5948910B2F49E81 /* TaskIntents.swift in Sources */,
 				ACBEC76A803FB374E81B15B3 /* TaskListChrome.swift in Sources */,
 				26261FD7994240967B6DF5FF /* TaskListContextMenu.swift in Sources */,
+				ABC108658E94E4FA0F2C6D77 /* TaskListModel.swift in Sources */,
 				FA61C7A9FA2CAA4D75E09B77 /* TaskListToolbars.swift in Sources */,
 				3239E48846BD07983E8A8FCF /* TaskListView.swift in Sources */,
 				CD586050137D2C8A1B4DBA56 /* TaskNavMenu.swift in Sources */,
