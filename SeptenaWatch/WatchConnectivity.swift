@@ -874,15 +874,48 @@ final class WatchConnectivity {
     try await db.save(record)
   }
 
-  /// Completes a task by mutating its `Task` record in place — mirrors
-  /// `TasksBackend.complete`: status → done, stamp completedAt, clear today.
+  /// Completes a task and creates the next occurrence when the record carries
+  /// a recurrence rule. This is kept in lockstep with the phone backend
+  /// because watch taps write directly to CloudKit.
   private func saveTaskCompletion(taskID: String) async throws {
     let recordID = CKRecord.ID(recordName: taskID, zoneID: ckZoneID)
     guard let record = try? await db.record(for: recordID) else { return }
     record["status"]      = "done"
     record["completedAt"] = Self.tsFmt.string(from: Date())
-    record["today"]       = 0
-    try await db.save(record)
+
+    let unit = record["recurrenceUnit"] as? String
+    let interval = (record["recurrenceInterval"] as? Int)
+      ?? (record["recurrenceInterval"] as? NSNumber)?.intValue
+      ?? 1
+    let afterCompletion = (record["recurrenceAfterCompletion"] as? Int)
+      .map { $0 != 0 }
+      ?? (record["recurrenceAfterCompletion"] as? NSNumber)?.boolValue
+      ?? true
+    let nextDate = unit.flatMap {
+      TasksWatchRecurrence.nextDate(
+        completedOn: today,
+        scheduled: record["scheduled"] as? String,
+        unit: $0,
+        interval: interval,
+        afterCompletion: afterCompletion
+      )
+    }
+
+    var records = [record]
+    if let nextDate {
+      let nextID = TasksWatchRecurrence.occurrenceID(sourceTaskID: taskID, scheduled: nextDate)
+      let nextRecordID = CKRecord.ID(recordName: nextID, zoneID: ckZoneID)
+      if (try? await db.record(for: nextRecordID)) == nil {
+        records.append(TasksWatchRecurrence.occurrenceRecord(
+          from: record,
+          recordID: nextRecordID,
+          scheduled: nextDate,
+          created: today,
+          createdAt: Date()
+        ))
+      }
+    }
+    _ = try await db.modifyRecords(saving: records, deleting: [])
   }
 
   /// Cancels a task — mirrors `TasksBackend.cancel`: status → cancelled, stamp

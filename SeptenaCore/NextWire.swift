@@ -293,9 +293,9 @@ struct MealWire: Codable, Hashable, Identifiable {
   /// How many times this meal was logged in the window — the ×N badge and the
   /// frequency rank (already applied by the publisher).
   var count: Int = 1
-  /// Already logged today. The wrist picker keeps the row but grays it and
-  /// disables the tap so it can't be re-logged by accident. Additive
-  /// (defaults false) so older snapshots decode fine.
+  /// Already logged today. The wrist picker keeps the row but grays it so it
+  /// reads as done — still tappable to log again. Additive (defaults false)
+  /// so older snapshots decode fine.
   var loggedToday: Bool = false
   var proteinG: Double = 0
   var fatG: Double = 0

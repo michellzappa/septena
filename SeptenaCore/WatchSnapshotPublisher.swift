@@ -295,9 +295,9 @@ enum WatchSnapshotPublisher {
         .joined(separator: "|")
     }
 
-    // Meals already logged today stay in the list but get grayed + un-tappable
-    // on the wrist (below), so the user sees them as done and can't re-log by
-    // accident. Republished on every mutation, so the flag clears tomorrow.
+    // Meals already logged today stay in the list but get grayed on the wrist
+    // (still tappable to log again). Republished on every mutation, so the
+    // flag clears tomorrow.
     let today = SeptenaDate.today
     let loggedToday = Set(entries.filter { $0.date == today }.map(signature))
 

@@ -272,8 +272,40 @@ final class TasksWatchStore {
     guard let record = try? await db.record(for: recordID) else { return }
     record["status"] = "done"
     record["completedAt"] = Self.tsFmt.string(from: Date())
-    record["today"] = 0
-    try await db.save(record)
+
+    let unit = record["recurrenceUnit"] as? String
+    let interval = (record["recurrenceInterval"] as? Int)
+      ?? (record["recurrenceInterval"] as? NSNumber)?.intValue
+      ?? 1
+    let afterCompletion = (record["recurrenceAfterCompletion"] as? Int)
+      .map { $0 != 0 }
+      ?? (record["recurrenceAfterCompletion"] as? NSNumber)?.boolValue
+      ?? true
+    let nextDate = unit.flatMap {
+      TasksWatchRecurrence.nextDate(
+        completedOn: today,
+        scheduled: record["scheduled"] as? String,
+        unit: $0,
+        interval: interval,
+        afterCompletion: afterCompletion
+      )
+    }
+
+    var records = [record]
+    if let nextDate {
+      let nextID = TasksWatchRecurrence.occurrenceID(sourceTaskID: taskID, scheduled: nextDate)
+      let nextRecordID = CKRecord.ID(recordName: nextID, zoneID: ckZoneID)
+      if (try? await db.record(for: nextRecordID)) == nil {
+        records.append(TasksWatchRecurrence.occurrenceRecord(
+          from: record,
+          recordID: nextRecordID,
+          scheduled: nextDate,
+          created: today,
+          createdAt: Date()
+        ))
+      }
+    }
+    _ = try await db.modifyRecords(saving: records, deleting: [])
   }
 
   private func saveTaskCancel(taskID: String) async throws {

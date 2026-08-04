@@ -984,7 +984,7 @@ struct MealPickerView: View {
               .minimumScaleFactor(0.8)
           }
           // Already logged today → a green check, in place of the ×N badge, so
-          // the row reads as done.
+          // the row reads as done. Still tappable — same meal twice is common.
           if meal.loggedToday {
             Spacer(minLength: 0)
             Image(systemName: "checkmark.circle.fill")
@@ -1000,10 +1000,9 @@ struct MealPickerView: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      // Grayed + un-tappable once logged today, so it can't be re-logged by a
-      // stray tap. Clears at the next day's snapshot.
-      .disabled(meal.loggedToday)
-      .opacity(meal.loggedToday ? 0.45 : 1)
+      // Grayed once logged today so it reads as done, still tappable to log
+      // again. Clears at the next day's snapshot.
+      .opacity(meal.loggedToday ? 0.5 : 1)
       .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
     }
     .listStyle(.plain)
