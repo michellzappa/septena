@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1500,
-      "date": "2026-07-25",
+      "build": 1509,
+      "date": "2026-08-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Introducing Septask, a focused tasks app",
-          "detail": "A dedicated to-do app built on your Septena task data, with its own widgets, watch complication, and Home Screen quick actions.",
+          "detail": "A new dedicated task app shares your Septena task data with its own Home, Today, and Upcoming tabs on iPhone, iPad, and Mac, plus a watch app.",
           "section": "tasks"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Progression hints suggest when to add reps or load, sessions gained editable start/end times, and the session editor was reworked with a live progress-chart marker.",
-          "section": "training"
+          "title": "Recurring tasks pick up automatically",
+          "detail": "Completing a recurring task now spawns its next occurrence instead of leaving you to recreate it.",
+          "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a meal photo for on-device analysis that prefills macros, and re-log past meals scaled to a new portion.",
+          "title": "More reliable task editing",
+          "detail": "Fixed an issue where editing a task's title could silently fail to save.",
+          "section": "tasks"
+        },
+        {
+          "title": "More ways to organize tasks",
+          "detail": "Attach files, share tasks to other apps, drag tasks to re-home them, select multiple tasks at once, and recover deleted tasks for 30 days.",
+          "section": "tasks"
+        },
+        {
+          "title": "Meal photo scanning and easier re-logging",
+          "detail": "Snap a photo to prefill a meal's details, log an already-logged meal again, and scale a re-logged meal by a percentage.",
           "section": "nutrition"
         },
         {
-          "title": "Recently Deleted for tasks",
-          "detail": "Deleted tasks stick around for 30 days with one-tap restore, instead of vanishing immediately.",
-          "section": "tasks"
+          "title": "Reworked training sessions",
+          "detail": "A rebuilt session editor adds editable start and end times, reps-before-load progression hints, and a top-weight toggle on your progress chart.",
+          "section": "training"
         },
         {
-          "title": "Import tasks from Things",
-          "detail": "Bring in a Things database export, including project section headings.",
-          "section": "tasks"
+          "title": "Suggested goals for more sections",
+          "detail": "Chores, gut, habits, medications, mood, and supplements now offer suggested goals to get you started.",
+          "section": "goals"
         },
         {
-          "title": "Calendar events in Today and Upcoming",
-          "detail": "Your system calendar events now appear alongside tasks in the Today and Upcoming views.",
-          "section": "tasks"
-        },
-        {
-          "title": "Copy the grocery list",
-          "detail": "A new button copies your shopping list to the clipboard for pasting elsewhere.",
-          "section": "groceries"
-        },
-        {
-          "title": "Clearer privacy controls",
-          "detail": "See exactly what's sent at each telemetry level and review a log of recently sent data.",
-          "section": null
+          "title": "New steps tile on the dashboard",
+          "detail": "A dashboard tile now shows your daily step count.",
+          "section": "activity"
         }
       ]
     },
