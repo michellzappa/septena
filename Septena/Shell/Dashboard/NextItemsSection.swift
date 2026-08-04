@@ -969,7 +969,7 @@ struct NextDoneSection: View {
       nextFoldableSectionHeader(title: "Done Today", count: items.count,
                                 isCollapsed: isCollapsed) {
         Haptics.tick()
-        withAnimation(.easeInOut(duration: 0.2)) { isCollapsed.toggle() }
+        a11yAnimate(.easeInOut(duration: 0.2)) { isCollapsed.toggle() }
       }
     }) {
       if !isCollapsed {
@@ -1022,7 +1022,7 @@ struct DoneEventRow: View {
       ?? theme.color(for: event.sectionKey)
     return HStack(spacing: 10) {
       Text(event.time ?? "—")
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(.secondary)
         .frame(width: 42, alignment: .trailing)
       Circle()

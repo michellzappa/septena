@@ -242,7 +242,7 @@ struct CommunityProfilePane: View {
           .transition(.move(edge: .bottom).combined(with: .opacity))
       }
     }
-    .animation(.snappy, value: savedConfirmation)
+    .a11yAnimation(.snappy, value: savedConfirmation)
   }
 
   private var fallbackSection: some View {

@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // Accessibility primitives shared across the app.
 //
@@ -111,6 +116,46 @@ extension EnvironmentValues {
   var a11yMotion: A11yMotion {
     A11yMotion(reduceMotion: accessibilityReduceMotion)
   }
+}
+
+// MARK: - Drop-in `withAnimation` replacement
+
+extension A11yMotion {
+  /// Reduce Motion read straight from the platform rather than the SwiftUI
+  /// environment.
+  ///
+  /// `A11yMotion.run` is the better call when a view already has
+  /// `@Environment(\.a11yMotion)` — the environment participates in SwiftUI's
+  /// invalidation, so a view re-renders when the user flips the setting mid-
+  /// session. This static path exists for the (large) set of imperative call
+  /// sites that live in a plain method with no environment in scope, where the
+  /// alternative was a bare `withAnimation` that honored nothing at all. The
+  /// value is read at call time, so it is always current for the animation it
+  /// is about to run.
+  static var reduceMotionEnabled: Bool {
+    #if canImport(UIKit)
+    return UIAccessibility.isReduceMotionEnabled
+    #elseif os(macOS)
+    return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    #else
+    return false
+    #endif
+  }
+}
+
+/// Drop-in replacement for the global `withAnimation(_:_:)` that honors Reduce
+/// Motion. Under Reduce Motion the state change still applies, instantly.
+///
+/// **Call this, never bare `withAnimation`.** Per DesignSpec §9 every animation
+/// a user can trigger has to be gated, and a bare `withAnimation` silently
+/// isn't. Prefer `.a11yAnimation(_:value:)` for declarative animation and
+/// `A11yMotion.run` where the environment is already in scope; reach for this
+/// when neither is available.
+@discardableResult
+@MainActor
+func a11yAnimate<R>(_ animation: Animation? = .default, _ body: () -> R) -> R {
+  if A11yMotion.reduceMotionEnabled { return body() }
+  return withAnimation(animation, body)
 }
 
 // MARK: - Settle

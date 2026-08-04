@@ -46,9 +46,9 @@ struct ClaudeReconnectCue: View {
     Task {
       if await provider.refreshNow() {
         Haptics.success()
-        withAnimation(.snappy) { justReconnected = true }
+        a11yAnimate(.snappy) { justReconnected = true }
         try? await Task.sleep(for: .seconds(1.6))
-        withAnimation(.snappy) { justReconnected = false }
+        a11yAnimate(.snappy) { justReconnected = false }
       }
     }
   }
@@ -178,7 +178,7 @@ private struct SecuredLockGlyph: View {
       .scaleEffect(shown ? 1 : 0.6)
       .opacity(shown ? 1 : 0)
       .onAppear {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { shown = true }
+        a11yAnimate(.spring(response: 0.35, dampingFraction: 0.6)) { shown = true }
       }
   }
 }

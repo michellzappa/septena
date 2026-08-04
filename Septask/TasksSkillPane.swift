@@ -38,10 +38,10 @@ struct TasksSkillPane: View {
       Section {
         Button {
           SkillCopy.copy(SectionSkill.preamble + "\n\n" + skill.body)
-          withAnimation { copied = true }
+          a11yAnimate { copied = true }
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            withAnimation { copied = false }
+            a11yAnimate { copied = false }
           }
         } label: {
           Label(copied ? "Copied" : "Copy Skill", systemImage: copied ? "checkmark" : "doc.on.doc")

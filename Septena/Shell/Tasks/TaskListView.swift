@@ -324,7 +324,7 @@ struct TaskListView: View {
     Haptics.tick()
     var set = scopeLoggedExpandedIds
     if set.contains(id) { set.remove(id) } else { set.insert(id) }
-    withAnimation(.easeInOut(duration: 0.2)) {
+    a11yAnimate(.easeInOut(duration: 0.2)) {
       scopeLoggedExpandedData = (try? JSONEncoder().encode(set)) ?? Data()
     }
   }
@@ -748,7 +748,7 @@ struct TaskListView: View {
     guard filter != .recentlyDeleted else { return }
     guard !closeActiveEditIfNeeded() else { return }
     guard allowsInlineCreate else {
-      withAnimation(.snappy(duration: 0.25)) {
+      a11yAnimate(.snappy(duration: 0.25)) {
         expandedEditId = nil
         creating = true
       }
@@ -771,7 +771,7 @@ struct TaskListView: View {
     draftEditIds.insert(task.id)
     quickAddDraftAtTop = showsQuickAddAtTop
     quickAddDraftId = task.id
-    withAnimation(.snappy(duration: 0.22)) {
+    a11yAnimate(.snappy(duration: 0.22)) {
       items.append(task)
       beginEdit(task)
     }
@@ -792,7 +792,7 @@ struct TaskListView: View {
       return
     }
     if filter == .today && inboxCollapsed {
-      withAnimation(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
+      a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
     }
     switch filter {
     case .area(let id):    startCreate(areaId: id)
@@ -1213,7 +1213,7 @@ struct TaskListView: View {
     Button {
       if closeActiveEditIfNeeded() { return }
       Haptics.tick()
-      withAnimation(.easeInOut(duration: 0.2)) { onToggle() }
+      a11yAnimate(.easeInOut(duration: 0.2)) { onToggle() }
     } label: {
       VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: Theme.iconTextGap) {
@@ -3230,7 +3230,7 @@ struct TaskListView: View {
     // Uncomplete cancels the pending fade.
     //
     // Order matters: the pool filter is `status != .done || model.settle.isSettling`.
-    // The status flip is an @State mutation wrapped in `withAnimation`, while
+    // The status flip is an @State mutation wrapped in `a11yAnimate`, while
     // `settling` lives on the separate @Observable `SettleStore` and commits in
     // its own (un-animated) transaction. If we flipped first, SwiftUI could
     // paint one frame where status == .done but settling == false — the pool

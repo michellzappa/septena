@@ -137,7 +137,7 @@ struct WelcomeHeader: View {
       .frame(maxWidth: .infinity)
       .contentTransition(.opacity)
       .opacity(isGenerating ? 0.5 : 1)
-      .animation(.easeInOut(duration: 0.2), value: isGenerating)
+      .a11yAnimation(.easeInOut(duration: 0.2), value: isGenerating)
       .contentShape(.rect)
       .onTapGesture { Task { await regenerate() } }
       .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: rerollTick)
@@ -175,7 +175,7 @@ struct WelcomeHeader: View {
     cacheJSON = cache.encoded()
     // Animate the swap so the box grows/shrinks (and content below slides)
     // rather than snapping to the new line count.
-    withAnimation(.smooth(duration: 0.4)) { line = generated }
+    a11yAnimate(.smooth(duration: 0.4)) { line = generated }
   }
 
   /// Tap-to-reroll: force a fresh line for the current phase and cache it.
@@ -192,7 +192,7 @@ struct WelcomeHeader: View {
     var cache = WelcomeCache.load(cacheJSON, stamp: stamp)
     cache.lines[band.rawValue] = WelcomeCache.Entry(text: generated, sig: currentSignature)
     cacheJSON = cache.encoded()
-    withAnimation(.smooth(duration: 0.4)) { line = generated }
+    a11yAnimate(.smooth(duration: 0.4)) { line = generated }
     rerollTick += 1  // fires the haptic
   }
 }

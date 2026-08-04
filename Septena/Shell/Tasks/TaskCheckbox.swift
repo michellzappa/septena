@@ -305,7 +305,7 @@ struct TaskCheckbox: View {
     ringScale = 0.9
     ringOpacity = 0.55
     ringDrift = 0
-    withAnimation(.easeOut(duration: 0.4)) {
+    a11yAnimate(.easeOut(duration: 0.4)) {
       ringScale = reach
       ringOpacity = 0
     }
@@ -339,7 +339,7 @@ struct TaskCheckbox: View {
         try? await Task.sleep(for: .milliseconds(180))
         echoScale = 0.9
         echoOpacity = 0.4
-        withAnimation(.easeOut(duration: 0.4)) {
+        a11yAnimate(.easeOut(duration: 0.4)) {
           echoScale = 1.45
           echoOpacity = 0
         }
@@ -349,13 +349,13 @@ struct TaskCheckbox: View {
       // Fall → thud: a taller fall than feels polite, so the landing reads —
       // deep squash on impact, a tight splash, then spring back round.
       bodyDrop = -11
-      withAnimation(.spring(response: 0.34, dampingFraction: 0.62)) { bodyDrop = 0 }
+      a11yAnimate(.spring(response: 0.34, dampingFraction: 0.62)) { bodyDrop = 0 }
       Task { @MainActor in
         try? await Task.sleep(for: .milliseconds(140))
-        withAnimation(.easeOut(duration: 0.08)) { bodySquash = 0.78 }
+        a11yAnimate(.easeOut(duration: 0.08)) { bodySquash = 0.78 }
         pulse(reach: 1.5)
         try? await Task.sleep(for: .milliseconds(90))
-        withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) { bodySquash = 1 }
+        a11yAnimate(.spring(response: 0.2, dampingFraction: 0.5)) { bodySquash = 1 }
       }
 
     case .tuck:
@@ -365,15 +365,15 @@ struct TaskCheckbox: View {
       ringScale = 0.95
       ringOpacity = 0.5
       ringDrift = 0
-      withAnimation(.easeOut(duration: 0.55)) {
+      a11yAnimate(.easeOut(duration: 0.55)) {
         ringScale = 1.3
         ringOpacity = 0
         ringDrift = 11
       }
       Task { @MainActor in
         try? await Task.sleep(for: .milliseconds(180))
-        withAnimation(.easeOut(duration: 0.14)) { bodyDip = 4 }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.65).delay(0.14)) { bodyDip = 0 }
+        a11yAnimate(.easeOut(duration: 0.14)) { bodyDip = 4 }
+        a11yAnimate(.spring(response: 0.3, dampingFraction: 0.65).delay(0.14)) { bodyDip = 0 }
       }
     }
   }

@@ -175,7 +175,7 @@ struct AmbientHalo: View {
         .opacity(dark ? 0.45 : 0.25)
     }
     .frame(width: diameter, height: diameter)
-    .animation(.easeInOut(duration: 1.5), value: times)
+    .a11yAnimation(.easeInOut(duration: 1.5), value: times)
     .allowsHitTesting(false)
     .accessibilityHidden(true)
   }
@@ -202,7 +202,7 @@ struct AmbientGlow: View {
       startRadius: 0,
       endRadius: 220
     )
-    .animation(.easeInOut(duration: 1.5), value: sky)
+    .a11yAnimation(.easeInOut(duration: 1.5), value: sky)
     .allowsHitTesting(false)
     .accessibilityHidden(true)
   }

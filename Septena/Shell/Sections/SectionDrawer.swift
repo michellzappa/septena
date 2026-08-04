@@ -230,7 +230,7 @@ struct DrawerModeToggle: View {
   var body: some View {
     Button {
       let next: DrawerMode = (mode == .log) ? .patterns : .log
-      withAnimation(.snappy) { mode = next }
+      a11yAnimate(.snappy) { mode = next }
       // Persist ONLY on an explicit user toggle. Programmatic mode changes
       // (the empty-state nudge, day-step-forces-Log) deliberately route around
       // this so they never overwrite the remembered choice.
@@ -451,7 +451,7 @@ struct SectionDrawer<Content: View>: View {
     let today = Calendar.current.startOfDay(for: clock.now)
     let clamped = min(Calendar.current.startOfDay(for: moved), today)
     if let str = SeptenaDate.format(clamped), str != currentDate.wrappedValue {
-      withAnimation(.snappy) { currentDate.wrappedValue = str }
+      a11yAnimate(.snappy) { currentDate.wrappedValue = str }
     }
   }
 
@@ -461,7 +461,7 @@ struct SectionDrawer<Content: View>: View {
   private func backToToday() {
     if let mode, mode.wrappedValue == .patterns { mode.wrappedValue = .log }
     guard let currentDate, currentDate.wrappedValue != clock.today else { return }
-    withAnimation(.snappy) { currentDate.wrappedValue = clock.today }
+    a11yAnimate(.snappy) { currentDate.wrappedValue = clock.today }
   }
 
   #if os(iOS)

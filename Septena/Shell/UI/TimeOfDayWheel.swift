@@ -462,7 +462,7 @@ struct TimeOfDayWheel: View {
           .fill(skyShading(nightArc))
           .padding(20)
           .rotationEffect(.degrees(displayedRotation))
-          .animation(.easeInOut(duration: 0.6), value: displayedRotation)
+          .a11yAnimation(.easeInOut(duration: 0.6), value: displayedRotation)
       }
 
       // All marks, on top of the face: ticks, duration bands, dots, hour

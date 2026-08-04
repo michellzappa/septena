@@ -1013,7 +1013,7 @@ struct WeekDashboardView: View {
   //   2. `refresh(section:)`  — async refetch of just that section's
   //      endpoints. Reconciles with the server once the outbox drains.
   //
-  // Animation lives on the tile components (`.animation(.snappy, value:)`
+  // Animation lives on the tile components (`.a11yAnimation(.snappy, value:)`
   // inside `ModuleTile`), so any @State assignment here tweens for free.
 
   private func repaint(section: AddInfoSection) {

@@ -153,8 +153,8 @@ struct AddMoodPage: View {
     .frame(height: 84)
     .frame(maxWidth: .infinity)
     .padding(.top, 4)
-    .animation(.spring(duration: 0.32, bounce: 0.35), value: emotion)
-    .animation(.snappy(duration: 0.2), value: quadrant)
+    .a11yAnimation(.spring(duration: 0.32, bounce: 0.35), value: emotion)
+    .a11yAnimation(.snappy(duration: 0.2), value: quadrant)
   }
 
   // MARK: - Canvas
@@ -417,7 +417,7 @@ private struct MoodCanvas: View {
               if Task.isCancelled { return }
               guard pressStart != nil, quadrant == nil,
                     pressedQuadrant == q else { return }
-              withAnimation(q.expandSpring) {
+              a11yAnimate(q.expandSpring) {
                 onPickQuadrant(q)
               }
               Haptics.tick()
@@ -461,7 +461,7 @@ private struct MoodCanvas: View {
                   let q = releasedQuadrant,
                   elapsed < Self.holdThreshold {
           // Released before hold fired — fall back to tap-to-zoom.
-          withAnimation(q.expandSpring) {
+          a11yAnimate(q.expandSpring) {
             onPickQuadrant(q)
           }
           Haptics.tick()
@@ -568,7 +568,7 @@ private struct QuadrantBubble: View {
         : 1.0
       bubble
         .scaleEffect(isPressed ? 0.92 : breath)
-        .animation(.spring(duration: 0.18, bounce: 0.0), value: isPressed)
+        .a11yAnimation(.spring(duration: 0.18, bounce: 0.0), value: isPressed)
     }
   }
 
@@ -597,7 +597,7 @@ private struct QuadrantBubble: View {
       // bubble reaches full size — keeps the visual clean for the
       // chip cascade. Fades back in on Back / collapse.
       .opacity(isExpanding ? 0 : 1)
-      .animation(.easeOut(duration: 0.22), value: isExpanding)
+      .a11yAnimation(.easeOut(duration: 0.22), value: isExpanding)
     }
     .frame(width: side, height: side)
     // Bubble is purely visual now; the canvas-level gesture handles
@@ -761,12 +761,12 @@ private struct EmotionChip: View {
     .frame(width: side, height: side)
     .scaleEffect(visible ? bumpScale : 0.5)
     .opacity(visible ? 1 : 0)
-    .animation(.snappy(duration: 0.16), value: isSelected)
-    .animation(.snappy(duration: 0.12), value: isHovered)
+    .a11yAnimation(.snappy(duration: 0.16), value: isSelected)
+    .a11yAnimation(.snappy(duration: 0.12), value: isHovered)
     .onAppear {
       Task { @MainActor in
         try? await Task.sleep(nanoseconds: UInt64(appearDelay * 1_000_000_000))
-        withAnimation(emotion.quadrant.spring) {
+        a11yAnimate(emotion.quadrant.spring) {
           visible = true
         }
       }

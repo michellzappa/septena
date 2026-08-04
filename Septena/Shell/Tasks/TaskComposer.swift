@@ -425,7 +425,7 @@ struct TaskComposerCard: View {
     }
     .onKeyPress(.space) { activateFocused() }
     .onKeyPress(.return) { activateFocused() }
-    .animation(.snappy(duration: 0.22), value: showsNotesField)
+    .a11yAnimation(.snappy(duration: 0.22), value: showsNotesField)
   }
 
   // MARK: - Title / notes
@@ -665,7 +665,7 @@ struct TaskComposerCard: View {
   private func applySuggestedList() {
     guard let s = suggestedList else { return }
     Haptics.tick()
-    withAnimation(.snappy(duration: 0.2)) {
+    a11yAnimate(.snappy(duration: 0.2)) {
       switch s.kind {
       case .project:
         draft.projectId = s.id
@@ -695,7 +695,7 @@ struct TaskComposerCard: View {
 
   private func apply(_ token: DetectedToken) {
     Haptics.tick()
-    withAnimation(.snappy(duration: 0.2)) { applyToken(token) }
+    a11yAnimate(.snappy(duration: 0.2)) { applyToken(token) }
     updateSuggestion()
   }
 

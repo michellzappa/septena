@@ -318,7 +318,7 @@ struct RootTabView: View {
           .transition(.move(edge: .top).combined(with: .opacity))
       }
     }
-    .animation(.snappy, value: iPadChrome.atRoot(for: tabSelection.current.chromeID))
+    .a11yAnimation(.snappy, value: iPadChrome.atRoot(for: tabSelection.current.chromeID))
     .onAppear { visitedTabs.insert(tabSelection.current) }
     .onChange(of: tabSelection.current) { _, tab in visitedTabs.insert(tab) }
   }
@@ -359,7 +359,7 @@ struct RootTabView: View {
           // strip via `.toolbar(removing: .sidebarToggle)` on both columns).
           if tabSelection.current == .tasks {
             Button {
-              withAnimation(.snappy) {
+              a11yAnimate(.snappy) {
                 nav.sidebarVisibility = nav.sidebarVisibility == .detailOnly ? .all : .detailOnly
               }
             } label: {

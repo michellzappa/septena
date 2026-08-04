@@ -157,7 +157,7 @@ struct TabSwitcher: View {
       ForEach(tabs, id: \.tab) { item in
         let selected = tabSelection.current == item.tab
         Button {
-          if !selected { withAnimation(.snappy(duration: 0.28)) { tabSelection.current = item.tab } }
+          if !selected { a11yAnimate(.snappy(duration: 0.28)) { tabSelection.current = item.tab } }
         } label: {
           Text(item.title)
             .font(.body.weight(.semibold))

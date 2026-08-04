@@ -718,7 +718,7 @@ struct AttachmentZone: View {
 
         if items.count > Self.collapsedCount {
           Button {
-            withAnimation(.easeInOut(duration: 0.18)) { expanded.toggle() }
+            a11yAnimate(.easeInOut(duration: 0.18)) { expanded.toggle() }
           } label: {
             Text(expanded ? "Show less" : "Show all (\(items.count))")
               .scaledFont(size: 11, weight: .medium)

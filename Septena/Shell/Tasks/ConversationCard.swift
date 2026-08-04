@@ -121,7 +121,7 @@ struct ConversationCard: View {
           Button { choose(option, replyTo: q.seq, step: q.step) } label: { Text(option) }
             .buttonStyle(.bordered).buttonBorderShape(.capsule).tint(accent)
         }
-        Button { withAnimation { showOther.toggle() } } label: { Text("Other…") }
+        Button { a11yAnimate { showOther.toggle() } } label: { Text("Other…") }
           .buttonStyle(.bordered).buttonBorderShape(.capsule)
       }
 

@@ -50,7 +50,7 @@ struct TaskMoveDrop: ViewModifier {
         .background(
           RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
-            .animation(.easeOut(duration: 0.12), value: isTargeted)
+            .a11yAnimation(.easeOut(duration: 0.12), value: isTargeted)
         )
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: TaskMoveDropDelegate(isTargeted: $isTargeted,

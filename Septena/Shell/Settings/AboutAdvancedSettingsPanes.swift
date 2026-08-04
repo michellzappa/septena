@@ -486,7 +486,7 @@ struct SkillsSettingsPane: View {
           }
       }
     }
-    .animation(.snappy, value: showCopiedToast)
+    .a11yAnimation(.snappy, value: showCopiedToast)
   }
 
   @State private var showCopiedToast = false

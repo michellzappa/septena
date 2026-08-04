@@ -231,7 +231,7 @@ struct AppLockCover: View {
       // Intercept all hits so nothing behind the cover is tappable.
       .contentShape(Rectangle())
       .transition(.opacity)
-      .animation(.easeInOut(duration: 0.18), value: lock.phase)
+      .a11yAnimation(.easeInOut(duration: 0.18), value: lock.phase)
     }
   }
 }

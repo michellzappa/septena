@@ -119,12 +119,12 @@ struct DayDialHero: View {
     guard target != dayOffset else { return }
     let crossesToday = (dayOffset == 0) != (target == 0)
     let holdMs = crossesToday ? 560 : 190
-    withAnimation(.easeOut(duration: 0.14)) { marksVisible = false }
+    a11yAnimate(.easeOut(duration: 0.14)) { marksVisible = false }
     Task { @MainActor in
       try? await Task.sleep(for: .milliseconds(150))
       dayOffset = target                 // reorients (wedge animates) + reloads
       try? await Task.sleep(for: .milliseconds(holdMs))
-      withAnimation(.easeIn(duration: 0.3)) { marksVisible = true }
+      a11yAnimate(.easeIn(duration: 0.3)) { marksVisible = true }
     }
   }
 
@@ -255,7 +255,7 @@ struct DayDialHero: View {
         .onEnded { v in
           let dx = v.translation.width
           let horizontal = abs(dx) > abs(v.translation.height)
-          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { dragX = 0 }
+          a11yAnimate(.spring(response: 0.35, dampingFraction: 0.85)) { dragX = 0 }
           if horizontal && dx > 40 { scrub(-1) }        // swipe right → previous day
           else if horizontal && dx < -40 { scrub(1) }   // swipe left → next day
         }

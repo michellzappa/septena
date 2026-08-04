@@ -136,7 +136,7 @@ struct CoachChatView: View {
           .padding(16)
         }
         .onChange(of: session.messages.last?.text) {
-          withAnimation { proxy.scrollTo(session.messages.last?.id, anchor: .bottom) }
+          a11yAnimate { proxy.scrollTo(session.messages.last?.id, anchor: .bottom) }
         }
       }
 
@@ -482,7 +482,7 @@ private struct CoachPromptInspector: View {
         ToolbarItem(placement: .primaryAction) {
           Button {
             CoachClipboard.copy(text)
-            withAnimation { copied = true }
+            a11yAnimate { copied = true }
           } label: {
             Label(copied ? "Copied" : "Copy",
                   systemImage: copied ? "checkmark" : "doc.on.doc")

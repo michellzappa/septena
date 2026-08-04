@@ -145,7 +145,7 @@ struct SeptaskNextFold: View {
   private var foldHeader: some View {
     Button {
       Haptics.tick()
-      withAnimation(.easeInOut(duration: 0.2)) { collapsed.toggle() }
+      a11yAnimate(.easeInOut(duration: 0.2)) { collapsed.toggle() }
     } label: {
       HStack(spacing: Theme.iconTextGap) {
         Image(systemName: "arrow.right")

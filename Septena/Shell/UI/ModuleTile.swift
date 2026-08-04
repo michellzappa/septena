@@ -158,7 +158,7 @@ private struct ProgressRow: View {
           .textCase(.uppercase)
         Spacer()
         Text("\(format(progress.current))/\(format(progress.target))\(progress.unit)")
-          .font(.caption.monospacedDigit())
+          .font(.septenaMetaSmall)
           .foregroundStyle(.secondary)
           .contentTransition(.numericText())
           .a11yAnimation(Theme.Motion.gauge, value: progress.current)
@@ -195,13 +195,13 @@ private struct ProgressRow: View {
     .onChange(of: targetFrac) { old, new in
       guard seeded else { seeded = true; fillFrac = new; return }
       guard !reduceMotion, animationsEnabled else { fillFrac = new; return }
-      withAnimation(Theme.Motion.gauge) { fillFrac = new }
+      a11yAnimate(Theme.Motion.gauge) { fillFrac = new }
       // Only a grow earns the glint (a log added something); a correction
       // downward just slides back quietly.
       guard new > old else { return }
       hlStart = old; hlEnd = old; hlOpacity = 0.55
-      withAnimation(.easeOut(duration: 0.55)) { hlEnd = new }
-      withAnimation(.easeOut(duration: 0.65)) { hlOpacity = 0 }
+      a11yAnimate(.easeOut(duration: 0.55)) { hlEnd = new }
+      a11yAnimate(.easeOut(duration: 0.65)) { hlOpacity = 0 }
     }
   }
 
@@ -466,7 +466,7 @@ struct Histogram: View {
         // Tween bar heights when the underlying series changes — a
         // quick-add bumps today's bar (the last one), which slides up
         // smoothly instead of jumping. Stacked modifiers because SwiftUI's
-        // `.animation(_:value:)` watches one value each.
+        // `.a11yAnimation(_:value:)` watches one value each.
         #if !WIDGET_EXTENSION
         .a11yAnimation(Theme.Motion.standard, value: values)
         .a11yAnimation(Theme.Motion.standard, value: secondaryValues)

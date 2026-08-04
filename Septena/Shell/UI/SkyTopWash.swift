@@ -234,7 +234,7 @@ struct SkyTopWash: View {
         SkyAtmosphere.render(elevation: elevation)
       }.value
       if let last = lastRenderedBucket, last != bucket {
-        withAnimation(.easeInOut(duration: 1.2)) { stops = computed }
+        a11yAnimate(.easeInOut(duration: 1.2)) { stops = computed }
       } else {
         stops = computed
       }

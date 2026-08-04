@@ -219,7 +219,7 @@ struct TaskAttributeBar: View {
       case .when:       InlineWhenPanel(draft: $draft, accent: accent)
       case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent) {
-        withAnimation(.snappy(duration: 0.22)) { expanded = nil }
+        a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
@@ -242,7 +242,7 @@ struct TaskAttributeBar: View {
     // Move the keyboard cursor onto the pill (also drops the title field's
     // keyboard before a calendar opens — what `onInteractStart` used to do).
     focus = .pill(attr)
-    withAnimation(.snappy(duration: 0.22)) {
+    a11yAnimate(.snappy(duration: 0.22)) {
       if attr.presentsSheet {
         expanded = nil
         showingList = true
@@ -256,7 +256,7 @@ struct TaskAttributeBar: View {
   /// it. `showsNotesField` keys off `focus == .notes`, so this both shows the
   /// field and focuses it in one move.
   private func revealNotes() {
-    withAnimation(.snappy(duration: 0.22)) { focus = .notes }
+    a11yAnimate(.snappy(duration: 0.22)) { focus = .notes }
   }
 
   private func startDiscuss() {
@@ -371,7 +371,7 @@ private struct InlineWhenPanel: View {
 
   private var calendarBinding: Binding<Date> {
     Binding(get: { draft.scheduled ?? today },
-            set: { d in withAnimation(.snappy(duration: 0.2)) { draft.setScheduled(d) } })
+            set: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } })
   }
 
   var body: some View {
@@ -390,7 +390,7 @@ private struct InlineWhenPanel: View {
 
       if isSet {
         Button(role: .destructive) {
-          withAnimation(.snappy(duration: 0.2)) { draft.clearWhen() }
+          a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() }
         } label: {
           Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
         }
@@ -409,7 +409,7 @@ private struct InlineWhenPanel: View {
 
   @ViewBuilder
   private func chip(_ title: String, active: Bool, _ action: @escaping () -> Void) -> some View {
-    Button { withAnimation(.snappy(duration: 0.2)) { action() } } label: {
+    Button { a11yAnimate(.snappy(duration: 0.2)) { action() } } label: {
       Text(title)
         .font(.septenaLabel)
         .foregroundStyle(active ? Theme.inkPrimary : Theme.inkSecondary)
@@ -446,7 +446,7 @@ private struct InlineDatePanel: View {
         .tint(accent)
       if date != nil {
         Button(role: .destructive) {
-          withAnimation(.snappy(duration: 0.2)) { date = nil }
+          a11yAnimate(.snappy(duration: 0.2)) { date = nil }
         } label: {
           Label("Clear", systemImage: "xmark.circle")
             .font(.septenaLabel)

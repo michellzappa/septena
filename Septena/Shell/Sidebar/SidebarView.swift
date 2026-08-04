@@ -967,7 +967,7 @@ struct SidebarRootView: View {
     Haptics.tick()
     var set = collapsedAreas
     if set.contains(areaId) { set.remove(areaId) } else { set.insert(areaId) }
-    withAnimation(.easeInOut(duration: 0.2)) {
+    a11yAnimate(.easeInOut(duration: 0.2)) {
       collapsedAreasData = (try? JSONEncoder().encode(set)) ?? Data()
     }
   }
@@ -1666,7 +1666,7 @@ private struct SidebarTaskDrop: ViewModifier {
           // accent treatment. See CLAUDE.md "One selection/target language".
           RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
-            .animation(.easeOut(duration: 0.12), value: isTargeted)
+            .a11yAnimation(.easeOut(duration: 0.12), value: isTargeted)
         )
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in

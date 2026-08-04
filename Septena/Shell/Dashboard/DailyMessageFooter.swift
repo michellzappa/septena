@@ -72,7 +72,7 @@ struct DailyMessageFooter: View {
   /// Walk to the next line, with a selection tick and a soft blur-swap.
   private func advance() {
     Haptics.pick()
-    withAnimation(.smooth(duration: 0.35)) { bump += 1 }
+    a11yAnimate(.smooth(duration: 0.35)) { bump += 1 }
   }
 
   private func reload() {

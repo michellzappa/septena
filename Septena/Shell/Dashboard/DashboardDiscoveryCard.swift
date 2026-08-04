@@ -84,7 +84,7 @@ struct DashboardDiscoveryCard: View {
         .foregroundStyle(.secondary)
       Spacer()
       Button {
-        withAnimation { dismissed = true }
+        a11yAnimate { dismissed = true }
       } label: {
         Image(systemName: "xmark")
           .font(.caption.weight(.semibold))
@@ -142,7 +142,7 @@ struct DashboardDiscoveryCard: View {
   // MARK: Actions
 
   private func act(on s: Suggestion) {
-    withAnimation { _ = actedOn.insert(s) }
+    a11yAnimate { _ = actedOn.insert(s) }
     switch s {
     case .coach:
       enableSection("goals")

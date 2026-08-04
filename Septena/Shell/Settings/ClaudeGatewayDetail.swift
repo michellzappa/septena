@@ -41,10 +41,10 @@ struct ClaudeGatewayDetail: View {
       Section {
         Button {
           SkillCopy.copy(Self.connectorURL)
-          withAnimation { urlCopied = true }
+          a11yAnimate { urlCopied = true }
           Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            withAnimation { urlCopied = false }
+            a11yAnimate { urlCopied = false }
           }
         } label: {
           HStack(spacing: 12) {

@@ -185,7 +185,7 @@ struct SupplementsDestinationView: View {
   }
 
   private func toggleBucket(_ key: String) {
-    withAnimation(.snappy) {
+    a11yAnimate(.snappy) {
       // First tap seeds from the current auto-open state (only the live time
       // bucket open) so the accordion freezes exactly as shown, then flips the
       // tapped one. "Anytime" is excluded — it never folds.
