@@ -154,7 +154,7 @@ struct TaskListView: View {
     let base = storageFilter == filter
       ? triageStorage
       : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
-    return base.filter { $0.status == .open || settle.isSettling($0.id) }
+    return base.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
   /// Tasks that rolled into Today on their own — scheduled for a date strictly
@@ -193,18 +193,7 @@ struct TaskListView: View {
   /// edge), the way Things/Reminders never reshuffle the list while you type.
   @State private var pendingReloadWhileEditing = false
 
-  /// IDs of tasks completed during this view's lifetime. On Project / Area
-  /// pages we want to hide historical completions but keep just-completed
-  /// rows visible until the user navigates away (matches the reference design).
-  @State private var sessionDoneIds: Set<String> = []
-  /// Tasks created on this device this session — excludes them from the remote-
-  /// arrival reveal (local `startCreate` already animates the append).
-  @State private var sessionCreatedIds: Set<String> = []
 
-  /// Drives the "linger → fade" beat after a check (see `SettleStore`). Keeps
-  /// a just-completed row in place for a moment, then fades it out where it
-  /// sits instead of yanking it the instant you tap.
-  @State private var settle = SettleStore()
   /// One-shot amber flash when a task is pinned to Today (row wash + checkbox pulse).
   @State private var promoteFlash = PromoteFlashStore()
   @State private var toastStore = SeptenaToastStore()
@@ -326,7 +315,7 @@ struct TaskListView: View {
   /// Area pages honour `excludeProjectedTasks` so only area-direct work appears.
   private var loggedScopeItems: [SeptenaTask] {
     guard scopeLoggedFilterId != nil else { return [] }
-    var result = items.filter { $0.status == .done && !settle.isSettling($0.id) }
+    var result = items.filter { $0.status == .done && !model.settle.isSettling($0.id) }
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
   }
@@ -680,9 +669,7 @@ struct TaskListView: View {
         logbookLimit = Self.logbookPageSize
         logbookRevealAll = false
       }
-      sessionDoneIds = []
-      sessionCreatedIds = []
-      settle.cancelAll()
+      model.resetSession()
       clearSelection()
       expandedEditId = nil
       draftEditIds = []
@@ -780,7 +767,7 @@ struct TaskListView: View {
       quickAddGroupTarget = nil
     }
     let task = seed.create(via: mutator, deferPush: true, atBottom: true)
-    sessionCreatedIds.insert(task.id)
+    model.noteCreated(task.id)
     draftEditIds.insert(task.id)
     quickAddDraftAtTop = showsQuickAddAtTop
     quickAddDraftId = task.id
@@ -1768,7 +1755,7 @@ struct TaskListView: View {
   /// classified-list pool so pointer rendering and keyboard traversal cannot
   /// drift when a completed row settles or the Inbox is folded.
   private var todayOpenTaskPool: [SeptenaTask] {
-    items.filter { $0.status == .open || settle.isSettling($0.id) }
+    items.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
   private var todayLooseInboxRows: [SeptenaTask] {
@@ -1810,7 +1797,7 @@ struct TaskListView: View {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       } else {
         classifiedIds = classified
-          .filter { $0.status == .open || settle.isSettling($0.id) }
+          .filter { $0.status == .open || model.settle.isSettling($0.id) }
           .sorted(by: SeptenaTask.compareNextPageOrder)
           .map(\.id)
       }
@@ -1931,7 +1918,7 @@ struct TaskListView: View {
     for id in ids {
       guard let task = currentTask(id: id) else { continue }
       let copy = mutator.duplicate(task)
-      sessionCreatedIds.insert(copy.id)
+      model.noteCreated(copy.id)
       lastCopyId = copy.id
     }
     guard let lastCopyId else { return }
@@ -2071,11 +2058,11 @@ struct TaskListView: View {
     // ordering rationale (the pool filter is `status == .open || isSettling`).
     // The mutator durably enqueues the server-side cancel; if push ultimately
     // fails the next pull will surface server truth.
-    settle.schedule(id) {
-      motion.run(Theme.Motion.settle) { settle.endSettle(id) }
+    model.settle.schedule(id) {
+      motion.run(Theme.Motion.settle) { model.settle.endSettle(id) }
     }
     motion.run(Theme.Motion.settle) { flipStatus(id: id, to: .cancelled) }
-    sessionDoneIds.insert(id)
+    model.noteCompleted(id, done: true)
     mutator.cancel(id: id)
   }
 
@@ -2764,7 +2751,7 @@ struct TaskListView: View {
   @ViewBuilder
   private var ungroupedOpenItems: some View {
     let base = items
-    let pool = base.filter { $0.status == .open || settle.isSettling($0.id) }
+    let pool = base.filter { $0.status == .open || model.settle.isSettling($0.id) }
     let classified = pool
       .filter { $0.project != nil || $0.area != nil }
       .sorted(by: SeptenaTask.compareNextPageOrder)
@@ -2779,7 +2766,7 @@ struct TaskListView: View {
     // Drop finished rows (completed or cancelled) except those still settling
     // (just checked / just cancelled), so a finished task lingers for the beat
     // then fades — instead of sitting struck through until the next reload.
-    let pool = base.filter { $0.status == .open || settle.isSettling($0.id) }
+    let pool = base.filter { $0.status == .open || model.settle.isSettling($0.id) }
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
@@ -2932,7 +2919,7 @@ struct TaskListView: View {
     var result = items
     if excludeProjectedTasks { result = result.filter { $0.project == nil } }
     if hideHistoricalDone {
-      result = result.filter { $0.status == .open || settle.isSettling($0.id) }
+      result = result.filter { $0.status == .open || model.settle.isSettling($0.id) }
     }
     return result
   }
@@ -3142,7 +3129,7 @@ struct TaskListView: View {
       // Drop finished rows (completed or cancelled) except those still
       // settling, so a just-checked / just-cancelled upcoming task lingers for
       // the beat then fades (matches every other open-work list).
-      if task.status != .open && !settle.isSettling(task.id) { continue }
+      if task.status != .open && !model.settle.isSettling(task.id) { continue }
       // Bucket on the date that actually places the task in the *future* —
       // Things shows an overdue task under Today, never under its stale past
       // day. A task enters Upcoming on either `scheduled` OR `deadline` being
@@ -3233,7 +3220,7 @@ struct TaskListView: View {
     if newStatus == .open { Haptics.tap() }
 
     // Completion never relocates a row. We open the settle window BEFORE the
-    // status flip so the row stays put while it lingers — `settle.isSettling(id)`
+    // status flip so the row stays put while it lingers — `model.settle.isSettling(id)`
     // keeps it visible (see `visibleItems` and the grouped pool) and `load()`
     // preserves settling rows, so the `.septenaTasksChanged` this completion
     // posts can't yank it. After the beat the settle clears and the row fades
@@ -3242,7 +3229,7 @@ struct TaskListView: View {
     // `.transition(.opacity)` and rows below slide up.
     // Uncomplete cancels the pending fade.
     //
-    // Order matters: the pool filter is `status != .done || settle.isSettling`.
+    // Order matters: the pool filter is `status != .done || model.settle.isSettling`.
     // The status flip is an @State mutation wrapped in `withAnimation`, while
     // `settling` lives on the separate @Observable `SettleStore` and commits in
     // its own (un-animated) transaction. If we flipped first, SwiftUI could
@@ -3253,11 +3240,11 @@ struct TaskListView: View {
     // always in the pool, and a done-and-settling row is too, so the row never
     // leaves it across the two transactions.
     if newStatus == .done {
-      settle.schedule(task.id) {
-        motion.run(Theme.Motion.settle) { settle.endSettle(task.id) }
+      model.settle.schedule(task.id) {
+        motion.run(Theme.Motion.settle) { model.settle.endSettle(task.id) }
       }
     } else {
-      settle.cancel(task.id)
+      model.settle.cancel(task.id)
     }
 
     motion.run(Theme.Motion.settle) { flipStatus(id: task.id, to: newStatus) }
@@ -3274,8 +3261,7 @@ struct TaskListView: View {
                                 accent: theme.color(for: "tasks"),
                                 logCommit: logCommit)
     }
-    if newStatus == .done { sessionDoneIds.insert(task.id) }
-    else                  { sessionDoneIds.remove(task.id) }
+    model.noteCompleted(task.id, done: newStatus == .done)
 
     if newStatus == .done {
       mutator.complete(id: task.id)
@@ -3343,104 +3329,39 @@ struct TaskListView: View {
 
   // MARK: - Load
 
-  /// Merge `fresh` with any row from `prior` that's mid-settle (just checked,
-  /// lingering for the fade) but which the fresh read dropped — the Today /
-  /// Inbox queries exclude done tasks, and completing one posts
-  /// `.septenaTasksChanged`, which reloads us. Without this a completion would
-  /// yank its own row before it could fade. Each lingering row is reinserted at
-  /// the slot it held in `prior` (anchored after its nearest still-present
-  /// predecessor) rather than appended, so it fades out in place instead of
-  /// jumping to the bottom — the "moves down" jump we're avoiding. `prior` order
-  /// makes earlier insertions valid anchors for adjacent lingering rows. The
-  /// settle timer (or a reload / filter swap, which cancels it) clears these
-  /// out; we never `cancelAll()` here for the same reason.
-  private func preservingSettling(fresh: [SeptenaTask], prior: [SeptenaTask]) -> [SeptenaTask] {
-    RemoteTaskSync.preservingSettling(fresh: fresh, prior: prior, isSettling: settle.isSettling)
+  /// Apply a merge outcome, playing whichever beat it earned. Motion and the
+  /// promote flash stay here — they're presentation; `TaskListModel.merge`
+  /// owns the reconciliation itself.
+  private func applyMerge(_ outcome: TaskListModel.MergeOutcome,
+                          assign: ([SeptenaTask]) -> Void) {
+    switch outcome.motion {
+    case .settle:
+      motion.run(Theme.Motion.settle) { assign(outcome.rows) }
+    case .expand:
+      RemoteTaskSync.flashTodayPromotes(ids: outcome.arrived, in: outcome.rows,
+                                        via: promoteFlash)
+      motion.run(Theme.Motion.expand) { assign(outcome.rows) }
+    case .none:
+      assign(outcome.rows)
+    }
   }
 
-  /// IDs in `fresh` that weren't on screen a moment ago and weren't created
-  /// locally this session — worth the gentle expand-in beat (inverse of settle).
-  private func remoteArrivingIDs(prior: [SeptenaTask], fresh: [SeptenaTask]) -> Set<String> {
-    RemoteTaskSync.arrivingIDs(
-      prior: prior,
-      fresh: fresh,
-      excluding: ownCreateExclusions(),
-      animate: loadedFilters.contains(filter)
-    )
+  /// Open the linger-then-fade window for a row a merge just ghosted, finishing
+  /// inside an animated transaction so the row fades and its siblings slide up
+  /// — the same beat a local tap gets.
+  private func openSettleWindow(_ id: String) {
+    model.settle.schedule(id) {
+      motion.run(Theme.Motion.settle) { model.settle.endSettle(id) }
+    }
   }
 
+  /// Rows the user created here this session — excluded from the remote-arrival
+  /// beat, since the local create already animated its own append.
   private func ownCreateExclusions() -> Set<String> {
-    var ids = sessionCreatedIds
+    var ids = model.sessionCreatedIds
     ids.formUnion(draftEditIds)
     if let quickAddDraftId { ids.insert(quickAddDraftId) }
     return ids
-  }
-
-  /// Assign a merged list with motion only when a passive sync needs it —
-  /// ghost completions prefer settle; remote arrivals prefer expand.
-  private func assignMerged(_ merged: [SeptenaTask],
-                            ghosted: Set<String>,
-                            arrived: Set<String>,
-                            assign: ( [SeptenaTask]) -> Void) {
-    if !ghosted.isEmpty {
-      motion.run(Theme.Motion.settle) { assign(merged) }
-    } else if !arrived.isEmpty {
-      RemoteTaskSync.flashTodayPromotes(ids: arrived, in: merged, via: promoteFlash)
-      motion.run(Theme.Motion.expand) { assign(merged) }
-    } else {
-      assign(merged)
-    }
-  }
-
-  /// Ghost-check remote completions: a row that was open on screen a moment ago
-  /// and has *just been completed by another device* should animate exactly
-  /// like a local tap rather than silently disappear. We route it through the
-  /// very same settle window a tap uses — flip the prior row to `.done` (so the
-  /// box fills and the title strikes through on the next render; `TaskCheckbox`
-  /// replays its visual feel off `isDone`) and open its settle window so it
-  /// lingers, then fades out in place. Silent on purpose: we never call
-  /// `TaskCelebration`, so a passive sync doesn't buzz the haptics (the feel
-  /// itself is haptic-free). Rows the user is mid-settling locally, or already
-  /// completed this session, are left alone.
-  ///
-  /// A just-completed row shows up in the fresh read two different ways, so we
-  /// detect both: the drop-done filters (Today / Inbox / Upcoming) make it
-  /// *vanish*, while project / area views keep every status, so it's *present
-  /// but flipped to done*. The present case is read straight from `fresh` in
-  /// memory; only the vanished ids hit the store (they might instead be
-  /// deferred / deleted / rescheduled), so an ordinary reload stays a no-op.
-  ///
-  /// Returns `prior` with the ghosted rows flipped to done (so
-  /// `preservingSettling` can re-anchor any that vanished) plus the ids it
-  /// ghosted — empty means there's nothing new to animate.
-  private func ghostCheckRemoteCompletions(prior: [SeptenaTask], fresh: [SeptenaTask])
-    -> (rows: [SeptenaTask], ghosted: Set<String>) {
-    let candidates = prior.filter {
-      $0.status == .open && !settle.isSettling($0.id) && !sessionDoneIds.contains($0.id)
-    }
-    guard !candidates.isEmpty else { return (prior, []) }
-    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    var done = Set<String>()
-    var vanished = Set<String>()
-    for c in candidates {
-      if let f = freshByID[c.id] { if f.status == .done { done.insert(c.id) } }
-      else { vanished.insert(c.id) }
-    }
-    if !vanished.isEmpty {
-      done.formUnion(LocalCache.completedIDs(among: vanished, in: modelContext))
-    }
-    guard !done.isEmpty else { return (prior, []) }
-    var rows = prior
-    for id in done {
-      // Same finalize as `toggle()` — `endSettle` inside the animated
-      // transaction so the row fades and siblings slide up.
-      settle.schedule(id) {
-        self.motion.run(Theme.Motion.settle) { self.settle.endSettle(id) }
-      }
-      sessionDoneIds.insert(id)
-      if let i = rows.firstIndex(where: { $0.id == id }) { rows[i].status = .done }
-    }
-    return (rows, done)
   }
 
   /// Reload the list UNLESS an editor owns the keyboard. Background refreshes
@@ -3495,12 +3416,13 @@ struct TaskListView: View {
     // we're still inside applyDidFinishBatch — CKSyncEngine asserts.
     // The mirror is already up to date by the time the notification
     // fires, so a plain re-read is correct.
-    let prior = items
-    let local = localTasks()
-    let ghost = ghostCheckRemoteCompletions(prior: prior, fresh: local)
-    let merged = preservingSettling(fresh: local, prior: ghost.rows)
-    let arrived = remoteArrivingIDs(prior: prior, fresh: local)
-    assignMerged(merged, ghosted: ghost.ghosted, arrived: arrived) { items = $0 }
+    let outcome = model.merge(prior: items,
+                             fresh: localTasks(),
+                             context: modelContext,
+                             animateArrivals: loadedFilters.contains(filter),
+                             ownCreations: ownCreateExclusions(),
+                             openSettleWindow: openSettleWindow)
+    applyMerge(outcome) { items = $0 }
     loadedFilters.insert(filter)
     // Projects + areas live in SwiftData (mirrored by CKSyncEngine), so
     // the local cache is authoritative — no network round-trip needed.
@@ -3516,14 +3438,14 @@ struct TaskListView: View {
       // settling (the `.triage` query drops done tasks), so an accepted
       // suggestion lingers struck-through and fades in place like every other
       // completed row — same preservation `items` gets above.
-      let localTriage = LocalCache.tasks(in: modelContext, filter: .triage)
-      let triageGhost = ghostCheckRemoteCompletions(prior: triageStorage,
-                                                    fresh: localTriage)
-      let mergedTriage = preservingSettling(fresh: localTriage, prior: triageGhost.rows)
-      let triageArrived = remoteArrivingIDs(prior: triageStorage, fresh: localTriage)
-      assignMerged(mergedTriage, ghosted: triageGhost.ghosted, arrived: triageArrived) {
-        triageStorage = $0
-      }
+      let triageOutcome = model.merge(
+        prior: triageStorage,
+        fresh: LocalCache.tasks(in: modelContext, filter: .triage),
+        context: modelContext,
+        animateArrivals: loadedFilters.contains(filter),
+        ownCreations: ownCreateExclusions(),
+        openSettleWindow: openSettleWindow)
+      applyMerge(triageOutcome) { triageStorage = $0 }
     } else {
       triageStorage = []
     }
@@ -3608,7 +3530,7 @@ struct TaskListView: View {
   private func refreshFilingSuggestions() {
     var seen = Set<String>()
     let candidates = (triageItems + items).filter {
-      ($0.status == .open || settle.isSettling($0.id)) && seen.insert($0.id).inserted
+      ($0.status == .open || model.settle.isSettling($0.id)) && seen.insert($0.id).inserted
     }
     model.refreshFilingSuggestions(
       filter: filter,

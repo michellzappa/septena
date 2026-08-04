@@ -10,15 +10,18 @@ import EventKit
 // from ~30 call sites. Each increment moves one concern here and deletes the
 // matching state + refresher from the view.
 //
-// What lives here so far — the two derived snapshots that are pure functions of
-// (filter, store, structure) and have nothing to do with laying out rows:
-//   • the woven calendar agenda,
-//   • the per-row filing suggestions behind the "→ Suggested" capsule,
-//   • per-project completion ratios for the project pie glyph.
+// What lives here so far:
+//   • the derived snapshots that are pure functions of (filter, store,
+//     structure) — the woven calendar agenda, the per-row filing suggestions
+//     behind the "→ Suggested" capsule, per-project completion ratios;
+//   • the settle store and this session's completed / created ids;
+//   • `merge`, which reconciles a fresh store read against what's on screen
+//     (ghost-check, settle preservation, arrival detection).
 //
-// Still in the view, for the next increment: the task snapshot arrays
-// themselves (`items` / `triageStorage`), the settle/ghost/arrival merge
-// passes, and the debounced `load()` that drives them.
+// Still in the view, for the next increment: the snapshot arrays themselves
+// (`items` / `triageStorage`) and the debounced `load()` that drives them.
+// Motion stays in the view on purpose — `merge` returns which beat it earned
+// rather than playing it, so this type has no opinion about animation.
 @MainActor
 @Observable
 final class TaskListModel {
@@ -37,6 +40,124 @@ final class TaskListModel {
   /// Aggregated from raw entities rather than projecting the whole historical
   /// corpus into row DTOs on every refresh.
   private(set) var progressByProject: [String: Double] = [:]
+
+  /// Drives the "linger → fade" beat after a check: a just-completed row holds
+  /// its place for a moment, then fades where it sits instead of being yanked
+  /// the instant you tap. Owned here because the merge below has to know which
+  /// rows are mid-settle to keep them alive across a re-read.
+  let settle = SettleStore()
+
+  /// Rows completed during this view's lifetime, and rows created on this
+  /// device this session. Both exist to tell "the user just did this" apart
+  /// from "another device did this" — the first animates locally and must not
+  /// be ghost-checked again, the second must not get the remote-arrival beat.
+  private(set) var sessionDoneIds: Set<String> = []
+  var sessionCreatedIds: Set<String> = []
+
+  /// Which animation a merge earned. Ghost completions prefer settle; remote
+  /// arrivals prefer expand; an ordinary re-read gets neither. Returned rather
+  /// than applied so the view keeps ownership of motion + the promote flash,
+  /// which are presentation, not data.
+  enum MergeMotion { case none, settle, expand }
+
+  struct MergeOutcome {
+    let rows: [SeptenaTask]
+    let motion: MergeMotion
+    /// Rows that arrived from another device — the view flashes any that landed
+    /// on Today.
+    let arrived: Set<String>
+  }
+
+  // MARK: - Merge
+
+  /// Reconcile a fresh store read against what's on screen.
+  ///
+  /// Three passes, in order, each of which exists because a naive assignment
+  /// looked wrong:
+  ///   1. **Ghost-check** — a row completed on ANOTHER device should animate
+  ///      like a local tap rather than blink out. Detected two ways because a
+  ///      completed row shows up differently per filter: drop-done lists
+  ///      (Today / Inbox / Upcoming) make it vanish, while project / area lists
+  ///      keep every status so it's present-but-flipped. Only the vanished ids
+  ///      hit the store, so an ordinary reload stays a no-op.
+  ///   2. **Settle preservation** — a row mid-fade is reinserted at the slot it
+  ///      held, anchored after its nearest surviving predecessor, so it fades in
+  ///      place instead of jumping to the bottom.
+  ///   3. **Arrival detection** — rows that weren't on screen a moment ago and
+  ///      weren't created here get the gentle expand-in beat.
+  /// `openSettleWindow` is called for each row this pass ghosts, BEFORE the
+  /// preservation pass reads `isSettling` — the view supplies it because
+  /// closing the window is an animated transaction, and animation belongs to
+  /// the view. Without it a remotely-completed row that vanished from the fresh
+  /// read is never preserved, so it blinks out instead of fading in place.
+  func merge(prior: [SeptenaTask],
+             fresh: [SeptenaTask],
+             context: ModelContext,
+             animateArrivals: Bool,
+             ownCreations: Set<String>,
+             openSettleWindow: (String) -> Void) -> MergeOutcome {
+    let ghost = ghostCheckRemoteCompletions(prior: prior, fresh: fresh,
+                                            context: context,
+                                            openSettleWindow: openSettleWindow)
+    let rows = RemoteTaskSync.preservingSettling(fresh: fresh,
+                                                 prior: ghost.rows,
+                                                 isSettling: settle.isSettling)
+    let arrived = RemoteTaskSync.arrivingIDs(prior: prior,
+                                             fresh: fresh,
+                                             excluding: ownCreations,
+                                             animate: animateArrivals)
+    let motion: MergeMotion = !ghost.ghosted.isEmpty ? .settle
+                            : (!arrived.isEmpty ? .expand : .none)
+    return MergeOutcome(rows: rows, motion: motion, arrived: arrived)
+  }
+
+  /// Flip rows the user completed elsewhere to `.done` and open their settle
+  /// window, so a passive sync replays the same beat a tap does. Silent on
+  /// purpose — no `TaskCelebration`, so a remote completion never buzzes.
+  private func ghostCheckRemoteCompletions(prior: [SeptenaTask],
+                                           fresh: [SeptenaTask],
+                                           context: ModelContext,
+                                           openSettleWindow: (String) -> Void)
+    -> (rows: [SeptenaTask], ghosted: Set<String>) {
+    let candidates = prior.filter {
+      $0.status == .open && !settle.isSettling($0.id) && !sessionDoneIds.contains($0.id)
+    }
+    guard !candidates.isEmpty else { return (prior, []) }
+    let freshByID = Dictionary(fresh.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    var done = Set<String>()
+    var vanished = Set<String>()
+    for c in candidates {
+      if let f = freshByID[c.id] { if f.status == .done { done.insert(c.id) } }
+      else { vanished.insert(c.id) }
+    }
+    if !vanished.isEmpty {
+      done.formUnion(LocalCache.completedIDs(among: vanished, in: context))
+    }
+    guard !done.isEmpty else { return (prior, []) }
+    var rows = prior
+    for id in done {
+      openSettleWindow(id)
+      sessionDoneIds.insert(id)
+      if let i = rows.firstIndex(where: { $0.id == id }) { rows[i].status = .done }
+    }
+    return (rows, done)
+  }
+
+  // MARK: - Session bookkeeping
+
+  func noteCompleted(_ id: String, done: Bool) {
+    if done { sessionDoneIds.insert(id) } else { sessionDoneIds.remove(id) }
+  }
+
+  func noteCreated(_ id: String) { sessionCreatedIds.insert(id) }
+
+  /// A filter swap starts a fresh session: nothing on the new list was
+  /// completed or created "just now" from the user's point of view.
+  func resetSession() {
+    sessionDoneIds = []
+    sessionCreatedIds = []
+    settle.cancelAll()
+  }
 
   // MARK: - Calendar agenda
 
