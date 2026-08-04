@@ -342,6 +342,7 @@
 		37472B63F2961B91B8D8F3D3 /* MealPhotoAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4A221B10F3A52E1A274A46 /* MealPhotoAnalyzer.swift */; };
 		376773BB640A26B6867A2DBF /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5CC0F56E6E022C95AB16E4 /* DistanceUnit.swift */; };
 		376DFEC50F389C3D73911189 /* ListKeyboardNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E6E59A15917AE4DA79973F3 /* ListKeyboardNavigation.swift */; };
+		376FE4BAD315D07189A0769B /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779B9966F458332BD097F8AE /* SelectionLanguage.swift */; };
 		378961FCD47459D09152C2DB /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */; };
 		3797CC96603DC088851E9CA3 /* TaskCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08DA8E8E77422BB9583A61C /* TaskCommands.swift */; };
 		37D36A4792F578FB21B2EE40 /* ThingsImportTestFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0546FA3A26D7FAFC642688C5 /* ThingsImportTestFixtures.swift */; };
@@ -456,6 +457,7 @@
 		488AE136298A5323F4D7943E /* StatGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99DE56A667951A168ED593F0 /* StatGrid.swift */; };
 		48B94D7C0B89E8D398A8226A /* NextComplicationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16A2330C66B761049C702ED /* NextComplicationViews.swift */; };
 		49179FE2F47C3E6E124DB9F7 /* FastingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AA5BDDAF414C995743611BD /* FastingTests.swift */; };
+		491811614B081A9658F06B6D /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779B9966F458332BD097F8AE /* SelectionLanguage.swift */; };
 		493812C849DE7512D132FC84 /* NutritionTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02521EAE0A29ED3F985ADE07 /* NutritionTargets.swift */; };
 		495AAB0A42EE740E0934012A /* EditGutEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCB8601AE73D7F70536C902 /* EditGutEntrySheet.swift */; };
 		496B1C593F677187AF4B5543 /* MCPProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97752A8BAEC96E4F0C0B406 /* MCPProtocol.swift */; };
@@ -673,6 +675,7 @@
 		6D402BCBCEA37E92687CCB04 /* OpenNewTaskRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = E85658815D797A7AD141AF84 /* OpenNewTaskRouting.swift */; };
 		6D4169508BD478BC65A67B95 /* CoachVoiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15B7C1644977DC5B2BBB9339 /* CoachVoiceRecord.swift */; };
 		6D6A87E8DB07808C9C99E51B /* TasksWidgetWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC669F29CAAD92C342D2F4E1 /* TasksWidgetWire.swift */; };
+		6D6C7821FD7B63D4F491E234 /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779B9966F458332BD097F8AE /* SelectionLanguage.swift */; };
 		6DB169E3C4B6BC5BA8855D66 /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		6DEF721835395CBA52F670D4 /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
 		6E0EBEF6EEBE1D73251FF57C /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA820579EFB323F3CA111DD /* KeychainStore.swift */; };
@@ -1213,6 +1216,7 @@
 		C8EBB237FE5D3159919824BF /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105A64B4FE28BF5907996A17 /* HomeChrome.swift */; };
 		C8F7E91227008E29DA40DB5C /* SectionRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B8CA0380F3FD3679CE4C676 /* SectionRecord.swift */; };
 		C979D4254BA3426C243BB319 /* CommunitySignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474D7FFD0D64FFFD949E53AD /* CommunitySignIn.swift */; };
+		C97BF78FC4AE63A229828AB1 /* SelectionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779B9966F458332BD097F8AE /* SelectionLanguage.swift */; };
 		C9933E4E455B5E1CE5012B28 /* HeatmapLevels.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5BA0A891EA19221B63484D /* HeatmapLevels.swift */; };
 		C99FE1546CD03185ACDA54C0 /* SiblingNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */; };
 		C9A195F8FF0C63824E0A5BD8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */; };
@@ -1971,6 +1975,7 @@
 		7665B2DC0D88761C66A7600D /* MCPToolCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPToolCatalog.swift; sourceTree = "<group>"; };
 		76AE5AD5849D62B848A1EA73 /* TasksTodayComplicationBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksTodayComplicationBundle.swift; sourceTree = "<group>"; };
 		7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPatternsSection.swift; sourceTree = "<group>"; };
+		779B9966F458332BD097F8AE /* SelectionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionLanguage.swift; sourceTree = "<group>"; };
 		77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueFlowView.swift; sourceTree = "<group>"; };
 		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -3179,6 +3184,7 @@
 				79C5F444FF752423C964920B /* ProfileAvatar.swift */,
 				C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */,
 				D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */,
+				779B9966F458332BD097F8AE /* SelectionLanguage.swift */,
 				28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */,
 				034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */,
 				83240595543A18730CCF71A0 /* SkillCopy.swift */,
@@ -4194,6 +4200,7 @@
 				856C9A2EE2BA9E1E27376383 /* SectionRecord.swift in Sources */,
 				AAF1E7697F6F777A18388EC4 /* SectionTheme.swift in Sources */,
 				C8192AA203F61FC30E5C97C1 /* SelectableScrollList.swift in Sources */,
+				491811614B081A9658F06B6D /* SelectionLanguage.swift in Sources */,
 				9B57E911758285B10B14B99C /* SeptaskApp.swift in Sources */,
 				0CFB810E7BAD2E4A01815BBD /* SeptaskNavigationCommands.swift in Sources */,
 				E0A3041E3816376DF8F1155F /* SeptaskNextFold.swift in Sources */,
@@ -4481,6 +4488,7 @@
 				099DA660CBA59A4EC006C514 /* SectionRecord.swift in Sources */,
 				E2F4E6A072B09F2777E366BB /* SectionTheme.swift in Sources */,
 				CBEF91560D00A4D0F561E1C7 /* SelectableScrollList.swift in Sources */,
+				6D6C7821FD7B63D4F491E234 /* SelectionLanguage.swift in Sources */,
 				A7DC150F03AAF93F61060775 /* SeptaskApp.swift in Sources */,
 				EFFEF76A8572BBF7BFBD36B4 /* SeptaskNavigationCommands.swift in Sources */,
 				112C1B070FFBF656C8D6126D /* SeptaskNextFold.swift in Sources */,
@@ -4916,6 +4924,7 @@
 				2233D19F321BC3DFA2A8177B /* SectionsSettingsPane.swift in Sources */,
 				7B76F0E4AB2868F54240F937 /* SelectablePillsView.swift in Sources */,
 				BC23D66280BE0D0D0A1393A7 /* SelectableScrollList.swift in Sources */,
+				C97BF78FC4AE63A229828AB1 /* SelectionLanguage.swift in Sources */,
 				3CBCA87BAF3A8DC687932B3B /* SeptenaPage.swift in Sources */,
 				20137D07663FDBF9563E84A0 /* SeptenaPlus.swift in Sources */,
 				65C4B4FFE5F751A4790F3D9E /* SeptenaSceneDelegate.swift in Sources */,
@@ -5448,6 +5457,7 @@
 				875C220D9A4002A1B0A65F83 /* SectionsSettingsPane.swift in Sources */,
 				DB0F231B1B679E0D2EC442F1 /* SelectablePillsView.swift in Sources */,
 				17D6C8BA0763862CEF2095C3 /* SelectableScrollList.swift in Sources */,
+				376FE4BAD315D07189A0769B /* SelectionLanguage.swift in Sources */,
 				D5107E3C346DA99A8FDF6F2E /* SeptenaPage.swift in Sources */,
 				31A1155F7A11663B094E1304 /* SeptenaPlus.swift in Sources */,
 				AF54170275CCBA1FC2D00774 /* SeptenaSceneDelegate.swift in Sources */,

@@ -117,8 +117,11 @@ private struct EmotionPill: View {
           .fill(emotion.quadrant.color.opacity(isSelected ? 0.95 : 0.55))
       )
       .overlay(
+        // The fill is a fixed, always-saturated quadrant hue (MoodCatalog), not
+        // the adaptive accent, and the label is black — so a white ring reads on
+        // all four in both appearances. The mood grid's own visual language.
         RoundedRectangle(cornerRadius: 10)
-          .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 2)
+          .strokeBorder(isSelected ? Color.white : Color.clear, lineWidth: 2)  // septena-lint:allow selection-white-on-fill
       )
   }
 }

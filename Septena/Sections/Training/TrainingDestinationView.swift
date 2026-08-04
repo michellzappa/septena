@@ -404,7 +404,7 @@ struct TrainingDestinationView: View {
             Text("Zone 2 cardio").font(.subheadline.weight(.semibold))
             Spacer()
             Text("\(weekly)/\(target)m")
-              .font(.caption.monospacedDigit())
+              .font(.septenaMetaSmall)
               .foregroundStyle(.secondary)
           }
           Chart {
@@ -550,14 +550,14 @@ struct TrainingDestinationView: View {
             Text("Strength volume").font(.subheadline.weight(.semibold))
             Spacer()
             Text("\(thisWeekValue)/\(Int(target)) hard sets")
-              .font(.caption.monospacedDigit())
+              .font(.septenaMetaSmall)
               .foregroundStyle(.secondary)
           }
           HStack(alignment: .firstTextBaseline) {
             Text(bandText).font(.caption2).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text(deltaText)
-              .font(.caption2.monospacedDigit())
+              .font(.septenaMetaMicro)
               .foregroundStyle(.secondary)
               .layoutPriority(1)
           }
@@ -718,7 +718,7 @@ struct TrainingDestinationView: View {
       }
       .frame(height: 8)
       Text("\(sets)")
-        .font(.caption.monospacedDigit())
+        .font(.septenaMetaSmall)
         .foregroundStyle(sets == 0 ? Theme.inkSecondary : Theme.inkPrimary)
         .frame(width: 24, alignment: .trailing)
     }
@@ -801,7 +801,7 @@ struct TrainingDestinationView: View {
         Text("Intensity").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
         Spacer()
         Text("avg \(avg.decimalString())/4")
-          .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+          .font(.septenaMetaMicro).foregroundStyle(.secondary)
       }
       Chart {
         ForEach(series) { w in
@@ -991,24 +991,16 @@ struct TrainingDestinationView: View {
         HStack(spacing: 6) {
           ForEach(items) { item in
             let isSelected = item.name == selectedExercise
-            Button {
+            SelectableChip(isSelected: isSelected, tint: accent) {
               selectedExercise = item.name
             } label: {
-              HStack(spacing: 4) {
-                Text(item.label).font(.caption.weight(.medium))
+              HStack(spacing: Theme.Spacing.xs) {
+                Text(item.label)
                 Text("\(item.count)")
-                  .font(.caption2.monospacedDigit())
-                  .foregroundStyle(accent.opacity(isSelected ? 1.0 : 0.55))
+                  .font(.septenaMeta)
+                  .opacity(isSelected ? 1.0 : 0.65)
               }
-              .padding(.horizontal, 10)
-              .padding(.vertical, 5)
-              .background(
-                accent.opacity(isSelected ? 0.28 : 0.10),
-                in: Capsule()
-              )
-              .foregroundStyle(accent)
             }
-            .buttonStyle(.plain)
           }
         }
       }
@@ -2207,7 +2199,7 @@ struct TrainingSessionView: View {
             .foregroundStyle(.secondary)
           Spacer()
           Text("\(done)/\(total)")
-            .font(.caption.monospacedDigit())
+            .font(.septenaMetaSmall)
             .foregroundStyle(.secondary)
         }
         ProgressView(value: Double(done), total: Double(total))
@@ -3287,7 +3279,14 @@ struct TrainingExerciseEditorBody: View {
       HStack(spacing: 8) {
       ForEach(TrainingEffort.levels) { rung in
         let isSelected = TrainingEffort.canonicalKey(entry.difficulty) == rung.key
-        Button {
+        // Grid-packed segments, so `.roundedRect` rather than a capsule — but
+        // the same canonical chip fill/ink. This used to fill solid accent with
+        // WHITE text, which is invisible in dark mode wherever no section hue
+        // is in scope (the app accent is adaptive ink). See SelectionLanguage.
+        SelectableChip(isSelected: isSelected,
+                       tint: accent,
+                       shape: .roundedRect,
+                       fillsWidth: true) {
           store.update { $0.entries[index].difficulty = rung.key }
         } label: {
           VStack(spacing: 2) {
@@ -3295,23 +3294,12 @@ struct TrainingExerciseEditorBody: View {
               .font(.septenaHeroMetric())
             if scale != .rir {
               Text(rung.short.uppercased())
-                .font(.caption2.weight(.semibold))
+                .font(.septenaBadge)
                 .tracking(0.5)
             }
           }
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 10)
-          // Same treatment as the +/- steppers: accent-tinted fill, no stroke;
-          // the selected rung fills solid accent with white text.
-          .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-              .fill(isSelected ? accent : accent.opacity(0.14))
-          )
-          .foregroundStyle(isSelected ? Color.white : accent)
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(rung.label)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
       }
       }
     }

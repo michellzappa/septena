@@ -47,7 +47,7 @@ struct TaskReorderDrop: ViewModifier {
         .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
         .overlay(alignment: .top) { if hoverBefore == true { insertionLine } }
         .overlay(alignment: .bottom) { if hoverBefore == false { insertionLine } }
-        .animation(.easeOut(duration: 0.14), value: hoverBefore)
+        .a11yAnimation(.easeOut(duration: 0.14), value: hoverBefore)
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: TaskReorderDropDelegate(hoverBefore: $hoverBefore,
                                                   rowHeight: { rowHeight },
@@ -717,27 +717,35 @@ struct WeekStrip: View {
           Haptics.pick()
           onPick(Self.cal.startOfDay(for: d))
         } label: {
+          // Selection reuses the canonical chip fill/ink (SelectionLanguage).
+          // This used to paint a SOLID `theme.accent` with white text — and
+          // `theme.accent` is the app's adaptive ink, which is WHITE in dark
+          // mode, so the selected day rendered white-on-white and vanished.
+          // A wash plus matching ink is contrast-safe in both appearances; the
+          // selected day is then separated from "today" by a full-weight
+          // stroke rather than by fill strength alone.
           VStack(spacing: 2) {
             Text(Self.weekdayFmt.string(from: d))
               .scaledFont(size: 11, weight: .medium)
-              .foregroundStyle(isSelected ? Color.white : Theme.inkSecondary)
+              .foregroundStyle(isSelected ? theme.accent : Theme.inkSecondary)
             Text("\(Self.cal.component(.day, from: d))")
               .scaledFont(size: 17, weight: .semibold, design: .rounded)
-              .foregroundStyle(isSelected ? Color.white
-                               : (isToday ? theme.accent : Theme.inkPrimary))
+              .foregroundStyle(isSelected || isToday ? theme.accent : Theme.inkPrimary)
           }
           .frame(maxWidth: .infinity)
           .padding(.vertical, 8)
           .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .fill(isSelected ? theme.accent
+              .fill(isSelected
+                    ? SelectableChipStyle.fill(tint: theme.accent, isSelected: true)
                     : (isToday ? theme.accent.opacity(0.12)
                        : (isWeekend ? Theme.inkSecondary.opacity(0.09) : Color.clear)))
           )
           .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-              .strokeBorder(isSelected ? Color.clear : Theme.inkSecondary.opacity(0.18),
-                            lineWidth: 0.5)
+              .strokeBorder(isSelected ? theme.accent
+                            : Theme.inkSecondary.opacity(0.18),
+                            lineWidth: isSelected ? 1.5 : 0.5)
           )
           .contentShape(Rectangle())
         }

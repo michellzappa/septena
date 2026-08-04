@@ -262,15 +262,10 @@ struct SelectableListRowBackground: View {
 struct SidebarMacRowBackground: View {
   let isSelected: Bool
 
+  /// Delegates to the shared inset primitive so the source list and the ⌘K
+  /// palette can't drift apart — see `SelectionLanguage.swift`.
   var body: some View {
-    if isSelected {
-      RoundedRectangle(cornerRadius: 6, style: .continuous)
-        .fill(Theme.listSelectionFill)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 1)
-    } else {
-      Color.clear
-    }
+    InsetSelectionBackground(isSelected: isSelected)
   }
 }
 #endif

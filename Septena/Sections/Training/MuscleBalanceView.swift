@@ -86,15 +86,9 @@ struct MuscleBalanceView: View {
     ScrollView(.horizontal, showsIndicators: false) {
       HStack(spacing: 8) {
         ForEach(Group.allCases) { g in
-          let selected = group == g
-          Button { group = g } label: {
-            Text(g.rawValue)
-              .font(.subheadline)
-              .padding(.horizontal, 12).padding(.vertical, 6)
-              .background(selected ? accent : Color.secondary.opacity(0.15), in: Capsule())
-              .foregroundStyle(selected ? Color.white : Color.primary)
+          SelectableChip(g.rawValue, isSelected: group == g, tint: accent) {
+            group = g
           }
-          .buttonStyle(.plain)
         }
       }
       .padding(.vertical, 2)
@@ -130,7 +124,7 @@ private struct MuscleBalanceRow: View {
       HStack(spacing: 8) {
         zoneBar
         Text("\(perWeek)/\(target)")
-          .font(.caption.monospacedDigit())
+          .font(.septenaMetaSmall)
           .foregroundStyle(.secondary)
           .frame(width: 40, alignment: .trailing)
       }

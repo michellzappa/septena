@@ -436,21 +436,12 @@ struct EditGoalSheet: View {
               ForEach(availableSections, id: \.key) { sec in
                 let selected = selectedSections.contains(sec.key)
                 let color = theme.accentByKey[sec.key] ?? Color.secondary
-                Button {
+                SelectableChip(isSelected: selected, tint: color, fillsWidth: true) {
                   if selected { selectedSections.remove(sec.key) }
                   else { selectedSections.insert(sec.key) }
                 } label: {
-                  Text(sec.label)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .frame(maxWidth: .infinity)
-                    .background(selected ? color : color.opacity(0.12))
-                    .foregroundStyle(selected ? .white : color)
-                    .clipShape(Capsule())
+                  Text(sec.label).lineLimit(1)
                 }
-                .buttonStyle(.plain)
               }
             }
             .padding(.vertical, 4)

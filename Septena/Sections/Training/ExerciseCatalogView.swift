@@ -7,6 +7,12 @@ struct ExerciseCatalogView: View {
   private var allExercises: [ExerciseDefinitionEntity]
 
   @Environment(\.modelContext) private var context
+  @Environment(SectionTheme.self) private var theme
+  /// This catalog is pushed from the Training *settings* pane, which is outside
+  /// `SectionDrawer`'s `.tint(accent)` scope — so `Color.accentColor` here is
+  /// the monochrome app ink, not the Training hue. Read the section color
+  /// explicitly (DesignSpec §4) instead of inheriting the wrong one.
+  private var accent: Color { theme.color(for: "training") }
   @State private var searchText = ""
   @State private var muscleFilter: MuscleFilter = .all
   @State private var showArchived = false
@@ -140,16 +146,7 @@ struct ExerciseCatalogView: View {
   }
 
   private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Text(label)
-        .font(.subheadline)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
-        .foregroundStyle(isSelected ? Color.white : Color.primary)
-        .clipShape(Capsule())
-    }
-    .buttonStyle(.plain)
+    SelectableChip(label, isSelected: isSelected, tint: accent, action: action)
   }
 
   @ViewBuilder
@@ -175,11 +172,11 @@ struct ExerciseCatalogView: View {
 
   private func typeBadge(_ type: String) -> some View {
     Text(type)
-      .font(.caption2)
+      .font(.septenaBadge)
       .padding(.horizontal, 5)
       .padding(.vertical, 2)
-      .background(Color.accentColor.opacity(0.12))
-      .foregroundStyle(Color.accentColor)
+      .background(accent.opacity(0.12))
+      .foregroundStyle(accent)
       .clipShape(RoundedRectangle(cornerRadius: 4))
   }
 

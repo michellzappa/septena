@@ -316,11 +316,16 @@ private struct QuickFindRow: View {
       }
       Spacer(minLength: 8)
     }
-    .padding(.horizontal, 14)
+    .padding(.horizontal, Theme.Spacing.lg)
     .padding(.vertical, 11)
-    .background(selected ? Color.accentColor.opacity(0.18) : Color.clear)
-    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    .padding(.horizontal, 6)
+    // Palette-row selection: the canonical neutral `listSelectionFill`, drawn
+    // as the sanctioned inset shape (`InsetSelectionBackground`). This used to
+    // paint `Color.accentColor.opacity(0.18)` clipped and THEN re-padded, which
+    // both invented a second (hue-tinted) selection language and made the
+    // highlight read as a chip floating on top of the row.
+    .background(InsetSelectionBackground(isSelected: selected,
+                                         horizontalInset: Theme.Spacing.xs + 2,
+                                         verticalInset: 0))
   }
 
   @ViewBuilder

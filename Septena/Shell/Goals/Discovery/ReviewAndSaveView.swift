@@ -77,24 +77,15 @@ struct ReviewAndSaveView: View {
       ForEach(availableSections, id: \.key) { section in
         let selected = draft.wrappedValue.sections.contains(section.key)
         let color = theme.accentByKey[section.key] ?? Color.secondary
-        Button {
+        SelectableChip(isSelected: selected, tint: color, fillsWidth: true) {
           if selected {
             draft.wrappedValue.sections.removeAll { $0 == section.key }
           } else {
             draft.wrappedValue.sections.append(section.key)
           }
         } label: {
-          Text(section.label)
-            .font(.caption.weight(.medium))
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity)
-            .background(selected ? color : color.opacity(0.12))
-            .foregroundStyle(selected ? .white : color)
-            .clipShape(Capsule())
+          Text(section.label).lineLimit(1)
         }
-        .buttonStyle(.plain)
       }
     }
     .padding(.vertical, 4)
