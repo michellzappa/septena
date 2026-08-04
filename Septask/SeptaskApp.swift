@@ -14,6 +14,12 @@ struct SeptaskApp: App {
   @State private var iPadChrome = IPadChromeModel()
   @State private var logCommit = LogCommitCenter()
   @State private var settingsStore = SettingsStore()
+  /// The Settings window is its own scene and `navigation` is deliberately
+  /// per-window (see the note above), so this scene owns a detached route
+  /// state rather than borrowing a main window's. Previously the scene
+  /// injected no NavigationState at all — anything in Settings that read one
+  /// would have crashed on open.
+  @State private var settingsNavigation = NavigationState()
   private let localStore = LocalStore.shared
   private let services = SeptenaServices.shared
 
@@ -45,15 +51,12 @@ struct SeptaskApp: App {
     #if os(macOS)
     Window("Settings", id: "septask-settings") {
       SeptaskSettingsView()
-        .environment(theme)
-        .environment(settingsStore)
-        .environment(services.taskMutator)
-        .environment(services.areasMutator)
-        .environment(services.projectsMutator)
-        .environment(services.checklistMutator)
-        .environment(services.ckEngine)
-        .environment(dayClock)
-        .environment(logCommit)
+        // Its own scene, so it replicates the main window's chain — via the
+        // same shared injector, which also gives this scene the NavigationState
+        // it was previously missing.
+        .septenaSharedEnvironment(navigation: settingsNavigation, theme: theme,
+                                  settings: settingsStore, dayClock: dayClock,
+                                  logCommit: logCommit, services: services)
         .modelContainer(localStore.container)
         .septenaTextSize()
     }
@@ -98,16 +101,13 @@ private struct SeptaskMainWindow: View {
         }
         navigation.pendingShortcut = nil
       }
-      .environment(navigation)
-      .environment(theme)
-      .environment(settingsStore)
-      .environment(services.taskMutator)
-      .environment(services.areasMutator)
-      .environment(services.projectsMutator)
-      .environment(services.checklistMutator)
-      .environment(services.ckEngine)
-      .environment(dayClock)
-      .environment(logCommit)
+      // Shared with Septena — see `septenaSharedEnvironment`. Adding a
+      // dependency there breaks BOTH roots until each supplies it, which is
+      // what stops one app launching into a missing-environment crash.
+      .septenaSharedEnvironment(navigation: navigation, theme: theme,
+                                settings: settingsStore, dayClock: dayClock,
+                                logCommit: logCommit, services: services)
+      // Septask-only chrome.
       .environment(iPadChrome)
       .modelContainer(localStore.container)
       .septenaTextSize()

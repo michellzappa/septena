@@ -104,18 +104,13 @@ struct SeptenaApp: App {
           SeptenaPlusPaywall()
             .onAppear { supportMomentShown = true }
         }
-        .environment(navigation)
-        .environment(theme)
+        // Shared with Septask — see `septenaSharedEnvironment`.
+        .septenaSharedEnvironment(navigation: navigation, theme: theme,
+                                  settings: settingsStore, dayClock: dayClock,
+                                  logCommit: logCommit, services: services)
+        // Septena-only sections / chrome.
         .environment(trainingDraft)
-        .environment(settingsStore)
         .environment(supportStore)
-        .environment(taskMutator)
-        .environment(checklistMutator)
-        .environment(areasMutator)
-        .environment(projectsMutator)
-        .environment(dayClock)
-        .environment(ckEngine)
-        .environment(logCommit)
         .environment(appLock)
         .modelContainer(localStore.container)
         // App-wide text-size preference (Settings ▸ General ▸ Text Size).
@@ -569,21 +564,15 @@ struct SeptenaApp: App {
     // drops the zoom button — there's nothing to maximize into.
     Window("Settings", id: "settings") {
       SettingsView(initialDestination: navigation.settingsDestination)
-        // A separate scene gets its own environment — replicate the main
-        // WindowGroup's chain above so SettingsView resolves SettingsStore /
-        // CKEngine / NavigationState / SectionTheme. Keep the two in sync.
-        .environment(navigation)
-        .environment(theme)
+        // A separate scene gets its own environment, so it replicates the
+        // main WindowGroup's chain. The shared half comes from the same
+        // `septenaSharedEnvironment` the other root uses, so these can no
+        // longer drift apart by hand.
+        .septenaSharedEnvironment(navigation: navigation, theme: theme,
+                                  settings: settingsStore, dayClock: dayClock,
+                                  logCommit: logCommit, services: services)
         .environment(trainingDraft)
-        .environment(settingsStore)
         .environment(supportStore)
-        .environment(taskMutator)
-        .environment(checklistMutator)
-        .environment(areasMutator)
-        .environment(projectsMutator)
-        .environment(dayClock)
-        .environment(ckEngine)
-        .environment(logCommit)
         .modelContainer(localStore.container)
     }
     // Hidden title bar so the sidebar background runs to the top of the window

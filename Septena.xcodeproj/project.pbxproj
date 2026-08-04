@@ -171,6 +171,7 @@
 		1CBF0222F73BAE3CDDB0E342 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		1CDD156193D88DE404018441 /* WithingsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF60A4EBE9BB351D23C913BE /* WithingsProvider.swift */; };
 		1CFEC78AD7FC12536E52B09A /* TasksTodayComplicationData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C06A1D1AB36E3778302425C /* TasksTodayComplicationData.swift */; };
+		1D164B2AFADF270517C3D130 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */; };
 		1D5CE77E22DD8C6C28C2882D /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE15CAC5702E646C1C1B927 /* RootTabView.swift */; };
 		1D83FF8B75518376B066822F /* ThingsImportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C12D8EF3D8DC512726EC06D /* ThingsImportModels.swift */; };
 		1D8C6EEB0864DC1954680F28 /* AIModelTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CE066849A08E248408104E3 /* AIModelTag.swift */; };
@@ -425,6 +426,7 @@
 		44E547C5374EF7A17384B9AE /* MedicationsQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5639B02F15F4D98C32B13209 /* MedicationsQuickAddMenu.swift */; };
 		44F7269365DACF8BE736B2F1 /* ConversationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */; };
 		44F7589C52084E4A07897D03 /* TimeOfDayWheel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729A9E0B1243570301EBC253 /* TimeOfDayWheel.swift */; };
+		44F77BC2C92A9E83D2309076 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */; };
 		450496F40630174648D27F2F /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		450F6EE8AD17A6935567940D /* DayClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFD8EA98B891BB43A0CE4640 /* DayClock.swift */; };
 		4518FF8DABC6B97B89A727A7 /* SkillCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83240595543A18730CCF71A0 /* SkillCopy.swift */; };
@@ -824,6 +826,7 @@
 		8803B9983635564C828FCAB1 /* ComplicationRingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A91C61650531D1237F0D554 /* ComplicationRingsView.swift */; };
 		880498388AA26E39F9DF4FEA /* MoodCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A6C7577D812B175563945B /* MoodCatalog.swift */; };
 		881C31FAE6D190498F378B6C /* RhythmWidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75738AAA1F8AD9EA26EF0D3B /* RhythmWidgetSnapshot.swift */; };
+		881CA6858984427B6D10F256 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */; };
 		8877DE54B1CFE5A7B64F2C2E /* GoalMetricProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21A8FE1B8B5D5A1B17969276 /* GoalMetricProgressView.swift */; };
 		887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 808A135DB47F304105813AE4 /* AppLock.swift */; };
 		88DCC6E7BDFD768BD320F29B /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA820579EFB323F3CA111DD /* KeychainStore.swift */; };
@@ -942,6 +945,7 @@
 		9D40D51C499D9BF7A92B46F4 /* VolumeUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B4DF2D4A21D88AD4B3A964 /* VolumeUnit.swift */; };
 		9D505D4EA27FF19FA81876E8 /* PaletteSwatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C6701A404542695D1C52EC /* PaletteSwatch.swift */; };
 		9D5CC35F18F047AA944B1744 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
+		9DA8E54FBC31DAC851699BB8 /* SharedAppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */; };
 		9DDAA9E81CDEEA0F79F1F4C0 /* CoachChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AAC894569974BDF43B3B15 /* CoachChatView.swift */; };
 		9E084131A189B3588E9DFB09 /* NutritionRelogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDB94315ACFC4369C86E9F50 /* NutritionRelogging.swift */; };
 		9E1B443A31142AE89CAED97A /* ThingsSQLiteReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75BBE36F4FDB38D97CC5132 /* ThingsSQLiteReader.swift */; };
@@ -1704,6 +1708,7 @@
 		019FD83A1963232155425024 /* PhotosBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosBridge.swift; sourceTree = "<group>"; };
 		02521EAE0A29ED3F985ADE07 /* NutritionTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionTargets.swift; sourceTree = "<group>"; };
 		02752E0B20CE1402BCC108A4 /* HabitIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitIntents.swift; sourceTree = "<group>"; };
+		034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedAppEnvironment.swift; sourceTree = "<group>"; };
 		035453AA7844A66C20E64324 /* RingStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingStyles.swift; sourceTree = "<group>"; };
 		03669C5350B224AF8B8C7845 /* CoachBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachBackend.swift; sourceTree = "<group>"; };
 		0406A27ED1059173E5A4EBBD /* RhythmWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmWidget.swift; sourceTree = "<group>"; };
@@ -3169,6 +3174,7 @@
 				C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */,
 				D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */,
 				28C18653CD7DFAA0358DB633 /* SeptenaPage.swift */,
+				034BFDA37B41C86ABE556BA1 /* SharedAppEnvironment.swift */,
 				83240595543A18730CCF71A0 /* SkillCopy.swift */,
 				3795310A060A418D32730BFA /* SkyAtmosphere.swift */,
 				AE9CF6ECBC428C4253E69AC4 /* SkyTopWash.swift */,
@@ -4199,6 +4205,7 @@
 				F7A99F53FA4C9341F8D60752 /* SettingsMirror.swift in Sources */,
 				B2E310CC0C21A54B61ED3363 /* SettingsRecord.swift in Sources */,
 				6160FDCE0C2B1D67387C78FD /* SettingsStore.swift in Sources */,
+				44F77BC2C92A9E83D2309076 /* SharedAppEnvironment.swift in Sources */,
 				2C203947178231CAEF6470F3 /* SharedTaskCapture.swift in Sources */,
 				6804DE97DB747232B44C2E63 /* ShortcutAction.swift in Sources */,
 				C99FE1546CD03185ACDA54C0 /* SiblingNudge.swift in Sources */,
@@ -4484,6 +4491,7 @@
 				B12532631DF245E7173A2AE8 /* SettingsMirror.swift in Sources */,
 				7354DD58EC485F7B5ADC2FC4 /* SettingsRecord.swift in Sources */,
 				123DB4D405AFA16F28117EB6 /* SettingsStore.swift in Sources */,
+				9DA8E54FBC31DAC851699BB8 /* SharedAppEnvironment.swift in Sources */,
 				1F575A4F45A78F7922AB65C5 /* SharedTaskCapture.swift in Sources */,
 				31BBA78DA6CC7EB1B9D83319 /* ShortcutAction.swift in Sources */,
 				25F2FB5AEB4751EBE4FCF042 /* SiblingNudge.swift in Sources */,
@@ -4916,6 +4924,7 @@
 				ADCA538CBFB1E75DCC416215 /* SettingsRecord.swift in Sources */,
 				2A808F941EDCCD97842147B3 /* SettingsStore.swift in Sources */,
 				B60A9AE489FD7502DC0B83B8 /* SettingsView.swift in Sources */,
+				1D164B2AFADF270517C3D130 /* SharedAppEnvironment.swift in Sources */,
 				0FCAB9037396890E368CDC57 /* SharedTaskCapture.swift in Sources */,
 				D1390C463EBA8DB590C709F5 /* ShortcutAction.swift in Sources */,
 				04EED183D775AD966C4EACBB /* SiblingNudge.swift in Sources */,
@@ -5446,6 +5455,7 @@
 				8920FD91C3706F090902F4A5 /* SettingsRecord.swift in Sources */,
 				A88E57D87F444354C18F15D2 /* SettingsStore.swift in Sources */,
 				76C049B6FAEBDE6471287104 /* SettingsView.swift in Sources */,
+				881CA6858984427B6D10F256 /* SharedAppEnvironment.swift in Sources */,
 				9BE6D5FA6C63EE22A7784A91 /* SharedTaskCapture.swift in Sources */,
 				D7C756207C468C4D0EBD7E69 /* ShortcutAction.swift in Sources */,
 				7A1D060431D1419F063CCED6 /* SiblingNudge.swift in Sources */,
