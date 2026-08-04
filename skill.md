@@ -55,7 +55,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
 - **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, deadline, today, completedAt, source, notes, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - **`notes`** — the task's free-text body. Readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` (pass `notes`; on update, `null`/`""` clears it). This is the plain note field, distinct from the structured `TaskConvo` (artifact/handoff/thread) below.
-- `tasks_complete` will **error on recurring tasks** — tell the user to complete those in the app so the next occurrence spawns correctly.
+- `tasks_complete` on a **recurring** task also creates its next occurrence and returns it as `nextOccurrence` — say when the task comes back, don't send the user to the app. If the result carries a `recurrenceWarning`, the task was still completed but the series didn't advance; relay that rather than claiming the next one is scheduled.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 
 #### Task Conversations (agent-driven resolution)
@@ -348,7 +348,7 @@ grocery_item_set_low(id, low: false)
 
 - `AUTHENTICATION_FAILED` / 401 → ckWebAuthToken expired, user needs to reconnect the MCP.
 - `NOT_FOUND` on lookup → record doesn't exist; for `*_delete` this is fine (idempotent), for `*_update` surface it.
-- Recurring task complete error → explain it must be done in the app.
+- `recurrenceWarning` on a complete → the task IS done, but its next occurrence wasn't created. Say both parts.
 - CloudKit field-type errors during writes → almost always a wrong field name; check this skill against tool descriptions.
 
 ## Don'ts

@@ -184,7 +184,7 @@ const GLOBAL_TOOLS: Tool[] = [
   },
   {
     name: "tasks_complete",
-    description: "Mark a task done. Errors on recurring tasks (complete those in the app so the next occurrence spawns).",
+    description: "Mark a task done. For recurring tasks, this also creates the next occurrence.",
     inputSchema: completeTaskJsonSchema,
   },
   {

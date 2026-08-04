@@ -1,6 +1,7 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { logEvent } from "../util.js";
-import { getEffectiveTimezone, localServerTimestamp } from "../tz.js";
+import { getEffectiveTimezone, localServerTimestamp, todayYMD } from "../tz.js";
+import { nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { listAreas } from "./listAreas.js";
 import { listProjects } from "./listProjects.js";
 
@@ -219,11 +220,17 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
   const tz = await getEffectiveTimezone(client);
   const fields = await lookupRecord(client, input.id);
   if (!fields) throw new Error(`Task not found: ${input.id}`);
-  const recurrenceUnit = fields.recurrenceUnit?.value as string | undefined;
-  if (recurrenceUnit && recurrenceUnit.length > 0) {
-    throw new Error(
-      `Task ${input.id} is recurring (every ${recurrenceUnit}). Complete it in the Septena app so the next occurrence spawns.`,
-    );
+  // Already terminal: report the existing completion instead of re-stamping it,
+  // and never spawn a SECOND occurrence from a row that already advanced its
+  // series. The app guards the same way (`guard entity.status == .open`), which
+  // matters now that completion has a side effect beyond the row itself.
+  if ((fields.status?.value as string | undefined) === "done") {
+    return {
+      id: input.id,
+      status: "done",
+      completedAt: (fields.completedAt?.value as string | undefined) ?? null,
+      alreadyComplete: true,
+    };
   }
   const completedAt = localServerTimestamp(tz);
   await modifyRecords(client, [
@@ -242,7 +249,115 @@ export async function completeTask(client: CloudKitClient, input: { id: string }
       },
     },
   ]);
-  return { id: input.id, status: "done", completedAt };
+  // Recurring tasks used to be REFUSED here, because only the app could
+  // advance the series. The app's TasksBackend.complete now spawns the next
+  // occurrence itself, so this does too — a refusal would leave the gateway
+  // telling users something untrue about their own data.
+  const recurrence = await spawnNextOccurrence(client, input.id, fields, tz, completedAt);
+  return { id: input.id, status: "done", completedAt, ...recurrence };
+}
+
+/**
+ * Create the next instance of a recurring task, mirroring the app's
+ * `CloudKitTasksBackend.createRecurringOccurrence`.
+ *
+ * Idempotent by construction: the record name is derived from
+ * (source id + next scheduled date), so the same completion arriving from the
+ * phone and from chat converges on ONE record instead of racing to make two.
+ * We still look it up first to avoid a pointless write.
+ *
+ * Never throws. The task is already marked done at this point, and failing the
+ * whole tool call after a successful completion would tell the model the
+ * completion didn't happen. A series that couldn't advance comes back as a
+ * `recurrenceWarning` on the result instead.
+ */
+async function spawnNextOccurrence(
+  client: CloudKitClient,
+  sourceID: string,
+  source: Record<string, { value: unknown }>,
+  tz: string,
+  completedAt: string,
+): Promise<{ nextOccurrence?: { id: string; scheduled: string }; recurrenceWarning?: string }> {
+  const unit = (source.recurrenceUnit?.value as string | undefined) ?? "";
+  if (!unit) return {};
+
+  const interval = Number(source.recurrenceInterval?.value ?? 1) || 1;
+  const afterCompletion = Number(source.recurrenceAfterCompletion?.value ?? 0) === 1;
+  const scheduled = (source.scheduled?.value as string | undefined) || null;
+
+  const next = nextScheduledDate({
+    completedOn: completedAt.slice(0, 10),
+    scheduled,
+    rule: { unit, interval, afterCompletion },
+  });
+  if (!next) {
+    logEvent("recurrence_next_date_failed", { id: sourceID, unit, interval });
+    return {
+      recurrenceWarning:
+        `Task ${sourceID} is recurring (every ${unit}) but the next date could not be calculated, ` +
+        `so no new occurrence was created. It was still marked done.`,
+    };
+  }
+
+  const id = occurrenceID(sourceID, next);
+  if (await lookupRecord(client, id)) {
+    logEvent("recurrence_occurrence_exists", { id, sourceID });
+    return { nextOccurrence: { id, scheduled: next } };
+  }
+
+  const sourceProvenance = source.source?.value as string | undefined;
+  const fields: Record<string, { value: unknown }> = {
+    title: { value: source.title?.value ?? "" },
+    status: { value: "open" },
+    created: { value: todayYMD(tz) },
+    scheduled: { value: next },
+    // A deadline belonged to the occurrence that was just completed — the new
+    // one gets its next scheduled date, not an already-expired deadline.
+    today: { value: 0 },
+    recurrenceUnit: { value: unit },
+    recurrenceInterval: { value: interval },
+    recurrenceAfterCompletion: { value: afterCompletion ? 1 : 0 },
+    createdAt: { value: Date.now() },
+  };
+  if (source.area?.value) fields.area = { value: source.area.value };
+  if (source.project?.value) fields.project = { value: source.project.value };
+  if (source.heading?.value) fields.heading = { value: source.heading.value };
+  if (source.kind?.value) fields.kind = { value: source.kind.value };
+  // Only the plaintext body carries over: `notes` is an encrypted field that
+  // CloudKit Web Services cannot read, so the gateway can't copy it. The app,
+  // which can, copies both. Documented divergence, not an oversight.
+  if (source.notesText?.value) fields.notesText = { value: source.notesText.value };
+  if (sourceProvenance) fields.source = { value: sourceProvenance };
+  if (source.sourceClient?.value) fields.sourceClient = { value: source.sourceClient.value };
+  // Completing an agent-authored row IS engagement with the recurring task, so
+  // the next occurrence shouldn't reappear wearing a fresh "unseen" cue.
+  if (sourceProvenance === "mcp") fields.acknowledgedAt = { value: Date.now() };
+  else if (source.acknowledgedAt?.value) fields.acknowledgedAt = { value: source.acknowledgedAt.value };
+  // `position` is deliberately NOT set. The app puts a new occurrence at the
+  // top of the list, which needs a read of every task's order key; the gateway
+  // has no read-before-write here (same call it already makes for chat moves),
+  // so the row falls back to ordering by `createdAt` — which, for a task
+  // created right now, lands it at the top anyway.
+
+  try {
+    const { droppedFields } = await client.createWithFieldFallback({
+      recordType: "Task",
+      recordName: id,
+      fields,
+      protectedFields: ["title", "status", "scheduled", "recurrenceUnit"],
+    });
+    if (droppedFields.length > 0) {
+      logEvent("recurrence_create_dropped_fields", { id, droppedFields });
+    }
+    return { nextOccurrence: { id, scheduled: next } };
+  } catch (err) {
+    logEvent("recurrence_create_failed", { id, sourceID, error: String(err) });
+    return {
+      recurrenceWarning:
+        `Task ${sourceID} was marked done, but its next occurrence (due ${next}) could not be created. ` +
+        `It will reappear when the task is next opened in the Septena app.`,
+    };
+  }
 }
 
 export async function updateTask(client: CloudKitClient, input: UpdateTaskInput) {
