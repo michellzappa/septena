@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1509,
+      "build": 1517,
       "date": "2026-08-04",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Introducing Septask, a focused tasks app",
-          "detail": "A new dedicated task app shares your Septena task data with its own Home, Today, and Upcoming tabs on iPhone, iPad, and Mac, plus a watch app.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A new dedicated app for your tasks and to-dos, sharing the same private data as Septena, with its own iPhone, iPad, Mac, and Watch experience.",
+          "section": null
+        },
+        {
+          "title": "Recurring tasks continue themselves",
+          "detail": "Completing a recurring task now creates its next occurrence automatically, and tasks can carry attachments and be shared in from other apps.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks pick up automatically",
-          "detail": "Completing a recurring task now spawns its next occurrence instead of leaving you to recreate it.",
+          "title": "Faster ways to plan and organize tasks",
+          "detail": "A redesigned date picker with quick-pick pills, a markdown-aware notes editor, multi-select bulk actions, and drag-and-drop to re-home tasks.",
           "section": "tasks"
         },
         {
-          "title": "More reliable task editing",
-          "detail": "Fixed an issue where editing a task's title could silently fail to save.",
+          "title": "Recover deleted tasks and import from Things",
+          "detail": "Deleted tasks now sit in a Recently Deleted view with restore before a 30-day auto-purge, and you can bring in an existing Things export, headings included.",
           "section": "tasks"
         },
         {
-          "title": "More ways to organize tasks",
-          "detail": "Attach files, share tasks to other apps, drag tasks to re-home them, select multiple tasks at once, and recover deleted tasks for 30 days.",
-          "section": "tasks"
-        },
-        {
-          "title": "Meal photo scanning and easier re-logging",
-          "detail": "Snap a photo to prefill a meal's details, log an already-logged meal again, and scale a re-logged meal by a percentage.",
+          "title": "Log meals from a photo",
+          "detail": "Snap a photo to prefill a meal's fields with on-device analysis, and re-log a previous meal scaled to a new amount.",
           "section": "nutrition"
         },
         {
           "title": "Reworked training sessions",
-          "detail": "A rebuilt session editor adds editable start and end times, reps-before-load progression hints, and a top-weight toggle on your progress chart.",
+          "detail": "A redesigned session editor with progression hints, editable start/end times, an auto-advancing rest flow, and a Watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, and supplements now offer suggested goals to get you started.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Pin goals to the weekly dashboard, toggle habit-backed goals right from their tile, and get suggested goals across chores, gut, habits, medications, mood, supplements, and symptoms.",
           "section": "goals"
         },
         {
-          "title": "New steps tile on the dashboard",
-          "detail": "A dashboard tile now shows your daily step count.",
-          "section": "activity"
+          "title": "See exactly what telemetry gets sent",
+          "detail": "A full transparency ladder shows what's collected at each level, with a recent-activity log and an easy opt-out.",
+          "section": null
         }
       ]
     },
