@@ -2269,6 +2269,12 @@ struct TaskListView: View {
       // Deterministically ordered after the save (same `.onDisappear`), so a
       // typed-then-tapped-away task is committed, not purged.
       onVanish: {
+        // `.onDisappear` fires for a row that merely scrolled out of the
+        // `LazyVStack`'s materialization window, not just for a real fold — so
+        // check that the editor is actually closed before treating this as
+        // teardown. Without the guard, a brand-new draft the user hadn't typed
+        // into yet could be purged out from under them mid-edit.
+        guard expandedEditId != task.id else { return }
         guard draftEditIds.contains(task.id) else { return }
         draftEditIds.remove(task.id)
         purgeDraftIfEmpty(id: task.id)
@@ -2415,7 +2421,8 @@ struct TaskListView: View {
     if allowsInlineCreate {
       quickAddLine()
         .asListRow()
-        .taskCardChrome(.solo)
+        .taskCardChrome(.solo,
+                        isSelected: selection.contains(Self.quickAddScrollID))
     }
   }
 
@@ -2426,7 +2433,8 @@ struct TaskListView: View {
       if usesSingleOpenTaskCard {
         quickAddLine()
           .asListRow()
-          .taskCardChrome(.solo)
+          .taskCardChrome(.solo,
+                          isSelected: selection.contains(Self.quickAddScrollID))
       } else {
         quickAddLine().asListRow()
       }
@@ -2898,7 +2906,14 @@ struct TaskListView: View {
     if appendQuickAdd {
       quickAddLine(showsEditor: quickAddShowsEditor)
         .asListRow()
-        .taskCardChrome(TaskCardPosition(index: rows.count, count: cardCount))
+        // The quick-add trigger is a selectable row (it carries the sentinel id
+        // and sits in `keyboardOrderedTaskIds`), so it has to paint the same
+        // selection fill every other row does. Without `isSelected` here, ↑/↓
+        // landed on it and NOTHING highlighted — the cursor effectively went
+        // invisible for one row, which reads as "the New task line can't be
+        // selected by keyboard" even though Return would have opened it.
+        .taskCardChrome(TaskCardPosition(index: rows.count, count: cardCount),
+                        isSelected: selection.contains(Self.quickAddScrollID))
     }
   }
 
@@ -3643,52 +3658,57 @@ struct TaskListView: View {
 
   // MARK: - New-to-dos banner
 
-  /// Soft-yellow "You have N new to-dos" banner — compact start-of-day
-  /// notice that surfaces tasks scheduled for past dates rolling into Today.
-  /// Tapping OK persists today's date so it stays dismissed for the rest of
-  /// the day; reappears tomorrow.
+  /// Start-of-day notice for tasks that rolled into Today on their own — a
+  /// plan made on an earlier day whose date has now arrived. Dismissing
+  /// persists today's date so it stays gone for the rest of the day and
+  /// returns tomorrow.
+  ///
+  /// Deliberately NOT a filled color band with a filled button: that is
+  /// Things' treatment of the same idea, and a saturated yellow slab is the
+  /// loudest thing on a screen whose own language is quiet cards and
+  /// typographic group headers. This reads as one more card in the stack
+  /// (`Theme.cardSurface` on the card grid's own metrics) and spends its gold
+  /// in exactly one place — the glyph. Gold is the app's temporal accent
+  /// (`Theme.todayAccent`, the same swatch as the Today sun), so the cue still
+  /// says "time moved" without shouting. Per DesignSpec §4 there are no raw
+  /// `Color` literals here; the old banner used `Color.yellow` twice.
   @ViewBuilder
   private func newTodosBanner(count: Int) -> some View {
-    // Colors lean on system + adapt: a soft yellow tint that reads as
-    // attention in light mode and isn't glare-bright in dark mode.
-    // Text and button label use Color.primary so contrast follows the
-    // user's interface style.
-    HStack(spacing: 12) {
-      HStack(spacing: 0) {
-        Text("You have ")
-        Text("\(count)").fontWeight(.bold)
-        Text(count == 1 ? " new to-do" : " new to-dos")
-      }
-      .scaledFont(size: 14)
-      .foregroundStyle(.primary)
-      Spacer()
+    HStack(spacing: Theme.iconTextGap) {
+      Image(systemName: "arrow.down.circle.fill")
+        .font(.septenaMeta)
+        .foregroundStyle(Theme.todayAccent)
+        .accessibilityHidden(true)
+      Text(count == 1
+           ? "1 task rolled into Today"
+           : "\(count) tasks rolled into Today")
+        .font(.septenaMeta)
+        .foregroundStyle(Theme.inkSecondary)
+        .lineLimit(1)
+      Spacer(minLength: Theme.iconTextGap)
       Button {
         Haptics.tick()
         UserDefaults.standard.set(clock.today, forKey: "septena.newTodos.dismissedDate")
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
-        Text("OK")
-          .scaledFont(size: 13, weight: .semibold)
-          .foregroundStyle(.primary)
-          .padding(.horizontal, 14)
-          .padding(.vertical, 6)
-          .background(
-            Color.yellow.opacity(0.55),
-            in: RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall, style: .continuous)
-          )
+        Text("Dismiss")
+          .font(.septenaMetaStrong)
+          .foregroundStyle(Theme.inkSecondary)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .inlineHover(capsule: true)
     }
-    .padding(.horizontal, 14)
+    .padding(.horizontal, TaskCardMetrics.contentInset)
     .padding(.vertical, 10)
     .background(
-      Color.yellow.opacity(0.20),
-      in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+      RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
+        .fill(Theme.cardSurface)
     )
-    // Match the row selection-pill's effective inset (Theme.hPadding - 6) so
-    // the banner and the highlighted row align edge-to-edge.
-    .padding(.horizontal, Theme.hPadding - 6)
-    .padding(.bottom, 12)
+    // Same margin as the task cards below, so the notice sits in the card
+    // column rather than floating on its own inset.
+    .padding(.horizontal, TaskCardMetrics.margin)
+    .padding(.bottom, TaskCardMetrics.groupGap)
     .transition(.opacity.combined(with: .move(edge: .top)))
   }
 

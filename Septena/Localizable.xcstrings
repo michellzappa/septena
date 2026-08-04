@@ -8757,6 +8757,7 @@
       }
     },
     "You have " : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
