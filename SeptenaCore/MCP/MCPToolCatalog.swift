@@ -104,7 +104,7 @@ enum MCPToolCatalog {
                            "description": "Provenance. user_request = the user asked (committed, placed where specified). agent_suggestion = you proposed it without being asked (lands unratified in the inbox for review). Omit to use the connection default."],
               ]]),
       MCPTool(name: "tasks_complete",
-              description: "Mark a task done. Errors on recurring tasks (complete those in the app so the next occurrence spawns).",
+              description: "Mark a task done. For recurring tasks, this also creates the next occurrence.",
               inputSchema: ["type": "object", "required": ["id"], "properties": ["id": ["type": "string"]]]),
       MCPTool(name: "tasks_update",
               description: "Update fields on an existing task. Any subset of title, today, scheduled, deadline, area, project, status (cancelled), notes.",

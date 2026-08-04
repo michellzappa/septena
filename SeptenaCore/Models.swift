@@ -152,7 +152,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Returns `0` when the task is done, off Today, an unratified agent row
   /// (it carries its own cue), or a legacy pin with no `todaySetOn` to date it.
   func daysOnToday(today: String = SeptenaDate.today) -> Int {
-    guard status == .open, source != TaskSource.mcp, isOnToday else { return 0 }
+    guard status == .open, !showsAgentCue(), isOnToday else { return 0 }
     var landed: [String] = []
     if self.today, let t = todaySetOn { landed.append(t) }
     if let s = scheduled, s <= today { landed.append(s) }
@@ -180,7 +180,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// transparent. Derived, no stored state; self-clears when the task leaves
   /// Today or is completed.
   func todayTenureFill(today: String = SeptenaDate.today) -> Double? {
-    guard status == .open, source != TaskSource.mcp, isOnToday else { return nil }
+    guard status == .open, !showsAgentCue(), isOnToday else { return nil }
     let carried = daysOnToday(today: today)
     guard carried >= 1 else { return nil }
     return min(1, Double(carried) / 7.0)
@@ -397,6 +397,30 @@ struct Recurrence: Codable, Hashable {
       }
     }
     return "Every \(interval) \(unit.rawValue)s"
+  }
+
+  /// Calculates the scheduled date for the next occurrence.
+  ///
+  /// `afterCompletion` controls the anchor: true means the interval starts
+  /// from the day the task was completed; false means it advances from the
+  /// task's prior scheduled date. A fixed-schedule task that is completed
+  /// late advances until it reaches the next future occurrence, rather than
+  /// creating another already-overdue copy.
+  func nextDate(completedOn: String, scheduled: String?) -> String? {
+    RecurrenceDateCalculator.nextDate(
+      completedOn: completedOn,
+      scheduled: scheduled,
+      unit: unit.rawValue,
+      interval: interval,
+      afterCompletion: afterCompletion
+    )
+  }
+
+  /// Stable record identity for an occurrence generated from a task/date
+  /// pair. Keeping this deterministic makes completion idempotent across the
+  /// phone, watch, and MCP paths.
+  static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
+    RecurrenceDateCalculator.occurrenceID(sourceTaskID: sourceTaskID, scheduled: scheduled)
   }
 }
 

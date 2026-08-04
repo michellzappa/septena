@@ -35,7 +35,7 @@ enum MCPError: Error {
   /// Bad / missing arguments — surfaced to the model as an `isError` tool
   /// result so it can correct itself, never as a transport-level failure.
   case badArgument(String)
-  /// A write the underlying mutator rejected (e.g. recurring-task complete).
+  /// A write the underlying mutator rejected.
   case rejected(String)
 
   var message: String {

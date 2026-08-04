@@ -1680,6 +1680,9 @@ extension SeptenaTask {
       project: e.project,
       notes: e.notes,
       recurrence: e.recurrence,
+      nextOccurrence: e.status == .open
+        ? e.recurrence?.nextDate(completedOn: SeptenaDate.today, scheduled: e.scheduled)
+        : nil,
       updatedAt: e.updatedAt,
       deletedAt: e.deletedAt,
       source: e.source,

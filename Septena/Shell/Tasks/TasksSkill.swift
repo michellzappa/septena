@@ -15,7 +15,7 @@ enum TasksSkill {
               inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field), notes (free-text body)"),
         SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/deadline/area/project/notes",
               inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), deadline (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled), notes (free-text body, or null/\"\" to clear)"),
-        SectionSkill.Tool("tasks_complete",      "Mark done. ERRORS on recurring — those must be done in-app so the next occurrence spawns",
+        SectionSkill.Tool("tasks_complete",      "Mark done. Recurring tasks automatically get their next occurrence",
               inputs: "required: id"),
         SectionSkill.Tool("tasks_defer",         "Set scheduled date, clear today",
               inputs: "required: id, until (YYYY-MM-DD)"),
@@ -99,7 +99,6 @@ enum TasksSkill {
       If you're about to tell the user "I added/moved/scheduled X," and routing matters, list the destination view first to confirm X is actually there. `tasks_create` and `tasks_update` return success on any schema-valid write — they don't validate that the result matches user intent.
 
       ### Don't
-      - Don't try to `tasks_complete` a recurring task. Tell the user to do it in the app.
       - Don't reference area/project by name. Always resolve to id first via `tasks_list_areas` / `tasks_list_projects`.
       - Don't assume `anytime` shows all tasks. It's only open, dateless, unfiled tasks.
       - Don't claim a task is "added" without mentioning which view/list it landed in.

@@ -160,3 +160,58 @@ struct SeptenaDateParser {
   }
 }
 
+/// Pure date arithmetic for task recurrence. Kept beside the date utilities
+/// because the lightweight core test target includes this file without the
+/// full SwiftData-backed task model.
+enum RecurrenceDateCalculator {
+  private static let formatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = TimeZone.current
+    return f
+  }()
+
+  static func nextDate(completedOn: String,
+                       scheduled: String?,
+                       unit: String,
+                       interval: Int,
+                       afterCompletion: Bool) -> String? {
+    guard let completedDate = formatter.date(from: String(completedOn.prefix(10))) else {
+      return nil
+    }
+    let anchor = afterCompletion
+      ? completedDate
+      : (scheduled.flatMap { formatter.date(from: String($0.prefix(10))) } ?? completedDate)
+    let component: Calendar.Component
+    switch unit {
+    case "day": component = .day
+    case "week": component = .weekOfYear
+    case "month": component = .month
+    default: return nil
+    }
+    let step = max(1, interval)
+    let calendar = Calendar.current
+    guard var next = calendar.date(byAdding: component, value: step, to: anchor) else {
+      return nil
+    }
+    if !afterCompletion {
+      while next <= completedDate {
+        guard let advanced = calendar.date(byAdding: component, value: step, to: next) else {
+          return nil
+        }
+        next = advanced
+      }
+    }
+    return formatter.string(from: next)
+  }
+
+  static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
+    var hash: UInt64 = 14695981039346656037
+    for byte in "\(sourceTaskID)|\(scheduled)".utf8 {
+      hash ^= UInt64(byte)
+      hash = hash &* 1099511628211
+    }
+    return "recur-\(String(format: "%016llx", hash))"
+  }
+}

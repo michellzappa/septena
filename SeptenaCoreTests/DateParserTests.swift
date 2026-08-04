@@ -42,3 +42,26 @@ import Foundation
     #expect(SeptenaDateParser.parse("not a date at all") == nil)
   }
 }
+
+@Suite struct RecurrenceTests {
+  @Test func advancesFromCompletionDate() {
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-08-02", scheduled: nil,
+      unit: "day", interval: 3, afterCompletion: true
+    ) == "2026-08-05")
+  }
+
+  @Test func advancesFromFixedScheduleAndSkipsMissedDates() {
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-08-20", scheduled: "2026-08-01",
+      unit: "week", interval: 1, afterCompletion: false
+    ) == "2026-08-22")
+  }
+
+  @Test func producesStableOccurrenceIDs() {
+    let first = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")
+    let second = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")
+    #expect(first == second)
+    #expect(first.hasPrefix("recur-"))
+  }
+}

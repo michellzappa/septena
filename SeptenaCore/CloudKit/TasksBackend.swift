@@ -84,6 +84,54 @@ final class CloudKitTasksBackend {
     TaskChange.post(id)
   }
 
+  /// Inserts the next instance as a complete, recurring TaskEntity in one
+  /// local save. The deterministic id makes this safe when two surfaces
+  /// complete the same source row close together.
+  private func createRecurringOccurrence(from entity: TaskEntity,
+                                         recurrence: Recurrence,
+                                         scheduled: String) {
+    let id = Recurrence.occurrenceID(sourceTaskID: entity.id, scheduled: scheduled)
+    guard fetch(id: id) == nil else {
+      SeptenaLog.info("[CK] recurrence.create id=\(id) already exists — idempotent no-op")
+      return
+    }
+
+    let next = TaskEntity(
+      id: id,
+      title: entity.title,
+      statusRaw: TaskStatus.open.rawValue,
+      created: SeptenaDate.today,
+      scheduled: scheduled,
+      // A deadline belongs to the completed occurrence. The generated task
+      // gets its next scheduled date instead of inheriting an expired deadline.
+      deadline: nil,
+      today: false,
+      todaySetOn: nil,
+      completedAt: nil,
+      area: entity.area,
+      project: entity.project,
+      notes: entity.notes,
+      // Conversation turns belong to the completed occurrence; the new
+      // occurrence starts with a clean thread.
+      conversationJSON: nil,
+      recurrenceUnit: recurrence.unit.rawValue,
+      recurrenceInterval: recurrence.interval,
+      recurrenceAfterCompletion: recurrence.afterCompletion,
+      position: TaskOrder.topPosition(in: context),
+      pendingSync: true,
+      source: entity.source,
+      sourceClient: entity.sourceClient,
+      // Completing an agent-authored row is engagement with the recurring
+      // task, so the next occurrence should not immediately show a fresh cue.
+      acknowledgedAt: entity.source == TaskSource.mcp ? Date() : entity.acknowledgedAt,
+      createdAt: Date(),
+      kind: entity.kind,
+      heading: entity.heading
+    )
+    context.insert(next)
+    commitAndPush(next, op: "recurrence.create")
+  }
+
   // MARK: Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
 
   /// Decoded conversation for a task; nil if the task is unknown.
@@ -243,6 +291,15 @@ final class CloudKitTasksBackend {
 
   func complete(id: String) {
     guard let entity = fetch(id: id) else { return }
+    // Completion can arrive twice (e.g. an optimistic phone tap followed by a
+    // watch write). Never spawn a second occurrence from an already-terminal
+    // source row.
+    guard entity.status == .open else { return }
+    let recurrence = entity.recurrence
+    let nextDate = recurrence?.nextDate(
+      completedOn: SeptenaDate.today,
+      scheduled: entity.scheduled
+    )
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = ckServerTimestamp()
     // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
@@ -254,6 +311,11 @@ final class CloudKitTasksBackend {
     // Keeping the flag means uncomplete returns the task exactly where it was.
     entity.pendingSync = true
     commitAndPush(entity, op: "complete")
+    if let recurrence, let nextDate {
+      createRecurringOccurrence(from: entity, recurrence: recurrence, scheduled: nextDate)
+    } else if recurrence != nil {
+      SeptenaLog.error("[CK] complete id=\(id) could not calculate next recurrence", nil)
+    }
   }
 
   func uncomplete(id: String) {

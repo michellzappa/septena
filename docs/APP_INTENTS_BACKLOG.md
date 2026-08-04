@@ -81,10 +81,10 @@ inbox / upcoming sets matching the app sidebar.
 ### AI-2 · `CompleteTaskIntent`
 **Why:** MCP has `tasks_complete`; intents don't. Highest-value missing action.
 **What:** Intent taking a `TaskAppEntity` → `TaskMutator.complete`. Mirror
-MCP's guard: error on recurring tasks (complete in-app so the next occurrence
-spawns). Donate for prediction.
-**Acceptance:** "Complete <task>" marks it done; recurring tasks refused with a
-clear dialog. Parity with `tasks_complete`.
+Route through the same task mutator as MCP. Recurring completion creates the
+next occurrence in the shared CloudKit-backed store. Donate for prediction.
+**Acceptance:** "Complete <task>" marks it done; recurring tasks also create
+their next occurrence. Parity with `tasks_complete`.
 
 ### AI-3 · `MoveToTodayIntent` + `DeferTaskIntent`
 **Why:** MCP has `tasks_move_to_today` + `tasks_defer`; the two highest-value
