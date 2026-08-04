@@ -927,17 +927,30 @@ struct WeekDashboardView: View {
     #endif
   }
 
-  /// Network-backed tiles (Oura, Withings, GitHub, HealthKit). Kept off the
-  /// mirror path and capped at ≤2 concurrent HTTP calls — past ~4 the shared
-  /// URLSession path has heap-corrupted at launch, so GitHub stays sequential.
+  /// Network-backed tiles (Oura, Withings, GitHub, HealthKit), kept off the
+  /// mirror path.
+  ///
+  /// This used to carry a hard "≤4 concurrent HTTP calls or the app
+  /// heap-corrupts at launch" rule, with GitHub forced sequential to stay under
+  /// it. That constraint was inherited from the FastAPI era and its cause is
+  /// gone: `SeptenaClient`, the single shared HTTP client it was blamed on, no
+  /// longer exists. Each provider now owns a private `URLSession` (there is no
+  /// `URLSession.shared` anywhere in the app), and every provider store is a
+  /// synchronous `@MainActor` method, so two fetches cannot interleave a write
+  /// to the shared SwiftData context either.
+  ///
+  /// The sequencing below is kept as-is because it is cheap and works, NOT
+  /// because parallelism is unsafe — adding a fetch here no longer needs to be
+  /// serialized on principle. `SWIFT_STRICT_CONCURRENCY: targeted` is what
+  /// guards this now (see project.yml).
   private func loadNetwork() async {
-    // Coalesce overlapping runs (initial-load + day-change can both fire)
-    // so concurrent HTTP stays within the safe ≤4-parallel ceiling.
+    // Coalesce overlapping runs (initial-load + day-change can both fire) so a
+    // provider isn't refetching on top of itself.
     if networkLoading { return }
     networkLoading = true
     defer { networkLoading = false }
-    // Oura + Withings in parallel (HTTP cap ≤2); each is timed independently
-    // so the Perf log shows the per-provider latency that adds up to the stall.
+    // Oura + Withings in parallel; each is timed independently so the Perf log
+    // shows the per-provider latency that adds up to the stall.
     async let ouraTimed = PerfTrace.span("net.oura") {
       try? await OuraProvider.shared.fetchHistory(days: Self.historyDays)
     }

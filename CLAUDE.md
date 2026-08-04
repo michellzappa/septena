@@ -250,9 +250,16 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
 
 - **"Week" = trailing 7 days** (today + previous 6), never the calendar week.
   Use `sinceDate(daysBack: 6)`.
-- **`WeekDashboardView.loadAll()` caps at ≤4 parallel HTTP calls** via
-  `SeptenaClient`. New launch-time fetches must be sequential or the app
-  heap-corrupts.
+- **~~`WeekDashboardView.loadAll()` caps at ≤4 parallel HTTP calls~~ — RETIRED.**
+  This rule blamed a shared `SeptenaClient`, which no longer exists (it went
+  with the FastAPI migration). Each provider owns a private `URLSession` — there
+  is no `URLSession.shared` in the app — and every provider store is a
+  synchronous `@MainActor` method, so concurrent fetches can't interleave a
+  write to the shared SwiftData context. New launch-time fetches do NOT need to
+  be serialized on principle. Safety here is enforced by the compiler now:
+  `SWIFT_STRICT_CONCURRENCY: targeted` (project.yml), which the tree builds
+  clean under. If a launch-time crash ever does reappear, chase it as a real
+  race with the checker turned up — don't reinstate a parallelism cap.
 - **MCP gateway filters string date ranges client-side** — the CloudKit schema is
   auto-managed and Dashboard indexes are off-limits.
 - **CloudKit Prod schema deploy is additive-only** and deploying schema does NOT

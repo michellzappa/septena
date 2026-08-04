@@ -12,7 +12,14 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    SWIFT_STRICT_CONCURRENCY: minimal
+    # `targeted` (not `minimal`): the compiler checks every type that has
+    # actually adopted concurrency — async/await, actors, @MainActor — which is
+    # exactly where a real data race can live, and the tree builds clean under
+    # it. `complete` is NOT viable yet: SwiftData's `#Predicate` key paths
+    # aren't Sendable on Swift 5.10, which buries the signal under ~1600
+    # spurious warnings, and the type-checker crashes outright on the largest
+    # view bodies. Revisit when those files are broken up and we move to Swift 6.
+    SWIFT_STRICT_CONCURRENCY: targeted
     # MARKETING_VERSION is the deliberate, human-chosen release version
     # (SemVer). Bump it by hand here only when cutting a release — see
     # docs/VERSIONING.md. CURRENT_PROJECT_VERSION (the build number) is NOT set
