@@ -382,6 +382,7 @@
 		3D9C63A8E4F7EFC23368FE9A /* GoalIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A865C5A09B9E6BC01402AD5 /* GoalIntents.swift */; };
 		3DB2D34E5D04E32E0E83E012 /* CKEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3A43D786998D198C9BCA480 /* CKEngine.swift */; };
 		3DE7DFFF8CFC7A8A74C03220 /* TaskInlineRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5E298F308656C2236B1CC5E /* TaskInlineRows.swift */; };
+		3DEE0F448B770DB5CC486CBB /* ConnectionHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */; };
 		3E0184DE60F06697D6F59120 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		3E8232F947D6A67FFAED7EC5 /* LocalMCPSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB10CCDDEAC20D7E90832D7 /* LocalMCPSettingsPane.swift */; };
 		3E86C458DD50C0143EE6C258 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
@@ -804,6 +805,7 @@
 		86B10FA26DC181024D121B3C /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		86F5D51D3D254081AC71B211 /* SectionGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */; };
 		86FBE2BAEC6E090B951312A1 /* WeekDashboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88A4200542D116FBDFFAC57 /* WeekDashboardScreen.swift */; };
+		871595CFFB68167889744A0A /* ConnectionHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */; };
 		87539232CBB8428BAC83C5A5 /* WeekDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06B99940C560FECACAB88860 /* WeekDashboardView.swift */; };
 		875C220D9A4002A1B0A65F83 /* SectionsSettingsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C36D5AA0C5C42E8D7F4057 /* SectionsSettingsPane.swift */; };
 		8767A0FBBEEFE9C5FC5ACE16 /* SuggestionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B57B46F99E041E6147DBFCE6 /* SuggestionBlocks.swift */; };
@@ -1251,6 +1253,7 @@
 		D593377255FBA78C5C2F3EE6 /* VirtueFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */; };
 		D6626FF4335C35221349209A /* WeightCadence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2416C5A216AEE7F3DBA82BB /* WeightCadence.swift */; };
 		D66CAAFEED0B729D35E3C062 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
+		D673E1F537E145710E99F14F /* ConnectionHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */; };
 		D6E4D8E5BB9D44178EACB425 /* ClaudeReconnectNudge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D0F38BDF095C455676498B /* ClaudeReconnectNudge.swift */; };
 		D6EF293BEA531F0759C94A92 /* ProjectRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7C4DF4E90BB39F4A0D23DE /* ProjectRecord.swift */; };
 		D709D5503F2A7BF7C5B51928 /* CommunityAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F4E9CCFCE85AEF36B4C6AF /* CommunityAuth.swift */; };
@@ -1483,6 +1486,7 @@
 		FC2E90AB984DB22819EF9799 /* RemoteTaskSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */; };
 		FC420555B2F254BCEA4713BF /* MCPProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97752A8BAEC96E4F0C0B406 /* MCPProtocol.swift */; };
 		FC42E1F90B3ED8F8E36F59A5 /* ConsistencyHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0E984505A489247AADAB293 /* ConsistencyHeatmap.swift */; };
+		FCC911BED483499CA088FB54 /* ConnectionHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */; };
 		FD0A397799DEAAA954C86C52 /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93406744A63B069898310432 /* MirrorReader.swift */; };
 		FD2D921637A390ABCEA55A9C /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71127DDB09DDF4AADA870825 /* RoutineDetailView.swift */; };
 		FD30D0FFCA73BD41686BF14A /* TasksWatchWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC3E1673BA9289B29884918 /* TasksWatchWire.swift */; };
@@ -1816,6 +1820,7 @@
 		49D65622A4E2C5FDF6D0B129 /* TasksWatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksWatchStore.swift; sourceTree = "<group>"; };
 		4A4A221B10F3A52E1A274A46 /* MealPhotoAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPhotoAnalyzer.swift; sourceTree = "<group>"; };
 		4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchemaSeedRegistrar.swift; sourceTree = "<group>"; };
+		4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionHealth.swift; sourceTree = "<group>"; };
 		4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentFeed.swift; sourceTree = "<group>"; };
 		4CB0FEA3128C7486D772B3A6 /* MilestoneUnits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilestoneUnits.swift; sourceTree = "<group>"; };
 		4D23858A1A44DB2F156B311E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -3206,6 +3211,7 @@
 				D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */,
 				8B1AC82A051DFA765B575639 /* ClaudeGatewayProvider.swift */,
 				44D0F38BDF095C455676498B /* ClaudeReconnectNudge.swift */,
+				4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */,
 				D1E4AE35AB6070F3A880EC04 /* ConsistencyStats.swift */,
 				B1665DD6AC090E7B02FACAC4 /* ConsumableContainer.swift */,
 				80DEE8B28CA8C41A6CA85016 /* ConvoDerived.swift */,
@@ -4027,6 +4033,7 @@
 				081791BB8FFC09A58075E284 /* CommunityAuth.swift in Sources */,
 				5722294C39BA5E6C337278FD /* CommunityClient.swift in Sources */,
 				1BE8F4905764C84DE6D99D83 /* ConnectedAppsDetails.swift in Sources */,
+				FCC911BED483499CA088FB54 /* ConnectionHealth.swift in Sources */,
 				E6C25AAD6985F96C2C2845EA /* ConsistencyHeatmap.swift in Sources */,
 				6A72C2BEBF71AA081E0C6E8D /* ConsistencyStats.swift in Sources */,
 				B2C441490622B7CAFAF959B9 /* ConsumableContainer.swift in Sources */,
@@ -4304,6 +4311,7 @@
 				224E2E0362E5FBA044DD2FA2 /* CommunityAuth.swift in Sources */,
 				F2AF8350E5FC97BC1A0A51CD /* CommunityClient.swift in Sources */,
 				6BE5264D3AB133BA0B49CDDF /* ConnectedAppsDetails.swift in Sources */,
+				871595CFFB68167889744A0A /* ConnectionHealth.swift in Sources */,
 				FC42E1F90B3ED8F8E36F59A5 /* ConsistencyHeatmap.swift in Sources */,
 				F17F64E7C6CA8C64D25E1EB8 /* ConsistencyStats.swift in Sources */,
 				4EA0D979ABA88B12B1CCF931 /* ConsumableContainer.swift in Sources */,
@@ -4606,6 +4614,7 @@
 				C0BE0E78731E75D1FC7C67CC /* CommunityTestimonialPane.swift in Sources */,
 				DCC71567246993C6746D85E8 /* CompletionPatternsSection.swift in Sources */,
 				46FDD56AC5F9012319D48025 /* ConnectedAppsDetails.swift in Sources */,
+				3DEE0F448B770DB5CC486CBB /* ConnectionHealth.swift in Sources */,
 				331439A1A265FAA64B5B02B6 /* ConsistencyHeatmap.swift in Sources */,
 				EFA74ED84CC5C35B6F51D0D3 /* ConsistencyStats.swift in Sources */,
 				9FEA5131491ACDF98B92EC51 /* ConsumableContainer.swift in Sources */,
@@ -5027,6 +5036,7 @@
 				43877F17B51EB0A687E70FD7 /* SuggestionBlocks.swift in Sources */,
 				4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */,
 				B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */,
+				020363FC7B427EF3EDD81A73 /* TasksWatchWire.swift in Sources */,
 				F4251470458A2411D47FC255 /* WatchModels.swift in Sources */,
 				B2E14AA11D3195E8F27276BB /* WatchSky.swift in Sources */,
 				9B1F584EB23911FBA6180A3C /* WolfActivityRing.swift in Sources */,
@@ -5128,6 +5138,7 @@
 				5971C7FB327900E70C5494C9 /* CommunityTestimonialPane.swift in Sources */,
 				56130025E486E2BCDF58BB15 /* CompletionPatternsSection.swift in Sources */,
 				FF04649B6820CC74EEB3FF68 /* ConnectedAppsDetails.swift in Sources */,
+				D673E1F537E145710E99F14F /* ConnectionHealth.swift in Sources */,
 				EA56ADCFD84CE200C7CEF2A9 /* ConsistencyHeatmap.swift in Sources */,
 				271ED637C90C08FC42DF6238 /* ConsistencyStats.swift in Sources */,
 				A49AB879C7583F69605D5F6E /* ConsumableContainer.swift in Sources */,

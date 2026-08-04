@@ -70,6 +70,31 @@ public final class GitHubProvider {
 
   public var hasToken: Bool { token?.isEmpty == false }
 
+  // MARK: Connection health
+  //
+  // "Has a token" is NOT "working". A PAT that expired, was revoked, or lost
+  // its `read:user` scope still sits in the Keychain, so a token-only status
+  // reads "Connected" in green while every fetch 401s — and because each
+  // surface paints from `ResponseCache` first, the section keeps showing a
+  // frozen calendar with no hint that it stopped updating. So every fetch
+  // records its outcome in `ConnectionHealth`, persisted so the answer
+  // survives a cold launch, and the status surfaces read *this* rather than
+  // `hasToken`.
+
+  private var health = ConnectionHealth(namespace: "github")
+
+  /// When the last fetch succeeded. `nil` = never (on this device).
+  public var lastFetchAt: Date? { health.lastFetchAt }
+  /// Why the last fetch failed, or `nil` if it succeeded. Shown verbatim in
+  /// Settings — the GitHub error body is the diagnostic.
+  public var lastError: String? { health.lastError }
+
+  /// Settings-facing summary — one source of truth for the Integrations row
+  /// and the GitHub detail pane so they can never disagree.
+  public var connectionDisplayState: ConnectionDisplayState {
+    health.displayState(hasCredentials: hasToken)
+  }
+
   private let session: URLSession
   private let keychainAccount = "septena.github.pat"
 
@@ -89,11 +114,31 @@ public final class GitHubProvider {
     guard !trimmed.isEmpty else { clearToken(); return }
     Self.storeToken(trimmed, account: keychainAccount)
     token = trimmed
+    // A new token deserves a clean slate — the old token's 401 must not keep
+    // the row red until the next fetch lands.
+    health.reset()
   }
 
   public func clearToken() {
     Self.deleteToken(account: keychainAccount)
     token = nil
+    health.reset()
+  }
+
+  // MARK: Cache
+  //
+  // ONE blob, shared by the dashboard tile, the destination view and the
+  // correlation feature. These used to keep two keys for the same calendar
+  // (`week.github` and `github.contributions`) and could disagree about it;
+  // the provider now owns the write so there is a single copy.
+
+  public static let cacheKey = "week.github"
+  private static let legacyCacheKey = "github.contributions"
+
+  /// Last known calendar from disk, for cold-paint before the fetch lands.
+  public static func cached() -> GitHubContributions? {
+    ResponseCache.load(GitHubContributions.self, forKey: cacheKey)
+      ?? ResponseCache.load(GitHubContributions.self, forKey: legacyCacheKey)
   }
 
   // MARK: Fetch
@@ -106,7 +151,26 @@ public final class GitHubProvider {
   /// Throws `SeptenaError.server`/`.decoding` on failure — including a
   /// `.server(401, …)` when no token is set, so callers that want a soft
   /// empty state should guard on `hasToken` first.
+  ///
+  /// Success and failure are both recorded on the provider (and the result
+  /// cached), so a caller that swallows the error with `try?` still leaves the
+  /// status surfaces able to say the section stopped updating and why.
   public func fetchContributions(days: Int = 365) async throws -> GitHubContributions {
+    guard hasToken else {
+      throw SeptenaError.server(401, "No GitHub token configured.")
+    }
+    do {
+      let result = try await performFetch(days: days)
+      health.recordSuccess()
+      ResponseCache.save(result, forKey: Self.cacheKey)
+      return result
+    } catch {
+      health.recordFailure(error)
+      throw error
+    }
+  }
+
+  private func performFetch(days: Int) async throws -> GitHubContributions {
     guard let token = token, !token.isEmpty else {
       throw SeptenaError.server(401, "No GitHub token configured.")
     }

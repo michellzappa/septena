@@ -34,9 +34,9 @@ enum GitHubPlugin: SectionPlugin {
   // Reads the cached contribution calendar the destination / tile already
   // fetch; no extra network. Returns [] until GitHub is connected.
   static func correlationFeatures(context: ModelContext) -> [CorrelationFeature] {
-    let cached = ResponseCache.load(GitHubContributions.self, forKey: "github.contributions")
-      ?? ResponseCache.load(GitHubContributions.self, forKey: "week.github")
-    guard let c = cached, !c.days.isEmpty else { return [] }
+    // Via the provider so this reads the same blob the tile does — it used to
+    // prefer the older of the two keys and could correlate a stale calendar.
+    guard let c = GitHubProvider.cached(), !c.days.isEmpty else { return [] }
     let series = Dictionary(uniqueKeysWithValues: c.days.map { ($0.date, Double($0.count)) })
     return [
       CorrelationFeature(key: "github_commits",

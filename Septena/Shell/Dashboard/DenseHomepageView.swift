@@ -452,6 +452,8 @@ private struct DomainSparkline: View {
             .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round))
             .interpolationMethod(.monotone)
           }
+        } else {
+          emptyMark
         }
 
       case .none:
@@ -496,11 +498,12 @@ private struct DomainSparkline: View {
   }
 
   private var emptyMark: some ChartContent {
-    // Invisible mark so the Chart still lays out at the requested
-    // frame size; a sibling overlay paints the dash. Returning
-    // EmptyChartContent isn't a thing, so use a single zero-opacity
-    // RuleMark instead.
+    // A faint dashed baseline spanning the row's full width — the
+    // window has days, just no measurements in it, which reads
+    // differently from the row not existing at all. Dashed + low
+    // opacity keeps it from being mistaken for a real flat reading.
     RuleMark(y: .value("Empty", 0))
-      .foregroundStyle(.clear)
+      .foregroundStyle(accent.opacity(0.25))
+      .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 2]))
   }
 }

@@ -107,12 +107,14 @@ struct ConnectedAppsSettingsSections: View {
 
       // GitHub — read-only contribution calendar via the GraphQL API.
       // Static token (Keychain); syncs across the user's devices via iCloud
-      // Keychain, never to CloudKit or a Septena server.
+      // Keychain, never to CloudKit or a Septena server. Status comes from
+      // the last *fetch*, not from "a token exists" — an expired PAT would
+      // otherwise sit here in green while the section quietly went stale.
       NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.github)) {
         stateRow(title: "GitHub",
                  systemImage: "chevron.left.forwardslash.chevron.right",
-                 state: githubProvider.hasToken ? "Connected" : "Connect",
-                 isGranted: githubProvider.hasToken)
+                 state: githubProvider.connectionDisplayState.label,
+                 isGranted: githubProvider.connectionDisplayState.isHealthy)
       }
 
       NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.readwise)) {
@@ -184,6 +186,10 @@ struct ConnectedAppsSettingsSections: View {
     case .granted:       return "Granted"
     case .denied:        return "Denied"
     case .notDetermined: return "Grant"
+    // Asked, but nothing is coming through. HealthKit won't say whether
+    // that's a denial, so the row states the observable fact instead of
+    // claiming a grant it can't verify.
+    case .silent:        return "No data"
     }
   }
 
@@ -215,6 +221,37 @@ struct ConnectedAppSettingsPane: View {
     case .withings:    WithingsIntegrationDetail()
     case .github:      GitHubIntegrationDetail()
     case .readwise:    ReadwiseConnectView()
+    }
+  }
+}
+
+// MARK: - Shared connection-health rows
+
+/// The "Last synced" + last-error pair every `ConnectionHealth`-backed
+/// integration shows under its Status row. Lives here once so the wording,
+/// the icons, and the "Never" fallback stay identical across detail panes —
+/// the same reason `ConnectionHealth` itself is one type.
+struct ConnectionHealthRows: View {
+  let lastFetchAt: Date?
+  let lastError: String?
+
+  var body: some View {
+    HStack {
+      Label("Last synced", systemImage: "clock.arrow.circlepath")
+      Spacer()
+      Text(lastFetchAt.map { $0.formatted(.relative(presentation: .named)) } ?? "Never")
+        .foregroundStyle(.secondary)
+    }
+    // The reason the last fetch failed, verbatim. This is the diagnostic:
+    // "Bad credentials" means the token expired or was revoked, a scope
+    // complaint means it's missing the read scope.
+    if let lastError {
+      Label {
+        Text(lastError).font(.caption)
+      } icon: {
+        Image(systemName: "exclamationmark.triangle.fill")
+          .foregroundStyle(.orange)
+      }
     }
   }
 }
@@ -575,9 +612,11 @@ private struct GitHubIntegrationDetail: View {
         HStack {
           Label("Status", systemImage: "chevron.left.forwardslash.chevron.right")
           Spacer()
-          Text(provider.hasToken ? "Connected" : "Not configured")
-            .foregroundStyle(provider.hasToken ? .green : .secondary)
+          Text(provider.connectionDisplayState.label)
+            .foregroundStyle(provider.connectionDisplayState.isHealthy ? .green : .secondary)
         }
+        ConnectionHealthRows(lastFetchAt: provider.lastFetchAt,
+                             lastError: provider.lastError)
         Button {
           Task { await runTest() }
         } label: {
@@ -592,6 +631,10 @@ private struct GitHubIntegrationDetail: View {
           Text(lastResult)
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+      } footer: {
+        if provider.connectionDisplayState == .needsAttention {
+          Text("Personal access tokens expire. Create a replacement with the read:user scope and paste it above — the calendar backfills on the next refresh.")
         }
       }
     }

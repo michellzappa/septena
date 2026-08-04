@@ -32,6 +32,7 @@ struct ActivityDestinationView: View {
       switch bridge.access {
       case .granted:       vitals
       case .notDetermined: askForAccess
+      case .silent:        silentNotice
       case .denied:        if steppedDays.isEmpty { deniedNotice }
       }
     }
@@ -104,6 +105,26 @@ struct ActivityDestinationView: View {
           Task { _ = await bridge.requestAccess() }
         }
         .buttonStyle(.borderedProminent)
+        .tint(accent)
+      }
+    }
+  }
+
+  /// Asked, refreshed, everything empty. HealthKit hides read denial, so the
+  /// notice names both possibilities rather than picking one and being wrong.
+  /// Re-asking is harmless — HealthKit no-ops for types already decided.
+  private var silentNotice: some View {
+    DrawerSection {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("No Health data coming through")
+          .font(.septenaCardTitle)
+        Text("Either there's nothing recorded for these metrics yet, or Septena's read access was turned off. Check Settings → Health → Data Access & Devices → Septena.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+        Button("Check access") {
+          Task { _ = await bridge.requestAccess() }
+        }
+        .buttonStyle(.bordered)
         .tint(accent)
       }
     }

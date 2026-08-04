@@ -953,12 +953,14 @@ struct WeekDashboardView: View {
       bodyRows = sorted
       ResponseCache.save(sorted, forKey: CacheKey.bodyRows)
     }
+    // `try?` on purpose — a dead GitHub token must not take the dashboard
+    // down with it. The failure isn't lost: the provider records it, and the
+    // section + Settings row surface it (the tile keeps its cached calendar).
     if GitHubProvider.shared.hasToken,
        let gh = await PerfTrace.span("net.github", "", {
          try? await GitHubProvider.shared.fetchContributions(days: 365)
        }) {
-      githubContributions = gh
-      ResponseCache.save(gh, forKey: CacheKey.github)
+      githubContributions = gh   // provider already cached it
     }
     await PerfTrace.span("net.healthkit") { await HealthKitBridge.shared.refresh() }
     // Body (Withings) + GitHub inputs just landed — refresh the tile cache.

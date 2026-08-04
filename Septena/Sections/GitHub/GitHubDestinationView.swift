@@ -15,7 +15,6 @@ struct GitHubDestinationView: View {
   @State private var provider = GitHubProvider.shared
 
   private var accent: Color { theme.color(for: "github") }
-  private static let cacheKey = "github.contributions"
 
   /// ISO date → day, for O(1) heatmap cell lookup.
   private var byDate: [String: GitHubDay] {
@@ -24,6 +23,7 @@ struct GitHubDestinationView: View {
 
   var body: some View {
     SectionDrawer(sectionKey: "github") {
+      staleBanner
       if !contributions.days.isEmpty {
         summarySection
         heatmapSection
@@ -97,6 +97,33 @@ struct GitHubDestinationView: View {
     .a11yCombineKeepingChildren(weeklySummary(weeks))
   }
 
+  /// Shown when the token stops working. The cached calendar keeps painting
+  /// underneath — it's still true history — but a heatmap that silently
+  /// stopped at some date three weeks ago reads as "I wrote no code since
+  /// then", which is the one thing it must never imply. The `emptyState`
+  /// below can't cover this: it only renders when there is no data at all,
+  /// and a stale cache means there always is.
+  @ViewBuilder
+  private var staleBanner: some View {
+    let state = provider.connectionDisplayState
+    if state == .needsAttention || state == .stale, !contributions.days.isEmpty {
+      DrawerSection {
+        Label {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("Not syncing — showing the last calendar Septena could fetch.")
+              .font(.subheadline)
+            Text(provider.lastError ?? "Check the token in Settings › Integrations › GitHub.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        } icon: {
+          Image(systemName: "exclamationmark.triangle.fill")
+            .foregroundStyle(.orange)
+        }
+      }
+    }
+  }
+
   @ViewBuilder
   private var emptyState: some View {
     if !loading && contributions.days.isEmpty {
@@ -161,9 +188,7 @@ struct GitHubDestinationView: View {
   // MARK: - Loading
 
   private func paintFromCache() {
-    if let v = ResponseCache.load(GitHubContributions.self, forKey: Self.cacheKey) {
-      contributions = v
-    }
+    if let v = GitHubProvider.cached() { contributions = v }
     loading = false
   }
 
@@ -172,10 +197,9 @@ struct GitHubDestinationView: View {
     loading = true
     defer { loading = false }
     do {
-      let c = try await provider.fetchContributions(days: 365)
-      contributions = c
+      // The provider caches on success, so there's nothing to save here.
+      contributions = try await provider.fetchContributions(days: 365)
       loadError = nil
-      ResponseCache.save(c, forKey: Self.cacheKey)
     } catch {
       loadError = error.localizedDescription
     }

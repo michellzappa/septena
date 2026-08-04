@@ -54,25 +54,56 @@ final class HealthKitBridge {
     case granted
     case denied
     case notDetermined
+    /// We've asked, we've refreshed, and every read came back empty.
+    /// HealthKit will not say whether that's a denial or a genuinely still
+    /// day, so neither do we — see `access`.
+    case silent
   }
 
-  /// HealthKit doesn't expose per-type read status for privacy reasons —
-  /// callers see `.sharingDenied` even when the user said yes — so we
-  /// approximate. If we've loaded any non-zero number, treat as granted;
-  /// otherwise probe the step type's authorization status.
+  /// True when at least one type we read or write has never been decided —
+  /// i.e. HealthKit would show a permission sheet if we asked now.
+  ///
+  /// This is the one honest read-side signal Apple exposes. It matters most
+  /// for the case `readTypes` invites: a build adds a metric, HealthKit only
+  /// prompts for types it hasn't resolved, and nothing re-asks at launch — so
+  /// the new type's queries return 0 forever and look exactly like a quiet
+  /// week. Refreshed on every `refresh()`.
+  private(set) var needsAuthorizationRequest = false
+
+  /// Read access, stated only as strongly as HealthKit actually permits.
+  ///
+  /// Read authorization is deliberately opaque: `authorizationStatus(for:)`
+  /// reports `.sharingDenied` for read types whether or not the user said
+  /// yes, and a denied query returns 0 rather than an error. So there are
+  /// only two things we can honestly claim — a number we actually read
+  /// (proof of access), and a pending permission sheet. Everything else is
+  /// `.silent`. The old version inferred `.granted` from `hasLoaded` alone,
+  /// which meant a fully-denied install still showed "Granted" in green.
   var access: Access {
     guard isAvailable else { return .denied }
     #if canImport(HealthKit)
     if hasLoaded && (stepsToday > 0 || stepsHistory.contains(where: { $0 > 0 })) {
       return .granted
     }
-    let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
-    switch store.authorizationStatus(for: stepType) {
-    case .notDetermined: return .notDetermined
-    default:             return hasLoaded ? .granted : .notDetermined
-    }
+    // Never asked, or asked before a newer build added types.
+    if needsAuthorizationRequest || !hasLoaded { return .notDetermined }
+    return .silent
     #else
     return .denied
+    #endif
+  }
+
+  /// Probe whether a permission sheet is still owed. Cheap; runs with each
+  /// refresh so newly-added read types can't sit un-granted indefinitely.
+  func refreshRequestStatus() async {
+    #if canImport(HealthKit)
+    guard isAvailable else { return }
+    let status: HKAuthorizationRequestStatus = await withCheckedContinuation { cont in
+      store.getRequestStatusForAuthorization(toShare: writeTypes, read: readTypes) { status, _ in
+        cont.resume(returning: status)
+      }
+    }
+    needsAuthorizationRequest = (status == .shouldRequest)
     #endif
   }
 
@@ -245,6 +276,7 @@ final class HealthKitBridge {
     #endif
     #if canImport(HealthKit)
     guard isAvailable else { hasLoaded = true; return }
+    await refreshRequestStatus()
     async let st = todaySum(.stepCount)
     async let ak = todaySum(.activeEnergyBurned, unit: .kilocalorie())
     async let ex = todaySum(.appleExerciseTime, unit: .minute())

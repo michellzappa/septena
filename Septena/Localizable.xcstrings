@@ -3123,6 +3123,9 @@
     "Effort scale" : {
 
     },
+    "Either there's nothing recorded for these metrics yet, or Septena's read access was turned off. Check Settings → Health → Data Access & Devices → Septena." : {
+
+    },
     "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
       "localizations" : {
         "pt-BR" : {
@@ -5359,6 +5362,9 @@
         }
       }
     },
+    "No Health data coming through" : {
+
+    },
     "No meals logged yet" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5533,6 +5539,9 @@
       }
     },
     "Not supported on this device." : {
+
+    },
+    "Not syncing — showing the last calendar Septena could fetch." : {
 
     },
     "Note" : {
@@ -5941,6 +5950,9 @@
           }
         }
       }
+    },
+    "Personal access tokens expire. Create a replacement with the read:user scope and paste it above — the calendar backfills on the next refresh." : {
+
     },
     "Photo access is denied. Enable it in Settings → Privacy → Photos. Meal thumbnails won't show until then." : {
       "localizations" : {
