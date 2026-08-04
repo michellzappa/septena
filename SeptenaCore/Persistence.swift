@@ -1726,24 +1726,44 @@ enum TaskOrder {
   /// lands at the top of the list (matching the existing insert-at-top feel).
   @MainActor
   static func topPosition(in context: ModelContext) -> Double {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    let minKey = rows
-      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
-      .map { key($0) }
-      .min()
-    return (minKey ?? 0) - gap
+    (extremeKey(in: context, highest: false) ?? 0) - gap
   }
 
   /// A position that sorts below every live task — used by the foot-of-list
   /// quick-add line so a capture lands where the user typed, not at the top.
   @MainActor
   static func bottomPosition(in context: ModelContext) -> Double {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    let maxKey = rows
-      .filter { !$0.pendingDeletion && $0.deletedAt == nil }
+    (extremeKey(in: context, highest: true) ?? 0) + gap
+  }
+
+  /// The lowest (or highest) order key across live tasks.
+  ///
+  /// `key` mixes two stored columns — an explicit `position` once the row has
+  /// been dragged, otherwise `createdAt` — so the extreme can't be expressed as
+  /// one `SortDescriptor`. Taking the extreme of each column with a limit-1
+  /// sorted fetch and combining them gets the same answer from two indexed
+  /// seeks. This previously materialized EVERY `TaskEntity` in the store and
+  /// mapped it, on every single task create.
+  @MainActor
+  private static func extremeKey(in context: ModelContext, highest: Bool) -> Double? {
+    let order: SortOrder = highest ? .reverse : .forward
+
+    var dragged = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { !$0.pendingDeletion && $0.deletedAt == nil && $0.position != 0 },
+      sortBy: [SortDescriptor(\.position, order: order)]
+    )
+    dragged.fetchLimit = 1
+
+    var undragged = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { !$0.pendingDeletion && $0.deletedAt == nil && $0.position == 0 },
+      sortBy: [SortDescriptor(\.createdAt, order: order)]
+    )
+    undragged.fetchLimit = 1
+
+    let candidates = [dragged, undragged]
+      .compactMap { (try? context.fetch($0))?.first }
       .map { key($0) }
-      .max()
-    return (maxKey ?? 0) + gap
+    return highest ? candidates.max() : candidates.min()
   }
 
   /// Evenly spaced keys for `count` tasks dropped between two neighbor keys

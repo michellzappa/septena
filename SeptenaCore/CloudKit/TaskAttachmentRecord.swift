@@ -132,10 +132,24 @@ final class TaskAttachmentStore {
   }
 
   func attachments(taskID: String) -> [TaskAttachmentEntity] {
-    let rows = (try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? []
-    return rows.filter { $0.taskID == taskID }.sorted {
-      ($0.position, $0.createdAt) < ($1.position, $1.createdAt)
-    }
+    // Filter and sort in the store. This used to materialize EVERY attachment
+    // row in the database and filter in memory — from a view body, on every
+    // composer render (see `attachmentCount` for the cheaper existence check).
+    let descriptor = FetchDescriptor<TaskAttachmentEntity>(
+      predicate: #Predicate { $0.taskID == taskID },
+      sortBy: [SortDescriptor(\.position), SortDescriptor(\.createdAt)]
+    )
+    return (try? context.fetch(descriptor)) ?? []
+  }
+
+  /// How many attachments a task has, counted in the store without
+  /// materializing them. For view bodies that only need "any?" or a badge
+  /// number — the common case, and the one that was doing the most work.
+  func attachmentCount(taskID: String) -> Int {
+    let descriptor = FetchDescriptor<TaskAttachmentEntity>(
+      predicate: #Predicate { $0.taskID == taskID }
+    )
+    return (try? context.fetchCount(descriptor)) ?? 0
   }
 
   func add(taskID: String, sourceURL: URL) throws {

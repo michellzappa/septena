@@ -1508,7 +1508,7 @@ struct TaskAttributeBar: View {
             .focused($focus, equals: .pill(attr))
         }
         if let task = discussTask {
-          let count = SeptenaServices.shared.taskAttachmentStore.attachments(taskID: task.id).count
+          let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
           AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
                         value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
                         isSet: count > 0, isActive: expanded == .attachments,
@@ -1583,7 +1583,7 @@ struct TaskAttributeBar: View {
     switch attr {
     case .notes:      !draft.notes.isEmpty
     case .discuss:    discussWorking
-    case .attachments: discussTask.map { !SeptenaServices.shared.taskAttachmentStore.attachments(taskID: $0.id).isEmpty } ?? false
+    case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
     case .repeatRule: draft.recurrence != nil
