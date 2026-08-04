@@ -477,9 +477,18 @@ extension Font {
   static var septenaButton: Font       { .system(size: SeptenaTypeScale.size(.subheadline), weight: .semibold) }
   static var septenaLabel: Font        { .system(size: SeptenaTypeScale.size(.footnote), weight: .medium) }
   static var septenaBadge: Font        { .system(size: SeptenaTypeScale.size(.caption2), weight: .semibold) }
+  static var septenaCaption: Font      { .system(size: SeptenaTypeScale.size(.caption1)) }
+  static var septenaMetaMicro: Font    { .system(size: SeptenaTypeScale.size(.caption2)).monospacedDigit() }
+  static var septenaMetaSmall: Font    { .system(size: SeptenaTypeScale.size(.caption1)).monospacedDigit() }
   static var septenaMeta: Font         { .system(size: SeptenaTypeScale.size(.footnote)).monospacedDigit() }
   static var septenaMetaStrong: Font   { .system(size: SeptenaTypeScale.size(.footnote), weight: .semibold).monospacedDigit() }
   static var septenaMetric: Font       { .system(size: SeptenaTypeScale.size(.body), design: .monospaced).monospacedDigit() }
+
+  /// Chip / segment label — see the iOS definition for the rationale.
+  static func septenaChip(isSelected: Bool = false) -> Font {
+    .system(size: SeptenaTypeScale.size(.subheadline),
+            weight: isSelected ? .semibold : .regular)
+  }
 
   /// Hero metric — the large, standalone, glanceable number. See the iOS
   /// definition below for the rationale; this is the macOS (explicit-size) path.
@@ -537,8 +546,28 @@ extension Font {
   static let septenaButton       = Font.system(.subheadline, weight: .semibold)
   static let septenaLabel        = Font.system(.footnote, weight: .medium)
   static let septenaBadge        = Font.system(.caption2, weight: .semibold)
+  /// Small secondary label — the `.caption` rung between `septenaLabel`
+  /// (footnote) and `septenaBadge` (caption2). Explanatory sublabels, chart
+  /// axis text, inline hints. This exists so surfaces stop reaching for a raw
+  /// `.font(.caption)`; if the text is a *number*, use `septenaMeta` instead.
+  static let septenaCaption      = Font.system(.caption)
+
+  // MARK: Chips (SF Pro)
+  /// Label inside a `SelectableChip`. Weight carries the selected state, so the
+  /// chip never has to change size (which would reflow the strip on tap).
+  static func septenaChip(isSelected: Bool = false) -> Font {
+    .system(.subheadline, weight: isSelected ? .semibold : .regular)
+  }
 
   // MARK: Metrics (mono, tabular)
+  //
+  // One ladder, four rungs, so a number never has to hand-roll a mono font to
+  // hit a size the stylesheet didn't cover — which is exactly how the app ended
+  // up with dozens of bespoke `.font(.caption.monospacedDigit())` calls:
+  //   micro (caption2) → small (caption) → meta (footnote) → metric (body)
+  // Anything larger and standalone is a hero metric (rounded), not mono.
+  static let septenaMetaMicro    = Font.system(.caption2).monospacedDigit()
+  static let septenaMetaSmall    = Font.system(.caption).monospacedDigit()
   static let septenaMeta         = Font.system(.footnote).monospacedDigit()
   static let septenaMetaStrong   = Font.system(.footnote, weight: .semibold).monospacedDigit()
   static let septenaMetric       = Font.system(.body, design: .monospaced).monospacedDigit()
