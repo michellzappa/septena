@@ -149,10 +149,22 @@ struct TaskComposerCard: View {
   /// Escape follows the platform contract: cancel is non-destructive until a
   /// dirty draft has been explicitly confirmed for discard.
   @State private var showingKeyboardDiscardConfirmation = false
-  /// Autosave guard. Every persistence path (explicit Save, Return-to-save,
-  /// or a terminal action that already decided the outcome) flips this so the
-  /// `.onDisappear` autosave doesn't double-write or resurrect a deleted task.
-  @State private var savedOrSkipped = false
+  /// The draft exactly as it was at the last successful write. `persistOnce`
+  /// skips when the current draft still equals it, which makes saving
+  /// idempotent WITHOUT being one-shot.
+  ///
+  /// This used to be a `savedOrSkipped` boolean latch, and that silently ate
+  /// edits. `.onDisappear` is the autosave hook, but the inline editor lives in
+  /// a `LazyVStack`, which fires `.onDisappear` whenever the row leaves the
+  /// materialization window — a scroll, or the relayout the editor itself
+  /// causes when its title wraps — while keeping the view's `@State` alive. The
+  /// latch turned that transient disappear into the ONLY save the editor would
+  /// ever perform: everything typed afterwards was held in `draft`, shown in the
+  /// field, and never written. Hence "2 of 4 edits stuck".
+  @State private var lastPersistedDraft: TaskDraft?
+  /// Explicit Cancel → Discard. Terminal for this editing session, unlike the
+  /// save bookkeeping above: it must survive any number of teardowns.
+  @State private var discarded = false
   /// SuggestionEngine's learned area/project pick for the current title (the
   /// "Suggested" chip). Recomputed as the title changes; create-mode only.
   @State private var suggestedList: SuggestionEngine.Suggestion?
@@ -240,7 +252,7 @@ struct TaskComposerCard: View {
     // be idempotent — once a cancel is in flight, the duplicates are no-ops.
     // Previously the second call re-read `isDirty` after the first had already
     // discarded and closed, which made the outcome depend on handler ordering.
-    guard !showingKeyboardDiscardConfirmation, !savedOrSkipped else { return }
+    guard !showingKeyboardDiscardConfirmation, !discarded else { return }
     if isDirty {
       showingKeyboardDiscardConfirmation = true
     } else {
@@ -282,11 +294,17 @@ struct TaskComposerCard: View {
       }
       // Safety net: persist on any teardown the buttons didn't already handle
       // (app backgrounded, the inspector toggled shut by the system, a parent
-      // removed, or — inline — the row folded). Idempotent via `savedOrSkipped`
-      // — an explicit Save already ran it, and a Cancel → Discard flips the
-      // guard so this no-ops and the draft is dropped. The belt to the Cancel
-      // suspenders: the only path that loses work is a confirmed Discard. For
-      // the inline editor this IS the save path — folding the row autosaves.
+      // removed, or — inline — the row folded). Idempotent via
+      // `lastPersistedDraft`: an explicit Save already wrote this exact draft
+      // so it no-ops, and a Cancel → Discard latches it off entirely. The belt
+      // to the Cancel suspenders: the only path that loses work is a confirmed
+      // Discard. For the inline editor this IS the save path — folding the row
+      // autosaves.
+      //
+      // Note this can fire while the row is still being edited: the inline host
+      // is a `LazyVStack`, which disappears a row that merely scrolled out of
+      // the materialization window without destroying its state. That's exactly
+      // why the guard compares drafts instead of latching after the first call.
       // Save first, THEN let the host decide about an untouched draft — both in
       // the one teardown event so purge can never front-run the autosave.
       .onDisappear { persistOnce(); onVanish?() }
@@ -691,9 +709,9 @@ struct TaskComposerCard: View {
     seededIdentity = mode.identity
     seededMode = mode
     seededDeferredCreate = deferredCreate
-    // A new subject gets a fresh save latch. Without this, a card instance that
-    // already saved once could never write again.
-    savedOrSkipped = false
+    // A new subject starts with nothing written and nothing discarded.
+    lastPersistedDraft = nil
+    discarded = false
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
@@ -793,14 +811,20 @@ struct TaskComposerCard: View {
     }
   }
 
-  /// Persist exactly once. The single funnel for every save path (explicit
-  /// Save button, Return-to-save, autosave-on-close), so they can't double
-  /// write. Skips the write when there's nothing worth saving (an empty new
-  /// task that's just being dismissed).
+  /// The single funnel for every save path (explicit Save button,
+  /// Return-to-save, autosave-on-teardown). Writes only when the draft is
+  /// worth saving AND differs from what was last written, so the paths can't
+  /// double-write — but any genuinely new edit still gets through, however
+  /// many times this is called.
+  ///
+  /// It is deliberately NOT one-shot. See `lastPersistedDraft`: a `LazyVStack`
+  /// fires `.onDisappear` on a row that merely scrolled out of view, and the
+  /// user goes on typing into a view whose state is still very much alive.
   private func persistOnce() {
-    guard !savedOrSkipped else { return }
-    savedOrSkipped = true
+    guard !discarded else { return }
     guard draft.canSave else { return }
+    guard draft != lastPersistedDraft else { return }
+    lastPersistedDraft = draft
     persist()
     onDone()
   }
@@ -816,12 +840,12 @@ struct TaskComposerCard: View {
     draft.differs(fromSeed: seededDraft)
   }
 
-  /// Explicit Cancel → Discard. Flip the autosave guard so the `.onDisappear`
-  /// net below doesn't resurrect the dropped draft: create makes no task, edit
-  /// leaves the original untouched (its mutations never ran). The scaffold
-  /// closes after this.
+  /// Explicit Cancel → Discard. Latches the autosave off for good so the
+  /// `.onDisappear` net can't resurrect the dropped draft: create makes no
+  /// task, edit leaves the original untouched (its mutations never ran). The
+  /// scaffold closes after this.
   private func discard() {
-    savedOrSkipped = true
+    discarded = true
   }
 
   /// Persist + close (Return-to-save / newline-save). Closing then fires
