@@ -25,6 +25,10 @@ struct SeptaskApp: App {
 
   #if os(iOS)
   @UIApplicationDelegateAdaptor(SeptaskAppDelegate.self) private var appDelegate
+  #else
+  // macOS runs the AppKit shell as its default window; this delegate opens it
+  // and owns the launch sequence (docs/SEPTASK.md, "AppKit shell on macOS").
+  @NSApplicationDelegateAdaptor(SeptaskMacAppDelegate.self) private var appDelegate
   #endif
 
   var body: some Scene {
@@ -39,12 +43,17 @@ struct SeptaskApp: App {
         settingsStore: settingsStore
       )
     }
-    .restorationBehavior(.automatic)
     #if os(macOS)
     .windowStyle(.hiddenTitleBar)
     .defaultSize(width: 980, height: 700)
     .defaultPosition(.center)
-    .defaultLaunchBehavior(.presented)
+    // The classic SwiftUI window still exists — Go ▸ Classic Window opens it —
+    // but macOS launches into the AppKit shell, so this scene neither presents
+    // itself at launch nor gets restored on top of it.
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
+    #else
+    .restorationBehavior(.automatic)
     #endif
     .commands { SeptaskCommandMenus() }
 
@@ -128,8 +137,9 @@ private struct SeptaskMainWindow: View {
         SeptaskAppDelegate.navigation = navigation
         #endif
 
-        await services.start()
-        SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+        // Shared with the macOS AppKit root — see `SeptaskLaunch`. Idempotent,
+        // so it's harmless when that root already ran it.
+        await SeptaskLaunch.run(settings: settingsStore)
         // Publish the watch snapshot as soon as the runtime is up — don't wait
         // for a foreground bounce; the watch shows "error fetching record" until
         // this record exists in CloudKit.
@@ -138,11 +148,6 @@ private struct SeptaskMainWindow: View {
           context: localStore.container.mainContext,
           date: dayClock.today)
         #endif
-        ClaudeReconnectNudge.shared.start()
-        Task { @MainActor in
-          await ClaudeGatewayProvider.shared.refreshIfNeeded()
-          ClaudeReconnectNudge.shared.reconcile()
-        }
         #if DEBUG
         if DemoSeedMode.isOn {
           DemoSeed.populate(context: localStore.container.mainContext, today: dayClock.today)
@@ -150,34 +155,19 @@ private struct SeptaskMainWindow: View {
           NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
         }
         #endif
-        BadgeManager.shared.start(context: localStore.container.mainContext)
-        Task {
-          await services.absorbRemoteChanges()
-          let context = localStore.container.mainContext
-          settingsStore.reloadFromMirror(context: context)
-          settingsStore.reconcileWelcomeName(context: context, engine: services.ckEngine)
-          settingsStore.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
-          settingsStore.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
-          settingsStore.reconcileSupporter(context: context, engine: services.ckEngine)
-        }
       }
       .onChange(of: scenePhase) { _, phase in
         if phase == .active {
-          Task { @MainActor in
-            await services.start()
-            SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-          }
           #if os(iOS)
           SeptaskAppDelegate.navigation = navigation
           #endif
-          ClaudeReconnectNudge.shared.activate()
           Task { @MainActor in
-            try? await services.ckEngine.fetchChanges()
-            await ClaudeGatewayProvider.shared.refreshIfNeeded()
-            ClaudeReconnectNudge.shared.reconcile()
+            await SeptaskLaunch.activate()
+            #if os(iOS)
             TasksWatchSnapshotPublisher.schedule(
               context: localStore.container.mainContext,
               date: dayClock.today)
+            #endif
           }
         }
       }

@@ -8,6 +8,103 @@ of new strings, on-device signed convergence test, App Store packaging.
 Web project links (P5) follow the native-sharing work per
 `docs/NATIVE_PROJECT_SHARING_SPEC.md`. Internal codename: **Septask**.
 
+**macOS is moving to AppKit** for the task surfaces — see "AppKit shell on
+macOS" below before touching `SeptaskMac`.
+
+## AppKit shell on macOS (2026-08-06)
+
+**Decision: SeptaskMac's task surfaces are being ported to AppKit.** SwiftUI's
+keyboard path (key event → focus resolution → state change → view-graph diff →
+render, spread across runloop passes) is structurally slower than AppKit's
+synchronous responder chain, and no amount of SwiftUI tuning closes it. The
+whole "macOS keyboard & focus" trap section in `CLAUDE.md` is the archaeology
+of trying. Confirmed by side-by-side test on live data: materially faster and
+more Mac-native.
+
+**Shape of it.** The AppKit shell lives in `Septask/SeptaskKit*.swift`, inside
+the existing `SeptaskMac` target — NOT a new target (a new bundle id would need
+its own iCloud container provisioning, and its own empty mirror to sync before
+it could be judged).
+
+**It is now the default window on macOS.** The SwiftUI `WindowGroup` is
+`.defaultLaunchBehavior(.suppressed)` + `.restorationBehavior(.disabled)`
+there, and `SeptaskMacAppDelegate` opens the AppKit window at launch. The
+classic SwiftUI window is still one menu item away (Go ▸ Classic Window, ⌥⌘0)
+because it hosts everything the shell hasn't covered yet — including the
+first-run welcome gate, which the AppKit shell does NOT show.
+
+- `SeptaskLaunch.swift` — the launch sequence both roots share, plus the macOS
+  `NSApplicationDelegate`. Launch work lives here, not in a scene's `.task`.
+- `SeptaskKitWindow.swift` — `NSSplitViewController` window controller.
+- `SeptaskKitSidebar.swift` — `NSOutlineView` source list (views + areas /
+  projects, open counts, drop targets).
+- `SeptaskKitTaskList.swift` — `NSTableView` list, row cell, keyboard, drag &
+  drop, the animated row diff, and `KitDayFormat`.
+- `SeptaskKitRowViews.swift` — drawn primitives: checkbox, chip, sidebar
+  glyphs, the card row background, the recurrence menu.
+- `SeptaskKitTheme.swift` — the ONLY place kit code reads fonts/colors.
+- `SeptaskKitInspector.swift` — ⌥⌘I inspector: title, notes, dates, repeat.
+- `SeptaskKitQuickFind.swift` — ⇧⌘F search panel.
+- `SeptaskKitQuickEntry.swift` — global ⌃Space capture panel.
+- `SeptaskKitDatePopover.swift` — ⌘S / ⌘⇧D date popovers.
+- `SeptaskKitSettings.swift` — hosts the SwiftUI settings view.
+
+**What's still missing** versus the SwiftUI surface is tracked as a prioritized
+checklist in `docs/SEPTASK_APPKIT_PARITY.md` — read that before picking up
+shell work, and keep it current as items land.
+
+**Rules for working on it:**
+
+- **Presentation and interaction only.** Reads go through `LocalCache` /
+  `StructureCache`, writes through `TaskMutator` — the mutator write boundary
+  is unchanged. Any list/grouping semantics the AppKit shell needs that live in
+  a SwiftUI view get **hoisted into core**, never re-derived here; a second
+  copy of "what belongs in Today" is exactly the drift this repo forbids. The
+  grouped-Today order mirrors `TaskListView.orderedFromGroupedOpen` and reads
+  the same `SettingsKey.todayGroupByList`.
+- **Lockstep with the SwiftUI task surface**, like the two MCP servers: a
+  change to task interaction or presentation lands in both shells in the same
+  change, until the SwiftUI shell is retired.
+- **Keyboard bindings come from `TaskRowShortcuts`** (`TaskCommands.swift`) so
+  the two shells never teach conflicting muscle memory. The Space trap applies
+  here too: never bind it, and the checkbox sets `refusesFirstResponder`.
+- **One menu bar, either shell.** The menus are still SwiftUI `Commands`.
+  They act on the focused SwiftUI scene when there is one, and otherwise fall
+  back to `SeptaskKitCommands`, which routes to the frontmost shell window.
+  Add a command in BOTH arms or it goes dead in one of the two shells. Row
+  commands keep the `TaskRowShortcuts` bindings on both paths.
+- **Settings and other form surfaces stay SwiftUI**, hosted in
+  `NSHostingController` (⌘, → `SeptaskKitSettingsWindow`). They are not
+  latency surfaces; porting them is pure drift. A hosted shared view still
+  needs the full environment chain — use `septenaSharedEnvironment`, or it
+  crashes at launch (see "P1 Findings").
+- **Hosted views take their observables from `SeptaskMacRuntime`, never fresh
+  instances.** The shell has no SwiftUI scene holding a `SettingsStore` /
+  `SectionTheme` / `DayClock`, so that enum owns one of each for the process.
+  Constructing a second `SettingsStore` for a hosted window is a silent bug:
+  the user's edits land in a copy nothing else reads, and a second `DayClock`
+  drops the debug day offset.
+- **Motion routes through `KitMotion`** (the AppKit mirror of `A11yMotion`),
+  which reads `NSWorkspace.accessibilityDisplayShouldReduceMotion`. Never
+  animate rows directly.
+- **Standard AppKit only** — the same "never get creative" rule as SwiftUI.
+  `NSTableView`/`NSOutlineView` selection, the field editor for inline rename
+  (the native answer to the `Text`→`TextField` corruption trap), `NSPopover`
+  for scoped editors, `NSMenu` for closed choice sets, native drag & drop.
+- **Selection is ALWAYS the neutral token**, focused or not:
+  `SeptaskKitTheme.listSelectionFill` (= `Theme.listSelectionFill` =
+  `.unemphasizedSelectedContentBackgroundColor`), drawn full-bleed on the card
+  for a list row and inset+rounded for a source-list row. Do NOT let AppKit
+  draw its emphasized selection: `.selectedContentBackgroundColor` follows the
+  **app accent, which here is adaptive INK**, so the "standard" treatment
+  paints selected rows solid black in light mode — the AppKit face of the
+  accent-is-ink trap in `CLAUDE.md`. Row views also pin
+  `interiorBackgroundStyle` to `.normal`, or AppKit flips row text to white
+  against that neutral fill.
+- **The global ⌃Space hotkey** uses Carbon `RegisterEventHotKey` (sandbox-safe,
+  no accessibility permission). It contends with Things' identical binding
+  while Things is running — that's the OS, not a bug.
+
 ## Icon Notes (2026-07-02)
 
 Septask's icon is generated, not designed by hand — regenerate rather than

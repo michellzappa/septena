@@ -19,6 +19,12 @@ enum SettingsKey {
   /// row's subtitle, sorted by due urgency (`SeptenaTask.compareNextPageOrder`).
   /// Read by `TaskListView` and `TasksDestinationView`.
   static let todayGroupByList = "septena.today.groupByList"
+  /// Whether the AppKit shell's sidebar shows its trailing count badges.
+  /// Absent → on. Currently read only by `SeptaskKitSidebarController`
+  /// (View ▸ Show Sidebar Counts) — kept in the shared registry rather than
+  /// local to that file on the chance the SwiftUI sidebar wants the same
+  /// toggle later.
+  static let septaskSidebarCounts = "septena.septask.sidebarCounts"
   /// Device-local mirror of `AppSettings.onboardedAt`: true once the
   /// first-run welcome has been completed (here or, after sync, on another
   /// device). The welcome gate reads this for an instant, offline-safe
