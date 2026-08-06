@@ -139,6 +139,11 @@ public final class ClaudeGatewayProvider {
   public private(set) var lastRefreshAt: Date?
   public private(set) var lastError: String?
   public private(set) var isRefreshing = false
+  /// True only while `ASWebAuthenticationSession` is on-screen. AppLock
+  /// reads this so the sheet's `.inactive` transition isn't mistaken for a
+  /// real background (which would cover/re-lock mid-auth and can leave the
+  /// session hung with `isRefreshing` stuck until a process restart).
+  public private(set) var isPresentingWebAuth = false
   /// Token is (presumed) stale and needs an interactive re-mint. Set on
   /// foreground when the last refresh is older than the token lifetime —
   /// the UI surfaces a subtle "reconnect" cue rather than auto-popping the
@@ -170,10 +175,18 @@ public final class ClaudeGatewayProvider {
     return .connected
   }
 
+  /// Cap on how long we wait for the Apple sign-in sheet to complete. The
+  /// old WKWebView path had an explicit timeout; ASWebAuthenticationSession
+  /// does not — if its completion never fires (bad anchor, AASA glitch,
+  /// interrupted presentation), `isRefreshing` would stick true and every
+  /// later tap would no-op until the process restarts.
+  private static let webAuthTimeout: TimeInterval = 90
+
   private let session: URLSession
   // Retained for the duration of a sign-in.
   private var authSession: ASWebAuthenticationSession?
   private var anchorProvider: AuthAnchorProvider?
+  private var webAuthTimeoutTask: Task<Void, Never>?
 
   private init() {
     let cfg = URLSessionConfiguration.default
@@ -541,23 +554,49 @@ public final class ClaudeGatewayProvider {
 
   /// Present the sign-in and capture the HTTPS callback URL.
   private func runWebAuth(startURL: URL) async throws -> URL {
-    try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
+    // One-shot resume: the session completion, start()-failure, and the
+    // watchdog timeout can all race; resuming a CheckedContinuation twice
+    // traps.
+    final class ResumeOnce: @unchecked Sendable {
+      private var done = false
+      private let lock = NSLock()
+      func run(_ body: () -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        guard !done else { return }
+        done = true
+        body()
+      }
+    }
+    let once = ResumeOnce()
+
+    return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
+      let finish: (Result<URL, Error>) -> Void = { [weak self] result in
+        once.run {
+          self?.webAuthTimeoutTask?.cancel()
+          self?.webAuthTimeoutTask = nil
+          self?.authSession = nil
+          self?.anchorProvider = nil
+          self?.isPresentingWebAuth = false
+          cont.resume(with: result)
+        }
+      }
+
       let provider = AuthAnchorProvider()
       let webAuth = ASWebAuthenticationSession(
         url: startURL,
         callback: .https(host: Self.callbackHost, path: Self.callbackPath)
-      ) { [weak self] callbackURL, error in
-        self?.authSession = nil
-        self?.anchorProvider = nil
+      ) { callbackURL, error in
         if let callbackURL {
-          cont.resume(returning: callbackURL)
+          finish(.success(callbackURL))
         } else if let asError = error as? ASWebAuthenticationSessionError,
                   asError.code == .canceledLogin {
           // User tapped Cancel / swiped the sheet away — leave the reconnect
-          // cue up, don't record it as an error.
-          cont.resume(throwing: GatewayError.cancelled)
+          // cue up, don't record it as an error. (A watchdog cancel() also
+          // lands here; we resume timeout *before* calling cancel(), so the
+          // once-guard drops that secondary resume.)
+          finish(.failure(GatewayError.cancelled))
         } else {
-          cont.resume(throwing: error ?? GatewayError.server(0, "sign-in cancelled"))
+          finish(.failure(error ?? GatewayError.server(0, "sign-in cancelled")))
         }
       }
       webAuth.presentationContextProvider = provider
@@ -565,15 +604,28 @@ public final class ClaudeGatewayProvider {
       webAuth.prefersEphemeralWebBrowserSession = false
       self.anchorProvider = provider
       self.authSession = webAuth
+      self.isPresentingWebAuth = true
+
+      // Watchdog: if the completion never fires, cancel and surface a
+      // retryable error instead of leaving isRefreshing stuck forever.
+      self.webAuthTimeoutTask = Task { @MainActor [weak self] in
+        try? await Task.sleep(for: .seconds(Self.webAuthTimeout))
+        guard !Task.isCancelled else { return }
+        self?.logger.error("Claude gateway sign-in timed out after \(Int(Self.webAuthTimeout), privacy: .public)s")
+        // Resume with timeout *before* cancel() so cancel's canceledLogin
+        // completion hits the once-guard instead of winning the race as a
+        // silent user-cancel (which would hide the failure from the cue).
+        finish(.failure(GatewayError.server(0, "sign-in timed out — tap to try again")))
+        self?.authSession?.cancel()
+      }
+
       // start() returns false when it can't present (e.g. Associated Domains
       // not active / no window). Surface that instead of hanging forever.
       if !webAuth.start() {
-        self.authSession = nil
-        self.anchorProvider = nil
-        cont.resume(throwing: GatewayError.server(
+        finish(.failure(GatewayError.server(
           0,
           "couldn’t start sign-in — check this app's Associated Domains and that the AASA is reachable"
-        ))
+        )))
       }
     }
   }
@@ -610,21 +662,24 @@ public final class ClaudeGatewayProvider {
   }
 }
 
-// Supplies the window ASWebAuthenticationSession presents over. Match the
-// Withings OAuth anchor: fall back to any scene window (not an empty anchor)
-// so `start()` doesn't fail when SwiftUI hasn't marked a key window yet —
-// common when the reconnect cue lives in the iPad overlay bar.
+// Supplies the window ASWebAuthenticationSession presents over. Prefer the
+// foreground-active scene's key window; fall back to any scene window. Never
+// return a detached `UIWindow()` — `start()` can return true against an
+// unattached anchor and then never invoke its completion (the "tap spins
+// forever until restart" failure mode). Prefer an empty `ASPresentationAnchor`
+// in that rare case so `start()` fails cleanly instead.
 private final class AuthAnchorProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
   func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
     #if os(iOS)
     let scenes = UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
-    let window = scenes
-      .flatMap(\.windows)
-      .first(where: \.isKeyWindow)
-      ?? scenes.flatMap(\.windows).first
-      ?? UIWindow()
-    return window
+    let preferred = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+    if let window = preferred?.windows.first(where: \.isKeyWindow)
+      ?? preferred?.windows.first
+      ?? scenes.flatMap(\.windows).first {
+      return window
+    }
+    return ASPresentationAnchor()
     #elseif os(macOS)
     return NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first ?? ASPresentationAnchor()
     #else

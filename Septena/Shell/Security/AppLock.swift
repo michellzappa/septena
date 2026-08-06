@@ -116,6 +116,12 @@ final class AppLock {
     // Already locked or mid-auth → the cover is up and the timer doesn't
     // matter; don't reset it (the biometric sheet itself fires `.inactive`).
     guard phase == .unlocked else { return }
+    // ASWebAuthenticationSession (Claude reconnect) also takes the scene
+    // inactive while its sheet is up. Treating that as a real background
+    // covers the app and — with "Lock after: Immediately" — re-arms Face ID
+    // on top of the Apple sheet, which races the session and can leave its
+    // completion never firing (`isRefreshing` stuck until restart).
+    if ClaudeGatewayProvider.shared.isPresentingWebAuth { return }
     covering = true
     backgroundedAt = Date()
   }
@@ -127,6 +133,14 @@ final class AppLock {
     case .authenticating:
       break // focus returning from the system sheet; await its callback
     case .unlocked:
+      // Still inside an ASWebAuthenticationSession presentation — the scene
+      // can flicker active/inactive around the sheet. Don't consume a stale
+      // backgroundedAt or re-cover.
+      if ClaudeGatewayProvider.shared.isPresentingWebAuth {
+        backgroundedAt = nil
+        covering = false
+        return
+      }
       guard let since = backgroundedAt else {
         covering = false
         return
