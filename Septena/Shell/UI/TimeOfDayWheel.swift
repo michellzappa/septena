@@ -462,7 +462,10 @@ struct TimeOfDayWheel: View {
           .fill(skyShading(nightArc))
           .padding(20)
           .rotationEffect(.degrees(displayedRotation))
+          // Accessibility.swift isn't in the widget target — same gate as ModuleTile.
+          #if !WIDGET_EXTENSION
           .a11yAnimation(.easeInOut(duration: 0.6), value: displayedRotation)
+          #endif
       }
 
       // All marks, on top of the face: ticks, duration bands, dots, hour
