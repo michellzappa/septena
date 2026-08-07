@@ -105,6 +105,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private let tableView = SeptaskKitTableView()
+  private let scrollView = NSScrollView()
   private let emptyLabel = NSTextField(labelWithString: "No Tasks")
   private var rows: [Row] = []
   private var filter: TaskFilter = .today
@@ -242,19 +243,22 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.registerForDraggedTypes([.septaskTask])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
 
-    let scroll = NSScrollView()
-    scroll.documentView = tableView
-    scroll.hasVerticalScroller = true
-    scroll.drawsBackground = true
-    scroll.backgroundColor = SeptaskKitTheme.pageBackground
+    scrollView.documentView = tableView
+    scrollView.hasVerticalScroller = true
+    scrollView.drawsBackground = true
+    scrollView.backgroundColor = SeptaskKitTheme.pageBackground
     // Breathing room above the first card and below the last — Things-style;
     // without it the list runs flush to the window's top and bottom edges.
     // `contentInsets` (not a spacer row) is the standard way to do this: it
     // pads the clip view rather than the document, so scroll/bounce and
     // "scroll to visible" all still measure from the real content edges.
-    scroll.automaticallyAdjustsContentInsets = false
-    scroll.contentInsets = NSEdgeInsets(top: 16, left: 0, bottom: 16, right: 0)
-    view = scroll
+    // The actual top/bottom VALUE is set in `viewDidLayout` — it tracks
+    // `SeptaskKitLayout.inset(for:)`, the same width-dependent number the
+    // rows use for their left/right margin, so the card reads as evenly
+    // framed on all four sides instead of a fixed vertical amount that only
+    // matches the horizontal one at one particular window width.
+    scrollView.automaticallyAdjustsContentInsets = false
+    view = scrollView
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
     emptyLabel.textColor = SeptaskKitTheme.iconMuted
@@ -288,6 +292,18 @@ final class SeptaskKitTaskListController: NSViewController {
 
   deinit {
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
+  }
+
+  /// Keeps the scroll view's top/bottom breathing room in step with the
+  /// rows' width-dependent left/right margin (`SeptaskKitLayout.inset(for:)`)
+  /// on every resize — a fixed vertical constant would only agree with the
+  /// horizontal margin at one specific window width.
+  override func viewDidLayout() {
+    super.viewDidLayout()
+    let inset = SeptaskKitLayout.inset(for: view.bounds.width)
+    if scrollView.contentInsets.top != inset || scrollView.contentInsets.bottom != inset {
+      scrollView.contentInsets = NSEdgeInsets(top: inset, left: 0, bottom: inset, right: 0)
+    }
   }
 
   /// True once `show` has run at least once — see the guard below.
@@ -738,6 +754,12 @@ final class SeptaskKitTaskListController: NSViewController {
       }
     }
     tableView.endUpdates()
+    // The insert/remove/move above can change which SURVIVING rows are now
+    // first/last in their card — refresh every on-screen row's geometry
+    // directly rather than relying on the content-diff below, which only
+    // catches a row whose own `Row` value changed (see the doc comment on
+    // `refreshCardGeometry`).
+    refreshCardGeometry()
 
     // Surviving rows whose content changed (rename, date, today flag).
     let oldByKey = Dictionary(old.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
@@ -1725,7 +1747,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         fresh.identifier = identifier
         return fresh
       }()
+    applyCardGeometry(rowView, atRow: row)
+    return rowView
+  }
 
+  private func applyCardGeometry(_ rowView: KitCardRowView, atRow row: Int) {
     if rows[row].isCardRow {
       rowView.isCard = true
       let previousOnCard = row > 0 && rows[row - 1].isCardRow
@@ -1736,7 +1762,25 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       rowView.isCard = false
     }
     rowView.needsDisplay = true
-    return rowView
+  }
+
+  /// A row's corner rounding depends on its NEIGHBORS' card-row-ness
+  /// (`isFirstInGroup`/`isLastInGroup`), not just its own content — so
+  /// inserting/removing/moving a row can change the correct geometry for a
+  /// SURVIVING neighbor that itself didn't change (e.g. completing the last
+  /// item in a card leaves the new last item still square-cornered on the
+  /// bottom, since `apply`'s content-diff only reloads rows whose own `Row`
+  /// value changed, never a neighbor purely because it's now first/last).
+  /// `insertRows`/`removeRows`/`moveRow` don't re-invoke `rowViewForRow` for
+  /// unaffected rows, so on-screen row views need to be corrected directly
+  /// rather than through the delegate. Only touches rows already on screen —
+  /// cheap, and anything off-screen gets correct geometry the moment
+  /// `rowViewForRow` dequeues it fresh.
+  private func refreshCardGeometry() {
+    tableView.enumerateAvailableRowViews { rowView, row in
+      guard let cardRow = rowView as? KitCardRowView, rows.indices.contains(row) else { return }
+      applyCardGeometry(cardRow, atRow: row)
+    }
   }
 
   // MARK: Drag & drop (reorder + re-file)
