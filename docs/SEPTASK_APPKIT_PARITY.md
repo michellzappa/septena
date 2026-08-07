@@ -1,5 +1,38 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-07 bug-report pass:** fixed a real data bug MZ caught by hand — a
+task could render in Inbox AND its filed project/area at once. Root cause:
+`isInTriageBand` (`SeptenaCore/Models.swift` / `Persistence.swift`) never
+consulted `project`/`area` for `source == mcp` rows (an agent proposal stayed
+"in Inbox" no matter where it got filed) — now guards `project == nil &&
+area == nil` up front for BOTH populations before either branch. See the
+"2026-08-07 correction" note in `docs/TRIAGE_BAND_SPEC.md` §3 for the full
+reasoning; this is a SeptenaCore fix, so it applies to the SwiftUI shell too,
+not just AppKit. Also fixed two AppKit-only rendering bugs MZ caught in the
+same pass: (1) card corner-rounding going stale on a SURVIVING row after an
+insert/remove/move — `SeptaskKitTaskListController.apply`'s diff path only
+reloaded rows whose own `Row` value changed, never a neighbor that became
+first/last purely because an adjacent row was added or removed, so a card's
+new bottom row could stay square-cornered forever; `refreshCardGeometry()` now
+walks on-screen row views directly after every diff. (2) The list's top/bottom
+breathing room was a fixed 16pt constant while the left/right margin is
+`SeptaskKitLayout.inset(for: width)` (10%, clamped 10–220) — the two only
+agreed at one specific window width. `viewDidLayout` now keeps
+`scrollView.contentInsets.top`/`.bottom` equal to the SAME computed pixel
+value the rows use for their sides, at every width. And replaced the flat
+"Move" `NSMenu` with `SeptaskKitMoveModal.swift` — a type-to-filter floating
+panel matching `SeptaskKitQuickFind`'s shape, the AppKit counterpart of
+SwiftUI's `MovePickerSheet` — and, per MZ's explicit call, restricted Move
+targets to AREAS ONLY (`KitMoveMenu.destinations` no longer lists projects;
+`Destination.project` stays a case for other callers — drag-and-drop refiling,
+a project's own page — it's just not a Move-command choice anymore). MZ
+separately reported the Next page rendering empty and the page-title chevron
+not opening the nav menu — both match exactly what `d888c98` (the immediately
+prior commit) already fixed; re-read the code and found no residual bug, so
+this is very likely the stale-build symptom the "Suggested order" section
+below already warns about. Flagged, not re-fixed — if either persists after a
+clean rebuild + relaunch, it's a NEW bug, not this one.
+
 **Landed since the last pass (2026-08-06):** inline composer with the
 elective pill rail (§1), the three row cues — tenure dial, unread-context
 dot, agent cue (§3), structure CRUD — new/rename/delete area & project
