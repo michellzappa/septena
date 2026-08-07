@@ -221,15 +221,18 @@ enum KitGlyph {
   }
 
   /// `ProjectProgressIcon` — faint track ring under an arc that starts at 12
-  /// o'clock and sweeps clockwise (diameter 14, line width 2.5).
-  static func progress(_ value: Double, tint: NSColor = .secondaryLabelColor) -> NSImage {
+  /// o'clock and sweeps clockwise (diameter 14 by default, line width scaled
+  /// to match — the group header passes a bigger `diameter` for its chunkier
+  /// icon).
+  static func progress(_ value: Double, tint: NSColor = .secondaryLabelColor,
+                       diameter: CGFloat = 14) -> NSImage {
     let clamped = value.isFinite ? max(0, min(1, value)) : 0
     // Quantized so scrolling a long sidebar reuses cache entries.
     let step = (clamped * 20).rounded() / 20
-    let key = cacheKey("p:\(step):\(tint.description)")
+    let key = cacheKey("p:\(step):\(tint.description):\(diameter)")
     if let hit = cache[key] { return hit }
 
-    let diameter: CGFloat = 14, lineWidth: CGFloat = 2.5
+    let lineWidth = diameter * (2.5 / 14)
     let image = draw(size: NSSize(width: diameter + lineWidth, height: diameter + lineWidth)) { rect in
       let circle = NSRect(x: lineWidth / 2, y: lineWidth / 2, width: diameter, height: diameter)
       let track = NSBezierPath(ovalIn: circle)
@@ -254,13 +257,15 @@ enum KitGlyph {
   }
 
   /// `SidebarAreaRow`'s filler dot — deliberately solid, so it never reads as
-  /// a checkable or progress ring.
-  static func areaDot() -> NSImage {
-    let key = cacheKey("dot")
+  /// a checkable or progress ring. `diameter` scales the whole image (dot
+  /// inset stays proportional) — the group header passes a bigger one.
+  static func areaDot(diameter: CGFloat = 16) -> NSImage {
+    let key = cacheKey("dot:\(diameter)")
     if let hit = cache[key] { return hit }
-    let image = draw(size: NSSize(width: 16, height: 16)) { rect in
+    let inset = diameter * (5.0 / 16)
+    let image = draw(size: NSSize(width: diameter, height: diameter)) { rect in
       SeptaskKitTheme.iconMuted.setFill()
-      NSBezierPath(ovalIn: rect.insetBy(dx: 5, dy: 5)).fill()
+      NSBezierPath(ovalIn: rect.insetBy(dx: inset, dy: inset)).fill()
     }
     cache[key] = image
     return image
@@ -455,12 +460,13 @@ final class KitCardRowView: NSTableRowView {
     }
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
-    // One neutral fill, focused or not — `Theme.listSelectionFill`. NOT the
-    // emphasized `.selectedContentBackgroundColor`: that follows the app
-    // accent, and this app's accent is adaptive INK (black in light mode), so
-    // the standard treatment paints a black bar. Neutral is also the repo's
+    // One neutral fill, faded when unemphasized (not the app's own second
+    // color — see `SeptaskKitTheme.listSelectionFill(emphasized:)`). NOT the
+    // system `.selectedContentBackgroundColor`: that follows the app accent,
+    // and this app's accent is adaptive INK (black in light mode), so the
+    // standard treatment paints a black bar. Neutral is also the repo's
     // canonical selection language (docs/DesignSpec.md §4.5).
-    SeptaskKitTheme.listSelectionFill.setFill()
+    SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
     cardPath().fill()
     for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
     NSGraphicsContext.restoreGraphicsState()
@@ -476,13 +482,34 @@ final class KitCardRowView: NSTableRowView {
 /// full-bleed card shape the task list uses.
 @MainActor
 final class KitSidebarRowView: NSTableRowView {
+  /// Extra height `heightOfRowByItem` adds ABOVE a top-level area/loose-
+  /// project row — its section-start margin. The selection pill must not
+  /// cover that band, or a selected area reads as if the blank space above
+  /// it were selected too. 0 for every other row (the common case). Set
+  /// alongside this row view in `outlineView(_:rowViewForItem:)`.
+  var extraTopMargin: CGFloat = 0
+
   override func drawSelection(in dirtyRect: NSRect) {
     guard selectionHighlightStyle != .none else { return }
-    // Vertical inset bumped from 1 to 3 — at 1 the pill touched the row's
-    // top/bottom edges almost exactly, so a taller (top-of-section) row's
-    // selection stretched full-height instead of floating with margin.
-    let rect = bounds.insetBy(dx: 8, dy: 3)
-    SeptaskKitTheme.listSelectionFill.setFill()
+    // The pill covers only the row's CONTENT band — `bounds` minus
+    // `extraTopMargin` — sitting at the BOTTOM of `bounds`, matching
+    // `SidebarCell`'s own bottom-anchored content (see its
+    // `contentBottomInset` comment). For a plain row (`extraTopMargin == 0`)
+    // this is just `bounds` itself, same as before.
+    let contentHeight = bounds.height - extraTopMargin
+    // Vertical inset bumped from 3 down to 1 — was reading a bit thin
+    // against the row; this puts ~20% more selected pixels above/below.
+    let verticalInset: CGFloat = 1
+    // NSTableRowView is FLIPPED (minY is the row's visual TOP, not its
+    // bottom) — the margin band is the first `extraTopMargin` points from
+    // `minY`, so skipping it means starting the pill AFTER that, not at
+    // `minY` itself. Getting this backwards is what put the pill floating
+    // in the margin with the row's text sitting below it, outside the pill.
+    let rect = NSRect(x: bounds.minX + 8,
+                      y: bounds.minY + extraTopMargin + verticalInset,
+                      width: bounds.width - 16,
+                      height: contentHeight - verticalInset * 2)
+    SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
   }
 

@@ -120,9 +120,6 @@ final class SeptaskKitTaskListController: NSViewController {
   private var settleWorkItem: DispatchWorkItem?
   /// Held so its submenu can be refreshed from the live structure on open.
   private let moveMenuItem = NSMenuItem()
-  /// True once the FIRST real Auto Layout pass has completed — see
-  /// `viewDidLayout()` and the width guard in `heightForTask`.
-  private var hasLaidOutOnce = false
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -133,6 +130,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A grouped Today/Anytime area or project header was clicked — drill into
   /// that list, the same destination its sidebar row goes to.
   var onNavigateToGroup: ((TaskFilter) -> Void)?
+  /// Tab pressed while the list holds focus — the window owns moving focus
+  /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
+  var onFocusSidebar: (() -> Void)?
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
@@ -201,6 +201,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onClearSchedule = { [weak self] in self?.clearScheduleSelection() }
     tableView.onDuplicate = { [weak self] in self?.duplicateSelection() }
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
+    tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     // Edit ▸ Copy targets the first responder, so implementing `copy(_:)` on
     // the table is what makes the STANDARD menu item work — better than a
     // second ⌘C item in the Task menu fighting it for the binding.
@@ -240,21 +241,6 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     tableView.registerForDraggedTypes([.septaskTask])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
-
-    // A wrapped title's wrap width depends on the table's own width
-    // (`SeptaskKitLayout.taskTitleWidth`), so any width change — a window
-    // resize, dragging the sidebar splitter — has to re-ask every row's
-    // height, or a row narrowed after its height was computed keeps its old
-    // (now too-short) height and its 2nd line clips into the row below it.
-    tableView.postsFrameChangedNotifications = true
-    observers.append(NotificationCenter.default.addObserver(
-      forName: NSView.frameDidChangeNotification, object: tableView, queue: .main
-    ) { [weak tableView] _ in
-      MainActor.assumeIsolated {
-        guard let tableView else { return }
-        tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<tableView.numberOfRows))
-      }
-    })
 
     let scroll = NSScrollView()
     scroll.documentView = tableView
@@ -302,19 +288,6 @@ final class SeptaskKitTaskListController: NSViewController {
 
   deinit {
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
-  }
-
-  /// Corrective backstop for the "double-tall rows at launch" bug: the very
-  /// first `reload()` can run before Auto Layout has resolved the table's
-  /// real width (see `heightForTask`'s guard), so once that first REAL
-  /// layout pass completes, force every row to re-measure against the now-
-  /// correct width. One-shot — later layout passes (window resize) are
-  /// already covered by the `frameDidChangeNotification` observer above.
-  override func viewDidLayout() {
-    super.viewDidLayout()
-    guard !hasLaidOutOnce, tableView.bounds.width > 200 else { return }
-    hasLaidOutOnce = true
-    tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<tableView.numberOfRows))
   }
 
   /// True once `show` has run at least once — see the guard below.
@@ -1631,7 +1604,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // section; "Inbox"/"Agenda" are sub-groups within Today's own flow and
     // don't need the same visual break.
     case .header(let id, _, _, _):
-      let base = SeptenaTypeScale.size(.headline) + 9 + 26
+      // Kept in sync with `KitGroupHeaderCell.font`'s `+14` bump.
+      let base = SeptenaTypeScale.size(.headline) + 14 + 26
       return isNavigableHeaderId(id) ? base + 10 : base
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
@@ -1640,43 +1614,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return KitComposerCell.height(showsNotes: composerShowsNotes)
       }
-      return heightForTask(task, tableWidth: tableView.bounds.width)
+      return SeptaskKitTheme.rowHeight
     case .event: return SeptaskKitTheme.rowHeight
     case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
     }
-  }
-
-  /// A row grows to fit its title when it wraps to a 2nd line — computed
-  /// against the SAME wrap width `SeptaskKitTaskCell.layout()` sets on the
-  /// field itself (`SeptaskKitLayout.taskTitleWidth`), or the measured height
-  /// and the field's actual wrap wouldn't agree, reproducing the overlap this
-  /// exists to fix. Headings keep the single-line height — they're short
-  /// project-section names in practice, not a surface this was asked for.
-  private func heightForTask(_ task: SeptenaTask, tableWidth: CGFloat) -> CGFloat {
-    // Before the FIRST real Auto Layout pass (e.g. the very first `reload()`,
-    // fired synchronously from `selectDefault()` during window construction),
-    // `tableWidth` can still be near-zero. Measuring wrap against that would
-    // force EVERY title — even a short one — to read as needing 2 lines,
-    // doubling every row's height until something happens to re-measure.
-    // `viewDidLayout()` corrects this once real geometry lands; this guard
-    // just stops the bad height from ever being computed in the first place.
-    guard !task.isHeading, tableWidth > 200 else { return SeptaskKitTheme.rowHeight }
-
-    let width = SeptaskKitLayout.taskTitleWidth(tableWidth: tableWidth)
-    let font = SeptaskKitTheme.taskTitle
-    let singleLineHeight = font.ascender - font.descender + font.leading
-    let measured = (task.title as NSString).boundingRect(
-      with: NSSize(width: width, height: .greatestFiniteMagnitude),
-      options: [.usesLineFragmentOrigin, .usesFontLeading],
-      attributes: [.font: font]
-    ).height
-    let lines = max(1, min(2, Int((measured / singleLineHeight).rounded(.up))))
-    guard lines > 1 else { return SeptaskKitTheme.rowHeight }
-
-    // Exactly one extra line's worth of height — so the padding above and
-    // below a wrapped title matches a single-line row's, and everything stays
-    // centered (all three columns use `centerYAnchor`).
-    return SeptaskKitTheme.rowHeight + singleLineHeight
   }
 
   /// Card geometry: a run of task rows between headers draws as one card,
@@ -1911,12 +1852,12 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       self.onToggle?(self.taskId)
     }
 
-    // Wraps up to 2 lines and grows the row to fit (see `heightForTask`);
-    // longer than that still truncates with an ellipsis on the 2nd line.
-    title.maximumNumberOfLines = 2
-    title.cell?.wraps = true
+    // Single-line, truncate with ellipsis — denser list rhythm; full title
+    // is on the tooltip / inspector / composer.
+    title.maximumNumberOfLines = 1
+    title.cell?.wraps = false
     title.cell?.truncatesLastVisibleLine = true
-    title.lineBreakMode = .byWordWrapping
+    title.lineBreakMode = .byTruncatingTail
     title.isEditable = false
     title.isSelectable = false
     title.delegate = self
@@ -1953,10 +1894,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
-      // Everything centers vertically, at any number of title lines: the row
-      // grows by exactly one line height when the title wraps
-      // (`heightForTask`), so a 2-line title stays centered and the checkbox
-      // and trailing meta sit on its optical middle.
       checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
       checkbox.widthAnchor.constraint(equalToConstant: 20),
       checkbox.heightAnchor.constraint(equalToConstant: 20),
@@ -1977,10 +1914,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
-    // Same formula the controller uses to size the row for this wrap width
-    // (`SeptaskKitLayout.taskTitleWidth`) — keeping the two on one shared
-    // function is what stops them drifting and reproducing the overlap bug.
-    title.preferredMaxLayoutWidth = SeptaskKitLayout.taskTitleWidth(tableWidth: bounds.width)
     super.layout()
   }
 
@@ -1996,6 +1929,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       notesGlyph.isHidden = true
       chip.isHidden = true
       detail.stringValue = ""
+      title.toolTip = task.title
       title.attributedStringValue = NSAttributedString(
         string: task.title,
         attributes: [
@@ -2006,6 +1940,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
 
     checkbox.isHidden = false
+    title.toolTip = task.title
     let done = task.status != .open
     checkbox.isDone = done
     // The box carries readiness and Today the same way TaskCheckbox does:
@@ -2332,8 +2267,16 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// down the list shows one consistent rung of section title.
   var onTap: (() -> Void)?
 
+  /// Bumped from `+9` after visual review — at `+9` a project's small
+  /// progress-ring icon read noticeably lighter than an area's emoji next to
+  /// it even at matching font, so both the title and the icon frame grew
+  /// together (see `iconDiameter`/`init` below) for a chunkier section break.
   private static let font: NSFont =
-    .systemFont(ofSize: SeptenaTypeScale.size(.headline) + 9, weight: .bold)
+    .systemFont(ofSize: SeptenaTypeScale.size(.headline) + 14, weight: .bold)
+  /// Matches the icon/emoji/glyph diameter to the bumped title — was a flat
+  /// 18pt frame with a 14pt progress ring and a 16pt area dot inside it.
+  /// (Dialed back from an initial 24 — that read too big next to the title.)
+  private static let iconDiameter: CGFloat = 20
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -2346,7 +2289,7 @@ final class KitGroupHeaderCell: NSTableCellView {
     title.font = SeptaskKitTheme.groupTitle
     title.textColor = .labelColor
     title.lineBreakMode = .byTruncatingTail
-    emoji.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline))
+    emoji.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
     count.font = SeptaskKitTheme.meta
 
     let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
@@ -2365,7 +2308,7 @@ final class KitGroupHeaderCell: NSTableCellView {
     NSLayoutConstraint.activate([
       leadingConstraint,
       icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
-      icon.widthAnchor.constraint(equalToConstant: 18),
+      icon.widthAnchor.constraint(equalToConstant: Self.iconDiameter),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
       title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
@@ -2412,12 +2355,12 @@ final class KitGroupHeaderCell: NSTableCellView {
       emoji.stringValue = glyph
       icon.isHidden = true
     case .areaDot:
-      icon.image = KitGlyph.areaDot()
+      icon.image = KitGlyph.areaDot(diameter: Self.iconDiameter)
     case .project(let progress):
-      icon.image = KitGlyph.progress(progress)
+      icon.image = KitGlyph.progress(progress, diameter: Self.iconDiameter)
     case .symbol(let name):
       icon.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
+        .withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
     }
     // Reused cells carry a stale cursor rect otherwise — a scrolled-in
@@ -2535,6 +2478,9 @@ final class SeptaskKitTableView: NSTableView {
   var onMove: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
+  /// Tab / Shift-Tab — two-pane keyboard nav, sidebar ⇄ list (mirrors the
+  /// sidebar's own `onTab` in `KitSidebarOutlineView`).
+  var onFocusSidebar: (() -> Void)?
 
   /// Standard responder-chain copy, so Edit ▸ Copy (and its ⌘C) reaches the
   /// task list without a competing menu item.
@@ -2588,6 +2534,10 @@ final class SeptaskKitTableView: NSTableView {
     switch event.keyCode {
     case 36, 76:  // Return / keypad Enter — opens the composer, not a bare rename.
       onOpenComposer?()
+    case 48:  // Tab / Shift-Tab — only two stops in the loop, so either
+      // direction just crosses to the sidebar (no field editor is live here;
+      // one is first responder instead and eats Tab before this fires).
+      onFocusSidebar?()
     default:
       super.keyDown(with: event)
     }

@@ -45,10 +45,8 @@ enum SeptaskKitTheme {
   }
 
   /// Single-line row height derived from the body rung so rows grow with the
-  /// user's text-size setting instead of clipping. Rows whose title wraps to a
-  /// second line grow by exactly one line's height, keeping the padding above
-  /// and below identical to a single-line row — see
-  /// `SeptaskKitTaskListController.heightForTask`.
+  /// user's text-size setting instead of clipping. Titles truncate; they do
+  /// not wrap and grow the row.
   static var rowHeight: CGFloat { SeptenaTypeScale.size(.body) + 21 }
 
   // MARK: - Color
@@ -81,19 +79,31 @@ enum SeptaskKitTheme {
   /// Theme.sidebarBackground — the source list's backing.
   static let sidebarBackground = NSColor(Theme.sidebarBackground)
 
-  /// Theme.listSelectionFill — the app's ONE selection fill, on every surface
-  /// and in every focus state. NOT the emphasized system color: that follows
-  /// the accent, which here is adaptive ink, so it would paint selected rows
-  /// solid black in light mode.
+  /// Theme.listSelectionFill — the app's ONE selection fill, on every
+  /// surface, in both focus states. NOT the emphasized system color: that
+  /// follows the accent, which here is adaptive ink, so it would paint
+  /// selected rows solid black in light mode.
+  ///
+  /// One SHAPE and one HUE always (never a second selection language — see
+  /// `docs/DesignSpec.md` §4.5) — but `emphasized` (mirrors
+  /// `NSTableRowView.isEmphasized`, AppKit's own "this row's table is the
+  /// window's first responder AND the window is key" signal, no manual
+  /// tracking needed) fades the SAME fill rather than swapping it, so a
+  /// selection that lost keyboard focus — Tab moved to the other pane, or the
+  /// window went inactive — reads as "still selected, not what you'd act on
+  /// right now" instead of looking identical to the live one.
   ///
   /// Bumped noticeably lighter than the raw system
   /// `.unemphasizedSelectedContentBackgroundColor` after visual review — it
   /// read too heavy next to the shell's light gray page and white cards. This
   /// intentionally diverges from `Theme.listSelectionFill`'s SwiftUI value
   /// (same raw system token); worth raising upstream if it holds up.
-  static let listSelectionFill: NSColor = NSColor(name: nil) { appearance in
-    let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
-    return isDark ? NSColor(white: 0.24, alpha: 1) : NSColor(white: 0.93, alpha: 1)
+  static func listSelectionFill(emphasized: Bool) -> NSColor {
+    NSColor(name: nil) { appearance in
+      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      let white: CGFloat = isDark ? 0.24 : 0.93
+      return NSColor(white: white, alpha: emphasized ? 1 : 0.5)
+    }
   }
 }
 
@@ -112,21 +122,6 @@ enum SeptaskKitLayout {
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {
     min(maxInset, max(minInset, width * marginFraction))
-  }
-
-  /// The width left for a task row's TITLE after the checkbox and a reserved
-  /// trailing budget (list chip / date / notes glyph — their exact combined
-  /// width varies per row, so this is a conservative fixed reservation, not a
-  /// pixel-exact one). Used both to WRAP the title
-  /// (`SeptaskKitTaskCell.layout()`) and to size the row that wrap needs
-  /// (`SeptaskKitTaskListController.heightForTask`) — one formula, so the two
-  /// can't drift apart and reproduce the "text taller than its row" overlap.
-  static func taskTitleWidth(tableWidth: CGFloat) -> CGFloat {
-    let inset = inset(for: tableWidth)
-    let leading = inset + 6 + 20 + 7          // card gap + checkbox + title gap
-    let trailingReserve: CGFloat = 90         // chip / date / notes budget
-    let trailing = inset + 8 + trailingReserve
-    return max(80, tableWidth - leading - trailing)
   }
 }
 #endif

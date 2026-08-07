@@ -51,6 +51,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     sidebar.onSelect = { [weak list] filter, title in
       list?.show(filter, title: title)
     }
+    // Tab / Shift-Tab crosses between the two panes — the only two stops in
+    // this window's keyboard-nav loop.
+    sidebar.onFocusList = { [weak list] in list?.focusList() }
+    list.onFocusSidebar = { [weak sidebar] in sidebar?.focusSidebar() }
     list.onSelectionChange = { [weak inspector] task in
       inspector?.show(task)
     }

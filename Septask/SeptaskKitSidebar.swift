@@ -53,6 +53,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   var onSelect: ((TaskFilter, String) -> Void)?
+  /// Tab pressed while the sidebar holds focus — the window owns moving
+  /// focus to the list (mirrors the list's own `onFocusSidebar`).
+  var onFocusList: (() -> Void)?
 
   private let outlineView = KitSidebarOutlineView()
   private var roots: [Node] = []
@@ -114,6 +117,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // AppKit's automatic path for a table's `.menu` paints its own native
     // "row targeted by a context menu" highlight the row view can't suppress.
     outlineView.onRightClick = { [weak self] event in self?.presentContextMenu(for: event) }
+    outlineView.onTab = { [weak self] in self?.onFocusList?() }
 
     let scroll = NSScrollView()
     scroll.documentView = outlineView
@@ -163,6 +167,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let row = outlineView.row(forItem: today)
     guard row >= 0 else { return }
     outlineView.selectRowIndexes([row], byExtendingSelection: false)
+  }
+
+  /// Give the sidebar keyboard focus — the list's side of the Tab loop
+  /// (`SeptaskKitTaskListController.focusList()`). Selection already exists
+  /// (the sidebar always has a current filter), so this only moves the
+  /// responder, never the selection.
+  func focusSidebar() {
+    view.window?.makeFirstResponder(outlineView)
   }
 
   // MARK: - Tree
@@ -491,13 +503,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
     let identifier = NSUserInterfaceItemIdentifier("sidebarRow")
-    if let reused = outlineView.makeView(withIdentifier: identifier, owner: nil)
-      as? KitSidebarRowView {
-      return reused
-    }
-    let fresh = KitSidebarRowView()
-    fresh.identifier = identifier
-    return fresh
+    let row = (outlineView.makeView(withIdentifier: identifier, owner: nil) as? KitSidebarRowView)
+      ?? { let fresh = KitSidebarRowView(); fresh.identifier = identifier; return fresh }()
+    // Must match `heightOfRowByItem`'s own `+16` exactly, or the selection
+    // pill either clips into the margin band (too big) or leaves a sliver of
+    // unselected content band showing (too small).
+    row.extraTopMargin = (item as? Node).map { topLevelAreaOrProjectKeys.contains($0.key) ? 16 : 0 } ?? 0
+    return row
   }
 
   /// Uniform row height, +margin above EVERY top-level area/loose-project row
@@ -851,9 +863,20 @@ final class KitDisclosureView: NSView {
 @MainActor
 private final class KitSidebarOutlineView: NSOutlineView {
   var onRightClick: ((NSEvent) -> Void)?
+  /// Tab / Shift-Tab — two-pane keyboard nav, list ⇄ sidebar (mirrors
+  /// `SeptaskKitTableView.onFocusSidebar`).
+  var onTab: (() -> Void)?
 
   override func rightMouseDown(with event: NSEvent) {
     onRightClick?(event)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    if event.keyCode == 48 {  // Tab / Shift-Tab — only two stops in the loop.
+      onTab?()
+      return
+    }
+    super.keyDown(with: event)
   }
 }
 #endif

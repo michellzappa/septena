@@ -23,6 +23,43 @@ file `SeptaskKitPrompt.swift` (`KitPrompt.text`/`.confirmDestructive`) —
 every NSAlert-based prompt in the shell goes through it now; use it for the
 next one instead of writing another `NSAlert` block inline.
 
+**2026-08-07 third pass:** ⚠️ a prior session reverted task-row titles from
+wrap-to-2-lines back to single-line-truncate (`SeptaskKitTaskCell`,
+`SeptaskKitTheme.rowHeight`/`taskTitleWidth` removed) — this is a **parity
+regression**, not a fix: `TaskComponents.swift`'s canonical SwiftUI row uses
+`.lineLimit(2)`, so long titles wrap and grow the row there. The AppKit
+implementation that matched it (grow-row-by-one-line-on-wrap, guarded against
+the pre-layout near-zero-width launch bug) is git history — `git log -p
+--all -- Septask/SeptaskKitTheme.swift` around the `taskTitleWidth`/
+`heightForTask` removal has the working version to restore if MZ wants
+parity back rather than the denser single-line list. Left as-is (not
+reverted) pending MZ's call — it's a deliberate-looking change even though it
+diverges from SwiftUI. Also added: Tab/Shift-Tab now crosses focus between
+sidebar and task list (`onFocusSidebar`/`onFocusList`, wired in
+`SeptaskKitWindow.swift`) — a 2-stop loop via explicit `keyDown` interception
+(consistent with this file's existing Return-key pattern), not the native
+key-view loop, since NSTableView/NSOutlineView don't reliably surface Tab to
+`nextKeyView` on their own. Selected-and-focused now reads differently from
+selected-and-blurred: `SeptaskKitTheme.listSelectionFill(emphasized:)` fades
+the SAME fill (never a second color/shape — docs/DesignSpec.md §4.5) using
+`NSTableRowView.isEmphasized`, AppKit's own signal for "this row's table is
+the window's first responder" — no manual tracking needed, so Tab-ing to the
+sidebar now visibly dims the list's old selection instead of both panes
+looking identically "active." Area/project headers (`KitGroupHeaderCell`)
+bumped chunkier — font `headline+9` → `headline+14`, icon/emoji/progress-ring
+frame 18pt → 24pt (`KitGlyph.progress`/`.areaDot` gained a `diameter` param,
+default unchanged, so the sidebar/screen-title call sites are untouched) —
+row height's `+9` kept in lockstep. Confirmed the `wt/kit-next` worktree
+(`../septena-kit-next`, branch `wt/kit-next`) already has a full Next-feed
+port as a sidebar destination (`SeptaskKitNext.swift`, hosts the shared
+`SeptaskNextPage`) — builds green there, but it forked before this session's
+Upcoming-buckets/headings/reorder work landed on `main`, so it needs a rebase
+before merging. And ⌘1–4 (Today/Upcoming/Anytime/Logbook) were checked, not
+rebuilt — `SeptaskNavigationCommands.swift`'s "Go" menu already routes to
+`SeptaskKitCommands.go(_:)` when the AppKit shell is frontmost; if they're
+not firing for MZ it's very likely the same stale-build symptom as the
+header-size report above, not a real gap.
+
 What the AppKit shell (`Septask/SeptaskKit*.swift`) still lacks versus the
 SwiftUI task surface it's replacing on macOS. Context, decision, and working
 rules live in `docs/SEPTASK.md` ("AppKit shell on macOS"); this file is only
