@@ -4,60 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1540,
+      "build": 1546,
       "date": "2026-08-07",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A new companion app over the same private task data, with its own iPhone, iPad, Mac, and Apple Watch experience.",
+          "title": "Septask, a focused task app, joins Septena",
+          "detail": "A new lightweight app for iPhone, Mac, and Apple Watch shares the same private tasks, areas, and projects as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Bulk actions, drag-and-drop, and Recently Deleted for tasks",
-          "detail": "Multi-select tasks for bulk edits, drag tasks onto Today groups to re-home them, and recover deleted tasks for 30 days.",
+          "title": "Recurring tasks create their next occurrence automatically",
+          "detail": "Complete a repeating task and the next one appears on its own.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks and Things import",
-          "detail": "Completing a recurring task now spawns its next occurrence, and you can import tasks straight from a Things database export.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring over an existing Things database, including headings mapped into project sections.",
           "section": "tasks"
         },
         {
-          "title": "Attach files to tasks",
-          "detail": null,
-          "section": "tasks"
-        },
-        {
-          "title": "Calendar events woven into Today and Upcoming",
-          "detail": "Hidden-calendar choices now sync across your devices.",
+          "title": "Recover deleted tasks for 30 days",
+          "detail": "A Recently Deleted view lets you restore or permanently purge tasks you removed.",
           "section": "tasks"
         },
         {
           "title": "Photo-first meal logging",
-          "detail": "Snap a photo and Septena analyzes and prefills the meal for you; re-logged meals can be scaled by portion.",
+          "detail": "Snap a photo of your meal and on-device analysis prefills the details for you.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Get per-set progression hints, editable session start/end times, effort-weighted muscle volume, and an auto-advancing rest timer with a watch Live Activity.",
+          "title": "Redesigned training rest flow",
+          "detail": "Rest timers now auto-advance between sets, with a Live Activity you can follow from your watch.",
           "section": "training"
         },
         {
-          "title": "Pinned goals on your dashboard",
-          "detail": "Pin goals to the week dashboard and toggle habit-backed goals right from the tile.",
+          "title": "Pin goals to your dashboard",
+          "detail": "New suggested goals also appear for chores, gut, habits, medications, mood, supplements, and symptoms.",
           "section": "goals"
         },
         {
-          "title": "See what's shared with privacy telemetry controls",
-          "detail": "Choose your telemetry level and review a log of what was recently sent.",
+          "title": "See exactly what data is sent",
+          "detail": "Privacy settings now show a full telemetry checklist with graded levels and anonymized opt-out.",
           "section": null
-        },
-        {
-          "title": "Copy your grocery list",
-          "detail": "A new button copies the shopping list to your clipboard.",
-          "section": "groceries"
         }
       ]
     },
