@@ -1573,10 +1573,17 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
 extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelegate {
   func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
-  func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool {
-    if case .header = rows[row] { return true }
-    return false
-  }
+  /// Always false, deliberately — NOT `if case .header = rows[row] { true }`.
+  /// A `.header` row already gets full custom appearance from `KitCardRowView`
+  /// + `KitGroupHeaderCell` (the same mechanism `.screenTitle` uses, which
+  /// DOES render at its intended size). Marking it a group row on top of that
+  /// let AppKit's own system "section header" text style — small, secondary
+  /// color, semibold — fight the cell's own font, and it wins: that's why
+  /// `KitGroupHeaderCell`'s font bumps kept visually not-landing no matter
+  /// how large `Self.font` was set. `shouldSelectRow` already excludes
+  /// headers from selection on its own (`rows[row].task != nil`), so nothing
+  /// downstream actually needed `isGroupRow` to be true.
+  func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { false }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
     rows[row].task != nil
@@ -1604,8 +1611,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // section; "Inbox"/"Agenda" are sub-groups within Today's own flow and
     // don't need the same visual break.
     case .header(let id, _, _, _):
-      // Kept in sync with `KitGroupHeaderCell.font`'s `+14` bump.
-      let base = SeptenaTypeScale.size(.headline) + 14 + 26
+      // Kept in sync with `KitGroupHeaderCell.font` (17pt).
+      let base = 17 * FontScale.shared.factor + 26
       return isNavigableHeaderId(id) ? base + 10 : base
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
@@ -2267,16 +2274,25 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// down the list shows one consistent rung of section title.
   var onTap: (() -> Void)?
 
-  /// Bumped from `+9` after visual review — at `+9` a project's small
-  /// progress-ring icon read noticeably lighter than an area's emoji next to
-  /// it even at matching font, so both the title and the icon frame grew
-  /// together (see `iconDiameter`/`init` below) for a chunkier section break.
-  private static let font: NSFont =
-    .systemFont(ofSize: SeptenaTypeScale.size(.headline) + 14, weight: .bold)
-  /// Matches the icon/emoji/glyph diameter to the bumped title — was a flat
-  /// 18pt frame with a 14pt progress ring and a 16pt area dot inside it.
-  /// (Dialed back from an initial 24 — that read too big next to the title.)
-  private static let iconDiameter: CGFloat = 20
+  /// Matches SwiftUI's ACTUAL group header exactly —
+  /// `sectionGroupHeaderTitleStyle()` (`Theme.groupHeaderFontSize` = 17 on
+  /// macOS, `.semibold`) — rather than another guessed offset off
+  /// `.headline`. Every earlier pass here (`+9`, `+14`, `+10`, `.bold`) was
+  /// tuning a number disconnected from the real target, which is why each
+  /// round kept reading "wrong" no matter which way it was nudged. A `var`,
+  /// not `let`: `FontScale.shared.factor` can change at runtime (Settings ▸
+  /// Text Size), and SwiftUI's `scaledFont` reacts live — this should too.
+  private static var font: NSFont {
+    .systemFont(ofSize: 17 * FontScale.shared.factor, weight: .semibold)
+  }
+  /// The icon COLUMN width — same as a task row's checkbox column
+  /// (`Theme.checkboxTap` = 22 on macOS) — so header glyphs and row
+  /// checkboxes sit at one X. NOT the glyph's own size: SwiftUI sizes each
+  /// icon KIND differently within this column (`TaskListView.groupHeaderBody`
+  /// — `AreaIcon(diameter: 21)`, `ProjectProgressIcon(diameter: 14)`, a
+  /// system symbol at `.scaledFont(size: 16)`), so `configure` matches those
+  /// per case rather than forcing one shared diameter.
+  private static let iconColumnWidth: CGFloat = 22
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -2289,7 +2305,9 @@ final class KitGroupHeaderCell: NSTableCellView {
     title.font = SeptaskKitTheme.groupTitle
     title.textColor = .labelColor
     title.lineBreakMode = .byTruncatingTail
-    emoji.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
+    // Sized to roughly fill the 21pt area-icon slot (matches `AreaIcon`'s
+    // emoji sizing), not the title's own font.
+    emoji.font = .systemFont(ofSize: 16 * FontScale.shared.factor)
     count.font = SeptaskKitTheme.meta
 
     let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
@@ -2308,7 +2326,7 @@ final class KitGroupHeaderCell: NSTableCellView {
     NSLayoutConstraint.activate([
       leadingConstraint,
       icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
-      icon.widthAnchor.constraint(equalToConstant: Self.iconDiameter),
+      icon.widthAnchor.constraint(equalToConstant: Self.iconColumnWidth),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
       title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
@@ -2355,9 +2373,11 @@ final class KitGroupHeaderCell: NSTableCellView {
       emoji.stringValue = glyph
       icon.isHidden = true
     case .areaDot:
-      icon.image = KitGlyph.areaDot(diameter: Self.iconDiameter)
+      // 21 — matches `AreaIcon(diameter: 21)` in `TaskListView.groupHeaderBody`.
+      icon.image = KitGlyph.areaDot(diameter: 21)
     case .project(let progress):
-      icon.image = KitGlyph.progress(progress, diameter: Self.iconDiameter)
+      // 14 — matches `ProjectProgressIcon(diameter: 14)`, same call site.
+      icon.image = KitGlyph.progress(progress, diameter: 14)
     case .symbol(let name):
       icon.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
         .withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
