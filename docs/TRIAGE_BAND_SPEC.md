@@ -197,6 +197,21 @@ ratified-and-due-today. Concretely, `Today list = isOnToday && !inTriageBand`. A
 unacknowledged agent task with `scheduled == today` is in the **band**, not the
 list, until blessed. This is the one real change to the existing predicates.
 
+**2026-08-07 correction:** rule 2's "regardless of `project`" turned out to be
+wrong in practice, not just in wording — a task could be filed into a real
+project/area (by the agent itself, or by a human dragging/filing it in either
+shell) and still render inside the Inbox band AND on that project's page at
+once, because `isInTriageBand` never consulted `project`/`area` for
+`source == mcp` rows. A project/area assignment is real filing intent, same as
+a human disposition — it should always leave the band, for either population.
+`isInTriageBand` (`SeptenaTask`/`TaskEntity`) now guards `project == nil &&
+area == nil` before either branch; rule 2 is effectively "regardless of
+`scheduled`/`deadline`" only, not `project`. This also happens to close the
+"acknowledge never gets called" gap in some write paths (docs/
+SEPTASK_APPKIT_PARITY.md, §4/§6) — once a filed task always leaves the band on
+its own, an unacknowledged-forever agent row filed into a project no longer
+gets stuck double-listed until the 7-day decay.
+
 ---
 
 ## 4. The triage verb-set (the whole game)

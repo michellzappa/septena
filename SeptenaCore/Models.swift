@@ -244,18 +244,23 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// divider is ratification, not date: two captured-but-not-committed
   /// populations belong here —
   ///   • an unacknowledged agent proposal still inside its freshness window
-  ///     (`showsAgentCue`), regardless of any date/project it carries; and
+  ///     (`showsAgentCue`), regardless of any DATE it carries; and
   ///   • a loose human capture with no disposition at all (the classic Inbox).
-  /// A row leaves the band the instant it is ratified (any disposition, or
-  /// `acknowledge` for agent rows) — and for agent rows also when the cue
-  /// decays (ratification-by-timeout, so a long-ignored proposal ages into
-  /// its natural bucket rather than living in limbo). DTO mirror of
+  /// A project/area assignment is ALWAYS a disposition, for either population
+  /// — a task never sits in Inbox and a category at once. A row leaves the
+  /// band the instant it is ratified (any disposition, or `acknowledge` for
+  /// agent rows) — and for agent rows also when the cue decays
+  /// (ratification-by-timeout, so a long-ignored proposal ages into its
+  /// natural bucket rather than living in limbo). DTO mirror of
   /// `TaskEntity.isInTriageBand` — keep the two in lockstep.
   var isInTriageBand: Bool {
     guard status == .open, !isHeading else { return false }
+    // Filed into a project or area is a disposition regardless of source —
+    // an agent that both proposes a task AND files it stays out of Inbox;
+    // only an unfiled agent proposal rides the cue-decay window.
+    guard project == nil, area == nil else { return false }
     if source == TaskSource.mcp { return showsAgentCue() }
-    return scheduled == nil && deadline == nil
-        && project == nil && area == nil && !today
+    return scheduled == nil && deadline == nil && !today
   }
 
   /// Native projection used by the SwiftData mirror. Keeping this typed avoids

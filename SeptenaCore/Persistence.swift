@@ -193,20 +193,24 @@ final class TaskEntity {
   /// Single definition of "is this open task in the triage band" — the
   /// *unratified* layer rendered above Today (see `docs/TRIAGE_BAND_SPEC.md`).
   /// The divider is ratification, not date: an unacknowledged agent proposal
-  /// still inside its freshness window (regardless of any date/project it
-  /// carries), or a loose human capture with no disposition at all (the
-  /// classic Inbox). A row leaves the band on any ratification — a disposition,
-  /// an `acknowledge`, or (agent rows only) cue decay. Mirror of
-  /// `SeptenaTask.isInTriageBand`; keep the two in lockstep. The agent arm
+  /// still inside its freshness window (regardless of any DATE it carries),
+  /// or a loose human capture with no disposition at all (the classic Inbox).
+  /// A project/area assignment is ALWAYS a disposition — a task never sits in
+  /// Inbox and a category at once. A row leaves the band on any ratification
+  /// — a disposition, an `acknowledge`, or (agent rows only) cue decay. Mirror
+  /// of `SeptenaTask.isInTriageBand`; keep the two in lockstep. The agent arm
   /// reuses the same predicate as `showsAgentCue` so band == cue for agent rows.
   var isInTriageBand: Bool {
     guard status == .open, !isHeading else { return false }
+    // Filed into a project or area is a disposition regardless of source —
+    // an agent that both proposes a task AND files it stays out of Inbox;
+    // only an unfiled agent proposal rides the cue-decay window.
+    guard project == nil, area == nil else { return false }
     if source == TaskSource.mcp {
       guard acknowledgedAt == nil, createdAt != .distantPast else { return false }
       return Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
     }
-    return scheduled == nil && deadline == nil
-        && project == nil && area == nil && !today
+    return scheduled == nil && deadline == nil && !today
   }
 
   var recurrence: Recurrence? {
