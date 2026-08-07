@@ -48,6 +48,7 @@ first-run welcome gate, which the AppKit shell does NOT show.
 - `SeptaskKitQuickEntry.swift` — global ⌃Space capture panel.
 - `SeptaskKitDatePopover.swift` — ⌘S / ⌘⇧D date popovers.
 - `SeptaskKitSettings.swift` — hosts the SwiftUI settings view.
+- `SeptaskKitNext.swift` — hosts the SwiftUI Next page (sidebar destination).
 
 **What's still missing** versus the SwiftUI surface is tracked as a prioritized
 checklist in `docs/SEPTASK_APPKIT_PARITY.md` — read that before picking up
@@ -730,6 +731,12 @@ section (`Septask/SeptaskNextFold.swift`, mounted from `TaskListView` under
 `#if SEPTASK`, gated by Settings ▸ General ▸ "Next in Today", default on).
 Rationale: Septask mirrors the whole zone anyway; the fold removes the
 app-switch for the day's rituals.
+
+**AppKit shell (2026-08-07):** the same feed is a **sidebar destination**
+instead (`KitSidebarDestination.next` → hosted `SeptaskNextPage` via
+`SeptaskKitNext.swift`). The shared body is `SeptaskNextFeed`; the Today
+fold and the AppKit page both render it. Appending heterogeneous ritual rows
+to the AppKit Today `NSTableView` was deliberately rejected.
 
 - **Composition, not copies.** The fold renders the SAME models/rows Septena's
   Next tab uses (`NextItemsModel`, `NextSuggestionsModel`,
