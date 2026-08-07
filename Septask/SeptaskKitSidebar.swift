@@ -61,6 +61,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// `heightOfRowByItem`, so each area still reads as its own section without
   /// the "Areas & Projects" text header that used to separate them.
   private var topLevelAreaOrProjectKeys: Set<String> = []
+  /// Where `organize` (loose projects, then areas) begins within `roots` —
+  /// `roots = views + organize`. Structure drag-reorder uses this to convert
+  /// between "position within `roots`" (what NSOutlineView hands back for a
+  /// root-level drop) and "position within the pure loose-project or
+  /// pure-area id list" (what the mutators' `reorder(orderedIDs:)` expects).
+  private var organizeStartIndex = 0
   private var observers: [NSObjectProtocol] = []
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
@@ -102,7 +108,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.indentationPerLevel = 0
     outlineView.dataSource = self
     outlineView.delegate = self
-    outlineView.registerForDraggedTypes([.septaskTask])
+    outlineView.registerForDraggedTypes([.septaskTask, .septaskStructureItem])
+    outlineView.setDraggingSourceOperationMask(.move, forLocal: true)
     // NOT `.menu`: same reasoning as the task table (SeptaskKitTaskList) —
     // AppKit's automatic path for a table's `.menu` paints its own native
     // "row targeted by a context menu" highlight the row view can't suppress.
@@ -244,6 +251,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // `numberOfChildrenOfItem(nil)` returns, so this list order IS the
     // top-level row order.
     roots = views + organize
+    organizeStartIndex = views.count
     topLevelAreaOrProjectKeys = Set(organize.map(\.key))
     outlineView.reloadData()
     outlineView.expandItem(nil, expandChildren: true)
@@ -313,15 +321,20 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo,
                    proposedItem item: Any?, proposedChildIndex index: Int)
     -> NSDragOperation {
-    guard let node = item as? Node, dropAction(for: node) != nil,
-          !KitDrag.ids(from: info).isEmpty else { return [] }
-    // Always target the row itself, never a gap between rows.
-    outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
-    return .move
+    if !KitDrag.ids(from: info).isEmpty {
+      guard let node = item as? Node, dropAction(for: node) != nil else { return [] }
+      // Always target the row itself, never a gap between rows.
+      outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
+      return .move
+    }
+    return validateStructureReorder(info, proposedItem: item, proposedChildIndex: index)
   }
 
   func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
                    item: Any?, childIndex index: Int) -> Bool {
+    guard !KitDrag.ids(from: info).isEmpty else {
+      return acceptStructureReorder(info, proposedItem: item, proposedChildIndex: index)
+    }
     guard let node = item as? Node, let action = dropAction(for: node) else { return false }
     let ids = KitDrag.ids(from: info)
     guard !ids.isEmpty else { return false }
@@ -348,6 +361,130 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // counts here) listen for this.
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     return true
+  }
+
+  // MARK: - Structure drag-reorder (areas / projects)
+  //
+  // Always compatible with the existing data: this calls the SAME
+  // `reorder(orderedIDs:)` API and the SAME move-before-target math
+  // (`SidebarView.reorderArea`/`reorderProject`) the SwiftUI sidebar's own
+  // drag-and-drop already uses — areas reorder among themselves (a flat id
+  // list), projects reorder among SAME-PARENT siblings only (loose projects
+  // together, or together within one area). Cross-parent drops would be a
+  // REPARENT, not a reorder, and are rejected — filing a project into a
+  // different area happens via "New Project in ⟨Area⟩" or a task drop, not
+  // by dragging the project row itself.
+
+  /// The `roots` index range areas occupy (always the tail of `organize`,
+  /// after any loose projects). Empty range at `roots.count` if there are
+  /// no areas.
+  private var areaNodeRange: Range<Int> {
+    guard let first = roots.firstIndex(where: {
+      if case .area = $0.content { return true }
+      return false
+    }) else { return roots.count..<roots.count }
+    return first..<roots.count
+  }
+
+  private func node(forKey key: String) -> Node? {
+    func search(_ nodes: [Node]) -> Node? {
+      for candidate in nodes {
+        if candidate.key == key { return candidate }
+        if let found = search(candidate.children) { return found }
+      }
+      return nil
+    }
+    return search(roots)
+  }
+
+  func outlineView(_ outlineView: NSOutlineView,
+                   pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+    guard let node = item as? Node else { return nil }
+    switch node.content {
+    case .area, .project:
+      let pbItem = NSPasteboardItem()
+      pbItem.setString(node.key, forType: .septaskStructureItem)
+      return pbItem
+    case .filter:
+      return nil
+    }
+  }
+
+  private func draggedStructureNode(from info: NSDraggingInfo) -> Node? {
+    guard let key = (info.draggingPasteboard.pasteboardItems ?? [])
+      .first?.string(forType: .septaskStructureItem) else { return nil }
+    return node(forKey: key)
+  }
+
+  private func validateStructureReorder(_ info: NSDraggingInfo, proposedItem item: Any?,
+                                        proposedChildIndex index: Int) -> NSDragOperation {
+    // Only between-row drops reorder; dropping ON a row is the task-filing
+    // gesture (handled above) or meaningless for a structure item.
+    guard index != NSOutlineViewDropOnItemIndex, let dragged = draggedStructureNode(from: info)
+    else { return [] }
+
+    switch dragged.content {
+    case .area:
+      guard item == nil,
+            areaNodeRange.contains(index) || index == areaNodeRange.upperBound
+      else { return [] }
+      outlineView.setDropItem(nil, dropChildIndex: index)
+      return .move
+
+    case .project(let project, _):
+      if project.area == nil {
+        // Loose project → root, within the loose-project prefix only (before
+        // the area block begins).
+        guard item == nil, index >= organizeStartIndex, index <= areaNodeRange.lowerBound
+        else { return [] }
+        outlineView.setDropItem(nil, dropChildIndex: index)
+        return .move
+      } else {
+        // Project nested under an area → only back into that SAME area.
+        guard let parent = item as? Node, case .area(let area) = parent.content,
+              area.id == project.area
+        else { return [] }
+        outlineView.setDropItem(parent, dropChildIndex: index)
+        return .move
+      }
+
+    case .filter:
+      return []
+    }
+  }
+
+  private func acceptStructureReorder(_ info: NSDraggingInfo, proposedItem item: Any?,
+                                      proposedChildIndex index: Int) -> Bool {
+    guard let dragged = draggedStructureNode(from: info) else { return false }
+    let snapshot = StructureCache.snapshot(in: context)
+
+    switch dragged.content {
+    case .area(let area):
+      var ids = snapshot.areas.map(\.id)
+      guard let from = ids.firstIndex(of: area.id) else { return false }
+      ids.remove(at: from)
+      let to = min(max(0, index - areaNodeRange.lowerBound), ids.count)
+      ids.insert(area.id, at: to)
+      Task { try? await areasMutator.reorder(orderedIDs: ids) }
+      return true
+
+    case .project(let project, _):
+      var siblings = snapshot.projects
+        .filter { $0.area == project.area && $0.status == .active }
+        .map(\.id)
+      guard let from = siblings.firstIndex(of: project.id) else { return false }
+      siblings.remove(at: from)
+      // Root-relative for a loose project (needs the same offset validate
+      // used); already parent-relative for a project nested under an area.
+      let localIndex = project.area == nil ? index - organizeStartIndex : index
+      let to = min(max(0, localIndex), siblings.count)
+      siblings.insert(project.id, at: to)
+      Task { try? await projectsMutator.reorder(orderedIDs: siblings) }
+      return true
+
+    case .filter:
+      return false
+    }
   }
 
   // MARK: - NSOutlineViewDelegate
@@ -478,7 +615,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let emoji = NSTextField(labelWithString: "")
     /// Custom expand/collapse affordance — see the controller's
     /// `shouldShowOutlineCellForItem`.
-    let disclosure = NSButton()
+    let disclosure = KitDisclosureView()
     var onToggleDisclosure: (() -> Void)?
 
     init(identifier: NSUserInterfaceItemIdentifier) {
@@ -500,13 +637,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       badge.setContentHuggingPriority(.required, for: .horizontal)
 
       disclosure.translatesAutoresizingMaskIntoConstraints = false
-      disclosure.isBordered = false
-      disclosure.bezelStyle = .regularSquare
-      disclosure.imagePosition = .imageOnly
-      disclosure.setButtonType(.momentaryChange)
-      disclosure.contentTintColor = SeptaskKitTheme.iconMuted
-      disclosure.target = self
-      disclosure.action = #selector(disclosureTapped)
+      disclosure.onTap = { [weak self] in self?.onToggleDisclosure?() }
       disclosure.setContentHuggingPriority(.required, for: .horizontal)
 
       addSubview(text)
@@ -546,8 +677,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }
 
     required init?(coder: NSCoder) { fatalError("SidebarCell is code-only") }
-
-    @objc private func disclosureTapped() { onToggleDisclosure?() }
   }
 
   func outlineViewSelectionDidChange(_ notification: Notification) {
@@ -608,7 +737,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc func newArea() {
-    guard let title = Self.promptText(title: "New Area", placeholder: "Area name",
+    guard let title = KitPrompt.text(title: "New Area", placeholder: "Area name",
                                       confirmTitle: "Create") else { return }
     Task { try? await areasMutator.create(title: title) }
   }
@@ -623,7 +752,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc func newProject() { newProject(inArea: nil) }
 
   private func newProject(inArea areaId: String?) {
-    guard let title = Self.promptText(title: "New Project", placeholder: "Project name",
+    guard let title = KitPrompt.text(title: "New Project", placeholder: "Project name",
                                       confirmTitle: "Create") else { return }
     Task { try? await projectsMutator.create(title: title, area: areaId) }
   }
@@ -631,12 +760,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc private func renameSelected() {
     switch selectedNode?.content {
     case .area(let area):
-      guard let title = Self.promptText(title: "Rename Area", placeholder: "Area name",
+      guard let title = KitPrompt.text(title: "Rename Area", placeholder: "Area name",
                                         initial: area.title, confirmTitle: "Rename")
       else { return }
       Task { try? await areasMutator.rename(id: area.id, to: title) }
     case .project(let project, _):
-      guard let title = Self.promptText(title: "Rename Project", placeholder: "Project name",
+      guard let title = KitPrompt.text(title: "Rename Project", placeholder: "Project name",
                                         initial: project.title, confirmTitle: "Rename")
       else { return }
       Task { try? await projectsMutator.rename(id: project.id, to: title) }
@@ -650,13 +779,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // one deletion story between the two shells.
     switch selectedNode?.content {
     case .area(let area):
-      guard Self.confirmDelete(title: "Delete \(area.title)?",
+      guard KitPrompt.confirmDestructive(title: "Delete \(area.title)?",
                               message: "Projects in this area will be detached but not deleted.")
       else { return }
       Task { try? await areasMutator.delete(id: area.id) }
       bounceToTodayIfShowing(key: "area:\(area.id)")
     case .project(let project, _):
-      guard Self.confirmDelete(title: "Delete \(project.title)?",
+      guard KitPrompt.confirmDestructive(title: "Delete \(project.title)?",
                               message: "Tasks in this project will be moved to the inbox.")
       else { return }
       Task { try? await projectsMutator.delete(id: project.id) }
@@ -674,30 +803,46 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     select(.today)
   }
 
-  private static func promptText(title: String, placeholder: String,
-                                 initial: String = "", confirmTitle: String) -> String? {
-    let alert = NSAlert()
-    alert.messageText = title
-    alert.addButton(withTitle: confirmTitle)
-    alert.addButton(withTitle: "Cancel")
-    let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-    field.placeholderString = placeholder
-    field.stringValue = initial
-    alert.accessoryView = field
-    alert.window.initialFirstResponder = field
-    guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-    let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
+}
+
+/// The disclosure chevron's hit area — a plain `NSButton` here would compete
+/// with the ROW's own drag-recognition (the row is a drag SOURCE, for
+/// structure reorder): a table/outline row view's `mouseDown` claims the
+/// event for potential drag-threshold tracking before an ordinary subview's
+/// click-tracking gets a turn, so the button's action could silently never
+/// fire. Same fix already proven for the task checkbox
+/// (`KitCheckboxView.mouseDown`) — hand-track press/release directly instead
+/// of going through `NSButton`'s cell-tracking loop.
+@MainActor
+final class KitDisclosureView: NSView {
+  private let imageView = NSImageView()
+  var onTap: (() -> Void)?
+
+  var image: NSImage? {
+    get { imageView.image }
+    set { imageView.image = newValue }
   }
 
-  private static func confirmDelete(title: String, message: String) -> Bool {
-    let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = message
-    alert.addButton(withTitle: "Delete")
-    alert.buttons.first?.hasDestructiveAction = true
-    alert.addButton(withTitle: "Cancel")
-    return alert.runModal() == .alertFirstButtonReturn
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    imageView.translatesAutoresizingMaskIntoConstraints = false
+    imageView.contentTintColor = SeptaskKitTheme.iconMuted
+    addSubview(imageView)
+    NSLayoutConstraint.activate([
+      imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+      imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitDisclosureView is code-only") }
+
+  override func mouseDown(with event: NSEvent) {
+    // Swallow — see the type comment.
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    let point = convert(event.locationInWindow, from: nil)
+    if bounds.contains(point) { onTap?() }
   }
 }
 

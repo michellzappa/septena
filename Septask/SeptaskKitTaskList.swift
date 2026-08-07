@@ -7,6 +7,11 @@ extension NSPasteboard.PasteboardType {
   /// Dragged task rows carry their stable task id — the same identity every
   /// wire and mutator speaks (docs/IDENTIFIERS.md).
   static let septaskTask = NSPasteboard.PasteboardType("com.septena.septask.task-id")
+  /// Dragged SIDEBAR STRUCTURE rows (area/project reordering) — carries the
+  /// node's `key` ("area:<id>" / "project:<id>"), distinct from
+  /// `.septaskTask` so the sidebar's single drop handler can tell "reorder
+  /// the sidebar itself" apart from "file a dragged task".
+  static let septaskStructureItem = NSPasteboard.PasteboardType("com.septena.septask.structure-item")
 }
 
 /// Shared by the list (reorder/re-file drops) and the sidebar (file/schedule
@@ -65,18 +70,23 @@ final class SeptaskKitTaskListController: NSViewController {
     let time: String
   }
 
-  /// One list line: a synthetic group header, a task row, or a calendar event.
+  /// One list line: a synthetic group header, a task row, a calendar event,
+  /// the project/area page's own big title, or the "N logged items" footer.
   /// `key` is the stable identity the animated diff runs on.
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
+    case screenTitle(title: String, icon: GroupIcon)
     case task(SeptenaTask, chip: Chip?)
     case event(Event)
+    case loggedFooter(count: Int, expanded: Bool)
 
     var key: String {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
+      case .screenTitle: return "screen-title"
       case .task(let task, _): return task.id
       case .event(let event): return "e:" + event.id
+      case .loggedFooter: return "logged-footer"
       }
     }
 
@@ -88,7 +98,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// Rows that draw on a card (tasks and events), vs. headers on the page.
     var isCardRow: Bool {
       switch self {
-      case .header: return false
+      case .header, .screenTitle, .loggedFooter: return false
       case .task, .event: return true
       }
     }
@@ -110,6 +120,9 @@ final class SeptaskKitTaskListController: NSViewController {
   private var settleWorkItem: DispatchWorkItem?
   /// Held so its submenu can be refreshed from the live structure on open.
   private let moveMenuItem = NSMenuItem()
+  /// True once the FIRST real Auto Layout pass has completed — see
+  /// `viewDidLayout()` and the width guard in `heightForTask`.
+  private var hasLaidOutOnce = false
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -204,11 +217,25 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self, let tableView else { return }
       let point = tableView.convert(event.locationInWindow, from: nil)
       let row = tableView.row(at: point)
-      guard row >= 0 else { return }
+      guard row >= 0 else {
+        // Blank space below the list, on a project page: the entry point
+        // for adding a section, matching the SwiftUI page's own affordance.
+        if case .project = self.filter {
+          self.buildBlankSpaceMenu().popUp(positioning: nil, at: point, in: tableView)
+        }
+        return
+      }
       if !tableView.selectedRowIndexes.contains(row) {
         tableView.selectRowIndexes([row], byExtendingSelection: false)
       }
-      let menu = self.filter == .recentlyDeleted ? recentlyDeletedMenu : contextMenu
+      let menu: NSMenu
+      if let task = self.rows[row].task, task.isHeading {
+        menu = self.buildHeadingContextMenu()
+      } else if self.filter == .recentlyDeleted {
+        menu = recentlyDeletedMenu
+      } else {
+        menu = contextMenu
+      }
       menu.popUp(positioning: nil, at: point, in: tableView)
     }
     tableView.registerForDraggedTypes([.septaskTask])
@@ -275,6 +302,19 @@ final class SeptaskKitTaskListController: NSViewController {
 
   deinit {
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
+  }
+
+  /// Corrective backstop for the "double-tall rows at launch" bug: the very
+  /// first `reload()` can run before Auto Layout has resolved the table's
+  /// real width (see `heightForTask`'s guard), so once that first REAL
+  /// layout pass completes, force every row to re-measure against the now-
+  /// correct width. One-shot — later layout passes (window resize) are
+  /// already covered by the `frameDidChangeNotification` observer above.
+  override func viewDidLayout() {
+    super.viewDidLayout()
+    guard !hasLaidOutOnce, tableView.bounds.width > 200 else { return }
+    hasLaidOutOnce = true
+    tableView.noteHeightOfRows(withIndexesChanged: IndexSet(0..<tableView.numberOfRows))
   }
 
   /// True once `show` has run at least once — see the guard below.
@@ -352,29 +392,42 @@ final class SeptaskKitTaskListController: NSViewController {
     })
 
     var pool = LocalCache.tasks(in: context, filter: filter)
+    // One standard title row, on every page — computed once here rather than
+    // duplicated into each branch below.
+    let titleRows: [Row] = screenTitleRow().map { [$0] } ?? []
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = agenda() + triageBand() + groupedByList(withoutTriage(pool))
+      newRows = titleRows + agenda() + triageBand() + groupedByList(withoutTriage(pool))
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract.
-      newRows = agenda() + triageBand()
+      newRows = titleRows + agenda() + triageBand()
         + withoutTriage(pool).sorted(by: SeptenaTask.compareNextPageOrder).map(chipped)
     case .upcoming:
-      newRows = agenda() + pool.map(chipped)
+      newRows = titleRows + upcomingBuckets(pool)
     case .unscheduled:
-      newRows = groupedByList(pool)
+      newRows = titleRows + groupedByList(pool)
     case .project, .area:
-      // Scoped reads return every live status; this surface shows open work
-      // (plus headings). Finished rows live in the Logbook, as in the app.
-      // No chips — the whole list already says where these live.
+      // Scoped reads return every live status; capture the done subset for
+      // the logged footer BEFORE narrowing `pool` to open work (+ headings) —
+      // finished rows don't live inline here, same as the SwiftUI page.
+      var completed = pool.filter { $0.status == .done }
+      if case .area = filter {
+        // Area pages show only area-DIRECT work in the open list — a task
+        // filed under one of the area's projects appears on that project's
+        // page, not doubled here. The logged footer honors the same split.
+        completed = completed.filter { $0.project == nil }
+      }
+      completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+
       pool = pool.filter { $0.isHeading || $0.status == .open }
-      newRows = pool.map { .task($0, chip: nil) }
+      newRows = titleRows + pool.map { .task($0, chip: nil) }
+        + loggedFooterRows(completed: completed)
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
-      newRows = pool.prefix(200).map(chipped)
+      newRows = titleRows + pool.prefix(200).map(chipped)
     default:
-      newRows = pool.map(chipped)
+      newRows = titleRows + pool.map(chipped)
     }
 
     apply(newRows, animated: animated)
@@ -390,20 +443,23 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  /// The day's calendar agenda, woven above the tasks the way the SwiftUI
-  /// list weaves it (`TaskListModel.refreshCalendarEvents`): Today shows what
-  /// is still ahead today, Upcoming the next 30 days. Gated on the same
-  /// setting and on access already being granted — this shell never triggers
-  /// the permission prompt; Settings ▸ Integrations owns that.
-  private func agenda() -> [Row] {
+  /// Gated on the setting AND on access already being granted — this shell
+  /// never triggers the permission prompt itself; Settings ▸ Integrations
+  /// owns that, same as `agenda()`/`upcomingBuckets()` below.
+  private var showsCalendarEvents: Bool {
     let enabled = UserDefaults.standard.object(forKey: SettingsKey.tasksShowCalendarEvents) == nil
       ? true
       : UserDefaults.standard.bool(forKey: SettingsKey.tasksShowCalendarEvents)
-    guard enabled, CalendarBridge.shared.access == .granted else { return [] }
+    return enabled && CalendarBridge.shared.access == .granted
+  }
 
-    let events = filter == .today
-      ? CalendarBridge.shared.remainingTodayEvents()
-      : CalendarBridge.shared.upcomingEvents(days: 30)
+  /// TODAY's calendar agenda, woven above the tasks the way the SwiftUI list
+  /// weaves it (`TaskListModel.refreshCalendarEvents`) — what's still ahead
+  /// today. Upcoming uses `upcomingBuckets()` instead, which weaves events
+  /// per-day rather than as one block at the top.
+  private func agenda() -> [Row] {
+    guard showsCalendarEvents else { return [] }
+    let events = CalendarBridge.shared.remainingTodayEvents()
     guard !events.isEmpty else { return [] }
 
     let rows = events.map { event in
@@ -413,6 +469,77 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     return [.header(id: "agenda", title: "Agenda", icon: .symbol("calendar"),
                     count: events.count)] + rows
+  }
+
+  /// Upcoming grouped by day — matches `TaskListView.upcomingBuckets()`
+  /// exactly: bucket key is the EARLIEST FUTURE of a task's scheduled/deadline
+  /// date (so a past-scheduled, future-deadline task buckets on the deadline,
+  /// never under a stale header), days are the UNION of task-days and
+  /// event-days (an all-day-event-only day still gets a row), sorted
+  /// ascending, with `SeptenaDate.scheduleHeaderLabel` giving each day's
+  /// title ("Today"/"Tomorrow"/weekday/"EEE, MMM d" — the exact same
+  /// function, not a reimplementation).
+  private func upcomingBuckets(_ pool: [SeptenaTask]) -> [Row] {
+    let today = SeptenaDate.today
+    var tasksByDay: [String: [SeptenaTask]] = [:]
+    for task in pool {
+      let key = [task.scheduled, task.deadline]
+        .compactMap { $0 }
+        .filter { $0 > today }
+        .min()
+      guard let key else { continue }
+      tasksByDay[key, default: []].append(task)
+    }
+
+    var eventsByDay: [String: [EKEvent]] = [:]
+    if showsCalendarEvents {
+      for event in CalendarBridge.shared.upcomingEvents(days: 30) {
+        for key in upcomingDayKeys(for: event) {
+          eventsByDay[key, default: []].append(event)
+        }
+      }
+    }
+
+    let days = Set(tasksByDay.keys).union(eventsByDay.keys).sorted()
+    var rows: [Row] = []
+    for key in days {
+      let label = SeptenaDate.parse(key).map(SeptenaDate.scheduleHeaderLabel) ?? key
+      let dayTasks = tasksByDay[key] ?? []
+      let dayEvents = eventsByDay[key] ?? []
+      rows.append(.header(id: "day-\(key)", title: label, icon: .symbol("calendar"),
+                         count: dayTasks.count))
+      rows.append(contentsOf: dayEvents.map { event in
+        .event(Event(id: event.eventIdentifier ?? UUID().uuidString,
+                    title: event.title ?? "",
+                    time: KitDayFormat.eventTime(event, on: filter)))
+      })
+      rows.append(contentsOf: dayTasks.map(chipped))
+    }
+    return rows
+  }
+
+  /// Every day an event covers within the 30-day window — a multi-day
+  /// all-day event (e.g. a long weekend) shows on each day it spans, not
+  /// just its start day. Mirrors `TaskListView.upcomingDayKeys(for:)`.
+  private func upcomingDayKeys(for event: EKEvent) -> [String] {
+    let cal = Calendar.current
+    guard let today = SeptenaDate.startOfDay(for: SeptenaDate.today),
+          let start = event.startDate,
+          let windowEnd = cal.date(byAdding: .day, value: 30, to: today)
+    else { return [] }
+    var endRef = event.endDate ?? start
+    if event.isAllDay, endRef == cal.startOfDay(for: endRef) {
+      endRef = endRef.addingTimeInterval(-1)
+    }
+    var day = max(cal.startOfDay(for: start), today)
+    let lastDay = min(cal.startOfDay(for: endRef), windowEnd)
+    var keys: [String] = []
+    while day <= lastDay {
+      if let key = SeptenaDate.format(day) { keys.append(key) }
+      guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+      day = next
+    }
+    return keys
   }
 
   /// The unratified band that rides on top of Today — loose captures and
@@ -459,6 +586,84 @@ final class SeptaskKitTaskListController: NSViewController {
   /// then its projects), then loose projects. Sidebar order throughout
   /// (StructureCache). Headers only appear above non-empty groups, and carry
   /// the same glyph + count as their sidebar row.
+  // MARK: - Project/area page chrome (screen title, logged footer)
+
+  /// The current project/area's id, when the list is scoped to one — the
+  /// same value both the title row and the logged-footer state key key off.
+  private var scopeId: String? {
+    switch filter {
+    case .project(let id), .area(let id): return id
+    default: return nil
+    }
+  }
+
+  /// The page's own big title — an area's emoji/dot or a project's
+  /// completion ring, plus its name at a larger rung than an in-list group
+  /// header. macOS windows have no automatic "large title" the way an iOS
+  /// nav bar does, so this is what stands in for it, same as the SwiftUI
+  /// destination screens.
+  /// One standard component on EVERY page, not just project/area — the
+  /// smart lists use the same symbols the sidebar rows do
+  /// (`NavigationState.filterIcon`), so a page's title always matches the
+  /// icon you clicked in the sidebar to get there.
+  private func screenTitleRow() -> Row? {
+    let snapshot = StructureCache.snapshot(in: context)
+    switch filter {
+    case .today: return .screenTitle(title: "Today", icon: .symbol("sun.max.fill"))
+    case .triage: return .screenTitle(title: "Inbox", icon: .symbol("tray"))
+    case .upcoming: return .screenTitle(title: "Upcoming", icon: .symbol("calendar"))
+    case .unscheduled: return .screenTitle(title: "Anytime", icon: .symbol("rectangle.stack.fill"))
+    case .logbook: return .screenTitle(title: "Logbook", icon: .symbol("checkmark"))
+    case .recentlyDeleted: return .screenTitle(title: "Recently Deleted", icon: .symbol("trash"))
+    case .project(let id):
+      guard let project = snapshot.projects.first(where: { $0.id == id }) else { return nil }
+      let progress = projectProgress()[id] ?? 0
+      return .screenTitle(title: project.title, icon: .project(progress))
+    case .area(let id):
+      guard let area = snapshot.areas.first(where: { $0.id == id }) else { return nil }
+      return .screenTitle(title: area.title, icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot)
+    }
+  }
+
+  /// Same UserDefaults key AND encoding `TaskListView`'s
+  /// `scopeLoggedExpandedData` (`@AppStorage`-backed `Data` holding a
+  /// JSON `Set<String>` of expanded project/area ids) uses — sharing it
+  /// means expand/collapse state agrees between this shell and the classic
+  /// SwiftUI window instead of drifting into two independent trackers.
+  private static let loggedExpandedKey = "septena.tasks.projectLoggedExpanded"
+
+  private func loggedExpandedIds() -> Set<String> {
+    guard let data = UserDefaults.standard.data(forKey: Self.loggedExpandedKey) else { return [] }
+    return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+  }
+
+  /// Things-style footer: "Show N logged items" / collapsed by default,
+  /// expanding into the completed tasks for this page. Matches
+  /// `TaskListView.scopeLoggedSection` exactly (same copy, same sort —
+  /// newest-completed-first).
+  private func loggedFooterRows(completed: [SeptenaTask]) -> [Row] {
+    guard let scopeId, !completed.isEmpty else { return [] }
+    let expanded = loggedExpandedIds().contains(scopeId)
+    var rows: [Row] = [.loggedFooter(count: completed.count, expanded: expanded)]
+    if expanded {
+      rows.append(contentsOf: completed.map { .task($0, chip: nil) })
+    }
+    return rows
+  }
+
+  func toggleLoggedExpanded() {
+    guard let scopeId else { return }
+    var ids = loggedExpandedIds()
+    if ids.contains(scopeId) { ids.remove(scopeId) } else { ids.insert(scopeId) }
+    UserDefaults.standard.set((try? JSONEncoder().encode(ids)) ?? Data(),
+                              forKey: Self.loggedExpandedKey)
+    // Hard reload, not the diffed animated path: this can insert/remove a
+    // whole BLOCK of rows below the footer in one go, and an instant
+    // reveal/collapse reads as correct disclosure behavior on its own —
+    // no need to fight the diff machinery for what's an infrequent toggle.
+    reload(animated: false)
+  }
+
   private func groupedByList(_ pool: [SeptenaTask]) -> [Row] {
     let snapshot = StructureCache.snapshot(in: context)
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
@@ -945,6 +1150,13 @@ final class SeptaskKitTaskListController: NSViewController {
       // Commit the in-flight edit first; commitRename runs synchronously.
       view.window?.makeFirstResponder(tableView)
     }
+    if composingTaskId != nil {
+      // A composer left open would otherwise silently swallow the reload
+      // below (reload() no-ops while `composingTaskId` is set) — the new
+      // task would be created but never actually show up. Closing it first
+      // gives ⌘N a clean slate no matter what was being edited before.
+      collapseComposer(commit: true)
+    }
 
     var area: String?
     var project: String?
@@ -968,7 +1180,7 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
-    beginEditSelectedRow()
+    beginEditingRow(row)
   }
 
   // MARK: - Editing entry points
@@ -978,10 +1190,31 @@ final class SeptaskKitTaskListController: NSViewController {
   /// fixing a typo.
   func beginEditSelectedRow() {
     let row = tableView.selectedRow
-    guard row >= 0,
-          let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
-            as? SeptaskKitTaskCell else { return }
-    cell.beginEditing()
+    guard row >= 0 else { return }
+    beginEditingRow(row)
+  }
+
+  /// Standard AppKit way to act on a row synchronously right after inserting
+  /// it: `makeIfNecessary: true` forces the cell into existence instead of
+  /// hoping it's already been dequeued (a bare `reloadData()` doesn't
+  /// guarantee that timing, so `false` here could silently no-op — the
+  /// exact way ⌘N could create a task and NOT actually enter edit mode,
+  /// leaving the title un-editable until the user clicked it themselves).
+  /// One retry on the next runloop turn as a backstop, so a fresh task is
+  /// reliably ready to type into immediately.
+  private func beginEditingRow(_ row: Int) {
+    if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
+      as? SeptaskKitTaskCell {
+      cell.beginEditing()
+      return
+    }
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.rows.indices.contains(row) else { return }
+      if let cell = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
+        as? SeptaskKitTaskCell {
+        cell.beginEditing()
+      }
+    }
   }
 
   /// Return / double-click — expands the selected row into the inline
@@ -997,7 +1230,13 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     let row = tableView.selectedRow
-    guard row >= 0, let task = rows[row].task, !task.isHeading else { return }
+    guard row >= 0, let task = rows[row].task else { return }
+    // A section heading has no pills/notes to open a full composer for —
+    // same as the SwiftUI project page, renaming it is a bare title edit.
+    guard !task.isHeading else {
+      beginEditingRow(row)
+      return
+    }
     beginComposing(id: task.id)
   }
 
@@ -1078,6 +1317,21 @@ final class SeptaskKitTaskListController: NSViewController {
     else { return }
     cell.refreshPills(with: fresh, listName: listName(for: fresh))
     bindComposerActions(cell, task: fresh)
+  }
+
+  /// A header id built by `groupedByList`'s "p-"/"a-" prefix has a real
+  /// area/project to drill into; "inbox"/"agenda" don't. ONE place this is
+  /// decided — `heightOfRow`'s extra margin and `viewFor:`'s click/cursor
+  /// wiring both call this rather than each re-deriving it, which is exactly
+  /// the kind of duplicated logic that let them drift apart before.
+  private func isNavigableHeaderId(_ id: String) -> Bool {
+    id.hasPrefix("p-") || id.hasPrefix("a-")
+  }
+
+  private func navigationTarget(forHeaderId id: String) -> TaskFilter? {
+    if id.hasPrefix("p-") { return .project(String(id.dropFirst(2))) }
+    if id.hasPrefix("a-") { return .area(String(id.dropFirst(2))) }
+    return nil
   }
 
   private func listName(for task: SeptenaTask) -> String? {
@@ -1241,6 +1495,58 @@ final class SeptaskKitTaskListController: NSViewController {
 
   @objc private func menuRestore() { restoreTasks(actionableSelection.map(\.id)) }
 
+  // MARK: - Headings (project sections)
+  //
+  // A heading is a real task (`isHeading`, `kind == "heading"`) — creating,
+  // renaming, and deleting one call the SAME `TaskMutator` methods and use
+  // the SAME confirmation copy the SwiftUI project page does
+  // (`TaskListView.commitHeadingCreate`/`commitHeadingRename`, and the
+  // "Delete this section?" dialog), so a section behaves identically in
+  // either shell. NOT yet implemented: filing a task under a heading by
+  // dragging it there (SwiftUI's `handleHeadingDrop`) — tracked in
+  // docs/SEPTASK_APPKIT_PARITY.md rather than rushed here.
+
+  /// Right-click on blank list space, project pages only — where "New
+  /// Section" lives since there's no heading row to right-click yet.
+  private func buildBlankSpaceMenu() -> NSMenu {
+    let menu = NSMenu()
+    menu.addItem(item("New Section", #selector(menuNewSection), "", []))
+    return menu
+  }
+
+  /// Right-click on a heading row: rename (same field-editor path as any
+  /// task) and delete — nothing else on the normal task menu applies to a
+  /// section divider.
+  private func buildHeadingContextMenu() -> NSMenu {
+    let menu = NSMenu()
+    menu.addItem(item("Rename", #selector(menuRename), "r", [.command]))
+    menu.addItem(.separator())
+    menu.addItem(item("Delete Section", #selector(menuDeleteHeading), "", []))
+    return menu
+  }
+
+  @objc private func menuNewSection() {
+    guard case .project(let projectId) = filter,
+          let title = KitPrompt.text(title: "New Section", placeholder: "Section name",
+                                     confirmTitle: "Create")
+    else { return }
+    _ = mutator.createHeading(title: title, project: projectId)
+    reload()
+  }
+
+  @objc private func menuDeleteHeading() {
+    let row = tableView.selectedRow
+    guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
+    // Exact copy from TaskListView's confirmationDialog — same story either shell.
+    guard KitPrompt.confirmDestructive(
+      title: "Delete this section?",
+      message: "Its tasks stay in the project.",
+      confirmTitle: "Delete Section"
+    ) else { return }
+    mutator.delete(id: heading.id)
+    reload()
+  }
+
   private func item(_ title: String, _ action: Selector, _ key: String,
                     _ modifiers: NSEvent.ModifierFlags) -> NSMenuItem {
     let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
@@ -1320,15 +1626,23 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
     switch rows[row] {
     // Headers carry the air between cards, so they're taller than their text.
-    // Sized off the LARGER (navigable) header font so an area/project header
-    // never clips — the plain ones just get a touch more air.
-    case .header: return SeptenaTypeScale.size(.headline) + 5 + 26
+    // Area/project headers get EXTRA margin above them (matching the
+    // sidebar's per-top-level-area treatment) — they start a new list
+    // section; "Inbox"/"Agenda" are sub-groups within Today's own flow and
+    // don't need the same visual break.
+    case .header(let id, _, _, _):
+      let base = SeptenaTypeScale.size(.headline) + 9 + 26
+      return isNavigableHeaderId(id) ? base + 10 : base
+    // The page's own title — noticeably taller than an in-list header, the
+    // same visual weight a big navigation title would carry.
+    case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
     case .task(let task, _):
       if task.id == composingTaskId {
         return KitComposerCell.height(showsNotes: composerShowsNotes)
       }
       return heightForTask(task, tableWidth: tableView.bounds.width)
     case .event: return SeptaskKitTheme.rowHeight
+    case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
     }
   }
 
@@ -1339,7 +1653,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// exists to fix. Headings keep the single-line height — they're short
   /// project-section names in practice, not a surface this was asked for.
   private func heightForTask(_ task: SeptenaTask, tableWidth: CGFloat) -> CGFloat {
-    guard !task.isHeading else { return SeptaskKitTheme.rowHeight }
+    // Before the FIRST real Auto Layout pass (e.g. the very first `reload()`,
+    // fired synchronously from `selectDefault()` during window construction),
+    // `tableWidth` can still be near-zero. Measuring wrap against that would
+    // force EVERY title — even a short one — to read as needing 2 lines,
+    // doubling every row's height until something happens to re-measure.
+    // `viewDidLayout()` corrects this once real geometry lands; this guard
+    // just stops the bad height from ever being computed in the first place.
+    guard !task.isHeading, tableWidth > 200 else { return SeptaskKitTheme.rowHeight }
 
     let width = SeptaskKitLayout.taskTitleWidth(tableWidth: tableWidth)
     let font = SeptaskKitTheme.taskTitle
@@ -1491,12 +1812,24 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? KitGroupHeaderCell(identifier: identifier)
       // Only area/project headers have a leaf to drill into — "Inbox" and
       // "Agenda" aren't destinations of their own.
-      let target: TaskFilter? =
-        if id.hasPrefix("p-") { .project(String(id.dropFirst(2))) }
-        else if id.hasPrefix("a-") { .area(String(id.dropFirst(2))) }
-        else { nil }
+      let target = navigationTarget(forHeaderId: id)
       cell.configure(title: title, icon: icon, count: count, isNavigable: target != nil)
       cell.onTap = target.map { filter in { [weak self] in self?.onNavigateToGroup?(filter) } }
+      return cell
+
+    case .screenTitle(let title, let icon):
+      let identifier = NSUserInterfaceItemIdentifier("screenTitleCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
+        ?? KitScreenTitleCell(identifier: identifier)
+      cell.configure(title: title, icon: icon)
+      return cell
+
+    case .loggedFooter(let count, let expanded):
+      let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
+        ?? KitLoggedFooterCell(identifier: identifier)
+      cell.configure(count: count, expanded: expanded)
+      cell.onTap = { [weak self] in self?.toggleLoggedExpanded() }
       return cell
 
     case .task(let task, let chip):
@@ -1679,7 +2012,13 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // dashed = unratified proposal, gold = promoted to Today.
     let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
     checkbox.isDashed = !done && isProposal
-    checkbox.isToday = task.today
+    // Matches `TaskCheckboxModel.isToday = task.isOnToday && showsTodayIndicator`
+    // exactly: the solid pinned badge is suppressed ON the Today screen
+    // itself (redundant there — everything on screen is already "on Today"),
+    // where the tenure fade below carries the cue instead. Elsewhere (moved
+    // in via a scheduled/deadline date counts too, not just the pinned flag —
+    // `isOnToday`, not the raw `today` field) it shows solid.
+    checkbox.isToday = task.isOnToday && filter != .today
     // The remaining cue vocabulary, matching `TaskCheckboxModel`: gold tenure
     // dial for days carried on Today, corner dot for unread agent context on a
     // committed row (proposals are excluded — they already read as dashed),
@@ -1835,6 +2174,143 @@ final class KitEventCell: NSTableCellView {
   }
 }
 
+// MARK: - Project/area screen title
+
+/// The page's own big title — an area's emoji/dot or a project's completion
+/// ring, plus its name at a larger rung than an in-list group header. Not
+/// clickable (you're already here) and carries no count, unlike
+/// `KitGroupHeaderCell`, which is why this is its own small type rather than
+/// a third mode bolted onto that one.
+@MainActor
+final class KitScreenTitleCell: NSTableCellView {
+  private let icon = NSImageView()
+  private let emoji = NSTextField(labelWithString: "")
+  private let title = NSTextField(labelWithString: "")
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+
+  private static let font: NSFont = .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold)
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    icon.translatesAutoresizingMaskIntoConstraints = false
+    emoji.translatesAutoresizingMaskIntoConstraints = false
+    emoji.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
+    title.translatesAutoresizingMaskIntoConstraints = false
+    title.font = Self.font
+    title.textColor = .labelColor
+    title.lineBreakMode = .byTruncatingTail
+
+    addSubview(icon)
+    addSubview(emoji)
+    addSubview(title)
+    textField = title
+    leadingConstraint = icon.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
+    trailingConstraint = title.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 18),
+      emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
+      emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
+      title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
+      title.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+      trailingConstraint,
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
+
+  /// Same width-dependent centered-column margin as every other row.
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 4
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(title titleText: String, icon iconKind: SeptaskKitTaskListController.GroupIcon) {
+    title.stringValue = titleText
+    emoji.isHidden = true
+    icon.isHidden = false
+    switch iconKind {
+    case .emoji(let glyph):
+      emoji.isHidden = false
+      emoji.stringValue = glyph
+      icon.isHidden = true
+    case .areaDot:
+      icon.image = KitGlyph.areaDot()
+    case .project(let progress):
+      icon.image = KitGlyph.progress(progress)
+    case .symbol(let name):
+      icon.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
+      icon.contentTintColor = SeptaskKitTheme.inkSecondary
+    }
+  }
+}
+
+// MARK: - Logged footer ("Show N logged items")
+
+/// Things-style footer on project/area pages — a quiet link that expands
+/// completed tasks for that page. Matches `TaskListView.scopeLoggedToggleRow`
+/// exactly: same copy, meta font, secondary ink, left-aligned on the content
+/// column (not the wider page gutter).
+@MainActor
+final class KitLoggedFooterCell: NSTableCellView {
+  private let label = NSTextField(labelWithString: "")
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+
+    let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
+    addGestureRecognizer(click)
+
+    addSubview(label)
+    textField = label
+    leadingConstraint = label.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = label.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      trailingConstraint,
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitLoggedFooterCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(count: Int, expanded: Bool) {
+    label.stringValue = expanded ? "Hide \(count) logged items" : "Show \(count) logged items"
+  }
+
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
+  }
+
+  @objc private func handleClick() { onTap?() }
+}
+
 // MARK: - Group header cell
 
 /// The header above a run of rows: the group's glyph, its name, and its count
@@ -1849,13 +2325,15 @@ final class KitGroupHeaderCell: NSTableCellView {
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   /// Set only for area/project headers (see `configure`) — clicking drills
-  /// into that list, the same destination its sidebar row goes to.
+  /// into that list, the same destination its sidebar row goes to. Whether a
+  /// header is clickable is entirely a matter of this being non-nil
+  /// (`resetCursorRects` below) — NOT a font distinction; every header in
+  /// the list reads at ONE size, "Inbox" and "Agenda" included, so a glance
+  /// down the list shows one consistent rung of section title.
   var onTap: (() -> Void)?
 
-  /// Area/project header — +5 over the plain group-header rung, so the
-  /// clickable ones read heavier than "Inbox"/"Agenda", which aren't.
-  private static let navigableFont: NSFont =
-    .systemFont(ofSize: SeptenaTypeScale.size(.headline) + 5, weight: .semibold)
+  private static let font: NSFont =
+    .systemFont(ofSize: SeptenaTypeScale.size(.headline) + 9, weight: .bold)
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -1920,11 +2398,11 @@ final class KitGroupHeaderCell: NSTableCellView {
     // that, since this font carrying is the whole point of the row.
     title.attributedStringValue = NSAttributedString(
       string: titleText,
-      attributes: [
-        .font: isNavigable ? Self.navigableFont : SeptaskKitTheme.groupTitle,
-        .foregroundColor: NSColor.labelColor,
-      ])
-    count.stringValue = countValue > 0 ? String(countValue) : ""
+      attributes: [.font: Self.font, .foregroundColor: NSColor.labelColor])
+    // No trailing count on any header, by request — the field stays in the
+    // view for layout stability but is never populated.
+    count.stringValue = ""
+    _ = countValue
 
     emoji.isHidden = true
     icon.isHidden = false

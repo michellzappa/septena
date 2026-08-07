@@ -8,6 +8,21 @@ complete/reopen, delete/restore, rename, and move (§6, partial — dates and
 recurrence still unwired). Struck below; a plan for Task Conversations (§2)
 is in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
 
+**2026-08-07 follow-up pass:** the project/area page header (icon + big
+title) generalized into ONE standard component shown on every page, not just
+project/area; the "Show N logged items" footer (§7, below); the tenure
+outline now fades gray→gold in lockstep with the fill instead of a binary
+gray/gold jump, matching `TaskCheckbox` exactly (§3); plus bug fixes that
+aren't parity items but are worth knowing landed: card corner-rounding
+seams, double-height rows on first launch, ⌘N occasionally not entering
+edit mode, and the logged-footer disclosure not visually expanding.
+
+**2026-08-07 second pass:** structure drag-reorder for areas/projects (§4),
+heading create/rename/delete (§4), Upcoming day-bucketing (§5). New shared
+file `SeptaskKitPrompt.swift` (`KitPrompt.text`/`.confirmDestructive`) —
+every NSAlert-based prompt in the shell goes through it now; use it for the
+next one instead of writing another `NSAlert` block inline.
+
 What the AppKit shell (`Septask/SeptaskKit*.swift`) still lacks versus the
 SwiftUI task surface it's replacing on macOS. Context, decision, and working
 rules live in `docs/SEPTASK.md` ("AppKit shell on macOS"); this file is only
@@ -87,11 +102,39 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   moved to the inbox." / "Projects in this area will be detached but not
   deleted."). Bounces to Today if the deleted item is the one on screen, same
   rescue as SwiftUI.
-- **[P2] Reorder areas/projects by dragging in the sidebar**
-  (`position` / `TaskStructureOrder`). The shell's sidebar accepts *task* drops
-  but has no structure reordering.
-- **[P2] Headings.** The shell renders project headings but can't create,
-  rename, delete, or move tasks under them (`createHeading`, `setHeading`).
+- **[DONE] Reorder areas/projects by dragging in the sidebar.**
+  `SeptaskKitSidebar.swift`, "Structure drag-reorder" section. A second
+  pasteboard type (`.septaskStructureItem`, distinct from `.septaskTask` so
+  the single drop handler can tell "reorder the sidebar" from "file a
+  dragged task" apart) carries the dragged node's `key`. Calls the EXACT
+  same `reorder(orderedIDs:)` API and the same move-before-target math as
+  `SidebarView.reorderArea`/`reorderProject` — areas reorder as one flat id
+  list, projects reorder among same-parent siblings only (loose-together, or
+  together within one area). Cross-parent drops (which would REPARENT, not
+  reorder) are rejected — validated via `areaNodeRange`/`organizeStartIndex`,
+  the index boundaries within `roots` where the loose-project block ends and
+  the area block begins.
+- **[DONE] Headings — create / rename / delete.** `SeptaskKitTaskList.swift`,
+  "Headings (project sections)" section. Same `TaskMutator` calls SwiftUI
+  uses (`createHeading`, plain `update(id:title:)` for rename, `delete` for
+  delete), same confirmation copy ("Delete this section? Its tasks stay in
+  the project."). Entry points: right-click a heading row (Rename / Delete
+  Section), right-click blank space on a project page (New Section).
+  Double-click/Return on a heading now falls back to the bare-title editor
+  instead of no-op (the composer's pill rail makes no sense for a heading).
+  - **[P2] NOT done: filing a task under a heading by DRAGGING it there**
+    (SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`). The shell's
+    existing intra-list drag (`SeptaskKitTaskListController.acceptDrop`)
+    reorders position and skips heading rows when finding neighbors, but
+    never calls `mutator.setHeading`, and project pages don't visually GROUP
+    rows by heading membership the way SwiftUI's `groupRows`/`visibleItems`
+    do — they render in flat position order. Doing this properly needs (a)
+    grouping the `.project`/`.area` render path by `heading` before laying
+    out rows (mirroring `groupedByList`'s pattern, not the raw `pool.map`
+    it uses today), then (b) extending `acceptDrop` to detect a heading
+    target and call `setHeading` accordingly. Skipped this pass — scoped as
+    a "same logic" CRUD pass, not a render-path rework — deliberately, not
+    forgotten.
 - **[P3] Project detail / notes**, area attachment (repo / calendar / feed
   context feed).
 
@@ -104,8 +147,19 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   (`purge`, no undo — it's a real SwiftData delete). Right-click menu is
   Restore / Delete Permanently only — the normal menu's rename/dates/etc.
   don't apply to a deleted row.
-- **[P2] Upcoming date buckets.** SwiftUI groups Upcoming into day/week buckets
-  (`upcomingBuckets`, `DayBucketHeader`); the shell shows one flat list.
+- **[DONE] Upcoming date buckets.** `SeptaskKitTaskList.swift`,
+  `upcomingBuckets(_:)`/`upcomingDayKeys(for:)` — line-for-line port of
+  `TaskListView.upcomingBuckets`/`upcomingDayKeys`: bucket key is the
+  earliest FUTURE of scheduled/deadline, days are the union of task-days and
+  event-days (an all-day-event-only day still gets a row), multi-day events
+  span every day they cover, day labels come from the real
+  `SeptenaDate.scheduleHeaderLabel` (not reimplemented). `agenda()` (Today's
+  woven-block-at-top agenda) is now Today-only; Upcoming's calendar events
+  weave per-day instead. Correction to the previous entry here: there's no
+  week-level super-header — `DayBucketHeader` (grepped by name earlier) is
+  actually the Habits/Mood TIME-OF-DAY bucket header (morning/afternoon/
+  evening), unrelated to Upcoming; `upcomingBuckets()` only ever groups by
+  day. So this port is complete, not partial.
 - **[P2] The embedded Next fold** (`SeptaskNextFold`, `NextItemsSection`,
   `NextSuggestionsSection`).
 - **[P2] Reminders inbox import** (`RemindersInboxSection`).
@@ -155,6 +209,9 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   both). A rule set elsewhere displays correctly but can't be edited here.
 - **[P3] Today "review" band** — overdue-scheduled rows that the SwiftUI Today
   response separates out (`review`) are just ordinary Today rows in the shell.
+- **[DONE] "Show N logged items" footer** on project/area pages — same copy,
+  same UserDefaults key as `TaskListView.scopeLoggedExpandedData`, so
+  expand/collapse state agrees between both shells.
 - **[P3] Logbook has no bulk clear/purge.**
 - **[P3] Calendar events are inert** — no click-through to Calendar.app.
 - **[P3] Keyboard Shortcuts sheet** (⌘/ in SwiftUI). The menu bar is arguably
@@ -173,7 +230,40 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
 2. **Localization sweep** (§6) — do before the literal count grows further.
-3. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
-4. **Structure reordering** (§4) + **headings CRUD** (§4).
+3. **Drag-a-task-under-a-heading** (§4) — the one piece left out of the
+   headings pass; needs the `.project`/`.area` render path grouped by
+   `heading` first (see that entry for the exact shape).
+4. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
 5. **Accessibility pass** (§6) — the custom-drawn checkbox/chevrons/rows.
 6. Everything else in §5/§6/§7 as it comes up.
+
+## Handoff notes for whoever picks this up next
+
+- **Build/verify loop**: `xcodegen generate` then
+  `scripts/build.sh SeptaskMac 'platform=macOS'` — this is the ONLY green
+  gate; nobody tests by running the app (see root `CLAUDE.md`). Also run
+  `scripts/lint-design.sh` before calling something done.
+- **Every `SeptaskKit*.swift` file starts with `#if os(macOS)`** and is
+  compiled into `SeptaskMac` only — don't expect these types to exist when
+  building the `Septask` (iOS) scheme.
+- **Read `docs/SEPTASK.md`'s "AppKit shell on macOS" section FIRST** — it has
+  the actual working rules (mutators as the write boundary, `.custom`
+  `rowSizeStyle` being load-bearing for both height AND font, the neutral
+  selection-fill rule, motion routing through `KitMotion`) that this backlog
+  doc doesn't repeat.
+- **Two recurring bug classes worth knowing about going in**, both hit more
+  than once this pass:
+  1. Any `configure()`-style method on a reused `NSTableCellView`/composer
+     cell must NOT blindly overwrite `titleField`/`notesView` on every call
+     — only on a genuinely NEW item. A refresh-after-side-effect call (a
+     pill press, a background sync) landing while the user is mid-edit will
+     silently revert what they typed. See `SeptaskKitInspectorController
+     .show(_:)` and `KitComposerCell.refreshPills` vs `.configure` for the
+     fixed pattern (split "full load" from "read-only-fields-only refresh").
+  2. `TaskMutator`/`AreasMutator`/`ProjectsMutator` write calls post their
+     change-notification SYNCHRONOUSLY, before the call returns. Any
+     "restyle now, mutate, reload later" sequence (the settle beat, the
+     composer's toggle-complete) MUST set its own reentrancy guard (see
+     `isSettling`/`composingTaskId`) BEFORE the mutator call, not after —
+     otherwise the synchronous notification's own reload runs first and
+     undoes the state you were about to set up.

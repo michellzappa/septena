@@ -49,7 +49,7 @@ enum SeptaskKitTheme {
   /// second line grow by exactly one line's height, keeping the padding above
   /// and below identical to a single-line row — see
   /// `SeptaskKitTaskListController.heightForTask`.
-  static var rowHeight: CGFloat { SeptenaTypeScale.size(.body) + 18 }
+  static var rowHeight: CGFloat { SeptenaTypeScale.size(.body) + 21 }
 
   // MARK: - Color
 
@@ -105,7 +105,7 @@ enum SeptaskKitTheme {
 /// to read), very wide windows stop the column from thinning out forever.
 @MainActor
 enum SeptaskKitLayout {
-  static let marginFraction: CGFloat = 0.15
+  static let marginFraction: CGFloat = 0.10
   static let minInset: CGFloat = 10
   static let maxInset: CGFloat = 220
 

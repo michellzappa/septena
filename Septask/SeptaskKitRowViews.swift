@@ -79,7 +79,20 @@ final class KitCheckboxView: NSView {
       // Unratified proposal — the readiness form from language v2.
       path.setLineDash([2.5, 2.0], count: 2, phase: 0)
     }
-    (isToday ? SeptaskKitTheme.todayAccent : SeptaskKitTheme.checkboxStroke).setStroke()
+    if isToday {
+      SeptaskKitTheme.todayAccent.setStroke()
+    } else if let tenureFill, tenureFill > 0 {
+      // Matches TaskCheckbox exactly: when the pinned badge ISN'T shown (the
+      // Today screen suppresses it — redundant there), the outline itself
+      // fades gray→gold in lockstep with the tenure fill instead of jumping
+      // straight to solid gold, so there's no step-change on day 1.
+      let strength = CGFloat(min(1, max(0, tenureFill))) * Self.tenureMaxOpacity
+      SeptaskKitTheme.checkboxStroke.blended(withFraction: strength,
+                                             of: SeptaskKitTheme.todayAccent)?.setStroke()
+        ?? SeptaskKitTheme.checkboxStroke.setStroke()
+    } else {
+      SeptaskKitTheme.checkboxStroke.setStroke()
+    }
     path.stroke()
 
     // Agent cue — a soft ring outside the box marking a fresh, unengaged
@@ -385,21 +398,41 @@ final class KitCardRowView: NSTableRowView {
   var isFirstInGroup = true
   var isLastInGroup = true
 
+  /// The row's own inset rect — fully rounded on all 4 corners via the
+  /// proven `NSBezierPath(roundedRect:)` API.
   private func cardPath() -> NSBezierPath {
-    var rect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
-    // Rounded only at the run's ends: over-extend past the row on the joined
-    // side so that side's corners fall outside the clipped drawn area and
-    // read as square. `NSTableRowView` is FLIPPED (origin top-left, y grows
-    // downward), so "joined above" (not first) extends upward — origin AND
-    // height — while "joined below" (not last) extends only the height.
+    let rect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
+    return NSBezierPath(roundedRect: rect, xRadius: Self.corner, yRadius: Self.corner)
+  }
+
+  /// Small same-color squares that "fill in" the rounded notch at corners
+  /// that should read as SQUARE instead — a middle row's top corners (it
+  /// joins the row above) and/or bottom corners (joins the row below).
+  ///
+  /// Deliberately NOT the previous technique (over-extend `cardPath`'s rect
+  /// past this row's own bounds so the far corners land outside the row's
+  /// clip and get cut off): that depended on this row's clip boundary and
+  /// the ADJACENT row's clip boundary landing on the exact same pixel, and
+  /// any sub-pixel mismatch between two independently-drawn, independently
+  /// -antialiased row views showed up as a visible seam or stray notch right
+  /// at the row boundary — precisely the "corner roundedness is buggy" look.
+  /// Patches are self-contained to THIS row's own drawing, so there is
+  /// nothing left for a neighbor row's rounding to misalign with.
+  private func squareCornerPatches() -> [NSRect] {
+    let rect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
+    var patches: [NSRect] = []
     if !isFirstInGroup {
-      rect.origin.y -= Self.corner
-      rect.size.height += Self.corner
+      patches.append(NSRect(x: rect.minX, y: rect.minY, width: Self.corner, height: Self.corner))
+      patches.append(NSRect(x: rect.maxX - Self.corner, y: rect.minY,
+                            width: Self.corner, height: Self.corner))
     }
     if !isLastInGroup {
-      rect.size.height += Self.corner
+      patches.append(NSRect(x: rect.minX, y: rect.maxY - Self.corner,
+                            width: Self.corner, height: Self.corner))
+      patches.append(NSRect(x: rect.maxX - Self.corner, y: rect.maxY - Self.corner,
+                            width: Self.corner, height: Self.corner))
     }
-    return NSBezierPath(roundedRect: rect, xRadius: Self.corner, yRadius: Self.corner)
+    return patches
   }
 
   override func drawBackground(in dirtyRect: NSRect) {
@@ -411,6 +444,7 @@ final class KitCardRowView: NSTableRowView {
     NSBezierPath(rect: bounds).setClip()
     SeptaskKitTheme.cardSurface.setFill()
     cardPath().fill()
+    for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
     NSGraphicsContext.restoreGraphicsState()
   }
 
@@ -428,6 +462,7 @@ final class KitCardRowView: NSTableRowView {
     // canonical selection language (docs/DesignSpec.md §4.5).
     SeptaskKitTheme.listSelectionFill.setFill()
     cardPath().fill()
+    for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
     NSGraphicsContext.restoreGraphicsState()
   }
 
