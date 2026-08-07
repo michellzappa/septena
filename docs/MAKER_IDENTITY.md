@@ -36,7 +36,7 @@ fresh ones, don't pretend they're current if they're old.
 | Built fast, with AI | ~1,080 commits in the native app + 230 in the pilot (~1,310 app commits; ~1,410 incl. gateway + site), all inside ~11 weeks (Apr 4 → Jun 21 2026) — only possible paired with AI |
 | Evenings and weekends | Holds in **both** repos. Native: peaks 8–11pm (9pm = 131), Sat (199) + Sun (207) biggest. Pilot: single biggest day is Sunday (65). |
 | **Not** a night owl | **Zero** commits between 1am and 6am — in *either* repo. None. |
-| Built in the open | Public repo (`github.com/septena/septena`), MIT-licensed — every line that touches your data is readable |
+| Built in the open | Public repo (`github.com/michellzappa/septena`), MIT-licensed — every line that touches your data is readable |
 | Private by design | Local-first, CloudKit private DB, no third-party analytics, no investors, no growth team |
 | The numbers are trustworthy | The public repo has a single root + linear history; going open source rewrote hashes (a secrets + history scrub) but **preserved author dates**, so its counts/dates are real. It's the public continuation of an earlier private repo — the same codebase, renamed — so don't double-count: those early commits already live inside the public repo's history. |
 
@@ -207,7 +207,7 @@ is API spend, not server farms or salaries. Keep it dry; don't oversell it.
 ### Block D — Built in the open (trust pillar, reusable one-liner)
 
 > A thousand-plus commits, all public. You can read every line that touches your
-> data — `github.com/septena/septena`.
+> data — `github.com/michellzappa/septena`.
 
 ### Block E — Changelog & journal sign-off voice
 

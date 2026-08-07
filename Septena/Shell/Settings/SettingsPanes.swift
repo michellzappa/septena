@@ -136,7 +136,7 @@ struct PrivacySettingsPane: View {
           Text("Septena is open source. Read exactly what's collected and when, in the code:")
             .padding(.top, 4)
           Link("View the analytics source on GitHub",
-               destination: URL(string: "https://github.com/septena/septena/blob/main/SeptenaCore/Telemetry.swift")!)
+               destination: URL(string: "https://github.com/michellzappa/septena/blob/main/SeptenaCore/Telemetry.swift")!)
             .font(.callout)
         }
       }

@@ -83,7 +83,7 @@ three entities above):**
 
 The existing `GET /api/training/entries` returns all entries but
 without the config or session_types catalog. Mirror the pattern from
-[septena#10](https://github.com/septena/septena/pull/10) and add a
+[septena#10](https://github.com/michellzappa/septena/pull/10) and add a
 **single** new endpoint:
 
 ```python

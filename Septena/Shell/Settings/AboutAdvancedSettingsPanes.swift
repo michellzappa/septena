@@ -85,7 +85,7 @@ struct AboutSettingsPane: View {
       Section("Links") {
         outboundLink("Website", destination: "https://septena.app", icon: "globe")
         outboundLink("Telegram", destination: "https://t.me/septena_app", icon: "paperplane")
-        outboundLink("Source code", destination: "https://github.com/septena/septena", icon: "chevron.left.forwardslash.chevron.right")
+        outboundLink("Source code", destination: "https://github.com/michellzappa/septena", icon: "chevron.left.forwardslash.chevron.right")
         outboundLink("License", destination: "https://opensource.org/licenses/MIT", icon: "doc.text", trailing: "MIT")
       }
 
