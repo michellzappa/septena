@@ -2,37 +2,37 @@ import SwiftUI
 import SwiftData
 
 // The Next feed — suggestions plus the chores / habits / supplements trio —
-// embedded at the foot of Septask's Today list so a Septask user never has to
-// bounce to Septena for the day's rituals. One outer fold ("Next"), open/closed
-// from the header, state persisted.
-//
-// Composition only, per the Septask charter: every model and row view here is
+// composition only, per the Septask charter: every model and row view here is
 // the SAME type Septena's Next tab renders (NextItemsModel / HabitRow /
-// NextSuggestionRow …). What differs is the container: Septena's Next is a
-// native `List`; Today's task list is a `SelectableScrollList`
-// (ScrollView/LazyVStack), so the rows wear the Tasks surface's own card
-// language (`taskCardChrome`) instead of List cells — same emphasis token as
-// every other card on this surface, never a second style.
+// NextSuggestionRow …). What differs is the container.
+//
+// Two hosts share one feed body (`SeptaskNextFeed`):
+//   • `SeptaskNextFold` — embedded at the foot of SwiftUI Today's list
+//     (SelectableScrollList card language, collapsible, Settings-gated).
+//   • `SeptaskNextPage` — standalone page for the AppKit sidebar destination
+//     (and any future full-page host). Same cuts from Septena's Next tab.
 //
 // Deliberate deltas from Septena's Next page, all composition-shaped:
-//   • No "Tasks Today" block — the Today list right above IS that block.
-//   • No "Done Today" log — the completed-timeline read too recursively on a
-//     surface that's already the task log; Next here is the forward glance only.
-//   • No training suggestion — its destination (the live training session)
-//     is a Septena-sized surface Septask doesn't compile. Mood check-in and
-//     meal logging present locally (see SeptaskRootView's modal switch).
-//   • No List selection / keyboard cursor across Next rows — the task list
-//     owns the selection model on this surface; Next rows stay tap/long-press
-//     interactive exactly like iPhone.
-struct SeptaskNextFold: View {
-  /// Device-local prefs. `showInTodayKey` gates the whole fold (Settings ▸
-  /// General); `collapsedKey` is the fold state the header chevron toggles.
-  static let showInTodayKey = "septask.next.showInToday"
-  static let collapsedKey = "septask.next.collapsed"
+//   • No "Tasks Today" block — Today IS that block (fold sits under it; the
+//     page is the forward glance beside it).
+//   • No "Done Today" log — forward glance only.
+//   • No training suggestion — its destination is a Septena-sized surface
+//     Septask doesn't compile. Mood check-in and meal logging present locally
+//     (see SeptaskRootView / SeptaskKitNext modal switch).
+//   • No List selection / keyboard cursor across Next rows.
+
+// MARK: - Shared feed
+
+/// The actionable Next body — suggestions + trio — used by both the Today
+/// fold and the standalone Next page. Owns the models and reload wiring so
+/// the two hosts can't drift.
+struct SeptaskNextFeed: View {
+  /// Optional — the Today fold's header wants the open count without owning
+  /// a second copy of the models.
+  var onOpenCountChange: ((Int) -> Void)? = nil
 
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
-  @Environment(\.modelContext) private var modelContext
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(NavigationState.self) private var nav
   @Environment(ChecklistMutator.self) private var checklistMutator
@@ -40,8 +40,6 @@ struct SeptaskNextFold: View {
   @State private var model = NextItemsModel()
   @State private var suggestionsModel = NextSuggestionsModel()
 
-  @AppStorage(Self.showInTodayKey) private var showInToday = true
-  @AppStorage(Self.collapsedKey) private var collapsed = false
   @AppStorage(NextLinger.supplementsKey) private var lingerSupplements = NextLinger.supplementsDefault
   @AppStorage(NextLinger.habitsKey) private var lingerHabits = NextLinger.habitsDefault
 
@@ -50,16 +48,14 @@ struct SeptaskNextFold: View {
   private static let suggestionKeys: Set<String> =
     ["intake", "nutrition", "training", "mood"]
 
-  // MARK: - Feed slices (same rules as NextView / NextOpenSection)
-
-  /// Trio blocks in the user's saved order. The Today list above IS the
-  /// tasks block, so it never renders twice.
+  /// Trio blocks in the user's saved order. Tasks never render here — Today
+  /// (or the Tasks lists) owns that block.
   private var orderedKeys: [String] {
     NextFeed.nextSectionKeys(from: settingsStore.sections).filter { $0 != "tasks" }
   }
 
   /// Suggestions minus today's skips, minus training (no in-app destination
-  /// in Septask — see the header comment).
+  /// in Septask — see the file header).
   private var visibleSuggestions: [NextSuggestion] {
     suggestionsModel.suggestions.filter {
       !suggestionsModel.skipped.contains($0.id) && $0.kind != .training
@@ -74,108 +70,57 @@ struct SeptaskNextFold: View {
     model.openSupplements.filter { DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerSupplements) }
   }
 
-  /// Everything still actionable — drives the fold header's count and the
-  /// empty state.
+  /// Everything still actionable — drives empty state (and fold header count).
   private var openCount: Int {
     visibleSuggestions.count + model.openChores.count
       + habitsNow.count + supplementsNow.count
   }
 
   var body: some View {
-    if showInToday {
-      // One plain VStack row inside the task scroll (not a Group of loose
-      // siblings): the load / refresh modifiers below must attach once, to a
-      // single stable anchor.
-      VStack(alignment: .leading, spacing: 0) {
-        // The seam between the task list above and Next below — a hairline on
-        // the cards' content column so the two read as distinct bands.
-        Divider()
-          .padding(.leading, TaskCardMetrics.headerLeading)
-          .padding(.trailing, TaskCardMetrics.margin)
-          .padding(.top, 8)
-        foldHeader
-        if !collapsed {
-          if openCount == 0 && model.hasLoaded {
-            emptyRow
-          } else {
-            if !visibleSuggestions.isEmpty { suggestionsBlock }
-            ForEach(orderedKeys, id: \.self) { key in
-              trioBlock(for: key)
-            }
-          }
+    Group {
+      if openCount == 0 && model.hasLoaded {
+        emptyRow
+      } else {
+        if !visibleSuggestions.isEmpty { suggestionsBlock }
+        ForEach(orderedKeys, id: \.self) { key in
+          trioBlock(for: key)
         }
       }
-      .task {
-        model.paintFromCache(today: clock.today, now: clock.now)
-        suggestionsModel.paintFromCache(today: clock.today)
-        async let a: () = model.load(today: clock.today, now: clock.now)
-        async let b: () = suggestionsModel.load(now: clock.now)
-        _ = await (a, b)
-      }
-      // Scoped data changes reload only the models that consume them; inbound
-      // CloudKit batches reload both from the mirror. (Mirrors NextView, minus
-      // the Done-log path this fold doesn't render.)
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-        if note.isCloudKitBatch {
-          Task {
-            async let a: () = model.load(today: clock.today, now: clock.now)
-            async let b: () = suggestionsModel.load(now: clock.now)
-            _ = await (a, b)
-          }
-          return
-        }
-        guard note.affectsAnySection(of: Self.suggestionKeys) else { return }
-        Task { await suggestionsModel.load(now: clock.now) }
-      }
-      .onChange(of: clock.today) { _, _ in
+    }
+    .task {
+      model.paintFromCache(today: clock.today, now: clock.now)
+      suggestionsModel.paintFromCache(today: clock.today)
+      async let a: () = model.load(today: clock.today, now: clock.now)
+      async let b: () = suggestionsModel.load(now: clock.now)
+      _ = await (a, b)
+    }
+    // Scoped data changes reload only the models that consume them; inbound
+    // CloudKit batches reload both from the mirror. (Mirrors NextView, minus
+    // the Done-log path this feed doesn't render.)
+    .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+      if note.isCloudKitBatch {
         Task {
           async let a: () = model.load(today: clock.today, now: clock.now)
           async let b: () = suggestionsModel.load(now: clock.now)
           _ = await (a, b)
         }
+        return
+      }
+      guard note.affectsAnySection(of: Self.suggestionKeys) else { return }
+      Task { await suggestionsModel.load(now: clock.now) }
+    }
+    .onChange(of: clock.today) { _, _ in
+      Task {
+        async let a: () = model.load(today: clock.today, now: clock.now)
+        async let b: () = suggestionsModel.load(now: clock.now)
+        _ = await (a, b)
       }
     }
+    .onAppear { onOpenCountChange?(openCount) }
+    .onChange(of: openCount) { _, count in onOpenCountChange?(count) }
   }
 
-  // MARK: - Fold header
-
-  /// The top-level "Next" band header — a peer of the task list's section
-  /// headers (icon column over the cards, title, count, rotating chevron), so
-  /// the fold reads as one more section of this surface.
-  private var foldHeader: some View {
-    Button {
-      Haptics.tick()
-      a11yAnimate(.easeInOut(duration: 0.2)) { collapsed.toggle() }
-    } label: {
-      HStack(spacing: Theme.iconTextGap) {
-        Image(systemName: "arrow.right")
-          .scaledFont(size: 16)
-          .foregroundStyle(Theme.iconMuted)
-          .frame(width: Theme.checkboxTap, alignment: .center)
-          .offset(x: -Theme.checkboxLeadingNudge)
-        Text("Next").sectionGroupHeaderTitleStyle()
-        if openCount > 0 {
-          Text("\(openCount)")
-            .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
-            .monospacedDigit()
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        Spacer()
-        Image(systemName: "chevron.down")
-          .scaledFont(size: 12, weight: .semibold)
-          .foregroundStyle(Theme.iconMuted)
-          .rotationEffect(.degrees(collapsed ? -90 : 0))
-      }
-      .padding(.leading, TaskCardMetrics.headerLeading)
-      .padding(.trailing, TaskCardMetrics.margin)
-      .padding(.top, 12)
-      .padding(.bottom, 8)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityHint(collapsed ? "Expand" : "Collapse")
-  }
+  // MARK: - Block chrome
 
   private var emptyRow: some View {
     Text("Nothing here yet")
@@ -187,20 +132,13 @@ struct SeptaskNextFold: View {
       .taskCardChrome(.solo)
   }
 
-  // MARK: - Block chrome
-
-  /// Sub-block header — the Suggested / trio titles INSIDE the Next fold. A
-  /// step down from `sectionGroupHeaderTitleStyle` (the task/fold headers):
-  /// smaller, lighter, and gray, so a block inside Next never competes with a
-  /// task section header for the same rung of the hierarchy.
+  /// Sub-block header — the Suggested / trio titles. A step down from a page
+  /// / section-group header: smaller, lighter, and gray, so a block inside
+  /// Next never competes with a task section header for the same rung.
   @ViewBuilder
   private func blockHeader(_ title: String, trailing: (() -> AnyView)? = nil) -> some View {
     HStack(spacing: 8) {
       Text(title)
-        // Halfway between the task/fold header size (`groupHeaderFontSize`,
-        // 17 mac / 20 iOS) and the first, too-small pass (13): ~15 mac /
-        // ~16.5 iOS. Still lighter + gray so a block inside Next stays
-        // subordinate to a task section header.
         .scaledFont(size: (Theme.groupHeaderFontSize + 13) / 2,
                     weight: .medium, relativeTo: .subheadline)
         .foregroundStyle(Theme.inkSecondary)
@@ -289,8 +227,170 @@ struct SeptaskNextFold: View {
     default:
       // `orderedKeys` only yields NextBlocks members; "tasks" is filtered
       // above. A new member without a case here should fail loudly in debug.
-      let _ = { assertionFailure("SeptaskNextFold has no case for Next block '\(key)'") }()
+      let _ = { assertionFailure("SeptaskNextFeed has no case for Next block '\(key)'") }()
       EmptyView()
     }
+  }
+}
+
+// MARK: - Today fold (SwiftUI)
+
+/// Foldable Next band at the foot of Septask's Today list. Gated by Settings ▸
+/// General ▸ "Next in Today". The AppKit shell does NOT use this — it has a
+/// dedicated sidebar destination (`SeptaskNextPage` via `SeptaskKitNext`).
+struct SeptaskNextFold: View {
+  /// Device-local prefs. `showInTodayKey` gates the whole fold (Settings ▸
+  /// General); `collapsedKey` is the fold state the header chevron toggles.
+  static let showInTodayKey = "septask.next.showInToday"
+  static let collapsedKey = "septask.next.collapsed"
+
+  @AppStorage(Self.showInTodayKey) private var showInToday = true
+  @AppStorage(Self.collapsedKey) private var collapsed = false
+
+  /// Mirrored from the feed so the header can show a count while collapsed
+  /// (feed unmounted) still reflecting the last known open set — and update
+  /// live while expanded.
+  @State private var feedOpenCount = 0
+
+  var body: some View {
+    if showInToday {
+      // One plain VStack row inside the task scroll (not a Group of loose
+      // siblings): the load / refresh modifiers on the feed must attach once,
+      // to a single stable anchor — and the fold chrome sits around it.
+      VStack(alignment: .leading, spacing: 0) {
+        // The seam between the task list above and Next below — a hairline on
+        // the cards' content column so the two read as distinct bands.
+        Divider()
+          .padding(.leading, TaskCardMetrics.headerLeading)
+          .padding(.trailing, TaskCardMetrics.margin)
+          .padding(.top, 8)
+        foldHeader
+        // Keep the feed mounted while collapsed so its models keep loading /
+        // the header count stays live — same as the pre-extract fold, where
+        // `.task` / `.onReceive` lived on the outer VStack.
+        SeptaskNextFeed { feedOpenCount = $0 }
+          .frame(maxHeight: collapsed ? 0 : nil)
+          .clipped()
+          .opacity(collapsed ? 0 : 1)
+          .allowsHitTesting(!collapsed)
+          .accessibilityHidden(collapsed)
+      }
+    }
+  }
+
+  /// The top-level "Next" band header — a peer of the task list's section
+  /// headers (icon column over the cards, title, count, rotating chevron), so
+  /// the fold reads as one more section of this surface.
+  private var foldHeader: some View {
+    Button {
+      Haptics.tick()
+      a11yAnimate(.easeInOut(duration: 0.2)) { collapsed.toggle() }
+    } label: {
+      HStack(spacing: Theme.iconTextGap) {
+        Image(systemName: "arrow.right")
+          .scaledFont(size: 16)
+          .foregroundStyle(Theme.iconMuted)
+          .frame(width: Theme.checkboxTap, alignment: .center)
+          .offset(x: -Theme.checkboxLeadingNudge)
+        Text("Next").sectionGroupHeaderTitleStyle()
+        if feedOpenCount > 0 {
+          Text("\(feedOpenCount)")
+            .scaledFont(size: Theme.groupHeaderFontSize, weight: .regular)
+            .monospacedDigit()
+            .foregroundStyle(Theme.inkSecondary)
+        }
+        Spacer()
+        Image(systemName: "chevron.down")
+          .scaledFont(size: 12, weight: .semibold)
+          .foregroundStyle(Theme.iconMuted)
+          .rotationEffect(.degrees(collapsed ? -90 : 0))
+      }
+      .padding(.leading, TaskCardMetrics.headerLeading)
+      .padding(.trailing, TaskCardMetrics.margin)
+      .padding(.top, 12)
+      .padding(.bottom, 8)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityHint(collapsed ? "Expand" : "Collapse")
+  }
+}
+
+// MARK: - Standalone page (AppKit sidebar + any full-page host)
+
+/// Full-page Next feed — the AppKit sidebar's "Next" destination. Same feed
+/// body as the Today fold; page chrome instead of fold chrome. Suggestion
+/// destinations (mood / nutrition) are presented as sheets here so the
+/// AppKit host doesn't need its own modal switch.
+struct SeptaskNextPage: View {
+  @Environment(NavigationState.self) private var nav
+  @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var dayClock
+  @Environment(TaskMutator.self) private var taskMutator
+  @Environment(AreasMutator.self) private var areasMutator
+  @Environment(ProjectsMutator.self) private var projectsMutator
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(LogCommitCenter.self) private var logCommit
+  @Environment(ChecklistMutator.self) private var checklistMutator
+
+  var body: some View {
+    @Bindable var nav = nav
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        pageHeader
+        SeptaskNextFeed()
+      }
+      .padding(.bottom, 24)
+    }
+    .background(Theme.groupedBackground.ignoresSafeArea())
+    .sheet(item: $nav.presentedModal) { modal in
+      switch modal {
+      case .addInfo(let section) where section == .nutrition:
+        withEnvironment(NewNutritionEntrySheet())
+          .septenaModalSheet(macWidth: 560, macHeight: 600)
+      case .moodCheckin:
+        withEnvironment(AddMoodPage(anchorTime: dayClock.now, date: dayClock.today))
+          .septenaModalSheet(macWidth: 560, macHeight: 600)
+      default:
+        EmptyView()
+      }
+    }
+  }
+
+  private var pageHeader: some View {
+    HStack(spacing: Theme.iconTextGap) {
+      Image(systemName: "arrow.right")
+        .scaledFont(size: 22, weight: .semibold)
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(width: 28, alignment: .center)
+      Text("Next")
+        .scaledFont(size: 28, weight: .bold, relativeTo: .largeTitle)
+        .foregroundStyle(Theme.inkPrimary)
+      Spacer()
+    }
+    .padding(.leading, TaskCardMetrics.headerLeading)
+    .padding(.trailing, TaskCardMetrics.margin)
+    .padding(.top, 28)
+    .padding(.bottom, 8)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  /// Re-inject the environment onto presented sheets — same belt-and-
+  /// suspenders as `SeptaskRootView.withEnvironment` against `@Observable`
+  /// loss across a presentation boundary.
+  private func withEnvironment<V: View>(_ content: V) -> some View {
+    content
+      .environment(nav)
+      .environment(theme)
+      .environment(dayClock)
+      .environment(taskMutator)
+      .environment(areasMutator)
+      .environment(projectsMutator)
+      .environment(ckEngine)
+      .environment(settingsStore)
+      .environment(logCommit)
+      .environment(checklistMutator)
   }
 }

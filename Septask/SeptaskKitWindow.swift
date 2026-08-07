@@ -41,20 +41,25 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// The pieces the menu bar drives. Held so `SeptaskKitCommands` can route a
   /// menu selection to the shell when its window is the one in front.
   private var list: SeptaskKitTaskListController?
+  private var next: SeptaskKitNextController?
+  private var detail: KitDetailPaneController?
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
+  private var inspectorItem: NSSplitViewItem?
 
   private init() {
     let list = SeptaskKitTaskListController()
+    let next = SeptaskKitNextController()
+    let detail = KitDetailPaneController()
     let sidebar = SeptaskKitSidebarController()
     let inspector = SeptaskKitInspectorController()
-    sidebar.onSelect = { [weak list] filter, title in
-      list?.show(filter, title: title)
-    }
     // Tab / Shift-Tab crosses between the two panes — the only two stops in
-    // this window's keyboard-nav loop.
+    // this window's keyboard-nav loop. (`sidebar.onSelect` itself is wired
+    // below, after `super.init`, since `show(_:)` captures `self`.)
     sidebar.onFocusList = { [weak list] in list?.focusList() }
     list.onFocusSidebar = { [weak sidebar] in sidebar?.focusSidebar() }
+    detail.display(list)
+
     list.onSelectionChange = { [weak inspector] task in
       inspector?.show(task)
     }
@@ -67,11 +72,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     sidebarItem.minimumThickness = 190
     sidebarItem.maximumThickness = 320
     split.addSplitViewItem(sidebarItem)
-    let listItem = NSSplitViewItem(viewController: list)
+    let listItem = NSSplitViewItem(viewController: detail)
     listItem.minimumThickness = 380
     split.addSplitViewItem(listItem)
     // Native inspector pane — collapsed until ⌥⌘I, and it commits any pending
-    // note when it closes so nothing typed is lost on collapse.
+    // note when it closes so nothing typed is lost on collapse. Hidden while
+    // Next is showing (no task selection to inspect).
     let inspectorItem = NSSplitViewItem(inspectorWithViewController: inspector)
     inspectorItem.minimumThickness = 260
     inspectorItem.maximumThickness = 380
@@ -79,7 +85,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     split.addSplitViewItem(inspectorItem)
     split.splitView.autosaveName = "SeptaskKitSplit"
 
-    list.onToggleInspector = { [weak inspector] in
+    list.onToggleInspector = { [weak inspector, weak inspectorItem] in
+      guard let inspectorItem else { return }
       guard !inspectorItem.isCollapsed else {
         inspectorItem.animator().isCollapsed = false
         return
@@ -88,15 +95,14 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       inspectorItem.animator().isCollapsed = true
     }
 
-    // Quick Find steers the sidebar, which drives the list — so a jump always
-    // leaves the two in agreement — then selects the row it found.
+    // Quick Find steers the sidebar, which drives the detail — so a jump
+    // always leaves the two in agreement — then selects the row it found.
     let quickFind = SeptaskKitQuickFind { [weak sidebar, weak list] destination in
       sidebar?.select(destination.filter)
       if let taskId = destination.taskId {
         list?.select(taskId: taskId)
       }
     }
-    self.quickFind = quickFind
     list.onQuickFind = { [weak quickFind] in quickFind?.show() }
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
@@ -116,14 +122,41 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     super.init(window: window)
     window.delegate = self
     self.list = list
+    self.next = next
+    self.detail = detail
     self.sidebar = sidebar
     self.splitController = split
+    self.inspectorItem = inspectorItem
+    self.quickFind = quickFind
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
+
+    // Wired after super.init — capturing `self` in the closure above would
+    // be "used before super.init".
+    sidebar.onSelect = { [weak self] destination in
+      self?.show(destination)
+    }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
     // (start() memoizes), load-bearing if this window somehow opens first.
     Task { await SeptenaServices.shared.start() }
     sidebar.selectDefault()
+  }
+
+  /// Sidebar → detail. Task filters keep the NSTableView list; Next swaps in
+  /// the hosted SwiftUI feed. Inspector collapses off Next (nothing to show).
+  private func show(_ destination: KitSidebarDestination) {
+    switch destination {
+    case .filter(let filter, let title):
+      guard let list, let detail else { return }
+      detail.display(list)
+      list.show(filter, title: title)
+      list.focusList()
+    case .next:
+      guard let next, let detail else { return }
+      inspectorItem?.animator().isCollapsed = true
+      detail.display(next)
+      next.claimWindowSubtitle()
+    }
   }
 
   // MARK: - Menu-bar surface
@@ -136,6 +169,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   var isFrontmost: Bool { window?.isKeyWindow == true }
 
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
+  func goNext() { sidebar?.select(.next) }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
@@ -172,6 +206,36 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     Self.current = nil
+  }
+}
+
+/// Swaps the middle split pane between the task list and the Next host without
+/// rebuilding the `NSSplitViewController` — both children stay alive so
+/// returning to a list keeps selection / scroll position.
+@MainActor
+private final class KitDetailPaneController: NSViewController {
+  private weak var current: NSViewController?
+
+  override func loadView() {
+    view = NSView()
+  }
+
+  func display(_ child: NSViewController) {
+    if current === child { return }
+    if let current {
+      current.view.removeFromSuperview()
+      current.removeFromParent()
+    }
+    addChild(child)
+    child.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(child.view)
+    NSLayoutConstraint.activate([
+      child.view.topAnchor.constraint(equalTo: view.topAnchor),
+      child.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
+    current = child
   }
 }
 

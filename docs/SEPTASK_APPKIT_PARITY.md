@@ -197,8 +197,14 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   actually the Habits/Mood TIME-OF-DAY bucket header (morning/afternoon/
   evening), unrelated to Upcoming; `upcomingBuckets()` only ever groups by
   day. So this port is complete, not partial.
-- **[P2] The embedded Next fold** (`SeptaskNextFold`, `NextItemsSection`,
-  `NextSuggestionsSection`).
+- **[DONE] Next feed.** Sidebar row ("Next", after Today) swaps the detail
+  pane to a hosted `SeptaskNextPage` (`SeptaskKitNext.swift`) — same shared
+  feed body as SwiftUI's `SeptaskNextFold` (`SeptaskNextFeed`: suggestions +
+  chores / habits / supplements, no Tasks Today / Done log / training). AppKit
+  deliberately does NOT append Next at the foot of the Today table
+  (heterogeneous NSTableView rows would fight the shell); a separate sidebar
+  destination is the AppKit-shaped answer. Mood / nutrition suggestion sheets
+  present from the page. Open-count badge via `KitNextCount`.
 - **[P2] Reminders inbox import** (`RemindersInboxSection`).
 - **[P3] Things import** (`ThingsImportView`) — one-time migration, fine in the
   classic window.

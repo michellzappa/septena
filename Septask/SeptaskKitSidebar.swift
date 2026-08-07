@@ -12,7 +12,7 @@ private extension Int {
 // Reads the same ordered structure snapshot the SwiftUI sidebar uses
 // (StructureCache), rendered as a native NSOutlineView: fixed views up top,
 // then areas (selectable, expandable) with their projects nested and loose
-// projects alongside. Selection drives the task list via `onSelect`.
+// projects alongside. Selection drives the detail pane via `onSelect`.
 //
 // Things-style layout, deliberately un-Finder-like: NO section header rows
 // ("Views" / "Areas & Projects"), NO per-level indentation — a project sits
@@ -21,6 +21,16 @@ private extension Int {
 // lives IN the indentation column) has nowhere natural to draw, so it's
 // suppressed and replaced with a custom chevron on the row's trailing edge,
 // left of the count badge.
+
+/// Where the sidebar points the detail pane. Next is NOT a `TaskFilter` —
+/// it's the chores / habits / supplements / suggestions feed (see
+/// `SeptaskNextPage`), so it lives beside the smart-list filters rather than
+/// inside them.
+enum KitSidebarDestination: Equatable {
+  case filter(TaskFilter, title: String)
+  case next
+}
+
 @MainActor
 final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
 
@@ -28,6 +38,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   final class Node {
     enum Content {
       case filter(TaskFilter, title: String, symbol: String)
+      /// Standalone Next feed — not a task filter (see `KitSidebarDestination`).
+      case next
       case area(Area)
       /// `progress` drives the completion ring, matching `ProjectProgressIcon`.
       case project(Project, progress: Double)
@@ -46,13 +58,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     var key: String {
       switch content {
       case .filter(let filter, _, _): return "filter:\(filter.serverView)"
+      case .next: return "next"
       case .area(let area): return "area:\(area.id)"
       case .project(let project, _): return "project:\(project.id)"
       }
     }
   }
 
-  var onSelect: ((TaskFilter, String) -> Void)?
+  var onSelect: ((KitSidebarDestination) -> Void)?
   /// Tab pressed while the sidebar holds focus — the window owns moving
   /// focus to the list (mirrors the list's own `onFocusSidebar`).
   var onFocusList: (() -> Void)?
@@ -146,13 +159,21 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   /// Point the sidebar at a destination (Quick Find, or any other jump).
-  /// Selecting the row is what drives the list, so navigation always leaves
-  /// the sidebar and the content in agreement.
+  /// Selecting the row is what drives the detail pane, so navigation always
+  /// leaves the sidebar and the content in agreement.
   func select(_ filter: TaskFilter) {
-    let key: String = switch filter {
-    case .area(let id): "area:\(id)"
-    case .project(let id): "project:\(id)"
-    default: "filter:\(filter.serverView)"
+    select(.filter(filter, title: filter.title))
+  }
+
+  func select(_ destination: KitSidebarDestination) {
+    let key: String = switch destination {
+    case .next: "next"
+    case .filter(let filter, _):
+      switch filter {
+      case .area(let id): "area:\(id)"
+      case .project(let id): "project:\(id)"
+      default: "filter:\(filter.serverView)"
+      }
     }
     // A project inside a collapsed area has no row until the area is opened.
     outlineView.expandItem(nil, expandChildren: true)
@@ -219,9 +240,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // captures live in the triage band on top of Today (the same structure
     // the SwiftUI sidebar settled on, docs/TRIAGE_BAND_SPEC.md). The band's
     // size rides on Today's count so nothing about it is hidden.
+    // Next sits beside Today (not at the foot of the Today list) — the AppKit
+    // shape for the feed SwiftUI embeds as `SeptaskNextFold`.
     var views = [
       Node(.filter(.today, title: "Today", symbol: "sun.max.fill"),
            count: todayCount + inboxCount > 0 ? todayCount + inboxCount : nil),
+      Node(.next, count: KitNextCount.open().nilIfZero),
       Node(.filter(.upcoming, title: "Upcoming", symbol: "calendar"),
            count: LocalCache.tasks(in: context, filter: .upcoming).count.nilIfZero),
       Node(.filter(.unscheduled, title: "Anytime", symbol: "rectangle.stack.fill"),
@@ -323,6 +347,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       case .unscheduled: return .anytime
       default: return nil   // Inbox is where captures start, not a filing target; Logbook is an archive.
       }
+    case .next:
+      return nil   // Rituals feed, not a task filing target.
     case .area(let area):
       return .area(area.id)
     case .project(let project, _):
@@ -417,7 +443,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       let pbItem = NSPasteboardItem()
       pbItem.setString(node.key, forType: .septaskStructureItem)
       return pbItem
-    case .filter:
+    case .filter, .next:
       return nil
     }
   }
@@ -460,7 +486,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         return .move
       }
 
-    case .filter:
+    case .filter, .next:
       return []
     }
   }
@@ -494,7 +520,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       Task { try? await projectsMutator.reorder(orderedIDs: siblings) }
       return true
 
-    case .filter:
+    case .filter, .next:
       return false
     }
   }
@@ -549,6 +575,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         ? SeptaskKitTheme.todayAccent
         : SeptaskKitTheme.inkSecondary
       cell.imageView?.image = KitGlyph.colored(symbol: symbol, color: tint)
+    case .next:
+      cell.textField?.font = SeptaskKitTheme.taskTitle
+      cell.textField?.stringValue = "Next"
+      cell.imageView?.image = KitGlyph.colored(symbol: "arrow.right",
+                                              color: SeptaskKitTheme.inkSecondary)
     case .area(let area):
       // Bold — an area is a section, the weight that distinguishes it from
       // its own projects one level down.
@@ -696,11 +727,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
           let node = outlineView.item(atRow: outlineView.selectedRow) as? Node else { return }
     switch node.content {
     case .filter(let filter, let title, _):
-      onSelect?(filter, title)
+      onSelect?(.filter(filter, title: title))
+    case .next:
+      onSelect?(.next)
     case .area(let area):
-      onSelect?(.area(area.id), area.title)
+      onSelect?(.filter(.area(area.id), title: area.title))
     case .project(let project, _):
-      onSelect?(.project(project.id), project.title)
+      onSelect?(.filter(.project(project.id), title: project.title))
     }
   }
 
@@ -731,7 +764,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       menu.addItem(item("Rename Project…", #selector(renameSelected)))
       menu.addItem(item("Delete Project…", #selector(deleteSelected)))
       _ = project
-    case .filter(_, _, _), .none:
+    case .filter(_, _, _), .next, .none:
       menu.addItem(item("New Area…", #selector(newArea)))
       menu.addItem(item("New Project…", #selector(newProjectLoose)))
     }
