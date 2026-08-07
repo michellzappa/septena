@@ -223,11 +223,24 @@ private final class KitDetailPaneController: NSViewController {
   func display(_ child: NSViewController) {
     if current === child { return }
     if let current {
+      // Manual containment (`addChild`/`addSubview`, not one of AppKit's
+      // built-in container APIs) doesn't forward appearance transitions on
+      // its own — has to be done by hand here, or an `NSHostingController`
+      // child never gets its `viewDidAppear`, which is what actually starts
+      // its SwiftUI content running (`.task`/`.onAppear` never fire without
+      // it). The task list controller never needed this (pure AppKit, no
+      // SwiftUI lifecycle dependency) — this only bit once a hosted SwiftUI
+      // controller (`SeptaskKitNextController`) became a second thing this
+      // swaps to: the page rendered permanently blank, `.task` never having
+      // fired to load its data.
+      current.viewWillDisappear()
       current.view.removeFromSuperview()
       current.removeFromParent()
+      current.viewDidDisappear()
     }
     addChild(child)
     child.view.translatesAutoresizingMaskIntoConstraints = false
+    child.viewWillAppear()
     view.addSubview(child.view)
     NSLayoutConstraint.activate([
       child.view.topAnchor.constraint(equalTo: view.topAnchor),
@@ -235,6 +248,7 @@ private final class KitDetailPaneController: NSViewController {
       child.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
     ])
+    child.viewDidAppear()
     current = child
   }
 }

@@ -82,9 +82,11 @@ final class SeptaskKitDatePopover: NSViewController {
     stack.alignment = .leading
     // Tight within a choice group; the two `setCustomSpacing` calls below
     // open real air between the three sections (quick choices / calendar /
-    // clear) — was one flat 2pt rhythm the whole way down.
-    stack.spacing = 4
-    stack.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+    // clear). Bumped again after visual review — 4/16/12 still read cramped,
+    // especially the calendar sitting almost flush against the popover's
+    // rounded edge.
+    stack.spacing = 6
+    stack.edgeInsets = NSEdgeInsets(top: 18, left: 22, bottom: 18, right: 22)
     stack.translatesAutoresizingMaskIntoConstraints = false
 
     var lastQuickChoice: NSButton?
@@ -98,14 +100,14 @@ final class SeptaskKitDatePopover: NSViewController {
       stack.addArrangedSubview(button)
       lastQuickChoice = button
     }
-    if let lastQuickChoice { stack.setCustomSpacing(12, after: lastQuickChoice) }
+    if let lastQuickChoice { stack.setCustomSpacing(16, after: lastQuickChoice) }
 
     picker.datePickerStyle = .clockAndCalendar
     picker.datePickerElements = [.yearMonthDay]
     picker.target = self
     picker.action = #selector(calendarChoice)
     stack.addArrangedSubview(picker)
-    stack.setCustomSpacing(12, after: picker)
+    stack.setCustomSpacing(16, after: picker)
 
     let clear = NSButton(title: kind.clearTitle, target: self, action: #selector(clearChoice))
     clear.bezelStyle = .recessed

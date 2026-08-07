@@ -2211,6 +2211,9 @@ final class KitScreenTitleCell: NSTableCellView {
   /// on why this isn't built once and cached. Optional-returning to match
   /// the `[weak self]` closure the controller wires it up with.
   var onOpenNavMenu: (() -> NSMenu?)?
+  /// Stored (not a local in `init`) so `handleClick` can read back exactly
+  /// where the click landed — see its comment.
+  private let clickRecognizer = NSClickGestureRecognizer()
 
   private static let font: NSFont = .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold)
 
@@ -2238,8 +2241,9 @@ final class KitScreenTitleCell: NSTableCellView {
       .withSymbolConfiguration(.init(pointSize: 13, weight: .semibold))
     chevron.contentTintColor = SeptaskKitTheme.iconMuted
 
-    let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
-    addGestureRecognizer(click)
+    clickRecognizer.target = self
+    clickRecognizer.action = #selector(handleClick)
+    addGestureRecognizer(clickRecognizer)
 
     addSubview(icon)
     addSubview(emoji)
@@ -2268,10 +2272,13 @@ final class KitScreenTitleCell: NSTableCellView {
 
   @objc private func handleClick() {
     guard let menu = onOpenNavMenu?() else { return }
-    // Anchor under the title, matching a Menu's usual pop-down direction —
-    // not at the click point, which would land wherever inside the row the
-    // gesture recognizer happened to fire.
-    menu.popUp(positioning: nil, at: NSPoint(x: title.frame.minX, y: bounds.minY), in: self)
+    // The gesture recognizer's own `location(in:)` — NOT a hand-computed
+    // point off `bounds.minY` (that assumed a coordinate flip and got it
+    // backwards, popping the menu off in the wrong direction so it never
+    // read as "opened"). `location(in:)` already accounts for whatever this
+    // view's actual `isFlipped` is, so it's the point that's guaranteed
+    // right regardless.
+    menu.popUp(positioning: nil, at: clickRecognizer.location(in: self), in: self)
   }
 
   /// The pointing-hand cursor is the platform's "this is a link/button"
