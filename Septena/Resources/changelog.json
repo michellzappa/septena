@@ -4,50 +4,60 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1532,
+      "build": 1540,
       "date": "2026-08-07",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app for iPhone, iPad, and Mac",
-          "detail": "A new dedicated app for managing tasks, built on the same private data as Septena, including a watch app.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A new companion app over the same private task data, with its own iPhone, iPad, Mac, and Apple Watch experience.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks create their next occurrence automatically",
-          "detail": "Completing a repeating task immediately schedules the next one.",
+          "title": "Bulk actions, drag-and-drop, and Recently Deleted for tasks",
+          "detail": "Multi-select tasks for bulk edits, drag tasks onto Today groups to re-home them, and recover deleted tasks for 30 days.",
           "section": "tasks"
         },
         {
-          "title": "Attach files to tasks, or import from Things",
-          "detail": "Add attachments directly to a task, or bring in an existing Things database.",
+          "title": "Recurring tasks and Things import",
+          "detail": "Completing a recurring task now spawns its next occurrence, and you can import tasks straight from a Things database export.",
           "section": "tasks"
         },
         {
-          "title": "Drag tasks to re-home them, with multi-select bulk actions",
-          "detail": "Drag tasks between groups and select several at once to move, copy, or file them together.",
+          "title": "Attach files to tasks",
+          "detail": null,
           "section": "tasks"
         },
         {
-          "title": "Restore recently deleted tasks",
-          "detail": "Deleted tasks are kept for 30 days and can be restored from a Recently Deleted view.",
+          "title": "Calendar events woven into Today and Upcoming",
+          "detail": "Hidden-calendar choices now sync across your devices.",
           "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a photo of a meal and Septena analyzes it to prefill nutrition details; re-logged meals can also be scaled by portion.",
+          "title": "Photo-first meal logging",
+          "detail": "Snap a photo and Septena analyzes and prefills the meal for you; re-logged meals can be scaled by portion.",
           "section": "nutrition"
         },
         {
-          "title": "Training session improvements",
-          "detail": "New progression hints on strength sets, editable session start/end times, and an auto-advancing rest timer with a watch Live Activity.",
+          "title": "Smarter strength training",
+          "detail": "Get per-set progression hints, editable session start/end times, effort-weighted muscle volume, and an auto-advancing rest timer with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Fixed sleep heatmap dates",
-          "detail": "Oura sleep nights now align to the correct wake day.",
-          "section": "sleep"
+          "title": "Pinned goals on your dashboard",
+          "detail": "Pin goals to the week dashboard and toggle habit-backed goals right from the tile.",
+          "section": "goals"
+        },
+        {
+          "title": "See what's shared with privacy telemetry controls",
+          "detail": "Choose your telemetry level and review a log of what was recently sent.",
+          "section": null
+        },
+        {
+          "title": "Copy your grocery list",
+          "detail": "A new button copies the shopping list to your clipboard.",
+          "section": "groceries"
         }
       ]
     },
