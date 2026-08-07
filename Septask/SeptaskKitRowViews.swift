@@ -347,28 +347,28 @@ enum KitMoveMenu {
     case project(String)
   }
 
-  static func destinations(areas: [Area], projects: [Project]) -> [(title: String, target: Destination)] {
-    var result: [(String, Destination)] = [("No List", .none)]
-    let byArea = Dictionary(grouping: projects.filter { $0.deletedAt == nil },
-                            by: { $0.area ?? "" })
-    for area in areas {
-      result.append((area.title, .area(area.id)))
-      for project in byArea[area.id] ?? [] {
-        // Indented so the nesting reads without a submenu per area.
-        result.append(("    " + project.title, .project(project.id)))
-      }
-    }
-    for project in byArea[""] ?? [] {
-      result.append((project.title, .project(project.id)))
-    }
-    return result
+  /// Move targets are areas only — moving a task INTO a specific project is
+  /// filing detail an area-level triage decision shouldn't require; a task
+  /// that needs a project goes there once it's inside the area (drag, or the
+  /// project's own page). `.project` stays a case on `Destination` (existing
+  /// call sites — `move(to:)`'s `apply`, drag-and-drop refiling — still target
+  /// a project directly), it's just never offered as a MOVE-command choice.
+  /// `emoji` rides alongside `title` rather than getting folded into it —
+  /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
+  /// icon-column slot of its own); `SeptaskKitMoveModal` swaps its icon
+  /// column glyph for it instead, same "emoji replaces the generic glyph,
+  /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
+  static func destinations(areas: [Area], projects: [Project])
+    -> [(title: String, target: Destination, emoji: String?)] {
+    [("No List", .none, nil)] + areas.map { ($0.title, .area($0.id), $0.emoji) }
   }
 
   static func build(areas: [Area], projects: [Project],
                     target: AnyObject, action: Selector) -> NSMenu {
     let menu = NSMenu()
     for (index, entry) in destinations(areas: areas, projects: projects).enumerated() {
-      let item = NSMenuItem(title: entry.title, action: action, keyEquivalent: "")
+      let title = entry.emoji.map { "\($0)  \(entry.title)" } ?? entry.title
+      let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
       item.target = target
       item.tag = index
       menu.addItem(item)

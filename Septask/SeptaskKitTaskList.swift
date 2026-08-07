@@ -820,17 +820,33 @@ final class SeptaskKitTaskListController: NSViewController {
     onStoreChanged?()
   }
 
-  /// ⌘⇧M — pop the move menu at the selected row. A menu (not a bespoke
-  /// picker) so it gets arrow keys and type-select for free.
+  /// ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMoveModal`), the
+  /// AppKit counterpart of SwiftUI's `MovePickerSheet`. Built once, reused —
+  /// it re-reads structure fresh on every `show`.
+  private lazy var moveModal = SeptaskKitMoveModal { [weak self] destination in
+    self?.move(to: destination)
+  }
+
+  /// The area a task currently reads as "in", for the picker's checkmark —
+  /// its own area directly, or (filed into a project) that project's area.
+  /// A top-level/loose project has no area to represent in an areas-only
+  /// picker, so it shows no checkmark rather than a misleading one.
+  private func currentMoveDestination(for task: SeptenaTask) -> KitMoveMenu.Destination? {
+    if let area = task.area { return .area(area) }
+    if let projectId = task.project {
+      let snapshot = StructureCache.snapshot(in: context)
+      guard let area = snapshot.projects.first(where: { $0.id == projectId })?.area else { return nil }
+      return .area(area)
+    }
+    return .none
+  }
+
   func presentMoveMenu() {
-    guard !actionableSelection.isEmpty, tableView.selectedRow >= 0 else { return }
-    let snapshot = StructureCache.snapshot(in: context)
-    let menu = KitMoveMenu.build(areas: snapshot.areas, projects: snapshot.projects,
-                                 target: self, action: #selector(menuMoveTo(_:)))
-    let rect = tableView.rect(ofRow: tableView.selectedRow)
-    menu.popUp(positioning: nil,
-               at: NSPoint(x: rect.minX + 40, y: rect.maxY),
-               in: tableView)
+    let selection = actionableSelection
+    guard !selection.isEmpty else { return }
+    let title = selection.count > 1 ? "Move \(selection.count) Tasks" : "Move"
+    let current = selection.count == 1 ? currentMoveDestination(for: selection[0]) : nil
+    moveModal.show(current: current, title: title)
   }
 
   /// Apply a repeat rule to the selection (menu bar + context menu).
