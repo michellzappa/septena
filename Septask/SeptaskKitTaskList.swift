@@ -1487,6 +1487,68 @@ final class SeptaskKitTaskListController: NSViewController {
     return menu
   }
 
+  /// The page title's own navigation dropdown — the AppKit counterpart of
+  /// `TaskNavMenu`: every sidebar destination in the SAME order (smart
+  /// lists, top-level projects, each area + its projects, Recently Deleted
+  /// when non-empty), a checkmark on whichever one is current, jump on
+  /// click. Icons match `Route.icon` exactly (`NavigationState.swift`) so
+  /// this can't drift from what the sidebar itself shows. Built fresh on
+  /// every click (like `TaskNavMenu`'s lazy `menuContent`), not cached —
+  /// structure changes shouldn't leave a stale menu around.
+  private func buildNavMenu() -> NSMenu {
+    let menu = NSMenu()
+    let snapshot = StructureCache.snapshot(in: context)
+
+    func destItem(_ title: String, icon: String, filter destFilter: TaskFilter) -> NSMenuItem {
+      let menuItem = NSMenuItem(title: title, action: #selector(navMenuSelect(_:)), keyEquivalent: "")
+      menuItem.target = self
+      menuItem.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
+      menuItem.representedObject = destFilter
+      menuItem.state = destFilter == filter ? .on : .off
+      return menuItem
+    }
+
+    // Smart lists — matches `TaskDestinations.smartListRoutes` exactly (Next
+    // is deliberately absent there too — it's a sidebar destination, not a
+    // Tasks one).
+    menu.addItem(destItem("Today", icon: "sun.max.fill", filter: .today))
+    menu.addItem(destItem("Upcoming", icon: "calendar", filter: .upcoming))
+    menu.addItem(destItem("Anytime", icon: "rectangle.stack.fill", filter: .unscheduled))
+    menu.addItem(destItem("Logbook", icon: "checkmark", filter: .logbook))
+
+    let topLevel = snapshot.projects.filter { $0.area == nil && $0.status == .active }
+    if !topLevel.isEmpty {
+      menu.addItem(.separator())
+      for project in topLevel {
+        menu.addItem(destItem(project.title, icon: "number", filter: .project(project.id)))
+      }
+    }
+
+    for area in snapshot.areas {
+      let areaProjects = snapshot.projects.filter { $0.area == area.id && $0.status == .active }
+      menu.addItem(.separator())
+      menu.addItem(destItem(area.title, icon: "folder", filter: .area(area.id)))
+      for project in areaProjects {
+        menu.addItem(destItem(project.title, icon: "number", filter: .project(project.id)))
+      }
+    }
+
+    if !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty {
+      menu.addItem(.separator())
+      menu.addItem(destItem("Recently Deleted", icon: "trash", filter: .recentlyDeleted))
+    }
+
+    return menu
+  }
+
+  @objc private func navMenuSelect(_ sender: NSMenuItem) {
+    guard let destFilter = sender.representedObject as? TaskFilter else { return }
+    // Same path Quick Find and a group-header click use — steer the
+    // sidebar, which drives the list, so a jump always leaves the two in
+    // agreement.
+    onNavigateToGroup?(destFilter)
+  }
+
   /// Right-click on a heading row: rename (same field-editor path as any
   /// task) and delete — nothing else on the normal task menu applies to a
   /// section divider.
@@ -1770,6 +1832,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitScreenTitleCell
         ?? KitScreenTitleCell(identifier: identifier)
       cell.configure(title: title, icon: icon)
+      // The title IS the navigation dropdown (Things-style) — same contract
+      // as SwiftUI's `TaskNavMenu`. Built fresh per click via the closure
+      // rather than once here, so it can never show a stale structure.
+      cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       return cell
 
     case .loggedFooter(let count, let expanded):
@@ -2129,17 +2195,22 @@ final class KitEventCell: NSTableCellView {
 // MARK: - Project/area screen title
 
 /// The page's own big title — an area's emoji/dot or a project's completion
-/// ring, plus its name at a larger rung than an in-list group header. Not
-/// clickable (you're already here) and carries no count, unlike
-/// `KitGroupHeaderCell`, which is why this is its own small type rather than
-/// a third mode bolted onto that one.
+/// ring, plus its name at a larger rung than an in-list group header. The
+/// title IS the navigation dropdown (Things-style, matching SwiftUI's
+/// `TaskNavMenu`/`ScreenTitleMenuLabel`) — clicking it (or the trailing
+/// chevron) jumps anywhere without the sidebar.
 @MainActor
 final class KitScreenTitleCell: NSTableCellView {
   private let icon = NSImageView()
   private let emoji = NSTextField(labelWithString: "")
   private let title = NSTextField(labelWithString: "")
+  private let chevron = NSImageView()
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  /// Builds the dropdown fresh on every click — see the call site's comment
+  /// on why this isn't built once and cached. Optional-returning to match
+  /// the `[weak self]` closure the controller wires it up with.
+  var onOpenNavMenu: (() -> NSMenu?)?
 
   private static let font: NSFont = .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold)
 
@@ -2154,14 +2225,30 @@ final class KitScreenTitleCell: NSTableCellView {
     title.font = Self.font
     title.textColor = .labelColor
     title.lineBreakMode = .byTruncatingTail
+    // Allowed to shrink/truncate now that the chevron sits right after it
+    // (equal-constrained, not `lessThanOrEqualTo`) — without this a long
+    // area/project name would fight the row's trailing bound instead of
+    // truncating.
+    title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    chevron.translatesAutoresizingMaskIntoConstraints = false
+    chevron.setContentHuggingPriority(.required, for: .horizontal)
+    chevron.setContentCompressionResistancePriority(.required, for: .horizontal)
+    chevron.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 13, weight: .semibold))
+    chevron.contentTintColor = SeptaskKitTheme.iconMuted
+
+    let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
+    addGestureRecognizer(click)
 
     addSubview(icon)
     addSubview(emoji)
     addSubview(title)
+    addSubview(chevron)
     textField = title
     leadingConstraint = icon.leadingAnchor.constraint(
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
-    trailingConstraint = title.trailingAnchor.constraint(
+    trailingConstraint = chevron.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
@@ -2171,11 +2258,27 @@ final class KitScreenTitleCell: NSTableCellView {
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
       title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
       title.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+      chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
+      chevron.centerYAnchor.constraint(equalTo: title.centerYAnchor),
       trailingConstraint,
     ])
   }
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
+
+  @objc private func handleClick() {
+    guard let menu = onOpenNavMenu?() else { return }
+    // Anchor under the title, matching a Menu's usual pop-down direction —
+    // not at the click point, which would land wherever inside the row the
+    // gesture recognizer happened to fire.
+    menu.popUp(positioning: nil, at: NSPoint(x: title.frame.minX, y: bounds.minY), in: self)
+  }
+
+  /// The pointing-hand cursor is the platform's "this is a link/button"
+  /// signal — matches `KitGroupHeaderCell`'s navigable headers.
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
+  }
 
   /// Same width-dependent centered-column margin as every other row.
   override func layout() {
@@ -2203,6 +2306,9 @@ final class KitScreenTitleCell: NSTableCellView {
         .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
     }
+    // A reused cell carries a stale cursor rect otherwise — matches
+    // `KitGroupHeaderCell.configure`'s identical call.
+    window?.invalidateCursorRects(for: self)
   }
 }
 
