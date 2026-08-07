@@ -237,17 +237,36 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
                doCommandBy commandSelector: Selector) -> Bool {
     switch commandSelector {
     case #selector(NSResponder.insertNewline(_:)):
-      commit()
-      onCollapse?()
+      deferCommitAndCollapse()
       return true
     case #selector(NSResponder.cancelOperation(_:)):
       // Autosaves like the SwiftUI inline host — Esc folds the row, it doesn't
       // discard what was typed.
-      commit()
-      onCollapse?()
+      deferCommitAndCollapse()
       return true
     default:
       return false
+    }
+  }
+
+  /// `commit()` calls through to `TaskMutator`, which posts its change
+  /// notification SYNCHRONOUSLY — and that notification's OWN observers (the
+  /// sidebar rebuild in particular) can reselect and call back down into
+  /// `focusList()`, i.e. `makeFirstResponder`, on the very row/field editor
+  /// whose `doCommandBy:` is still on the call stack asking it to resign.
+  /// AppKit's first-responder machinery isn't safely reentrant like that —
+  /// this is what "Esc doesn't close the row, and clicking away doesn't
+  /// either" traced back to: a first-responder fight left mid-transition with
+  /// a defunct field editor still visually attached, no longer wired to
+  /// anything real. Deferring one runloop tick — the same trick used
+  /// elsewhere in this file for "let the current event finish first" AppKit
+  /// hazards — runs the commit AFTER this `doCommandBy:` call has already
+  /// returned and the text system has finished its own resign-first-responder
+  /// sequence, so the reentrant `makeFirstResponder` lands on a clean stack.
+  private func deferCommitAndCollapse() {
+    DispatchQueue.main.async { [weak self] in
+      self?.commit()
+      self?.onCollapse?()
     }
   }
 

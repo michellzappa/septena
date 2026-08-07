@@ -1793,7 +1793,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? SeptaskKitTaskCell(identifier: identifier)
       cell.configure(with: task, filter: filter, chip: chip)
       cell.onToggle = { [weak self] id in self?.toggle(id: id) }
-      cell.onRename = { [weak self] id, title in self?.commitRename(id: id, title: title) }
+      // Deferred one runloop tick — same reentrancy hazard as the composer's
+      // `deferCommitAndCollapse` (see its doc comment): `onRename` fires from
+      // `controlTextDidEndEditing`, itself mid-resign-first-responder, and
+      // `commitRename`'s mutator write posts synchronously, which can cascade
+      // back into `makeFirstResponder` (via the sidebar's reselect) before
+      // this call has even returned. Running the commit on a fresh tick keeps
+      // that reentrant call off an in-progress first-responder transition —
+      // the "Esc/click-away doesn't close the row" bug.
+      cell.onRename = { [weak self] id, title in
+        DispatchQueue.main.async { self?.commitRename(id: id, title: title) }
+      }
       return cell
 
     case .event(let event):

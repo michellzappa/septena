@@ -66,33 +66,61 @@ final class SeptaskKitDatePopover: NSViewController {
   }
 
   override func loadView() {
+    // Genuine vibrancy, not the flat/washed-out look a bare `NSStackView`
+    // popover falls back to — same `.popover` material + rounded, masked
+    // layer as `SeptaskKitQuickFind`/`SeptaskKitQuickEntry`'s panels, so
+    // every floating AppKit surface in the shell reads as one glass family.
+    let content = NSVisualEffectView()
+    content.material = .popover
+    content.state = .active
+    content.wantsLayer = true
+    content.layer?.cornerRadius = 14
+    content.layer?.masksToBounds = true
+
     let stack = NSStackView()
     stack.orientation = .vertical
     stack.alignment = .leading
-    stack.spacing = 2
-    stack.edgeInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+    // Tight within a choice group; the two `setCustomSpacing` calls below
+    // open real air between the three sections (quick choices / calendar /
+    // clear) — was one flat 2pt rhythm the whole way down.
+    stack.spacing = 4
+    stack.edgeInsets = NSEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+    stack.translatesAutoresizingMaskIntoConstraints = false
 
+    var lastQuickChoice: NSButton?
     for (title, offset) in kind.quickChoices {
       let button = NSButton(title: title, target: self, action: #selector(quickChoice(_:)))
       button.bezelStyle = .recessed
       button.isBordered = false
       button.tag = offset ?? -1
       button.contentTintColor = .controlAccentColor
+      button.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
       stack.addArrangedSubview(button)
+      lastQuickChoice = button
     }
+    if let lastQuickChoice { stack.setCustomSpacing(12, after: lastQuickChoice) }
 
     picker.datePickerStyle = .clockAndCalendar
     picker.datePickerElements = [.yearMonthDay]
     picker.target = self
     picker.action = #selector(calendarChoice)
     stack.addArrangedSubview(picker)
+    stack.setCustomSpacing(12, after: picker)
 
     let clear = NSButton(title: kind.clearTitle, target: self, action: #selector(clearChoice))
     clear.bezelStyle = .recessed
     clear.isBordered = false
+    clear.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
     stack.addArrangedSubview(clear)
 
-    view = stack
+    content.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.topAnchor.constraint(equalTo: content.topAnchor),
+      stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+      stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+      stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+    ])
+    view = content
   }
 
   // MARK: - Choices
