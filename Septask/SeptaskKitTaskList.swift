@@ -2306,8 +2306,9 @@ final class KitGroupHeaderCell: NSTableCellView {
     title.textColor = .labelColor
     title.lineBreakMode = .byTruncatingTail
     // Sized to roughly fill the 21pt area-icon slot (matches `AreaIcon`'s
-    // emoji sizing), not the title's own font.
-    emoji.font = .systemFont(ofSize: 16 * FontScale.shared.factor)
+    // emoji sizing), not the title's own font. Dialed down 2pt after visual
+    // review — 16 read a touch heavy next to the 17pt title.
+    emoji.font = .systemFont(ofSize: 14 * FontScale.shared.factor)
     count.font = SeptaskKitTheme.meta
 
     let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
@@ -2331,7 +2332,9 @@ final class KitGroupHeaderCell: NSTableCellView {
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
       title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
       // Bottom-aligned: the header's air belongs above it, separating cards.
-      title.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+      // -5 (was -4) — 1pt more breathing room below the title before the
+      // list underneath starts.
+      title.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5),
       count.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 8),
       count.firstBaselineAnchor.constraint(equalTo: title.firstBaselineAnchor),
       trailingConstraint,
@@ -2376,8 +2379,9 @@ final class KitGroupHeaderCell: NSTableCellView {
       // 21 — matches `AreaIcon(diameter: 21)` in `TaskListView.groupHeaderBody`.
       icon.image = KitGlyph.areaDot(diameter: 21)
     case .project(let progress):
-      // 14 — matches `ProjectProgressIcon(diameter: 14)`, same call site.
-      icon.image = KitGlyph.progress(progress, diameter: 14)
+      // 13 — SwiftUI's own `ProjectProgressIcon(diameter: 14)`, dialed down
+      // 1pt after visual review to sit better against the 17pt title.
+      icon.image = KitGlyph.progress(progress, diameter: 13)
     case .symbol(let name):
       icon.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
         .withSymbolConfiguration(.init(pointSize: 16, weight: .medium))
