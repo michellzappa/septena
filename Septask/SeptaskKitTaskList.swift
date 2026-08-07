@@ -1276,6 +1276,17 @@ final class SeptaskKitTaskListController: NSViewController {
       cell.commit()
     }
     composingTaskId = nil
+    // Resign the field editor BEFORE reloading, not after — `reload()`'s own
+    // guard (`isTitleEditorActive`) reads the WINDOW's actual first responder,
+    // which is still the title/notes field editor until this call, and
+    // nothing else in this class ever resigns it. Reloading first (the
+    // previous order) meant `reload()` silently no-op'd on every single
+    // commit — `cell.commit()`'s write landed instantly, but the on-screen
+    // row kept showing the pre-edit title/height until some LATER, unrelated
+    // notification happened to fire a reload while the editor was finally
+    // gone. That's the "took a beat to appear" lag: not a real write delay,
+    // a stale-redraw window between commit and the next lucky reload.
+    view.window?.makeFirstResponder(tableView)
     reload()
     // Belt and braces: force the row's cell back to normal even when nothing
     // actually changed (composer opened and closed with no edits) — the
@@ -1285,7 +1296,6 @@ final class SeptaskKitTaskListController: NSViewController {
       tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
       tableView.noteHeightOfRows(withIndexesChanged: [row])
     }
-    view.window?.makeFirstResponder(tableView)
   }
 
   /// Re-read the task from the store and refresh the composer cell's PILLS —
