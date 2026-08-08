@@ -124,6 +124,10 @@ final class SeptaskKitTaskListController: NSViewController {
   private var settleWorkItem: DispatchWorkItem?
   /// Held so its submenu can be refreshed from the live structure on open.
   private let moveMenuItem = NSMenuItem()
+  /// Placement items — titles / visibility refresh on every open from the
+  /// current selection (see `refreshPlacementMenuItems`).
+  private let todayMenuItem = NSMenuItem()
+  private let clearScheduleMenuItem = NSMenuItem()
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -938,6 +942,16 @@ final class SeptaskKitTaskListController: NSViewController {
          reopening: selection.filter { $0.status != .open })
   }
 
+  /// Cancel open tasks in the selection — same settle beat as complete
+  /// (linger struck-through, then leave for the Logbook). Already-finished
+  /// rows are left alone; trash has nothing to cancel.
+  func cancelSelection() {
+    guard filter != .recentlyDeleted else { return }
+    let open = actionableSelection.filter { $0.status == .open }
+    guard !open.isEmpty else { return }
+    applyCancel(open)
+  }
+
   private func toggle(id: String) {
     // In the trash, a checkbox tap means "bring this back" — mark-complete
     // has no meaning for an already-deleted row.
@@ -1041,6 +1055,46 @@ final class SeptaskKitTaskListController: NSViewController {
 
     for task in completing { mutator.complete(id: task.id) }
     for task in reopening { mutator.uncomplete(id: task.id) }
+    beginSettle()
+  }
+
+  /// Cancel a batch with the same linger-then-drop path as `apply(completing:)`.
+  /// Undo reopens via `uncomplete` (status → open), matching SwiftUI's cancel.
+  private func applyCancel(_ tasks: [SeptenaTask]) {
+    let ids = tasks.map(\.id)
+    recordUndo(name: "Cancel Task",
+              undo: { [weak self] in
+                for id in ids { self?.mutator.uncomplete(id: id) }
+                self?.reload()
+              },
+              redo: { [weak self] in
+                for id in ids { self?.mutator.cancel(id: id) }
+                self?.reload()
+              })
+
+    let dropsFinished: Bool
+    switch filter {
+    case .logbook, .recentlyDeleted: dropsFinished = false
+    default: dropsFinished = true
+    }
+    guard dropsFinished else {
+      for id in ids { mutator.cancel(id: id) }
+      reload()
+      return
+    }
+
+    isSettling = true
+    let idSet = Set(ids)
+    var restyled = IndexSet()
+    for index in rows.indices {
+      if case .task(var task, let chip) = rows[index], idSet.contains(task.id) {
+        task.status = .cancelled
+        rows[index] = .task(task, chip: chip)
+        restyled.insert(index)
+      }
+    }
+    tableView.reloadData(forRowIndexes: restyled, columnIndexes: [0])
+    for id in ids { mutator.cancel(id: id) }
     beginSettle()
   }
 
@@ -1506,6 +1560,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Same commands, same order, same bindings as the menu bar's Task menu and
   /// as `TaskRowCommands` in the SwiftUI shell — one vocabulary everywhere.
+  /// Terminal outcomes (complete / cancel / delete) share one submenu so the
+  /// three stay next to each other instead of Delete living alone at the bottom.
   private func buildContextMenu() -> NSMenu {
     let menu = NSMenu()
     menu.delegate = self
@@ -1514,11 +1570,34 @@ final class SeptaskKitTaskListController: NSViewController {
     menu.addItem(item("Copy", #selector(menuCopy), "c", [.command]))
     menu.addItem(item("Duplicate", #selector(menuDuplicate), "d", [.command]))
     menu.addItem(.separator())
-    menu.addItem(item("Mark as Complete", #selector(menuToggleComplete), "k", [.command]))
-    menu.addItem(item("Toggle Today", #selector(menuToggleToday), "t", [.command]))
+
+    let completeItem = NSMenuItem(title: "Complete", action: nil, keyEquivalent: "")
+    let completeMenu = NSMenu()
+    completeMenu.addItem(item("Mark as Complete", #selector(menuToggleComplete), "k", [.command]))
+    completeMenu.addItem(item("Cancel Task", #selector(menuCancel), "", []))
+    completeMenu.addItem(.separator())
+    completeMenu.addItem(item("Delete", #selector(menuDelete), "\u{8}", [.command]))
+    completeItem.submenu = completeMenu
+    menu.addItem(completeItem)
+
+    // Titles and visibility are set in `menuNeedsUpdate` — "Toggle Today" is
+    // never shown as a bare toggle; on the Today list the item is hidden
+    // entirely (Clear Schedule is the exit).
+    todayMenuItem.action = #selector(menuToggleToday)
+    todayMenuItem.target = self
+    todayMenuItem.keyEquivalent = "t"
+    todayMenuItem.keyEquivalentModifierMask = [.command]
+    menu.addItem(todayMenuItem)
+
     menu.addItem(item("When…", #selector(menuWhen), "s", [.command]))
     menu.addItem(item("Deadline…", #selector(menuDeadline), "d", [.command, .shift]))
-    menu.addItem(item("Clear Schedule", #selector(menuClearSchedule), ".", [.command, .shift]))
+
+    clearScheduleMenuItem.title = "Clear Schedule"
+    clearScheduleMenuItem.action = #selector(menuClearSchedule)
+    clearScheduleMenuItem.target = self
+    clearScheduleMenuItem.keyEquivalent = "."
+    clearScheduleMenuItem.keyEquivalentModifierMask = [.command, .shift]
+    menu.addItem(clearScheduleMenuItem)
 
     // Move and Repeat are closed sets, so they're submenus rather than more
     // popovers — the standard AppKit shape for "pick one of a few". The move
@@ -1533,9 +1612,6 @@ final class SeptaskKitTaskListController: NSViewController {
     repeatItem.submenu = KitRecurrenceMenu.build(target: self,
                                                  action: #selector(menuSetRecurrence(_:)))
     menu.addItem(repeatItem)
-
-    menu.addItem(.separator())
-    menu.addItem(item("Delete", #selector(menuDelete), "\u{8}", [.command]))
     return menu
   }
 
@@ -1702,15 +1778,39 @@ final class SeptaskKitTaskListController: NSViewController {
 // MARK: - Context menu freshness
 
 extension SeptaskKitTaskListController: NSMenuDelegate {
-  /// Rebuild the move destinations each time the menu opens — areas and
-  /// projects change while the window is open, and a submenu built once at
-  /// construction would quietly go stale.
+  /// Refresh selection-dependent items each time the menu opens — move
+  /// destinations from live structure, and Today / Clear Schedule from the
+  /// current selection (see `refreshPlacementMenuItems`).
   func menuNeedsUpdate(_ menu: NSMenu) {
     let snapshot = StructureCache.snapshot(in: context)
     moveMenuItem.submenu = KitMoveMenu.build(areas: snapshot.areas,
                                              projects: snapshot.projects,
                                              target: self,
                                              action: #selector(menuMoveTo(_:)))
+    refreshPlacementMenuItems()
+  }
+
+  /// Directional Today labels; hide the Today item on the Today list (you're
+  /// already there — Clear Schedule is the exit). Hide Clear Schedule when
+  /// nothing would change.
+  private func refreshPlacementMenuItems() {
+    let selection = actionableSelection
+
+    // On Today: every row is already "on Today", so a Today action just
+    // competes with Clear Schedule. Hide it; ⌘T still works via the key
+    // binding on the table.
+    if filter == .today || selection.isEmpty {
+      todayMenuItem.isHidden = true
+    } else if selection.allSatisfy(\.isOnToday) {
+      todayMenuItem.isHidden = false
+      todayMenuItem.title = "Remove from Today"
+    } else {
+      todayMenuItem.isHidden = false
+      todayMenuItem.title = "Move to Today"
+    }
+
+    let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
+    clearScheduleMenuItem.isHidden = !canClear
   }
 }
 

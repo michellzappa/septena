@@ -184,6 +184,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     guard let list else { return }
     switch command {
     case .toggleComplete: list.toggleCompleteSelection()
+    case .cancel: list.cancelSelection()
     case .toggleToday: list.toggleTodaySelection()
     case .rename: list.beginEditSelectedRow()
     case .when: list.presentDatePopover(kind: .when)
@@ -197,7 +198,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   enum RowCommand {
-    case toggleComplete, toggleToday, rename, when, deadline, clearSchedule, delete
+    case toggleComplete, cancel, toggleToday, rename, when, deadline, clearSchedule, delete
     case duplicate, move
     case setRecurrence(Recurrence?)
   }
