@@ -96,10 +96,13 @@ final class SeptaskKitTaskListController: NSViewController {
     }
 
     /// Rows that draw on a card (tasks and events), vs. headers on the page.
+    /// Project section headings sit BETWEEN cards (SwiftUI's `headingRow`),
+    /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .loggedFooter: return false
-      case .task, .event: return true
+      case .task(let task, _): return !task.isHeading
+      case .event: return true
       }
     }
   }
@@ -380,7 +383,7 @@ final class SeptaskKitTaskListController: NSViewController {
       rows.indices.contains(row) ? rows[row].task?.id : nil
     })
 
-    var pool = LocalCache.tasks(in: context, filter: filter)
+    let pool = LocalCache.tasks(in: context, filter: filter)
     // One standard title row, on every page — computed once here rather than
     // duplicated into each branch below.
     let titleRows: [Row] = screenTitleRow().map { [$0] } ?? []
@@ -398,8 +401,10 @@ final class SeptaskKitTaskListController: NSViewController {
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
       // Scoped reads return every live status; capture the done subset for
-      // the logged footer BEFORE narrowing `pool` to open work (+ headings) —
-      // finished rows don't live inline here, same as the SwiftUI page.
+      // the logged footer BEFORE narrowing `pool` to open work — finished
+      // rows don't live inline here, same as the SwiftUI page. Headings
+      // never ride through `LocalCache.tasks` (see `convert`); the project
+      // path fetches them via `LocalCache.headings(inProject:)` below.
       var completed = pool.filter { $0.status == .done }
       if case .area = filter {
         // Area pages show only area-DIRECT work in the open list — a task
@@ -409,9 +414,17 @@ final class SeptaskKitTaskListController: NSViewController {
       }
       completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
 
-      pool = pool.filter { $0.isHeading || $0.status == .open }
-      newRows = titleRows + pool.map { .task($0, chip: nil) }
-        + loggedFooterRows(completed: completed)
+      let open = pool.filter { $0.status == .open }
+      if case .project(let projectId) = filter {
+        newRows = titleRows + projectGrouped(open: open, projectId: projectId)
+          + loggedFooterRows(completed: completed)
+      } else {
+        // Area: flat (headings only live inside a project), and only
+        // area-direct open work — same `excludeProjectedTasks` split.
+        let direct = open.filter { $0.project == nil }
+        newRows = titleRows + direct.map { .task($0, chip: nil) }
+          + loggedFooterRows(completed: completed)
+      }
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
       newRows = titleRows + pool.prefix(200).map(chipped)
@@ -624,6 +637,28 @@ final class SeptaskKitTaskListController: NSViewController {
   private func loggedExpandedIds() -> Set<String> {
     guard let data = UserDefaults.standard.data(forKey: Self.loggedExpandedKey) else { return [] }
     return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+  }
+
+  /// Project detail partitioned by heading — mirrors
+  /// `TaskListView.projectGroupedRows`: the un-headed block first, then each
+  /// heading as a divider followed by its member tasks. Tasks whose
+  /// `heading` points at a since-deleted divider fall back into the
+  /// un-headed block. Headings come from `LocalCache.headings(inProject:)`
+  /// (they are excluded from every `tasks(in:filter:)` read).
+  private func projectGrouped(open: [SeptenaTask], projectId: String) -> [Row] {
+    let headings = LocalCache.headings(inProject: projectId, in: context)
+    let headingIds = Set(headings.map(\.id))
+    let unheaded = open.filter { task in
+      guard let h = task.heading else { return true }
+      return !headingIds.contains(h)
+    }
+    var result: [Row] = unheaded.map { .task($0, chip: nil) }
+    for heading in headings {
+      result.append(.task(heading, chip: nil))
+      let members = open.filter { $0.heading == heading.id }
+      result.append(contentsOf: members.map { .task($0, chip: nil) })
+    }
+    return result
   }
 
   /// Things-style footer: "Show N logged items" / collapsed by default,
@@ -1523,12 +1558,12 @@ final class SeptaskKitTaskListController: NSViewController {
   // the SAME confirmation copy the SwiftUI project page does
   // (`TaskListView.commitHeadingCreate`/`commitHeadingRename`, and the
   // "Delete this section?" dialog), so a section behaves identically in
-  // either shell. NOT yet implemented: filing a task under a heading by
-  // dragging it there (SwiftUI's `handleHeadingDrop`) — tracked in
-  // docs/SEPTASK_APPKIT_PARITY.md rather than rushed here.
+  // either shell. Project pages GROUP by heading (`projectGrouped`) and
+  // drag-filing calls `setHeading` (`acceptGroupedTaskDrop`) — same
+  // shape as SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`.
 
   /// Right-click on blank list space, project pages only — where "New
-  /// Section" lives since there's no heading row to right-click yet.
+  /// Section" lives when there's no heading row to right-click yet.
   private func buildBlankSpaceMenu() -> NSMenu {
     let menu = NSMenu()
     menu.addItem(item("New Section", #selector(menuNewSection), "", []))
@@ -1639,6 +1674,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   @objc private func menuToggleComplete() { toggleCompleteSelection() }
+  @objc private func menuCancel() { cancelSelection() }
   @objc private func menuToggleToday() { toggleTodaySelection() }
   @objc private func menuRename() { beginEditSelectedRow() }
   @objc private func menuInspector() { onToggleInspector?() }
@@ -1728,6 +1764,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
     case .task(let task, _):
+      if task.isHeading {
+        // Section break between cards — room above matching SwiftUI's
+        // `headingRow` top padding so the divider isn't flush to the card.
+        return SeptaskKitTheme.heading.pointSize + 28
+      }
       if task.id == composingTaskId {
         return KitComposerCell.height(showsNotes: composerShowsNotes)
       }
@@ -1796,7 +1837,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
   func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int)
     -> NSPasteboardWriting? {
-    guard let task = rows[row].task, !task.isHeading else { return nil }
+    guard let task = rows[row].task else { return nil }
+    // Headings drag only on a project page (reorder among themselves).
+    // Everywhere else they're not a row the user should lift.
+    if task.isHeading {
+      guard case .project = filter else { return nil }
+    }
     let item = NSPasteboardItem()
     item.setString(task.id, forType: .septaskTask)
     return item
@@ -1807,7 +1853,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  proposedDropOperation operation: NSTableView.DropOperation)
     -> NSDragOperation {
     guard allowsReorder, !KitDrag.ids(from: info).isEmpty else { return [] }
-    if operation == .on {
+    // Never drop into the logged-footer / completed block — clamp the
+    // indicator to the open-work region above it.
+    if let clamped = clampDropRow(row), clamped != row {
+      tableView.setDropRow(clamped, dropOperation: .above)
+    } else if operation == .on {
       tableView.setDropRow(row, dropOperation: .above)
     }
     return .move
@@ -1817,23 +1867,31 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
     let ids = KitDrag.ids(from: info)
     guard !ids.isEmpty else { return false }
+    let insertAt = clampDropRow(row) ?? row
+
+    // Project pages: group-aware drop (file under a heading + reorder
+    // within the group, or reorder headings among themselves). Mirrors
+    // `TaskListView.handleGroupedTaskDrop` / `handleHeadingDrop`.
+    if case .project(let projectId) = filter {
+      return acceptProjectDrop(ids: ids, at: insertAt, projectId: projectId)
+    }
+
     let dragged = Set(ids)
 
     // Neighbor order keys around the insertion gap, skipping headers and the
     // rows being moved. TaskOrder.positions spaces the drop between them.
-    // (The midpoint-exhaustion renumber pass is TaskListView's; a spike-level
-    // collision just lands adjacent, which the next drag resolves.)
+    // (The midpoint-exhaustion renumber pass is shared via `applyManualOrder`.)
     var aboveKey: Double?
-    for index in stride(from: row - 1, through: 0, by: -1) {
+    for index in stride(from: insertAt - 1, through: 0, by: -1) {
       if let task = rows[index].task, !task.isHeading, !dragged.contains(task.id) {
-        aboveKey = TaskOrder.key(position: task.position, createdAt: task.createdAt)
+        aboveKey = task.orderKey
         break
       }
     }
     var belowKey: Double?
-    for index in row..<rows.count {
+    for index in insertAt..<rows.count {
       if let task = rows[index].task, !task.isHeading, !dragged.contains(task.id) {
-        belowKey = TaskOrder.key(position: task.position, createdAt: task.createdAt)
+        belowKey = task.orderKey
         break
       }
     }
@@ -1842,14 +1900,153 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     for (id, position) in zip(ids, positions) {
       mutator.reorder(id: id, toPosition: position)
     }
-    refileIfGroupedDrop(ids: ids, at: row, dragged: dragged)
+    refileIfGroupedDrop(ids: ids, at: insertAt, dragged: dragged)
     reload()
     return true
   }
 
-  /// In the grouped views, a drop inside another area/project group also
-  /// re-files the task there (Things behavior): the receiving group is the
-  /// nearest header above the insertion gap; none means the loose zone.
+  /// Drop row clamped to the open-work region — never into the logged
+  /// footer or the completed rows it expands. Returns nil when `row` is
+  /// already valid (so validateDrop can avoid a redundant setDropRow).
+  private func clampDropRow(_ row: Int) -> Int? {
+    guard let footer = rows.firstIndex(where: {
+      if case .loggedFooter = $0 { return true }
+      return false
+    }), row > footer else { return nil }
+    return footer
+  }
+
+  /// Persist a manual-order drop — same midpoint-with-renumber-fallback
+  /// `TaskListView.applyManualOrder` uses, so exhausted gaps don't silently
+  /// land adjacent to the wrong neighbor.
+  private func applyManualOrder(ids: [String], into sequence: [SeptenaTask], at insertion: Int) {
+    let above = insertion > 0 ? sequence[insertion - 1].orderKey : nil
+    let below = insertion < sequence.count ? sequence[insertion].orderKey : nil
+    let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
+    let strictlyPlaced =
+      zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
+      && (above.map { slots.first! > $0 } ?? true)
+      && (below.map { slots.last! < $0 } ?? true)
+    if strictlyPlaced {
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+      return
+    }
+    var final = sequence.map(\.id)
+    final.insert(contentsOf: ids, at: insertion)
+    let base = sequence.first?.orderKey ?? TaskOrder.gap
+    for (i, id) in final.enumerated() {
+      let pos = base + TaskOrder.gap * Double(i)
+      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+    }
+  }
+
+  /// Project-page drop: headings reorder among headings; tasks join the
+  /// destination group's `heading` and take positions around the gap.
+  private func acceptProjectDrop(ids: [String], at row: Int, projectId: String) -> Bool {
+    let headings = LocalCache.headings(inProject: projectId, in: context)
+    let headingIds = Set(headings.map(\.id))
+    let draggingHeading = ids.contains { headingIds.contains($0) }
+    let allHeadings = ids.allSatisfy { headingIds.contains($0) }
+    // Mixed heading+task drags aren't meaningful in either shell.
+    if draggingHeading && !allHeadings { return false }
+    if allHeadings {
+      return acceptHeadingReorder(ids: ids, at: row, headings: headings)
+    }
+    return acceptGroupedTaskDrop(ids: ids, at: row, headingIds: headingIds)
+  }
+
+  /// Headings dragged onto the heading strip — reorder among themselves
+  /// (`TaskListView.handleHeadingDrop`'s heading branch).
+  private func acceptHeadingReorder(ids: [String], at row: Int,
+                                    headings: [SeptenaTask]) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty else { return false }
+    let remaining = headings.filter { !dragged.contains($0.id) }
+    // Insert before the first non-dragged heading at or below the gap;
+    // none → append.
+    var insertion = remaining.count
+    for index in row..<rows.count {
+      if let task = rows[index].task, task.isHeading, !dragged.contains(task.id),
+         let ti = remaining.firstIndex(where: { $0.id == task.id }) {
+        insertion = ti
+        break
+      }
+    }
+    applyManualOrder(ids: ids, into: remaining, at: insertion)
+    reload()
+    return true
+  }
+
+  /// Task drop inside a project's grouped list. Destination group is read
+  /// from the row ABOVE the insertion gap: a heading → file under it (at
+  /// top); a task → join that task's heading; screen title / nothing →
+  /// un-headed block. Same contract as `handleGroupedTaskDrop`, adapted
+  /// to NSTableView's gap-based (`.above`) drop model.
+  private func acceptGroupedTaskDrop(ids: [String], at row: Int,
+                                     headingIds: Set<String>) -> Bool {
+    let dragged = Set(ids)
+    guard !ids.isEmpty else { return false }
+
+    let group = destinationHeading(aboveRow: row - 1, headingIds: headingIds)
+    let byId = Dictionary(rows.compactMap(\.task).map { ($0.id, $0) },
+                          uniquingKeysWith: { a, _ in a })
+    // Refuse dragging a heading through the task path (defensive — the
+    // caller already splits pure-heading drags out).
+    if ids.contains(where: { byId[$0]?.isHeading == true }) { return false }
+
+    let groupRows = openTasksInRenderedOrder().filter { task in
+      resolvedHeading(task, headingIds: headingIds) == group
+        && !dragged.contains(task.id)
+    }
+
+    var insertion = 0
+    if row > 0, let above = rows[row - 1].task, !above.isHeading,
+       !dragged.contains(above.id),
+       resolvedHeading(above, headingIds: headingIds) == group,
+       let idx = groupRows.firstIndex(where: { $0.id == above.id }) {
+      insertion = idx + 1
+    }
+
+    for id in ids {
+      guard let task = byId[id] else { continue }
+      if resolvedHeading(task, headingIds: headingIds) != group {
+        mutator.setHeading(id: id, heading: group)
+      }
+    }
+    applyManualOrder(ids: ids, into: groupRows, at: insertion)
+    reload()
+    return true
+  }
+
+  /// Open (non-heading) tasks in the order currently on screen — the
+  /// sequence `applyManualOrder` / group filters read against.
+  private func openTasksInRenderedOrder() -> [SeptenaTask] {
+    rows.compactMap { row in
+      guard let task = row.task, !task.isHeading, task.status == .open else { return nil }
+      return task
+    }
+  }
+
+  /// Heading membership for grouping: a stale FK to a deleted heading
+  /// counts as un-headed, matching `projectGrouped`.
+  private func resolvedHeading(_ task: SeptenaTask, headingIds: Set<String>) -> String? {
+    guard let h = task.heading, headingIds.contains(h) else { return nil }
+    return h
+  }
+
+  /// Destination `heading` id for a gap whose row above is `index`.
+  /// `nil` = the un-headed block at the top of the project.
+  private func destinationHeading(aboveRow index: Int, headingIds: Set<String>) -> String? {
+    guard index >= 0, rows.indices.contains(index),
+          let task = rows[index].task else { return nil }
+    if task.isHeading { return task.id }
+    return resolvedHeading(task, headingIds: headingIds)
+  }
+
+  /// In the grouped Today/Anytime views, a drop inside another area/project
+  /// group also re-files the task there (Things behavior): the receiving
+  /// group is the nearest header above the insertion gap; none means the
+  /// loose zone.
   private func refileIfGroupedDrop(ids: [String], at row: Int, dragged: Set<String>) {
     let grouped: Bool
     switch filter {
@@ -2087,7 +2284,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
         string: task.title,
         attributes: [
           .font: SeptaskKitTheme.heading,
-          .foregroundColor: SeptaskKitTheme.inkSecondary,
+          .foregroundColor: NSColor.labelColor,
         ])
       return
     }

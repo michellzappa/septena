@@ -1,5 +1,9 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-08:** Drag-under-heading + group-by-heading on project pages
+(§4) — `projectGrouped` / `acceptGroupedTaskDrop` / `acceptHeadingReorder`.
+See the DONE entry under Headings below.
+
 **2026-08-07 bug-report pass:** fixed a real data bug MZ caught by hand — a
 task could render in Inbox AND its filed project/area at once. Root cause:
 `isInTriageBand` (`SeptenaCore/Models.swift` / `Persistence.swift`) never
@@ -184,29 +188,28 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   reorder) are rejected — validated via `areaNodeRange`/`organizeStartIndex`,
   the index boundaries within `roots` where the loose-project block ends and
   the area block begins.
-- **[DONE] Headings — create / rename / delete.** `SeptaskKitTaskList.swift`,
-  "Headings (project sections)" section. Same `TaskMutator` calls SwiftUI
-  uses (`createHeading`, plain `update(id:title:)` for rename, `delete` for
-  delete), same confirmation copy ("Delete this section? Its tasks stay in
-  the project."). Entry points: right-click a heading row (Rename / Delete
-  Section), right-click blank space on a project page (New Section).
-  Double-click/Return on a heading now falls back to the bare-title editor
-  instead of no-op (the composer's pill rail makes no sense for a heading).
-  - **[P2] NOT done: filing a task under a heading by DRAGGING it there**
-    (SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`). The shell's
-    existing intra-list drag (`SeptaskKitTaskListController.acceptDrop`)
-    reorders position and skips heading rows when finding neighbors, but
-    never calls `mutator.setHeading`, and project pages don't visually GROUP
-    rows by heading membership the way SwiftUI's `groupRows`/`visibleItems`
-    do — they render in flat position order. Doing this properly needs (a)
-    grouping the `.project`/`.area` render path by `heading` before laying
-    out rows (mirroring `groupedByList`'s pattern, not the raw `pool.map`
-    it uses today), then (b) extending `acceptDrop` to detect a heading
-    target and call `setHeading` accordingly. Skipped this pass — scoped as
-    a "same logic" CRUD pass, not a render-path rework — deliberately, not
-    forgotten.
-- **[P3] Project detail / notes**, area attachment (repo / calendar / feed
-  context feed).
+  - **[DONE] Headings — create / rename / delete.** `SeptaskKitTaskList.swift`,
+    "Headings (project sections)" section. Same `TaskMutator` calls SwiftUI
+    uses (`createHeading`, plain `update(id:title:)` for rename, `delete` for
+    delete), same confirmation copy ("Delete this section? Its tasks stay in
+    the project."). Entry points: right-click a heading row (Rename / Delete
+    Section), right-click blank space on a project page (New Section).
+    Double-click/Return on a heading now falls back to the bare-title editor
+    instead of no-op (the composer's pill rail makes no sense for a heading).
+  - **[DONE] Filing a task under a heading by DRAGGING it there** — project
+    pages now GROUP by heading (`projectGrouped`, mirroring
+    `TaskListView.projectGroupedRows`: un-headed block first, then each
+    heading + members; headings fetched via `LocalCache.headings(inProject:)`
+    since they never ride through `tasks(in:filter:)`). Drop uses
+    `acceptGroupedTaskDrop` / `acceptHeadingReorder` (AppKit gap-model
+    counterparts of `handleGroupedTaskDrop` / `handleHeadingDrop`): drop
+    below a heading files under it; drop onto a task joins that task's
+    group and calls `setHeading`; pure heading drags reorder among
+    headings. Midpoint-exhaustion renumber via shared `applyManualOrder`.
+    Headings break the card run (`isCardRow` false) so each section is its
+    own card, matching SwiftUI.
+  - **[P3] Project detail / notes**, area attachment (repo / calendar / feed
+    context feed).
 
 ## 5. Views and routes missing
 
@@ -306,12 +309,9 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
 2. **Localization sweep** (§6) — do before the literal count grows further.
-3. **Drag-a-task-under-a-heading** (§4) — the one piece left out of the
-   headings pass; needs the `.project`/`.area` render path grouped by
-   `heading` first (see that entry for the exact shape).
-4. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
-5. **Accessibility pass** (§6) — the custom-drawn checkbox/chevrons/rows.
-6. Everything else in §5/§6/§7 as it comes up.
+3. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
+4. **Accessibility pass** (§6) — the custom-drawn checkbox/chevrons/rows.
+5. Everything else in §5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 
