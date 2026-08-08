@@ -28,10 +28,10 @@ enum SeptaskKitTheme {
     .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .regular)
   }
 
-  /// Project-heading rows — caption rung, semibold (matches the SwiftUI
-  /// heading treatment in project lists).
+  /// Project section headings — same 17pt semibold as SwiftUI's
+  /// `sectionGroupHeaderTitleStyle()` / `Theme.groupHeaderFontSize`.
   static var heading: NSFont {
-    .systemFont(ofSize: SeptenaTypeScale.size(.caption1), weight: .semibold)
+    .systemFont(ofSize: 17 * FontScale.shared.factor, weight: .semibold)
   }
 
   /// Theme.septenaCardTitle — the group header above a run of rows.
@@ -79,30 +79,52 @@ enum SeptaskKitTheme {
   /// Theme.sidebarBackground — the source list's backing.
   static let sidebarBackground = NSColor(Theme.sidebarBackground)
 
-  /// Theme.listSelectionFill — the app's ONE selection fill, on every
-  /// surface, in both focus states. NOT the emphasized system color: that
-  /// follows the accent, which here is adaptive ink, so it would paint
-  /// selected rows solid black in light mode.
+  /// Selection fill for AppKit rows. Same SHAPE everywhere (full-bleed card /
+  /// inset sidebar pill — never a second language), but the *active*
+  /// (`emphasized`) state follows the user's macOS System Settings accent as
+  /// a wash — Finder/Mail/Notes idiom — while unemphasized stays the neutral
+  /// gray so a selection that lost keyboard focus (Tab to the other pane, or
+  /// the window went inactive) still reads as selected without looking live.
   ///
-  /// One SHAPE and one HUE always (never a second selection language — see
-  /// `docs/DesignSpec.md` §4.5) — but `emphasized` (mirrors
-  /// `NSTableRowView.isEmphasized`, AppKit's own "this row's table is the
-  /// window's first responder AND the window is key" signal, no manual
-  /// tracking needed) fades the SAME fill rather than swapping it, so a
-  /// selection that lost keyboard focus — Tab moved to the other pane, or the
-  /// window went inactive — reads as "still selected, not what you'd act on
-  /// right now" instead of looking identical to the live one.
-  ///
-  /// Bumped noticeably lighter than the raw system
-  /// `.unemphasizedSelectedContentBackgroundColor` after visual review — it
-  /// read too heavy next to the shell's light gray page and white cards. This
-  /// intentionally diverges from `Theme.listSelectionFill`'s SwiftUI value
-  /// (same raw system token); worth raising upstream if it holds up.
+  /// Cannot use `.selectedContentBackgroundColor` / `NSColor.controlAccentColor`:
+  /// both follow the **app** AccentColor, which here is adaptive INK (black in
+  /// light / white in dark), so the "standard" treatment paints a solid black
+  /// bar. We resolve the System Settings preference via `AppleAccentColor`
+  /// instead and paint a low-opacity wash so row text can stay normal ink
+  /// (`interiorBackgroundStyle = .normal`) — same wash-plus-ink pattern as
+  /// `SelectableChip`. Unemphasized still diverges lighter than the raw
+  /// `.unemphasizedSelectedContentBackgroundColor` so it doesn't fight the
+  /// shell's light gray page / white cards.
   static func listSelectionFill(emphasized: Bool) -> NSColor {
     NSColor(name: nil) { appearance in
       let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      if emphasized {
+        // Wash opacity calibrated so the accent reads clearly on white cards
+        // (light) and dark surfaces without needing white text.
+        let alpha: CGFloat = isDark ? 0.34 : 0.22
+        return systemAccentColor.withAlphaComponent(alpha)
+      }
       let white: CGFloat = isDark ? 0.24 : 0.93
-      return NSColor(white: white, alpha: emphasized ? 1 : 0.5)
+      return NSColor(white: white, alpha: 0.5)
+    }
+  }
+
+  /// User's System Settings accent, bypassing the app's AccentColor asset
+  /// (adaptive ink). `AppleAccentColor` is the documented preference key;
+  /// `nil` means Blue (the system default). Do NOT call
+  /// `NSColor.controlAccentColor` here — with a Global Accent Color Name set
+  /// it returns the asset ink, and reading it can also break SwiftUI's
+  /// accent resolution (FB13688723).
+  private static var systemAccentColor: NSColor {
+    switch UserDefaults.standard.object(forKey: "AppleAccentColor") as? Int {
+    case -1: return .systemGray      // Graphite
+    case 0:  return .systemRed
+    case 1:  return .systemOrange
+    case 2:  return .systemYellow
+    case 3:  return .systemGreen
+    case 4:  return .systemPurple
+    case 5:  return .systemPink
+    default: return .systemBlue      // nil / unknown → Blue
     }
   }
 }

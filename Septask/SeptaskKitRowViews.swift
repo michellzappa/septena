@@ -460,12 +460,9 @@ final class KitCardRowView: NSTableRowView {
     }
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
-    // One neutral fill, faded when unemphasized (not the app's own second
-    // color — see `SeptaskKitTheme.listSelectionFill(emphasized:)`). NOT the
-    // system `.selectedContentBackgroundColor`: that follows the app accent,
-    // and this app's accent is adaptive INK (black in light mode), so the
-    // standard treatment paints a black bar. Neutral is also the repo's
-    // canonical selection language (docs/DesignSpec.md §4.5).
+    // Emphasized = System Settings accent wash; unemphasized = neutral gray.
+    // See `SeptaskKitTheme.listSelectionFill(emphasized:)` — cannot use
+    // `.selectedContentBackgroundColor` (follows the app's ink AccentColor).
     SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
     cardPath().fill()
     for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
@@ -477,9 +474,9 @@ final class KitCardRowView: NSTableRowView {
   override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
 }
 
-/// Source-list selection: the same neutral token, drawn INSET and rounded —
-/// the sidebar/palette shape of the app's selection language, versus the
-/// full-bleed card shape the task list uses.
+/// Source-list selection: same `listSelectionFill(emphasized:)` token as the
+/// task list, drawn INSET and rounded — the sidebar/palette shape versus the
+/// full-bleed card shape.
 @MainActor
 final class KitSidebarRowView: NSTableRowView {
   /// Extra height `heightOfRowByItem` adds ABOVE a top-level area/loose-

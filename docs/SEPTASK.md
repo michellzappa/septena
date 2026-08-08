@@ -92,16 +92,15 @@ shell work, and keep it current as items land.
   `NSTableView`/`NSOutlineView` selection, the field editor for inline rename
   (the native answer to the `Text`→`TextField` corruption trap), `NSPopover`
   for scoped editors, `NSMenu` for closed choice sets, native drag & drop.
-- **Selection is ALWAYS the neutral token**, focused or not:
-  `SeptaskKitTheme.listSelectionFill` (= `Theme.listSelectionFill` =
-  `.unemphasizedSelectedContentBackgroundColor`), drawn full-bleed on the card
-  for a list row and inset+rounded for a source-list row. Do NOT let AppKit
-  draw its emphasized selection: `.selectedContentBackgroundColor` follows the
-  **app accent, which here is adaptive INK**, so the "standard" treatment
-  paints selected rows solid black in light mode — the AppKit face of the
-  accent-is-ink trap in `CLAUDE.md`. Row views also pin
-  `interiorBackgroundStyle` to `.normal`, or AppKit flips row text to white
-  against that neutral fill.
+- **Selection shape is the app token; active hue is the system accent.**
+  `SeptaskKitTheme.listSelectionFill(emphasized:)` draws full-bleed on the
+  card (list row) and inset+rounded (source-list row). Emphasized uses a wash
+  of the user's System Settings accent (`AppleAccentColor`, not
+  `NSColor.controlAccentColor` — the app AccentColor is adaptive INK, so the
+  standard `.selectedContentBackgroundColor` would paint solid black).
+  Unemphasized stays a light neutral gray so a blurred selection still reads
+  as selected. Row views pin `interiorBackgroundStyle` to `.normal` so AppKit
+  does not flip row text to white against the wash.
 - **The global ⌃Space hotkey** uses Carbon `RegisterEventHotKey` (sandbox-safe,
   no accessibility permission). It contends with Things' identical binding
   while Things is running — that's the OS, not a bug.

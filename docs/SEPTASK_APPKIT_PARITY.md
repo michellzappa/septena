@@ -77,12 +77,12 @@ sidebar and task list (`onFocusSidebar`/`onFocusList`, wired in
 (consistent with this file's existing Return-key pattern), not the native
 key-view loop, since NSTableView/NSOutlineView don't reliably surface Tab to
 `nextKeyView` on their own. Selected-and-focused now reads differently from
-selected-and-blurred: `SeptaskKitTheme.listSelectionFill(emphasized:)` fades
-the SAME fill (never a second color/shape — docs/DesignSpec.md §4.5) using
-`NSTableRowView.isEmphasized`, AppKit's own signal for "this row's table is
-the window's first responder" — no manual tracking needed, so Tab-ing to the
-sidebar now visibly dims the list's old selection instead of both panes
-looking identically "active." Area/project headers (`KitGroupHeaderCell`)
+selected-and-blurred: `SeptaskKitTheme.listSelectionFill(emphasized:)` keeps
+one shape and swaps hue by focus — System Settings accent wash when
+`NSTableRowView.isEmphasized`, light neutral gray when not — so Tab-ing to
+the sidebar dims the list's old selection instead of both panes looking
+identically "active." (Cannot use `.selectedContentBackgroundColor`: app
+AccentColor is adaptive ink.) Area/project headers (`KitGroupHeaderCell`)
 bumped chunkier — font `headline+9` → `headline+14`, icon/emoji/progress-ring
 frame 18pt → 24pt (`KitGlyph.progress`/`.areaDot` gained a `diameter` param,
 default unchanged, so the sidebar/screen-title call sites are untouched) —
