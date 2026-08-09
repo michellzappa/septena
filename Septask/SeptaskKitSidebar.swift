@@ -961,64 +961,38 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
 }
 
-/// The disclosure chevron's hit area — a plain `NSButton` here would compete
-/// with the ROW's own drag-recognition (the row is a drag SOURCE, for
-/// structure reorder): a table/outline row view's `mouseDown` claims the
-/// event for potential drag-threshold tracking before an ordinary subview's
-/// click-tracking gets a turn, so the button's action could silently never
-/// fire. Same fix already proven for the task checkbox
-/// (`KitCheckboxView.mouseDown`) — hand-track press/release directly instead
-/// of going through `NSButton`'s cell-tracking loop.
+/// The disclosure chevron — a real `NSButton`.
+///
+/// This was a hand-tracked custom `NSView` for a long time, on the theory that
+/// an `NSButton` would lose its click to the row's drag-threshold tracking.
+/// That theory was never verified, and three rounds of fixes on top of it
+/// (mouseDown/mouseUp overrides, then a `hitTest` override) all failed to make
+/// the fold work — the tell being that the pointing-hand cursor appeared the
+/// whole time, which proves only that the view exists, never that clicks reach
+/// it. `NSOutlineView` is built to host controls in its cells; a button gets
+/// its own tracking, pressed state, keyboard activation, and accessibility for
+/// free. Standard control, per CLAUDE.md — arrived at the hard way.
 @MainActor
-final class KitDisclosureView: NSView {
-  private let imageView = NSImageView()
+final class KitDisclosureView: NSButton {
   var onTap: (() -> Void)?
-
-  var image: NSImage? {
-    get { imageView.image }
-    set { imageView.image = newValue }
-  }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
-    imageView.translatesAutoresizingMaskIntoConstraints = false
-    imageView.contentTintColor = SeptaskKitTheme.iconMuted
-    imageView.kitA11yIgnore()
-    addSubview(imageView)
-    NSLayoutConstraint.activate([
-      imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
-      imageView.centerYAnchor.constraint(equalTo: centerYAnchor),
-    ])
+    isBordered = false
+    bezelStyle = .inline
+    imagePosition = .imageOnly
+    contentTintColor = SeptaskKitTheme.iconMuted
+    title = ""
+    target = self
+    action = #selector(fire)
+    // Keyboard focus belongs to the outline view — arrow keys already expand
+    // and collapse rows natively, so this must not become a tab stop.
+    refusesFirstResponder = true
   }
 
   required init?(coder: NSCoder) { fatalError("KitDisclosureView is code-only") }
 
-  /// Claim the click off the chevron `NSImageView` filling this view.
-  ///
-  /// This is what was actually broken. The hand-tracked press below was
-  /// correct but unreachable: `NSImageView` is an `NSControl`, and a control's
-  /// `mouseDown` runs its cell's tracking and then CONSUMES the event instead
-  /// of passing it up the responder chain. Since the glyph sits centered over
-  /// almost all of this 14×14 view, essentially every click on the chevron
-  /// died there — the fold never fired. (`KitCheckboxView` never had the
-  /// problem because it draws its box in `draw(_:)` with no control on top.)
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    super.hitTest(point) == nil ? nil : self
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    onTap?()
-    return true
-  }
-
-  override func mouseDown(with event: NSEvent) {
-    // Swallow — see the type comment.
-  }
-
-  override func mouseUp(with event: NSEvent) {
-    let point = convert(event.locationInWindow, from: nil)
-    if bounds.contains(point) { onTap?() }
-  }
+  @objc private func fire() { onTap?() }
 }
 
 /// Keyboard/right-click seam mirroring `SeptaskKitTableView` — see the

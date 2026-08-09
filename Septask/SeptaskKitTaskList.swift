@@ -2887,8 +2887,15 @@ final class KitEventCell: NSTableCellView {
 final class KitScreenTitleCell: NSTableCellView {
   private let icon = NSImageView()
   private let emoji = NSTextField(labelWithString: "")
-  private let title = NSTextField(labelWithString: "")
-  private let chevron = NSImageView()
+  /// The title + chevron ARE the control — a real `NSButton`, not a label with
+  /// hand-tracked mouse handling. Three attempts to make a custom view receive
+  /// this click failed at the event layer (a click recognizer, then
+  /// mouseDown/mouseUp overrides, then a `hitTest` override); an `NSControl`
+  /// is what `NSTableView` is built to host in a cell, and it brings its own
+  /// tracking, highlight, accessibility, and keyboard activation. This is the
+  /// "use standard components, never get creative" rule in CLAUDE.md, arrived
+  /// at the hard way.
+  private let button = NSButton()
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   /// Builds the dropdown fresh on every click — see the call site's comment
@@ -2905,109 +2912,68 @@ final class KitScreenTitleCell: NSTableCellView {
     icon.translatesAutoresizingMaskIntoConstraints = false
     emoji.translatesAutoresizingMaskIntoConstraints = false
     emoji.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
-    title.translatesAutoresizingMaskIntoConstraints = false
-    title.font = Self.font
-    title.textColor = .labelColor
-    title.lineBreakMode = .byTruncatingTail
-    // Allowed to shrink/truncate now that the chevron sits right after it
-    // (equal-constrained, not `lessThanOrEqualTo`) — without this a long
-    // area/project name would fight the row's trailing bound instead of
-    // truncating.
-    title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    chevron.translatesAutoresizingMaskIntoConstraints = false
-    chevron.setContentHuggingPriority(.required, for: .horizontal)
-    chevron.setContentCompressionResistancePriority(.required, for: .horizontal)
-    chevron.image = NSImage(systemSymbolName: "chevron.down",
-                            accessibilityDescription: nil)?
+    button.translatesAutoresizingMaskIntoConstraints = false
+    button.isBordered = false
+    button.bezelStyle = .inline
+    button.font = Self.font
+    button.image = NSImage(systemSymbolName: "chevron.down",
+                           accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: 13, weight: .semibold))
-    chevron.contentTintColor = SeptaskKitTheme.iconMuted
-    chevron.kitA11yIgnore()
+    button.imagePosition = .imageTrailing
+    button.contentTintColor = .labelColor
+    button.lineBreakMode = .byTruncatingTail
+    button.target = self
+    button.action = #selector(openNavMenu)
+    // Keyboard focus stays on the table — this is a pointer affordance, and
+    // the same jumps are already on the menu bar. Matches the checkbox.
+    button.refusesFirstResponder = true
+    button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
-    title.kitA11yIgnore()
 
     addSubview(icon)
     addSubview(emoji)
-    addSubview(title)
-    addSubview(chevron)
-    textField = title
-    setAccessibilityElement(true)
+    addSubview(button)
     leadingConstraint = icon.leadingAnchor.constraint(
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
-    trailingConstraint = chevron.trailingAnchor.constraint(
+    trailingConstraint = button.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
-      icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      icon.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       icon.widthAnchor.constraint(equalToConstant: 18),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
-      title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
-      title.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
-      chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
-      chevron.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      // -2 keeps the glyph's optical left edge where the label's used to sit:
+      // a borderless NSButton still carries a small internal content inset.
+      button.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+      button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
     ])
   }
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
 
-  /// Claim every click inside the title, whatever decorative subview happens
-  /// to be under the pointer.
-  ///
-  /// This is the half that actually made the dropdown work. `chevron` and
-  /// `icon` are `NSImageView`s and `title` is an `NSTextField` — all three are
-  /// `NSControl`s, and a control's `mouseDown` runs its cell's tracking and
-  /// then CONSUMES the event rather than passing it up the responder chain.
-  /// So a click on the chevron (the obvious place to click!) died inside
-  /// `NSImageView` and never reached this view's `mouseUp` at all. The
-  /// pointing-hand cursor still appeared, which is what made this look like a
-  /// live control: `resetCursorRects` doesn't go through hit-testing, so the
-  /// cursor is not evidence that clicks arrive.
-  ///
-  /// `KitCheckboxView` is the shell's one click target that always worked —
-  /// and the one with no control on top of it, drawing its box in `draw(_:)`.
-  /// Same pattern applies to every other click target here.
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    super.hitTest(point) == nil ? nil : self
-  }
-
-  // Hand-tracked press instead of an `NSClickGestureRecognizer`.
-  // `NSTableView.mouseDown` runs its own event-tracking loop (row selection +
-  // drag threshold) that pulls events straight off the queue with
-  // `nextEventMatchingMask:`. Those events never pass back through
-  // `NSWindow.sendEvent`, which is the ONLY place gesture recognizers are fed
-  // — so a click recognizer on a cell view sees the mouseDown, never the
-  // mouseUp, and never reaches `.recognized`. Swallowing the press here keeps
-  // the table out of that loop, and the matching mouseUp is then delivered to
-  // this same view.
-  override func mouseDown(with event: NSEvent) {
-    // Swallow — see the comment above.
-  }
-
-  override func mouseUp(with event: NSEvent) {
-    let point = convert(event.locationInWindow, from: nil)
-    guard bounds.contains(point) else { return }
-    openNavMenu()
-  }
-
-  private func openNavMenu() {
+  /// Fired by the button's own target/action — no hand-tracked mouse handling.
+  @objc private func openNavMenu() {
     guard let menu = onOpenNavMenu?() else { return }
-    // Anchored under the title rather than at the click point, so the menu
-    // drops from the same place every time — what SwiftUI's `Menu` does, and
-    // what makes the title read as one control with the chevron. Written
-    // flip-safe: `NSTableCellView` doesn't override `isFlipped`, but the
-    // anchor shouldn't silently invert if that ever changes.
-    let anchor = NSPoint(x: title.frame.minX - 12,
-                         y: isFlipped ? title.frame.maxY + 4 : title.frame.minY - 4)
-    menu.popUp(positioning: nil, at: anchor, in: self)
+    // Dropped from the button's own bottom-left, the standard pull-down
+    // geometry. `popUp(positioning:at:in:)` takes the point in the anchor
+    // view's coordinates; `NSButton` is unflipped, so its bottom edge is y=0.
+    menu.popUp(positioning: nil,
+               at: NSPoint(x: 0, y: -4),
+               in: button)
   }
 
   /// The pointing-hand cursor is the platform's "this is a link/button"
-  /// signal — matches `KitGroupHeaderCell`'s navigable headers.
+  /// signal — matches `KitGroupHeaderCell`'s navigable headers. Scoped to the
+  /// BUTTON's frame now, not the whole cell: the cursor should promise a click
+  /// only where one actually lands. (The old whole-cell rect was what made the
+  /// dead title look live for three rounds of debugging.)
   override func resetCursorRects() {
-    addCursorRect(bounds, cursor: .pointingHand)
+    addCursorRect(button.frame, cursor: .pointingHand)
   }
 
   /// Same width-dependent centered-column margin as every other row.
@@ -3019,7 +2985,12 @@ final class KitScreenTitleCell: NSTableCellView {
   }
 
   func configure(title titleText: String, icon iconKind: SeptaskKitTaskListController.GroupIcon) {
-    title.stringValue = titleText
+    // `attributedTitle`, not `title`: a borderless NSButton otherwise paints
+    // its label in the control's default color, which loses the page title's
+    // full-strength ink.
+    button.attributedTitle = NSAttributedString(
+      string: titleText,
+      attributes: [.font: Self.font, .foregroundColor: NSColor.labelColor])
     emoji.isHidden = true
     icon.isHidden = false
     switch iconKind {
@@ -3036,15 +3007,13 @@ final class KitScreenTitleCell: NSTableCellView {
         .withSymbolConfiguration(.init(pointSize: 14, weight: .medium))
       icon.contentTintColor = SeptaskKitTheme.inkSecondary
     }
-    kitA11yButton(label: TaskA11y.navigationTitle(titleText))
+    // The BUTTON is the accessibility element now — it carries the press
+    // action natively, so the cell doesn't need to fake one.
+    setAccessibilityElement(false)
+    button.setAccessibilityLabel(TaskA11y.navigationTitle(titleText))
     // A reused cell carries a stale cursor rect otherwise — matches
     // `KitGroupHeaderCell.configure`'s identical call.
     window?.invalidateCursorRects(for: self)
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    openNavMenu()
-    return true
   }
 }
 
