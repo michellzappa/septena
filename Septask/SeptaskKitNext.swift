@@ -39,7 +39,7 @@ final class SeptaskKitNextController: NSViewController {
 
   /// Match the task list's subtitle convention when this pane is front.
   func claimWindowSubtitle() {
-    view.window?.subtitle = "Next"
+    view.window?.subtitle = String(localized: "Next", comment: "Smart list title")
   }
 }
 

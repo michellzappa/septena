@@ -42,8 +42,14 @@ private struct SeptaskKitRowCommands: View {
       Button("Duplicate") { SeptaskKitCommands.row(.duplicate) }
         .keyboardShortcut("d", modifiers: .command)
       Divider()
-      Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
-        .keyboardShortcut("k", modifiers: .command)
+      Menu("Complete") {
+        Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
+          .keyboardShortcut("k", modifiers: .command)
+        Button("Cancel Task") { SeptaskKitCommands.row(.cancel) }
+        Divider()
+        Button("Delete") { SeptaskKitCommands.row(.delete) }
+          .keyboardShortcut(.delete, modifiers: .command)
+      }
       Button("Toggle Today") { SeptaskKitCommands.row(.toggleToday) }
         .keyboardShortcut("t", modifiers: .command)
       Button("When…") { SeptaskKitCommands.row(.when) }
@@ -59,9 +65,6 @@ private struct SeptaskKitRowCommands: View {
           Button(choice.title) { SeptaskKitCommands.row(.setRecurrence(choice.rule)) }
         }
       }
-      Divider()
-      Button("Delete") { SeptaskKitCommands.row(.delete) }
-        .keyboardShortcut(.delete, modifiers: .command)
     }
     .disabled(!SeptaskKitCommands.canActOnSelection)
   }

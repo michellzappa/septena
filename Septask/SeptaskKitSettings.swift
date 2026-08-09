@@ -39,7 +39,7 @@ enum SeptaskKitSettingsWindow {
 
     let host = NSHostingController(rootView: AnyView(root))
     let window = NSWindow(contentViewController: host)
-    window.title = "Settings"
+    window.title = String(localized: "Settings", comment: "Settings window title")
     window.styleMask = [.titled, .closable, .fullSizeContentView]
     window.titlebarAppearsTransparent = true
     window.center()

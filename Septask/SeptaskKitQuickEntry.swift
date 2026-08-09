@@ -72,7 +72,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     content.layer?.cornerRadius = 12
     content.layer?.masksToBounds = true
 
-    field.placeholderString = "New task…"
+    field.placeholderString = String(localized: "New task…",
+                                     comment: "SeptaskKit: quick entry placeholder")
     field.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
     field.isBordered = false
     field.drawsBackground = false
@@ -80,7 +81,9 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     field.delegate = self
     field.translatesAutoresizingMaskIntoConstraints = false
 
-    let hint = NSTextField(labelWithString: "↩ Inbox    ⌘↩ Today    esc Cancel")
+    let hint = NSTextField(labelWithString: String(
+      localized: "↩ Inbox    ⌘↩ Today    esc Cancel",
+      comment: "SeptaskKit: quick entry shortcut legend"))
     hint.font = SeptaskKitTheme.meta
     hint.textColor = SeptaskKitTheme.iconMuted
     hint.translatesAutoresizingMaskIntoConstraints = false

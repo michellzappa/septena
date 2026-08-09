@@ -19,7 +19,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let deadlineButton = NSButton()
   private let repeatPopUp = NSPopUpButton()
   private let listLabel = NSTextField(labelWithString: "")
-  private let placeholder = NSTextField(labelWithString: "No Selection")
+  private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
+                                                                 comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
 
   private var task: SeptenaTask?
@@ -54,7 +55,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     notesView.isAutomaticQuoteSubstitutionEnabled = false
     notesScroll.documentView = notesView
 
-    let notesLabel = NSTextField(labelWithString: "Notes")
+    let notesLabel = NSTextField(labelWithString: String(localized: "Notes",
+                                                         comment: "SeptaskKit: inspector field"))
     notesLabel.font = SeptaskKitTheme.chip
     notesLabel.textColor = SeptaskKitTheme.iconMuted
 
@@ -137,6 +139,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.isHidden = false
     placeholder.isHidden = true
 
+    if next.showsAgentCue() {
+      mutator.acknowledge(id: next.id)
+    }
+
     loadedTitle = next.title
     loadedNotes = next.notes ?? ""
     titleField.stringValue = loadedTitle
@@ -148,14 +154,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// same-task or not, since nothing here is a live text edit in progress.
   private func refreshReadOnlyFields(_ next: SeptenaTask) {
     let when: String = if next.today {
-      "Today"
+      String(localized: "Today", comment: "Smart list title")
     } else if let scheduled = next.scheduled {
       KitDayFormat.display(scheduled)
     } else {
-      "Anytime"
+      String(localized: "Anytime", comment: "Smart list title")
     }
-    whenButton.title = "When: \(when)"
-    deadlineButton.title = "Deadline: " + (next.deadline.map(KitDayFormat.display) ?? "None")
+    whenButton.title = String(localized: "When: \(when)",
+                              comment: "SeptaskKit: inspector when field")
+    let deadlineValue = next.deadline.map(KitDayFormat.display)
+      ?? String(localized: "None", comment: "No deadline")
+    deadlineButton.title = String(localized: "Deadline: \(deadlineValue)",
+                                  comment: "SeptaskKit: inspector deadline field")
     listLabel.stringValue = listDescription(for: next)
 
     let repeatIndex = KitRecurrenceMenu.index(of: next.recurrence)
@@ -188,13 +198,15 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     let snapshot = StructureCache.snapshot(in: context)
     if let id = task.project,
        let project = snapshot.projects.first(where: { $0.id == id }) {
-      return "In \(project.title)"
+      return String(localized: "In \(project.title)",
+                    comment: "SeptaskKit: inspector list affiliation")
     }
     if let id = task.area,
        let area = snapshot.areas.first(where: { $0.id == id }) {
-      return "In \(area.title)"
+      return String(localized: "In \(area.title)",
+                    comment: "SeptaskKit: inspector list affiliation")
     }
-    return "No list"
+    return String(localized: "No list", comment: "SeptaskKit: inspector list affiliation")
   }
 
   // MARK: - Commits

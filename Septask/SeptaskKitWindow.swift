@@ -109,7 +109,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onNavigateToGroup = { [weak sidebar] filter in sidebar?.select(filter) }
 
     let window = NSWindow(contentViewController: split)
-    window.title = "Septask (AppKit)"
+    window.title = String(localized: "Septask (AppKit)",
+                          comment: "SeptaskKit: window title")
     // Matches the SwiftUI scene's `.windowStyle(.hiddenTitleBar)`: content
     // runs under a transparent title bar, traffic lights float over the
     // sidebar. The title still names the window in the Window menu.
@@ -184,6 +185,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     guard let list else { return }
     switch command {
     case .toggleComplete: list.toggleCompleteSelection()
+    case .cancel: list.cancelSelection()
     case .toggleToday: list.toggleTodaySelection()
     case .rename: list.beginEditSelectedRow()
     case .when: list.presentDatePopover(kind: .when)
@@ -197,7 +199,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   enum RowCommand {
-    case toggleComplete, toggleToday, rename, when, deadline, clearSchedule, delete
+    case toggleComplete, cancel, toggleToday, rename, when, deadline, clearSchedule, delete
     case duplicate, move
     case setRecurrence(Recurrence?)
   }

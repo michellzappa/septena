@@ -1,5 +1,13 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-09:** AppKit VoiceOver floor (§6 Accessibility) — `TaskA11y` shared
+spoken vocabulary + kit wiring (checkbox, rows, sidebar disclosure, headers,
+logged footer); agent-cue `acknowledge` on composer/inspector engage.
+
+**2026-08-08:** Drag-under-heading + group-by-heading on project pages
+(§4) — `projectGrouped` / `acceptGroupedTaskDrop` / `acceptHeadingReorder`.
+See the DONE entry under Headings below.
+
 **2026-08-07 bug-report pass:** fixed a real data bug MZ caught by hand — a
 task could render in Inbox AND its filed project/area at once. Root cause:
 `isInTriageBand` (`SeptenaCore/Models.swift` / `Persistence.swift`) never
@@ -73,12 +81,12 @@ sidebar and task list (`onFocusSidebar`/`onFocusList`, wired in
 (consistent with this file's existing Return-key pattern), not the native
 key-view loop, since NSTableView/NSOutlineView don't reliably surface Tab to
 `nextKeyView` on their own. Selected-and-focused now reads differently from
-selected-and-blurred: `SeptaskKitTheme.listSelectionFill(emphasized:)` fades
-the SAME fill (never a second color/shape — docs/DesignSpec.md §4.5) using
-`NSTableRowView.isEmphasized`, AppKit's own signal for "this row's table is
-the window's first responder" — no manual tracking needed, so Tab-ing to the
-sidebar now visibly dims the list's old selection instead of both panes
-looking identically "active." Area/project headers (`KitGroupHeaderCell`)
+selected-and-blurred: `SeptaskKitTheme.listSelectionFill(emphasized:)` keeps
+one shape and swaps hue by focus — System Settings accent wash when
+`NSTableRowView.isEmphasized`, light neutral gray when not — so Tab-ing to
+the sidebar dims the list's old selection instead of both panes looking
+identically "active." (Cannot use `.selectedContentBackgroundColor`: app
+AccentColor is adaptive ink.) Area/project headers (`KitGroupHeaderCell`)
 bumped chunkier — font `headline+9` → `headline+14`, icon/emoji/progress-ring
 frame 18pt → 24pt (`KitGlyph.progress`/`.areaDot` gained a `diameter` param,
 default unchanged, so the sidebar/screen-title call sites are untouched) —
@@ -148,11 +156,9 @@ renders or writes these, and the data is live (the MCP gateway writes it).
   (`todayTenureFill()`), capped at 70% opacity.
 - **[DONE] Unread-context corner dot** — haloed dot for a committed task with
   a started conversation (`conversation.hasStarted`).
-- **[DONE, half] Agent cue ring** — drawn from `showsAgentCue()`. NOT wired:
-  `mutator.acknowledge(id:)` is never called, so a row's cue can't be cleared
-  from the shell — engaging with it here doesn't turn the glow off. Small
-  follow-up: call `acknowledge` wherever the composer/inspector opens on an
-  agent-cued row.
+- **[DONE] Agent cue ring** — drawn from `showsAgentCue()`.
+  `mutator.acknowledge(id:)` runs when the composer or inspector opens on an
+  agent-cued row, so engaging clears the glow (same as SwiftUI).
 - **[P3] Check celebration** (`CheckFeel.stamp` — stamp + pulse ring at the
   box). The shell's completion feedback is the settle beat only.
 - **[P3] Promote flash** — amber ring when a row is pinned to Today.
@@ -184,29 +190,28 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   reorder) are rejected — validated via `areaNodeRange`/`organizeStartIndex`,
   the index boundaries within `roots` where the loose-project block ends and
   the area block begins.
-- **[DONE] Headings — create / rename / delete.** `SeptaskKitTaskList.swift`,
-  "Headings (project sections)" section. Same `TaskMutator` calls SwiftUI
-  uses (`createHeading`, plain `update(id:title:)` for rename, `delete` for
-  delete), same confirmation copy ("Delete this section? Its tasks stay in
-  the project."). Entry points: right-click a heading row (Rename / Delete
-  Section), right-click blank space on a project page (New Section).
-  Double-click/Return on a heading now falls back to the bare-title editor
-  instead of no-op (the composer's pill rail makes no sense for a heading).
-  - **[P2] NOT done: filing a task under a heading by DRAGGING it there**
-    (SwiftUI's `handleGroupedTaskDrop`/`handleHeadingDrop`). The shell's
-    existing intra-list drag (`SeptaskKitTaskListController.acceptDrop`)
-    reorders position and skips heading rows when finding neighbors, but
-    never calls `mutator.setHeading`, and project pages don't visually GROUP
-    rows by heading membership the way SwiftUI's `groupRows`/`visibleItems`
-    do — they render in flat position order. Doing this properly needs (a)
-    grouping the `.project`/`.area` render path by `heading` before laying
-    out rows (mirroring `groupedByList`'s pattern, not the raw `pool.map`
-    it uses today), then (b) extending `acceptDrop` to detect a heading
-    target and call `setHeading` accordingly. Skipped this pass — scoped as
-    a "same logic" CRUD pass, not a render-path rework — deliberately, not
-    forgotten.
-- **[P3] Project detail / notes**, area attachment (repo / calendar / feed
-  context feed).
+  - **[DONE] Headings — create / rename / delete.** `SeptaskKitTaskList.swift`,
+    "Headings (project sections)" section. Same `TaskMutator` calls SwiftUI
+    uses (`createHeading`, plain `update(id:title:)` for rename, `delete` for
+    delete), same confirmation copy ("Delete this section? Its tasks stay in
+    the project."). Entry points: right-click a heading row (Rename / Delete
+    Section), right-click blank space on a project page (New Section).
+    Double-click/Return on a heading now falls back to the bare-title editor
+    instead of no-op (the composer's pill rail makes no sense for a heading).
+  - **[DONE] Filing a task under a heading by DRAGGING it there** — project
+    pages now GROUP by heading (`projectGrouped`, mirroring
+    `TaskListView.projectGroupedRows`: un-headed block first, then each
+    heading + members; headings fetched via `LocalCache.headings(inProject:)`
+    since they never ride through `tasks(in:filter:)`). Drop uses
+    `acceptGroupedTaskDrop` / `acceptHeadingReorder` (AppKit gap-model
+    counterparts of `handleGroupedTaskDrop` / `handleHeadingDrop`): drop
+    below a heading files under it; drop onto a task joins that task's
+    group and calls `setHeading`; pure heading drags reorder among
+    headings. Midpoint-exhaustion renumber via shared `applyManualOrder`.
+    Headings break the card run (`isCardRow` false) so each section is its
+    own card, matching SwiftUI.
+  - **[P3] Project detail / notes**, area attachment (repo / calendar / feed
+    context feed).
 
 ## 5. Views and routes missing
 
@@ -250,10 +255,12 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 ## 6. Platform integration
 
-- **[P1] Localization.** Every string in `SeptaskKit*.swift` is a hardcoded
-  English literal. The SwiftUI surface goes through `Localizable.xcstrings`,
-  which already carries translations for the same concepts. This is the one
-  gap that gets *worse* the longer it waits (more literals to sweep).
+- **[DONE] Localization.** `SeptaskKit*.swift` chrome goes through
+  `String(localized:comment:)` against the shared `Localizable.xcstrings`
+  (same keys as SwiftUI where they already existed — smart lists, logged
+  footer plurals, delete-area/project bodies, recurrence cadences). User
+  data (task/project/area titles) stays verbatim. Smoke-test with
+  `-AppleLanguages (pt-BR)`.
 - **[DONE, partial] Undo / redo.** `SeptaskKitTaskListController` owns an
   `UndoManager` (overrides `NSResponder.undoManager` — there's no
   `NSDocument`, so `NSWindow.undoManager` is nil by default and won't do this
@@ -264,8 +271,12 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   has no undo at all, so this is net-new capability, not parity.
 - **[P2] Paste (⌘V) to create tasks** from clipboard text (multi-line → one
   task per line). Copy already works via Edit ▸ Copy.
-- **[P2] Accessibility.** The custom-drawn checkbox, sidebar chevrons, and card
-  rows have no accessibility labels/roles yet, so VoiceOver reads them poorly.
+- **[DONE, floor] Accessibility.** Custom-drawn checkbox, sidebar disclosure
+  chevrons, task/heading rows, screen/group titles, and the logged footer
+  expose VoiceOver roles/labels via `TaskA11y` + AppKit helpers in
+  `Accessibility.swift`. Shared cue strings match SwiftUI
+  (`Added by Claude…`, `Has notes`, …). Deeper work (task rotor, FKA
+  regression, Dynamic Type audit) stays on `docs/BACKLOG.md`.
 - **[P3] In-list search field.** Quick Find (⇧⌘F) covers global search; there's
   no filter-within-this-list field, and the shell has no toolbar to host one.
 - **[P3] No toolbar at all** — the SwiftUI window has search + add buttons.
@@ -305,13 +316,8 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
-2. **Localization sweep** (§6) — do before the literal count grows further.
-3. **Drag-a-task-under-a-heading** (§4) — the one piece left out of the
-   headings pass; needs the `.project`/`.area` render path grouped by
-   `heading` first (see that entry for the exact shape).
-4. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
-5. **Accessibility pass** (§6) — the custom-drawn checkbox/chevrons/rows.
-6. Everything else in §5/§6/§7 as it comes up.
+2. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
+3. Everything else in §5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 

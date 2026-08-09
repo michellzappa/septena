@@ -258,20 +258,32 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // Next sits beside Today (not at the foot of the Today list) — the AppKit
     // shape for the feed SwiftUI embeds as `SeptaskNextFold`.
     var views = [
-      Node(.filter(.today, title: "Today", symbol: "sun.max.fill"),
+      Node(.filter(.today,
+                   title: String(localized: "Today", comment: "Smart list title"),
+                   symbol: "sun.max.fill"),
            count: todayCount + inboxCount > 0 ? todayCount + inboxCount : nil),
       Node(.next, count: KitNextCount.open().nilIfZero),
-      Node(.filter(.upcoming, title: "Upcoming", symbol: "calendar"),
+      Node(.filter(.upcoming,
+                   title: String(localized: "Upcoming", comment: "Smart list title"),
+                   symbol: "calendar"),
            count: LocalCache.tasks(in: context, filter: .upcoming).count.nilIfZero),
-      Node(.filter(.unscheduled, title: "Anytime", symbol: "rectangle.stack.fill"),
+      Node(.filter(.unscheduled,
+                   title: String(localized: "Anytime", comment: "Smart list title"),
+                   symbol: "rectangle.stack.fill"),
            count: LocalCache.tasks(in: context, filter: .unscheduled).count.nilIfZero),
-      Node(.filter(.logbook, title: "Logbook", symbol: "checkmark"), count: doneTodayCount.nilIfZero),
+      Node(.filter(.logbook,
+                   title: String(localized: "Logbook", comment: "Smart list title"),
+                   symbol: "checkmark"),
+           count: doneTodayCount.nilIfZero),
     ]
     // Only shown once there's something in it — same gate the SwiftUI
     // sidebar uses, so an empty trash doesn't sit in the list forever.
     let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
     if recentlyDeletedCount > 0 {
-      views.append(Node(.filter(.recentlyDeleted, title: "Recently Deleted", symbol: "trash"),
+      views.append(Node(.filter(.recentlyDeleted,
+                                title: String(localized: "Recently Deleted",
+                                              comment: "Smart list title"),
+                                symbol: "trash"),
                         count: recentlyDeletedCount))
     }
 
@@ -592,7 +604,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       cell.imageView?.image = KitGlyph.colored(symbol: symbol, color: tint)
     case .next:
       cell.textField?.font = SeptaskKitTheme.sidebarTitle
-      cell.textField?.stringValue = "Next"
+      cell.textField?.stringValue = String(localized: "Next", comment: "Smart list title")
       cell.imageView?.image = KitGlyph.colored(symbol: "arrow.right",
                                               color: SeptaskKitTheme.inkSecondary)
     case .area(let area):
@@ -619,10 +631,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
     if node.children.isEmpty {
       cell.disclosure.isHidden = true
+      cell.disclosure.kitA11yIgnore()
       cell.onToggleDisclosure = nil
     } else {
       cell.disclosure.isHidden = false
-      cell.disclosure.image = Self.chevronImage(expanded: outlineView.isItemExpanded(node))
+      let expanded = outlineView.isItemExpanded(node)
+      cell.disclosure.image = Self.chevronImage(expanded: expanded)
+      let title = cell.textField?.stringValue ?? ""
+      cell.disclosure.kitA11yButton(
+        label: expanded ? TaskA11y.collapse(title) : TaskA11y.expand(title))
       cell.onToggleDisclosure = { [weak self, weak outlineView] in
         guard let outlineView else { return }
         if outlineView.isItemExpanded(node) {
@@ -643,7 +660,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let row = outlineView.row(forItem: node)
     guard row >= 0, let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false)
       as? SidebarCell else { return }
-    cell.disclosure.image = Self.chevronImage(expanded: outlineView.isItemExpanded(node))
+    let expanded = outlineView.isItemExpanded(node)
+    cell.disclosure.image = Self.chevronImage(expanded: expanded)
+    let title = cell.textField?.stringValue ?? ""
+    cell.disclosure.kitA11yButton(
+      label: expanded ? TaskA11y.collapse(title) : TaskA11y.expand(title))
   }
 
   func outlineViewItemDidExpand(_ notification: Notification) {
@@ -774,17 +795,25 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let menu = NSMenu()
     switch node?.content {
     case .area(let area):
-      menu.addItem(item("New Project in \(area.title)", #selector(newProjectInSelectedArea)))
+      menu.addItem(item(String(localized: "New Project in \(area.title)",
+                               comment: "SeptaskKit: sidebar context menu"),
+                        #selector(newProjectInSelectedArea)))
       menu.addItem(.separator())
-      menu.addItem(item("Rename Area…", #selector(renameSelected)))
-      menu.addItem(item("Delete Area…", #selector(deleteSelected)))
+      menu.addItem(item(String(localized: "Rename Area…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(renameSelected)))
+      menu.addItem(item(String(localized: "Delete Area…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(deleteSelected)))
     case .project(let project, _):
-      menu.addItem(item("Rename Project…", #selector(renameSelected)))
-      menu.addItem(item("Delete Project…", #selector(deleteSelected)))
+      menu.addItem(item(String(localized: "Rename Project…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(renameSelected)))
+      menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(deleteSelected)))
       _ = project
     case .filter(_, _, _), .next, .none:
-      menu.addItem(item("New Area…", #selector(newArea)))
-      menu.addItem(item("New Project…", #selector(newProjectLoose)))
+      menu.addItem(item(String(localized: "New Area…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(newArea)))
+      menu.addItem(item(String(localized: "New Project…", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(newProjectLoose)))
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
   }
@@ -800,8 +829,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc func newArea() {
-    guard let title = KitPrompt.text(title: "New Area", placeholder: "Area name",
-                                      confirmTitle: "Create") else { return }
+    guard let title = KitPrompt.text(
+      title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"),
+      placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
+      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
+    ) else { return }
     Task { try? await areasMutator.create(title: title) }
   }
 
@@ -815,21 +847,32 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc func newProject() { newProject(inArea: nil) }
 
   private func newProject(inArea areaId: String?) {
-    guard let title = KitPrompt.text(title: "New Project", placeholder: "Project name",
-                                      confirmTitle: "Create") else { return }
+    guard let title = KitPrompt.text(
+      title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
+      placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
+      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
+    ) else { return }
     Task { try? await projectsMutator.create(title: title, area: areaId) }
   }
 
   @objc private func renameSelected() {
     switch selectedNode?.content {
     case .area(let area):
-      guard let title = KitPrompt.text(title: "Rename Area", placeholder: "Area name",
-                                        initial: area.title, confirmTitle: "Rename")
+      guard let title = KitPrompt.text(
+        title: String(localized: "Rename Area", comment: "SeptaskKit: structure CRUD"),
+        placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
+        initial: area.title,
+        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
+      )
       else { return }
       Task { try? await areasMutator.rename(id: area.id, to: title) }
     case .project(let project, _):
-      guard let title = KitPrompt.text(title: "Rename Project", placeholder: "Project name",
-                                        initial: project.title, confirmTitle: "Rename")
+      guard let title = KitPrompt.text(
+        title: String(localized: "Rename Project", comment: "SeptaskKit: structure CRUD"),
+        placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
+        initial: project.title,
+        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
+      )
       else { return }
       Task { try? await projectsMutator.rename(id: project.id, to: title) }
     default:
@@ -842,14 +885,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // one deletion story between the two shells.
     switch selectedNode?.content {
     case .area(let area):
-      guard KitPrompt.confirmDestructive(title: "Delete \(area.title)?",
-                              message: "Projects in this area will be detached but not deleted.")
+      guard KitPrompt.confirmDestructive(
+        title: String(localized: "Delete \(area.title)?",
+                      comment: "SeptaskKit: delete area confirm"),
+        message: String(localized: "Projects in this area will be detached but not deleted.",
+                        comment: "Delete area confirmation body")
+      )
       else { return }
       Task { try? await areasMutator.delete(id: area.id) }
       bounceToTodayIfShowing(key: "area:\(area.id)")
     case .project(let project, _):
-      guard KitPrompt.confirmDestructive(title: "Delete \(project.title)?",
-                              message: "Tasks in this project will be moved to the inbox.")
+      guard KitPrompt.confirmDestructive(
+        title: String(localized: "Delete \(project.title)?",
+                      comment: "SeptaskKit: delete project confirm"),
+        message: String(localized: "Tasks in this project will be moved to the inbox.",
+                        comment: "Delete project confirmation body")
+      )
       else { return }
       Task { try? await projectsMutator.delete(id: project.id) }
       bounceToTodayIfShowing(key: "project:\(project.id)")
@@ -890,6 +941,7 @@ final class KitDisclosureView: NSView {
     super.init(frame: frameRect)
     imageView.translatesAutoresizingMaskIntoConstraints = false
     imageView.contentTintColor = SeptaskKitTheme.iconMuted
+    imageView.kitA11yIgnore()
     addSubview(imageView)
     NSLayoutConstraint.activate([
       imageView.centerXAnchor.constraint(equalTo: centerXAnchor),
@@ -898,6 +950,11 @@ final class KitDisclosureView: NSView {
   }
 
   required init?(coder: NSCoder) { fatalError("KitDisclosureView is code-only") }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
 
   override func mouseDown(with event: NSEvent) {
     // Swallow — see the type comment.

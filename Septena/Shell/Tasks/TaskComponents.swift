@@ -136,7 +136,7 @@ struct AgentCueMarker: View {
     Image(systemName: "circle.fill")
       .font(.caption2)
       .foregroundStyle(tint)
-      .accessibilityLabel(Text("Added by Claude, not yet seen"))
+      .accessibilityLabel(Text(TaskA11y.agentCue))
   }
 }
 
@@ -152,7 +152,7 @@ struct ArrivedTodayMarker: View {
     Image(systemName: "circle")
       .font(.caption2)
       .foregroundStyle(tint)
-      .accessibilityLabel(Text("Arrived in Today"))
+      .accessibilityLabel(Text(TaskA11y.arrivedToday))
   }
 }
 
@@ -258,7 +258,7 @@ struct CheckableRow<Trailing: View>: View {
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
       .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
-      .accessibilityLabel(showsNotesGlyph ? "\(title), has notes" : title)
+      .accessibilityLabel(TaskA11y.rowLabel(title: title, hasNotes: showsNotesGlyph, isHeading: false))
   }
 
   private var titleText: Text {
