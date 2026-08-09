@@ -56,29 +56,48 @@ exact hazard, and now the house rule for every click target in a cell:
 `KitLoggedFooterCell` and `KitGroupHeaderCell` carried the same latent bug and
 were converted with it.
 
-**…and that still wasn't the whole story.** Hand-tracking the press changed
-nothing when MZ retested (verified against a real build: Xcode's
-`Septask.app` was newer than the fix commit). The hand-tracked press was
-correct but *unreachable*. `NSImageView` and `NSTextField` are `NSControl`s,
-and a control's `mouseDown` runs its cell's tracking and then CONSUMES the
-event rather than passing it up the responder chain — so a click on the
-chevron glyph died inside the `NSImageView` and never reached the owning
-view's `mouseUp` at all. Same for the sidebar's `KitDisclosureView`, whose
-9pt glyph covers nearly all of its 14×14 hit area. Real fix: `hitTest`
-claiming any hit within bounds, so a decorative label/glyph can't intercept.
+**…and that still wasn't the whole story, either.** Both of the above
+explanations were wrong, and both shipped with confident comments saying
+otherwise. What finally settled it was a scratch AppKit harness (a table with
+a laid-out cell, geometry taken from `frameOfCell`/a laid-out subview's
+`convert(bounds, to: nil)` — hand-set frames made an earlier probe silently
+test empty space and report nonsense). Hit-testing the centre of each kind of
+cell content:
 
-**The false signal that cost two rounds:** the pointing-hand cursor appeared
-over both chevrons the whole time, which read as "the control is live".
-`resetCursorRects` does NOT go through hit-testing — the cursor proves the
-view exists, never that clicks reach it. The real tell was sitting in the
-same file: `KitCheckboxView` is the one click target that always worked, and
-the only one with no control on top of it (it draws its box in `draw(_:)`).
+```
+NSButton              -> NSButton     ✅ receives clicks
+bare custom NSView    -> that view    ✅ receives clicks
+NSTextField label     -> NSTableView  ❌ the table claims it
+```
 
-Lesson for the next "re-read the code and found no residual bug" moment: a
-reported symptom that survives a fix usually means the fix addressed a
-*different* layer of the same interaction — and before re-diagnosing, check
-the built binary's timestamp against the fix commit so "it didn't work" and
-"you didn't run it" can't be confused.
+**`NSTableView` claims hit-testing for label/image cell content.** Both broken
+controls had an `NSImageView` glyph exactly where you click (the sidebar
+chevron's image fills nearly all of its 14×14 hit view), so the click was
+claimed by the table and no `mouseDown`/`mouseUp`/`hitTest` override on the
+surrounding view ever ran. Fix: both are real `NSButton`s now.
+
+**Two false signals cost three rounds.** First, the pointing-hand cursor
+appeared over both chevrons the whole time, reading as "this control is live"
+— `resetCursorRects` does NOT go through hit-testing, so the cursor proves the
+view exists, never that clicks reach it. (Cursor rects are now scoped to the
+button's own frame, so a dead area can't advertise itself again.) Second,
+`KitCheckboxView` works, which looked like proof that the hand-rolled approach
+was sound; it isn't, because a bare custom `NSView` that draws itself IS hit
+normally — it's labels and images that get claimed.
+
+**House rule, now with evidence behind it: every click target in a
+table/outline cell is a real `NSButton`.** No gesture recognizers, no
+hand-tracked `mouseDown`/`mouseUp`, no `hitTest` overrides. Still unconverted
+and carrying the same bug: `KitGroupHeaderCell` (navigable headers),
+`KitLoggedFooterCell`, `KitProjectTargetCell` — their titles are
+`NSTextField`s, so their clicks are claimed by the table too.
+
+Lessons for the next session: a reported symptom that survives a fix usually
+means the fix addressed a *different* layer of the same interaction; check the
+built binary's timestamp against the fix commit before concluding a fix failed;
+and when reasoning about AppKit internals, build a throwaway harness and
+measure instead of arguing from memory — but take geometry from the framework,
+because a probe with hand-set frames will happily test empty space and lie.
 
 **Landed since the last pass (2026-08-06):** inline composer with the
 elective pill rail (§1), the three row cues — tenure dial, unread-context
