@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1555,
+      "build": 1564,
       "date": "2026-08-09",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, joins Septena",
-          "detail": "A new dedicated task app for iOS and macOS shares your Septena task data, with its own native macOS shell and watch app.",
+          "title": "Introducing Septask, a focused task app",
+          "detail": "A new companion app for Mac, iPhone, and iPad that shows only your tasks, sharing the same private data as Septena with its own widgets and watch app.",
           "section": "tasks"
         },
         {
-          "title": "Tasks get richer organization",
-          "detail": "Group tasks under project headings, import tasks from Things, attach files to tasks, and completing a recurring task now creates its next occurrence automatically.",
+          "title": "Recurring tasks, attachments, and easy recovery",
+          "detail": "Completing a recurring task now creates its next occurrence automatically, tasks can carry attachments, and deleted tasks can be restored for 30 days.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events and better organization in task lists",
+          "detail": "Calendar events now appear alongside tasks in Today and Upcoming, and tasks can be filed by drag-and-drop under project headings with a redesigned date picker.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import tasks from Things",
+          "detail": "Bring over your existing Things database, including headings mapped to project sections.",
           "section": "tasks"
         },
         {
           "title": "Photo-based meal logging",
-          "detail": "Take a photo of your meal to auto-fill nutrition fields, and re-log a meal scaled by a percentage.",
+          "detail": "Snap a photo of a meal and Septena analyzes and prefills the nutrition details, and re-logged meals can now be scaled by a percentage.",
           "section": "nutrition"
         },
         {
-          "title": "More control over training sessions",
-          "detail": "Edit session start and end times, get reps-before-load progression hints, and rest timers now auto-advance between sets.",
+          "title": "Smarter strength training sessions",
+          "detail": "The rest timer now auto-advances with a watch Live Activity, sets get one-tap progression hints, and sessions have editable start and end times.",
           "section": "training"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions, and goals can be pinned to the dashboard.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Keep favorite goals visible on the week dashboard, with suggested goals now offered for chores, gut, habits, medications, mood, and supplements.",
           "section": "goals"
         },
         {
-          "title": "Expanded watch app",
-          "detail": "Septask now has its own watch app, and the Next feed, intake tracking, and fasting status are all available on the wrist.",
-          "section": null
-        },
-        {
           "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy view shows the full telemetry ladder and a log of recently sent data, with an anonymized opt-out.",
+          "detail": "A new privacy screen shows a full checklist of what's shared at each analytics level, plus a recent-activity log, and opting out is now anonymous.",
           "section": null
-        },
-        {
-          "title": "Copy your grocery list",
-          "detail": "A new button copies the shopping list to the clipboard.",
-          "section": "groceries"
         }
       ]
     },
