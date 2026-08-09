@@ -109,7 +109,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onNavigateToGroup = { [weak sidebar] filter in sidebar?.select(filter) }
 
     let window = NSWindow(contentViewController: split)
-    window.title = "Septask (AppKit)"
+    window.title = String(localized: "Septask (AppKit)",
+                          comment: "SeptaskKit: window title")
     // Matches the SwiftUI scene's `.windowStyle(.hiddenTitleBar)`: content
     // runs under a transparent title bar, traffic lights float over the
     // sidebar. The title still names the window in the Window menu.

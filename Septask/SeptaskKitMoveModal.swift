@@ -83,6 +83,8 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
     field.delegate = self
     field.translatesAutoresizingMaskIntoConstraints = false
     field.sendsSearchStringImmediately = true
+    field.setAccessibilityTitle(String(localized: "Filter destinations",
+                                       comment: "SeptaskKit: move modal search field a11y"))
 
     let column = NSTableColumn(identifier: .init("moveRow"))
     tableView.addTableColumn(column)
@@ -122,6 +124,8 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
     panel.backgroundColor = .clear
     panel.hasShadow = true
     panel.delegate = self
+    panel.setAccessibilityTitle(String(localized: "Move",
+                                       comment: "SeptaskKit: move modal panel a11y title"))
     self.panel = panel
     return panel
   }

@@ -21,16 +21,26 @@ final class SeptaskKitDatePopover: NSViewController {
       switch self {
       case .when:
         // nil offset = Today (the today flag, not a scheduled date).
-        return [("Today", nil), ("Tomorrow", 1), ("Next Week", 7)]
+        return [
+          (String(localized: "Today", comment: "Relative date"), nil),
+          (String(localized: "Tomorrow", comment: "Relative date"), 1),
+          (String(localized: "Next Week", comment: "Relative date"), 7),
+        ]
       case .deadline:
-        return [("Today", 0), ("Tomorrow", 1), ("Next Week", 7)]
+        return [
+          (String(localized: "Today", comment: "Relative date"), 0),
+          (String(localized: "Tomorrow", comment: "Relative date"), 1),
+          (String(localized: "Next Week", comment: "Relative date"), 7),
+        ]
       }
     }
 
     var clearTitle: String {
       switch self {
-      case .when: return "Clear (Anytime)"
-      case .deadline: return "No Deadline"
+      case .when:
+        return String(localized: "Clear (Anytime)", comment: "SeptaskKit: date popover clear")
+      case .deadline:
+        return String(localized: "No Deadline", comment: "SeptaskKit: date popover clear")
       }
     }
   }

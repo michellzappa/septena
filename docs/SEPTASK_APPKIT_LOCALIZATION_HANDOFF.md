@@ -132,12 +132,12 @@ the only green gate (see root `CLAUDE.md`). Ask the user to smoke-test with
 
 ## Definition of done
 
-- [ ] No user-facing English string literal remains in `Septask/SeptaskKit*.swift`
+- [x] No user-facing English string literal remains in `Septask/SeptaskKit*.swift`
       (identifiers / symbols / keys excluded).
-- [ ] Shared concepts reuse existing catalog keys (logged footer, smart-list
+- [x] Shared concepts reuse existing catalog keys (logged footer, smart-list
       titles, recurrence labels, delete-section / delete-project copy).
-- [ ] `scripts/build.sh SeptaskMac 'platform=macOS'` green.
-- [ ] `docs/SEPTASK_APPKIT_PARITY.md` §6 Localization marked **[DONE]**.
+- [x] `scripts/build.sh SeptaskMac 'platform=macOS'` green.
+- [x] `docs/SEPTASK_APPKIT_PARITY.md` §6 Localization marked **[DONE]**.
 - [ ] User asked to verify with a non-English `-AppleLanguages` launch.
 
 ---

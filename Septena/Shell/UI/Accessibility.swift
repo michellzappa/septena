@@ -550,3 +550,46 @@ extension View {
     accessibilityIdentifier(id.raw)
   }
 }
+
+#if os(macOS)
+// MARK: - AppKit helpers
+//
+// Thin wrappers over NSAccessibility setters so SeptaskKit custom-drawn
+// controls (checkbox, disclosure chevron, card cells) speak with one
+// vocabulary. Prefer these over scattering role/label calls at every site.
+// Spoken strings come from `TaskA11y` (or `String(localized:)`) — never
+// hardcode a parallel English dialect here.
+
+extension NSView {
+
+  /// Hide a decorative subview from VoiceOver (notes glyph, chip icon, etc.).
+  func kitA11yIgnore() {
+    setAccessibilityElement(false)
+  }
+
+  /// Expose this view as a labeled accessibility element with an optional
+  /// value/help. Call again whenever visual state that affects speech changes.
+  func kitA11yElement(role: NSAccessibility.Role,
+                      label: String,
+                      value: Any? = nil,
+                      help: String? = nil) {
+    setAccessibilityElement(true)
+    setAccessibilityRole(role)
+    setAccessibilityLabel(label)
+    setAccessibilityValue(value)
+    setAccessibilityHelp(help)
+  }
+
+  /// Button-shaped control (sidebar disclosure, logged-footer toggle, …).
+  func kitA11yButton(label: String, help: String? = nil) {
+    kitA11yElement(role: .button, label: label, help: help)
+  }
+
+  /// Static header (group title / screen title).
+  func kitA11yHeader(label: String) {
+    kitA11yElement(role: .staticText, label: label)
+    setAccessibilityRoleDescription(String(localized: "Heading",
+                                           comment: "A11y: role description for section headers"))
+  }
+}
+#endif

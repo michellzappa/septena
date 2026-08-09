@@ -21,16 +21,16 @@ final class KitCheckboxView: NSView {
   private static let corner: CGFloat = 3.5
   private static let stroke: CGFloat = 1.2
 
-  var isDone = false { didSet { needsDisplay = true } }
-  var isDashed = false { didSet { needsDisplay = true } }
-  var isToday = false { didSet { needsDisplay = true } }
+  var isDone = false { didSet { needsDisplay = true; refreshAccessibility() } }
+  var isDashed = false { didSet { needsDisplay = true; refreshAccessibility() } }
+  var isToday = false { didSet { needsDisplay = true; refreshAccessibility() } }
   /// Today tenure dial (0…1) — gold interior deepening one seventh per carried
   /// day (`SeptenaTask.todayTenureFill`). nil = no dial.
-  var tenureFill: Double? = nil { didSet { needsDisplay = true } }
+  var tenureFill: Double? = nil { didSet { needsDisplay = true; refreshAccessibility() } }
   /// Unread agent context on a committed task — the haloed corner dot.
-  var cornerDot = false { didSet { needsDisplay = true } }
+  var cornerDot = false { didSet { needsDisplay = true; refreshAccessibility() } }
   /// A fresh, unacknowledged agent-created row — the cue ring.
-  var agentCue = false { didSet { needsDisplay = true } }
+  var agentCue = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var onToggle: (() -> Void)?
 
   /// Matches `TaskCheckbox.tenureMaxOpacity`: never fully opaque, so an aged
@@ -42,6 +42,33 @@ final class KitCheckboxView: NSView {
   /// Keyboard focus stays on the table — mirrors `.focusable(false)` on the
   /// SwiftUI checkbox, so Space can never activate a completion.
   override var acceptsFirstResponder: Bool { false }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    refreshAccessibility()
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitCheckboxView is code-only") }
+
+  /// VoiceOver: real checkbox role + shared `TaskA11y` vocabulary. Press
+  /// activates `onToggle` (same as a mouse click on the box).
+  private func refreshAccessibility() {
+    kitA11yElement(
+      role: .checkBox,
+      label: TaskA11y.checkboxLabel(),
+      value: TaskA11y.checkboxValue(isDone: isDone),
+      help: TaskA11y.checkboxHelp(isDone: isDone,
+                                  isDashed: isDashed,
+                                  isToday: isToday,
+                                  tenureFill: tenureFill,
+                                  agentCue: agentCue,
+                                  cornerDot: cornerDot))
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onToggle?()
+    return true
+  }
 
   override func mouseDown(with event: NSEvent) {
     // Swallow the press so a click on the box doesn't also start a row drag.
@@ -298,13 +325,19 @@ enum KitGlyph {
 @MainActor
 enum KitRecurrenceMenu {
   /// Menu order, with the rule each row writes. `nil` clears recurrence.
-  static let choices: [(title: String, rule: Recurrence?)] = [
-    ("Never", nil),
-    ("Daily", Recurrence(unit: .day, interval: 1)),
-    ("Weekly", Recurrence(unit: .week, interval: 1)),
-    ("Every 2 Weeks", Recurrence(unit: .week, interval: 2)),
-    ("Monthly", Recurrence(unit: .month, interval: 1)),
-  ]
+  static var choices: [(title: String, rule: Recurrence?)] {
+    [
+      (String(localized: "Never", comment: "Recurrence cadence"), nil),
+      (String(localized: "Daily", comment: "Recurrence cadence"),
+       Recurrence(unit: .day, interval: 1)),
+      (String(localized: "Weekly", comment: "Recurrence cadence"),
+       Recurrence(unit: .week, interval: 1)),
+      (String(localized: "Every 2 Weeks", comment: "Recurrence cadence"),
+       Recurrence(unit: .week, interval: 2)),
+      (String(localized: "Monthly", comment: "Recurrence cadence"),
+       Recurrence(unit: .month, interval: 1)),
+    ]
+  }
 
   static func build(target: AnyObject, action: Selector) -> NSMenu {
     let menu = NSMenu()
@@ -360,7 +393,8 @@ enum KitMoveMenu {
   /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
   static func destinations(areas: [Area], projects: [Project])
     -> [(title: String, target: Destination, emoji: String?)] {
-    [("No List", .none, nil)] + areas.map { ($0.title, .area($0.id), $0.emoji) }
+    [(String(localized: "No List", comment: "SeptaskKit: move destination"), .none, nil)]
+      + areas.map { ($0.title, .area($0.id), $0.emoji) }
   }
 
   static func build(areas: [Area], projects: [Project],

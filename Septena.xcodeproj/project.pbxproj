@@ -293,6 +293,7 @@
 		2E71534FB75930353C9B6320 /* HabitsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D38FA671236F83BEFCB8EBE /* HabitsDestinationView.swift */; };
 		2E8C926D9B95C7774B99A747 /* ReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C641220AFE9A17115F46A97C /* ReasoningProvider.swift */; };
 		2ED32D83DAF70E51745C9183 /* GroceriesDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA781FD1BD2DC0AA7388700 /* GroceriesDestinationView.swift */; };
+		2EDD017400643FC3FD502338 /* TaskA11y.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */; };
 		2EDFD2A189FA08831FF7E4F8 /* SuggestedGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0859B4B06CF7EDA6FBE0AC18 /* SuggestedGoal.swift */; };
 		2EE26BE41A95A216674211D2 /* TrainingComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008C9FF807F34F3024F9B348 /* TrainingComplication.swift */; };
 		2EEAB7D2677B30DB93C2182E /* DayDialHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E57B43CB582FB96ACACBB1D /* DayDialHero.swift */; };
@@ -508,6 +509,7 @@
 		4F6B8DD9BA460EF3332F487C /* MirrorReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93406744A63B069898310432 /* MirrorReader.swift */; };
 		4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */; };
 		4FBE329D7003929D4E3A98BF /* ReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C641220AFE9A17115F46A97C /* ReasoningProvider.swift */; };
+		4FBF40F7328948CB07A8C883 /* TaskA11y.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */; };
 		4FBF503917E03E829BA50234 /* ChoreDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B51BC53BD88D706639E85DB /* ChoreDetailView.swift */; };
 		500ED8305AD78B70EF40D352 /* NotificationKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A1CF28130DC18463097263 /* NotificationKit.swift */; };
 		50516F572A62A45207EF654E /* ReportPayloadBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48750329451455744523A40 /* ReportPayloadBuilder.swift */; };
@@ -528,6 +530,7 @@
 		52A745BD8C72B17AF2A19566 /* TaskListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35CAE6A0E50AE71E8E1CF88 /* TaskListModel.swift */; };
 		52CA17C6216FE77817FE261E /* NextFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848DD768C118B7BDF4E27FC4 /* NextFeed.swift */; };
 		52F20E3902FD8D231EFAD145 /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
+		5316992C23FB71A69319B4C9 /* TaskA11y.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */; };
 		5330AF71083A1F3514B862B8 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */; };
 		533D26E5CB13EAC2F2B088B2 /* TrainingQuickAddMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */; };
 		53401A017C87ADC3E632E44A /* SeptaskKitWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F00F31B7DD6B0E3BC0D347B /* SeptaskKitWindow.swift */; };
@@ -862,6 +865,7 @@
 		898AAE7FD3FAC62A1483D18F /* AppAttestClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C266A14FEBBA2493C7C210 /* AppAttestClient.swift */; };
 		89901FCA9B83E0E22487300C /* IntakeManageSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6A41AD0047B41E4CC8266AE /* IntakeManageSheet.swift */; };
 		89B1A0CC4C6B564CD8A01C40 /* DiscoveryShelf.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51885FDFDB9CF27D638FBD81 /* DiscoveryShelf.swift */; };
+		89DADF7AAB1D56C088062082 /* TaskA11y.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */; };
 		89E858FA4EF3D4CEA1BE268D /* NewNutritionEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CA8AEC00BA8AB4BD162D597 /* NewNutritionEntrySheet.swift */; };
 		89F13EE54A3E85810AE5266C /* DistanceUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5CC0F56E6E022C95AB16E4 /* DistanceUnit.swift */; };
 		8A020EE30C8D8C7EC28BDC66 /* SymptomsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D46EB2B5D44183C0600DCF /* SymptomsPlugin.swift */; };
@@ -1923,6 +1927,7 @@
 		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		52B7D2BC33C2434BBC95E4A7 /* SupplementIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementIntents.swift; sourceTree = "<group>"; };
 		530B8FDCAE87F532F06C9F1F /* EditIntakeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditIntakeEntrySheet.swift; sourceTree = "<group>"; };
+		53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskA11y.swift; sourceTree = "<group>"; };
 		53E343B15A4B6F29FBF956B8 /* ServerInspectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInspectorSheet.swift; sourceTree = "<group>"; };
 		53F4DAE3E470C1D3C5E049C6 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationEngine.swift; sourceTree = "<group>"; };
@@ -3155,6 +3160,7 @@
 				541D2E74F30CB26C102CDBF0 /* ConversationEngine.swift */,
 				0B24F662EF5D7717780A4F8D /* RemindersInboxSection.swift */,
 				04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */,
+				53BDE2DE5FFD6287961A77E1 /* TaskA11y.swift */,
 				080238E9010B8C8D1FD144D4 /* TaskAttachmentsPanel.swift */,
 				985DC4E3BD4D9960526EFF8E /* TaskAttributeBar.swift */,
 				7B21076B08A45AC0D53FE9BA /* TaskCheckbox.swift */,
@@ -4306,6 +4312,7 @@
 				3E8B33D2BB79BFF145D7B680 /* SuggestionBlocks.swift in Sources */,
 				1DA1192FB525C550E62D0DC0 /* SuggestionEngine.swift in Sources */,
 				FE01CF4F5A755992C6E42604 /* SyncIndicator.swift in Sources */,
+				89DADF7AAB1D56C088062082 /* TaskA11y.swift in Sources */,
 				0A2AA06438627458EC0531AD /* TaskAttachmentRecord.swift in Sources */,
 				178A8660ECC5E3DC3EAA1A12 /* TaskAttachmentsPanel.swift in Sources */,
 				61E246983243338B9A8D0ADA /* TaskAttributeBar.swift in Sources */,
@@ -4609,6 +4616,7 @@
 				8767A0FBBEEFE9C5FC5ACE16 /* SuggestionBlocks.swift in Sources */,
 				BF20C5D90C7F06B1485006E3 /* SuggestionEngine.swift in Sources */,
 				B37AE1A5BBE43F391387BB1A /* SyncIndicator.swift in Sources */,
+				2EDD017400643FC3FD502338 /* TaskA11y.swift in Sources */,
 				4CFA6739E7F8901F6A2B49FF /* TaskAttachmentRecord.swift in Sources */,
 				F03256CB07583485FD5BADCD /* TaskAttachmentsPanel.swift in Sources */,
 				91BBCDA6EDEF8BCE0B1961E0 /* TaskAttributeBar.swift in Sources */,
@@ -5061,6 +5069,7 @@
 				8A020EE30C8D8C7EC28BDC66 /* SymptomsPlugin.swift in Sources */,
 				4C25777C92AF9C757E2BD402 /* SymptomsQuickAddMenu.swift in Sources */,
 				BC0A7CBC554735ABF30A8001 /* SyncIndicator.swift in Sources */,
+				5316992C23FB71A69319B4C9 /* TaskA11y.swift in Sources */,
 				05A02232651E014F6A6FAD7E /* TaskAttachmentRecord.swift in Sources */,
 				F7861CCD9A7BD58A074E9520 /* TaskAttachmentsPanel.swift in Sources */,
 				6239C6774FAA462D68B92079 /* TaskAttributeBar.swift in Sources */,
@@ -5594,6 +5603,7 @@
 				157AB4D9506390DCCB7992F0 /* SymptomsPlugin.swift in Sources */,
 				1878C068064007425C362C63 /* SymptomsQuickAddMenu.swift in Sources */,
 				3B562D83E368E6726F7462AF /* SyncIndicator.swift in Sources */,
+				4FBF40F7328948CB07A8C883 /* TaskA11y.swift in Sources */,
 				4ACD0224383D936B2D2D3A72 /* TaskAttachmentRecord.swift in Sources */,
 				DE0E52C7E521881145EB42DD /* TaskAttachmentsPanel.swift in Sources */,
 				9627F4E86C623105E01C2555 /* TaskAttributeBar.swift in Sources */,

@@ -85,13 +85,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     pillRow.alignment = .centerY
     pillRow.translatesAutoresizingMaskIntoConstraints = false
 
-    todayPill.title = "Today"
+    todayPill.title = String(localized: "Today", comment: "Smart list title")
     todayPill.onPress = { [weak self] _ in self?.onAction?(.toggleToday) }
     whenPill.onPress = { [weak self] view in self?.onAction?(.when(view)) }
     deadlinePill.onPress = { [weak self] view in self?.onAction?(.deadline(view)) }
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
-    notesPill.title = "Notes"
+    notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.toggleNotes() }
     for pill in [todayPill, whenPill, deadlinePill, listPill, repeatPill, notesPill] {
       pillRow.addArrangedSubview(pill)
@@ -190,13 +190,40 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     checkbox.agentCue = task.showsAgentCue()
 
     todayPill.isOn = task.today
-    whenPill.title = task.scheduled.map { "When: " + KitDayFormat.display($0) } ?? "When"
+    whenPill.title = {
+      if let scheduled = task.scheduled {
+        let display = KitDayFormat.display(scheduled)
+        return String(localized: "When: \(display)",
+                      comment: "SeptaskKit: composer pill with date")
+      }
+      return String(localized: "When", comment: "SeptaskKit: composer pill")
+    }()
     whenPill.isOn = task.scheduled != nil
-    deadlinePill.title = task.deadline.map { "Due: " + KitDayFormat.display($0) } ?? "Deadline"
+    deadlinePill.title = {
+      if let deadline = task.deadline {
+        let display = KitDayFormat.display(deadline)
+        return String(localized: "Due: \(display)",
+                      comment: "SeptaskKit: composer pill with date")
+      }
+      return String(localized: "Deadline", comment: "SeptaskKit: composer pill")
+    }()
     deadlinePill.isOn = task.deadline != nil
-    listPill.title = listName.map { "List: " + $0 } ?? "List"
+    listPill.title = {
+      if let listName {
+        return String(localized: "List: \(listName)",
+                      comment: "SeptaskKit: composer pill with list name")
+      }
+      return String(localized: "List", comment: "SeptaskKit: composer pill")
+    }()
     listPill.isOn = listName != nil
-    repeatPill.title = task.recurrence.map { "Repeat: " + $0.shortLabel } ?? "Repeat"
+    repeatPill.title = {
+      if let recurrence = task.recurrence {
+        let label = recurrence.shortLabel
+        return String(localized: "Repeat: \(label)",
+                      comment: "SeptaskKit: composer pill with cadence")
+      }
+      return String(localized: "Repeat", comment: "SeptaskKit: composer pill")
+    }()
     repeatPill.isOn = task.recurrence != nil
   }
 

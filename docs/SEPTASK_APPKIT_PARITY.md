@@ -1,5 +1,9 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-09:** AppKit VoiceOver floor (§6 Accessibility) — `TaskA11y` shared
+spoken vocabulary + kit wiring (checkbox, rows, sidebar disclosure, headers,
+logged footer); agent-cue `acknowledge` on composer/inspector engage.
+
 **2026-08-08:** Drag-under-heading + group-by-heading on project pages
 (§4) — `projectGrouped` / `acceptGroupedTaskDrop` / `acceptHeadingReorder`.
 See the DONE entry under Headings below.
@@ -152,11 +156,9 @@ renders or writes these, and the data is live (the MCP gateway writes it).
   (`todayTenureFill()`), capped at 70% opacity.
 - **[DONE] Unread-context corner dot** — haloed dot for a committed task with
   a started conversation (`conversation.hasStarted`).
-- **[DONE, half] Agent cue ring** — drawn from `showsAgentCue()`. NOT wired:
-  `mutator.acknowledge(id:)` is never called, so a row's cue can't be cleared
-  from the shell — engaging with it here doesn't turn the glow off. Small
-  follow-up: call `acknowledge` wherever the composer/inspector opens on an
-  agent-cued row.
+- **[DONE] Agent cue ring** — drawn from `showsAgentCue()`.
+  `mutator.acknowledge(id:)` runs when the composer or inspector opens on an
+  agent-cued row, so engaging clears the glow (same as SwiftUI).
 - **[P3] Check celebration** (`CheckFeel.stamp` — stamp + pulse ring at the
   box). The shell's completion feedback is the settle beat only.
 - **[P3] Promote flash** — amber ring when a row is pinned to Today.
@@ -253,10 +255,12 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 ## 6. Platform integration
 
-- **[P1] Localization.** Every string in `SeptaskKit*.swift` is a hardcoded
-  English literal. The SwiftUI surface goes through `Localizable.xcstrings`,
-  which already carries translations for the same concepts. This is the one
-  gap that gets *worse* the longer it waits (more literals to sweep).
+- **[DONE] Localization.** `SeptaskKit*.swift` chrome goes through
+  `String(localized:comment:)` against the shared `Localizable.xcstrings`
+  (same keys as SwiftUI where they already existed — smart lists, logged
+  footer plurals, delete-area/project bodies, recurrence cadences). User
+  data (task/project/area titles) stays verbatim. Smoke-test with
+  `-AppleLanguages (pt-BR)`.
 - **[DONE, partial] Undo / redo.** `SeptaskKitTaskListController` owns an
   `UndoManager` (overrides `NSResponder.undoManager` — there's no
   `NSDocument`, so `NSWindow.undoManager` is nil by default and won't do this
@@ -267,8 +271,12 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   has no undo at all, so this is net-new capability, not parity.
 - **[P2] Paste (⌘V) to create tasks** from clipboard text (multi-line → one
   task per line). Copy already works via Edit ▸ Copy.
-- **[P2] Accessibility.** The custom-drawn checkbox, sidebar chevrons, and card
-  rows have no accessibility labels/roles yet, so VoiceOver reads them poorly.
+- **[DONE, floor] Accessibility.** Custom-drawn checkbox, sidebar disclosure
+  chevrons, task/heading rows, screen/group titles, and the logged footer
+  expose VoiceOver roles/labels via `TaskA11y` + AppKit helpers in
+  `Accessibility.swift`. Shared cue strings match SwiftUI
+  (`Added by Claude…`, `Has notes`, …). Deeper work (task rotor, FKA
+  regression, Dynamic Type audit) stays on `docs/BACKLOG.md`.
 - **[P3] In-list search field.** Quick Find (⇧⌘F) covers global search; there's
   no filter-within-this-list field, and the shell has no toolbar to host one.
 - **[P3] No toolbar at all** — the SwiftUI window has search + add buttons.
@@ -308,10 +316,8 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
-2. **Localization sweep** (§6) — do before the literal count grows further.
-3. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
-4. **Accessibility pass** (§6) — the custom-drawn checkbox/chevrons/rows.
-5. Everything else in §5/§6/§7 as it comes up.
+2. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
+3. Everything else in §5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 

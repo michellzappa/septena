@@ -37,8 +37,8 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     var subtitle: String {
       switch self {
       case .task(_, let subtitle): return subtitle
-      case .project: return "Project"
-      case .area: return "Area"
+      case .project: return String(localized: "Project", comment: "SeptaskKit: quick find kind")
+      case .area: return String(localized: "Area", comment: "SeptaskKit: quick find kind")
       }
     }
 
@@ -93,7 +93,8 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     content.layer?.cornerRadius = 12
     content.layer?.masksToBounds = true
 
-    field.placeholderString = "Search tasks, projects, areas…"
+    field.placeholderString = String(localized: "Search tasks, projects, areas…",
+                                     comment: "SeptaskKit: quick find placeholder")
     field.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
     field.isBordered = false
     field.drawsBackground = false
@@ -101,6 +102,8 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     field.delegate = self
     field.translatesAutoresizingMaskIntoConstraints = false
     field.sendsSearchStringImmediately = true
+    field.setAccessibilityTitle(String(localized: "Search",
+                                       comment: "SeptaskKit: quick find field a11y title"))
 
     let column = NSTableColumn(identifier: .init("hit"))
     tableView.addTableColumn(column)
@@ -140,6 +143,8 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     panel.backgroundColor = .clear
     panel.hasShadow = true
     panel.delegate = self
+    panel.setAccessibilityTitle(String(localized: "Quick Find",
+                                       comment: "SeptaskKit: quick find panel a11y title"))
     self.panel = panel
     return panel
   }
@@ -170,8 +175,13 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     where !task.isHeading && task.title.lowercased().contains(query) {
       let home = task.project.flatMap { projectTitles[$0] }
         ?? task.area.flatMap { areaTitles[$0] }
-        ?? (task.today ? "Today" : "Anytime")
-      let state = task.status == .open ? home : "\(home) · Completed"
+        ?? (task.today
+            ? String(localized: "Today", comment: "Smart list title")
+            : String(localized: "Anytime", comment: "Smart list title"))
+      let state = task.status == .open
+        ? home
+        : String(localized: "\(home) · Completed",
+                 comment: "SeptaskKit: quick find completed task subtitle")
       found.append(.task(task, subtitle: state))
     }
 

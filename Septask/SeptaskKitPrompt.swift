@@ -11,7 +11,7 @@ enum KitPrompt {
     let alert = NSAlert()
     alert.messageText = title
     alert.addButton(withTitle: confirmTitle)
-    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: String(localized: "Cancel", comment: "SeptaskKit: prompt dismiss"))
     let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
     field.placeholderString = placeholder
     field.stringValue = initial
@@ -23,13 +23,15 @@ enum KitPrompt {
   }
 
   static func confirmDestructive(title: String, message: String,
-                                 confirmTitle: String = "Delete") -> Bool {
+                                 confirmTitle: String? = nil) -> Bool {
     let alert = NSAlert()
     alert.messageText = title
     alert.informativeText = message
-    alert.addButton(withTitle: confirmTitle)
+    let confirm = confirmTitle
+      ?? String(localized: "Delete", comment: "SeptaskKit: prompt confirm")
+    alert.addButton(withTitle: confirm)
     alert.buttons.first?.hasDestructiveAction = true
-    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: String(localized: "Cancel", comment: "SeptaskKit: prompt dismiss"))
     return alert.runModal() == .alertFirstButtonReturn
   }
 }

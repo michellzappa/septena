@@ -88,6 +88,9 @@ shell work, and keep it current as items land.
 - **Motion routes through `KitMotion`** (the AppKit mirror of `A11yMotion`),
   which reads `NSWorkspace.accessibilityDisplayShouldReduceMotion`. Never
   animate rows directly.
+- **Kit VoiceOver goes through `TaskA11y` + AppKit helpers**
+  (`kitA11yElement` / `kitA11yButton` / `kitA11yHeader` in
+  `Accessibility.swift`) — same shared spoken vocabulary as SwiftUI task cues.
 - **Standard AppKit only** — the same "never get creative" rule as SwiftUI.
   `NSTableView`/`NSOutlineView` selection, the field editor for inline rename
   (the native answer to the `Text`→`TextField` corruption trap), `NSPopover`
