@@ -41,6 +41,23 @@ this is very likely the stale-build symptom the "Suggested order" section
 below already warns about. Flagged, not re-fixed — if either persists after a
 clean rebuild + relaunch, it's a NEW bug, not this one.
 
+**2026-08-09 correction:** it was not a stale build. The page-title dropdown
+had never worked, and `d888c98`'s fix (a better `popUp` anchor point) was
+downstream of the real defect: `KitScreenTitleCell` opened its menu from an
+`NSClickGestureRecognizer`, and **a click recognizer on an `NSTableCellView`
+can never fire**. `NSTableView.mouseDown` runs an event-tracking loop that
+takes events off the queue with `nextEventMatchingMask:`; those never pass
+back through `NSWindow.sendEvent`, which is the only place AppKit feeds
+gesture recognizers. The recognizer got the mouseDown and never the mouseUp.
+Fixed by hand-tracking the press (swallow mouseDown, act on mouseUp) — the
+same shape `KitCheckboxView` and `KitDisclosureView` already used for this
+exact hazard, and now the house rule for every click target in a cell:
+**no gesture recognizers inside table/outline cell views.**
+`KitLoggedFooterCell` and `KitGroupHeaderCell` carried the same latent bug and
+were converted with it. Lesson for the next "re-read the code and found no
+residual bug" moment: a reported symptom that survives a fix usually means the
+fix addressed a *different* layer of the same interaction.
+
 **Landed since the last pass (2026-08-06):** inline composer with the
 elective pill rail (§1), the three row cues — tenure dial, unread-context
 dot, agent cue (§3), structure CRUD — new/rename/delete area & project
@@ -198,6 +215,14 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
     Section), right-click blank space on a project page (New Section).
     Double-click/Return on a heading now falls back to the bare-title editor
     instead of no-op (the composer's pill rail makes no sense for a heading).
+    **[ ] Gap — discoverability.** SwiftUI shows a quiet "+ Add Section"
+    button at the foot of every project page (`TaskListView.addSectionButton`).
+    The AppKit shell has no equivalent: the only way in is a right-click on
+    blank space *below* the list, which doesn't exist once a project has
+    enough tasks to fill the window. There's no menu-bar command and no
+    shortcut either. MZ hit exactly this on 2026-08-09 ("unclear if they do
+    and where"). The fix is the SwiftUI affordance: a footer row on project
+    pages, alongside the existing right-click paths.
   - **[DONE] Filing a task under a heading by DRAGGING it there** — project
     pages now GROUP by heading (`projectGrouped`, mirroring
     `TaskListView.projectGroupedRows`: un-headed block first, then each
