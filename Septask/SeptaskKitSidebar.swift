@@ -993,6 +993,19 @@ final class KitDisclosureView: NSView {
 
   required init?(coder: NSCoder) { fatalError("KitDisclosureView is code-only") }
 
+  /// Claim the click off the chevron `NSImageView` filling this view.
+  ///
+  /// This is what was actually broken. The hand-tracked press below was
+  /// correct but unreachable: `NSImageView` is an `NSControl`, and a control's
+  /// `mouseDown` runs its cell's tracking and then CONSUMES the event instead
+  /// of passing it up the responder chain. Since the glyph sits centered over
+  /// almost all of this 14×14 view, essentially every click on the chevron
+  /// died there — the fold never fired. (`KitCheckboxView` never had the
+  /// problem because it draws its box in `draw(_:)` with no control on top.)
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    super.hitTest(point) == nil ? nil : self
+  }
+
   override func accessibilityPerformPress() -> Bool {
     onTap?()
     return true

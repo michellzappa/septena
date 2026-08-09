@@ -2953,16 +2953,35 @@ final class KitScreenTitleCell: NSTableCellView {
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
 
-  // Hand-tracked press instead of an `NSClickGestureRecognizer` — the same
-  // fix `KitCheckboxView` and `KitDisclosureView` already carry, for the same
-  // reason. `NSTableView.mouseDown` runs its own event-tracking loop (row
-  // selection + drag threshold) that pulls events straight off the queue with
+  /// Claim every click inside the title, whatever decorative subview happens
+  /// to be under the pointer.
+  ///
+  /// This is the half that actually made the dropdown work. `chevron` and
+  /// `icon` are `NSImageView`s and `title` is an `NSTextField` — all three are
+  /// `NSControl`s, and a control's `mouseDown` runs its cell's tracking and
+  /// then CONSUMES the event rather than passing it up the responder chain.
+  /// So a click on the chevron (the obvious place to click!) died inside
+  /// `NSImageView` and never reached this view's `mouseUp` at all. The
+  /// pointing-hand cursor still appeared, which is what made this look like a
+  /// live control: `resetCursorRects` doesn't go through hit-testing, so the
+  /// cursor is not evidence that clicks arrive.
+  ///
+  /// `KitCheckboxView` is the shell's one click target that always worked —
+  /// and the one with no control on top of it, drawing its box in `draw(_:)`.
+  /// Same pattern applies to every other click target here.
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    super.hitTest(point) == nil ? nil : self
+  }
+
+  // Hand-tracked press instead of an `NSClickGestureRecognizer`.
+  // `NSTableView.mouseDown` runs its own event-tracking loop (row selection +
+  // drag threshold) that pulls events straight off the queue with
   // `nextEventMatchingMask:`. Those events never pass back through
   // `NSWindow.sendEvent`, which is the ONLY place gesture recognizers are fed
   // — so a click recognizer on a cell view sees the mouseDown, never the
-  // mouseUp, and never reaches `.recognized`. The dropdown simply never
-  // opened. Swallowing the press here keeps the table out of that loop, and
-  // the matching mouseUp is then delivered to this same view.
+  // mouseUp, and never reaches `.recognized`. Swallowing the press here keeps
+  // the table out of that loop, and the matching mouseUp is then delivered to
+  // this same view.
   override func mouseDown(with event: NSEvent) {
     // Swallow — see the comment above.
   }
@@ -3091,6 +3110,12 @@ final class KitLoggedFooterCell: NSTableCellView {
 
   override func resetCursorRects() {
     addCursorRect(bounds, cursor: .pointingHand)
+  }
+
+  /// Claim the whole footer — the `NSTextField` label would otherwise eat the
+  /// click as an `NSControl`. See `KitScreenTitleCell.hitTest`.
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    super.hitTest(point) == nil ? nil : self
   }
 
   /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
@@ -3253,6 +3278,16 @@ final class KitGroupHeaderCell: NSTableCellView {
     // non-navigable header could keep the pointing-hand from whatever row
     // used to occupy this recycled view.
     window?.invalidateCursorRects(for: self)
+  }
+
+  /// Navigable headers claim their clicks off the `NSTextField` title and the
+  /// `NSImageView` glyph, both of which would otherwise swallow them as
+  /// `NSControl`s (see `KitScreenTitleCell.hitTest`). A non-navigable header
+  /// keeps the default so its clicks still reach the table.
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    let hit = super.hitTest(point)
+    guard onTap != nil else { return hit }
+    return hit == nil ? nil : self
   }
 
   /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
