@@ -84,6 +84,35 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// pure-area id list" (what the mutators' `reorder(orderedIDs:)` expects).
   private var organizeStartIndex = 0
   private var observers: [NSObjectProtocol] = []
+  /// Which areas the user has folded shut, by `Node.key`.
+  ///
+  /// NSOutlineView tracks expansion by ITEM IDENTITY, and `rebuild` throws
+  /// every `Node` away and makes new ones — so its own state can't survive a
+  /// refresh, and a refresh happens on every task change. Keys do survive.
+  /// Persisted so a fold outlives a relaunch, matching the SwiftUI sidebar's
+  /// own `DisclosureGroup` state.
+  private var collapsedKeys: Set<String> = Set(
+    UserDefaults.standard.stringArray(forKey: SettingsKey.septaskSidebarCollapsed) ?? [])
+
+  private func setCollapsed(_ collapsed: Bool, forKey key: String) {
+    if collapsed { collapsedKeys.insert(key) } else { collapsedKeys.remove(key) }
+    UserDefaults.standard.set(Array(collapsedKeys), forKey: SettingsKey.septaskSidebarCollapsed)
+  }
+
+  /// Re-apply the user's folds after a `reloadData()`. Expand-then-collapse
+  /// (rather than a blanket `expandItem(nil, expandChildren: true)`) is what
+  /// makes a fold stick: the blanket call re-opened every area on every
+  /// rebuild, so a collapsed area sprang back the moment any task changed.
+  /// Non-animated on purpose — this is state restoration, not a gesture.
+  private func restoreExpansion() {
+    for node in roots where !node.children.isEmpty {
+      if collapsedKeys.contains(node.key) {
+        outlineView.collapseItem(node)
+      } else {
+        outlineView.expandItem(node)
+      }
+    }
+  }
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
@@ -190,8 +219,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       default: "filter:\(filter.serverView)"
       }
     }
-    // A project inside a collapsed area has no row until the area is opened.
-    outlineView.expandItem(nil, expandChildren: true)
+    // A project inside a collapsed area has no row until the area is opened,
+    // so reveal just THAT area — not every one of them. The old blanket
+    // `expandItem(nil, expandChildren: true)` here meant any navigation
+    // (Quick Find, a group-header jump, the nav dropdown) silently unfolded
+    // the whole sidebar, undoing the user's folds a second way.
+    if let owner = roots.first(where: { node in
+      node.children.contains { $0.key == key }
+    }) {
+      outlineView.expandItem(owner)
+    }
     guard let row = row(forKey: key) else { return }
     outlineView.selectRowIndexes([row], byExtendingSelection: false)
     outlineView.scrollRowToVisible(row)
@@ -317,7 +354,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     organizeStartIndex = views.count
     topLevelAreaOrProjectKeys = Set(organize.map(\.key))
     outlineView.reloadData()
-    outlineView.expandItem(nil, expandChildren: true)
+    restoreExpansion()
 
     if let key, let row = row(forKey: key) {
       outlineView.selectRowIndexes([row], byExtendingSelection: false)
@@ -667,13 +704,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       label: expanded ? TaskA11y.collapse(title) : TaskA11y.expand(title))
   }
 
+  // These fire for every path — the chevron, the arrow keys, and the
+  // programmatic reveal in `select` — so recording the fold here (rather than
+  // in the click handler) is the one place that can't miss a toggle.
   func outlineViewItemDidExpand(_ notification: Notification) {
     guard let node = notification.userInfo?["NSObject"] as? Node else { return }
+    setCollapsed(false, forKey: node.key)
     updateDisclosure(for: node)
   }
 
   func outlineViewItemDidCollapse(_ notification: Notification) {
     guard let node = notification.userInfo?["NSObject"] as? Node else { return }
+    setCollapsed(true, forKey: node.key)
     updateDisclosure(for: node)
   }
 

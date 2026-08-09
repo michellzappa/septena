@@ -25,6 +25,12 @@ enum SettingsKey {
   /// local to that file on the chance the SwiftUI sidebar wants the same
   /// toggle later.
   static let septaskSidebarCounts = "septena.septask.sidebarCounts"
+  /// `Node.key`s of the AppKit sidebar's folded-shut areas (a `[String]`).
+  /// Device-local view state, deliberately not synced — which areas you keep
+  /// open is a per-window habit, not account data. NSOutlineView tracks
+  /// expansion by item identity and the sidebar rebuilds its nodes on every
+  /// data change, so this is what makes a fold survive the next refresh.
+  static let septaskSidebarCollapsed = "septena.septask.sidebarCollapsed"
   /// Device-local mirror of `AppSettings.onboardedAt`: true once the
   /// first-run welcome has been completed (here or, after sync, on another
   /// device). The welcome gate reads this for an instant, offline-safe

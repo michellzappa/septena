@@ -2895,9 +2895,6 @@ final class KitScreenTitleCell: NSTableCellView {
   /// on why this isn't built once and cached. Optional-returning to match
   /// the `[weak self]` closure the controller wires it up with.
   var onOpenNavMenu: (() -> NSMenu?)?
-  /// Stored (not a local in `init`) so `handleClick` can read back exactly
-  /// where the click landed — see its comment.
-  private let clickRecognizer = NSClickGestureRecognizer()
 
   private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
 
@@ -2930,10 +2927,6 @@ final class KitScreenTitleCell: NSTableCellView {
     emoji.kitA11yIgnore()
     title.kitA11yIgnore()
 
-    clickRecognizer.target = self
-    clickRecognizer.action = #selector(handleClick)
-    addGestureRecognizer(clickRecognizer)
-
     addSubview(icon)
     addSubview(emoji)
     addSubview(title)
@@ -2960,15 +2953,36 @@ final class KitScreenTitleCell: NSTableCellView {
 
   required init?(coder: NSCoder) { fatalError("KitScreenTitleCell is code-only") }
 
-  @objc private func handleClick() {
+  // Hand-tracked press instead of an `NSClickGestureRecognizer` — the same
+  // fix `KitCheckboxView` and `KitDisclosureView` already carry, for the same
+  // reason. `NSTableView.mouseDown` runs its own event-tracking loop (row
+  // selection + drag threshold) that pulls events straight off the queue with
+  // `nextEventMatchingMask:`. Those events never pass back through
+  // `NSWindow.sendEvent`, which is the ONLY place gesture recognizers are fed
+  // — so a click recognizer on a cell view sees the mouseDown, never the
+  // mouseUp, and never reaches `.recognized`. The dropdown simply never
+  // opened. Swallowing the press here keeps the table out of that loop, and
+  // the matching mouseUp is then delivered to this same view.
+  override func mouseDown(with event: NSEvent) {
+    // Swallow — see the comment above.
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    let point = convert(event.locationInWindow, from: nil)
+    guard bounds.contains(point) else { return }
+    openNavMenu()
+  }
+
+  private func openNavMenu() {
     guard let menu = onOpenNavMenu?() else { return }
-    // The gesture recognizer's own `location(in:)` — NOT a hand-computed
-    // point off `bounds.minY` (that assumed a coordinate flip and got it
-    // backwards, popping the menu off in the wrong direction so it never
-    // read as "opened"). `location(in:)` already accounts for whatever this
-    // view's actual `isFlipped` is, so it's the point that's guaranteed
-    // right regardless.
-    menu.popUp(positioning: nil, at: clickRecognizer.location(in: self), in: self)
+    // Anchored under the title rather than at the click point, so the menu
+    // drops from the same place every time — what SwiftUI's `Menu` does, and
+    // what makes the title read as one control with the chevron. Written
+    // flip-safe: `NSTableCellView` doesn't override `isFlipped`, but the
+    // anchor shouldn't silently invert if that ever changes.
+    let anchor = NSPoint(x: title.frame.minX - 12,
+                         y: isFlipped ? title.frame.maxY + 4 : title.frame.minY - 4)
+    menu.popUp(positioning: nil, at: anchor, in: self)
   }
 
   /// The pointing-hand cursor is the platform's "this is a link/button"
@@ -3010,7 +3024,7 @@ final class KitScreenTitleCell: NSTableCellView {
   }
 
   override func accessibilityPerformPress() -> Bool {
-    handleClick()
+    openNavMenu()
     return true
   }
 }
@@ -3036,9 +3050,6 @@ final class KitLoggedFooterCell: NSTableCellView {
     label.font = SeptaskKitTheme.meta
     label.textColor = SeptaskKitTheme.inkSecondary
     label.kitA11yIgnore()
-
-    let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
-    addGestureRecognizer(click)
 
     addSubview(label)
     textField = label
@@ -3082,7 +3093,18 @@ final class KitLoggedFooterCell: NSTableCellView {
     addCursorRect(bounds, cursor: .pointingHand)
   }
 
-  @objc private func handleClick() { onTap?() }
+  /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
+  /// on a table cell view never completes, because the table's own mouseDown
+  /// tracking loop eats the mouseUp before `NSWindow.sendEvent` can feed it
+  /// to the recognizer.
+  override func mouseDown(with event: NSEvent) {
+    // Swallow — see above.
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    let point = convert(event.locationInWindow, from: nil)
+    if bounds.contains(point) { onTap?() }
+  }
 }
 
 // MARK: - Group header cell
@@ -3143,8 +3165,6 @@ final class KitGroupHeaderCell: NSTableCellView {
     emoji.font = .systemFont(ofSize: 14 * FontScale.shared.factor)
     count.font = SeptaskKitTheme.meta
 
-    let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick))
-    addGestureRecognizer(click)
     count.textColor = SeptaskKitTheme.iconMuted
 
     addSubview(icon)
@@ -3235,7 +3255,27 @@ final class KitGroupHeaderCell: NSTableCellView {
     window?.invalidateCursorRects(for: self)
   }
 
-  @objc private func handleClick() { onTap?() }
+  /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
+  /// on a table cell view never completes, because the table's own mouseDown
+  /// tracking loop eats the mouseUp before `NSWindow.sendEvent` can feed it
+  /// to the recognizer. Non-navigable headers (`onTap == nil`) fall through
+  /// to the table so a click there still selects/deselects normally.
+  override func mouseDown(with event: NSEvent) {
+    guard onTap != nil else {
+      super.mouseDown(with: event)
+      return
+    }
+    // Swallow — see above.
+  }
+
+  override func mouseUp(with event: NSEvent) {
+    guard let onTap else {
+      super.mouseUp(with: event)
+      return
+    }
+    let point = convert(event.locationInWindow, from: nil)
+    if bounds.contains(point) { onTap() }
+  }
 
   override func accessibilityPerformPress() -> Bool {
     guard onTap != nil else { return false }
