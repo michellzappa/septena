@@ -563,6 +563,10 @@ private struct SeptaskPrivacyPane: View {
   @Environment(SettingsStore.self) private var store
   @AppStorage(SettingsKey.telemetryLevel) private var levelRaw: String =
     TelemetryClient.TelemetryLevel.balanced.rawValue
+  @AppStorage(SeptaskDiagnosticsCoordinator.enabledKey) private var diagnosticsEnabled = false
+  @State private var diagnosticsPreview: SeptaskDiagnosticsBatch?
+  @State private var diagnosticsPulse: SeptaskDiagnosticsPulse?
+  @State private var loadingPulse = false
 
   private var level: TelemetryClient.TelemetryLevel {
     TelemetryClient.TelemetryLevel(rawValue: levelRaw) ?? .balanced
@@ -600,11 +604,87 @@ private struct SeptaskPrivacyPane: View {
       }
 
       Section {
+        Toggle("Share anonymous weekly diagnostics", isOn: Binding(
+          get: { diagnosticsEnabled },
+          set: { enabled in
+            diagnosticsEnabled = enabled
+            SeptaskDiagnosticsCoordinator.setEnabled(enabled)
+            diagnosticsPreview = enabled ? SeptaskDiagnosticsCoordinator.shared.preview() : nil
+            if enabled { refreshDiagnosticsPulse() }
+            else { diagnosticsPulse = nil }
+          }
+        ))
+
+        if diagnosticsEnabled {
+          DisclosureGroup("What would be shared") {
+            ForEach(SeptaskDiagnosticsBatch.dataCatalog, id: \.self) { item in
+              Label(item, systemImage: "checkmark.circle")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            Text("Never: task text, titles, counts, account identity, or a device identifier.")
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+
+          if let diagnosticsPreview {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("This week's preview")
+                .font(.callout.weight(.medium))
+              Text("\(diagnosticsPreview.period) · \(diagnosticsPreview.app.version) (\(diagnosticsPreview.app.build)) · \(diagnosticsPreview.app.platform)")
+              Text("Claude: \(diagnosticsPreview.features.claudeConnected ? "on" : "off") · Calendar: \(diagnosticsPreview.features.calendarAccess ? "on" : "off") · Reminders: \(diagnosticsPreview.features.remindersAccess ? "on" : "off")")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          }
+
+          if loadingPulse {
+            ProgressView("Loading Community Pulse…")
+          } else if let latest = diagnosticsPulse?.latest {
+            VStack(alignment: .leading, spacing: 4) {
+              Text("Community Pulse")
+                .font(.callout.weight(.medium))
+              Text("\(latest.reportingInstalls) anonymous Septask installs reported for \(latest.period).")
+              if let version = latest.versions.first {
+                Text("Most reported version: \(version.name) (\(version.installs))")
+              }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          } else {
+            Text("Community Pulse appears once at least five anonymous installs report.")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+        }
+      } header: {
+        Text("Optional product diagnostics")
+      } footer: {
+        Text("This is a separate, opt-in weekly summary for improving Septask. It is not required for updates, iCloud sync, or support.")
+      }
+
+      Section {
         Text("Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud.")
       }
     }
     .formStyle(.grouped)
     .navigationTitle("Privacy")
+    .onAppear {
+      diagnosticsPreview = diagnosticsEnabled ? SeptaskDiagnosticsCoordinator.shared.preview() : nil
+      if diagnosticsEnabled { refreshDiagnosticsPulse() }
+    }
+  }
+
+  private func refreshDiagnosticsPulse() {
+    guard !loadingPulse else { return }
+    loadingPulse = true
+    Task { @MainActor in
+      diagnosticsPulse = await SeptaskDiagnosticsCoordinator.shared.loadPulse()
+      loadingPulse = false
+    }
   }
 }
 
@@ -679,6 +759,16 @@ private struct SeptaskAboutPane: View {
       }
 
       Section {
+        #if os(macOS)
+        Button("Check for Updates…") {
+          Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
+        }
+        #if DEBUG
+        .disabled(true)
+        #else
+        .disabled(!SeptaskUpdater.isConfigured)
+        #endif
+        #endif
         Button("Show Welcome Again") { welcomeCompleted = false }
       }
     }

@@ -85,6 +85,7 @@ private struct ClassicWindowCommand: View {
 /// steering each other while preserving the standard menu shortcuts.
 struct SeptaskCommandMenus: Commands {
   @FocusedValue(\.septaskNavigationActions) private var actions
+  @AppStorage(SettingsKey.textSizeStep) private var textSizeRaw = 0
 
   /// A navigation command has a target when a SwiftUI window is focused, or —
   /// on macOS, where it's the default window — when the AppKit shell is.
@@ -130,6 +131,35 @@ struct SeptaskCommandMenus: Commands {
       SeptaskKitCommands.quickFind()
       #endif
     }
+  }
+
+  private func showSettings() {
+    #if os(macOS)
+    // The AppKit shell is the default macOS surface. Do not route through a
+    // stale focused value from the suppressed SwiftUI WindowGroup: that only
+    // flips state on an invisible scene and makes Settings appear inert.
+    SeptaskKitSettingsWindow.show()
+    #else
+    actions?.showSettings()
+    #endif
+  }
+
+  private var textSizeSelection: Binding<Int> {
+    Binding(
+      get: { TextSizeStep.resolve(textSizeRaw).rawValue },
+      set: { raw in
+        let step = TextSizeStep.resolve(raw).rawValue
+        textSizeRaw = step
+        #if os(macOS)
+        FontScale.shared.setStep(step)
+        #endif
+      }
+    )
+  }
+
+  private func adjustTextSize(by delta: Int) {
+    let current = TextSizeStep.resolve(textSizeRaw).rawValue
+    textSizeSelection.wrappedValue = current + delta
   }
 
   var body: some Commands {
@@ -239,6 +269,29 @@ struct SeptaskCommandMenus: Commands {
       #endif
     }
 
+    // Standard macOS text-size affordances: the View menu exposes both a
+    // discoverable five-step scale and the familiar increase/decrease/reset
+    // shortcuts. This writes the same preference as Settings → Text Size.
+    CommandGroup(after: .toolbar) {
+      Menu("Text Size") {
+        Picker("Text Size", selection: textSizeSelection) {
+          ForEach(TextSizeStep.allCases) { step in
+            Text(step.label).tag(step.rawValue)
+          }
+        }
+        Divider()
+        Button("Increase Text Size") { adjustTextSize(by: 1) }
+          .keyboardShortcut("+", modifiers: .command)
+          .disabled(TextSizeStep.resolve(textSizeRaw) == .xLarge)
+        Button("Decrease Text Size") { adjustTextSize(by: -1) }
+          .keyboardShortcut("-", modifiers: .command)
+          .disabled(TextSizeStep.resolve(textSizeRaw) == .xSmall)
+        Button("Reset Text Size") { textSizeSelection.wrappedValue = TextSizeStep.normal.rawValue }
+          .keyboardShortcut("0", modifiers: .command)
+          .disabled(TextSizeStep.resolve(textSizeRaw) == .normal)
+      }
+    }
+
     #if os(macOS)
     // ⌘N belongs to whichever shell is in front; the shared NewTaskCommand
     // only knows about SwiftUI scenes.
@@ -262,16 +315,8 @@ struct SeptaskCommandMenus: Commands {
     }
 
     CommandGroup(replacing: .appSettings) {
-      Button("Settings…") {
-        if let actions {
-          actions.showSettings()
-        } else {
-          #if os(macOS)
-          SeptaskKitSettingsWindow.show()
-          #endif
-        }
-      }
-      .keyboardShortcut(",", modifiers: .command)
+      Button("Settings…") { showSettings() }
+        .keyboardShortcut(",", modifiers: .command)
       // Stays available from the Settings window itself, which is why this
       // checks "a shell exists" rather than "a shell is frontmost".
       .disabled(!canOpenSettings)
@@ -282,5 +327,18 @@ struct SeptaskCommandMenus: Commands {
         .keyboardShortcut("/", modifiers: [.command, .shift])
         .disabled(actions == nil)
     }
+
+    #if os(macOS)
+    CommandGroup(after: .appInfo) {
+      Button("Check for Updates…") {
+        Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
+      }
+      #if DEBUG
+      .disabled(true)
+      #else
+      .disabled(!SeptaskUpdater.isConfigured)
+      #endif
+    }
+    #endif
   }
 }

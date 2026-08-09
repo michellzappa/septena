@@ -23,6 +23,13 @@ enum SeptaskKitTheme {
   /// size read small in an early pass).
   static var taskTitle: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.body) + 1) }
 
+  /// Sidebar navigation labels — one shared semibold weight for smart lists,
+  /// areas, and projects. This keeps structure legible without the heavy bold
+  /// treatment areas previously used on their own.
+  static var sidebarTitle: NSFont {
+    .systemFont(ofSize: SeptenaTypeScale.size(.body) + 1, weight: .semibold)
+  }
+
   /// Theme.septenaMeta — footnote rung, monospaced digits (dates align).
   static var meta: NSFont {
     .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .regular)
@@ -36,7 +43,8 @@ enum SeptaskKitTheme {
 
   /// Theme.septenaCardTitle — the group header above a run of rows.
   static var groupTitle: NSFont {
-    .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
+    .systemFont(ofSize: Theme.groupHeaderFontSize * FontScale.shared.factor,
+                weight: .semibold)
   }
 
   /// Theme.septenaBadge — the row's list-membership chip.

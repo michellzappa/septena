@@ -76,6 +76,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private enum Row: Equatable {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon)
+    case projectTarget(id: String, title: String, progress: Double)
     case task(SeptenaTask, chip: Chip?)
     case event(Event)
     case loggedFooter(count: Int, expanded: Bool)
@@ -84,6 +85,7 @@ final class SeptaskKitTaskListController: NSViewController {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
       case .screenTitle: return "screen-title"
+      case .projectTarget(let id, _, _): return "project-target:" + id
       case .task(let task, _): return task.id
       case .event(let event): return "e:" + event.id
       case .loggedFooter: return "logged-footer"
@@ -99,7 +101,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .loggedFooter: return false
-      case .task, .event: return true
+      case .projectTarget, .task, .event: return true
       }
     }
   }
@@ -288,6 +290,11 @@ final class SeptaskKitTaskListController: NSViewController {
         self.reload()
       }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaTextSizeDidChange, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshTextSize() }
+    })
   }
 
   deinit {
@@ -341,6 +348,18 @@ final class SeptaskKitTaskListController: NSViewController {
     if tableView.selectedRow < 0, let first = rows.firstIndex(where: { $0.task != nil }) {
       tableView.selectRowIndexes([first], byExtendingSelection: false)
     }
+  }
+
+  /// Native AppKit cells do not observe `FontScale` the way SwiftUI font
+  /// tokens do. Reload the visible table cells and invalidate row heights so
+  /// View ▸ Text Size takes effect immediately in the main shell.
+  func refreshTextSize() {
+    emptyLabel.font = SeptaskKitTheme.taskTitle
+    tableView.reloadData()
+    if tableView.numberOfRows > 0 {
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tableView.numberOfRows))
+    }
+    tableView.needsLayout = true
   }
 
   /// Select and reveal a row by task id — how a jump (Quick Find) lands on
@@ -409,9 +428,34 @@ final class SeptaskKitTaskListController: NSViewController {
       }
       completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
 
+      if case .area = filter {
+        // Match SwiftUI's `excludeProjectedTasks`: project-filed tasks (and
+        // project headings) belong exclusively to the project target below.
+        pool = pool.filter { $0.project == nil }
+      }
       pool = pool.filter { $0.isHeading || $0.status == .open }
+      var projectRows: [Row] = []
+      if case .area(let areaID) = filter {
+        let snapshot = StructureCache.snapshot(in: context)
+        let areaProjects = snapshot.projects.filter {
+          $0.area == areaID && $0.status == .active
+        }
+        if !areaProjects.isEmpty {
+          let progress = projectProgress()
+          projectRows = [.header(id: "area-projects-\(areaID)",
+                                 title: "Projects",
+                                 icon: .symbol("folder"),
+                                 count: areaProjects.count)]
+            + areaProjects.map {
+              .projectTarget(id: $0.id,
+                             title: $0.title,
+                             progress: progress[$0.id] ?? 0)
+            }
+        }
+      }
+
       newRows = titleRows + pool.map { .task($0, chip: nil) }
-        + loggedFooterRows(completed: completed)
+        + projectRows + loggedFooterRows(completed: completed)
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
       newRows = titleRows + pool.prefix(200).map(chipped)
@@ -1727,11 +1771,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
+    case .projectTarget: return SeptaskKitTheme.rowHeight
     case .task(let task, _):
       if task.id == composingTaskId {
         return KitComposerCell.height(showsNotes: composerShowsNotes)
       }
       return SeptaskKitTheme.rowHeight
+        + (taskContextText(for: task) == nil ? 0 : 14)
     case .event: return SeptaskKitTheme.rowHeight
     case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
     }
@@ -1908,6 +1954,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onOpenNavMenu = { [weak self] in self?.buildNavMenu() }
       return cell
 
+    case .projectTarget(let id, let title, let progress):
+      let identifier = NSUserInterfaceItemIdentifier("projectTargetCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
+        as? KitProjectTargetCell
+        ?? KitProjectTargetCell(identifier: identifier)
+      cell.configure(title: title, progress: progress)
+      cell.onTap = { [weak self] in
+        self?.onNavigateToGroup?(.project(id))
+      }
+      return cell
+
     case .loggedFooter(let count, let expanded):
       let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
@@ -1927,7 +1984,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let identifier = NSUserInterfaceItemIdentifier("taskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? SeptaskKitTaskCell
         ?? SeptaskKitTaskCell(identifier: identifier)
-      cell.configure(with: task, filter: filter, chip: chip)
+      cell.configure(with: task, filter: filter, chip: chip,
+                     contextText: taskContextText(for: task))
       cell.onToggle = { [weak self] id in self?.toggle(id: id) }
       // Deferred one runloop tick — same reentrancy hazard as the composer's
       // `deferCommitAndCollapse` (see its doc comment): `onRename` fires from
@@ -1949,6 +2007,33 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.configure(with: event)
       return cell
     }
+  }
+
+  /// Matches SwiftUI `TaskListView.staticRow`'s project/area suppression:
+  /// scoped pages already name their context, while grouped Today/Anytime
+  /// pages use headers; the remaining surfaces keep the quiet second line.
+  private func taskContextText(for task: SeptenaTask) -> String? {
+    let snapshot = StructureCache.snapshot(in: context)
+    let suppressProject: Bool = switch filter {
+    case .project, .unscheduled: true
+    case .today: todayGroupsByList
+    default: false
+    }
+    let suppressArea: Bool = switch filter {
+    case .project, .area, .unscheduled: true
+    case .today: todayGroupsByList
+    default: false
+    }
+
+    if !suppressProject, let projectID = task.project,
+       let project = snapshot.projects.first(where: { $0.id == projectID }) {
+      return project.title
+    }
+    if !suppressArea, let areaID = task.area,
+       let area = snapshot.areas.first(where: { $0.id == areaID }) {
+      return area.title
+    }
+    return nil
   }
 }
 
@@ -1984,8 +2069,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
   private let checkbox = KitCheckboxView()
   private let title = NSTextField(labelWithString: "")
+  private let contextLabel = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
+  private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
   private var taskId = ""
   private var plainTitle = ""
@@ -2017,6 +2104,14 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.translatesAutoresizingMaskIntoConstraints = false
     title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+    contextLabel.font = SeptaskKitTheme.meta
+    contextLabel.textColor = SeptaskKitTheme.inkSecondary
+    contextLabel.maximumNumberOfLines = 1
+    contextLabel.lineBreakMode = .byTruncatingTail
+    contextLabel.isHidden = true
+    contextLabel.translatesAutoresizingMaskIntoConstraints = false
+    contextLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
     notesGlyph.translatesAutoresizingMaskIntoConstraints = false
     notesGlyph.contentTintColor = SeptaskKitTheme.iconMuted
     notesGlyph.image = NSImage(systemSymbolName: "text.alignleft",
@@ -2028,10 +2123,12 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     detail.isSelectable = false
     detail.setContentHuggingPriority(.required, for: .horizontal)
     detail.setContentCompressionResistancePriority(.required, for: .horizontal)
+    scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
     // Trailing cluster: notes marker, list chip, date — in that reading order,
     // each hidden when it has nothing to say.
-    let trailing = NSStackView(views: [notesGlyph, chip, detail])
+    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail])
     trailing.orientation = .horizontal
     trailing.spacing = 6
     trailing.translatesAutoresizingMaskIntoConstraints = false
@@ -2039,6 +2136,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     addSubview(checkbox)
     addSubview(title)
+    addSubview(contextLabel)
     addSubview(trailing)
     textField = title
     leadingConstraint = checkbox.leadingAnchor.constraint(
@@ -2052,9 +2150,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.heightAnchor.constraint(equalToConstant: 20),
       title.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
-      trailing.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 8),
+      contextLabel.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+      contextLabel.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
+      trailing.leadingAnchor.constraint(greaterThanOrEqualTo: contextLabel.trailingAnchor, constant: 8),
       trailingConstraint,
-      trailing.centerYAnchor.constraint(equalTo: centerYAnchor),
+      trailing.centerYAnchor.constraint(equalTo: title.centerYAnchor),
     ])
   }
 
@@ -2071,7 +2171,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   }
 
   func configure(with task: SeptenaTask, filter: TaskFilter,
-                 chip chipValue: SeptaskKitTaskListController.Chip?) {
+                 chip chipValue: SeptaskKitTaskListController.Chip?,
+                 contextText: String?) {
     taskId = task.id
     plainTitle = task.title
     editing = false
@@ -2081,6 +2182,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.isHidden = true
       notesGlyph.isHidden = true
       chip.isHidden = true
+      scheduleGlyph.isHidden = true
+      contextLabel.isHidden = true
       detail.stringValue = ""
       title.toolTip = task.title
       title.attributedStringValue = NSAttributedString(
@@ -2094,6 +2197,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     checkbox.isHidden = false
     title.toolTip = task.title
+    contextLabel.font = SeptaskKitTheme.meta
+    contextLabel.stringValue = contextText ?? ""
+    contextLabel.isHidden = contextText == nil
     let done = task.status != .open
     checkbox.isDone = done
     // The box carries readiness and Today the same way TaskCheckbox does:
@@ -2137,29 +2243,70 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     configureDetail(with: task, filter: filter, done: done)
   }
 
-  /// Trailing meta: the deadline when one exists (red once it's due),
-  /// otherwise the scheduled date where that's the list's point (Upcoming),
-  /// plus a repeat marker. Quiet by design — most rows show nothing.
+  /// Trailing meta mirrors SwiftUI's `TaskRow.trailingDate`: completed date,
+  /// due urgency, future deadlines, and scheduled dates each get their own
+  /// semantic glyph/treatment instead of collapsing into plain date text.
   private func configureDetail(with task: SeptenaTask, filter: TaskFilter, done: Bool) {
-    var parts: [String] = []
-    var color = SeptaskKitTheme.iconMuted
-
-    if let deadline = task.deadline, !done {
-      parts.append(KitDayFormat.display(deadline))
-      if deadline <= SeptenaDate.today {
-        color = SeptaskKitTheme.overdueRed
-      }
-    } else if case .upcoming = filter, let scheduled = task.scheduled {
-      parts.append(KitDayFormat.display(scheduled))
-    }
-    if task.recurrence != nil {
-      parts.append("↻")
-    }
-
+    scheduleGlyph.isHidden = true
+    scheduleGlyph.image = nil
     detail.font = SeptaskKitTheme.meta
-    detail.textColor = color
-    detail.stringValue = parts.joined(separator: "  ")
-    detail.isHidden = parts.isEmpty
+    detail.textColor = SeptaskKitTheme.iconMuted
+    detail.stringValue = ""
+    detail.isHidden = true
+
+    if done, let completedAt = task.completedAt {
+      let day = String(completedAt.prefix(10))
+      guard !day.isEmpty else { return }
+      configureScheduleGlyph(named: "checkmark", color: SeptaskKitTheme.iconMuted)
+      detail.stringValue = detailText(KitDayFormat.taskDate(day), task: task)
+      detail.isHidden = false
+      return
+    }
+
+    if let deadline = task.deadline, let date = KitDayFormat.date(fromWire: deadline) {
+      let today = KitDayFormat.todayDate() ?? Date()
+      let dueDay = Calendar.current.startOfDay(for: date)
+      let todayDay = Calendar.current.startOfDay(for: today)
+      if dueDay <= todayDay {
+        detail.font = .monospacedDigitSystemFont(
+          ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
+        detail.textColor = SeptaskKitTheme.overdueRed
+        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+      } else {
+        configureScheduleGlyph(named: "flag.fill", color: SeptaskKitTheme.inkSecondary)
+        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+      }
+      detail.isHidden = false
+      return
+    }
+
+    if let scheduled = task.scheduled, let date = KitDayFormat.date(fromWire: scheduled) {
+      let today = KitDayFormat.todayDate() ?? Date()
+      let scheduledDay = Calendar.current.startOfDay(for: date)
+      let todayDay = Calendar.current.startOfDay(for: today)
+      // Today already communicates its own current-day membership. Match
+      // SwiftUI by hiding past/today When dates there, while future dates and
+      // all scheduled dates on other surfaces remain visible.
+      if filter != .today || scheduledDay > todayDay {
+        configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
+        detail.stringValue = detailText(KitDayFormat.taskDate(scheduled), task: task)
+        detail.isHidden = false
+      }
+    } else if task.recurrence != nil {
+      detail.stringValue = "↻"
+      detail.isHidden = false
+    }
+  }
+
+  private func detailText(_ date: String, task: SeptenaTask) -> String {
+    task.recurrence == nil ? date : "\(date)  ↻"
+  }
+
+  private func configureScheduleGlyph(named name: String, color: NSColor) {
+    scheduleGlyph.image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    scheduleGlyph.contentTintColor = color
+    scheduleGlyph.isHidden = false
   }
 
   // MARK: - Field-editor rename
@@ -2190,6 +2337,91 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       return true
     }
     return false
+  }
+}
+
+// MARK: - Area project target
+
+/// A project listed inside its parent Area page. This is intentionally a card
+/// row rather than a task row: project tasks stay behind the project target,
+/// and clicking the row drills into that project's own list.
+@MainActor
+final class KitProjectTargetCell: NSTableCellView {
+  private let progress = NSImageView()
+  private let title = NSTextField(labelWithString: "")
+  private let chevron = NSImageView()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  private let clickRecognizer = NSClickGestureRecognizer()
+
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    progress.translatesAutoresizingMaskIntoConstraints = false
+    title.translatesAutoresizingMaskIntoConstraints = false
+    title.lineBreakMode = .byTruncatingTail
+    title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    chevron.translatesAutoresizingMaskIntoConstraints = false
+    chevron.setContentHuggingPriority(.required, for: .horizontal)
+    chevron.setContentCompressionResistancePriority(.required, for: .horizontal)
+    chevron.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+    chevron.contentTintColor = SeptaskKitTheme.iconMuted
+
+    clickRecognizer.target = self
+    clickRecognizer.action = #selector(handleClick)
+    addGestureRecognizer(clickRecognizer)
+
+    addSubview(progress)
+    addSubview(title)
+    addSubview(chevron)
+    textField = title
+    leadingConstraint = progress.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = chevron.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      progress.centerYAnchor.constraint(equalTo: centerYAnchor),
+      progress.widthAnchor.constraint(equalToConstant: 20),
+      progress.heightAnchor.constraint(equalToConstant: 20),
+      title.leadingAnchor.constraint(equalTo: progress.trailingAnchor, constant: 7),
+      title.centerYAnchor.constraint(equalTo: centerYAnchor),
+      chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
+      chevron.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      trailingConstraint,
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitProjectTargetCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(title titleText: String, progress progressValue: Double) {
+    self.progress.image = KitGlyph.progress(progressValue, diameter: 13)
+    title.attributedStringValue = NSAttributedString(
+      string: titleText,
+      attributes: [
+        .font: NSFont.systemFont(ofSize: SeptenaTypeScale.size(.body) + 1,
+                                 weight: .semibold),
+        .foregroundColor: NSColor.labelColor,
+      ])
+    title.toolTip = titleText
+    window?.invalidateCursorRects(for: self)
+  }
+
+  @objc private func handleClick() { onTap?() }
+
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
   }
 }
 
@@ -2285,7 +2517,7 @@ final class KitScreenTitleCell: NSTableCellView {
   /// where the click landed — see its comment.
   private let clickRecognizer = NSClickGestureRecognizer()
 
-  private static let font: NSFont = .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold)
+  private static var font: NSFont { .systemFont(ofSize: SeptenaTypeScale.size(.title2), weight: .bold) }
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -2468,7 +2700,7 @@ final class KitGroupHeaderCell: NSTableCellView {
   var onTap: (() -> Void)?
 
   /// Matches SwiftUI's ACTUAL group header exactly —
-  /// `sectionGroupHeaderTitleStyle()` (`Theme.groupHeaderFontSize` = 17 on
+  /// `sectionGroupHeaderTitleStyle()` (`Theme.groupHeaderFontSize` = 15 on
   /// macOS, `.semibold`) — rather than another guessed offset off
   /// `.headline`. Every earlier pass here (`+9`, `+14`, `+10`, `.bold`) was
   /// tuning a number disconnected from the real target, which is why each
@@ -2615,6 +2847,19 @@ enum KitDayFormat {
 
   static func display(_ isoDay: String) -> String {
     guard let date = parse.date(from: isoDay) else { return isoDay }
+    return render.string(from: date)
+  }
+
+  /// Short task-row date treatment, matching SwiftUI's Today/Tomorrow labels
+  /// before falling back to the localized month/day form.
+  static func taskDate(_ isoDay: String) -> String {
+    guard let date = parse.date(from: isoDay), let today = todayDate() else {
+      return display(isoDay)
+    }
+    let calendar = Calendar.current
+    if calendar.isDate(date, inSameDayAs: today) { return "Today" }
+    if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today),
+       calendar.isDate(date, inSameDayAs: tomorrow) { return "Tomorrow" }
     return render.string(from: date)
   }
 

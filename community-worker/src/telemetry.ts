@@ -1,6 +1,6 @@
 import { rateLimited } from "./attest";
 import type { Env } from "./env";
-import { json, readJson } from "./http";
+import { json, publicJson, readJson } from "./http";
 
 type TelemetryEvent =
   | "app_open"
@@ -30,6 +30,33 @@ interface TelemetrySection {
   section: string;
   enabled: boolean;
 }
+
+interface WeeklyDiagnosticsBody {
+  schema?: unknown;
+  install_id?: unknown;
+  batch_id?: unknown;
+  period?: unknown;
+  app?: unknown;
+  features?: unknown;
+}
+
+interface WeeklyDiagnosticsApp {
+  version: string;
+  build: string;
+  platform: WeeklyDiagnosticsPlatform;
+  osMajor: number;
+  architecture: WeeklyDiagnosticsArchitecture;
+}
+
+interface WeeklyDiagnosticsFeatures {
+  claude_connected: boolean;
+  calendar_access: boolean;
+  reminders_access: boolean;
+  reminders_auto_import: boolean;
+}
+
+type WeeklyDiagnosticsPlatform = "macos" | "ios" | "catalyst" | "unknown";
+type WeeklyDiagnosticsArchitecture = "arm64" | "x86_64" | "unknown";
 
 const allowedKeys = new Set([
   "installId",
@@ -222,6 +249,122 @@ export async function ingestTelemetry(env: Env, req: Request): Promise<Response>
   return json({ ok: true });
 }
 
+/** Ingests the separate, opt-in, once-per-week Septask diagnostics snapshot. */
+export async function ingestWeeklyDiagnostics(env: Env, req: Request): Promise<Response> {
+  const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
+  if (await rateLimited(env, `weekly-diagnostics-ip:${ip}`, 30, 3600)) {
+    return json({ error: "rate_limited" }, 429);
+  }
+
+  const body = await readJson<WeeklyDiagnosticsBody>(req, 4096);
+  if (body.error) return body.error;
+  const data = body.data ?? {};
+  const allowed = new Set(["schema", "install_id", "batch_id", "period", "app", "features"]);
+  if (Object.keys(data).some((key) => !allowed.has(key))) {
+    return json({ error: "unknown_fields" }, 400);
+  }
+
+  if (data.schema !== 1) return json({ error: "unsupported_schema" }, 400);
+  const installID = cleanInstallId(data.install_id);
+  const batchID = cleanShortToken(data.batch_id, 64);
+  const period = cleanWeeklyPeriod(data.period);
+  const app = cleanWeeklyApp(data.app);
+  const features = cleanWeeklyFeatures(data.features);
+  if (!installID || !batchID || !period || !app || !features) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+
+  const installHash = await hmacInstallHash(env, installID);
+  if (await rateLimited(env, `weekly-diagnostics-install:${installHash}`, 4, 3600)) {
+    return json({ error: "rate_limited" }, 429);
+  }
+
+  await env.DB.prepare(`
+    insert into telemetry_weekly_batch
+      (install_hash, batch_id, period, platform, app_version, build, os_major, architecture, features_json)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    on conflict(install_hash, period) do update set
+      batch_id = excluded.batch_id,
+      platform = excluded.platform,
+      app_version = excluded.app_version,
+      build = excluded.build,
+      os_major = excluded.os_major,
+      architecture = excluded.architecture,
+      features_json = excluded.features_json,
+      received_at = datetime('now')
+  `).bind(
+    installHash,
+    batchID,
+    period,
+    app.platform,
+    app.version,
+    app.build,
+    app.osMajor,
+    app.architecture,
+    JSON.stringify(features),
+  ).run();
+
+  return json({ ok: true });
+}
+
+/** Public aggregate with a minimum group size to avoid small-cohort disclosure. */
+export async function weeklyDiagnosticsPulse(env: Env): Promise<Response> {
+  const minimumGroupSize = 5;
+  const result = await env.DB.prepare(`
+    select period, count(*) as reporting_installs
+    from telemetry_weekly_batch
+    where received_at >= datetime('now', '-56 days')
+    group by period
+    order by period desc
+    limit 8
+  `).all<{ period: string; reporting_installs: number }>();
+
+  const weeklyActive = (result.results ?? [])
+    .filter((row) => row.reporting_installs >= minimumGroupSize)
+    .map((row) => ({ period: row.period, reporting_installs: row.reporting_installs }));
+
+  const latestRow = weeklyActive[0];
+  if (!latestRow) {
+    return publicJson({ minimum_group_size: minimumGroupSize, weekly_active: [], latest: null });
+  }
+
+  const latest = await env.DB.prepare(`
+    select app_version, features_json
+    from telemetry_weekly_batch
+    where period = ?
+  `).bind(latestRow.period).all<{ app_version: string; features_json: string }>();
+
+  const versions = new Map<string, number>();
+  const featureTotals = new Map<string, number>();
+  for (const row of latest.results ?? []) {
+    versions.set(row.app_version, (versions.get(row.app_version) ?? 0) + 1);
+    const features = safeWeeklyFeatures(row.features_json);
+    if (!features) continue;
+    for (const [name, enabled] of Object.entries(features)) {
+      if (enabled) featureTotals.set(name, (featureTotals.get(name) ?? 0) + 1);
+    }
+  }
+
+  return publicJson({
+    minimum_group_size: minimumGroupSize,
+    weekly_active: weeklyActive,
+    latest: {
+      period: latestRow.period,
+      reporting_installs: latestRow.reporting_installs,
+      versions: [...versions.entries()]
+        .filter(([, installs]) => installs >= minimumGroupSize)
+        .map(([name, installs]) => ({ name, installs }))
+        .sort((a, b) => b.installs - a.installs || a.name.localeCompare(b.name)),
+      features: [...featureTotals.entries()]
+        .map(([name, enabled]) => ({
+          name,
+          adoption_percent: Math.round((enabled / latestRow.reporting_installs) * 100),
+        }))
+        .sort((a, b) => b.adoption_percent - a.adoption_percent || a.name.localeCompare(b.name)),
+    },
+  });
+}
+
 async function upsertSectionState(
   env: Env,
   args: {
@@ -401,6 +544,66 @@ function cleanSections(value: unknown): TelemetrySection[] | null {
     out.push({ section, enabled: obj.enabled });
   }
   return out;
+}
+
+function cleanWeeklyPeriod(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const period = value.trim();
+  return /^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/.test(period) ? period : null;
+}
+
+function cleanWeeklyApp(value: unknown): WeeklyDiagnosticsApp | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const app = value as Record<string, unknown>;
+  const allowed = new Set(["version", "build", "platform", "osMajor", "architecture"]);
+  if (Object.keys(app).some((key) => !allowed.has(key))) return null;
+
+  const version = cleanShortToken(app.version, 32);
+  const build = cleanShortToken(app.build, 32);
+  const platform = cleanWeeklyPlatform(app.platform);
+  const architecture = cleanWeeklyArchitecture(app.architecture);
+  const osMajor = app.osMajor;
+  if (!version || !build || !platform || !architecture || typeof osMajor !== "number" || !Number.isInteger(osMajor) || osMajor < 1 || osMajor > 99) {
+    return null;
+  }
+  return { version, build, platform, osMajor, architecture };
+}
+
+function cleanWeeklyPlatform(value: unknown): WeeklyDiagnosticsPlatform | null {
+  if (typeof value !== "string") return null;
+  return new Set<WeeklyDiagnosticsPlatform>(["macos", "ios", "catalyst", "unknown"]).has(value as WeeklyDiagnosticsPlatform)
+    ? value as WeeklyDiagnosticsPlatform
+    : null;
+}
+
+function cleanWeeklyArchitecture(value: unknown): WeeklyDiagnosticsArchitecture | null {
+  if (typeof value !== "string") return null;
+  return new Set<WeeklyDiagnosticsArchitecture>(["arm64", "x86_64", "unknown"]).has(value as WeeklyDiagnosticsArchitecture)
+    ? value as WeeklyDiagnosticsArchitecture
+    : null;
+}
+
+function cleanWeeklyFeatures(value: unknown): WeeklyDiagnosticsFeatures | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const features = value as Record<string, unknown>;
+  const allowed = new Set([
+    "claude_connected",
+    "calendar_access",
+    "reminders_access",
+    "reminders_auto_import",
+  ]);
+  if (Object.keys(features).some((key) => !allowed.has(key))) return null;
+  if (Object.keys(features).length !== allowed.size) return null;
+  if (Object.values(features).some((enabled) => typeof enabled !== "boolean")) return null;
+  return features as unknown as WeeklyDiagnosticsFeatures;
+}
+
+function safeWeeklyFeatures(value: string): WeeklyDiagnosticsFeatures | null {
+  try {
+    return cleanWeeklyFeatures(JSON.parse(value));
+  } catch {
+    return null;
+  }
 }
 
 async function hmacInstallHash(env: Env, installId: string): Promise<string> {

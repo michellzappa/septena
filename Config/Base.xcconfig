@@ -16,6 +16,9 @@ SEPTENA_DEVELOPMENT_TEAM =
 WITHINGS_CLIENT_ID =
 WITHINGS_CLIENT_SECRET =
 CLOUDKIT_WEB_API_TOKEN =
+// Public half of the Sparkle Ed25519 update-signing key. The private half
+// belongs only in the release keychain / GitHub secret.
+SPARKLE_PUBLIC_ED_KEY =
 
 // Build number (CFBundleVersion). Lives here, not in project.yml, so it can be
 // stamped from the git commit count by scripts/stamp-version.sh at archive

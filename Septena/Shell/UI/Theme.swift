@@ -332,9 +332,9 @@ enum Theme {
   static let listLeadingInset: CGFloat = 20
   static let cardVerticalPadding: CGFloat = 6
   static let cardActionIconSize: CGFloat = 14
-  // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
-  // so Today/Tasks group headers read at the same size as Next.
-  static let groupHeaderFontSize: CGFloat = 17
+  // Category headers sit above the cards, so keep them visually subordinate
+  // to the task text while preserving the same scale as the Next feed.
+  static let groupHeaderFontSize: CGFloat = 15
   /// Trailing quick-add glyph in a section/group header — one step under the
   /// title so the pair reads as a single control row (see `HeaderQuickAddButton`).
   static let headerQuickAddGlyphSize: CGFloat = groupHeaderFontSize - 4
@@ -356,9 +356,9 @@ enum Theme {
   static let listLeadingInset: CGFloat = 0
   static let cardVerticalPadding: CGFloat = 10
   static let cardActionIconSize: CGFloat = 18
-  // Matches `title2` (= septenaSectionTitle, the Next feed's section titles)
-  // so Today/Tasks group headers read at the same size as Next.
-  static let groupHeaderFontSize: CGFloat = 20
+  // Category headers sit above the cards, so keep them visually subordinate
+  // to the task text while preserving the same scale as the Next feed.
+  static let groupHeaderFontSize: CGFloat = 18
   /// Trailing quick-add glyph in a section/group header — one step under the
   /// title so the pair reads as a single control row (see `HeaderQuickAddButton`).
   static let headerQuickAddGlyphSize: CGFloat = groupHeaderFontSize - 4

@@ -39,9 +39,9 @@ enum TextSizeStep: Int, CaseIterable, Identifiable {
   var label: String {
     switch self {
     case .xSmall: return "Smallest"
-    case .small:  return "Smaller"
-    case .normal: return "Default"
-    case .large:  return "Larger"
+    case .small:  return "Small"
+    case .normal: return "Medium"
+    case .large:  return "Large"
     case .xLarge: return "Largest"
     }
   }
@@ -67,6 +67,12 @@ enum TextSizeStep: Int, CaseIterable, Identifiable {
 #if os(macOS)
 import AppKit
 
+extension Notification.Name {
+  /// Posted after the macOS text-size factor changes so native AppKit shells
+  /// can refresh already-visible cells (SwiftUI gets this through observation).
+  static let septenaTextSizeDidChange = Notification.Name("septena.textSizeDidChange")
+}
+
 /// macOS text-scale backing. macOS doesn't support Dynamic Type, so the
 /// app-wide Text Size setting is delivered by scaling the `.septena*` font
 /// tokens directly. This is `@Observable` and read from *inside* those token
@@ -84,7 +90,9 @@ final class FontScale {
 
   func setStep(_ step: Int) {
     let next = TextSizeStep.resolve(step).macFactor
-    if next != factor { factor = next }
+    guard next != factor else { return }
+    factor = next
+    NotificationCenter.default.post(name: .septenaTextSizeDidChange, object: self)
   }
 }
 

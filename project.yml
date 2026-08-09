@@ -9,6 +9,12 @@ options:
   xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
+# Sparkle is linked only by the direct-distribution macOS target below.
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.9.2
+
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -483,6 +489,7 @@ targets:
         type: file
     dependencies:
       - sdk: FoundationModels.framework
+      - package: Sparkle
     info:
       path: Septask/Info-Mac.plist
       properties:
@@ -498,6 +505,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
         CFBundleIconFile: AppIcon
+        SUFeedURL: https://updates.centaur-labs.io/appcast.xml
+        SUPublicEDKey: $(SPARKLE_PUBLIC_ED_KEY)
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUAutomaticallyUpdate: false
         NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
         NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
         NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.

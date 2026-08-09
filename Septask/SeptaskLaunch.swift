@@ -16,6 +16,7 @@ enum SeptaskLaunch {
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
     ClaudeReconnectNudge.shared.start()
+    SeptaskDiagnosticsCoordinator.shared.start()
     Task { @MainActor in
       await ClaudeGatewayProvider.shared.refreshIfNeeded()
       ClaudeReconnectNudge.shared.reconcile()
@@ -39,6 +40,7 @@ enum SeptaskLaunch {
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
     ClaudeReconnectNudge.shared.activate()
+    SeptaskDiagnosticsCoordinator.shared.start()
     try? await services.ckEngine.fetchChanges()
     await ClaudeGatewayProvider.shared.refreshIfNeeded()
     ClaudeReconnectNudge.shared.reconcile()
@@ -73,6 +75,11 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     SeptaskKitQuickEntry.installHotKey()
     SeptaskKitWindowController.show()
+    // Sparkle starts scheduled checks when the controller is created. Local
+    // Debug builds intentionally have no update key and must not prompt.
+    #if !DEBUG
+    if SeptaskUpdater.isConfigured { _ = SeptaskUpdater.shared }
+    #endif
     Task { @MainActor in await SeptaskLaunch.run(settings: SeptaskMacRuntime.settings) }
   }
 

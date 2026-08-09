@@ -102,6 +102,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.reloadData()
   }
 
+  /// Refresh native sidebar cells and their width-dependent row heights after
+  /// the app-wide macOS text-size setting changes.
+  func refreshTextSize() {
+    outlineView.reloadData()
+    if outlineView.numberOfRows > 0 {
+      outlineView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<outlineView.numberOfRows))
+    }
+    outlineView.needsLayout = true
+  }
+
   override func loadView() {
     let column = NSTableColumn(identifier: .init("main"))
     outlineView.addTableColumn(column)
@@ -152,6 +162,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         MainActor.assumeIsolated { self?.rebuild(preserving: self?.selectedKey()) }
       })
     }
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaTextSizeDidChange, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshTextSize() }
+    })
   }
 
   deinit {
@@ -569,21 +584,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     cell.emoji.isHidden = true
     switch node.content {
     case .filter(let filter, let title, let symbol):
-      cell.textField?.font = SeptaskKitTheme.taskTitle
+      cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = title
       let tint: NSColor = filter == .today
         ? SeptaskKitTheme.todayAccent
         : SeptaskKitTheme.inkSecondary
       cell.imageView?.image = KitGlyph.colored(symbol: symbol, color: tint)
     case .next:
-      cell.textField?.font = SeptaskKitTheme.taskTitle
+      cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = "Next"
       cell.imageView?.image = KitGlyph.colored(symbol: "arrow.right",
                                               color: SeptaskKitTheme.inkSecondary)
     case .area(let area):
-      // Bold — an area is a section, the weight that distinguishes it from
-      // its own projects one level down.
-      cell.textField?.font = .boldSystemFont(ofSize: SeptaskKitTheme.taskTitle.pointSize)
+      // Areas share the same semibold navigation weight as smart lists and
+      // projects; structure is carried by indentation and the disclosure
+      // affordance rather than a heavy bold face.
+      cell.textField?.font = SeptaskKitTheme.sidebarTitle
       cell.textField?.stringValue = area.title
       if let emoji = area.emoji {
         cell.emoji.isHidden = false
@@ -593,6 +609,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         cell.imageView?.image = KitGlyph.areaDot()
       }
     case .project(let project, let progress):
+      // Nested projects stay at the regular task-title weight; the area
+      // label and top navigation carry the semibold hierarchy.
       cell.textField?.font = SeptaskKitTheme.taskTitle
       cell.textField?.stringValue = project.title
       cell.imageView?.image = KitGlyph.progress(progress)
@@ -667,7 +685,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       let text = NSTextField(labelWithString: "")
       text.translatesAutoresizingMaskIntoConstraints = false
       text.lineBreakMode = .byTruncatingTail
-      text.font = SeptaskKitTheme.taskTitle
+      text.font = SeptaskKitTheme.sidebarTitle
       text.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
       let image = NSImageView()
       image.translatesAutoresizingMaskIntoConstraints = false

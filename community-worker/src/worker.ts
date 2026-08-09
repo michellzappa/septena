@@ -8,7 +8,7 @@ import { profileResponse, setSupporterTier, updateProfile } from "./profile";
 import { createSupportTicket, getSupportTicket, listSupportTickets, postSupportMessage, setTicketStatus } from "./support";
 import { addComment, createFeature, getFeature, listFeatures, listPublicFeatures, moderateComment, setVote, updateFeature } from "./features";
 import { deleteMyTestimonial, getMyTestimonial, listPublicTestimonials, listTestimonials, moderateTestimonial, putMyTestimonial } from "./testimonials";
-import { ingestTelemetry } from "./telemetry";
+import { ingestTelemetry, ingestWeeklyDiagnostics, weeklyDiagnosticsPulse } from "./telemetry";
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -61,6 +61,17 @@ async function route(req: Request, env: Env): Promise<Response> {
 
     if (req.method === "POST" && path === "/api/telemetry") {
       return ingestTelemetry(env, req);
+    }
+
+    if (req.method === "POST" && path === "/api/telemetry/weekly") {
+      return ingestWeeklyDiagnostics(env, req);
+    }
+
+    if (req.method === "OPTIONS" && path === "/api/public/telemetry") {
+      return publicJson({ ok: true });
+    }
+    if (req.method === "GET" && path === "/api/public/telemetry") {
+      return weeklyDiagnosticsPulse(env);
     }
 
     // Sign in with Apple → a worker session token. The App-Attest substitute

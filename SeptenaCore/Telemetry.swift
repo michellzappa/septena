@@ -135,7 +135,14 @@ public actor TelemetryClient {
   private static let installIDKey = "septena.telemetry.installID"
   private static let pendingLevelKey = "septena.telemetry.pendingLevel"
   private static let sectionInventoryDateKey = "septena.telemetry.sectionInventoryDate"
+  private static let appOpenSentKey = "septena.telemetry.appOpenSent"
   private static let recentLogKey = "septena.telemetry.recentLog"
+
+  /// Minimum spacing between `app_open` events per install. `trackAppOpen` fires
+  /// on every foreground; across several devices that is enough traffic to burn
+  /// the Worker's daily KV write budget (each telemetry POST is rate-limited with
+  /// KV writes). One `app_open` per hour per install is plenty for app-health.
+  private static let appOpenInterval: TimeInterval = 3600
 
   private let session: URLSession
   private var lastSent: [String: Date] = [:]
@@ -154,7 +161,18 @@ public actor TelemetryClient {
   public func trackAppOpen() async {
     await flushPendingLevel()
     guard Self.allows(.appHealth) else { return }
-    _ = await send(event: .appOpen, screen: nil, section: nil, enabled: nil, sections: nil, level: Self.currentLevel())
+
+    // Throttle to at most one per hour per install. The in-memory `lastSent`
+    // map is useless here (it resets on the cold launch that triggers the
+    // foreground), so persist the timestamp in UserDefaults.
+    let defaults = UserDefaults.standard
+    let now = Date()
+    let last = defaults.object(forKey: Self.appOpenSentKey) as? Date
+    if let last, now.timeIntervalSince(last) < Self.appOpenInterval { return }
+
+    if await send(event: .appOpen, screen: nil, section: nil, enabled: nil, sections: nil, level: Self.currentLevel()) {
+      defaults.set(now, forKey: Self.appOpenSentKey)
+    }
   }
 
   public func track(screen: String) async {
@@ -201,6 +219,15 @@ public actor TelemetryClient {
   public func recordSectionUsed(section: String) async {
     await flushPendingLevel()
     guard Self.allows(.sectionUsage) else { return }
+
+    // Aggregate usage only needs coarse resolution — throttle repeated opens of
+    // the same section within a session so drawer re-opens don't each cost a
+    // telemetry POST (and its Worker-side KV writes).
+    let now = Date()
+    let key = "section-used:\(section)"
+    if let last = lastSent[key], now.timeIntervalSince(last) < Self.appOpenInterval { return }
+    lastSent[key] = now
+
     _ = await send(event: .sectionUsed,
                    screen: nil,
                    section: section,
