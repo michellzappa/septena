@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1564,
-      "date": "2026-08-09",
+      "build": 1567,
+      "date": "2026-08-10",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Introducing Septask, a focused task app",
-          "detail": "A new companion app for Mac, iPhone, and iPad that shows only your tasks, sharing the same private data as Septena with its own widgets and watch app.",
+          "title": "Septask, a focused task app, joins the family",
+          "detail": "A new lightweight app for iPhone, Mac, and Apple Watch shows just your tasks, sharing the same private data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks, attachments, and easy recovery",
-          "detail": "Completing a recurring task now creates its next occurrence automatically, tasks can carry attachments, and deleted tasks can be restored for 30 days.",
+          "title": "Tasks gain recurring auto-repeat, Things import, and attachments",
+          "detail": "Completing a recurring task creates its next occurrence automatically, you can import tasks from a Things export, and tasks now support photo and file attachments.",
           "section": "tasks"
         },
         {
-          "title": "Calendar events and better organization in task lists",
-          "detail": "Calendar events now appear alongside tasks in Today and Upcoming, and tasks can be filed by drag-and-drop under project headings with a redesigned date picker.",
+          "title": "Recover deleted tasks for 30 days",
+          "detail": "A Recently Deleted view lets you restore or permanently purge removed tasks before they age out.",
           "section": "tasks"
         },
         {
-          "title": "Import tasks from Things",
-          "detail": "Bring over your existing Things database, including headings mapped to project sections.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a photo of a meal and Septena analyzes and prefills the nutrition details, and re-logged meals can now be scaled by a percentage.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Smarter strength training sessions",
-          "detail": "The rest timer now auto-advances with a watch Live Activity, sets get one-tap progression hints, and sessions have editable start and end times.",
+          "title": "Training sessions get a smarter editor",
+          "detail": "New progression hints, editable start and end times, and an auto-advancing rest timer make logging a session faster.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Keep favorite goals visible on the week dashboard, with suggested goals now offered for chores, gut, habits, medications, mood, and supplements.",
+          "title": "Log meals by photo",
+          "detail": "Take a picture of your food and Septena analyzes it on-device to prefill your meal, with support for re-logging at a scaled amount.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Goals get suggestions and can be pinned to your dashboard",
+          "detail": "Suggested goals now appear across chores, gut, habits, medications, mood, supplements, and symptoms, and any goal can be pinned to your week dashboard.",
           "section": "goals"
         },
         {
-          "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy screen shows a full checklist of what's shared at each analytics level, plus a recent-activity log, and opting out is now anonymous.",
+          "title": "See exactly what data leaves your device",
+          "detail": "A new privacy view shows your telemetry level and a log of what was recently sent, with a one-tap way to opt out.",
           "section": null
+        },
+        {
+          "title": "Copy your grocery list with one tap",
+          "detail": null,
+          "section": "groceries"
         }
       ]
     },
