@@ -73,7 +73,11 @@ enum SeptaskMacRuntime {
 @MainActor
 final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
-    SeptaskKitQuickEntry.installHotKey()
+    // Global ⌃Space hotkey disabled for now — it contends with Moom's own
+    // ⌃Space binding system-wide (mz uses that combo for Moom). Quick Entry
+    // is still reachable via the Window ▸ Quick Entry menu item, just without
+    // a keyboard shortcut. Re-enable with SeptaskKitQuickEntry.installHotKey()
+    // once a non-conflicting key is picked.
     SeptaskKitWindowController.show()
     // Sparkle starts scheduled checks when the controller is created. Local
     // Debug builds intentionally have no update key and must not prompt.
