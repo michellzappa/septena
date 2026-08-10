@@ -76,6 +76,30 @@ async function lookupRecord(
 
 // ---- Schemas (one-to-one with the CLI repo) ----
 
+/**
+ * Repeat rule shared by `tasks_create` and `tasks_update`. Mirrors the app's
+ * own `Recurrence` JSON (`unit` / `interval` / `after_completion`), so a rule
+ * set from chat is byte-identical to one set in the repeat picker. Nullable so
+ * an update can clear it.
+ *
+ * LOCKSTEP: septena/SeptenaCore/MCP/MCPToolCatalog.swift `recurrenceSchema`.
+ */
+export const recurrenceJsonSchema = {
+  type: ["object", "null"],
+  description:
+    "Repeat rule. Completing the task generates the next occurrence. after_completion=true counts the interval from the day you tick it off (\"every 3 days after completion\"); false counts from the previous scheduled date, which is what keeps a weekly task on its weekday (\"every Monday\") and REQUIRES the task to have a scheduled date. Pass null to clear an existing rule.",
+  required: ["unit"],
+  properties: {
+    unit: { type: "string", enum: ["day", "week", "month"] },
+    interval: { type: "integer", minimum: 1, default: 1, description: "Every N units. 1 = daily/weekly/monthly." },
+    after_completion: {
+      type: "boolean",
+      default: true,
+      description: "Anchor: true = from completion, false = from the previous scheduled date.",
+    },
+  },
+} as const;
+
 export const createTaskJsonSchema = {
   type: "object",
   required: ["title"],
@@ -87,6 +111,7 @@ export const createTaskJsonSchema = {
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
     project: { type: "string", description: "Project id (e.g. 'septena')" },
     notes: { type: "string", description: "Free-text note body for the task." },
+    recurrence: recurrenceJsonSchema,
     origin: {
       type: "string",
       enum: ["user_request", "agent_suggestion"],
@@ -115,6 +140,7 @@ export const updateTaskJsonSchema = {
     project: { type: ["string", "null"] },
     status: { type: "string", enum: ["open", "cancelled"] },
     notes: { type: ["string", "null"], description: 'Free-text note body, or null/"" to clear' },
+    recurrence: recurrenceJsonSchema,
   },
 } as const;
 
@@ -140,6 +166,7 @@ export interface CreateTaskInput {
   area?: string;
   project?: string;
   notes?: string;
+  recurrence?: RecurrenceInput | null;
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -160,6 +187,71 @@ export interface UpdateTaskInput {
   project?: string | null;
   status?: "open" | "cancelled";
   notes?: string | null;
+  recurrence?: RecurrenceInput | null;
+}
+
+/** Wire form of a repeat rule. `afterCompletion` is accepted as an alias for
+ *  `after_completion`: a model guessing the camelCase spelling would otherwise
+ *  silently get the OPPOSITE anchor. */
+export interface RecurrenceInput {
+  unit?: string;
+  interval?: number;
+  after_completion?: boolean;
+  afterCompletion?: boolean;
+}
+
+/**
+ * Decodes and validates a wire repeat rule. Throws rather than dropping a
+ * malformed one: a repeat the caller believes it set, that silently never
+ * landed, is the worst outcome here — the task just quietly stops coming back.
+ *
+ * `scheduled` is the date the task will have AFTER this call. A fixed rule
+ * (`after_completion: false`) has nothing to anchor to without one and would
+ * degrade into an after-completion rule, so it is rejected instead.
+ *
+ * LOCKSTEP: septena/SeptenaCore/MCP/MCPDispatch.swift `recurrenceArg`.
+ */
+export function parseRecurrenceInput(
+  raw: RecurrenceInput | null | undefined,
+  scheduled: string | null | undefined,
+): { unit: string; interval: number; afterCompletion: boolean } | null {
+  if (raw === null) return null;          // explicit clear
+  if (raw === undefined) return null;
+  const unit = String(raw.unit ?? "");
+  if (unit !== "day" && unit !== "week" && unit !== "month") {
+    throw new Error("recurrence.unit must be one of: day, week, month");
+  }
+  const interval = raw.interval === undefined ? 1 : Number(raw.interval);
+  if (!Number.isInteger(interval) || interval < 1) {
+    throw new Error("recurrence.interval must be 1 or greater");
+  }
+  const afterCompletion = raw.after_completion ?? raw.afterCompletion ?? true;
+  if (!afterCompletion && !scheduled) {
+    throw new Error(
+      "recurrence.after_completion=false anchors on the task's scheduled date, " +
+        "so the task needs one. Set 'scheduled' in this same call, or use " +
+        "after_completion=true to count from the completion day instead.",
+    );
+  }
+  return { unit, interval, afterCompletion };
+}
+
+/** CloudKit field triple for a rule (or the cleared form when null). */
+function recurrenceFields(
+  rule: { unit: string; interval: number; afterCompletion: boolean } | null,
+): Record<string, { value: unknown }> {
+  if (!rule) {
+    return {
+      recurrenceUnit: { value: "" },
+      recurrenceInterval: { value: 1 },
+      recurrenceAfterCompletion: { value: 1 },
+    };
+  }
+  return {
+    recurrenceUnit: { value: rule.unit },
+    recurrenceInterval: { value: rule.interval },
+    recurrenceAfterCompletion: { value: rule.afterCompletion ? 1 : 0 },
+  };
 }
 
 // ---- Implementations ----
@@ -167,6 +259,9 @@ export interface UpdateTaskInput {
 export async function createTask(client: CloudKitClient, input: CreateTaskInput) {
   await validateContainer(client, "area", input.area);
   await validateContainer(client, "project", input.project);
+  // Validate the rule BEFORE creating anything, so a bad repeat can't leave a
+  // stray non-recurring task behind.
+  const createRule = parseRecurrenceInput(input.recurrence, input.scheduled);
   const id = newTaskId();
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
@@ -192,6 +287,7 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   // Plaintext field (Web Services can't see the encrypted `notes`; the app
   // reads `notesText` first, same pattern as project notes).
   if (input.notes) fields.notesText = { value: input.notes };
+  if (createRule) Object.assign(fields, recurrenceFields(createRule));
 
   // createWithFieldFallback drops unknown fields and retries, so this is safe
   // to ship before the CloudKit prod schema learns source/sourceClient/createdAt
@@ -209,11 +305,20 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   // Signals exactly when the prod schema catches up: a non-empty list here
   // (containing source/sourceClient/createdAt) means provenance isn't sticking yet.
   const placement = committed ? "committed" : "inbox_proposal";
+  const echo = createRule
+    ? {
+        recurrence: {
+          unit: createRule.unit,
+          interval: createRule.interval,
+          after_completion: createRule.afterCompletion,
+        },
+      }
+    : {};
   if (droppedFields.length > 0) {
     logEvent("task_create_dropped_fields", { id, droppedFields });
-    return { id, title: input.title, placement, droppedFields };
+    return { id, title: input.title, placement, ...echo, droppedFields };
   }
-  return { id, title: input.title, placement };
+  return { id, title: input.title, placement, ...echo };
 }
 
 export async function completeTask(client: CloudKitClient, input: { id: string }) {
@@ -400,6 +505,23 @@ export async function updateTask(client: CloudKitClient, input: UpdateTaskInput)
   // notes → plaintext `notesText`; null/"" writes an empty string (clear),
   // matching the in-app server's clear-on-empty semantics.
   if (input.notes !== undefined) { fields.notesText = { value: input.notes ?? "" }; updated.push("notes"); }
+  // Recurrence last, so it validates against the schedule this call may have
+  // just set. Present-with-null clears; absent leaves the rule alone.
+  if (input.recurrence !== undefined) {
+    let effectiveScheduled: string | null | undefined = input.scheduled;
+    const wantsFixedAnchor =
+      input.recurrence !== null &&
+      (input.recurrence.after_completion ?? input.recurrence.afterCompletion ?? true) === false;
+    // Only pay for a read when the rule actually needs an anchor and this call
+    // didn't supply one — everything else stays a blind forceUpdate.
+    if (wantsFixedAnchor && effectiveScheduled === undefined) {
+      const existing = await lookupRecord(client, input.id);
+      effectiveScheduled = (existing?.scheduled?.value as string | undefined) || null;
+    }
+    const rule = parseRecurrenceInput(input.recurrence, effectiveScheduled);
+    Object.assign(fields, recurrenceFields(rule));
+    updated.push("recurrence");
+  }
 
   if (updated.length === 0) return { id: input.id, updated: [] };
 

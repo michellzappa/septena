@@ -51,6 +51,22 @@ interface TaskOut {
   // Row shape: "heading" = a project section divider, not a to-do. Filtered out
   // of every view below (mirrors iOS TaskEntity.isHeading). Absent = task.
   kind?: string;
+  // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
+  // round-trips into a write unchanged.
+  recurrence?: { unit: string; interval: number; after_completion: boolean };
+}
+
+/** Reads the three CloudKit recurrence columns back into the wire shape. */
+function recurrenceOut(
+  fields: Record<string, { value: unknown } | undefined>,
+): { unit: string; interval: number; after_completion: boolean } | undefined {
+  const unit = optionalString(fields.recurrenceUnit?.value);
+  if (!unit) return undefined;
+  return {
+    unit,
+    interval: Number(fields.recurrenceInterval?.value ?? 1) || 1,
+    after_completion: Number(fields.recurrenceAfterCompletion?.value ?? 1) !== 0,
+  };
 }
 
 // Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
@@ -103,6 +119,7 @@ export async function listTasks(
     acknowledgedAt: optionalNumber(r.fields.acknowledgedAt?.value),
     createdAt: optionalNumber(r.fields.createdAt?.value),
     kind: optionalString(r.fields.kind?.value),
+    recurrence: recurrenceOut(r.fields),
   }));
 
   // Project headings (section dividers) are not to-dos — drop them from every

@@ -55,6 +55,7 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
 - **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, deadline, today, completedAt, source, notes, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - **`notes`** — the task's free-text body. Readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` (pass `notes`; on update, `null`/`""` clears it). This is the plain note field, distinct from the structured `TaskConvo` (artifact/handoff/thread) below.
+- **`recurrence`** — the repeat rule, readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` as `{unit: "day"|"week"|"month", interval: N, after_completion: bool}` (on update, `null` clears it). `after_completion: true` (the default) counts the interval from the day the task is ticked off — use it for "every 3 days" phrasing with no anchor day. `after_completion: false` counts from the previous scheduled date, which is what keeps a named weekday on its weekday ("every Monday"); it REQUIRES the task to have a `scheduled` date and errors without one. Getting this backwards silently converts a fixed weekly task into one that drifts every time the user is late.
 - `tasks_complete` on a **recurring** task also creates its next occurrence and returns it as `nextOccurrence` — say when the task comes back, don't send the user to the app. If the result carries a `recurrenceWarning`, the task was still completed but the series didn't advance; relay that rather than claiming the next one is scheduled.
 - Resolve `area`/`project` names → ids via `tasks_list_areas` / `tasks_list_projects` before creating/updating.
 
@@ -135,6 +136,13 @@ tasks_create(title: "X", today: true)
 
 # "Schedule X for tomorrow"
 tasks_create(title: "X", scheduled: "<tomorrow>")
+
+**"remind me to write the newsletter every Monday"**
+```
+tasks_create(title: "Write newsletter",
+             scheduled: "<the next Monday, YYYY-MM-DD>",
+             recurrence: {unit: "week", interval: 1, after_completion: false})
+```
   → "Queued to sort, proposed for tomorrow."
 
 # "What haven't I sorted yet?"

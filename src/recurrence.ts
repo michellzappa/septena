@@ -48,11 +48,20 @@ function addDays(p: CivilDate, n: number): CivilDate {
 // Swift's Calendar clamps a month overflow (Jan 31 + 1 month = Feb 28/29).
 // Plain JS `setMonth` rolls over into the following month instead (Mar 3), so
 // the clamp is explicit here.
-function addMonths(p: CivilDate, n: number): CivilDate {
+//
+// `keepMonthEnd` mirrors the Swift `advance(_:by:_:_:keepMonthEnd:)` parameter.
+// Clamping ALONE makes a fixed monthly rule decay: Jan 31 clamps to Feb 28, the
+// next occurrence re-anchors on that stored date, and the series then walks
+// Mar 28 → Apr 28 and never returns to month-end. Snapping a last-day-of-month
+// anchor to the target month's last day keeps the chain stable
+// (Jan 31 → Feb 28 → Mar 31 → Apr 30).
+function addMonths(p: CivilDate, n: number, keepMonthEnd: boolean): CivilDate {
   const total = p.y * 12 + (p.m - 1) + n;
   const y = Math.floor(total / 12);
   const m = ((total % 12) + 12) % 12 + 1;
-  return { y, m, d: Math.min(p.d, daysInMonth(y, m)) };
+  const dim = daysInMonth(y, m);
+  if (keepMonthEnd && p.d === daysInMonth(p.y, p.m)) return { y, m, d: dim };
+  return { y, m, d: Math.min(p.d, dim) };
 }
 
 function toComparable(p: CivilDate): number {
@@ -87,6 +96,12 @@ export function nextScheduledDate(input: {
   const anchor = input.rule.afterCompletion ? completed : (scheduled ?? completed);
   const step = Math.max(1, input.rule.interval);
 
+  // Month-end is preserved only on a FIXED schedule, where the anchor is the
+  // previous scheduled date and the error compounds. An after-completion rule
+  // anchors on whatever day the box was ticked, so snapping there would invent
+  // a month-end intent the user never expressed. LOCKSTEP with Swift.
+  const keepMonthEnd = !input.rule.afterCompletion;
+
   const advance = (p: CivilDate): CivilDate | null => {
     switch (input.rule.unit) {
       case "day":
@@ -94,7 +109,7 @@ export function nextScheduledDate(input: {
       case "week":
         return addDays(p, step * 7);
       case "month":
-        return addMonths(p, step);
+        return addMonths(p, step, keepMonthEnd);
       default:
         return null;
     }
