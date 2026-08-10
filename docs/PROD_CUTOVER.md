@@ -38,6 +38,15 @@ release verification + new testers. The **MCP gateway stays on Development** too
 
 ## Phase 1 — Register the missing schema fields in Development
 
+**Phase 1a (do FIRST — schema is NOT frozen).** This checklist was written
+2026-07-03; feature work since then added schema. Re-reconcile before trusting the
+Phase-2 deploy list: run the code-vs-doc diff so `docs/CloudKitSchema.md` is a
+complete **superset** of every record type/field the current code writes. Known
+additions since the plan (verify there are no others): **`TaskAttachment`** (whole
+new record type), **`position`** on Area/Project, **`endedAt`** on training
+entries. Any new type/field must ride the same Phase-2 deploy or its writes fail
+silently in Prod.
+
 Production is stricter than Dev: fields the debug build never *wrote* were never
 auto-registered in the Dev schema, and Prod won't auto-create them → silent write
 failures. `SchemaSeedRegistrar` (committed, wired at `App.swift:394`, `#if DEBUG`)
