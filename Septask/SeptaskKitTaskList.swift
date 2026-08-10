@@ -974,7 +974,17 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Apply a repeat rule to the selection (menu bar + context menu).
   func setRecurrence(_ rule: Recurrence?) {
     for task in actionableSelection {
-      mutator.setRecurrence(id: task.id, recurrence: rule)
+      // Every repeat menu in the AppKit shell picks unit + interval only, so
+      // carry each row's OWN anchor mode across the change. Resetting it to the
+      // menu's default silently rewrote a fixed "every Monday" into "a week
+      // after you tick the box" — and multi-select makes it per task, which is
+      // why this resolves here rather than at the menu.
+      let resolved = rule.map {
+        Recurrence(unit: $0.unit,
+                   interval: $0.interval,
+                   afterCompletion: task.recurrence?.afterCompletion ?? $0.afterCompletion)
+      }
+      mutator.setRecurrence(id: task.id, recurrence: resolved)
     }
     reload()
     onStoreChanged?()
@@ -1871,7 +1881,9 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuClearSchedule() { clearScheduleSelection() }
 
   @objc private func menuSetRecurrence(_ sender: NSMenuItem) {
-    setRecurrence(KitRecurrenceMenu.recurrence(for: sender))
+    // `preserving: nil` on purpose — setRecurrence resolves the anchor mode
+    // per selected row, which is the only correct answer for a multi-selection.
+    setRecurrence(KitRecurrenceMenu.recurrence(for: sender, preserving: nil))
   }
   @objc private func menuDelete() { deleteSelection() }
 }
@@ -2430,6 +2442,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let chip = KitChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
+  private let repeatGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
@@ -2484,9 +2497,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
     scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-    // Trailing cluster: notes marker, list chip, date — in that reading order,
-    // each hidden when it has nothing to say.
-    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail])
+    // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
+    // glyph view rather than a "↻" concatenated onto the date string — per the
+    // DesignSpec, a glyph is a view, never baked into a formatted label.
+    repeatGlyph.translatesAutoresizingMaskIntoConstraints = false
+    repeatGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    repeatGlyph.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath",
+                                accessibilityDescription: TaskA11y.recurring)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    repeatGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    repeatGlyph.kitA11yIgnore()
+
+    // Trailing cluster: notes marker, list chip, date, repeat — in that reading
+    // order, each hidden when it has nothing to say. Repeat sits outboard of the
+    // date to match the SwiftUI row's trailing order.
+    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail, repeatGlyph])
     trailing.orientation = .horizontal
     trailing.spacing = 6
     trailing.translatesAutoresizingMaskIntoConstraints = false
@@ -2635,12 +2661,17 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     detail.textColor = SeptaskKitTheme.iconMuted
     detail.stringValue = ""
     detail.isHidden = true
+    // Independent of every date branch below. It used to ride the date string,
+    // so a recurring task scheduled TODAY and viewed in Today — the exact state
+    // a weekly task is in on its own day — hit the branch that hides the date
+    // and lost its repeat marker entirely.
+    repeatGlyph.isHidden = task.recurrence == nil
 
     if done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
       guard !day.isEmpty else { return }
       configureScheduleGlyph(named: "checkmark", color: SeptaskKitTheme.iconMuted)
-      detail.stringValue = detailText(KitDayFormat.taskDate(day), task: task)
+      detail.stringValue = KitDayFormat.taskDate(day)
       detail.isHidden = false
       return
     }
@@ -2653,10 +2684,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
         detail.font = .monospacedDigitSystemFont(
           ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
         detail.textColor = SeptaskKitTheme.overdueRed
-        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+        detail.stringValue = KitDayFormat.taskDate(deadline)
       } else {
         configureScheduleGlyph(named: "flag.fill", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+        detail.stringValue = KitDayFormat.taskDate(deadline)
       }
       detail.isHidden = false
       return
@@ -2671,17 +2702,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       // all scheduled dates on other surfaces remain visible.
       if filter != .today || scheduledDay > todayDay {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = detailText(KitDayFormat.taskDate(scheduled), task: task)
+        detail.stringValue = KitDayFormat.taskDate(scheduled)
         detail.isHidden = false
       }
-    } else if task.recurrence != nil {
-      detail.stringValue = "↻"
-      detail.isHidden = false
     }
-  }
-
-  private func detailText(_ date: String, task: SeptenaTask) -> String {
-    task.recurrence == nil ? date : "\(date)  ↻"
   }
 
   private func configureScheduleGlyph(named name: String, color: NSColor) {

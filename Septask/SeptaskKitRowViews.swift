@@ -350,14 +350,23 @@ enum KitRecurrenceMenu {
     return menu
   }
 
-  static func recurrence(for item: NSMenuItem) -> Recurrence? {
-    guard choices.indices.contains(item.tag) else { return nil }
-    return choices[item.tag].rule
+  /// The rule a menu row writes. `preserving` carries the task's CURRENT
+  /// anchor mode through a cadence change: this menu only picks unit +
+  /// interval, so without it, re-picking "Weekly" on a fixed-schedule task
+  /// silently rewrote "every Monday" into "a week after you tick the box" —
+  /// a semantic change the user never asked for and can't see.
+  static func recurrence(for item: NSMenuItem, preserving current: Recurrence?) -> Recurrence? {
+    guard choices.indices.contains(item.tag), let rule = choices[item.tag].rule else { return nil }
+    return Recurrence(unit: rule.unit,
+                      interval: rule.interval,
+                      afterCompletion: current?.afterCompletion ?? rule.afterCompletion)
   }
 
   /// Which row represents a task's current rule — an interval this menu
   /// doesn't offer falls back to "Never" showing unselected rather than
-  /// silently mislabeling the task.
+  /// silently mislabeling the task. Anchor mode is deliberately NOT part of
+  /// the match: both modes render as "Weekly" here, and `recurrence(for:)`
+  /// preserves whichever the task already had.
   static func index(of recurrence: Recurrence?) -> Int {
     guard let recurrence else { return 0 }
     return choices.firstIndex {

@@ -58,6 +58,51 @@ import Foundation
     ) == "2026-08-22")
   }
 
+  /// A fixed monthly rule anchored on month-end used to decay: `byAdding:
+  /// .month` clamps Jan 31 → Feb 28, and because the next occurrence re-anchors
+  /// on the stored date it then walked Mar 28 → Apr 28 forever.
+  @Test func fixedMonthlyKeepsMonthEndAcrossTheChain() {
+    var scheduled = "2026-01-31"
+    var walked: [String] = []
+    for _ in 0..<4 {
+      let next = RecurrenceDateCalculator.nextDate(
+        completedOn: scheduled, scheduled: scheduled,
+        unit: "month", interval: 1, afterCompletion: false
+      )
+      guard let next else { break }
+      walked.append(next)
+      scheduled = next
+    }
+    #expect(walked == ["2026-02-28", "2026-03-31", "2026-04-30", "2026-05-31"])
+  }
+
+  /// Mid-month days are untouched by the month-end rule.
+  @Test func fixedMonthlyKeepsAnOrdinaryDayOfMonth() {
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-01-15", scheduled: "2026-01-15",
+      unit: "month", interval: 1, afterCompletion: false
+    ) == "2026-02-15")
+  }
+
+  /// After-completion anchors on whatever day the box was ticked, so month-end
+  /// snapping must NOT apply — it would invent an intent the user never set.
+  @Test func afterCompletionMonthlyDoesNotSnapToMonthEnd() {
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-02-28", scheduled: nil,
+      unit: "month", interval: 1, afterCompletion: true
+    ) == "2026-03-28")
+  }
+
+  /// A fixed weekly rule keeps its weekday no matter how late it is completed.
+  @Test func fixedWeeklyKeepsItsWeekday() {
+    // 2026-08-03 is a Monday; completed three weeks late, still lands Monday.
+    let next = RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-08-22", scheduled: "2026-08-03",
+      unit: "week", interval: 1, afterCompletion: false
+    )
+    #expect(next == "2026-08-24")
+  }
+
   @Test func producesStableOccurrenceIDs() {
     let first = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")
     let second = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")

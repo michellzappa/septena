@@ -41,57 +41,29 @@ struct TasksWatchWire: Codable, Equatable, Sendable {
   }
 }
 
-/// Watch targets intentionally do not compile the full task model. Keep the
-/// small recurrence calculation here so direct watch CloudKit completion uses
-/// the same date and id rules as the phone backend.
+/// Watch targets intentionally do not compile the full task model, but they DO
+/// write completions straight to CloudKit — so the date and id rules must be
+/// the phone's, byte for byte. These forward to `RecurrenceDateCalculator`
+/// (`SeptenaCore/DateParser.swift`, compiled into both watch targets); this
+/// used to be a hand-copied second implementation, which is exactly how the
+/// two surfaces drift apart on the next fix.
 enum TasksWatchRecurrence {
   static func nextDate(completedOn: String,
                        scheduled: String?,
                        unit: String,
                        interval: Int,
                        afterCompletion: Bool) -> String? {
-    let dateFormatter: DateFormatter = {
-      let f = DateFormatter()
-      f.dateFormat = "yyyy-MM-dd"
-      f.locale = Locale(identifier: "en_US_POSIX")
-      f.timeZone = TimeZone.current
-      return f
-    }()
-    guard let completedDate = dateFormatter.date(from: String(completedOn.prefix(10))) else {
-      return nil
-    }
-    let anchor = afterCompletion
-      ? completedDate
-      : (scheduled.flatMap { dateFormatter.date(from: String($0.prefix(10))) } ?? completedDate)
-    let component: Calendar.Component
-    switch unit {
-    case "day": component = .day
-    case "week": component = .weekOfYear
-    case "month": component = .month
-    default: return nil
-    }
-    let calendar = Calendar.current
-    guard var next = calendar.date(byAdding: component, value: max(1, interval), to: anchor) else {
-      return nil
-    }
-    if !afterCompletion {
-      while next <= completedDate {
-        guard let advanced = calendar.date(byAdding: component, value: max(1, interval), to: next) else {
-          return nil
-        }
-        next = advanced
-      }
-    }
-    return dateFormatter.string(from: next)
+    RecurrenceDateCalculator.nextDate(
+      completedOn: completedOn,
+      scheduled: scheduled,
+      unit: unit,
+      interval: interval,
+      afterCompletion: afterCompletion
+    )
   }
 
   static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
-    var hash: UInt64 = 14695981039346656037
-    for byte in "\(sourceTaskID)|\(scheduled)".utf8 {
-      hash ^= UInt64(byte)
-      hash = hash &* 1099511628211
-    }
-    return "recur-\(String(format: "%016llx", hash))"
+    RecurrenceDateCalculator.occurrenceID(sourceTaskID: sourceTaskID, scheduled: scheduled)
   }
 
   /// Copies the user-facing fields needed for a fresh Task occurrence. The
@@ -126,6 +98,20 @@ enum TasksWatchRecurrence {
     next["createdAt"] = createdAt as NSDate
     next["kind"] = source["kind"]
     next["heading"] = source["heading"]
+    // Manual order. The phone puts a generated occurrence at the top of the
+    // list (`TaskOrder.topPosition`), which needs the whole store — the wrist
+    // only has this one record. Placing it one gap above its OWN source is the
+    // closest local approximation and, critically, beats leaving `position`
+    // unset: 0 means "sort by createdAt", which buried every watch-generated
+    // occurrence at the BOTTOM while phone-generated ones went to the top.
+    // `gap` mirrors `TaskOrder.gap`.
+    let gap = 1024.0
+    let sourceKey: Double = {
+      if let p = source["position"] as? Double, p != 0 { return p }
+      if let created = source["createdAt"] as? Date { return created.timeIntervalSinceReferenceDate }
+      return 0
+    }()
+    next["position"] = sourceKey - gap
     return next
   }
 }

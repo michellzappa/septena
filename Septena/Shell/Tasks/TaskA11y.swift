@@ -25,6 +25,11 @@ enum TaskA11y {
            comment: "Task row trailing notes glyph")
   }
 
+  static var recurring: String {
+    String(localized: "Repeats",
+           comment: "Task row trailing recurrence glyph")
+  }
+
   // MARK: Checkbox
 
   /// Primary label for the row checkbox. Keeps the control short; state and

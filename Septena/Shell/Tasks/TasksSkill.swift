@@ -12,9 +12,9 @@ enum TasksSkill {
         SectionSkill.Tool("tasks_list",          "List by view. Inbox = unscheduled, untoday; today = pinned; upcoming = future-scheduled; anytime EXCLUDES inbox-only tasks",
               inputs: "optional: view (today|inbox|upcoming|anytime|completed), limit"),
         SectionSkill.Tool("tasks_create",        "New task. Without today/scheduled/deadline it lands in INBOX ONLY — invisible in today/anytime/upcoming. Set a routing field if the user expects to see it",
-              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field), notes (free-text body)"),
+              inputs: "required: title · optional: today (boolean — pins to Today), scheduled (YYYY-MM-DD — puts in upcoming), deadline (YYYY-MM-DD — hard date only, does NOT route into views), area (id, not a routing field), project (id, not a routing field), notes (free-text body), recurrence{unit(day|week|month), interval, after_completion}"),
         SectionSkill.Tool("tasks_update",        "Patch any subset. Pass null to clear scheduled/deadline/area/project/notes",
-              inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), deadline (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled), notes (free-text body, or null/\"\" to clear)"),
+              inputs: "required: id · optional: title, today, scheduled (YYYY-MM-DD or null), deadline (YYYY-MM-DD or null), area (id or null), project (id or null), status (open|cancelled), notes (free-text body, or null/\"\" to clear), recurrence{unit, interval, after_completion} or null to clear"),
         SectionSkill.Tool("tasks_complete",      "Mark done. Recurring tasks automatically get their next occurrence",
               inputs: "required: id"),
         SectionSkill.Tool("tasks_defer",         "Set scheduled date, clear today",
@@ -83,6 +83,19 @@ enum TasksSkill {
       tasks_create(title: "pick up groceries")
       → reply: "Added to your inbox."
       ```
+
+      **"Remind me to write the newsletter every Monday"**
+      ```
+      tasks_create(title: "Write newsletter",
+                   scheduled: "<the next Monday, YYYY-MM-DD>",
+                   recurrence: {unit: "week", interval: 1, after_completion: false})
+      ```
+      A named weekday means a FIXED schedule: `after_completion: false` anchors
+      the rule to the scheduled date, so it stays on Monday however late you tick
+      it off. It requires `scheduled` in the same call and errors without one.
+      Use the default `after_completion: true` only for "every N days/weeks"
+      phrasing with no anchor day ("water the plants every 3 days"), where the
+      clock should restart from the completion.
 
       **"Move my errands to Saturday"**
       ```

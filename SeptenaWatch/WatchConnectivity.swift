@@ -880,6 +880,10 @@ final class WatchConnectivity {
   private func saveTaskCompletion(taskID: String) async throws {
     let recordID = CKRecord.ID(recordName: taskID, zoneID: ckZoneID)
     guard let record = try? await db.record(for: recordID) else { return }
+    // Mirrors the phone's `TasksBackend.complete` guard: a completion can
+    // arrive twice (optimistic phone tap, then this write), and a terminal
+    // source row must never spawn a second occurrence.
+    guard (record["status"] as? String ?? "open") == "open" else { return }
     record["status"]      = "done"
     record["completedAt"] = Self.tsFmt.string(from: Date())
 
@@ -925,7 +929,9 @@ final class WatchConnectivity {
     guard let record = try? await db.record(for: recordID) else { return }
     record["status"]      = "cancelled"
     record["completedAt"] = Self.tsFmt.string(from: Date())
-    record["today"]       = 0
+    // Deliberately does NOT clear `today` — same as `TasksBackend.cancel`. The
+    // status guard already hides a cancelled task everywhere, so clearing the
+    // pin only destroys placement the user can never get back on un-cancel.
     try await db.save(record)
   }
 

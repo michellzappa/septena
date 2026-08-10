@@ -19,6 +19,16 @@ private let ckTimestampFormatter: DateFormatter = {
 }()
 private func ckServerTimestamp() -> String { ckTimestampFormatter.string(from: Date()) }
 
+/// Completion stamp on the app's clock rather than the system's. `complete`
+/// computes the next occurrence from `DayClock.appToday`, and `uncomplete`
+/// recomputes that occurrence's id from this stamp — if the two disagreed
+/// under time travel, undo would look for a task that was never created.
+/// Identical to `ckServerTimestamp()` in Release.
+@MainActor
+private func ckCompletionTimestamp() -> String {
+  ckTimestampFormatter.string(from: DayClock.appNow)
+}
+
 /// Friendly `sourceClient` label for app-authored writes — the native
 /// counterpart to the gateway's "Claude". Identifies which surface created
 /// the row; also the value that registers the `sourceClient` CloudKit field
@@ -100,7 +110,7 @@ final class CloudKitTasksBackend {
       id: id,
       title: entity.title,
       statusRaw: TaskStatus.open.rawValue,
-      created: SeptenaDate.today,
+      created: DayClock.appToday,
       scheduled: scheduled,
       // A deadline belongs to the completed occurrence. The generated task
       // gets its next scheduled date instead of inheriting an expired deadline.
@@ -296,12 +306,15 @@ final class CloudKitTasksBackend {
     // source row.
     guard entity.status == .open else { return }
     let recurrence = entity.recurrence
+    // `appToday`, not `SeptenaDate.today`: the next occurrence must be computed
+    // against the day the user is actually looking at, so time travel can
+    // exercise a repeat rule. In Release the two are identical.
     let nextDate = recurrence?.nextDate(
-      completedOn: SeptenaDate.today,
+      completedOn: DayClock.appToday,
       scheduled: entity.scheduled
     )
     entity.statusRaw = TaskStatus.done.rawValue
-    entity.completedAt = ckServerTimestamp()
+    entity.completedAt = ckCompletionTimestamp()
     // Do NOT clear `today` (or `scheduled`/`deadline`): every visibility test
     // (`isOnToday`, `isInTriageBand`) and every count site already gate on
     // `status == .open`, so a done task is invisible regardless of the pin.
@@ -320,10 +333,46 @@ final class CloudKitTasksBackend {
 
   func uncomplete(id: String) {
     guard let entity = fetch(id: id) else { return }
+    // Completing a recurring task spawns the next occurrence, so undoing the
+    // completion has to take that occurrence back — otherwise one mis-tap
+    // (or the undo button right beside it) permanently leaves TWO open rows:
+    // the restored source AND the generated instance, both recurring.
+    if let recurrence = entity.recurrence, let completedAt = entity.completedAt {
+      retractSpawnedOccurrence(source: entity,
+                               recurrence: recurrence,
+                               completedOn: String(completedAt.prefix(10)))
+    }
     entity.statusRaw = TaskStatus.open.rawValue
     entity.completedAt = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "uncomplete")
+  }
+
+  /// Removes the occurrence `complete` generated for this source — but only
+  /// while it is still pristine. Once the generated instance has been edited,
+  /// completed, or talked to, it is the user's data and an undo on the source
+  /// must not destroy it; the deterministic id means we can find it exactly,
+  /// so a skip here is a conscious no-op rather than a guess.
+  private func retractSpawnedOccurrence(source: TaskEntity,
+                                        recurrence: Recurrence,
+                                        completedOn: String) {
+    guard let scheduled = recurrence.nextDate(completedOn: completedOn,
+                                              scheduled: source.scheduled) else { return }
+    let spawnedID = Recurrence.occurrenceID(sourceTaskID: source.id, scheduled: scheduled)
+    guard let spawned = fetch(id: spawnedID) else { return }
+    let untouched = spawned.status == .open
+      && spawned.completedAt == nil
+      && spawned.deletedAt == nil
+      && !spawned.pendingDeletion
+      && spawned.conversationJSON == nil
+      && spawned.scheduled == scheduled
+      && spawned.title == source.title
+      && spawned.notes == source.notes
+    guard untouched else {
+      SeptenaLog.info("[CK] uncomplete id=\(source.id) — occurrence \(spawnedID) was touched, keeping it")
+      return
+    }
+    purge(id: spawnedID)
   }
 
   func cancel(id: String) {
