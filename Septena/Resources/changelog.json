@@ -4,60 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1570,
+      "build": 1576,
       "date": "2026-08-12",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Introducing Septask",
-          "detail": "A new companion app focused purely on tasks, with native macOS, iPhone, iPad, and watch support, sharing the same private data as Septena.",
+          "title": "Septask, a focused task app for Mac",
+          "detail": "A new AppKit-based task app for macOS with its own sidebar, navigation, and task views, built on the same Septena task data.",
           "section": "tasks"
         },
         {
-          "title": "Faster, more flexible task management",
-          "detail": "Inline title editing, drag-and-drop filing into project sections, task attachments, sharing, multi-select actions, recurring tasks that auto-create their next occurrence, and importing tasks from Things.",
+          "title": "Septask arrives on Apple Watch",
+          "detail": "A dedicated Septask watch app with a today-tasks complication.",
           "section": "tasks"
         },
         {
-          "title": "Redesigned date picker for tasks",
-          "detail": "Quick-pick pills and a calendar popover make scheduling and rescheduling tasks faster.",
+          "title": "Recurring tasks stay on schedule",
+          "detail": "Completing a recurring task now spawns its next occurrence, and fixed-schedule repeats keep their original recurrence date.",
           "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a photo of a meal and Septena analyzes it on-device to prefill nutrition details, with an optional ingredient breakdown.",
+          "title": "Add attachments and recover deleted tasks",
+          "detail": "Tasks can now carry attachments, and deleted tasks land in Recently Deleted with a 30-day window to restore them.",
+          "section": "tasks"
+        },
+        {
+          "title": "Import tasks from Things",
+          "detail": "Bring over your existing Things database, including project section headings.",
+          "section": "tasks"
+        },
+        {
+          "title": "Photo-first meal logging",
+          "detail": "Snap a photo of a meal and Septena analyzes it on-device to prefill nutrition details.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training guidance",
-          "detail": "Progression hints for your sets, editable session start/end times, and a reworked session editor.",
+          "title": "Smarter strength training sessions",
+          "detail": "Training sessions now support editable start and end times and one-tap progression hints on your sets.",
           "section": "training"
         },
         {
-          "title": "Sleep heatmap now shows nights on the correct day",
-          "detail": null,
-          "section": "sleep"
-        },
-        {
-          "title": "Copy your grocery list to the clipboard",
-          "detail": null,
-          "section": "groceries"
-        },
-        {
           "title": "Suggested goals across more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions to get you started.",
-          "section": null
-        },
-        {
-          "title": "Clearer privacy controls",
-          "detail": "See a graded telemetry ladder and a log of what's been sent, with an easy way to opt out.",
-          "section": null
-        },
-        {
-          "title": "More reliable Claude connection",
-          "detail": "Fixed cases where sign-in could hang and improved reconnect handling across devices.",
-          "section": null
+          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer suggested goals to get started faster.",
+          "section": "goals"
         }
       ]
     },
