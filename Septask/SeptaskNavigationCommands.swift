@@ -196,10 +196,10 @@ struct SeptaskCommandMenus: Commands {
         .keyboardShortcut("0", modifiers: .command)
       ClassicWindowCommand()
 
-      // Discoverability for the global hotkey; the Carbon registration is
-      // what actually fires when the app isn't frontmost.
+      // The global ⌃Space hotkey is disabled for now (conflicts with Moom —
+      // see SeptaskLaunch.swift), so this is click-only until a
+      // non-conflicting key is picked; no keyboard shortcut shown here.
       Button("Quick Entry") { SeptaskKitQuickEntry.show() }
-        .keyboardShortcut(" ", modifiers: .control)
       #endif
     }
 

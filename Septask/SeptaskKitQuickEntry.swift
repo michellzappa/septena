@@ -2,17 +2,19 @@
 import AppKit
 import Carbon.HIToolbox
 
-// Things-style Quick Entry for the AppKit shell: ⌃Space anywhere (while
-// Septask is running) floats a small capture panel without switching apps.
-// Return files the capture to the Inbox (the triage band — the app's one
-// home for loose captures); ⌘Return sends it straight to Today; Esc or
-// clicking away dismisses. Writes go through TaskMutator like every other
-// surface.
+// Things-style Quick Entry for the AppKit shell: floats a small capture
+// panel without switching apps. Return files the capture to the Inbox (the
+// triage band — the app's one home for loose captures); ⌘Return sends it
+// straight to Today; Esc or clicking away dismisses. Writes go through
+// TaskMutator like every other surface.
 //
 // The global hotkey uses the Carbon RegisterEventHotKey API — the sanctioned,
 // sandbox-safe mechanism every quick-entry app uses (no event monitors, no
-// accessibility permission). If Things is still running with its own ⌃Space
-// registration, the two contend; quitting Things resolves it.
+// accessibility permission) — but installHotKey() is currently NOT called
+// (see SeptaskLaunch.swift): ⌃Space also contends with Moom's own binding,
+// so the global shortcut is disabled for now and Quick Entry is reachable
+// only via the Window ▸ Quick Entry menu item. Pick a non-conflicting
+// key/modifier before re-enabling.
 @MainActor
 final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegate {
 
