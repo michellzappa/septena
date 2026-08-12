@@ -85,6 +85,30 @@ button's own frame, so a dead area can't advertise itself again.) Second,
 was sound; it isn't, because a bare custom `NSView` that draws itself IS hit
 normally — it's labels and images that get claimed.
 
+**The sidebar fold was a SECOND, unrelated bug** hiding behind the first, and
+it also had nothing to do with clicks. Measured in the same harness, an
+NSOutlineView with the Septask sidebar's settings:
+
+```
+shouldShowOutlineCellForItem = false  ->  collapseItem is a NO-OP
+                                          (isItemExpanded stays true, rows unchanged)
+shouldShowOutlineCellForItem = true   ->  collapses correctly
+```
+
+Suppressing the native outline cell — which this sidebar does to hide the
+triangle in favour of its own trailing chevron — opts the item out of
+expansion **entirely**, including programmatic `collapseItem`. So the fold
+could never have worked, whatever the chevron was made of. Rather than give
+up the Things-style trailing chevron for a native leading triangle, the fold
+now lives in the DATA: a folded area reports zero children from
+`numberOfChildrenOfItem`, every row stays permanently expanded in
+outline-view terms, and `collapsedKeys` (persisted) is the source of truth.
+Note the trap that follows from it: `isItemExpanded` is now always true, so
+the chevron direction and the didExpand/didCollapse handlers must read
+`collapsedKeys` instead — and those handlers must NOT record the fold, since
+the post-rebuild `expandItem(nil, expandChildren: true)` fires didExpand for
+every node and would wipe every fold.
+
 **House rule, now with evidence behind it: every click target in a
 table/outline cell is a real `NSButton`.** No gesture recognizers, no
 hand-tracked `mouseDown`/`mouseUp`, no `hitTest` overrides. Still unconverted
