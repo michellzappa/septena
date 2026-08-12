@@ -138,16 +138,20 @@ enum SeptaskKitTheme {
 }
 
 /// Content column geometry — Things-style: rows don't stretch edge-to-edge on
-/// a wide window, they float in a centered column with proportional gutters
-/// rather than a fixed pixel cap. The margin is ~`marginFraction` of the
-/// container's width on each side, clamped to `[minInset, maxInset]` — narrow
-/// windows keep a small fixed gutter (the fraction alone would be too tight
-/// to read), very wide windows stop the column from thinning out forever.
+/// a wide window, they float in a centered column with proportional left/right
+/// gutters rather than a fixed pixel cap. The horizontal margin is
+/// ~`marginFraction` of the container's width on each side, clamped to
+/// `[minInset, maxInset]`. Top/bottom scroll breathing room is a fixed
+/// `verticalInset` — tying it to the side margin made the header/footer gap
+/// swell on wide windows and read as broken.
 @MainActor
 enum SeptaskKitLayout {
   static let marginFraction: CGFloat = 0.10
   static let minInset: CGFloat = 10
   static let maxInset: CGFloat = 220
+  /// Top/bottom `NSScrollView.contentInsets` — fixed so the list doesn't
+  /// grow a taller header band as the window widens (sides still flex).
+  static let verticalInset: CGFloat = 16
 
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {

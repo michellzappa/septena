@@ -3744,6 +3744,9 @@
         }
       }
     },
+    "Give the task a date to repeat on a fixed schedule." : {
+
+    },
     "Glum" : {
       "localizations" : {
         "pt-BR" : {

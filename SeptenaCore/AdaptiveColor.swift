@@ -107,6 +107,46 @@ enum AdaptiveColor {
     return hslToRGB(hsl)
   }
 
+  // MARK: - Solid-fill contrast (accent CTAs)
+
+  /// Near-black label on a light solid fill. Matches the light-mode side of
+  /// `Theme.listSelectedInk` — full white fails on yellow/lime/amber slabs
+  /// (e.g. `#d6f249` ≈ 1.3:1, `#aacc00` ≈ 1.9:1, palette lime `#84cc16` ≈ 2.0:1).
+  static let solidFillDarkInk = Color.black.opacity(0.88)
+
+  /// Minimum WCAG contrast for white ink on a solid button fill. 3:1 is large-
+  /// text / UI-component AA — prominent button labels qualify; body AA (4.5:1)
+  /// would force yellows into olive and erase section identity.
+  static let whiteInkMinContrast = 3.0
+
+  /// Label ink that contrasts against a solid `fill`. Prefer this over hard-
+  /// coded `.white` on hand-rolled accent CTAs — light yellows/limes need
+  /// dark ink; deep earth tones keep white.
+  static func inkOnSolidFill(_ fill: Color) -> Color {
+    prefersDarkInk(on: fill) ? solidFillDarkInk : .white
+  }
+
+  /// `true` when black ink contrasts better than white against `fill`.
+  static func prefersDarkInk(on fill: Color) -> Bool {
+    guard let rgb = resolve(fill) else { return false }
+    let l = relativeLuminance(rgb)
+    let whiteContrast = (1.0 + 0.05) / (l + 0.05)
+    let blackContrast = (l + 0.05) / 0.05
+    return blackContrast > whiteContrast
+  }
+
+  /// Darken `fill` (preserving hue) until white ink clears `whiteInkMinContrast`.
+  /// Use as `.tint(...)` on `.glassProminent` / `.borderedProminent`, which force
+  /// white labels and cannot pick dark ink. No-op when the fill already passes.
+  /// Remapping every light accent to a fixed chartreuse (`#aacc00`) is wrong —
+  /// that swatch still fails white ink; darken in-place instead.
+  static func fillForWhiteInk(_ fill: Color) -> Color {
+    guard let rgb = resolve(fill) else { return fill }
+    if contrastAgainstWhite(rgb) >= whiteInkMinContrast { return fill }
+    let darkened = darkenedForWhiteInk(rgb, minContrast: whiteInkMinContrast)
+    return Color(red: darkened.r, green: darkened.g, blue: darkened.b)
+  }
+
   // MARK: - Token parsing
 
   private static func unpack(_ hex: UInt32) -> RGB {
@@ -154,6 +194,58 @@ enum AdaptiveColor {
       .compactMap { Double($0) }
     guard nums.count >= 3 else { return nil }
     return RGB(r: nums[0] / 255, g: nums[1] / 255, b: nums[2] / 255)
+  }
+
+  // MARK: - Luminance / contrast
+
+  /// Resolve a SwiftUI `Color` to sRGB components in the *current* appearance.
+  /// Dynamic/`AdaptiveColor` values evaluate to whichever variant is showing.
+  private static func resolve(_ color: Color) -> RGB? {
+    #if os(macOS)
+    guard let srgb = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+    return RGB(r: srgb.redComponent, g: srgb.greenComponent, b: srgb.blueComponent)
+    #else
+    let ui = UIColor(color)
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    if ui.getRed(&r, green: &g, blue: &b, alpha: &a) {
+      return RGB(r: Double(r), g: Double(g), b: Double(b))
+    }
+    guard let converted = ui.cgColor.converted(
+      to: CGColorSpaceCreateDeviceRGB(), intent: .defaultIntent, options: nil),
+          let c = converted.components, c.count >= 3
+    else { return nil }
+    return RGB(r: Double(c[0]), g: Double(c[1]), b: Double(c[2]))
+    #endif
+  }
+
+  private static func relativeLuminance(_ c: RGB) -> Double {
+    func lin(_ v: Double) -> Double {
+      v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+  }
+
+  private static func contrastAgainstWhite(_ c: RGB) -> Double {
+    (1.0 + 0.05) / (relativeLuminance(c) + 0.05)
+  }
+
+  /// Binary-search a scale toward black until white-ink contrast clears the bar.
+  private static func darkenedForWhiteInk(_ base: RGB, minContrast: Double) -> RGB {
+    // Scale RGB toward black. t=1 is the authored fill; t=0 is black.
+    // Keep the lightest t that still clears white-ink contrast.
+    var lo = 0.0, hi = 1.0
+    var best = RGB(r: 0, g: 0, b: 0)
+    for _ in 0..<12 {
+      let t = (lo + hi) / 2
+      let candidate = RGB(r: base.r * t, g: base.g * t, b: base.b * t)
+      if contrastAgainstWhite(candidate) >= minContrast {
+        best = candidate
+        lo = t
+      } else {
+        hi = t
+      }
+    }
+    return best
   }
 
   // MARK: - HSL ⇄ RGB

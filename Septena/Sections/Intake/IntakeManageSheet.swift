@@ -76,7 +76,7 @@ struct IntakeManageSheet: View {
             Image(systemName: s)
               .font(.title3)
               .frame(width: 38, height: 38)
-              .foregroundStyle(symbol == s ? Color.white : Color.primary)
+              .foregroundStyle(symbol == s ? AdaptiveColor.inkOnSolidFill(AdaptiveColor.adaptive(color) ?? .accentColor) : Color.primary)
               .background(symbol == s ? (AdaptiveColor.adaptive(color) ?? .accentColor) : Color.secondary.opacity(0.12),
                           in: RoundedRectangle(cornerRadius: 9))
               .onTapGesture {

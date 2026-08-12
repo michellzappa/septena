@@ -433,6 +433,12 @@ enum KitMoveMenu {
 /// The grouped-card surface the SwiftUI list draws its rows on: white card,
 /// gray page behind, rounded only at the ends of a run of rows. Selection
 /// draws inside the card so the highlight can't overhang it.
+///
+/// Contiguous multi-selection is its OWN rounding run, independent of the
+/// card group: square where selected rows meet, rounded at the ends of the
+/// selection. Using the card-group flags for selection (the old path) left
+/// every selected row fully rounded — the scalloped "kissing circles" look
+/// at each selected-row junction.
 @MainActor
 final class KitCardRowView: NSTableRowView {
   /// Seed value other cells use for their leading/trailing constraint
@@ -446,41 +452,41 @@ final class KitCardRowView: NSTableRowView {
   var isFirstInGroup = true
   var isLastInGroup = true
 
-  /// The row's own inset rect — fully rounded on all 4 corners via the
-  /// proven `NSBezierPath(roundedRect:)` API.
-  private func cardPath() -> NSBezierPath {
-    let rect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
-    return NSBezierPath(roundedRect: rect, xRadius: Self.corner, yRadius: Self.corner)
-  }
+  /// Contiguous selected neighbors on the same card. The list controller
+  /// refreshes these on every selection change (and in `rowViewForRow`) so a
+  /// row that was the end of a selection run re-squares when the next row
+  /// joins it — `drawSelection` alone would leave the old rounded end stale.
+  var joinsSelectedAbove = false
+  var joinsSelectedBelow = false
 
-  /// Small same-color squares that "fill in" the rounded notch at corners
-  /// that should read as SQUARE instead — a middle row's top corners (it
-  /// joins the row above) and/or bottom corners (joins the row below).
-  ///
-  /// Deliberately NOT the previous technique (over-extend `cardPath`'s rect
-  /// past this row's own bounds so the far corners land outside the row's
-  /// clip and get cut off): that depended on this row's clip boundary and
-  /// the ADJACENT row's clip boundary landing on the exact same pixel, and
-  /// any sub-pixel mismatch between two independently-drawn, independently
-  /// -antialiased row views showed up as a visible seam or stray notch right
-  /// at the row boundary — precisely the "corner roundedness is buggy" look.
-  /// Patches are self-contained to THIS row's own drawing, so there is
-  /// nothing left for a neighbor row's rounding to misalign with.
-  private func squareCornerPatches() -> [NSRect] {
-    let rect = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
-    var patches: [NSRect] = []
-    if !isFirstInGroup {
-      patches.append(NSRect(x: rect.minX, y: rect.minY, width: Self.corner, height: Self.corner))
-      patches.append(NSRect(x: rect.maxX - Self.corner, y: rect.minY,
-                            width: Self.corner, height: Self.corner))
+  /// The inline composer is open on this row. Things drops the blue selection
+  /// wash while editing — the expanded row stays on the white card so the
+  /// title reads as integrated text, not a selected cell with a field on top.
+  var isComposing = false
+
+  /// Uneven rounded rect for a card/selection slice. A fully-joined slice
+  /// (both ends square) is a plain rect — exact edge, no antialiased curve
+  /// for a neighbor to disagree with. One-sided joins over-extend the square
+  /// end past this row's bounds so that corner falls outside the clip;
+  /// `NSTableRowView` is flipped (minY = top), so "join above" extends
+  /// origin.y upward.
+  private func slicePath(roundTop: Bool, roundBottom: Bool) -> NSBezierPath {
+    let inset = bounds.insetBy(dx: SeptaskKitLayout.inset(for: bounds.width), dy: 0)
+    if !roundTop && !roundBottom {
+      return NSBezierPath(rect: inset)
     }
-    if !isLastInGroup {
-      patches.append(NSRect(x: rect.minX, y: rect.maxY - Self.corner,
-                            width: Self.corner, height: Self.corner))
-      patches.append(NSRect(x: rect.maxX - Self.corner, y: rect.maxY - Self.corner,
-                            width: Self.corner, height: Self.corner))
+    if roundTop && roundBottom {
+      return NSBezierPath(roundedRect: inset, xRadius: Self.corner, yRadius: Self.corner)
     }
-    return patches
+    var rect = inset
+    if !roundTop {
+      rect.origin.y -= Self.corner
+      rect.size.height += Self.corner
+    }
+    if !roundBottom {
+      rect.size.height += Self.corner
+    }
+    return NSBezierPath(roundedRect: rect, xRadius: Self.corner, yRadius: Self.corner)
   }
 
   override func drawBackground(in dirtyRect: NSRect) {
@@ -491,14 +497,15 @@ final class KitCardRowView: NSTableRowView {
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
     SeptaskKitTheme.cardSurface.setFill()
-    cardPath().fill()
-    for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
+    slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
     NSGraphicsContext.restoreGraphicsState()
   }
 
   override func drawSelection(in dirtyRect: NSRect) {
-    guard isCard, selectionHighlightStyle != .none else {
-      super.drawSelection(in: dirtyRect)
+    // Composer owns the row's surface — suppress the accent wash so the title
+    // sits on white card, not on a selected-cell fill (Things parity).
+    guard isCard, !isComposing, selectionHighlightStyle != .none else {
+      if !isCard { super.drawSelection(in: dirtyRect) }
       return
     }
     NSGraphicsContext.saveGraphicsState()
@@ -507,8 +514,9 @@ final class KitCardRowView: NSTableRowView {
     // See `SeptaskKitTheme.listSelectionFill(emphasized:)` — cannot use
     // `.selectedContentBackgroundColor` (follows the app's ink AccentColor).
     SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
-    cardPath().fill()
-    for patch in squareCornerPatches() { NSBezierPath(rect: patch).fill() }
+    // Selection-run rounding, not card-group: a mid-card multi-select still
+    // wants one continuous capsule, rounded only at its own ends.
+    slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
     NSGraphicsContext.restoreGraphicsState()
   }
 

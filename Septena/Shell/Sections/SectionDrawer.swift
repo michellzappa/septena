@@ -242,13 +242,10 @@ struct DrawerModeToggle: View {
         .accessibilityLabel(mode == .log ? "Show patterns" : "Show log")
     }
     // Identical to the trailing "+" (`DrawerActionButton`): the toolbar floats a
-    // bare `.glassProminent` circle, the full accent `.tint` fills it, and the
-    // style auto-contrasts the glyph to white. The drawer is bookended by two
-    // matching accent circles — switch on the left, add on the right. (A neutral
-    // circle with a colored glyph isn't reachable through the toolbar's glass
-    // styles, so we mirror the "+" rather than fight it.)
+    // bare `.glassProminent` circle, `.tint` fills it, and the style forces a
+    // white glyph — so light accents go through `fillForWhiteInk`.
     .buttonStyle(.glassProminent)
-    .tint(accent)
+    .tint(AdaptiveColor.fillForWhiteInk(accent))
   }
 }
 
@@ -710,7 +707,10 @@ struct DrawerActionButton: View {
     }
     .keyboardShortcut("n", modifiers: .command)
     .buttonStyle(.glassProminent)
-    .tint(accent)
+    // `.glassProminent` forces a white glyph — darken light accents (lime/yellow)
+    // so white clears large-text AA instead of washing toward an unreadable
+    // chartreuse. Hand-rolled CTAs use `inkOnSolidFill` and keep the authored hue.
+    .tint(AdaptiveColor.fillForWhiteInk(accent))
   }
 }
 

@@ -317,7 +317,7 @@ struct TrainingDestinationView: View {
           Text("Open").font(.subheadline.weight(.semibold))
         }
         .buttonStyle(.borderedProminent)
-        .tint(accent)
+        .tint(AdaptiveColor.fillForWhiteInk(accent))
         Button(role: .destructive) {
           draftStore.discard()
         } label: {
@@ -2903,7 +2903,7 @@ struct TrainingExerciseEditorBody: View {
               .contentShape(Rectangle())
           }
           .buttonStyle(.borderedProminent)
-          .tint(accent)
+          .tint(AdaptiveColor.fillForWhiteInk(accent))
           .disabled(entry.status == .saving)
           .containerRelativeFrame(.horizontal) { length, _ in length * 0.66 }
           Spacer(minLength: 0)

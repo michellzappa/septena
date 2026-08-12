@@ -173,7 +173,7 @@ struct DatePickerSheet: View {
           } label: {
             Text("\(initialDate == nil ? setLabel : updateLabel) · \(Self.setDateFmt.string(from: date))")
               .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(.white)
+              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
               .lineLimit(1)
               .minimumScaleFactor(0.8)
               .frame(maxWidth: .infinity)
@@ -321,7 +321,7 @@ struct RecurrencePickerSheet: View {
           } label: {
             Text(initial == nil ? "Set Repeat" : "Update Repeat")
               .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(.white)
+              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
               .background(theme.accent)

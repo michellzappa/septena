@@ -58,7 +58,7 @@ struct RemindersImportView: View {
       } label: {
         Text("Grant Access")
           .font(.septenaButton)
-          .foregroundStyle(.white)
+          .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
           .frame(maxWidth: .infinity)
           .padding(.vertical, 12)
           .background(theme.accent, in: RoundedRectangle(cornerRadius: Theme.cornerRadius))
