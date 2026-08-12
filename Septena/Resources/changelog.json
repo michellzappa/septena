@@ -4,50 +4,60 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1567,
-      "date": "2026-08-10",
+      "build": 1570,
+      "date": "2026-08-12",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, joins the family",
-          "detail": "A new lightweight app for iPhone, Mac, and Apple Watch shows just your tasks, sharing the same private data as Septena.",
+          "title": "Introducing Septask",
+          "detail": "A new companion app focused purely on tasks, with native macOS, iPhone, iPad, and watch support, sharing the same private data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Tasks gain recurring auto-repeat, Things import, and attachments",
-          "detail": "Completing a recurring task creates its next occurrence automatically, you can import tasks from a Things export, and tasks now support photo and file attachments.",
+          "title": "Faster, more flexible task management",
+          "detail": "Inline title editing, drag-and-drop filing into project sections, task attachments, sharing, multi-select actions, recurring tasks that auto-create their next occurrence, and importing tasks from Things.",
           "section": "tasks"
         },
         {
-          "title": "Recover deleted tasks for 30 days",
-          "detail": "A Recently Deleted view lets you restore or permanently purge removed tasks before they age out.",
+          "title": "Redesigned date picker for tasks",
+          "detail": "Quick-pick pills and a calendar popover make scheduling and rescheduling tasks faster.",
           "section": "tasks"
         },
         {
-          "title": "Training sessions get a smarter editor",
-          "detail": "New progression hints, editable start and end times, and an auto-advancing rest timer make logging a session faster.",
-          "section": "training"
-        },
-        {
-          "title": "Log meals by photo",
-          "detail": "Take a picture of your food and Septena analyzes it on-device to prefill your meal, with support for re-logging at a scaled amount.",
+          "title": "Photo-based meal logging",
+          "detail": "Snap a photo of a meal and Septena analyzes it on-device to prefill nutrition details, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Goals get suggestions and can be pinned to your dashboard",
-          "detail": "Suggested goals now appear across chores, gut, habits, medications, mood, supplements, and symptoms, and any goal can be pinned to your week dashboard.",
-          "section": "goals"
+          "title": "Smarter strength training guidance",
+          "detail": "Progression hints for your sets, editable session start/end times, and a reworked session editor.",
+          "section": "training"
         },
         {
-          "title": "See exactly what data leaves your device",
-          "detail": "A new privacy view shows your telemetry level and a log of what was recently sent, with a one-tap way to opt out.",
+          "title": "Sleep heatmap now shows nights on the correct day",
+          "detail": null,
+          "section": "sleep"
+        },
+        {
+          "title": "Copy your grocery list to the clipboard",
+          "detail": null,
+          "section": "groceries"
+        },
+        {
+          "title": "Suggested goals across more sections",
+          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions to get you started.",
           "section": null
         },
         {
-          "title": "Copy your grocery list with one tap",
-          "detail": null,
-          "section": "groceries"
+          "title": "Clearer privacy controls",
+          "detail": "See a graded telemetry ladder and a log of what's been sent, with an easy way to opt out.",
+          "section": null
+        },
+        {
+          "title": "More reliable Claude connection",
+          "detail": "Fixed cases where sign-in could hang and improved reconnect handling across devices.",
+          "section": null
         }
       ]
     },
