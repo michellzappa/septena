@@ -321,7 +321,7 @@ struct CoachChatView: View {
         HStack(spacing: 8) {
           Button { accept(action) } label: { Text("Add").fontWeight(.semibold) }
             .buttonStyle(.borderedProminent)
-            .tint(domain.accent)
+            .tint(AdaptiveColor.fillForWhiteInk(domain.accent))
           Button { dismissedActions.insert(action.id) } label: { Text("Dismiss") }
             .buttonStyle(.bordered)
         }

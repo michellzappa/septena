@@ -143,7 +143,7 @@ struct SessionCompleteSheet: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(accent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .foregroundStyle(.white)
+            .foregroundStyle(AdaptiveColor.inkOnSolidFill(accent))
         }
         .buttonStyle(.plain)
       }

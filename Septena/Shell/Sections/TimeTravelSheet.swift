@@ -121,7 +121,7 @@ struct TimeTravelSheet: View {
           } label: {
             Text("View This Day")
               .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(.white)
+              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
               .background(theme.accent)

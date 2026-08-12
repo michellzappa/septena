@@ -172,7 +172,7 @@ struct ThingsImportView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(theme.accent)
+        .tint(AdaptiveColor.fillForWhiteInk(theme.accent))
 
         Button("Choose a different file") {
           reset()

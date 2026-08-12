@@ -111,7 +111,7 @@ private struct SeptaskWelcomeView: View {
           .padding(.vertical, 6)
       }
       .buttonStyle(.borderedProminent)
-      .tint(theme.color(for: "tasks"))
+      .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
       .padding(20)
     }
   }

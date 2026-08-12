@@ -41,7 +41,10 @@ struct DiscoveryPrimaryAction: View {
         .contentShape(Capsule())
     }
     .buttonStyle(.plain)
-    .foregroundStyle(disabled ? Color.secondary : Color.white)
+    // Light accents (lime/yellow/amber) fail WCAG with white ink — pick ink from
+    // the fill. System glass can wash a lime toward `#d6f249`; dark ink stays
+    // readable there, white does not.
+    .foregroundStyle(disabled ? Color.secondary : AdaptiveColor.inkOnSolidFill(accent))
     .background(disabled ? Color.secondary.opacity(0.16) : accent, in: Capsule())
     #if os(iOS)
     .glassEffect(.regular.tint(disabled ? Color.clear : accent.opacity(0.42)).interactive(), in: .capsule)

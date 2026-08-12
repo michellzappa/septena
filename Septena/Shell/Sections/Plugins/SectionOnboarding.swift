@@ -224,7 +224,7 @@ struct SectionOnboarding<Item: Identifiable, Extra: View>: View {
         Button(confirmTitle) { confirm() }
           .buttonStyle(.borderedProminent)
           .controlSize(.large)
-          .tint(accent)
+          .tint(AdaptiveColor.fillForWhiteInk(accent))
           .frame(maxWidth: .infinity)
           .padding()
           .background(.bar)

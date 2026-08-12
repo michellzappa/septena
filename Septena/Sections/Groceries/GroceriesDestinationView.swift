@@ -126,6 +126,7 @@ struct GroceriesDestinationView: View {
         } actions: {
           Button("Add item") { creating = true }
             .buttonStyle(.borderedProminent)
+            .tint(AdaptiveColor.fillForWhiteInk(accent))
         }
       }
     }

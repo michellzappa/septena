@@ -105,7 +105,7 @@ struct ActivityDestinationView: View {
           Task { _ = await bridge.requestAccess() }
         }
         .buttonStyle(.borderedProminent)
-        .tint(accent)
+        .tint(AdaptiveColor.fillForWhiteInk(accent))
       }
     }
   }
