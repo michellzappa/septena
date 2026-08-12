@@ -192,18 +192,54 @@ enum RecurrenceDateCalculator {
     }
     let step = max(1, interval)
     let calendar = Calendar.current
-    guard var next = calendar.date(byAdding: component, value: step, to: anchor) else {
+    // Month-end is only preserved on a FIXED schedule, where the anchor is the
+    // previous scheduled date and the error compounds. An after-completion rule
+    // anchors on whatever day you happened to tick the box, so snapping there
+    // would invent a month-end intent the user never expressed.
+    let keepMonthEnd = !afterCompletion
+    guard var next = advance(anchor, by: step, component, calendar, keepMonthEnd: keepMonthEnd) else {
       return nil
     }
     if !afterCompletion {
+      // A task scheduled long ago (or a corrupt date) must not spin here.
+      var guardRail = 0
       while next <= completedDate {
-        guard let advanced = calendar.date(byAdding: component, value: step, to: next) else {
+        guardRail += 1
+        guard guardRail <= 10_000,
+              let advanced = advance(next, by: step, component, calendar, keepMonthEnd: keepMonthEnd) else {
           return nil
         }
         next = advanced
       }
     }
     return formatter.string(from: next)
+  }
+
+  /// Adds `step` units to `date`.
+  ///
+  /// For month steps this preserves a month-end anchor: `byAdding: .month`
+  /// alone clamps Jan 31 → Feb 28, and because the next occurrence re-anchors
+  /// on that stored date the rule then walks Mar 28 → Apr 28 and never returns
+  /// to month-end. Snapping a last-day-of-month anchor to the last day of the
+  /// target month makes the chain stable (Jan 31 → Feb 28 → Mar 31 → Apr 30).
+  /// The trade-off is deliberate: a fixed monthly rule anchored on Feb 28 is
+  /// read as "month-end", because the repeat picker offers no day-of-month.
+  private static func advance(_ date: Date,
+                              by step: Int,
+                              _ component: Calendar.Component,
+                              _ calendar: Calendar,
+                              keepMonthEnd: Bool) -> Date? {
+    guard let next = calendar.date(byAdding: component, value: step, to: date) else { return nil }
+    guard component == .month, keepMonthEnd, isLastDayOfMonth(date, calendar),
+          let range = calendar.range(of: .day, in: .month, for: next) else { return next }
+    var parts = calendar.dateComponents([.year, .month, .day], from: next)
+    parts.day = range.upperBound - 1
+    return calendar.date(from: parts) ?? next
+  }
+
+  private static func isLastDayOfMonth(_ date: Date, _ calendar: Calendar) -> Bool {
+    guard let range = calendar.range(of: .day, in: .month, for: date) else { return false }
+    return calendar.component(.day, from: date) == range.upperBound - 1
   }
 
   static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {

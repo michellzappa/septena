@@ -173,7 +173,7 @@ struct DatePickerSheet: View {
           } label: {
             Text("\(initialDate == nil ? setLabel : updateLabel) · \(Self.setDateFmt.string(from: date))")
               .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(.white)
+              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
               .lineLimit(1)
               .minimumScaleFactor(0.8)
               .frame(maxWidth: .infinity)
@@ -222,6 +222,10 @@ struct DatePickerSheet: View {
 struct RecurrencePickerSheet: View {
   @Environment(SectionTheme.self) private var theme
   let initial: Recurrence?
+  /// A fixed-schedule rule anchors on the task's scheduled date. Without one it
+  /// silently degrades into an after-completion rule, so the toggle is held ON
+  /// and explained rather than offering a choice that doesn't do what it says.
+  var hasScheduledDate: Bool = true
   let onPick: (Recurrence?) -> Void
   @Environment(\.dismiss) private var dismiss
 
@@ -235,6 +239,16 @@ struct RecurrencePickerSheet: View {
     _unit = State(initialValue: initial?.unit ?? .day)
     _interval = State(initialValue: initial?.interval ?? 1)
     _afterCompletion = State(initialValue: initial?.afterCompletion ?? true)
+  }
+
+  init(initial: Recurrence?, hasScheduledDate: Bool, onPick: @escaping (Recurrence?) -> Void) {
+    self.initial = initial
+    self.hasScheduledDate = hasScheduledDate
+    self.onPick = onPick
+    _unit = State(initialValue: initial?.unit ?? .day)
+    _interval = State(initialValue: initial?.interval ?? 1)
+    // With no date the effective anchor IS completion — show what will happen.
+    _afterCompletion = State(initialValue: hasScheduledDate ? (initial?.afterCompletion ?? true) : true)
   }
 
   var body: some View {
@@ -284,8 +298,19 @@ struct RecurrencePickerSheet: View {
           }
         }
         .tint(theme.accent)
+        .disabled(!hasScheduledDate)
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 18)
+
+        if !hasScheduledDate {
+          Text("Give the task a date to repeat on a fixed schedule.")
+            .font(.caption)
+            .foregroundStyle(Theme.inkSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.hPadding)
+            .padding(.top, 8)
+        }
 
         Spacer()
 
@@ -296,7 +321,7 @@ struct RecurrencePickerSheet: View {
           } label: {
             Text(initial == nil ? "Set Repeat" : "Update Repeat")
               .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(.white)
+              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
               .frame(maxWidth: .infinity)
               .padding(.vertical, 14)
               .background(theme.accent)

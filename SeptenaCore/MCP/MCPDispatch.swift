@@ -405,6 +405,7 @@ enum MCPDispatch {
     if let v = e.completedAt { out["completedAt"] = v }
     if let v = e.source { out["source"] = v }
     if let v = e.notes { out["notes"] = v }
+    if let v = e.recurrence { out["recurrence"] = recurrenceJSON(v) }
     let c = e.conversation
     var convo: [String: Any] = [
       "turns": c.thread.count,
@@ -439,17 +440,59 @@ enum MCPDispatch {
       }
     }()
     let m = SeptenaServices.shared.taskMutator
+    let scheduled = try args.date("scheduled")
+    // Validate the rule BEFORE creating anything, so a bad repeat doesn't leave
+    // a stray non-recurring task behind.
+    let rule = try recurrenceArg(args, scheduled: scheduled.flatMap(SeptenaDate.format))
     let t = m.create(
       title: try args.requireString("title"),
       area: args.string("area"), project: args.string("project"),
-      scheduled: try args.date("scheduled"),
+      scheduled: scheduled,
       deadline: try args.date("deadline") ?? args.date("due"),
       today: args.bool("today") ?? false,
       notes: args.string("notes"),
       source: TaskSource.mcp)
+    if let rule { m.setRecurrence(id: t.id, recurrence: rule) }
     if !proposed { m.acknowledge(id: t.id) }
-    return ["id": t.id, "title": t.title,
-            "placement": proposed ? "inbox_proposal" : "committed"]
+    var out: [String: Any] = ["id": t.id, "title": t.title,
+                              "placement": proposed ? "inbox_proposal" : "committed"]
+    if let rule { out["recurrence"] = recurrenceJSON(rule) }
+    return out
+  }
+
+  /// Wire form of a repeat rule — the same keys `tasks_create`/`tasks_update`
+  /// accept, so a read round-trips into a write unchanged.
+  private static func recurrenceJSON(_ r: Recurrence) -> [String: Any] {
+    ["unit": r.unit.rawValue, "interval": r.interval, "after_completion": r.afterCompletion]
+  }
+
+  /// Decodes a wire repeat rule. Throws rather than dropping a malformed one:
+  /// a repeat the caller believes it set, that silently never landed, is the
+  /// worst outcome here — the task just quietly stops coming back.
+  ///
+  /// `scheduled` is the date the task will have AFTER this call. A fixed rule
+  /// (`after_completion: false`) has nothing to anchor to without one and would
+  /// degrade into an after-completion rule, so it's rejected instead.
+  private static func recurrenceArg(_ args: MCPArgs, scheduled: String?) throws -> Recurrence? {
+    guard let raw = args.object("recurrence") else { return nil }
+    let r = MCPArgs(raw)
+    guard let unit = r.string("unit").flatMap(Recurrence.Unit.init(rawValue:)) else {
+      throw MCPError.badArgument("recurrence.unit must be one of: day, week, month")
+    }
+    let interval = r.int("interval") ?? 1
+    guard interval >= 1 else {
+      throw MCPError.badArgument("recurrence.interval must be 1 or greater")
+    }
+    // Accept the snake_case wire name and the Swift-style spelling — an agent
+    // guessing the latter should not silently get the opposite anchor.
+    let afterCompletion = r.bool("after_completion") ?? r.bool("afterCompletion") ?? true
+    if !afterCompletion, scheduled == nil {
+      throw MCPError.badArgument(
+        "recurrence.after_completion=false anchors on the task's scheduled date, "
+        + "so the task needs one. Set 'scheduled' in this same call, or use "
+        + "after_completion=true to count from the completion day instead.")
+    }
+    return Recurrence(unit: unit, interval: interval, afterCompletion: afterCompletion)
   }
 
   /// Reject writes that point a task at an `area`/`project` id with no matching
@@ -503,7 +546,21 @@ enum MCPDispatch {
       m.update(id: id, notes: args.string("notes") ?? "")
       updated.append("notes")
     }
+    // Last, so it validates against the schedule this call may have just set.
+    // Present-but-null clears the rule; absent leaves it alone.
+    if args.present("recurrence") {
+      let rule = try recurrenceArg(args, scheduled: scheduledOf(id))
+      m.setRecurrence(id: id, recurrence: rule)
+      updated.append("recurrence")
+    }
     return ["id": id, "updated": updated]
+  }
+
+  /// The task's scheduled date as currently stored — read after the other
+  /// updates land so a rule set in the same call sees the new date.
+  private static func scheduledOf(_ id: String) -> String? {
+    let desc = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    return (try? ctx.fetch(desc).first)?.scheduled
   }
 
   // MARK: - Task Conversations (docs/TASK_CONVERSATIONS_PHASE0.md)
@@ -657,6 +714,7 @@ enum MCPDispatch {
     if let p = t.project { out["project"] = p }
     if let c = t.completedAt { out["completedAt"] = c }
     if let n = t.notes { out["notes"] = n }
+    if let r = t.recurrence { out["recurrence"] = recurrenceJSON(r) }
     return out
   }
 

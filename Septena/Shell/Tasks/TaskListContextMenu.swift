@@ -82,7 +82,8 @@ struct TaskListModalPresenter: ViewModifier {
         .presentationCornerRadius(Theme.cornerRadius)
       }
       .sheet(isPresented: $showingRepeatSheet) {
-        RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId)) { rule in
+        RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId),
+                              hasScheduledDate: currentScheduled(repeatTargetId) != nil) { rule in
           if let id = repeatTargetId {
             applyRecurrence(id, rule)
           }

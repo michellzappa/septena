@@ -54,6 +54,7 @@
 		07F54D0DB13468114771FD91 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
 		081791BB8FFC09A58075E284 /* CommunityAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93F4E9CCFCE85AEF36B4C6AF /* CommunityAuth.swift */; };
 		082C2AA06B7AFCDF5EE65A8E /* MCPProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97752A8BAEC96E4F0C0B406 /* MCPProtocol.swift */; };
+		08546E2A980E2BAA6D254686 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		08688B496C6793BE8D96A59E /* IntakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87BCED8C3D11E7E122FA79C /* IntakePlugin.swift */; };
 		08C104B6530C0C2A3AF29FBA /* MacroWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3DB688522E2EB3B5330CDE /* MacroWidgetSnapshotStore.swift */; };
 		08D579E91C1A7B51A8F51AEE /* CoachVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41CEBC3677C82F8744114F96 /* CoachVoice.swift */; };
@@ -667,6 +668,7 @@
 		68A43C6FAD298BA30C7D905C /* ThingsImportApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */; };
 		68C67CEEEBEDD5091EE53BD4 /* CoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B86C3DEC61DA049EAC677E /* CoachView.swift */; };
 		68FEC658F37E69C0360A47D5 /* NextComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = C27BE273FD1D064942278AD1 /* NextComplication.swift */; };
+		69030C4693661207707D8859 /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
 		694FA326F02773E0158DC824 /* SkyAtmosphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3795310A060A418D32730BFA /* SkyAtmosphere.swift */; };
 		69B47DFE8D824BE6EDE19A50 /* ReadwiseProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDD6712980758E093BBE9E4 /* ReadwiseProvider.swift */; };
 		69BFF74C1A9BE3280CF48E0E /* BodyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC1153D56644D5B54CAFCFD /* BodyPlugin.swift */; };
@@ -1096,6 +1098,7 @@
 		AF4A021FAEC2C8221EC04AAB /* SkillCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83240595543A18730CCF71A0 /* SkillCopy.swift */; };
 		AF54170275CCBA1FC2D00774 /* SeptenaSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0C66C7087C68B74B1D57760 /* SeptenaSceneDelegate.swift */; };
 		AF5A77B5B730923A825F7C89 /* Outbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD295FAB7B881CAC43EE8C34 /* Outbox.swift */; };
+		AF8B76F87F7F1226E2A62BFC /* TasksWatchWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BC3E1673BA9289B29884918 /* TasksWatchWire.swift */; };
 		AF9AEC8D052F74DF449FE64F /* MacScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B337452F1AC0089640636D00 /* MacScreenshotTests.swift */; };
 		AFF482673D403B4586924B8A /* MacroWidgetBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CD4D07B80BB911D322899A9 /* MacroWidgetBuilder.swift */; };
 		AFFF470AFDBCA864958A9F57 /* TrainingPRCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE7BD5841409D69626291279 /* TrainingPRCalculator.swift */; };
@@ -1868,7 +1871,7 @@
 		3882D64DF6517B0447F5F65C /* TasksBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksBackend.swift; sourceTree = "<group>"; };
 		38951C4CD8077FBCC4FD6D14 /* ScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTests.swift; sourceTree = "<group>"; };
 		39261AEAACE14E6C8A503DFE /* OnboardingTargetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingTargetsView.swift; sourceTree = "<group>"; };
-		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39E8BE393381A7D49657D3C0 /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3ABBB43C070E15FD1C2F6120 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		3B662C803101D7F26F47EBE6 /* TrainingTargetMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingTargetMigration.swift; sourceTree = "<group>"; };
 		3B9559BEC76161CBDBE76A10 /* TaskConvo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskConvo.swift; sourceTree = "<group>"; };
@@ -1952,11 +1955,11 @@
 		56D46EB2B5D44183C0600DCF /* SymptomsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymptomsPlugin.swift; sourceTree = "<group>"; };
 		58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDraft.swift; sourceTree = "<group>"; };
 		5835F104E8DFAA668ACCF9A5 /* Fasting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fasting.swift; sourceTree = "<group>"; };
-		59055370ABA84DB912D64D1E /* SeptenaMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptaskMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		59055370ABA84DB912D64D1E /* Septena.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septena.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		594D306ECD44EA64FBBBCA85 /* Septask.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		59A88F76E4A01B4157081C37 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		5A180DB4658590D42B413003 /* TrainingSessionSpansTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionSpansTests.swift; sourceTree = "<group>"; };
-		5B1A7318866C182841EFEC7B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		5B1A7318866C182841EFEC7B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventRow.swift; sourceTree = "<group>"; };
 		5B49A0D20B2ECD672137900F /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5B607B2041EC629B65EAF216 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -2026,8 +2029,8 @@
 		7704DE3A742E53715F1667F4 /* TaskPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPatternsSection.swift; sourceTree = "<group>"; };
 		779B9966F458332BD097F8AE /* SelectionLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionLanguage.swift; sourceTree = "<group>"; };
 		77BD26CAAAC746043C2B1D6D /* VirtueFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtueFlowView.swift; sourceTree = "<group>"; };
-		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		77BEB26345A68838167042D8 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		78BD3A7769358CC755D5E3E3 /* CoachContextBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachContextBuilder.swift; sourceTree = "<group>"; };
 		792CC5DC9E3C1EE23F36FF57 /* WidgetInsets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetInsets.swift; sourceTree = "<group>"; };
 		793BFFE1738735D4130811DA /* SeptaskQuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskQuickActions.swift; sourceTree = "<group>"; };
@@ -2081,7 +2084,7 @@
 		8B1AC82A051DFA765B575639 /* ClaudeGatewayProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeGatewayProvider.swift; sourceTree = "<group>"; };
 		8B5560CBF2B7C0A7A6D257DD /* RingsHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingsHomepageView.swift; sourceTree = "<group>"; };
 		8BFC8BAFC359924E6B76358C /* EditSessionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSessionSheet.swift; sourceTree = "<group>"; };
-		8C3684B380D00696C61A7996 /* Septask.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8C3684B380D00696C61A7996 /* Septask.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Septask.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CF49F51756CC59FB1792FFF /* ClaudeGatewayDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeGatewayDetail.swift; sourceTree = "<group>"; };
 		8D2A98BC1B49383CBDFAB012 /* HeatmapHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatmapHomepageView.swift; sourceTree = "<group>"; };
 		8D3DB688522E2EB3B5330CDE /* MacroWidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroWidgetSnapshotStore.swift; sourceTree = "<group>"; };
@@ -2094,7 +2097,7 @@
 		8F00F31B7DD6B0E3BC0D347B /* SeptaskKitWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitWindow.swift; sourceTree = "<group>"; };
 		8F0DA5FA7D3E03C2DB1DE7C7 /* CorrelationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngine.swift; sourceTree = "<group>"; };
 		90855FEBFCEB8B3CC9343F88 /* TaskKeyboardContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskKeyboardContractTests.swift; sourceTree = "<group>"; };
-		90CE387562D24188A0AF4ABB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		90CE387562D24188A0AF4ABB /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		91528C4225020254A9F41AC8 /* MedicationsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicationsPlugin.swift; sourceTree = "<group>"; };
 		91BAA74D7BB0302A9AA70DE9 /* InsightsDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsDestinationView.swift; sourceTree = "<group>"; };
 		9250B1E8F9D8494F6C6C0A69 /* SeptaskSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskSettingsView.swift; sourceTree = "<group>"; };
@@ -2204,12 +2207,12 @@
 		C31AA779DF73D8C68DDF9B2F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C4E0ADF5987E9D7E112126AB /* EditHabitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditHabitSheet.swift; sourceTree = "<group>"; };
 		C5BCD4DA2CB4E9B237526865 /* KeyboardShortcutsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsView.swift; sourceTree = "<group>"; };
-		C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptenaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C62E8037BC8CBCE13C164828 /* SupplementsQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupplementsQuickAddMenu.swift; sourceTree = "<group>"; };
 		C641220AFE9A17115F46A97C /* ReasoningProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReasoningProvider.swift; sourceTree = "<group>"; };
 		C71A4E1AB6E0523DC1EFBCDA /* TasksSkillPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksSkillPane.swift; sourceTree = "<group>"; };
 		C729259A5867D99CC64AA9C3 /* AreaRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaRecord.swift; sourceTree = "<group>"; };
-		C76671701936DCFC77B97142 /* SeptaskUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeptaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C76671701936DCFC77B97142 /* SeptaskUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeptaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C786883CC7034B22DDADE727 /* CompletionPatternsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletionPatternsSection.swift; sourceTree = "<group>"; };
 		C7B436039E56AE29B498D15D /* WakingDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakingDay.swift; sourceTree = "<group>"; };
 		C7BAA3E1C2D19A55758017FC /* GitHubProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubProvider.swift; sourceTree = "<group>"; };
@@ -2228,7 +2231,7 @@
 		CF953DAF9FDAF8152D0F1A9C /* OpenNewTaskControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenNewTaskControlIntent.swift; sourceTree = "<group>"; };
 		D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableScrollList.swift; sourceTree = "<group>"; };
 		D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
-		D0EC1DA8956AB72A184A6844 /* SeptenaShare.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0EC1DA8956AB72A184A6844 /* SeptenaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D19FFA7AF205D77FD446D409 /* WatchModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchModels.swift; sourceTree = "<group>"; };
 		D1E4AE35AB6070F3A880EC04 /* ConsistencyStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsistencyStats.swift; sourceTree = "<group>"; };
 		D1F594B4124169ED852A1D95 /* NextWidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextWidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -2245,7 +2248,7 @@
 		D5B59047A762635E5A4D89D0 /* EditExerciseEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditExerciseEntrySheet.swift; sourceTree = "<group>"; };
 		D72A1514292FB8D98B35257C /* SeptaskWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskWatchApp.swift; sourceTree = "<group>"; };
 		D7A9CFE2B4EA160E84F58544 /* RemindersImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersImportView.swift; sourceTree = "<group>"; };
-		D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaLiveActivitiesExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaLiveActivitiesExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsToSeptenaMapper.swift; sourceTree = "<group>"; };
 		D85295BF9DDB44A2F3614388 /* AddInfoPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddInfoPalette.swift; sourceTree = "<group>"; };
 		D8FD5F9DD75DBCCE7F97E728 /* CommunityTestimonialPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityTestimonialPane.swift; sourceTree = "<group>"; };
@@ -2274,10 +2277,10 @@
 		E1DF9C41B58C99CE2B123E7C /* TasksWatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksWatchAppDelegate.swift; sourceTree = "<group>"; };
 		E2416C5A216AEE7F3DBA82BB /* WeightCadence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightCadence.swift; sourceTree = "<group>"; };
 		E275C679B8C62C4DD87E9D23 /* SeptaskLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskLaunch.swift; sourceTree = "<group>"; };
-		E2956BC485B54F8BBCD5B6C7 /* SeptaskShare.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptaskShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E2956BC485B54F8BBCD5B6C7 /* SeptaskShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptaskShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E31867A580D7D96DFB20391B /* ChoresDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresDestinationView.swift; sourceTree = "<group>"; };
 		E31DA79ECD8884E07F3A15A5 /* IntakeReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntakeReader.swift; sourceTree = "<group>"; };
-		E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E368966622BF4B1309F74C1E /* SeptenaWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SeptenaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E3876639898BA733B43E63C4 /* WorkoutLogEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutLogEntity.swift; sourceTree = "<group>"; };
 		E455CC1709E4A8C0430FEF0E /* SupportStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportStore.swift; sourceTree = "<group>"; };
 		E4752E39BC337503CC5BAD76 /* GitHubDestinationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitHubDestinationView.swift; sourceTree = "<group>"; };
@@ -2303,7 +2306,7 @@
 		EF5FE583555D3B430EC71004 /* MealCameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCameraPicker.swift; sourceTree = "<group>"; };
 		EFAEECC11E3355B23E650226 /* MacroWidgetWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroWidgetWire.swift; sourceTree = "<group>"; };
 		F05E01AB86D25931CD682001 /* WatchAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAppDelegate.swift; sourceTree = "<group>"; };
-		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F0BEBB91083B3194167B548E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F24E908729637004C14E5310 /* AddHabitPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHabitPage.swift; sourceTree = "<group>"; };
 		F2DDEBCD24A7394AE224AD93 /* NextBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextBlocks.swift; sourceTree = "<group>"; };
 		F2DEA6B14875DD8BB28133A3 /* ChoresPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChoresPlugin.swift; sourceTree = "<group>"; };
@@ -2525,7 +2528,6 @@
 				AF3B8630E404CA38C14B10AC /* InfoPlist.xcstrings */,
 				82B033F3BFB3BA4D616AA595 /* Localizable.xcstrings */,
 				784D3E7D8D933961200812D6 /* PrivacyInfo.xcprivacy */,
-				F364148FAD64C43890D125DA /* App */,
 				E5651035008888FF03C82755 /* Resources */,
 				59B08D4759930317F4B0B9CB /* Sections */,
 				842F4255B425A42BBD476DDD /* Shell */,
@@ -2615,7 +2617,6 @@
 				4767B3C1192FEBEF9685F09D /* PurposePromptService.swift */,
 				756B5C19E36F271ED9C5AB5B /* ValuesPromptService.swift */,
 				8A0DB568F37B6A4DE1B82492 /* VirtuePromptService.swift */,
-				0B92FD5AED2B7EED0BC952CD /* Components */,
 			);
 			name = Intelligence;
 			path = Septena/Shell/Intelligence;
@@ -2703,8 +2704,6 @@
 				788AF8156A5227746A49B6B8 /* Insights */,
 				8BA2AB61DF568A7DB50F9829 /* Intake */,
 				49D460199DA0C929300C41E3 /* Medications */,
-				DE2D93E436ECB8C6A791A6A3 /* Mood */,
-				4ACB6992807539A8ABCCBE9F /* Nutrition */,
 				D3C660F4C6778649B74F4F19 /* Sleep */,
 				21B9B1EA0FA765C91D4DA073 /* Supplements */,
 				64989ABF59CB5C0F7B053584 /* Symptoms */,
@@ -2880,19 +2879,11 @@
 		842F4255B425A42BBD476DDD /* Shell */ = {
 			isa = PBXGroup;
 			children = (
-				CC79ED5B01C41A0D165FE0CA /* Capture */,
 				98A1947F6BF14D5A6D6C2A1A /* Coach */,
-				A6F04EDC6C0599AC8EE810C0 /* Dashboard */,
 				03B5A38B75A9FBCDF905E644 /* Goals */,
-				4410E8EDE85F86F8FBA717BF /* Intelligence */,
 				86446509AEE92C03A74BCF48 /* Onboarding */,
 				F823096891A2B23FC7CB5D6B /* Reports */,
-				D97BDB7442163601D397B102 /* Sections */,
 				58E88D7A812F74DFC3213689 /* Security */,
-				6D68A1F0A14D187F52B0AB8E /* Settings */,
-				87100EA2A5455E2B0A07163C /* Sidebar */,
-				AC3601086E54088A26CF492F /* Tasks */,
-				BCF085879C9767DF22181130 /* UI */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -3198,7 +3189,7 @@
 			isa = PBXGroup;
 			children = (
 				8C3684B380D00696C61A7996 /* Septask.app */,
-				594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */,
+				594D306ECD44EA64FBBBCA85 /* Septask.app */,
 				ADCDCE95E0DA23E5FD2E4953 /* SeptaskMacUITests.xctest */,
 				E2956BC485B54F8BBCD5B6C7 /* SeptaskShare.appex */,
 				C76671701936DCFC77B97142 /* SeptaskUITests.xctest */,
@@ -3207,7 +3198,7 @@
 				39E8BE393381A7D49657D3C0 /* Septena.app */,
 				8E99BF2435646190AC7F9AD2 /* SeptenaCoreTests.xctest */,
 				D7B55967C37E1A4FD52BC689 /* SeptenaLiveActivitiesExtension.appex */,
-				59055370ABA84DB912D64D1E /* SeptenaMac.app */,
+				59055370ABA84DB912D64D1E /* Septena.app */,
 				9F2B50F5BF1098E27A7D4DCA /* SeptenaMacUITests.xctest */,
 				D0EC1DA8956AB72A184A6844 /* SeptenaShare.appex */,
 				C60BE1F10D726BA8A009799C /* SeptenaUITests.xctest */,
@@ -3278,7 +3269,6 @@
 			isa = PBXGroup;
 			children = (
 				67B23DB30F74DB6CE84F7C6E /* QuickFindView.swift */,
-				FEB5AF15AD001744F77A0B72 /* AddInfo */,
 			);
 			name = Capture;
 			path = Septena/Shell/Capture;
@@ -3536,7 +3526,7 @@
 				D09BA73660B9E4E0E7ECF146 /* Sparkle */,
 			);
 			productName = SeptaskMac;
-			productReference = 594D306ECD44EA64FBBBCA85 /* SeptaskMac.app */;
+			productReference = 594D306ECD44EA64FBBBCA85 /* Septask.app */;
 			productType = "com.apple.product-type.application";
 		};
 		1B1FB88A3182F26908EEC837 /* SeptenaMac */ = {
@@ -3555,7 +3545,7 @@
 			packageProductDependencies = (
 			);
 			productName = SeptenaMac;
-			productReference = 59055370ABA84DB912D64D1E /* SeptenaMac.app */;
+			productReference = 59055370ABA84DB912D64D1E /* Septena.app */;
 			productType = "com.apple.product-type.application";
 		};
 		2A4D1301995EEBAA1BE5D242 /* SeptenaMacUITests */ = {
@@ -3849,7 +3839,6 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					0FA54A9629590B2580526F3D = {
-						DevelopmentTeam = "$(SEPTENA_DEVELOPMENT_TEAM)";
 						ProvisioningStyle = Automatic;
 					};
 					1B1FB88A3182F26908EEC837 = {
@@ -4699,6 +4688,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				69030C4693661207707D8859 /* DateParser.swift in Sources */,
 				3B445E3B58ED439E4047057D /* SeptaskWatchApp.swift in Sources */,
 				1CFEC78AD7FC12536E52B09A /* TasksTodayComplicationData.swift in Sources */,
 				11E08385EE533CE55349D3F9 /* TasksWatchAppDelegate.swift in Sources */,
@@ -5223,6 +5213,7 @@
 			files = (
 				8803B9983635564C828FCAB1 /* ComplicationRingsView.swift in Sources */,
 				00FC97C66DE226B12A6E481F /* ConsumableContainer.swift in Sources */,
+				08546E2A980E2BAA6D254686 /* DateParser.swift in Sources */,
 				7E0DAB605158CED4DB2249C9 /* DayBucket.swift in Sources */,
 				6AE92DC393E450B35F86BD8C /* Fasting.swift in Sources */,
 				BCAC9CE622C5BB7AA0BE0BB9 /* MoodVocabulary.swift in Sources */,
@@ -5236,6 +5227,7 @@
 				7EFB4D848BBD48F43925E0B5 /* SkyAtmosphere.swift in Sources */,
 				0D48D890C071C68736A38A7F /* SolarClock.swift in Sources */,
 				43877F17B51EB0A687E70FD7 /* SuggestionBlocks.swift in Sources */,
+				AF8B76F87F7F1226E2A62BFC /* TasksWatchWire.swift in Sources */,
 				4F942DCF79C5D8EB5F471949 /* WatchAppDelegate.swift in Sources */,
 				B5C4876EC67FCD081FB3E0C5 /* WatchConnectivity.swift in Sources */,
 				F4251470458A2411D47FC255 /* WatchModels.swift in Sources */,
@@ -6055,6 +6047,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -6223,6 +6216,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Septask/SeptaskMac.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 992N457T8D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Septask/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (

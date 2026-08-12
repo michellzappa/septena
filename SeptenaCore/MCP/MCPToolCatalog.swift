@@ -33,6 +33,30 @@ enum MCPToolCatalog {
 
   private static let emptySchema: [String: Any] = ["type": "object", "properties": [:] as [String: Any]]
 
+  /// The repeat rule shared by `tasks_create` and `tasks_update`. Mirrors the
+  /// app's own `Recurrence` JSON (`unit` / `interval` / `after_completion`), so
+  /// an agent-set rule is byte-identical to one set in the repeat picker.
+  /// Nullable so `tasks_update` can clear it.
+  static let recurrenceSchema: [String: Any] = [
+    "type": ["object", "null"],
+    "description": """
+      Repeat rule. Completing the task generates the next occurrence. \
+      after_completion=true counts the interval from the day you tick it off \
+      ("every 3 days after completion"); false counts from the previous \
+      scheduled date, which is what keeps a weekly task on its weekday \
+      ("every Monday") and REQUIRES the task to have a scheduled date. \
+      Pass null to clear an existing rule.
+      """,
+    "required": ["unit"],
+    "properties": [
+      "unit": ["type": "string", "enum": ["day", "week", "month"]],
+      "interval": ["type": "integer", "minimum": 1, "default": 1,
+                   "description": "Every N units. 1 = daily/weekly/monthly."],
+      "after_completion": ["type": "boolean", "default": true,
+                           "description": "Anchor: true = from completion, false = from the previous scheduled date."],
+    ],
+  ]
+
   /// The 16 canonical muscle-group values (mirrors `Muscle.allCases`). Kept as
   /// a literal here so the catalog has no dependency direction issue; the
   /// dispatch-side validator (`validMuscles`) derives the same set from the enum.
@@ -102,6 +126,7 @@ enum MCPToolCatalog {
                 "notes": ["type": "string", "description": "Free-text note body for the task."],
                 "origin": ["type": "string", "enum": ["user_request", "agent_suggestion"],
                            "description": "Provenance. user_request = the user asked (committed, placed where specified). agent_suggestion = you proposed it without being asked (lands unratified in the inbox for review). Omit to use the connection default."],
+                "recurrence": MCPToolCatalog.recurrenceSchema,
               ]]),
       MCPTool(name: "tasks_complete",
               description: "Mark a task done. For recurring tasks, this also creates the next occurrence.",
@@ -118,6 +143,7 @@ enum MCPToolCatalog {
                 "project": ["type": ["string", "null"]],
                 "status": ["type": "string", "enum": ["open", "cancelled"]],
                 "notes": ["type": ["string", "null"], "description": "Free-text note body, or null/\"\" to clear"],
+                "recurrence": MCPToolCatalog.recurrenceSchema,
               ]]),
       MCPTool(name: "tasks_thread_get",
               description: "Read a task's conversation (TaskConvo: confirmedIntent, acceptance, thread of turns, artifact, handoff, endState, assignee).",

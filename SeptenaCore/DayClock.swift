@@ -63,6 +63,44 @@ public final class DayClock {
     if now != nowDate { now = nowDate }
     let day = SeptenaDate.format(nowDate) ?? today
     if day != today { today = day }
+    #if DEBUG
+    DayClock.travelledToday = debugDayOffset == 0 ? nil : day
+    #endif
+  }
+
+  #if DEBUG
+  /// Process-wide mirror of the time-travelled day, published by
+  /// `refreshIfNeeded`. Nil whenever the offset is 0 (the normal case).
+  private static var travelledToday: String?
+  #endif
+
+  /// "What day is it" for non-view code — the write paths that can't observe
+  /// an injected clock but must still agree with what the user is looking at.
+  /// Task recurrence is the motivating case: completing a repeat computes the
+  /// next date, and reading the real `Date()` there made time travel useless
+  /// for the one feature it's most needed to test. Release builds always get
+  /// the real day; there is no offset to honor.
+  public static var appToday: String {
+    #if DEBUG
+    return travelledToday ?? SeptenaDate.today
+    #else
+    return SeptenaDate.today
+    #endif
+  }
+
+  /// Instant counterpart to `appToday`, for stamps that must agree with it.
+  public static var appNow: Date {
+    #if DEBUG
+    guard let travelledToday, let day = SeptenaDate.parse(travelledToday) else { return Date() }
+    // Keep the real wall-clock time, move the calendar day.
+    let real = Date()
+    let cal = Calendar.current
+    let t = cal.dateComponents([.hour, .minute, .second], from: real)
+    return cal.date(bySettingHour: t.hour ?? 0, minute: t.minute ?? 0, second: t.second ?? 0,
+                    of: day) ?? real
+    #else
+    return Date()
+    #endif
   }
 
   /// The system instant, shifted by `debugDayOffset` in DEBUG builds. In

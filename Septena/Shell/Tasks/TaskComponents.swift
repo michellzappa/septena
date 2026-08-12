@@ -555,6 +555,7 @@ struct TaskRow: View {
       Image(systemName: "arrow.triangle.2.circlepath")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
+        .accessibilityLabel(TaskA11y.recurring)
     }
     agentSignal
   }

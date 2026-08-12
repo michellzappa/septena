@@ -218,7 +218,9 @@ struct TaskAttributeBar: View {
       switch expanded {
       case .when:       InlineWhenPanel(draft: $draft, accent: accent)
       case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
-      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence, accent: accent) {
+      case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
+                                          hasScheduledDate: draft.scheduled != nil,
+                                          accent: accent) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
       case .attachments:
@@ -467,6 +469,11 @@ private struct InlineDatePanel: View {
 /// inline twin of `RecurrencePickerSheet`. Expanded under the Repeat pill.
 private struct InlineRepeatPanel: View {
   @Binding var recurrence: Recurrence?
+  /// A fixed-schedule rule anchors on the task's scheduled date. Without one it
+  /// silently degrades into an after-completion rule (the anchor falls back to
+  /// the completion day), so the toggle is held ON and explained rather than
+  /// offering a choice that doesn't do what it says.
+  let hasScheduledDate: Bool
   let accent: Color
   /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
   /// owned by `TaskAttributeBar.expanded`.
@@ -493,7 +500,9 @@ private struct InlineRepeatPanel: View {
                                     afterCompletion: recurrence?.afterCompletion ?? true)) })
   }
   private var afterCompletion: Binding<Bool> {
-    Binding(get: { recurrence?.afterCompletion ?? true },
+    // Reads ON with no date because that IS the behavior — showing a stored
+    // OFF the engine can't honor would misreport what the rule will do.
+    Binding(get: { !hasScheduledDate || (recurrence?.afterCompletion ?? true) },
             set: { write(Recurrence(unit: recurrence?.unit ?? .week,
                                     interval: recurrence?.interval ?? 1, afterCompletion: $0)) })
   }
@@ -516,6 +525,14 @@ private struct InlineRepeatPanel: View {
       Toggle("After completion", isOn: afterCompletion)
         .font(.septenaSidebarRow)
         .tint(accent)
+        .disabled(!hasScheduledDate)
+
+      if !hasScheduledDate {
+        Text("Give the task a date to repeat on a fixed schedule.")
+          .font(.caption)
+          .foregroundStyle(Theme.inkSecondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
 
       Button(role: .destructive) {
         recurrence = nil

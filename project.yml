@@ -571,6 +571,12 @@ targets:
       # extension (the rings on the watch face) so the two can't drift.
       - path: SeptenaWatchComplication/ComplicationRingsView.swift
       - path: SeptenaWatchComplication/RingStyles.swift
+      # Task recurrence for the wrist: WatchConnectivity completes tasks straight
+      # to CloudKit and must generate the same next date + record id the phone
+      # would. TasksWatchRecurrence forwards to RecurrenceDateCalculator, so both
+      # files are needed. (Without them this target does not compile at all.)
+      - path: SeptenaCore/TasksWatchWire.swift
+      - path: SeptenaCore/DateParser.swift
       # Vendored WolfActivityRing (MIT) — the Apple-style activity ring that
       # renders the over-100% lap via color contrast (works in the complication).
       - path: SeptenaWatchComplication/WolfActivityRing.swift
@@ -642,6 +648,10 @@ targets:
           - "**/.DS_Store"
           - "**/*.entitlements"
       - path: SeptenaCore/TasksWatchWire.swift
+      # The canonical recurrence math, so a wrist completion generates exactly
+      # the date and record id the phone would (TasksWatchRecurrence forwards
+      # to it). Pure Foundation — no SwiftData, no UI.
+      - path: SeptenaCore/DateParser.swift
     dependencies:
       - target: SeptaskWatchComplication
         embed: true
