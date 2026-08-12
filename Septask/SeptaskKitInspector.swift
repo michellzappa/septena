@@ -245,7 +245,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   @objc private func repeatChanged(_ sender: NSMenuItem) {
     guard let current = task else { return }
-    mutator.setRecurrence(id: current.id, recurrence: KitRecurrenceMenu.recurrence(for: sender))
+    mutator.setRecurrence(id: current.id,
+                          recurrence: KitRecurrenceMenu.recurrence(for: sender,
+                                                                   preserving: current.recurrence))
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     refresh()
   }

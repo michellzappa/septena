@@ -52,16 +52,22 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
 
   // MARK: - Height
 
-  private static let titleLineHeight: CGFloat = 24
   private static let pillRowHeight: CGFloat = 24
   private static let notesHeight: CGFloat = 76
-  private static let verticalPadding: CGFloat = 10
+  /// Breathing room under the pill rail (and notes). The TOP of the composer
+  /// is not padded separately — it reuses the closed row's vertical band so
+  /// the title doesn't travel when the row expands.
+  private static let bottomPadding: CGFloat = 10
   private static let interRowGap: CGFloat = 8
 
   /// The row height the controller must return for an expanded row. Kept here
   /// so the geometry lives with the layout that produces it.
+  ///
+  /// Layout: a closed-row-height band at the top (checkbox + title centered
+  /// exactly as `SeptaskKitTaskCell`), then pills/notes hanging below. Enter
+  /// only grows the row downward — the title's screen position stays put.
   static func height(showsNotes: Bool) -> CGFloat {
-    var height = verticalPadding * 2 + titleLineHeight + interRowGap + pillRowHeight
+    var height = SeptaskKitTheme.rowHeight + interRowGap + pillRowHeight + bottomPadding
     if showsNotes { height += interRowGap + notesHeight }
     return height
   }
@@ -73,9 +79,15 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     checkbox.translatesAutoresizingMaskIntoConstraints = false
     checkbox.onToggle = { [weak self] in self?.onAction?(.toggleComplete) }
 
+    // Chrome-less title — same ink/type as the closed row, no bezel/fill so
+    // the field editor doesn't paint a second white "input" surface on the
+    // card (Things: caret in the title, not a boxed TextField).
     titleField.font = SeptaskKitTheme.taskTitle
+    titleField.textColor = .labelColor
     titleField.isBordered = false
+    titleField.isBezeled = false
     titleField.drawsBackground = false
+    titleField.backgroundColor = .clear
     titleField.focusRingType = .none
     titleField.delegate = self
     titleField.translatesAutoresizingMaskIntoConstraints = false
@@ -121,7 +133,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
-      checkbox.topAnchor.constraint(equalTo: topAnchor, constant: Self.verticalPadding + 2),
+      // Match `SeptaskKitTaskCell`: checkbox + title sit on the vertical
+      // center of a standard-height row. Expansion adds space BELOW this
+      // band, so Enter doesn't nudge the glyphs.
+      checkbox.centerYAnchor.constraint(equalTo: topAnchor,
+                                        constant: SeptaskKitTheme.rowHeight / 2),
       checkbox.widthAnchor.constraint(equalToConstant: 20),
       checkbox.heightAnchor.constraint(equalToConstant: 20),
       titleField.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
@@ -129,8 +145,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       trailingConstraint,
 
       pillRow.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
-      pillRow.topAnchor.constraint(equalTo: titleField.bottomAnchor,
-                                   constant: Self.interRowGap),
+      // Hang off the closed-row band, not the title's intrinsic bottom — keeps
+      // the gap stable regardless of field-editor metrics.
+      pillRow.topAnchor.constraint(equalTo: topAnchor,
+                                   constant: SeptaskKitTheme.rowHeight + Self.interRowGap),
       pillRow.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
       pillRow.trailingAnchor.constraint(lessThanOrEqualTo: titleField.trailingAnchor),
 
@@ -233,7 +251,39 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
 
   func focusTitle() {
     window?.makeFirstResponder(titleField)
-    titleField.currentEditor()?.selectAll(nil)
+    polishFieldEditor(selectAll: false)
+  }
+
+  /// The window's shared field editor defaults to an opaque white fill — that
+  /// is the "separate input box" sitting on the card. Clear it, and prefer a
+  /// caret at the end (Things) over a selected-all block that reads as a
+  /// second surface. `selectAll` stays available for call sites that want it.
+  private func polishFieldEditor(selectAll: Bool) {
+    guard let editor = titleField.currentEditor() as? NSTextView else { return }
+    editor.drawsBackground = false
+    editor.backgroundColor = .clear
+    editor.insertionPointColor = .labelColor
+    // Match the closed-row / composer title face — the shared field editor
+    // otherwise keeps whatever font the last client left on it (often the
+    // control default, 1–2pt smaller than taskTitle).
+    let font = titleField.font ?? SeptaskKitTheme.taskTitle
+    editor.font = font
+    editor.typingAttributes = [
+      .font: font,
+      .foregroundColor: NSColor.labelColor,
+    ]
+    if selectAll {
+      editor.selectAll(nil)
+    } else {
+      let end = (editor.string as NSString).length
+      editor.setSelectedRange(NSRange(location: end, length: 0))
+    }
+  }
+
+  func controlTextDidBeginEditing(_ obj: Notification) {
+    // Field editor is attached by the time this fires; clear it again in case
+    // focus arrived without going through `focusTitle()` (e.g. Tab back).
+    polishFieldEditor(selectAll: false)
   }
 
   private func toggleNotes() {

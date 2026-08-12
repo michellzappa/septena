@@ -262,12 +262,13 @@ final class SeptaskKitTaskListController: NSViewController {
     // `contentInsets` (not a spacer row) is the standard way to do this: it
     // pads the clip view rather than the document, so scroll/bounce and
     // "scroll to visible" all still measure from the real content edges.
-    // The actual top/bottom VALUE is set in `viewDidLayout` — it tracks
-    // `SeptaskKitLayout.inset(for:)`, the same width-dependent number the
-    // rows use for their left/right margin, so the card reads as evenly
-    // framed on all four sides instead of a fixed vertical amount that only
-    // matches the horizontal one at one particular window width.
+    // Fixed vertical inset (not the width-dependent side margin) — matching
+    // the sides made top/bottom swell on wide windows and read as broken.
     scrollView.automaticallyAdjustsContentInsets = false
+    scrollView.contentInsets = NSEdgeInsets(top: SeptaskKitLayout.verticalInset,
+                                            left: 0,
+                                            bottom: SeptaskKitLayout.verticalInset,
+                                            right: 0)
     view = scrollView
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
@@ -307,18 +308,6 @@ final class SeptaskKitTaskListController: NSViewController {
 
   deinit {
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
-  }
-
-  /// Keeps the scroll view's top/bottom breathing room in step with the
-  /// rows' width-dependent left/right margin (`SeptaskKitLayout.inset(for:)`)
-  /// on every resize — a fixed vertical constant would only agree with the
-  /// horizontal margin at one specific window width.
-  override func viewDidLayout() {
-    super.viewDidLayout()
-    let inset = SeptaskKitLayout.inset(for: view.bounds.width)
-    if scrollView.contentInsets.top != inset || scrollView.contentInsets.bottom != inset {
-      scrollView.contentInsets = NSEdgeInsets(top: inset, left: 0, bottom: inset, right: 0)
-    }
   }
 
   /// True once `show` has run at least once — see the guard below.
@@ -974,7 +963,17 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Apply a repeat rule to the selection (menu bar + context menu).
   func setRecurrence(_ rule: Recurrence?) {
     for task in actionableSelection {
-      mutator.setRecurrence(id: task.id, recurrence: rule)
+      // Every repeat menu in the AppKit shell picks unit + interval only, so
+      // carry each row's OWN anchor mode across the change. Resetting it to the
+      // menu's default silently rewrote a fixed "every Monday" into "a week
+      // after you tick the box" — and multi-select makes it per task, which is
+      // why this resolves here rather than at the menu.
+      let resolved = rule.map {
+        Recurrence(unit: $0.unit,
+                   interval: $0.interval,
+                   afterCompletion: task.recurrence?.afterCompletion ?? $0.afterCompletion)
+      }
+      mutator.setRecurrence(id: task.id, recurrence: resolved)
     }
     reload()
     onStoreChanged?()
@@ -1303,11 +1302,12 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Creation (⌘N)
 
-  /// Create in the context being looked at — Today lands on Today, a project/
-  /// area list files there, Upcoming schedules tomorrow (the minimal date that
-  /// keeps the row visible in that list). The new row appears at the top of
-  /// its group (TaskOrder's insert-at-top), selected, with the title editor
-  /// open.
+  /// Create in the context being looked at — and, on mixed multi-group
+  /// surfaces (Today / Anytime), in the area/project of the focused task so
+  /// ⌘N stays in the group you're in rather than always dumping into Inbox.
+  /// Upcoming schedules tomorrow (the minimal date that keeps the row visible
+  /// in that list). The new row appears at the top of its group (TaskOrder's
+  /// insert-at-top), selected, with the title editor open.
   func createTask() {
     if isTitleEditorActive {
       // Commit the in-flight edit first; commitRename runs synchronously.
@@ -1326,11 +1326,32 @@ final class SeptaskKitTaskListController: NSViewController {
     var today = false
     var scheduled: Date?
     switch filter {
-    case .today: today = true
-    case .project(let pid): project = pid
-    case .area(let aid): area = aid
-    case .upcoming: scheduled = KitDayFormat.tomorrow()
-    case .unscheduled, .triage: break
+    case .today:
+      today = true
+      // Grouped Today: inherit the selected row's filing. Flat Today has no
+      // groups, but the same inheritance still files under the focused list.
+      if let focused = focusedTaskForCreate() {
+        area = focused.area
+        project = focused.project
+      }
+    case .unscheduled:
+      if let focused = focusedTaskForCreate() {
+        area = focused.area
+        project = focused.project
+      }
+    case .project(let pid):
+      project = pid
+    case .area(let aid):
+      area = aid
+    case .upcoming:
+      scheduled = KitDayFormat.tomorrow()
+      // Upcoming isn't grouped by list, but still honor a focused task's
+      // filing so ⌘N doesn't strand the new row in Inbox.
+      if let focused = focusedTaskForCreate() {
+        area = focused.area
+        project = focused.project
+      }
+    case .triage: break
     case .logbook, .recentlyDeleted:
       NSSound.beep()
       return
@@ -1344,6 +1365,17 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
     beginEditingRow(row)
+  }
+
+  /// The task that should seed ⌘N's area/project — the table's focused row,
+  /// falling back to the sole selected task when focus is on a header/empty.
+  private func focusedTaskForCreate() -> SeptenaTask? {
+    let row = tableView.selectedRow
+    if row >= 0, let task = rows[row].task, !task.isHeading {
+      return task
+    }
+    let selected = actionableSelection
+    return selected.count == 1 ? selected[0] : nil
   }
 
   // MARK: - Editing entry points
@@ -1421,7 +1453,9 @@ final class SeptaskKitTaskListController: NSViewController {
 
   func beginComposing(id: String) {
     guard composingTaskId != id else { return }
-    if composingTaskId != nil { collapseComposer(commit: true) }
+    // Switching rows: fold the open one instantly so two height animations
+    // don't fight; the newly opened row still expands.
+    if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
     composingTaskId = id
     acknowledgeIfNeeded(id: id)
     guard let row = rows.firstIndex(where: { $0.task?.id == id }) else {
@@ -1429,13 +1463,17 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
-    // Force this ONE row to re-dequeue as the composer cell and pick up its
-    // taller height — the diffed path in `reload()` wouldn't do this on its
-    // own, since the row's underlying `Row` VALUE hasn't changed (composing
-    // state lives outside it, in `composingTaskId`).
+    // Swap to the composer cell first (clipped to the still-short row), then
+    // animate the height open — `noteHeightOfRows` animates for view-based
+    // tables when wrapped in an `NSAnimationContext` with non-zero duration.
     tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
-    tableView.noteHeightOfRows(withIndexesChanged: [row])
+    if let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) as? KitCardRowView {
+      applyCardGeometry(rowView, atRow: row)
+    }
+    refreshCardGeometry()
     tableView.scrollRowToVisible(row)
+    animateComposerHeight(ofRow: row)
+    // Focus as soon as the cell exists so typing isn't gated on the expand.
     DispatchQueue.main.async { [weak self] in
       guard let self, self.composingTaskId == id,
             let freshRow = self.rows.firstIndex(where: { $0.task?.id == id }),
@@ -1451,34 +1489,76 @@ final class SeptaskKitTaskListController: NSViewController {
   /// see `KitComposerCell.control(_:doCommandBy:)`), true for every other path
   /// (switching to a different row, selecting elsewhere) so nothing typed is
   /// silently dropped.
-  private func collapseComposer(commit: Bool) {
+  private func collapseComposer(commit: Bool, animated: Bool = true) {
     guard let taskId = composingTaskId else { return }
     if commit, let row = rows.firstIndex(where: { $0.task?.id == taskId }),
        let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
          as? KitComposerCell {
+      // Mutator notifications fire sync; `reload()` no-ops while
+      // `composingTaskId` is still set, so the height animation below owns
+      // the visual fold instead of racing a full-list reload.
       cell.commit()
     }
-    composingTaskId = nil
-    // Resign the field editor BEFORE reloading, not after — `reload()`'s own
-    // guard (`isTitleEditorActive`) reads the WINDOW's actual first responder,
-    // which is still the title/notes field editor until this call, and
-    // nothing else in this class ever resigns it. Reloading first (the
-    // previous order) meant `reload()` silently no-op'd on every single
-    // commit — `cell.commit()`'s write landed instantly, but the on-screen
-    // row kept showing the pre-edit title/height until some LATER, unrelated
-    // notification happened to fire a reload while the editor was finally
-    // gone. That's the "took a beat to appear" lag: not a real write delay,
-    // a stale-redraw window between commit and the next lucky reload.
+    // Resign before the height fold — a live field editor would keep edit
+    // chrome attached through the shrink.
     view.window?.makeFirstResponder(tableView)
-    reload()
-    // Belt and braces: force the row's cell back to normal even when nothing
-    // actually changed (composer opened and closed with no edits) — the
-    // diffed reload above only re-dequeues rows whose CONTENT differs, and
-    // cell TYPE isn't part of that diff.
-    if let row = rows.firstIndex(where: { $0.task?.id == taskId }) {
-      tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
-      tableView.noteHeightOfRows(withIndexesChanged: [row])
+    composingTaskId = nil
+
+    guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else {
+      reload()
+      return
     }
+    // Pull the just-committed title/notes into the in-memory row so the
+    // closed cell doesn't flash the pre-edit snapshot.
+    refreshTaskRowInPlace(id: taskId)
+    // Shrink FIRST while the composer cell is still on screen — its title
+    // sits in the closed-row band, so the glyphs stay put as pills clip away.
+    // Swapping to the task cell *before* the shrink would center the title
+    // in the still-tall frame (a visible jump).
+    animateComposerHeight(ofRow: row, animated: animated) { [weak self] in
+      guard let self else { return }
+      self.tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
+      self.refreshCardGeometry()
+    }
+  }
+
+  /// Re-read one task from the store into `rows` without a full list rebuild —
+  /// enough for the closed cell after a composer commit to show the new title.
+  private func refreshTaskRowInPlace(id: String) {
+    guard let index = rows.firstIndex(where: { $0.task?.id == id }),
+          case .task(_, let chip) = rows[index],
+          let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == id })
+    else { return }
+    rows[index] = .task(fresh, chip: chip)
+  }
+
+  /// Animate (or jump, under Reduce Motion) a row's height to whatever
+  /// `heightOfRow` currently returns — used for composer open/close and the
+  /// notes-pill expand inside an already-open composer.
+  private func animateComposerHeight(ofRow row: Int, animated: Bool = true,
+                                     completion: (() -> Void)? = nil) {
+    guard rows.indices.contains(row) else {
+      completion?()
+      return
+    }
+    let duration = animated ? KitMotion.composerAnimationDuration : 0
+    if duration <= 0 {
+      NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0
+        tableView.noteHeightOfRows(withIndexesChanged: [row])
+      }
+      completion?()
+      return
+    }
+    NSAnimationContext.runAnimationGroup({ ctx in
+      ctx.duration = duration
+      ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+      ctx.allowsImplicitAnimation = true
+      tableView.noteHeightOfRows(withIndexesChanged: [row])
+    }, completionHandler: {
+      // AppKit may call this off the main actor; hop back before touching UI.
+      DispatchQueue.main.async { completion?() }
+    })
   }
 
   /// Re-read the task from the store and refresh the composer cell's PILLS —
@@ -1544,7 +1624,7 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self, let cell,
             let row = self.rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
       self.composerShowsNotes = cell.showsNotes
-      self.tableView.noteHeightOfRows(withIndexesChanged: [row])
+      self.animateComposerHeight(ofRow: row)
     }
 
     cell.onCommit = { [weak self] title, notes in
@@ -1871,7 +1951,9 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuClearSchedule() { clearScheduleSelection() }
 
   @objc private func menuSetRecurrence(_ sender: NSMenuItem) {
-    setRecurrence(KitRecurrenceMenu.recurrence(for: sender))
+    // `preserving: nil` on purpose — setRecurrence resolves the anchor mode
+    // per selected row, which is the only correct answer for a multi-selection.
+    setRecurrence(KitRecurrenceMenu.recurrence(for: sender, preserving: nil))
   }
   @objc private func menuDelete() { deleteSelection() }
 }
@@ -1947,6 +2029,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
          && rows[tableView.selectedRow].task?.id == composingId) {
       collapseComposer(commit: true)
     }
+    // Contiguous selection rounding depends on neighbors' selected-ness —
+    // refresh every on-screen row so a former run-end re-squares when the
+    // next row joins (AppKit only redraws the rows whose selected bit flipped).
+    refreshSelectionJoins()
     // The inspector shows a single row; a multi-selection has no one subject.
     let selection = actionableSelection
     onSelectionChange?(selection.count == 1 ? selection.first : nil)
@@ -1998,16 +2084,44 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   }
 
   private func applyCardGeometry(_ rowView: KitCardRowView, atRow row: Int) {
+    let composing = rows[row].task?.id == composingTaskId
+    rowView.isComposing = composing
     if rows[row].isCardRow {
       rowView.isCard = true
-      let previousOnCard = row > 0 && rows[row - 1].isCardRow
-      let nextOnCard = row + 1 < rows.count && rows[row + 1].isCardRow
-      rowView.isFirstInGroup = !previousOnCard
-      rowView.isLastInGroup = !nextOnCard
+      // The open composer is its own rounded slice (Things' elevated edit
+      // card) — it breaks the card run so neighbors round off against it
+      // instead of squaring into a mid-card join that no longer exists.
+      let previousOnCard = row > 0
+        && rows[row - 1].isCardRow
+        && rows[row - 1].task?.id != composingTaskId
+      let nextOnCard = row + 1 < rows.count
+        && rows[row + 1].isCardRow
+        && rows[row + 1].task?.id != composingTaskId
+      rowView.isFirstInGroup = composing || !previousOnCard
+      rowView.isLastInGroup = composing || !nextOnCard
     } else {
       rowView.isCard = false
     }
+    applySelectionJoins(rowView, atRow: row)
     rowView.needsDisplay = true
+  }
+
+  /// Selection-run joins for contiguous multi-select rounding. Only joins
+  /// through adjacent card rows that are also selected — a header between
+  /// two selected tasks breaks the visual run the same way it breaks a card.
+  private func applySelectionJoins(_ rowView: KitCardRowView, atRow row: Int) {
+    let selected = tableView.selectedRowIndexes
+    guard selected.contains(row) else {
+      rowView.joinsSelectedAbove = false
+      rowView.joinsSelectedBelow = false
+      return
+    }
+    rowView.joinsSelectedAbove = row > 0
+      && selected.contains(row - 1)
+      && rows[row - 1].isCardRow
+    rowView.joinsSelectedBelow = row + 1 < rows.count
+      && selected.contains(row + 1)
+      && rows[row + 1].isCardRow
   }
 
   /// A row's corner rounding depends on its NEIGHBORS' card-row-ness
@@ -2026,6 +2140,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     tableView.enumerateAvailableRowViews { rowView, row in
       guard let cardRow = rowView as? KitCardRowView, rows.indices.contains(row) else { return }
       applyCardGeometry(cardRow, atRow: row)
+    }
+  }
+
+  /// Same walk as `refreshCardGeometry`, but only the selection-join flags —
+  /// called from `tableViewSelectionDidChange` so contiguous multi-select
+  /// corners stay continuous without a full geometry pass.
+  private func refreshSelectionJoins() {
+    tableView.enumerateAvailableRowViews { rowView, row in
+      guard let cardRow = rowView as? KitCardRowView, rows.indices.contains(row) else { return }
+      applySelectionJoins(cardRow, atRow: row)
+      cardRow.needsDisplay = true
     }
   }
 
@@ -2409,6 +2534,10 @@ private enum KitMotion {
   /// eye; the pause itself isn't motion, so it survives Reduce Motion and only
   /// the fade afterwards collapses.
   static let settleDelay: TimeInterval = 2.5
+  /// Inline composer expand/collapse — `Theme.Motion.quick`-adjacent. Zero
+  /// under Reduce Motion so `noteHeightOfRows` jumps.
+  static let composerDuration: TimeInterval = 0.22
+  static var composerAnimationDuration: TimeInterval { reduce ? 0 : composerDuration }
 }
 
 // MARK: - Row cell
@@ -2430,6 +2559,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let chip = KitChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
+  private let repeatGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
@@ -2456,8 +2586,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.lineBreakMode = .byTruncatingTail
     title.isEditable = false
     title.isSelectable = false
+    title.isBordered = false
+    title.isBezeled = false
+    title.drawsBackground = false
+    title.backgroundColor = .clear
+    title.focusRingType = .none
+    // Must live on the control itself, not only on attributedStringValue —
+    // beginEditing swaps to plain stringValue, and the field editor inherits
+    // `font`. Without this, edit mode falls back to the label default (~1–2pt
+    // smaller than SeptaskKitTheme.taskTitle).
+    title.font = SeptaskKitTheme.taskTitle
     title.delegate = self
     title.translatesAutoresizingMaskIntoConstraints = false
+    // Low hugging + compression so the title fills checkbox→trailing and
+    // truncates there — without a trailing pin an empty ⌘N title collapses
+    // to intrinsic (~1 glyph) width and the field editor inherits that frame.
+    title.setContentHuggingPriority(.defaultLow, for: .horizontal)
     title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
     contextLabel.font = SeptaskKitTheme.meta
@@ -2484,9 +2628,22 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
     scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-    // Trailing cluster: notes marker, list chip, date — in that reading order,
-    // each hidden when it has nothing to say.
-    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail])
+    // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
+    // glyph view rather than a "↻" concatenated onto the date string — per the
+    // DesignSpec, a glyph is a view, never baked into a formatted label.
+    repeatGlyph.translatesAutoresizingMaskIntoConstraints = false
+    repeatGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    repeatGlyph.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath",
+                                accessibilityDescription: TaskA11y.recurring)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+    repeatGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    repeatGlyph.kitA11yIgnore()
+
+    // Trailing cluster: notes marker, list chip, date, repeat — in that reading
+    // order, each hidden when it has nothing to say. Repeat sits outboard of the
+    // date to match the SwiftUI row's trailing order.
+    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail, repeatGlyph])
     trailing.orientation = .horizontal
     trailing.spacing = 6
     trailing.translatesAutoresizingMaskIntoConstraints = false
@@ -2515,6 +2672,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.heightAnchor.constraint(equalToConstant: 20),
       title.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
+      // Pin through to the trailing cluster so the title (and its field
+      // editor) always spans the row — empty create titles have ~0 intrinsic
+      // width, which is what made ⌘N open a one-glyph-wide editor.
+      title.trailingAnchor.constraint(equalTo: trailing.leadingAnchor, constant: -8),
       contextLabel.leadingAnchor.constraint(equalTo: title.leadingAnchor),
       contextLabel.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
       trailing.leadingAnchor.constraint(greaterThanOrEqualTo: contextLabel.trailingAnchor, constant: 8),
@@ -2558,6 +2719,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       contextLabel.isHidden = true
       detail.stringValue = ""
       title.toolTip = task.title
+      title.font = SeptaskKitTheme.heading
       title.attributedStringValue = NSAttributedString(
         string: task.title,
         attributes: [
@@ -2572,6 +2734,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     checkbox.isHidden = false
     checkbox.setAccessibilityElement(true)
     title.toolTip = task.title
+    title.font = SeptaskKitTheme.taskTitle
     contextLabel.font = SeptaskKitTheme.meta
     contextLabel.stringValue = contextText ?? ""
     contextLabel.isHidden = contextText == nil
@@ -2635,12 +2798,17 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     detail.textColor = SeptaskKitTheme.iconMuted
     detail.stringValue = ""
     detail.isHidden = true
+    // Independent of every date branch below. It used to ride the date string,
+    // so a recurring task scheduled TODAY and viewed in Today — the exact state
+    // a weekly task is in on its own day — hit the branch that hides the date
+    // and lost its repeat marker entirely.
+    repeatGlyph.isHidden = task.recurrence == nil
 
     if done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
       guard !day.isEmpty else { return }
       configureScheduleGlyph(named: "checkmark", color: SeptaskKitTheme.iconMuted)
-      detail.stringValue = detailText(KitDayFormat.taskDate(day), task: task)
+      detail.stringValue = KitDayFormat.taskDate(day)
       detail.isHidden = false
       return
     }
@@ -2653,10 +2821,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
         detail.font = .monospacedDigitSystemFont(
           ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
         detail.textColor = SeptaskKitTheme.overdueRed
-        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+        detail.stringValue = KitDayFormat.taskDate(deadline)
       } else {
         configureScheduleGlyph(named: "flag.fill", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = detailText(KitDayFormat.taskDate(deadline), task: task)
+        detail.stringValue = KitDayFormat.taskDate(deadline)
       }
       detail.isHidden = false
       return
@@ -2671,17 +2839,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       // all scheduled dates on other surfaces remain visible.
       if filter != .today || scheduledDay > todayDay {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = detailText(KitDayFormat.taskDate(scheduled), task: task)
+        detail.stringValue = KitDayFormat.taskDate(scheduled)
         detail.isHidden = false
       }
-    } else if task.recurrence != nil {
-      detail.stringValue = "↻"
-      detail.isHidden = false
     }
-  }
-
-  private func detailText(_ date: String, task: SeptenaTask) -> String {
-    task.recurrence == nil ? date : "\(date)  ↻"
   }
 
   private func configureScheduleGlyph(named name: String, color: NSColor) {
@@ -2697,9 +2858,31 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     guard !editing else { return }
     editing = true
     title.isEditable = true
+    // Keep the configure-time font (taskTitle / heading) on the plain string
+    // so the field editor doesn't drop to the control default.
+    let font = title.font ?? SeptaskKitTheme.taskTitle
+    title.font = font
     title.stringValue = plainTitle
+    // Fresh ⌘N rows can reach here before the first layout pass — without
+    // this the title's trailing pin hasn't resolved and the field editor
+    // attaches to a near-zero frame (the one-glyph-wide editor bug).
+    layoutSubtreeIfNeeded()
     window?.makeFirstResponder(title)
-    title.currentEditor()?.selectAll(nil)
+    // Field editor inherits the text field's frame (now full-width via the
+    // trailing pin) and defaults to an opaque white fill — clear it so rename
+    // reads as in-row text, same as the composer title. Also re-assert font:
+    // the shared field editor can carry a stale face from a prior edit.
+    if let editor = title.currentEditor() as? NSTextView {
+      editor.drawsBackground = false
+      editor.backgroundColor = .clear
+      editor.insertionPointColor = .labelColor
+      editor.font = font
+      editor.typingAttributes = [
+        .font: font,
+        .foregroundColor: NSColor.labelColor,
+      ]
+      editor.selectAll(nil)
+    }
   }
 
   func controlTextDidEndEditing(_ obj: Notification) {
