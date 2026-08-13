@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1584,
-      "date": "2026-08-12",
+      "build": 1586,
+      "date": "2026-08-13",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app",
-          "detail": "A new dedicated task app for Mac, iPhone, iPad, and Apple Watch that shares your Septena task data.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A new dedicated app for tasks and projects, sharing the same private data as Septena, now available on iPhone, iPad, and Mac.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks now work reliably everywhere",
-          "detail": "Completing a recurring task creates its next occurrence, and repeat schedules hold steady across every surface.",
+          "title": "Recurring tasks are far more reliable",
+          "detail": "Repeating tasks now behave consistently across every surface, and completing one reliably spawns its next occurrence.",
+          "section": "tasks"
+        },
+        {
+          "title": "Attach files to tasks",
+          "detail": null,
+          "section": "tasks"
+        },
+        {
+          "title": "Import tasks from Things",
+          "detail": "Bring over your existing Things database, including headings and project sections.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recover deleted tasks",
+          "detail": "Deleted tasks now live in Recently Deleted for 30 days with one-tap restore, alongside new multi-select bulk actions.",
           "section": "tasks"
         },
         {
           "title": "Photo-based meal logging",
-          "detail": "Take a photo of your meal and Septena analyzes it on-device to prefill the nutrition details.",
+          "detail": "Snap a photo of a meal and Septena analyzes and prefills the nutrition entry on-device.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "Strength sets get progression hints, rest periods auto-advance, and sessions track a live Watch activity.",
+          "detail": "Get per-set progression hints, effort-weighted muscle volume tracking, and a Live Activity that follows your session.",
           "section": "training"
         },
         {
-          "title": "Recently Deleted tasks with undo",
-          "detail": "Deleted tasks stay recoverable for 30 days, and bulk actions, drag-and-drop filing, and a redesigned date picker make task management faster.",
-          "section": "tasks"
-        },
-        {
-          "title": "Apple Watch gets a real task list and Next feed",
-          "detail": "See tasks, intake tracking, and fasting status on your wrist, including live complications.",
-          "section": null
-        },
-        {
-          "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy view shows the full analytics ladder and lets you opt out with an anonymized log of what was sent.",
-          "section": null
-        },
-        {
-          "title": "Pinned goals and a steps tile on your dashboard",
-          "detail": "Pin goals to the week dashboard and track daily steps alongside your other stats.",
+          "title": "Suggested goals for more sections",
+          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions, and you can pin any goal to your dashboard.",
           "section": "goals"
         }
       ]
