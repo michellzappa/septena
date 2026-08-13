@@ -2,13 +2,14 @@ import SwiftUI
 
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
-/// module" in both apps; Today and Upcoming are first-class smart-list tabs;
-/// the trailing `search` tab is a genuine Search destination — the ONLY thing
+/// module" in both apps; Today, Next, and Upcoming are first-class destinations
+/// (Next matches the AppKit sidebar page — not a fold under Today); the
+/// trailing `search` tab is a genuine Search destination — the ONLY thing
 /// iOS 26 renders in the tab bar's detached trailing slot (a `role: .search`
 /// tab). Quick-add is NOT a tab: every list already carries a nav-bar `+`
 /// (`pageChrome`) and ⌘N, so capture lives there, not in the bar.
 enum SeptaskTab: Hashable {
-  case tasks, today, upcoming, search
+  case tasks, today, next, upcoming, search
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -63,11 +64,11 @@ struct SeptaskRootView: View {
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
-      // subset with a Septask surface. The embedded Next fold (Today's foot)
-      // added two: the mood check-in and the nutrition new-meal sheet, both
-      // suggestion destinations. Training stays out (its destination is the
-      // live-session surface Septask doesn't compile — the fold filters that
-      // suggestion). Anything else ever set shows empty rather than crashing.
+      // subset with a Septask surface. The Next page's suggestions add two:
+      // the mood check-in and the nutrition new-meal sheet. Training stays
+      // out (its destination is the live-session surface Septask doesn't
+      // compile — the feed filters that suggestion). Anything else ever set
+      // shows empty rather than crashing.
       .sheet(item: $nav.presentedModal) { modal in
         switch modal {
         case .quickFind:
@@ -77,7 +78,7 @@ struct SeptaskRootView: View {
         case .addInfo(let section):
           // Septask's quick capture IS the task composer — no multi-section
           // palette here (the tasks-only twin of AddInfoSheet). The one
-          // exception: the Next fold's fast-break suggestion targets
+          // exception: the Next page's fast-break suggestion targets
           // nutrition, which opens the new-meal sheet directly.
           if section == .nutrition {
             withEnvironment(NewNutritionEntrySheet())
@@ -88,7 +89,7 @@ struct SeptaskRootView: View {
                                  macWidth: 560, macHeight: 520)
           }
         case .moodCheckin:
-          // The Next fold's mood suggestion — same check-in page as
+          // The Next page's mood suggestion — same check-in page as
           // Septena's tab root (RootTabView.modalSheet).
           withEnvironment(AddMoodPage(anchorTime: dayClock.now, date: dayClock.today))
             .septenaModalSheet(macWidth: 560, macHeight: 600)
@@ -135,6 +136,7 @@ struct SeptaskRootView: View {
       guard hSize == .compact, let last = path.last else { return }
       switch last {
       case .filter(.today):    selection = .today
+      case .next:              selection = .next
       case .filter(.upcoming): selection = .upcoming
       default:                 selection = .tasks
       }
@@ -161,6 +163,9 @@ struct SeptaskRootView: View {
       }
       Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
         NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
+      }
+      Tab("Next", systemImage: "arrow.right", value: SeptaskTab.next) {
+        NavigationStack { SeptaskNextPage() }.tint(theme.accent)
       }
       Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
         NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)

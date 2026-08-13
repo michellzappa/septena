@@ -8,7 +8,7 @@ import SwiftData
 // sidebar — collapsed via ⌘/ on macOS, and only a back-tap away on iPhone.
 //
 // Single-source: destinations come from `StructureCache` (sidebar order via
-// `TaskStructureOrder`) and `TaskDestinations.smartListRoutes`; every label /
+// `TaskStructureOrder`) and `TaskDestinations.sidebarRoutes`; every label /
 // icon / selection check reads off `Route`, so the menu can never disagree
 // with the sidebar about what's navigable, in what order, or what's current.
 //
@@ -56,7 +56,7 @@ struct TaskNavMenu<Trigger: View>: View {
     let projects = snapshot.projects
     let topLevel = projects.filter { $0.area == nil && $0.status == .active }
 
-    ForEach(TaskDestinations.smartListRoutes, id: \.id) { destButton($0) }
+    ForEach(TaskDestinations.sidebarRoutes, id: \.id) { destButton($0) }
 
     if !topLevel.isEmpty {
       Divider()

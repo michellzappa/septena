@@ -268,9 +268,9 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
-      # The embedded Next fold (SeptaskNextFold, Today's foot): the Next feed's
+      # The Next page (SeptaskNextPage): the Next feed's
       # models + rows, plus the suggestion destinations (mood check-in, new
-      # meal) and the Done Today editors (mood / gut / nutrition). Included by
+      # meal). Included by
       # file, never by folder — the rest of Shell/Dashboard and the section
       # folders reach into surfaces Septask doesn't compile.
       - path: Septena/Shell/Dashboard/MirrorReader.swift

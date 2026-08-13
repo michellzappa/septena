@@ -81,14 +81,28 @@ extension Route {
 /// See `docs/DRAG_AND_DROP.md` §5.
 @MainActor
 enum TaskDestinations {
-  /// Smart lists, in display order. Next is intentionally absent — it's a
-  /// top-level tab, not a Tasks destination.
+  /// Smart lists, in display order. Next is intentionally absent here — on
+  /// Septena it's a top-level tab; on Septask `sidebarRoutes` inserts it
+  /// after Today (matching the AppKit shell).
   static let smartListRoutes: [Route] = [
     .filter(.today),
     .filter(.upcoming),
     .filter(.unscheduled),
     .filter(.logbook),
   ]
+
+  /// Sidebar / title-dropdown destinations. Septask puts Next beside Today
+  /// (iPhone tab + iPad sidebar, same order as AppKit). Septena keeps Next
+  /// out of the Tasks sidebar.
+  static var sidebarRoutes: [Route] {
+    #if SEPTASK
+    var routes = smartListRoutes
+    routes.insert(.next, at: 1)
+    return routes
+    #else
+    return smartListRoutes
+    #endif
+  }
 
   static func orderedAreas(_ loaded: [Area]) -> [Area] {
     TaskStructureOrder.orderedAreas(loaded)

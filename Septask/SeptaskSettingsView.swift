@@ -373,7 +373,6 @@ private struct SeptaskTaskSettingsPane: View {
 /// home, rather than the full app's dashboard-layout controls.
 private struct SeptaskHomePane: View {
   @AppStorage(SettingsKey.loggingAnimationsEnabled) private var loggingAnimations = true
-  @AppStorage(SeptaskNextFold.showInTodayKey) private var showNextInToday = true
 
   var body: some View {
     Form {
@@ -385,14 +384,6 @@ private struct SeptaskHomePane: View {
         }
       } footer: {
         Text("Sets the app's text size on this device. It doesn't change Septena.")
-      }
-
-      Section {
-        Toggle(isOn: $showNextInToday) {
-          Label("Next in Today", systemImage: "arrow.right")
-        }
-      } footer: {
-        Text("Appends your Next feed — suggestions, chores, habits, supplements, and today's log — as a foldable section at the end of Today. Everything checks off here exactly like in Septena.")
       }
 
       Section {

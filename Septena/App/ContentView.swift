@@ -91,10 +91,10 @@ struct ContentView: View {
     switch route {
     case .filter(let f):  TaskListView(filter: f)
     case .next:
-      // Next is a life-OS surface; Septask compiles the tasks shell only and
-      // nothing there navigates to .next (docs/SEPTASK.md).
       #if SEPTASK
-      EmptyView()
+      // Same standalone Next page the AppKit sidebar hosts — iPad's SwiftUI
+      // split lands here; iPhone uses the Next tab instead (SeptaskRootView).
+      SeptaskNextPage()
       #else
       NextView()
       #endif

@@ -194,11 +194,11 @@ final class SeptenaServices {
       projectsMutator.bind(ckEngine: ckEngine)
       // Lets project deletion cascade-clear the link on referencing tasks.
       projectsMutator.taskMutator = taskMutator
-      // The Next feed's write set binds in BOTH profiles: Septask embeds the
-      // full Next feed at the foot of Today (SeptaskNextFold), so the trio
+      // The Next feed's write set binds in BOTH profiles: Septask hosts the
+      // full Next feed as its own page (SeptaskNextPage), so the trio
       // toggles (checklist), inline intake nudges, and the fast-break new-meal
       // suggestion (nutrition) must reach CloudKit from the tasks-only shell
-      // too. (Mood needs no engine binding; gut isn't written by the fold —
+      // too. (Mood needs no engine binding; gut isn't written by the page —
       // the Done Today log that read/edited it was cut, so gut stays full-only.)
       checklistMutator.bind(ckEngine: ckEngine)
       intakeMutator.bind(ckEngine: ckEngine)

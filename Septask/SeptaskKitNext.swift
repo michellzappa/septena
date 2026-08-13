@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 // Next page for the AppKit shell: hosts the shared SwiftUI `SeptaskNextPage`
-// (same feed body as the Today fold — docs/SEPTASK.md "Next in Today") in an
+// (same feed body as the iOS Next tab / iPad sidebar destination) in an
 // NSHostingController. Next is not a keyboard-latency task surface, so
 // porting HabitRow/ChoreRow/… to AppKit would be pure drift; hosting keeps
 // the single implementation. Same environment rules as Settings
@@ -52,28 +52,7 @@ final class SeptaskKitNextController: NSViewController {
 enum KitNextCount {
   static func open() -> Int {
     let clock = SeptaskMacRuntime.dayClock
-    let model = NextItemsModel()
-    model.paintFromCache(today: clock.today, now: clock.now)
-    let suggestions = NextSuggestionsModel()
-    suggestions.paintFromCache(today: clock.today)
-
-    let defaults = UserDefaults.standard
-    let lingerHabits = (defaults.object(forKey: NextLinger.habitsKey) as? Bool)
-      ?? NextLinger.habitsDefault
-    let lingerSupplements = (defaults.object(forKey: NextLinger.supplementsKey) as? Bool)
-      ?? NextLinger.supplementsDefault
-
-    let visibleSuggestions = suggestions.suggestions.filter {
-      !suggestions.skipped.contains($0.id) && $0.kind != .training
-    }
-    let habitsNow = model.openHabits.filter {
-      DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerHabits)
-    }
-    let supplementsNow = model.openSupplements.filter {
-      DayBucket.isDueNow(bucketKey: $0.bucket, linger: lingerSupplements)
-    }
-    return visibleSuggestions.count + model.openChores.count
-      + habitsNow.count + supplementsNow.count
+    return SeptaskNextFeed.openCount(today: clock.today, now: clock.now)
   }
 }
 #endif

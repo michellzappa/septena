@@ -34,6 +34,11 @@ struct SidebarRootView: View {
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
+  #if SEPTASK
+  /// Open Next items (suggestions + trio) — iPad sidebar badge, same cut as
+  /// AppKit's `KitNextCount`.
+  @State private var nextOpenCount: Int = 0
+  #endif
 
   // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
   // Move Up/Down renumbers via areas/projects mutators; the legacy device-local
@@ -74,6 +79,10 @@ struct SidebarRootView: View {
     _projectProgress = State(initialValue: agg.projectProgress)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
+    #if SEPTASK
+    _nextOpenCount = State(initialValue: SeptaskNextFeed.openCount(
+      today: SeptenaDate.today, now: Date()))
+    #endif
   }
   /// Fraction of each project's tasks that are done (0...1). Drives the
   /// circular progress icon in SidebarProjectRow.
@@ -510,10 +519,10 @@ struct SidebarRootView: View {
   // count are sidebar-specific styling, resolved per route here.
   //
   // No separate Inbox row — loose captures now live in the triage band on top
-  // of Today (docs/TRIAGE_BAND_SPEC.md). Next moved out of the Tasks sidebar —
-  // it's a top-level tab now.
+  // of Today (docs/TRIAGE_BAND_SPEC.md). Next is a top-level tab on Septena;
+  // Septask inserts it after Today via `TaskDestinations.sidebarRoutes`.
   private var smartListSpecs: [SmartListSpec] {
-    TaskDestinations.smartListRoutes.map { route in
+    TaskDestinations.sidebarRoutes.map { route in
       SmartListSpec(route: route,
                     icon: route.icon,
                     color: smartListColor(route),
@@ -542,6 +551,9 @@ struct SidebarRootView: View {
     case .filter(.upcoming):    return counts?.upcomingCount
     case .filter(.unscheduled): return counts?.unscheduledCount
     case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
+    #if SEPTASK
+    case .next:                 return nextOpenCount > 0 ? nextOpenCount : nil
+    #endif
     default:                    return nil
     }
   }
@@ -572,7 +584,7 @@ struct SidebarRootView: View {
   /// active project, and (when present) Recently Deleted. Used to resolve a
   /// `Route.id` tag back to its full `Route` for the selection binding.
   private var selectableRoutes: [Route] {
-    var routes = TaskDestinations.smartListRoutes
+    var routes = TaskDestinations.sidebarRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
     if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
@@ -990,6 +1002,9 @@ struct SidebarRootView: View {
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
     recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
+    #if SEPTASK
+    nextOpenCount = SeptaskNextFeed.openCount(today: clock.today, now: clock.now)
+    #endif
     reconcileSidebarSelection()
   }
 
@@ -1181,6 +1196,14 @@ private struct SidebarBehaviorModifier: ViewModifier {
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
         reload()
       }
+      #if SEPTASK
+      // Next's badge is chores / habits / suggestions, which post data-changed
+      // (not tasks-changed). Same debounce so a ritual burst is one reload.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)
+        .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
+        reload()
+      }
+      #endif
   }
 }
 

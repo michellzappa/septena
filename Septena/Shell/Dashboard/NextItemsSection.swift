@@ -989,8 +989,8 @@ struct NextDoneSection: View {
 }
 
 /// One timeline row: time chip · section-color dot · label · trailing detail.
-/// Internal (not private): Septask's embedded Next fold renders the same rows
-/// under the Tasks card chrome (see SeptaskNextFold).
+/// Internal (not private): Septask's Next page renders the same rows
+/// under the Tasks card chrome (see SeptaskNextPage).
 struct DoneEventRow: View {
   let event: DoneEvent
   /// Open the entry's editor. nil → read-only row (no menu).

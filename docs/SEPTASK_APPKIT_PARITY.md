@@ -327,7 +327,7 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   day. So this port is complete, not partial.
 - **[DONE] Next feed.** Sidebar row ("Next", after Today) swaps the detail
   pane to a hosted `SeptaskNextPage` (`SeptaskKitNext.swift`) — same shared
-  feed body as SwiftUI's `SeptaskNextFold` (`SeptaskNextFeed`: suggestions +
+  feed body as iOS SwiftUI's `SeptaskNextPage` (`SeptaskNextFeed`: suggestions +
   chores / habits / supplements, no Tasks Today / Done log / training). AppKit
   deliberately does NOT append Next at the foot of the Today table
   (heterogeneous NSTableView rows would fight the shell); a separate sidebar

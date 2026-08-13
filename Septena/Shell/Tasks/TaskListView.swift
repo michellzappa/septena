@@ -980,13 +980,6 @@ struct TaskListView: View {
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
       scopeLoggedSection()
-      #if SEPTASK
-      // Septask embeds the full Next feed (suggestions, chores / habits /
-      // supplements, Done Today) at the foot of Today so the day's rituals
-      // live one scroll away instead of one app away. One foldable section,
-      // gated by Settings ▸ General ▸ "Show Next in Today".
-      if filter == .today { SeptaskNextFold() }
-      #endif
       taskListFooter
     }
     // Click-away collapses the inline editor (Things-style) — selecting any

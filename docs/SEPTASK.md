@@ -230,7 +230,7 @@ binds in `start()`), not structural (no UIKit/shell types in the runtime).
 - **Two known upward seams in SeptenaCore.** `NextFeed.swift` references
   `NextSuggestionsModel` (defined in `Shell/Dashboard`) — originally both it
   and its one core dependent `WatchSnapshotPublisher.swift` were excluded from
-  the Septask target. Since the embedded Next fold (see "Next in Today" below)
+  the Septask target. Since the Next page landed (see "Next page" below),
   the Septask targets compile `NextFeed.swift` plus the Next model/row files,
   so only `WatchSnapshotPublisher.swift` stays excluded, with the `#if
   !SEPTASK` gate at its single call site.
@@ -315,10 +315,11 @@ long as bundle IDs and display names are explicit.
   not data or external clients.
 - **Task-only user surface.** Septask v1 has no Week, Goals, Health,
   training, nutrition, section picker, full section registry, or life-OS
-  dashboard. (Amended 2026-07-11: the Next feed — suggestions + the chores /
-  habits / supplements trio — embeds at the foot of Today as an opt-out
-  foldable section; see "Next in Today" below. Forward-glance + log only, not
-  a section surface, and no Done Today timeline; the rest of the rule holds.)
+  dashboard. (Amended 2026-07-11 / 2026-08-13: the Next feed — suggestions +
+  the chores / habits / supplements trio — is a first-class page, matching
+  the AppKit sidebar destination; see "Next page" below. Forward-glance
+  only, not a section surface, and no Done Today timeline; the rest of the
+  rule holds.)
 - **Complexity is the kill condition.** If task-only runtime extraction requires
   invasive surgery through sync and services, stop and reassess before building
   a broad parallel app shell.
@@ -725,37 +726,35 @@ shared supporting folder so both apps improve together.
 - Target definitions: `project.yml`
 
 
-## Next in Today (2026-07-11)
+## Next page (2026-08-13)
 
-Septask embeds the Next feed — suggestions plus the chores / habits /
-supplements trio — at the foot of the Today list, as one foldable "Next"
-section (`Septask/SeptaskNextFold.swift`, mounted from `TaskListView` under
-`#if SEPTASK`, gated by Settings ▸ General ▸ "Next in Today", default on).
-Rationale: Septask mirrors the whole zone anyway; the fold removes the
-app-switch for the day's rituals.
+Septask hosts the Next feed — suggestions plus the chores / habits /
+supplements trio — as a **first-class page**, not a fold under Today.
+iPhone: a tab between Today and Upcoming (`SeptaskRootView`). iPad: a
+sidebar row after Today (`TaskDestinations.sidebarRoutes` → `ContentView`
+→ `SeptaskNextPage`). AppKit: the same sidebar destination
+(`KitSidebarDestination.next` → hosted `SeptaskNextPage` via
+`SeptaskKitNext.swift`). Shared body is `SeptaskNextFeed` in
+`Septask/SeptaskNext.swift`.
 
-**AppKit shell (2026-08-07):** the same feed is a **sidebar destination**
-instead (`KitSidebarDestination.next` → hosted `SeptaskNextPage` via
-`SeptaskKitNext.swift`). The shared body is `SeptaskNextFeed`; the Today
-fold and the AppKit page both render it. Appending heterogeneous ritual rows
-to the AppKit Today `NSTableView` was deliberately rejected.
+The Today fold (`SeptaskNextFold`) and its Settings ▸ Home ▸ "Next in Today"
+toggle were removed so every platform agrees: Next is beside Today, not
+under it.
 
-- **Composition, not copies.** The fold renders the SAME models/rows Septena's
+- **Composition, not copies.** The page renders the SAME models/rows Septena's
   Next tab uses (`NextItemsModel`, `NextSuggestionsModel`,
-  `HabitRow`/`SupplementRow`/`ChoreRow`, `NextSuggestionRow`). Container
-  differs: Today is a `SelectableScrollList` (not a `List`), so rows wear the
+  `HabitRow`/`SupplementRow`/`ChoreRow`, `NextSuggestionRow`). Rows wear the
   Tasks surface's `taskCardChrome` instead of List cells. No List selection /
   keyboard cursor across Next rows.
 - **Deliberate cuts from Septena's Next page:** no "Tasks Today" block (the
-  Today list above IS it); no "Done Today" log (too recursive on a surface
-  that's already the task log — forward glance only); no training suggestion
-  (its destination is the live-session surface Septask doesn't compile). A
-  divider sits between the task list and the fold; the fold's sub-block titles
-  (Suggested / Chores / Habits / Supplements) render a step smaller + gray so
-  they don't compete with the task section headers.
+  Today list IS it); no "Done Today" log (too recursive on a surface that's
+  already the task log — forward glance only); no training suggestion
+  (its destination is the live-session surface Septask doesn't compile).
+  Sub-block titles (Suggested / Chores / Habits / Supplements) render a step
+  smaller + gray so they don't compete with task section headers.
 - **Runtime loosening (deliberate).** `SeptenaServices.start()` now binds
   `checklistMutator`, `intakeMutator`, and `nutritionMutator` in BOTH profiles
-  (the fold's write set: trio toggles, inline intake nudges, fast-break new
+  (the page's write set: trio toggles, inline intake nudges, fast-break new
   meal; mood needs no engine binding). Gut / goal / coach / activity /
   symptoms / medications / grocery / training mutators and the provider stores
   stay full-profile-only.
@@ -765,11 +764,12 @@ to the AppKit Today `NSTableView` was deliberately rejected.
   + check-in page (`AddMoodPage`), and Nutrition edit/new sheets +
   `NutritionCommit.swift` + MealPhoto analyzer/draft/camera. (`MealPhotoThumbnail`
   lives in `EditNutritionEntrySheet.swift`, so the new-meal sheet pulls that
-  file in even though the fold no longer edits meals.) Septask iOS also gained
+  file in even though the page no longer edits meals.) Septask iOS also gained
   the `FoundationModels.framework` dependency (meal-photo analyzer).
 - **Extraction made for this:** `NutritionPlugin.commitMeal` moved to
   `NutritionCommit` (Sections/Nutrition) so the meal sheets compile without
   the plugin/registry; `HydrationPlugin.waterFoodsMarker` forwards to it.
 - **Suggestion routing deltas:** intake nudges log inline (unchanged); mood
   opens `AddMoodPage` and fast-break opens `NewNutritionEntrySheet`, both from
-  `SeptaskRootView`'s modal switch (`.moodCheckin`, `.addInfo(.nutrition)`).
+  `SeptaskRootView`'s modal switch on iOS (`.moodCheckin`, `.addInfo(.nutrition)`)
+  and from `SeptaskNextPage`'s own sheet on AppKit.

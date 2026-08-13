@@ -296,8 +296,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // captures live in the triage band on top of Today (the same structure
     // the SwiftUI sidebar settled on, docs/TRIAGE_BAND_SPEC.md). The band's
     // size rides on Today's count so nothing about it is hidden.
-    // Next sits beside Today (not at the foot of the Today list) — the AppKit
-    // shape for the feed SwiftUI embeds as `SeptaskNextFold`.
+    // Next sits beside Today (not at the foot of the Today list) — the same
+    // first-class destination iOS now uses as a tab / sidebar row.
     var views = [
       Node(.filter(.today,
                    title: String(localized: "Today", comment: "Smart list title"),
