@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1586,
+      "build": 1588,
       "date": "2026-08-13",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Meet Septask, a focused task app",
-          "detail": "A new dedicated app for tasks and projects, sharing the same private data as Septena, now available on iPhone, iPad, and Mac.",
+          "detail": "A standalone iOS and Mac app over your same private task data, with a native AppKit shell on Mac and its own watch app.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks are far more reliable",
-          "detail": "Repeating tasks now behave consistently across every surface, and completing one reliably spawns its next occurrence.",
+          "title": "Recurring tasks now hold up everywhere",
+          "detail": "Completing a recurring task reliably spawns its next occurrence, and fixed-schedule repeats no longer drift.",
           "section": "tasks"
         },
         {
-          "title": "Attach files to tasks",
-          "detail": null,
-          "section": "tasks"
-        },
-        {
-          "title": "Import tasks from Things",
-          "detail": "Bring over your existing Things database, including headings and project sections.",
+          "title": "More ways to organize your tasks",
+          "detail": "Drag tasks to re-home them, file under project headings, multi-select for bulk actions, and import headings from a Things export.",
           "section": "tasks"
         },
         {
           "title": "Recover deleted tasks",
-          "detail": "Deleted tasks now live in Recently Deleted for 30 days with one-tap restore, alongside new multi-select bulk actions.",
+          "detail": "Deleted tasks now land in Recently Deleted with a 30-day window to restore them.",
           "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a photo of a meal and Septena analyzes and prefills the nutrition entry on-device.",
+          "title": "Photo-first meal logging",
+          "detail": "Snap a photo of your meal and on-device analysis prefills the fields, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter training sessions",
-          "detail": "Get per-set progression hints, effort-weighted muscle volume tracking, and a Live Activity that follows your session.",
+          "title": "Training session upgrades",
+          "detail": "Editable start/end times, per-set progression hints, and an auto-advancing rest timer with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions, and you can pin any goal to your dashboard.",
-          "section": "goals"
+          "title": "Task attachments and sharing",
+          "detail": "Attach files to a task and share into Septena or Septask from other apps.",
+          "section": "tasks"
+        },
+        {
+          "title": "See exactly what telemetry is sent",
+          "detail": "New privacy settings show a full log of anonymized usage data with graded levels from off to full.",
+          "section": null
         }
       ]
     },
