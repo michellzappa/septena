@@ -122,6 +122,13 @@ final class SeptaskKitTaskListController: NSViewController {
   private var composerShowsNotes = false
   /// The row currently expanded into the inline composer, if any.
   private var composingTaskId: String?
+  /// Row the drag would insert ABOVE (`NSTableView` gap index; `rows.count`
+  /// means after the last row). Drives `KitCardRowView.dropLine`.
+  private var dropAboveRow: Int? {
+    didSet {
+      if oldValue != dropAboveRow { refreshDropIndicator() }
+    }
+  }
   /// Completed rows are lingering on screen; refreshes wait (see `beginSettle`).
   private var isSettling = false
   private var settleWorkItem: DispatchWorkItem?
@@ -195,6 +202,15 @@ final class SeptaskKitTaskListController: NSViewController {
     // `keyboardFocusIndicatorColor`, which follows the accent, so with this
     // app's ink accent it renders as a black box around the selected row.
     tableView.focusRingType = .none
+    // Layer-backed NSTableView paints a full-row selection fill that never
+    // reaches `KitCardRowView.drawSelection` — a second rectangle around the
+    // inset card. `.none` turns that off; the row view paints the wash
+    // inside the card in `drawBackground`.
+    tableView.selectionHighlightStyle = .none
+    // Default `.gap` punches a row-height hole at the drop, which splits a
+    // per-row card into two and leaves a chrome-less duplicate in the gap.
+    // `.none` keeps the card intact; we draw SwiftUI's insertion line instead.
+    tableView.draggingDestinationFeedbackStyle = .none
     tableView.dataSource = self
     tableView.delegate = self
     tableView.target = self
@@ -252,6 +268,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     tableView.registerForDraggedTypes([.septaskTask])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
+    tableView.onDragEnded = { [weak self] in self?.dropAboveRow = nil }
 
     scrollView.documentView = tableView
     scrollView.hasVerticalScroller = true
@@ -923,6 +940,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     for entry in previous {
       apply(destination, project: entry.project, area: entry.area, id: entry.id)
+      mutator.acknowledge(id: entry.id)
     }
     reload()
     onStoreChanged?()
@@ -1095,7 +1113,10 @@ final class SeptaskKitTaskListController: NSViewController {
     default: dropsCompleted = true
     }
     guard dropsCompleted else {
-      for task in completing { mutator.complete(id: task.id) }
+      for task in completing {
+        mutator.complete(id: task.id)
+        mutator.acknowledge(id: task.id)
+      }
       for task in reopening { mutator.uncomplete(id: task.id) }
       reload()
       return
@@ -1115,7 +1136,10 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     tableView.reloadData(forRowIndexes: restyled, columnIndexes: [0])
 
-    for task in completing { mutator.complete(id: task.id) }
+    for task in completing {
+      mutator.complete(id: task.id)
+      mutator.acknowledge(id: task.id)
+    }
     for task in reopening { mutator.uncomplete(id: task.id) }
     beginSettle()
   }
@@ -1217,6 +1241,7 @@ final class SeptaskKitTaskListController: NSViewController {
         case .deadline:
           self.mutator.setDeadline(id: task.id, date: date)
         }
+        self.mutator.acknowledge(id: task.id)
       }
       self.reload()
     }
@@ -1228,6 +1253,7 @@ final class SeptaskKitTaskListController: NSViewController {
     for task in actionableSelection {
       mutator.schedule(id: task.id, date: nil)
       mutator.removeFromToday(id: task.id)
+      mutator.acknowledge(id: task.id)
     }
     reload()
   }
@@ -1239,6 +1265,7 @@ final class SeptaskKitTaskListController: NSViewController {
       } else {
         mutator.moveToToday(id: task.id)
       }
+      mutator.acknowledge(id: task.id)
     }
     reload()
   }
@@ -1443,21 +1470,15 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Inline composer (title + elective pills + notes)
 
-  /// Engaging a fresh agent-cued row clears the cue ring — same contract as
-  /// SwiftUI opening the composer/inspector (`TaskMutator.acknowledge`).
-  private func acknowledgeIfNeeded(id: String) {
-    guard let task = rows.compactMap(\.task).first(where: { $0.id == id }),
-          task.showsAgentCue() else { return }
-    mutator.acknowledge(id: id)
-  }
-
   func beginComposing(id: String) {
     guard composingTaskId != id else { return }
     // Switching rows: fold the open one instantly so two height animations
     // don't fight; the newly opened row still expands.
+    // Opening to peek must NOT acknowledge — cue == Inbox membership for
+    // agent rows (same contract as SwiftUI `TaskComposer`). Disposition
+    // paths (complete / when / move / today) ratify.
     if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
     composingTaskId = id
-    acknowledgeIfNeeded(id: id)
     guard let row = rows.firstIndex(where: { $0.task?.id == id }) else {
       composingTaskId = nil
       return
@@ -1659,6 +1680,7 @@ final class SeptaskKitTaskListController: NSViewController {
                         })
         if wasOpen {
           self.mutator.complete(id: task.id)
+          self.mutator.acknowledge(id: task.id)
         } else {
           self.mutator.uncomplete(id: task.id)
         }
@@ -1670,6 +1692,7 @@ final class SeptaskKitTaskListController: NSViewController {
         } else {
           self.mutator.moveToToday(id: task.id)
         }
+        self.mutator.acknowledge(id: task.id)
         self.refreshComposerRow(taskId: task.id)
 
       case .when(let anchor):
@@ -1683,6 +1706,7 @@ final class SeptaskKitTaskListController: NSViewController {
             self.mutator.schedule(id: task.id, date: date)
             self.mutator.removeFromToday(id: task.id)
           }
+          self.mutator.acknowledge(id: task.id)
           self.refreshComposerRow(taskId: task.id)
         }
 
@@ -1691,6 +1715,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                       initial: KitDayFormat.date(fromWire: task.deadline),
                                       relativeTo: anchor.bounds, of: anchor) { [weak self] date, _ in
           self?.mutator.setDeadline(id: task.id, date: date)
+          self?.mutator.acknowledge(id: task.id)
           self?.refreshComposerRow(taskId: task.id)
         }
 
@@ -2079,6 +2104,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         fresh.identifier = identifier
         return fresh
       }()
+    rowView.selectionHighlightStyle = .none
     applyCardGeometry(rowView, atRow: row)
     return rowView
   }
@@ -2103,6 +2129,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       rowView.isCard = false
     }
     applySelectionJoins(rowView, atRow: row)
+    applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
   }
 
@@ -2154,6 +2181,27 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     }
   }
 
+  private func applyDropLine(_ rowView: KitCardRowView, atRow row: Int) {
+    guard let drop = dropAboveRow else {
+      rowView.dropLine = .none
+      return
+    }
+    if drop == row {
+      rowView.dropLine = .top
+    } else if drop >= rows.count && row == rows.count - 1 {
+      rowView.dropLine = .bottom
+    } else {
+      rowView.dropLine = .none
+    }
+  }
+
+  private func refreshDropIndicator() {
+    tableView.enumerateAvailableRowViews { rowView, row in
+      guard let cardRow = rowView as? KitCardRowView, rows.indices.contains(row) else { return }
+      applyDropLine(cardRow, atRow: row)
+    }
+  }
+
   // MARK: Drag & drop (reorder + re-file)
 
   /// Manual reorder applies wherever manual order is what's shown; archives
@@ -2182,19 +2230,25 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                  proposedRow row: Int,
                  proposedDropOperation operation: NSTableView.DropOperation)
     -> NSDragOperation {
-    guard allowsReorder, !KitDrag.ids(from: info).isEmpty else { return [] }
+    guard allowsReorder, !KitDrag.ids(from: info).isEmpty else {
+      dropAboveRow = nil
+      return []
+    }
     // Never drop into the logged-footer / completed block — clamp the
     // indicator to the open-work region above it.
-    if let clamped = clampDropRow(row), clamped != row {
-      tableView.setDropRow(clamped, dropOperation: .above)
+    let target = clampDropRow(row) ?? row
+    if target != row {
+      tableView.setDropRow(target, dropOperation: .above)
     } else if operation == .on {
       tableView.setDropRow(row, dropOperation: .above)
     }
+    dropAboveRow = target
     return .move
   }
 
   func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo,
                  row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+    dropAboveRow = nil
     let ids = KitDrag.ids(from: info)
     guard !ids.isEmpty else { return false }
     let insertAt = clampDropRow(row) ?? row
@@ -2400,13 +2454,17 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
                           uniquingKeysWith: { a, _ in a })
     for id in ids {
       guard let task = byId[id] else { continue }
+      var moved = false
       if task.project != targetProject {
         mutator.moveToProject(id: id, project: targetProject)
+        moved = true
       }
       // Area only matters outside a project group (a project implies its area).
       if targetProject == nil, task.area != targetArea {
         mutator.moveToArea(id: id, area: targetArea)
+        moved = true
       }
+      if moved { mutator.acknowledge(id: id) }
     }
   }
 
@@ -2668,8 +2726,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     NSLayoutConstraint.activate([
       leadingConstraint,
       checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
-      checkbox.widthAnchor.constraint(equalToConstant: 20),
-      checkbox.heightAnchor.constraint(equalToConstant: 20),
+      checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       title.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
       // Pin through to the trailing cluster so the title (and its field
@@ -2858,6 +2916,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     guard !editing else { return }
     editing = true
     title.isEditable = true
+    // Truncation while the field editor is attached makes AppKit fight the
+    // insertion-point scroll — the caret jumps to the far right as you type
+    // or arrow through a long title. Clip for the duration of the edit.
+    title.lineBreakMode = .byClipping
+    title.cell?.truncatesLastVisibleLine = false
     // Keep the configure-time font (taskTitle / heading) on the plain string
     // so the field editor doesn't drop to the control default.
     let font = title.font ?? SeptaskKitTheme.taskTitle
@@ -2889,6 +2952,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     guard editing else { return }
     editing = false
     title.isEditable = false
+    title.lineBreakMode = .byTruncatingTail
+    title.cell?.truncatesLastVisibleLine = true
     onRename?(taskId, title.stringValue)
   }
 
@@ -3595,6 +3660,9 @@ final class SeptaskKitTableView: NSTableView {
   /// Tab / Shift-Tab — two-pane keyboard nav, sidebar ⇄ list (mirrors the
   /// sidebar's own `onTab` in `KitSidebarOutlineView`).
   var onFocusSidebar: (() -> Void)?
+  /// Drag left the table or ended — clear the insertion line. `validateDrop`
+  /// is not called on exit, so the table has to report this itself.
+  var onDragEnded: (() -> Void)?
 
   /// Standard responder-chain copy, so Edit ▸ Copy (and its ⌘C) reaches the
   /// task list without a competing menu item.
@@ -3667,6 +3735,16 @@ final class SeptaskKitTableView: NSTableView {
   /// entirely rather than adding to it.
   override func rightMouseDown(with event: NSEvent) {
     onRightClick?(event)
+  }
+
+  override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+    super.draggingExited(sender)
+    onDragEnded?()
+  }
+
+  override func draggingEnded(_ sender: any NSDraggingInfo) {
+    super.draggingEnded(sender)
+    onDragEnded?()
   }
 }
 #endif

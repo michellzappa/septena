@@ -52,8 +52,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
 
   // MARK: - Height
 
-  private static let pillRowHeight: CGFloat = 24
-  private static let notesHeight: CGFloat = 76
+  fileprivate static let pillRowHeight: CGFloat = 24
+  private static let notesHeight: CGFloat = 90
   /// Breathing room under the pill rail (and notes). The TOP of the composer
   /// is not padded separately — it reuses the closed row's vertical band so
   /// the title doesn't travel when the row expands.
@@ -89,6 +89,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     titleField.drawsBackground = false
     titleField.backgroundColor = .clear
     titleField.focusRingType = .none
+    titleField.lineBreakMode = .byClipping
+    titleField.cell?.wraps = false
+    titleField.cell?.truncatesLastVisibleLine = false
     titleField.delegate = self
     titleField.translatesAutoresizingMaskIntoConstraints = false
 
@@ -110,10 +113,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     }
 
     notesView.delegate = self
-    notesView.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline))
-    notesView.isRichText = false
+    notesView.isRichText = true
+    notesView.importsGraphics = false
+    notesView.allowsUndo = true
+    notesView.isAutomaticQuoteSubstitutionEnabled = false
     notesView.drawsBackground = false
     notesView.textContainerInset = NSSize(width: 2, height: 4)
+    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(
+      fontSize: SeptaskKitTheme.notesFontSize)
     notesScroll.documentView = notesView
     notesScroll.hasVerticalScroller = true
     notesScroll.drawsBackground = false
@@ -138,8 +145,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       // band, so Enter doesn't nudge the glyphs.
       checkbox.centerYAnchor.constraint(equalTo: topAnchor,
                                         constant: SeptaskKitTheme.rowHeight / 2),
-      checkbox.widthAnchor.constraint(equalToConstant: 20),
-      checkbox.heightAnchor.constraint(equalToConstant: 20),
+      checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       titleField.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       titleField.centerYAnchor.constraint(equalTo: checkbox.centerYAnchor),
       trailingConstraint,
@@ -185,8 +192,12 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   /// first opened for a task; never on a mid-edit refresh (see `refreshPills`).
   func configure(with task: SeptenaTask, listName: String?) {
     titleField.stringValue = task.title
-    notesView.string = task.notes ?? ""
-    notesShown = !(task.notes ?? "").isEmpty
+    let notes = task.notes ?? ""
+    let fontSize = SeptaskKitTheme.notesFontSize
+    notesView.textStorage?.setAttributedString(
+      MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
+    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+    notesShown = !notes.isEmpty
     notesScroll.isHidden = !notesShown
     notesPill.isOn = notesShown
     refreshPills(with: task, listName: listName)
@@ -275,8 +286,15 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     if selectAll {
       editor.selectAll(nil)
     } else {
+      // Collapse AppKit's default select-all; leave a user-placed caret (or
+      // a partial selection) alone. Unconditionally jumping to `end` is what
+      // yanked the insertion point to the far right after a click-to-edit
+      // or a field-editor restart mid-keystroke.
+      let selected = editor.selectedRange()
       let end = (editor.string as NSString).length
-      editor.setSelectedRange(NSRange(location: end, length: 0))
+      if end > 0, selected.location == 0, selected.length == end {
+        editor.setSelectedRange(NSRange(location: end, length: 0))
+      }
     }
   }
 
@@ -356,35 +374,114 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     }
     return false
   }
+
+  func textDidChange(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView, textView === notesView else { return }
+    MarkdownNotesStyle.restyle(textView, fontSize: SeptaskKitTheme.notesFontSize)
+  }
 }
 
 // MARK: - Pill
 
-/// One elective pill. A recessed `NSButton` is the platform's own capsule-with
-/// -on-state control, so this needs no custom drawing — `isOn` gets the filled
-/// treatment, matching the SwiftUI rail's "filled pills wear a gray capsule,
-/// not the section accent".
+/// One elective pill, drawn as a true stadium (corner radius = half height)
+/// matching SwiftUI's `AttributePill`. `NSButton.BezelStyle.recessed` is a
+/// rounded rect, not a capsule — that's why the rail read as chips. Filled
+/// pills wear a gray wash plus matching ink (never a black slab with white
+/// text), same as the SwiftUI inline rail's `neutral` treatment.
 @MainActor
 final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
 
   var isOn: Bool {
     get { state == .on }
-    set { state = newValue ? .on : .off }
+    set {
+      state = newValue ? .on : .off
+      restyle()
+    }
+  }
+
+  /// `attributedTitle` writes back through `title`; without this the restyle
+  /// would recurse. `title` still has to restyle so a label change ("When" →
+  /// "When: Friday") keeps the fill/ink pairing.
+  private var isRestyling = false
+
+  override var title: String {
+    get { super.title }
+    set {
+      super.title = newValue
+      restyle()
+      invalidateIntrinsicContentSize()
+    }
   }
 
   init() {
     super.init(frame: .zero)
-    bezelStyle = .recessed
-    setButtonType(.pushOnPushOff)
+    isBordered = false
+    bezelStyle = .inline
+    setButtonType(.momentaryPushIn)
+    (cell as? NSButtonCell)?.highlightsBy = []
+    (cell as? NSButtonCell)?.showsStateBy = []
+    alignment = .center
+    lineBreakMode = .byTruncatingTail
     font = SeptaskKitTheme.chip
+    focusRingType = .exterior
     translatesAutoresizingMaskIntoConstraints = false
+    wantsLayer = true
+    layer?.masksToBounds = true
+    layer?.cornerCurve = .continuous
     target = self
     action = #selector(pressed)
+    heightAnchor.constraint(equalToConstant: KitComposerCell.pillRowHeight).isActive = true
+    restyle()
   }
 
   required init?(coder: NSCoder) { fatalError("KitPillButton is code-only") }
 
+  override var intrinsicContentSize: NSSize {
+    let text = attributedTitle.size()
+    return NSSize(width: ceil(text.width) + Self.horizontalPadding * 2,
+                  height: KitComposerCell.pillRowHeight)
+  }
+
+  override func layout() {
+    super.layout()
+    applyCapsule()
+  }
+
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    restyle()
+  }
+
+  /// So the system focus ring follows the stadium, not a rounded-rect bezel.
+  override func drawFocusRingMask() {
+    NSBezierPath(roundedRect: bounds,
+                 xRadius: bounds.height / 2,
+                 yRadius: bounds.height / 2).fill()
+  }
+
+  private func restyle() {
+    guard !isRestyling else { return }
+    isRestyling = true
+    attributedTitle = NSAttributedString(
+      string: super.title,
+      attributes: [
+        .font: SeptaskKitTheme.chip,
+        .foregroundColor: isOn ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.inkSecondary,
+      ])
+    isRestyling = false
+    applyCapsule()
+  }
+
+  private func applyCapsule() {
+    guard let layer else { return }
+    layer.cornerRadius = bounds.height / 2
+    layer.cornerCurve = .continuous
+    layer.backgroundColor = (isOn ? SeptaskKitTheme.pillOnFill : SeptaskKitTheme.chipFill).cgColor
+  }
+
   @objc private func pressed() { onPress?(self) }
+
+  private static let horizontalPadding: CGFloat = 12
 }
 #endif

@@ -15,8 +15,8 @@ committed; gateway default = proposal) returning `placement`, and the gateway
 Gateway **deployed** (`wrangler`); `acknowledgedAt` confirmed in the prod CK
 schema so committed gateway writes stick. **Deferred:** the unread-context dot's
 production trigger (§3.5), the sort-pill `↗`, the per-connection "tasks arrive
-as" settings UI, the awaiting/dimmed state, and wiring a dashed/dot box tap to
-*open the conversation* (today it still completes — §5).
+as" settings UI, the awaiting/dimmed state. Box tap always completes (§5);
+row tap opens the conversation.
 
 Related: `docs/TRIAGE_BAND_SPEC.md` (the inbox/unratified layer),
 `docs/TASK_CONVERSATIONS_PLAN.md` (the task-as-conversation model),
@@ -133,8 +133,8 @@ Two servers, edited in lockstep (`CLAUDE.md`): in-app `LocalMCPServer`
 - **Human captures in the inbox stay solid.** Dashed is reserved for
   agent-*volunteered* proposals; a thing you typed is already committed, it just
   lacks a home. So `isInTriageBand && source == app` → **solid** (+ right pill).
-- **Tappable:** the dashed box and the dotted box open the task conversation on
-  tap (same destination as a row tap). Plain/done complete on tap as today.
+- **Tappable:** every box form (plain / dashed / dotted / done) toggles
+  completion on tap. Opening the conversation is a **row** tap, never the box.
 
 ### 3.2 Right slot — location & time
 
@@ -163,8 +163,8 @@ agent sort pill  ▸  date / today chip  ▸  (recurrence · notes glyphs)
   transparent on the arrival day and a seventh more opaque each carried
   day, capped at ~70% opacity so an aged task never reads as a
   solid/done box. It shows only once earned — a task that has carried over undone
-  (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived-today rows stay
-  transparent. The box's amber *stroke* still means "this is on Today" (presence)
+  (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived-today / duplicated
+  rows stay transparent (`daysOnToday` cannot predate `created`). The box's amber *stroke* still means "this is on Today" (presence)
   on off-Today surfaces (`isToday`); on the Today/Next surfaces the aging tint
   fades in the outline alongside the fill.
 
@@ -287,8 +287,8 @@ or on-demand when the project is opened).
 
 ## 5. Interaction
 
-- tap **plain / done** box → toggle completion (unchanged).
-- tap **dashed / dotted** box → open the task conversation (= row tap).
+- tap **any** box (plain / dashed / dotted / done) → toggle completion.
+  Check is check — the box never opens the row or the conversation.
 - tap **sort pill** → file to the suggested destination (ratify).
 - row tap → task detail / conversation (`TaskDetailView` / `ConversationCard`).
 - "Discuss" is **not** a control — it is the dot (signal) + the row tap (open).
@@ -301,7 +301,7 @@ Ship behind a feature flag; one green build via `scripts/build.sh`.
 
 1. `TaskCheckbox`: add `Readiness` form enum (`solid`, `dot`, `dashed`, plus
    existing done); render dashed border + haloed corner dot; drop `isToday`
-   tint. Make `dot`/`dashed` tappable → open conversation.
+   tint. Every form completes on tap (never opens).
 2. `TaskRow`: relocate the agent signal from the trailing status-dot slot into
    the box form; keep `ConvoBadge` logic as the dot driver; rebuild the trailing
    precedence ladder (sort pill ▸ date/today ▸ glyphs).

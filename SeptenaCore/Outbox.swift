@@ -62,16 +62,17 @@ final class TaskMutator {
               today: Bool = false,
               notes: String? = nil,
               source: String = TaskSource.app,
+              acknowledged: Bool = false,
               deferPush: Bool = false,
               atBottom: Bool = false) -> SeptenaTask {
     guard let cloudBackend else {
       preconditionFailure("TaskMutator.create called before SeptenaServices.shared.start()")
     }
-    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" source=\(source) deferPush=\(deferPush) atBottom=\(atBottom)")
+    SeptenaLog.info("[TaskMutator] route=cloudKit op=create title=\"\(title)\" source=\(source) acknowledged=\(acknowledged) deferPush=\(deferPush) atBottom=\(atBottom)")
     return cloudBackend.create(title: title, area: area, project: project,
                                scheduled: scheduled, deadline: deadline, today: today,
-                               notes: notes, source: source, deferPush: deferPush,
-                               atBottom: atBottom)
+                               notes: notes, source: source, acknowledged: acknowledged,
+                               deferPush: deferPush, atBottom: atBottom)
   }
 
   func complete(id: String) {
@@ -255,9 +256,12 @@ final class TaskMutator {
 
   /// Clone a task into a brand-new one (new id) carrying the same fields —
   /// area/project/heading placement, schedule, deadline, Today, notes, and
-  /// recurrence. The clone-field list lives HERE, beside `create`, so a new task
-  /// field can't be silently dropped by a duplicate path (heading membership was,
-  /// in two divergent view-layer copies of this).
+  /// recurrence. Today membership is a *fresh* pin (`todaySetOn` = today via
+  /// `create`); the clone does not inherit the source's gold tenure fill
+  /// because `daysOnToday` cannot predate `created`. The clone-field list lives
+  /// HERE, beside `create`, so a new task field can't be silently dropped by a
+  /// duplicate path (heading membership was, in two divergent view-layer
+  /// copies of this).
   @discardableResult
   func duplicate(_ task: SeptenaTask, source: String = TaskSource.app) -> SeptenaTask {
     let copy = create(
@@ -285,11 +289,25 @@ final class TaskMutator {
 
   /// Clear the agent-created freshness cue on engagement. Idempotent and
   /// cheap — the backend no-ops for non-agent or already-seen rows.
+  /// Callers must only invoke this on a real disposition (file / when /
+  /// today / complete) — never on peek/select. Stack is logged so a stray
+  /// call that still evacuates a row is diagnosable in Console.
   func acknowledge(id: String) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] acknowledge called before CK bound — dropping", nil)
       return
     }
+    let stack = Thread.callStackSymbols.prefix(8).joined(separator: " ← ")
+    SeptenaLog.info("[TaskMutator] acknowledge id=\(id) via \(stack)")
     cloudBackend.acknowledge(id: id)
+  }
+
+  /// Restore an accidentally peek-acked MCP proposal (clears `acknowledgedAt`).
+  func unacknowledge(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] unacknowledge called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.unacknowledge(id: id)
   }
 }

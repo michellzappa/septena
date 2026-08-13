@@ -296,6 +296,8 @@ final class SeptenaServices {
     // into "Anytime". Rewrites stored statusRaw → "open" and pushes the fix;
     // gated once-per-device, after the fetch so synced someday rows are present.
     SomedayStatusMigrator.runIfNeeded(context: context, engine: ckEngine)
+    // Undo Septask peek/select acks that exiled undated MCP proposals to Anytime.
+    PeekAckProposalRecovery.runIfNeeded(context: context, mutator: taskMutator)
     if !RuntimeProfile.current.isTasksOnly {
       // Fold any retired `bedtime` medication bucket into `evening`.
       medicationsMutator.migrateBedtimeBuckets()

@@ -15,9 +15,16 @@ import AppKit
 /// The task checkbox — AppKit rendering of `TaskCheckbox` (macOS geometry:
 /// 14pt rounded square, 3.5 corner, 1.2 stroke). Forms: open, dashed
 /// (unratified proposal), gold (promoted to Today), filled + check (done).
+///
+/// A real `NSButton`, not a hand-tracked `NSView`. Same lesson as
+/// `KitDisclosureView` / `KitScreenTitleCell`: `NSTableView`'s mouseDown
+/// tracking loop eats mouseUp before a custom view's pair can fire, so
+/// checkbox taps were intermittent. An `NSControl` brings its own tracking.
 @MainActor
-final class KitCheckboxView: NSView {
+final class KitCheckboxView: NSButton {
   static let boxSize: CGFloat = 14
+  /// Matches `Theme.checkboxTap` on macOS — the hit column, not the glyph.
+  static let tapSize: CGFloat = 22
   private static let corner: CGFloat = 3.5
   private static let stroke: CGFloat = 1.2
 
@@ -37,18 +44,27 @@ final class KitCheckboxView: NSView {
   /// Today task can't read as a solid/done box.
   private static let tenureMaxOpacity: CGFloat = 0.7
 
-  override var intrinsicContentSize: NSSize { NSSize(width: 20, height: 20) }
-
-  /// Keyboard focus stays on the table — mirrors `.focusable(false)` on the
-  /// SwiftUI checkbox, so Space can never activate a completion.
-  override var acceptsFirstResponder: Bool { false }
+  override var intrinsicContentSize: NSSize {
+    NSSize(width: Self.tapSize, height: Self.tapSize)
+  }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
+    isBordered = false
+    bezelStyle = .inline
+    title = ""
+    imagePosition = .imageOnly
+    target = self
+    action = #selector(fire)
+    // Keyboard focus stays on the table — mirrors `.focusable(false)` on the
+    // SwiftUI checkbox, so Space can never activate a completion.
+    refusesFirstResponder = true
     refreshAccessibility()
   }
 
   required init?(coder: NSCoder) { fatalError("KitCheckboxView is code-only") }
+
+  @objc private func fire() { onToggle?() }
 
   /// VoiceOver: real checkbox role + shared `TaskA11y` vocabulary. Press
   /// activates `onToggle` (same as a mouse click on the box).
@@ -63,20 +79,6 @@ final class KitCheckboxView: NSView {
                                   tenureFill: tenureFill,
                                   agentCue: agentCue,
                                   cornerDot: cornerDot))
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    onToggle?()
-    return true
-  }
-
-  override func mouseDown(with event: NSEvent) {
-    // Swallow the press so a click on the box doesn't also start a row drag.
-  }
-
-  override func mouseUp(with event: NSEvent) {
-    let point = convert(event.locationInWindow, from: nil)
-    if bounds.contains(point) { onToggle?() }
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -133,8 +135,11 @@ final class KitCheckboxView: NSView {
     }
 
     // Unread-context dot, haloed so it reads on any row background.
+    // Visual top-right — `isFlipped` swaps which edge is "top" (NSButton
+    // is flipped; the old NSView subclass was not).
     if cornerDot {
-      let center = NSPoint(x: box.maxX + 1, y: box.maxY + 1)
+      let topY = isFlipped ? box.minY - 1 : box.maxY + 1
+      let center = NSPoint(x: box.maxX + 1, y: topY)
       let halo = NSRect(x: center.x - 3.4, y: center.y - 3.4, width: 6.8, height: 6.8)
       SeptaskKitTheme.cardSurface.setFill()
       NSBezierPath(ovalIn: halo).fill()
@@ -145,11 +150,18 @@ final class KitCheckboxView: NSView {
   }
 
   /// The check mark inside a completed box (`checkSize` 9 in TaskCheckbox).
+  /// Fractions are top-down visual (0 = top of box) so the glyph stays upright
+  /// whether the view is flipped (`NSButton`) or not.
   private func drawCheck(in box: NSRect) {
+    func y(_ fromTop: CGFloat) -> CGFloat {
+      isFlipped
+        ? box.minY + box.height * fromTop
+        : box.maxY - box.height * fromTop
+    }
     let path = NSBezierPath()
-    path.move(to: NSPoint(x: box.minX + box.width * 0.26, y: box.midY + box.height * 0.02))
-    path.line(to: NSPoint(x: box.minX + box.width * 0.44, y: box.minY + box.height * 0.26))
-    path.line(to: NSPoint(x: box.minX + box.width * 0.76, y: box.maxY - box.height * 0.28))
+    path.move(to: NSPoint(x: box.minX + box.width * 0.26, y: y(0.48)))
+    path.line(to: NSPoint(x: box.minX + box.width * 0.44, y: y(0.74)))
+    path.line(to: NSPoint(x: box.minX + box.width * 0.76, y: y(0.28)))
     path.lineWidth = 1.6
     path.lineCapStyle = .round
     path.lineJoinStyle = .round
@@ -455,7 +467,8 @@ final class KitCardRowView: NSTableRowView {
   /// Contiguous selected neighbors on the same card. The list controller
   /// refreshes these on every selection change (and in `rowViewForRow`) so a
   /// row that was the end of a selection run re-squares when the next row
-  /// joins it — `drawSelection` alone would leave the old rounded end stale.
+  /// joins it — painting only in `drawSelection` would leave the old rounded
+  /// end stale.
   var joinsSelectedAbove = false
   var joinsSelectedBelow = false
 
@@ -463,6 +476,32 @@ final class KitCardRowView: NSTableRowView {
   /// wash while editing — the expanded row stays on the white card so the
   /// title reads as integrated text, not a selected cell with a field on top.
   var isComposing = false
+
+  /// Insertion line while a task drag is hovering. `.top` / `.bottom` sit on
+  /// this row's edge (the drop is `.above` a row, or after the last row).
+  /// Mirrors SwiftUI `TaskReorderDrop`'s 3pt capsule — a position marker,
+  /// not a row highlight, and not NSTableView's `.gap` feedback (that hole
+  /// splits a per-row card into two).
+  enum DropLine {
+    case none, top, bottom
+  }
+  var dropLine: DropLine = .none {
+    didSet { if oldValue != dropLine { needsDisplay = true } }
+  }
+
+  /// Layer-backed tables paint a full-row selection fill that never goes
+  /// through `drawSelection` — a second, rectangular highlight around the
+  /// inset card. Selection is therefore drawn in `drawBackground` (same clip
+  /// as the card) and `selectionHighlightStyle` is `.none` so AppKit's fill
+  /// stays off. These overrides keep the wash in sync when focus moves.
+  override var isSelected: Bool {
+    get { super.isSelected }
+    set { super.isSelected = newValue; needsDisplay = true }
+  }
+  override var isEmphasized: Bool {
+    get { super.isEmphasized }
+    set { super.isEmphasized = newValue; needsDisplay = true }
+  }
 
   /// Uneven rounded rect for a card/selection slice. A fully-joined slice
   /// (both ends square) is a plain rect — exact edge, no antialiased curve
@@ -492,32 +531,40 @@ final class KitCardRowView: NSTableRowView {
   override func drawBackground(in dirtyRect: NSRect) {
     guard isCard else {
       super.drawBackground(in: dirtyRect)
+      drawDropLine()
       return
     }
     NSGraphicsContext.saveGraphicsState()
     NSBezierPath(rect: bounds).setClip()
     SeptaskKitTheme.cardSurface.setFill()
     slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+    // Selection rides on the card (same clip, selection-run rounding) so it
+    // cannot overhang as a second rectangle. Composer owns the surface.
+    if isSelected && !isComposing {
+      SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
+      slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
+    }
     NSGraphicsContext.restoreGraphicsState()
+    drawDropLine()
   }
 
-  override func drawSelection(in dirtyRect: NSRect) {
-    // Composer owns the row's surface — suppress the accent wash so the title
-    // sits on white card, not on a selected-cell fill (Things parity).
-    guard isCard, !isComposing, selectionHighlightStyle != .none else {
-      if !isCard { super.drawSelection(in: dirtyRect) }
-      return
-    }
-    NSGraphicsContext.saveGraphicsState()
-    NSBezierPath(rect: bounds).setClip()
-    // Emphasized = System Settings accent wash; unemphasized = neutral gray.
-    // See `SeptaskKitTheme.listSelectionFill(emphasized:)` — cannot use
-    // `.selectedContentBackgroundColor` (follows the app's ink AccentColor).
-    SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
-    // Selection-run rounding, not card-group: a mid-card multi-select still
-    // wants one continuous capsule, rounded only at its own ends.
-    slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
-    NSGraphicsContext.restoreGraphicsState()
+  /// No-op: selection is painted in `drawBackground`. The table's
+  /// `selectionHighlightStyle` is `.none`, so AppKit does not call this;
+  /// kept empty so a style regression cannot restore the full-row fill.
+  override func drawSelection(in dirtyRect: NSRect) {}
+
+  /// 3pt capsule on the drop edge — SwiftUI `TaskReorderDrop.insertionLine`.
+  /// Horizontal inset matches that overlay's 20pt pad inside the card.
+  private func drawDropLine() {
+    guard dropLine != .none else { return }
+    let thickness: CGFloat = 3
+    let inset = SeptaskKitLayout.inset(for: bounds.width) + 20
+    let y: CGFloat = dropLine == .top ? 0 : bounds.height - thickness
+    let rect = NSRect(x: inset, y: y,
+                      width: max(0, bounds.width - inset * 2),
+                      height: thickness)
+    SeptaskKitTheme.inkPrimary.setFill()
+    NSBezierPath(roundedRect: rect, xRadius: thickness / 2, yRadius: thickness / 2).fill()
   }
 
   /// Keep row content in its normal ink. AppKit flips cell text to white for

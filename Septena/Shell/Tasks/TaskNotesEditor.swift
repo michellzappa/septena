@@ -335,7 +335,10 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
 }
 #endif
 
-private enum MarkdownNotesStyle {
+/// Lightweight Markdown awareness for task notes. Shared by the SwiftUI
+/// composer (`TaskMarkdownNotesEditor`) and the AppKit SeptaskKit notes
+/// fields — markers stay in the string; only typography changes.
+enum MarkdownNotesStyle {
   static func attributed(_ raw: String, fontSize: CGFloat) -> NSAttributedString {
     let attributed = NSMutableAttributedString(string: raw)
     apply(to: attributed, raw: raw, fontSize: fontSize)
@@ -432,6 +435,21 @@ private enum MarkdownNotesStyle {
       .paragraphStyle: paragraph
     ]
   }
+
+  #if os(macOS)
+  /// Restyle an AppKit notes view in place, preserving selection and typing
+  /// attributes. Call after any external string load and from `textDidChange`.
+  static func restyle(_ textView: NSTextView, fontSize: CGFloat) {
+    guard let storage = textView.textStorage else { return }
+    let selected = textView.selectedRange()
+    apply(to: storage, raw: textView.string, fontSize: fontSize)
+    let length = textView.string.utf16.count
+    let location = min(selected.location, length)
+    let lengthLeft = min(selected.length, max(0, length - location))
+    textView.setSelectedRange(NSRange(location: location, length: lengthLeft))
+    textView.typingAttributes = baseAttributes(fontSize: fontSize)
+  }
+  #endif
 
   private static func applyDelimited(_ pattern: String,
                                      delimiterLength: Int,

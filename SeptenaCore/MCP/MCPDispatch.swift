@@ -430,8 +430,8 @@ enum MCPDispatch {
     // the user SOLICITED it. The wire carries `origin`; omitted falls back to
     // this connection's default. The in-app local server is first-party (the
     // user's own Claude Code), so it defaults to committed. A committed task is
-    // acknowledged at birth so it never wears the unseen-proposal cue and leaves
-    // the triage band immediately.
+    // born already-acknowledged (one CloudKit write) so sibling apps never
+    // flash it through Inbox before the cue clears.
     let proposed: Bool = {
       switch args.string("origin") {
       case "agent_suggestion": return true
@@ -451,9 +451,9 @@ enum MCPDispatch {
       deadline: try args.date("deadline") ?? args.date("due"),
       today: args.bool("today") ?? false,
       notes: args.string("notes"),
-      source: TaskSource.mcp)
+      source: TaskSource.mcp,
+      acknowledged: !proposed)
     if let rule { m.setRecurrence(id: t.id, recurrence: rule) }
-    if !proposed { m.acknowledge(id: t.id) }
     var out: [String: Any] = ["id": t.id, "title": t.title,
                               "placement": proposed ? "inbox_proposal" : "committed"]
     if let rule { out["recurrence"] = recurrenceJSON(rule) }

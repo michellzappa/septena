@@ -226,6 +226,7 @@ final class CloudKitTasksBackend {
   func create(title: String, area: String?, project: String?,
               scheduled: Date?, deadline: Date?, today: Bool,
               notes: String?, source: String = TaskSource.app,
+              acknowledged: Bool = false,
               deferPush: Bool = false,
               atBottom: Bool = false) -> SeptenaTask {
     let id = uniqueTaskID()
@@ -242,6 +243,11 @@ final class CloudKitTasksBackend {
     let position = atBottom
       ? TaskOrder.bottomPosition(in: context)
       : TaskOrder.topPosition(in: context)
+    // One instant for both stamps so a committed MCP create is a single
+    // CloudKit write — a follow-up `acknowledge` would flash the row through
+    // Inbox on sibling apps (Septask) before yanking it. Spec: solicited mcp
+    // tasks are born already-acknowledged (`docs/TASK_ROW_LANGUAGE_SPEC.md`).
+    let now = Date()
     let entity = TaskEntity(
       id: id,
       title: trimmedTitle,
@@ -260,7 +266,8 @@ final class CloudKitTasksBackend {
       // Mirror the gateway's label for agent rows so MCP-authored tasks read as
       // "Claude" regardless of which surface (gateway / local server) wrote them.
       sourceClient: source == TaskSource.mcp ? "Claude" : currentAppClientLabel,
-      createdAt: Date()
+      acknowledgedAt: acknowledged ? now : nil,
+      createdAt: now
     )
     context.insert(entity)
     // deferPush is used for inline-editor drafts: skip the engine push
@@ -297,6 +304,17 @@ final class CloudKitTasksBackend {
     entity.acknowledgedAt = Date()
     entity.pendingSync = true
     commitAndPush(entity, op: "acknowledge")
+  }
+
+  /// Undo a peek/select ack — restore the proposal glow and (under the
+  /// pre-fix band predicate) Inbox membership. No-op when there's nothing
+  /// to clear.
+  func unacknowledge(id: String) {
+    guard let entity = fetch(id: id) else { return }
+    guard entity.source == TaskSource.mcp, entity.acknowledgedAt != nil else { return }
+    entity.acknowledgedAt = nil
+    entity.pendingSync = true
+    commitAndPush(entity, op: "unacknowledge")
   }
 
   func complete(id: String) {

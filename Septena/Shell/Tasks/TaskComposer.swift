@@ -170,18 +170,6 @@ struct TaskComposerCard: View {
   @State private var suggestedList: SuggestionEngine.Suggestion?
   /// Mirrors whether the Discuss pill is on the rail (edit mode, no thread yet).
   @State private var discussKickoffVisible = false
-  /// Inline-only: the title column width for wrap detection and whether the
-  /// draft title currently needs a second line. A vertical-axis `TextField`
-  /// with `lineLimit(1...2)` reserves two lines even when empty — so inline
-  /// create/edit stays single-line until the title actually wraps.
-  @State private var inlineTitleColumnWidth: CGFloat = 0
-  @State private var inlineTitleWraps = false
-  // The effective body point size for wrap measurement on iOS. `@ScaledMetric`
-  // tracks the ambient `dynamicTypeSize` — including the app's ±2 Text Size step,
-  // which is applied as an environment shift at the root — so the measurement
-  // font matches the size the title actually renders at. (macOS has no Dynamic
-  // Type; there the size comes from `SeptenaTypeScale` / `FontScale` instead.)
-  @ScaledMetric(relativeTo: .body) private var scaledTitleSize: CGFloat = 17
 
   init(mode: Mode, areas: [Area], projects: [Project], accent: Color,
        presentation: Presentation = .drawer, deferredCreate: Bool = false,
@@ -320,7 +308,6 @@ struct TaskComposerCard: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
         }
-        refreshInlineTitleWrap()
         updateSuggestion()
       }
   }
@@ -466,10 +453,6 @@ struct TaskComposerCard: View {
             .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { _, width in
-          inlineTitleColumnWidth = width
-          refreshInlineTitleWrap()
-        }
         .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       }
     } else {
@@ -483,18 +466,14 @@ struct TaskComposerCard: View {
   }
 
   private var titleField: some View {
-    // ONE field identity across the single-line ↔ wrapped transition: a
-    // vertical-axis `TextField` whose lineLimit *value* flips, never the view
-    // itself. (An earlier `if/else` swapped a plain field for a vertical-axis one
-    // at the wrap threshold, tearing down and rebuilding the focused field
-    // mid-keystroke — the Text↔TextField identity-swap trap that clobbers focus
-    // and cursor.) A range lineLimit reserves blank space for its MAX line count
-    // even when empty, so single-line mode caps at `1...1` to avoid a phantom
-    // second line on a new task; it opens to `1...2` only once the text wraps.
-    // Drawer: no checkbox to align against, so it may grow to two lines freely.
-    let singleLine = presentation == .inline && !inlineTitleWraps
-    return TextField("", text: $draft.title, axis: .vertical)
-      .lineLimit(singleLine ? 1...1 : 1...2)
+    // ONE field identity, one lineLimit. A ClosedRange (`1...2`) reserves two
+    // lines even when empty, and flipping `1...1` ↔ `1...2` from wrap-detection
+    // rebuilt the focused field mid-keystroke — SwiftUI then drops the caret
+    // at the end ("cursor jumps to the far right while typing or arrowing").
+    // `lineLimit(2)` is a max, matching the closed row, so the field stays
+    // one line until the title actually wraps.
+    TextField("", text: $draft.title, axis: .vertical)
+      .lineLimit(2)
       .textFieldStyle(.plain)
       .font(.septenaTaskTitle)
       // Match the closed row's title `Text` box so the two center-align to the
@@ -539,22 +518,6 @@ struct TaskComposerCard: View {
     #else
     return 0
     #endif
-  }
-
-  /// Recompute whether the inline title needs a second line so the field can
-  /// switch between single-line and vertical-axis modes without reserving two
-  /// blank lines on an empty new task.
-  private func refreshInlineTitleWrap() {
-    guard presentation == .inline else { return }
-    #if os(macOS)
-    // No Dynamic Type on macOS — the title renders at the FontScale-scaled body
-    // size, so measure with the same.
-    let bodySize = SeptenaTypeScale.size(.body)
-    #else
-    let bodySize = scaledTitleSize
-    #endif
-    inlineTitleWraps = TaskTitleMetrics.wraps(
-      text: draft.title, width: inlineTitleColumnWidth, bodyPointSize: bodySize)
   }
 
   /// Notes — a multi-line field sitting directly under the title (Things-style),
@@ -760,12 +723,13 @@ struct TaskComposerCard: View {
     }
   }
 
-  /// Move keyboard focus into the title field and — on macOS — drop the cursor
-  /// at the END of the existing title instead of letting `NSTextField` select
-  /// the whole string. The cursor nudge is deferred one beat past the focus
-  /// assignment so the field editor has joined the responder chain first
-  /// (otherwise there's nothing to reposition). A no-op for a fresh empty title.
+  /// Move keyboard focus into the title field and — on macOS — collapse
+  /// AppKit's default select-all to a caret at the END. Skipped entirely when
+  /// the field is already focused: a delayed autofocus used to fire ~0.4s after
+  /// open and yank the caret to the far right if the user had already tapped
+  /// or started typing.
   private func focusTitle() {
+    guard focus != .title else { return }
     focus = .title
     #if os(macOS)
     DispatchQueue.main.async { septenaMoveCursorToEnd() }
@@ -895,32 +859,6 @@ struct TaskComposerCard: View {
     default:
       return .ignored
     }
-  }
-}
-
-// MARK: - Inline title wrap metrics
-
-/// Width-aware single-line vs. wrapped detection for the inline composer title.
-/// Keeps new tasks at one line until the title actually needs two.
-private enum TaskTitleMetrics {
-  /// `bodyPointSize` is the effective rendered size of `.septenaTaskTitle` on the
-  /// caller's platform (Dynamic-Type-scaled on iOS, FontScale-scaled on macOS),
-  /// so the measurement font matches what the field draws at any Text Size step.
-  static func wraps(text: String, width: CGFloat, bodyPointSize: CGFloat) -> Bool {
-    guard !text.isEmpty, width > 0 else { return false }
-    #if os(macOS)
-    let font = NSFont.systemFont(ofSize: bodyPointSize)
-    let oneLine = font.ascender - font.descender + font.leading
-    #else
-    let font = UIFont.systemFont(ofSize: bodyPointSize)
-    let oneLine = font.lineHeight
-    #endif
-    let rect = (text as NSString).boundingRect(
-      with: CGSize(width: width, height: .greatestFiniteMagnitude),
-      options: [.usesLineFragmentOrigin, .usesFontLeading],
-      attributes: [.font: font],
-      context: nil)
-    return rect.height > oneLine * 1.05
   }
 }
 

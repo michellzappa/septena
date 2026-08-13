@@ -144,6 +144,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   ///   • `todaySetOn` (an explicit pin's stamp), or
   ///   • `scheduled` once it has arrived (≤ today), or
   ///   • `deadline` once it has arrived (≤ today).
+  /// Floor: a task cannot have sat on Today before it existed (`created`).
+  /// Without that, a duplicate (or any new capture that inherited a past When
+  /// / deadline) would pick up the source's gold tenure fill on day zero.
   /// Age = whole days from that landing day to today. `0` = arrived today
   /// (already carried by the amber checkbox / `showsArrivedToday`); a positive
   /// value means it survived that many day-rollovers undone. Derived, with NO
@@ -157,8 +160,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     if self.today, let t = todaySetOn { landed.append(t) }
     if let s = scheduled, s <= today { landed.append(s) }
     if let d = deadline, d <= today { landed.append(d) }
-    guard let earliest = landed.min(),
-          let from = SeptenaDate.parse(earliest),
+    guard var earliest = landed.min() else { return 0 }
+    if let created, created > earliest { earliest = created }
+    guard let from = SeptenaDate.parse(earliest),
           let to = SeptenaDate.parse(today) else { return 0 }
     let cal = Calendar.current
     let days = cal.dateComponents([.day],
@@ -243,23 +247,31 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// layer that renders above Today (see `docs/TRIAGE_BAND_SPEC.md`). The
   /// divider is ratification, not date: two captured-but-not-committed
   /// populations belong here —
-  ///   • an unacknowledged agent proposal still inside its freshness window
-  ///     (`showsAgentCue`), regardless of any DATE it carries; and
+  ///   • an agent proposal still inside its freshness window, and
   ///   • a loose human capture with no disposition at all (the classic Inbox).
   /// A project/area assignment is ALWAYS a disposition, for either population
-  /// — a task never sits in Inbox and a category at once. A row leaves the
-  /// band the instant it is ratified (any disposition, or `acknowledge` for
-  /// agent rows) — and for agent rows also when the cue decays
-  /// (ratification-by-timeout, so a long-ignored proposal ages into its
-  /// natural bucket rather than living in limbo). DTO mirror of
-  /// `TaskEntity.isInTriageBand` — keep the two in lockstep.
+  /// — a task never sits in Inbox and a category at once.
+  ///
+  /// Agent rows leave the band when (a) filed, (b) given a when/today *and*
+  /// acknowledged, or (c) the freshness window decays. Bare `acknowledge`
+  /// alone must NOT yank an undated proposal into Anytime — that was the
+  /// "click a dashed row and it vanishes" bug (peek/select used to ack).
+  /// DTO mirror of `TaskEntity.isInTriageBand` — keep the two in lockstep.
   var isInTriageBand: Bool {
     guard status == .open, !isHeading else { return false }
-    // Filed into a project or area is a disposition regardless of source —
-    // an agent that both proposes a task AND files it stays out of Inbox;
-    // only an unfiled agent proposal rides the cue-decay window.
     guard project == nil, area == nil else { return false }
-    if source == TaskSource.mcp { return showsAgentCue() }
+    if source == TaskSource.mcp {
+      guard createdAt != .distantPast else { return false }
+      let fresh = Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
+      guard fresh else { return false }
+      // Proposed with a when/today: stay until acknowledged (then it crosses
+      // into Today/Upcoming). Undated: stay for the whole freshness window
+      // even after ack — glow clears, row does not exile itself.
+      if today || scheduled != nil || deadline != nil {
+        return acknowledgedAt == nil
+      }
+      return true
+    }
     return scheduled == nil && deadline == nil && !today
   }
 

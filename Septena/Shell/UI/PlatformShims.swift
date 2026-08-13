@@ -451,16 +451,21 @@ struct DoubleClickCatcher: NSViewRepresentable {
   }
 }
 
-/// Drop the insertion point at the END of the key window's active text field,
-/// clearing the select-all that AppKit applies when a field becomes first
-/// responder (so a freshly-focused inline rename reads as "continue typing",
-/// not "overwrite"). SwiftUI's `TextField` exposes no cursor/selection API, so
-/// this is the contained AppKit reach — a one-shot responder read, like the
-/// `NSEvent.modifierFlags` read in `SelectableScrollList`, not an installed
-/// monitor. A no-op unless a field editor currently holds focus.
+/// Collapse AppKit's default select-all to a caret at the END of the key
+/// window's active text field (so a freshly-focused inline edit reads as
+/// "continue typing", not "overwrite"). SwiftUI's `TextField` exposes no
+/// cursor/selection API, so this is the contained AppKit reach — a one-shot
+/// responder read, like the `NSEvent.modifierFlags` read in
+/// `SelectableScrollList`, not an installed monitor.
+///
+/// Only acts on a full-string selection. A caret the user already placed (or
+/// a partial selection) stays put — a delayed autofocus used to call this
+/// unconditionally and yank the insertion point to the far right mid-edit.
 func septenaMoveCursorToEnd() {
   guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return }
   let end = (editor.string as NSString).length
+  let selected = editor.selectedRange()
+  guard end > 0, selected.location == 0, selected.length == end else { return }
   editor.setSelectedRange(NSRange(location: end, length: 0))
 }
 

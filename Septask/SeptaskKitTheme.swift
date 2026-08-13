@@ -52,6 +52,10 @@ enum SeptaskKitTheme {
     .systemFont(ofSize: SeptenaTypeScale.size(.caption2), weight: .semibold)
   }
 
+  /// Task notes body — two rungs above the old subheadline notes face so
+  /// prose matches `TaskMarkdownNotesEditor` (SwiftUI) at the body size.
+  static var notesFontSize: CGFloat { SeptenaTypeScale.size(.body) }
+
   /// Single-line row height derived from the body rung so rows grow with the
   /// user's text-size setting instead of clipping. Titles truncate; they do
   /// not wrap and grow the row.
@@ -67,6 +71,8 @@ enum SeptaskKitTheme {
   static let todayAccent = NSColor(Theme.todayAccent)
   /// Theme.overdueRed — late deadlines, platform red.
   static let overdueRed: NSColor = .systemRed
+  /// Theme.inkPrimary.
+  static let inkPrimary: NSColor = .labelColor
   /// Theme.inkSecondary.
   static let inkSecondary: NSColor = .secondaryLabelColor
   /// Theme.iconMuted — receding glyphs/meta (Reminders' non-tinted metadata).
@@ -82,8 +88,12 @@ enum SeptaskKitTheme {
   static let pageBackground = NSColor(Theme.groupedBackground)
   /// Theme.cardSurface — the card a run of rows sits on.
   static let cardSurface = NSColor(Theme.cardSurface)
-  /// Theme.mutedSurface — the row's list-membership chip fill.
+  /// Theme.mutedSurface — the row's list-membership chip fill, and the
+  /// unset elective-pill fill on the composer rail.
   static let chipFill = NSColor(Theme.mutedSurface)
+  /// Theme.inkPrimary.opacity(0.10) — filled/active elective pill. Matches
+  /// SwiftUI's neutral `AttributePill` (a gray wash, never a black slab).
+  static let pillOnFill = NSColor.labelColor.withAlphaComponent(0.10)
   /// Theme.sidebarBackground — the source list's backing.
   static let sidebarBackground = NSColor(Theme.sidebarBackground)
 

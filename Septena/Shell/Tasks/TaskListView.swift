@@ -715,7 +715,7 @@ struct TaskListView: View {
           accent: theme.color(for: "tasks"),
           onDone: {
             if case .edit(let task) = mode { repatchTask(id: task.id) }
-            Task { await load() }
+            reloadOrDeferWhileEditing()
           }
         )
       }
@@ -2243,7 +2243,11 @@ struct TaskListView: View {
         if draftEditIds.contains(task.id) { draftEditIds.remove(task.id) }
         clearQuickAddCaptureSlot(for: task.id)
         repatchTask(id: task.id)
-        Task { await load() }
+        // persistOnce can run mid-edit: the inline host is a LazyVStack, so
+        // `.onDisappear` fires when the row merely wraps or scrolls out of the
+        // materialization window. A full `load()` here would re-diff the list
+        // under a focused title field and drop the caret at the end.
+        reloadOrDeferWhileEditing()
       },
       // Fired after the editor's autosave has run on teardown: if this was an
       // inline-create draft the autosave left untouched (no title), drop it now.

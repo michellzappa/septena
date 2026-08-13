@@ -48,11 +48,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     notesScroll.drawsBackground = false
     notesScroll.translatesAutoresizingMaskIntoConstraints = false
     notesView.delegate = self
-    notesView.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline))
-    notesView.isRichText = false
+    notesView.isRichText = true
+    notesView.importsGraphics = false
+    notesView.allowsUndo = true
     notesView.drawsBackground = false
     notesView.textContainerInset = NSSize(width: 2, height: 6)
     notesView.isAutomaticQuoteSubstitutionEnabled = false
+    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(
+      fontSize: SeptaskKitTheme.notesFontSize)
     notesScroll.documentView = notesView
 
     let notesLabel = NSTextField(labelWithString: String(localized: "Notes",
@@ -139,14 +142,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.isHidden = false
     placeholder.isHidden = true
 
-    if next.showsAgentCue() {
-      mutator.acknowledge(id: next.id)
-    }
+    // Opening to peek must NOT acknowledge. Cue == Inbox membership for
+    // agent rows, so ratifying here would yank a proposal the moment it
+    // became the selected row (even with this pane collapsed). Same
+    // contract as SwiftUI `TaskComposer`. Disposition paths below ack.
 
     loadedTitle = next.title
     loadedNotes = next.notes ?? ""
     titleField.stringValue = loadedTitle
-    notesView.string = loadedNotes
+    let fontSize = SeptaskKitTheme.notesFontSize
+    notesView.textStorage?.setAttributedString(
+      MarkdownNotesStyle.attributed(loadedNotes, fontSize: fontSize))
+    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     refreshReadOnlyFields(next)
   }
 
@@ -237,7 +244,21 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     }
   }
 
-  func controlTextDidEndEditing(_ obj: Notification) { flushPendingEdits() }
+  func controlTextDidBeginEditing(_ obj: Notification) {
+    // Truncation fights the field-editor scroll and jumps the caret to the
+    // far right while typing or arrowing through a long title.
+    titleField.lineBreakMode = .byClipping
+  }
+
+  func controlTextDidEndEditing(_ obj: Notification) {
+    titleField.lineBreakMode = .byTruncatingTail
+    flushPendingEdits()
+  }
+
+  func textDidChange(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView, textView === notesView else { return }
+    MarkdownNotesStyle.restyle(textView, fontSize: SeptaskKitTheme.notesFontSize)
+  }
 
   func textDidEndEditing(_ notification: Notification) { flushPendingEdits() }
 
@@ -276,6 +297,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       case .deadline:
         self.mutator.setDeadline(id: current.id, date: date)
       }
+      self.mutator.acknowledge(id: current.id)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
     }
