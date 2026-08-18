@@ -119,9 +119,14 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
-  private var composerShowsNotes = false
+  /// Live notes-band height while the composer is open (`nil` = notes folded).
+  private var composerNotesHeight: CGFloat?
   /// The row currently expanded into the inline composer, if any.
   private var composingTaskId: String?
+  /// The row with a live bare title field editor (⌘N / ⌘R), if any — drives
+  /// `KitCardRowView.isEditingTitle` so the selection wash drops while typing,
+  /// the same way the composer already does.
+  private var editingTaskId: String?
   /// Row the drag would insert ABOVE (`NSTableView` gap index; `rows.count`
   /// means after the last row). Drives `KitCardRowView.dropLine`.
   private var dropAboveRow: Int? {
@@ -840,20 +845,26 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
 
-    let diff = newKeys.difference(from: oldKeys).inferringMoves()
+    // Plain difference — deliberately NOT the move-inferring variant
+    // (`inferringMoves`; see the appkit-inferring-moves lint rule). An inferred
+    // move's `associatedWith` offset is in the ORIGINAL array's coordinate
+    // space, but NSTableView applies a begin/endUpdates batch INCREMENTALLY
+    // (each call relative to the state the preceding calls left behind), so by
+    // the time the move ran its source index had already been shifted by the
+    // removes before it — `moveRow` then picked up whatever row had slid into
+    // that slot. Moving a task between Today's list groups reproduced it
+    // exactly: the group header got moved instead of the task, so the task
+    // appeared under the wrong heading and looked duplicated. A plain
+    // remove+insert is what NSTableView's incremental batch is defined for
+    // (and reads better here anyway — a row changing groups should leave and
+    // arrive, not glide).
     tableView.beginUpdates()
-    for change in diff {
+    for change in newKeys.difference(from: oldKeys) {
       switch change {
-      case .remove(let offset, _, let association):
-        if association == nil {
-          tableView.removeRows(at: [offset], withAnimation: KitMotion.removeRows)
-        }
-      case .insert(let offset, _, let association):
-        if let from = association {
-          tableView.moveRow(at: from, to: offset)
-        } else {
-          tableView.insertRows(at: [offset], withAnimation: KitMotion.insertRows)
-        }
+      case .remove(let offset, _, _):
+        tableView.removeRows(at: [offset], withAnimation: KitMotion.removeRows)
+      case .insert(let offset, _, _):
+        tableView.insertRows(at: [offset], withAnimation: KitMotion.insertRows)
       }
     }
     tableView.endUpdates()
@@ -953,18 +964,12 @@ final class SeptaskKitTaskListController: NSViewController {
     self?.move(to: destination)
   }
 
-  /// The area a task currently reads as "in", for the picker's checkmark —
-  /// its own area directly, or (filed into a project) that project's area.
-  /// A top-level/loose project has no area to represent in an areas-only
-  /// picker, so it shows no checkmark rather than a misleading one.
+  /// Exact destination for the picker's checkmark — project if filed there,
+  /// otherwise the area, otherwise No List.
   private func currentMoveDestination(for task: SeptenaTask) -> KitMoveMenu.Destination? {
+    if let project = task.project { return .project(project) }
     if let area = task.area { return .area(area) }
-    if let projectId = task.project {
-      let snapshot = StructureCache.snapshot(in: context)
-      guard let area = snapshot.projects.first(where: { $0.id == projectId })?.area else { return nil }
-      return .area(area)
-    }
-    return .none
+    return KitMoveMenu.Destination.none
   }
 
   func presentMoveMenu() {
@@ -1302,6 +1307,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func commitRename(id: String, title: String) {
+    clearEditingTitle()
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let isAbandonedNewTask = (id == pendingNewTaskId) && trimmed.isEmpty
     pendingNewTaskId = nil
@@ -1427,6 +1433,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func beginEditingRow(_ row: Int) {
     if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
       as? SeptaskKitTaskCell {
+      markEditingTitle(atRow: row)
       cell.beginEditing()
       return
     }
@@ -1434,9 +1441,34 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self, self.rows.indices.contains(row) else { return }
       if let cell = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
         as? SeptaskKitTaskCell {
+        self.markEditingTitle(atRow: row)
         cell.beginEditing()
       }
     }
+  }
+
+  /// Flag the row as title-editing and repaint just that row view — NOT a
+  /// `reloadData`, which would tear down the field editor we are about to
+  /// attach (the same hazard `isTitleEditorActive` guards `reload()` against).
+  private func markEditingTitle(atRow row: Int) {
+    editingTaskId = rows[row].task?.id
+    repaintEditingRow(row)
+  }
+
+  /// Clear the title-editing flag and repaint whichever row carried it.
+  private func clearEditingTitle() {
+    guard let id = editingTaskId else { return }
+    editingTaskId = nil
+    if let row = rows.firstIndex(where: { $0.task?.id == id }) {
+      repaintEditingRow(row)
+    }
+  }
+
+  private func repaintEditingRow(_ row: Int) {
+    guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false)
+      as? KitCardRowView else { return }
+    rowView.isEditingTitle = rows[row].task?.id == editingTaskId
+    rowView.needsDisplay = true
   }
 
   /// Return / double-click — expands the selected row into the inline
@@ -1524,6 +1556,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // chrome attached through the shrink.
     view.window?.makeFirstResponder(tableView)
     composingTaskId = nil
+    composerNotesHeight = nil
 
     guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else {
       reload()
@@ -1540,6 +1573,11 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let self else { return }
       self.tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
       self.refreshCardGeometry()
+      // Keep the just-closed task selected so Esc returns to the closed-row
+      // keyboard surface (arrows / ⌘K / …) instead of an empty selection.
+      if self.rows.indices.contains(row) {
+        self.tableView.selectRowIndexes([row], byExtendingSelection: false)
+      }
     }
   }
 
@@ -1633,7 +1671,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Never call this on a refresh; see `refreshComposerRow`.
   private func wireComposer(_ cell: KitComposerCell, task: SeptenaTask) {
     cell.configure(with: task, listName: listName(for: task))
-    composerShowsNotes = cell.showsNotes
+    composerNotesHeight = cell.currentNotesHeight
     bindComposerActions(cell, task: task)
   }
 
@@ -1644,8 +1682,17 @@ final class SeptaskKitTaskListController: NSViewController {
     cell.onNotesVisibilityChanged = { [weak self, weak cell] in
       guard let self, let cell,
             let row = self.rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
-      self.composerShowsNotes = cell.showsNotes
+      self.composerNotesHeight = cell.currentNotesHeight
       self.animateComposerHeight(ofRow: row)
+    }
+    cell.onNotesHeightChanged = { [weak self, weak cell] in
+      guard let self, let cell,
+            let row = self.rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
+      let next = cell.currentNotesHeight
+      guard self.composerNotesHeight != next else { return }
+      self.composerNotesHeight = next
+      // Typing growth should track the caret immediately — no open/close easing.
+      self.animateComposerHeight(ofRow: row, animated: false)
     }
 
     cell.onCommit = { [weak self] title, notes in
@@ -2085,7 +2132,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return SeptaskKitTheme.heading.pointSize + 28
       }
       if task.id == composingTaskId {
-        return KitComposerCell.height(showsNotes: composerShowsNotes)
+        return KitComposerCell.height(notesHeight: composerNotesHeight)
       }
       return SeptaskKitTheme.rowHeight
         + (taskContextText(for: task) == nil ? 0 : 14)
@@ -2112,6 +2159,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   private func applyCardGeometry(_ rowView: KitCardRowView, atRow row: Int) {
     let composing = rows[row].task?.id == composingTaskId
     rowView.isComposing = composing
+    rowView.isEditingTitle = rows[row].task?.id == editingTaskId
     if rows[row].isCardRow {
       rowView.isCard = true
       // The open composer is its own rounded slice (Things' elevated edit
@@ -2675,6 +2723,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     notesGlyph.image = NSImage(systemSymbolName: "text.alignleft",
                                accessibilityDescription: TaskA11y.hasNotes)?
       .withSymbolConfiguration(.init(pointSize: 9, weight: .regular))
+    notesGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    notesGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     notesGlyph.kitA11yIgnore()
 
     detail.lineBreakMode = .byClipping
@@ -2698,13 +2748,23 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     repeatGlyph.kitA11yIgnore()
 
-    // Trailing cluster: notes marker, list chip, date, repeat — in that reading
-    // order, each hidden when it has nothing to say. Repeat sits outboard of the
-    // date to match the SwiftUI row's trailing order.
-    let trailing = NSStackView(views: [notesGlyph, chip, scheduleGlyph, detail, repeatGlyph])
+    // Trailing cluster hugs the row's right edge. Order matches the row language
+    // spec: variable meta inboard, micro-glyphs outboard
+    // (chip · date · recurrence · notes). A leading spacer absorbs any extra
+    // width if Auto Layout stretches the stack — without it, NSStackView's
+    // default gravity packs visible glyphs to the title and the notes marker
+    // stairs down the middle of the row.
+    let trailingShove = NSView()
+    trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
+    let trailing = NSStackView(views: [trailingShove, chip, scheduleGlyph, detail, repeatGlyph, notesGlyph])
     trailing.orientation = .horizontal
+    trailing.alignment = .centerY
+    trailing.distribution = .fill
     trailing.spacing = 6
     trailing.translatesAutoresizingMaskIntoConstraints = false
+    trailing.setContentHuggingPriority(.required, for: .horizontal)
+    trailing.setContentCompressionResistancePriority(.required, for: .horizontal)
     trailing.setHuggingPriority(.required, for: .horizontal)
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
@@ -3378,8 +3438,11 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// round kept reading "wrong" no matter which way it was nudged. A `var`,
   /// not `let`: `FontScale.shared.factor` can change at runtime (Settings ▸
   /// Text Size), and SwiftUI's `scaledFont` reacts live — this should too.
+  /// READ THE TOKEN — this had drifted back to a hardcoded `17` while saying
+  /// it was 15, so an area/project header link outsized its own rows.
   private static var font: NSFont {
-    .systemFont(ofSize: 17 * FontScale.shared.factor, weight: .semibold)
+    .systemFont(ofSize: Theme.groupHeaderFontSize * FontScale.shared.factor,
+                weight: .semibold)
   }
   /// The icon COLUMN width — same as a task row's checkbox column
   /// (`Theme.checkboxTap` = 22 on macOS) — so header glyphs and row
@@ -3723,6 +3786,18 @@ final class SeptaskKitTableView: NSTableView {
     default:
       super.keyDown(with: event)
     }
+  }
+
+  /// Escape clears the selection — the standard AppKit responder method for
+  /// "back out of the current state", and the only reliable way to unselect on
+  /// a FULL list: clicking the background works, but a list that fills the
+  /// view has no background left to click, and the gutter beside a card is
+  /// still that row's rect (clicking it selects rather than deselects).
+  /// Editing takes priority: while a field editor is live it owns Escape (it
+  /// cancels the edit) and this never fires.
+  override func cancelOperation(_ sender: Any?) {
+    guard !selectedRowIndexes.isEmpty else { return }
+    deselectAll(nil)
   }
 
   /// Finder-standard context-menu targeting: right-click inside the selection

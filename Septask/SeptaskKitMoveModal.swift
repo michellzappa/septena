@@ -4,13 +4,10 @@ import SwiftData
 
 // The Move command's picker (⌘⇧M / Task ▸ Move…, and the row context menu's
 // "Move to…") — the AppKit counterpart of SwiftUI's `MovePickerSheet`
-// (Septena/Shell/Tasks/TaskPickerSheets.swift), cut down to AREAS ONLY: an
-// area (or "No List") is a filing DECISION; a specific project is detail a
-// user picks once inside the area, not something the Move command should
-// offer (see `KitMoveMenu.destinations`'s comment). Same floating-panel,
-// type-to-filter, arrow-keys, Return shape as `SeptaskKitQuickFind` — not a
-// new UI pattern, the established one for this shell's "type to jump"
-// surfaces.
+// (Septena/Shell/Tasks/TaskPickerSheets.swift). Lists No List, loose
+// projects, then each area with its projects nested underneath — type to
+// filter, arrows + Return to choose. Same floating-panel shape as
+// `SeptaskKitQuickFind`.
 @MainActor
 final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
                                  NSTableViewDataSource, NSTableViewDelegate,
@@ -18,10 +15,9 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
   private struct Row {
     let title: String
     let destination: KitMoveMenu.Destination
-    /// Fallback SF Symbol — shown only when `emoji` is nil (an area with no
-    /// emoji, or the "No List" row).
-    let symbol: String
     let emoji: String?
+    let indent: Bool
+    let projectId: String?
   }
 
   private let onChoose: (KitMoveMenu.Destination) -> Void
@@ -29,6 +25,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
   private let tableView = NSTableView()
   private var allRows: [Row] = []
   private var rows: [Row] = []
+  private var progressByProject: [String: Double] = [:]
   private var panel: NSPanel?
   /// Marks the checkmark row — nil for a bulk move (no single "current" to
   /// mark, matching `MovePickerSheet.showCurrentSelection`).
@@ -51,6 +48,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
     let panel = ensurePanel()
     field.stringValue = ""
     field.placeholderString = title
+    reloadProgress()
     reloadRows()
     if let host = NSApp.keyWindow ?? panel.parent {
       // Centered over the window it steers, a little above middle — same
@@ -132,17 +130,75 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
 
   // MARK: - Filtering
 
+  private func reloadProgress() {
+    var done: [String: Int] = [:]
+    var total: [String: Int] = [:]
+    for task in LocalCache.tasksWithProject(in: context) {
+      guard let pid = task.project else { continue }
+      switch task.status {
+      case .done: done[pid, default: 0] += 1; total[pid, default: 0] += 1
+      case .open: total[pid, default: 0] += 1
+      case .cancelled: break
+      }
+    }
+    progressByProject = total.reduce(into: [:]) { acc, kv in
+      acc[kv.key] = Double(done[kv.key] ?? 0) / Double(kv.value)
+    }
+  }
+
   private func reloadRows() {
     let query = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     let snapshot = StructureCache.snapshot(in: context)
-    allRows = KitMoveMenu.destinations(areas: snapshot.areas, projects: snapshot.projects)
+    allRows = KitMoveMenu.pickerDestinations(areas: snapshot.areas, projects: snapshot.projects)
       .map { entry in
-        Row(title: entry.title, destination: entry.target,
-           symbol: entry.target == .none ? "tray.fill" : "folder", emoji: entry.emoji)
+        Row(title: entry.title, destination: entry.target, emoji: entry.emoji,
+            indent: entry.indent, projectId: entry.projectId)
       }
-    rows = query.isEmpty ? allRows : allRows.filter { $0.title.lowercased().contains(query) }
+    rows = query.isEmpty ? allRows : Self.filterPickerRows(allRows, query: query)
     tableView.reloadData()
     selectCurrentOrFirst()
+  }
+
+  /// SwiftUI `MovePickerSheet` filter: keep No List / loose projects by title;
+  /// keep an area if its title matches or any child project matches; keep a
+  /// nested project only when its title matches (and emit its parent area
+  /// first when needed).
+  private static func filterPickerRows(_ all: [Row], query: String) -> [Row] {
+    let q = query.lowercased()
+    func matches(_ title: String) -> Bool { title.lowercased().contains(q) }
+
+    var result: [Row] = []
+    var index = 0
+    while index < all.count {
+      let row = all[index]
+      switch row.destination {
+      case .none:
+        if matches(row.title) { result.append(row) }
+        index += 1
+      case .project where !row.indent:
+        if matches(row.title) { result.append(row) }
+        index += 1
+      case .area:
+        var children: [Row] = []
+        var cursor = index + 1
+        while cursor < all.count {
+          let next = all[cursor]
+          guard case .project = next.destination, next.indent else { break }
+          if matches(next.title) { children.append(next) }
+          cursor += 1
+        }
+        if matches(row.title) || !children.isEmpty {
+          result.append(row)
+          // Area-title match still only lists children whose titles match
+          // (SwiftUI `projectsIn` always filters by query).
+          result.append(contentsOf: children)
+        }
+        index = cursor
+      case .project:
+        index += 1
+      }
+    }
+    return result
   }
 
   private func selectCurrentOrFirst() {
@@ -198,14 +254,15 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
       ?? MoveRowCell(identifier: identifier)
     let entry = rows[row]
     let checked = currentDestination.map { $0 == entry.destination } ?? false
-    cell.configure(symbol: entry.symbol, emoji: entry.emoji, title: entry.title, checked: checked)
+    let progress = entry.projectId.flatMap { progressByProject[$0] } ?? 0
+    cell.configure(destination: entry.destination, emoji: entry.emoji, title: entry.title,
+                   indent: entry.indent, progress: progress, checked: checked)
     return cell
   }
 
   func windowDidResignKey(_ notification: Notification) { dismiss() }
 
-  /// Result row: glyph (or an area's own emoji, swapped in — never both, same
-  /// rule `KitScreenTitleCell`/`SidebarCell` follow), title, trailing
+  /// Result row: tray / area emoji-or-folder / project pie, title, trailing
   /// checkmark on the current destination — same anatomy as
   /// `MovePickerSheet`'s row.
   private final class MoveRowCell: NSTableCellView {
@@ -213,6 +270,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
     private let emoji = NSTextField(labelWithString: "")
     private let title = NSTextField(labelWithString: "")
     private let checkmark = NSImageView()
+    private var leadingConstraint: NSLayoutConstraint!
 
     init(identifier: NSUserInterfaceItemIdentifier) {
       super.init(frame: .zero)
@@ -233,10 +291,12 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
       addSubview(title)
       addSubview(checkmark)
       textField = title
+      leadingConstraint = icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
       NSLayoutConstraint.activate([
-        icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+        leadingConstraint,
         icon.centerYAnchor.constraint(equalTo: centerYAnchor),
         icon.widthAnchor.constraint(equalToConstant: 14),
+        icon.heightAnchor.constraint(equalToConstant: 14),
         emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
         emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
         title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
@@ -249,16 +309,35 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
 
     required init?(coder: NSCoder) { fatalError("MoveRowCell is code-only") }
 
-    func configure(symbol: String, emoji emojiGlyph: String?, title titleText: String, checked: Bool) {
-      if let emojiGlyph {
-        emoji.stringValue = emojiGlyph
-        emoji.isHidden = false
-        icon.isHidden = true
-      } else {
-        icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
+    func configure(destination: KitMoveMenu.Destination, emoji emojiGlyph: String?,
+                   title titleText: String, indent: Bool, progress: Double, checked: Bool) {
+      leadingConstraint.constant = indent ? 40 : 16
+      switch destination {
+      case .none:
+        icon.image = NSImage(systemSymbolName: "tray.fill", accessibilityDescription: nil)?
           .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+        icon.contentTintColor = SeptaskKitTheme.iconMuted
         icon.isHidden = false
         emoji.isHidden = true
+        title.font = SeptaskKitTheme.taskTitle
+      case .area:
+        if let emojiGlyph {
+          emoji.stringValue = emojiGlyph
+          emoji.isHidden = false
+          icon.isHidden = true
+        } else {
+          icon.image = KitGlyph.areaDot(diameter: 12)
+          icon.contentTintColor = nil
+          icon.isHidden = false
+          emoji.isHidden = true
+        }
+        title.font = .systemFont(ofSize: SeptaskKitTheme.taskTitle.pointSize, weight: .semibold)
+      case .project:
+        icon.image = KitGlyph.progress(progress, tint: SeptaskKitTheme.inkSecondary, diameter: 12)
+        icon.contentTintColor = nil
+        icon.isHidden = false
+        emoji.isHidden = true
+        title.font = SeptaskKitTheme.taskTitle
       }
       title.stringValue = titleText
       checkmark.isHidden = !checked

@@ -17,7 +17,18 @@ final class SeptaskKitNextController: NSViewController {
   private let navigation = NavigationState()
   private var host: NSHostingController<AnyView>?
 
-  override func loadView() {
+  override func loadView() { view = NSView() }
+
+  /// The hosting controller is added as a CHILD view controller rather than
+  /// having its `view` lifted out and used as ours. Taking `host.view` alone
+  /// leaves the hosting controller outside the view-controller hierarchy, so
+  /// it never receives appearance callbacks and the SwiftUI content's
+  /// visibility is tracked only incidentally, by the hosting view noticing it
+  /// moved to a window. Settings — the shell's other SwiftUI host — is already
+  /// correct (`window.contentViewController = host`); this was the one site
+  /// that wasn't.
+  override func viewDidLoad() {
+    super.viewDidLoad()
     let theme = SeptaskMacRuntime.theme
     let settings = SeptaskMacRuntime.settings
     settings.reloadFromMirror(context: LocalStore.shared.container.mainContext)
@@ -34,7 +45,15 @@ final class SeptaskKitNextController: NSViewController {
 
     let host = NSHostingController(rootView: AnyView(root))
     self.host = host
-    view = host.view
+    addChild(host)
+    host.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(host.view)
+    NSLayoutConstraint.activate([
+      host.view.topAnchor.constraint(equalTo: view.topAnchor),
+      host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
   }
 
   /// Match the task list's subtitle convention when this pane is front.

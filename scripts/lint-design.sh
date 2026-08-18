@@ -83,6 +83,19 @@ scan ring-rerolled error \
   'Every ring in the app is ProjectProgressIcon. Extend it rather than re-rolling a trimmed circle.' \
   'Shell/Sidebar/SidebarView\.swift'
 
+# ── AppKit batch updates ─────────────────────────────────────────────────────
+# `inferringMoves()` reports the move's source in the ORIGINAL array's
+# coordinate space, but NSTableView applies a begin/endUpdates batch
+# INCREMENTALLY — each call relative to what the preceding ones left behind. So
+# `moveRow(at:to:)` fed an inferred offset grabs whatever row slid into that
+# slot: moving a task between Today's groups moved the group HEADER instead,
+# and the row read as duplicated under the wrong heading. Plain remove+insert
+# is what the incremental batch is defined for (verified against a real
+# NSTableView over 400 randomized diffs).
+scan appkit-inferring-moves error \
+  'inferringMoves\(\)' \
+  'NSTableView batches apply incrementally — an inferred move offset is stale by the time it runs. Use a plain difference (remove+insert).'
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

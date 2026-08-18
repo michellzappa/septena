@@ -48,12 +48,20 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
 
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  private var notesHeightConstraint: NSLayoutConstraint!
   private var notesShown = false
+  /// Last measured notes field height (clamped). Drives both the scroll
+  /// view's constraint and `KitComposerCell.height(notesHeight:)`.
+  private var measuredNotesHeight: CGFloat = KitComposerCell.notesMinHeight
 
   // MARK: - Height
 
   fileprivate static let pillRowHeight: CGFloat = 24
-  private static let notesHeight: CGFloat = 90
+  /// Empty / short notes — room for a couple of lines before the row grows.
+  private static let notesMinHeight: CGFloat = 72
+  /// Caps growth so a novel-length note scrolls inside the field instead of
+  /// eating the whole list. Matches SwiftUI `TaskMarkdownNotesEditor`.
+  private static let notesMaxHeight: CGFloat = 360
   /// Breathing room under the pill rail (and notes). The TOP of the composer
   /// is not padded separately — it reuses the closed row's vertical band so
   /// the title doesn't travel when the row expands.
@@ -66,9 +74,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   /// Layout: a closed-row-height band at the top (checkbox + title centered
   /// exactly as `SeptaskKitTaskCell`), then pills/notes hanging below. Enter
   /// only grows the row downward — the title's screen position stays put.
-  static func height(showsNotes: Bool) -> CGFloat {
+  /// Pass the live notes field height when notes are visible; `nil` folds
+  /// the notes band away.
+  static func height(notesHeight: CGFloat?) -> CGFloat {
     var height = SeptaskKitTheme.rowHeight + interRowGap + pillRowHeight + bottomPadding
-    if showsNotes { height += interRowGap + notesHeight }
+    if let notesHeight { height += interRowGap + notesHeight }
     return height
   }
 
@@ -119,10 +129,15 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     notesView.isAutomaticQuoteSubstitutionEnabled = false
     notesView.drawsBackground = false
     notesView.textContainerInset = NSSize(width: 2, height: 4)
+    notesView.isHorizontallyResizable = false
+    notesView.isVerticallyResizable = true
+    notesView.textContainer?.widthTracksTextView = true
+    notesView.textContainer?.lineFragmentPadding = 0
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(
       fontSize: SeptaskKitTheme.notesFontSize)
     notesScroll.documentView = notesView
-    notesScroll.hasVerticalScroller = true
+    notesScroll.hasVerticalScroller = false
+    notesScroll.autohidesScrollers = true
     notesScroll.drawsBackground = false
     notesScroll.borderType = .noBorder
     notesScroll.translatesAutoresizingMaskIntoConstraints = false
@@ -138,6 +153,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
     trailingConstraint = titleField.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    notesHeightConstraint = notesScroll.heightAnchor.constraint(
+      equalToConstant: Self.notesMinHeight)
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox + title sit on the vertical
@@ -163,7 +180,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       notesScroll.trailingAnchor.constraint(equalTo: titleField.trailingAnchor),
       notesScroll.topAnchor.constraint(equalTo: pillRow.bottomAnchor,
                                        constant: Self.interRowGap),
-      notesScroll.heightAnchor.constraint(equalToConstant: Self.notesHeight),
+      notesHeightConstraint,
     ])
 
     // Tab walks title → pills → notes, which is the composer's keyboard cursor
@@ -184,6 +201,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
     super.layout()
+    // Width can change on window resize — re-wrap and grow/shrink the field.
+    // Defer the table notify so we don't re-enter layout via noteHeightOfRows.
+    if recomputeNotesHeight(notify: false) {
+      DispatchQueue.main.async { [weak self] in
+        self?.onNotesHeightChanged?()
+      }
+    }
   }
 
   // MARK: - Populate
@@ -200,6 +224,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     notesShown = !notes.isEmpty
     notesScroll.isHidden = !notesShown
     notesPill.isOn = notesShown
+    recomputeNotesHeight(notify: false)
     refreshPills(with: task, listName: listName)
   }
 
@@ -260,6 +285,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   /// the row.
   var showsNotes: Bool { notesShown }
 
+  /// Live notes-band height for `heightOfRow`, or `nil` when the field is folded.
+  var currentNotesHeight: CGFloat? { notesShown ? measuredNotesHeight : nil }
+
   func focusTitle() {
     window?.makeFirstResponder(titleField)
     polishFieldEditor(selectAll: false)
@@ -308,12 +336,47 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     notesShown.toggle()
     notesScroll.isHidden = !notesShown
     notesPill.isOn = notesShown
+    recomputeNotesHeight(notify: false)
     onNotesVisibilityChanged?()
     if notesShown { window?.makeFirstResponder(notesView) }
   }
 
   /// The row has to change height when notes appear/disappear.
   var onNotesVisibilityChanged: (() -> Void)?
+  /// Fired when typed notes grow/shrink the field (no show/hide animation —
+  /// the controller should jump the row height).
+  var onNotesHeightChanged: (() -> Void)?
+
+  /// Fit the notes scroll view to its text, clamped to min/max. Returns
+  /// whether the measured height changed enough to matter for row sizing.
+  @discardableResult
+  private func recomputeNotesHeight(notify: Bool) -> Bool {
+    guard notesShown else {
+      let changed = abs(measuredNotesHeight - Self.notesMinHeight) > 0.5
+      measuredNotesHeight = Self.notesMinHeight
+      notesHeightConstraint.constant = Self.notesMinHeight
+      notesScroll.hasVerticalScroller = false
+      return changed
+    }
+
+    let width = max(notesScroll.bounds.width, 1)
+    notesView.textContainer?.containerSize = CGSize(width: width,
+                                                    height: .greatestFiniteMagnitude)
+    notesView.frame.size.width = width
+    guard let manager = notesView.layoutManager,
+          let container = notesView.textContainer else { return false }
+    manager.ensureLayout(for: container)
+    let used = manager.usedRect(for: container)
+    let inset = notesView.textContainerInset.height * 2
+    let next = min(Self.notesMaxHeight,
+                   max(Self.notesMinHeight, ceil(used.height + inset)))
+    let changed = abs(next - measuredNotesHeight) > 0.5
+    measuredNotesHeight = next
+    notesHeightConstraint.constant = next
+    notesScroll.hasVerticalScroller = next >= Self.notesMaxHeight - 1
+    if changed, notify { onNotesHeightChanged?() }
+    return changed
+  }
 
   /// Current field contents, for the controller's autosave.
   var pendingTitle: String { titleField.stringValue }
@@ -366,18 +429,26 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   }
 
   func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-    // Esc leaves the notes field for the title rather than closing the row —
-    // Return has to stay a newline inside notes.
+    // Same Esc contract as the title field: one press commits and folds the
+    // row, leaving the task selected. (Previously Esc only hopped notes →
+    // title, so closing needed two presses.)
     if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-      window?.makeFirstResponder(titleField)
+      deferCommitAndCollapse()
       return true
     }
     return false
   }
 
+  /// Esc on a focused pill (or anything else in this cell that doesn't eat
+  /// the command) also folds — "anywhere in open-task mode".
+  override func cancelOperation(_ sender: Any?) {
+    deferCommitAndCollapse()
+  }
+
   func textDidChange(_ notification: Notification) {
     guard let textView = notification.object as? NSTextView, textView === notesView else { return }
     MarkdownNotesStyle.restyle(textView, fontSize: SeptaskKitTheme.notesFontSize)
+    recomputeNotesHeight(notify: true)
   }
 }
 

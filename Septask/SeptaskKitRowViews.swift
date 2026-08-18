@@ -401,12 +401,22 @@ enum KitMoveMenu {
     case project(String)
   }
 
-  /// Move targets are areas only — moving a task INTO a specific project is
-  /// filing detail an area-level triage decision shouldn't require; a task
-  /// that needs a project goes there once it's inside the area (drag, or the
-  /// project's own page). `.project` stays a case on `Destination` (existing
-  /// call sites — `move(to:)`'s `apply`, drag-and-drop refiling — still target
-  /// a project directly), it's just never offered as a MOVE-command choice.
+  /// One row in the ⌘⇧M type-to-filter picker — areas AND projects, nested
+  /// like SwiftUI `MovePickerSheet` (loose projects, then each area with its
+  /// projects indented underneath).
+  struct PickerRow {
+    let title: String
+    let target: Destination
+    let emoji: String?
+    /// Indent project rows that nest under an area.
+    let indent: Bool
+    /// Drives the project pie glyph; nil for area / No List rows.
+    let projectId: String?
+  }
+
+  /// Context-menu / submenu targets — areas only. A long flat `NSMenu` of
+  /// every project is unwieldy; the type-to-filter modal
+  /// (`pickerDestinations`) is where projects live.
   /// `emoji` rides alongside `title` rather than getting folded into it —
   /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
   /// icon-column slot of its own); `SeptaskKitMoveModal` swaps its icon
@@ -416,6 +426,29 @@ enum KitMoveMenu {
     -> [(title: String, target: Destination, emoji: String?)] {
     [(String(localized: "No List", comment: "SeptaskKit: move destination"), .none, nil)]
       + areas.map { ($0.title, .area($0.id), $0.emoji) }
+  }
+
+  /// Full Move picker list — No List, loose projects, then each area with
+  /// its active projects nested. Mirrors `MovePickerSheet`'s hierarchy.
+  static func pickerDestinations(areas: [Area], projects: [Project]) -> [PickerRow] {
+    let active = projects.filter { $0.status == .active }
+    var rows: [PickerRow] = [
+      PickerRow(title: String(localized: "No List", comment: "SeptaskKit: move destination"),
+                target: .none, emoji: nil, indent: false, projectId: nil)
+    ]
+    for project in active where project.area == nil {
+      rows.append(PickerRow(title: project.title, target: .project(project.id),
+                            emoji: nil, indent: false, projectId: project.id))
+    }
+    for area in areas {
+      rows.append(PickerRow(title: area.title, target: .area(area.id),
+                            emoji: area.emoji, indent: false, projectId: nil))
+      for project in active where project.area == area.id {
+        rows.append(PickerRow(title: project.title, target: .project(project.id),
+                              emoji: nil, indent: true, projectId: project.id))
+      }
+    }
+    return rows
   }
 
   static func build(areas: [Area], projects: [Project],
@@ -476,6 +509,14 @@ final class KitCardRowView: NSTableRowView {
   /// wash while editing — the expanded row stays on the white card so the
   /// title reads as integrated text, not a selected cell with a field on top.
   var isComposing = false
+
+  /// A bare title field editor (⌘N / ⌘R) is live on this row. Same reason as
+  /// `isComposing`: the wash behind an active text field reads as a selected
+  /// cell with an input box dropped on it, and at a wide window the fill spans
+  /// the whole card behind the caret. The composer path already dropped the
+  /// wash; the field-editor path did not, so creating a task left you typing
+  /// into a full-width blue band.
+  var isEditingTitle = false
 
   /// Insertion line while a task drag is hovering. `.top` / `.bottom` sit on
   /// this row's edge (the drop is `.above` a row, or after the last row).
@@ -540,7 +581,7 @@ final class KitCardRowView: NSTableRowView {
     slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
     // Selection rides on the card (same clip, selection-run rounding) so it
     // cannot overhang as a second rectangle. Composer owns the surface.
-    if isSelected && !isComposing {
+    if isSelected && !isComposing && !isEditingTitle {
       SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
       slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
     }

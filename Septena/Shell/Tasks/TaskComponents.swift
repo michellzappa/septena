@@ -200,8 +200,8 @@ struct CheckableRow<Trailing: View>: View {
   /// to the box. Tasks leave this nil; their agent cue rides the trailing slot.
   var leadingEmoji: String? = nil
   let title: String
-  /// Inline suffix hugging the title (e.g. the task notes glyph). Sits at the
-  /// end of the title text — never in the right-aligned trailing slot.
+  /// Whether the row's accessibility label mentions notes. The visible notes
+  /// marker lives in `TaskRow`'s trailing cluster (right-aligned), not here.
   var showsNotesGlyph: Bool = false
   var subtitle: String? = nil
   /// Fixed minimum height for the title's single-line box, centered on the
@@ -247,10 +247,9 @@ struct CheckableRow<Trailing: View>: View {
     return Theme.inkPrimary
   }
 
-  /// Title as inline `Text` so a notes glyph flows at the end of the last
-  /// wrapped line (not parked beside line one in an `HStack`).
   private var titleLine: some View {
-    titleText
+    Text(title)
+      .foregroundStyle(titleInk)
       .font(.septenaTaskTitle)
       .strikethrough(isInactive)
       .opacity(isInactive ? 0.5 : 1)
@@ -259,12 +258,6 @@ struct CheckableRow<Trailing: View>: View {
       .fixedSize(horizontal: false, vertical: true)
       .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
       .accessibilityLabel(TaskA11y.rowLabel(title: title, hasNotes: showsNotesGlyph, isHeading: false))
-  }
-
-  private var titleText: Text {
-    let head = Text(title).foregroundStyle(titleInk)
-    guard showsNotesGlyph else { return head }
-    return head + Text("\u{00a0}") + TaskNotesGlyph.inlineText()
   }
 
   var body: some View {
@@ -432,16 +425,13 @@ extension TaskCheckbox {
   }
 }
 
-/// Compact notes marker that rides inline at the end of a task title.
+/// Compact notes marker for the task row's right-aligned trailing cluster.
 enum TaskNotesGlyph {
-  /// Vertical nudge so the glyph reads mid-aligned with the title's last line.
-  static let baselineOffset: CGFloat = 3.5
-
-  static func inlineText() -> Text {
-    Text(Image(systemName: "text.alignleft"))
+  static var view: some View {
+    Image(systemName: "text.alignleft")
       .font(.system(size: 10))
       .foregroundStyle(Theme.inkSecondary)
-      .baselineOffset(baselineOffset)
+      .accessibilityHidden(true)
   }
 }
 
@@ -450,9 +440,8 @@ enum TaskNotesGlyph {
 // The single closed (non-editing) task row used by every task surface — the
 // Tasks drawer, the deep `TaskListView`, and the dashboard Next feed — so a
 // task looks identical wherever it appears. A thin, data-driven wrapper over
-// `CheckableRow`: it owns the canonical trailing (recurrence glyph +
+// `CheckableRow`: it owns the canonical trailing (notes + recurrence glyph +
 // the due / scheduled date treatment) and resolves the project→area subtitle.
-// The notes glyph rides inline on the title via `showsNotesGlyph`.
 struct TaskRow: View {
   let task: SeptenaTask
   var accent: Color
@@ -544,10 +533,9 @@ struct TaskRow: View {
 
   // Right-side order (left → right): variable-width elements inboard, fixed-width
   // pinned to the right edge so the row's right margin stays stable.
-  //   accessory (Inbox "file here") · date  →  recurrence · status-dot
-  // Notes ride inline at the end of the title (see `TaskNotesGlyph`). The
-  // accessory and date flex with their content; recurrence and the agent/status
-  // dot are fixed and anchor the trailing edge.
+  //   accessory (Inbox "file here") · date  →  recurrence · notes · status-dot
+  // Accessory and date flex with their content; recurrence / notes / agent
+  // glyphs are fixed and anchor the trailing edge.
   @ViewBuilder private var trailing: some View {
     if let accessory { accessory }
     trailingDate
@@ -557,6 +545,7 @@ struct TaskRow: View {
         .foregroundStyle(Theme.inkSecondary)
         .accessibilityLabel(TaskA11y.recurring)
     }
+    if hasNotes { TaskNotesGlyph.view }
     agentSignal
   }
 

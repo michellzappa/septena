@@ -97,7 +97,18 @@ struct SeptaskNextFeed: View {
   }
 
   var body: some View {
-    Group {
+    // A VStack, NOT a Group — the lifecycle modifiers below hang off this
+    // container, and a modifier applied to a `Group` is applied to each of the
+    // group's CHILDREN individually. Cold, every branch here resolves to
+    // nothing (no suggestions yet, every trio block still empty, and the empty
+    // row gated behind `model.hasLoaded`), so a Group had zero children and
+    // `.task` attached to nothing: the load that would produce the children was
+    // itself hanging off the children. Next stayed permanently blank below its
+    // page header — no rows and no "Nothing here yet" — with `.onReceive`
+    // /`.onChange` equally dead, so nothing could recover it. A real container
+    // always exists, so its modifiers always run. (Septena's `NextView` hangs
+    // the same lifecycle off a `List`, which is why only Septask had this.)
+    VStack(alignment: .leading, spacing: 0) {
       if openCount == 0 && model.hasLoaded {
         emptyRow
       } else {

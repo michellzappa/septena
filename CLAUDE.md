@@ -300,6 +300,34 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
      `.focusedSceneValue(\.taskActions)` from a split-view detail SIGKILLs iPad
      (so those publishers stay `#if os(macOS)`).
   Otherwise the ban stands: no `NSEvent` monitors, no ungated hidden buttons.
+- **Never hang `.task` / `.onAppear` / `.onReceive` off a `Group`.** A modifier
+  applied to a `Group` is applied to each of the group's **children
+  individually** — so a `Group` whose branches all resolve to nothing has no
+  child to attach to and the modifier simply never runs. This deadlocks any view
+  whose loader lives there: Septask's Next feed rendered no rows cold (no
+  suggestions yet, every trio block empty, the empty row gated behind
+  `hasLoaded`), so `.task` never fired, so it never loaded, so it never rendered
+  rows — permanently blank below the page header, with no "Nothing here yet"
+  either, and `.onReceive`/`.onChange` equally dead so nothing could recover it.
+  Hang lifecycle off a container that always exists (`VStack`, `List`); Septena's
+  `NextView` was unaffected only because its `.task` sits on a `List`. Verified:
+  identical content fires 0 times in a `Group`, 1 time in a `VStack`. Not
+  greppable (the scanner can't see what a modifier attaches to) — this note is
+  the guardrail.
+- **`NSTableView` batch updates apply INCREMENTALLY — never feed them
+  `inferringMoves()`.** Unlike `UITableView` (all indexes relative to the
+  pre-batch state), each call inside `beginUpdates()`/`endUpdates()` is relative
+  to what the preceding calls left behind. A `CollectionDifference` move's
+  `associatedWith` offset is in the *original* array's coordinate space, so by
+  the time `moveRow(at:to:)` runs, earlier removes/inserts have shifted it and
+  it grabs whichever row slid into that slot. In Septask's AppKit Today list
+  this moved the *group header* instead of the task — the task rendered under
+  the wrong heading and read as a duplicate, with neighboring titles offset
+  (surviving rows keep their cached cells and aren't re-fetched, so nothing
+  self-corrects). Use a **plain** `difference(from:)` and apply
+  remove+insert; that's exactly what the incremental batch is defined for, and
+  a row changing groups should leave and arrive anyway. Enforced by the
+  `appkit-inferring-moves` lint rule.
 - **No inline `TextField` swapped into a *selectable* native `List` row.**
   Replacing a row's `Text` with a focusable `TextField` (then removing it) on
   edit corrupts a native `List`'s focus/selection on macOS — after the edit ends,

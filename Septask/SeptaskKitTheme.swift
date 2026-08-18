@@ -35,10 +35,15 @@ enum SeptaskKitTheme {
     .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .regular)
   }
 
-  /// Project section headings — same 17pt semibold as SwiftUI's
-  /// `sectionGroupHeaderTitleStyle()` / `Theme.groupHeaderFontSize`.
+  /// Project section headings — semibold at SwiftUI's
+  /// `sectionGroupHeaderTitleStyle()` rung (`Theme.groupHeaderFontSize`).
+  /// READ FROM THE TOKEN, never hardcoded: this said `17` while the token is
+  /// 15 on macOS, so AppKit headers outran the SwiftUI ones and sat 3pt above
+  /// the 14pt task title — the token's own comment is "keep them visually
+  /// subordinate to the task text", which 17 was not.
   static var heading: NSFont {
-    .systemFont(ofSize: 17 * FontScale.shared.factor, weight: .semibold)
+    .systemFont(ofSize: Theme.groupHeaderFontSize * FontScale.shared.factor,
+                weight: .semibold)
   }
 
   /// Theme.septenaCardTitle — the group header above a run of rows.
