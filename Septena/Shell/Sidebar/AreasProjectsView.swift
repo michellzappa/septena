@@ -38,6 +38,7 @@ func notesField(_ text: Binding<String>,
         .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
         .contentShape(Rectangle())
+        .septenaEditableTitleCursor()
         .onTapGesture { focused.wrappedValue = true }
     }
   }
@@ -145,6 +146,7 @@ struct AreaDetailView: View {
                        emoji: draftEmoji.isEmpty ? nil : draftEmoji)
                 .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
                 .contentShape(Rectangle())
+                .inlineHover(capsule: true)
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showingEmojiEditor) {

@@ -115,6 +115,7 @@ struct QuickFindView: View {
               QuickFindRow(hit: hit, selected: idx == selection)
                 .id(idx)
                 .contentShape(Rectangle())
+                .rowHover()
                 .onTapGesture { selection = idx; activateSelected() }
             }
           }

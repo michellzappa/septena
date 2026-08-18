@@ -217,6 +217,7 @@ struct CorrelationsHomepageView: View {
       ForEach(items) { e in
         TileView(pair: e, color: theme.color(for: e.spec.predictor.section))
           .contentShape(Rectangle())
+          .tileHover(cornerRadius: 12)
           .onTapGesture { focused = e }
       }
     }

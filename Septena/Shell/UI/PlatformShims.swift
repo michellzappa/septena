@@ -789,6 +789,22 @@ private struct TilePointerAffordance<S: Shape>: ViewModifier {
   }
 }
 
+/// `tileHover`'s conditional form — see that function's doc comment for why
+/// this is a modifier rather than an `if enabled { … }` branch at the call
+/// site.
+private struct TileHoverIf: ViewModifier {
+  let cornerRadius: CGFloat
+  let enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.tileHover(cornerRadius: cornerRadius)
+    } else {
+      content
+    }
+  }
+}
+
 extension View {
   /// Universal pointer / Apple-Pencil-hover for tappable custom surfaces
   /// (dashboard tiles, cards, log rows). System controls get hover for free;
@@ -800,6 +816,17 @@ extension View {
   func tileHover(cornerRadius: CGFloat = Theme.cornerRadius) -> some View {
     let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     return modifier(TilePointerAffordance(shape: shape))
+  }
+
+  /// `tileHover`, gated on a per-instance condition — for a tap target that's
+  /// only sometimes interactive (a chart that flips metrics for strength
+  /// exercises but no-ops for cardio/mobility). A bare `if enabled { ... }`
+  /// branch at the call site would change which concrete view type each branch
+  /// produces, which can reset state/identity for the content underneath;
+  /// wrapping in a `ViewModifier` keeps identity stable and just toggles the
+  /// wash's opacity.
+  func tileHover(cornerRadius: CGFloat = Theme.cornerRadius, enabled: Bool) -> some View {
+    modifier(TileHoverIf(cornerRadius: cornerRadius, enabled: enabled))
   }
 
   /// Alias for list rows — faint wash at the row radius (not the tile highlight).

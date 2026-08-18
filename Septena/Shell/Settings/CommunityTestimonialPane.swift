@@ -283,6 +283,9 @@ private struct StarRatingPicker: View {
         Image(systemName: (rating ?? 0) >= i ? "star.fill" : "star")
           .font(.title3)
           .foregroundStyle(.yellow)
+          .padding(4)
+          .contentShape(Circle())
+          .inlineHover(capsule: true)
           .onTapGesture { rating = i }
           .accessibilityLabel("\(i) star\(i == 1 ? "" : "s")")
       }

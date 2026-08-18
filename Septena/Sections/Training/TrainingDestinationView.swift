@@ -2346,6 +2346,7 @@ struct TrainingExerciseRow: View {
       .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
       .opacity(opacityFor(entry.status))
       .contentShape(Rectangle())
+      .tileHover()
       .onTapGesture { onTap() }
       // Long-press (right-click on Mac) surfaces the same per-exercise actions as
       // the drawer's ⋯ menu, without drilling in first. Same builder, so the two
@@ -3157,8 +3158,11 @@ struct TrainingExerciseEditorBody: View {
                               todayDate: SeptenaDate.parse(clock.today))
       }
       // Tap anywhere on the header+chart to flip the strength metric. Whole
-      // block is the target (charts are hard to hit), no-op for cardio/mobility.
+      // block is the target (charts are hard to hit), no-op for cardio/mobility
+      // — hover is gated the same way so a non-toggleable chart never signals
+      // an affordance it doesn't have.
       .contentShape(Rectangle())
+      .tileHover(enabled: canToggleMetric)
       .onTapGesture {
         guard canToggleMetric else { return }
         strengthTopWeight.toggle()

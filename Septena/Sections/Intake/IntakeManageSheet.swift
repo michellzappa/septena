@@ -79,6 +79,7 @@ struct IntakeManageSheet: View {
               .foregroundStyle(symbol == s ? AdaptiveColor.inkOnSolidFill(AdaptiveColor.adaptive(color) ?? .accentColor) : Color.primary)
               .background(symbol == s ? (AdaptiveColor.adaptive(color) ?? .accentColor) : Color.secondary.opacity(0.12),
                           in: RoundedRectangle(cornerRadius: 9))
+              .inlineHover(cornerRadius: 9)
               .onTapGesture {
                 symbol = s
                 mutator.updateKind(id: kindID, symbol: s)

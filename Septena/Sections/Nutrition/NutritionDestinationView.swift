@@ -799,6 +799,7 @@ struct NutritionDestinationView: View {
     // long-press / right-click → `.contextMenu`. Both are documented
     // SwiftUI affordances.
     .contentShape(RoundedRectangle(cornerRadius: 10))
+    .tileHover(cornerRadius: 10)
     .onTapGesture { editing = e }
     .contextMenu {
       Button { editing = e } label: { Label("Edit", systemImage: "pencil") }
