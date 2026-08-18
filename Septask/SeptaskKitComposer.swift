@@ -289,6 +289,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   var currentNotesHeight: CGFloat? { notesShown ? measuredNotesHeight : nil }
 
   func focusTitle() {
+    // A freshly-opened composer reaches here before its first layout pass —
+    // `beginComposing` swaps the cell in and focuses one runloop turn later,
+    // while the row is still animating open, so `titleField`'s trailing pin
+    // (set in `layout()`) has not resolved. Without this flush the field
+    // editor inherits a near-zero frame and you can only see the glyph you
+    // just typed. Same guard, same reason as `SeptaskKitTaskCell.beginEditing`.
+    layoutSubtreeIfNeeded()
     window?.makeFirstResponder(titleField)
     polishFieldEditor(selectAll: false)
   }

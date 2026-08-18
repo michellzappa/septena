@@ -80,6 +80,10 @@ final class SeptaskKitTaskListController: NSViewController {
     case task(SeptenaTask, chip: Chip?)
     case event(Event)
     case loggedFooter(count: Int, expanded: Bool)
+    /// Foot of Today's Inbox card — the clickable "New task" line, the AppKit
+    /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
+    /// `shouldSelectRow` already keeps it out of selection and arrow-nav.
+    case newTask
 
     var key: String {
       switch self {
@@ -89,6 +93,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .task(let task, _): return task.id
       case .event(let event): return "e:" + event.id
       case .loggedFooter: return "logged-footer"
+      case .newTask: return "new-task"
       }
     }
 
@@ -103,7 +108,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .loggedFooter: return false
-      case .projectTarget, .event: return true
+      case .projectTarget, .event, .newTask: return true
       case .task(let task, _): return !task.isHeading
       }
     }
@@ -425,11 +430,13 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + agenda() + triageBand() + groupedByList(withoutTriage(pool))
+      newRows = titleRows + agenda() + triageBand()
+        + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract.
       newRows = titleRows + agenda() + triageBand()
         + withoutTriage(pool).sorted(by: SeptenaTask.compareNextPageOrder).map(chipped)
+        + newTaskLine
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
     case .unscheduled:
@@ -609,11 +616,28 @@ final class SeptaskKitTaskListController: NSViewController {
   /// as the SwiftUI Today renders it.
   private func triageBand() -> [Row] {
     let band = LocalCache.tasks(in: context, filter: .triage)
-    guard !band.isEmpty else { return [] }
+    // Rendered even when the band is empty: Today always offers the foot
+    // "New task" line, so the Inbox card is the capture slot whether or not
+    // anything sits in it. Matches `TaskListView.triageSection`, which shows
+    // the section whenever `allowsInlineCreate` regardless of row count.
     return [.header(id: "inbox",
                     title: String(localized: "Inbox", comment: "Smart list title"),
                     icon: .symbol("tray"), count: band.count)]
       + band.map(chipped)
+  }
+
+  /// The "New task" line, or nothing while a create is in flight — then the
+  /// row being typed into reads as the slot itself rather than sitting under a
+  /// duplicate prompt. `pendingNewTaskId` clears on commit (and on an
+  /// abandoned empty row, which is purged), and the reload that follows puts a
+  /// fresh line back.
+  ///
+  /// Emitted by the CALLER, not by `triageBand`, because Today's Inbox run is
+  /// the triage band PLUS the loose rows that `groupedByList` emits before its
+  /// first group header — the same `allInbox` split SwiftUI's `triageSection`
+  /// makes. Appending it to the band alone parked it above those loose rows.
+  private var newTaskLine: [Row] {
+    pendingNewTaskId == nil ? [Row.newTask] : []
   }
 
   /// An MCP-authored row can satisfy both the triage band and Today (the band
@@ -761,7 +785,7 @@ final class SeptaskKitTaskListController: NSViewController {
     reload(animated: false)
   }
 
-  private func groupedByList(_ pool: [SeptenaTask]) -> [Row] {
+  private func groupedByList(_ pool: [SeptenaTask], inboxFooter: [Row] = []) -> [Row] {
     let snapshot = StructureCache.snapshot(in: context)
     let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
                                by: { $0.project! })
@@ -772,7 +796,9 @@ final class SeptaskKitTaskListController: NSViewController {
 
     // Loose rows keep their chips: an agent proposal can name a project while
     // still sitting in the ungrouped band.
-    var result: [Row] = loose.map(chipped)
+    // `inboxFooter` closes the Inbox run — Today's "New task" line sits after
+    // the loose rows and before the first group header.
+    var result: [Row] = loose.map(chipped) + inboxFooter
     func appendProject(_ project: Project) {
       guard let tasks = byProject[project.id], !tasks.isEmpty else { return }
       result.append(.header(id: "p-\(project.id)", title: project.title,
@@ -1341,7 +1367,13 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Upcoming schedules tomorrow (the minimal date that keeps the row visible
   /// in that list). The new row appears at the top of its group (TaskOrder's
   /// insert-at-top), selected, with the title editor open.
-  func createTask() {
+  /// `inInbox` is the foot-of-Inbox "New task" line: that row is anchored to
+  /// the Inbox card, so it must create LOOSE work regardless of what is
+  /// selected. Inheriting the focused row's filing there would file the task
+  /// into that list and drop it straight out of the Inbox band the user just
+  /// clicked in. ⌘N (inInbox: false) keeps inheriting, which is what makes it
+  /// land in the group you are working in.
+  func createTask(inInbox: Bool = false) {
     if isTitleEditorActive {
       // Commit the in-flight edit first; commitRename runs synchronously.
       view.window?.makeFirstResponder(tableView)
@@ -1363,7 +1395,7 @@ final class SeptaskKitTaskListController: NSViewController {
       today = true
       // Grouped Today: inherit the selected row's filing. Flat Today has no
       // groups, but the same inheritance still files under the focused list.
-      if let focused = focusedTaskForCreate() {
+      if !inInbox, let focused = focusedTaskForCreate() {
         area = focused.area
         project = focused.project
       }
@@ -1390,8 +1422,16 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
 
+    // Bottom-positioned for the Inbox line: that line sits at the foot of the
+    // Inbox run, so a top-positioned create would open the editor at the TOP
+    // of the run and shove everything down — you press Return on a row at the
+    // bottom and the field appears somewhere else. `atBottom` lands the row
+    // exactly where the line was, which is the same reason SwiftUI's foot
+    // quick-add passes it ("inline captures land above the New task row").
+    // ⌘N keeps the default top capture.
     let task = mutator.create(title: "", area: area, project: project,
-                              scheduled: scheduled, today: today)
+                              scheduled: scheduled, today: today,
+                              atBottom: inInbox)
     pendingNewTaskId = task.id
     reload(animated: false)
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
@@ -1418,7 +1458,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// fixing a typo.
   func beginEditSelectedRow() {
     let row = tableView.selectedRow
-    guard row >= 0 else { return }
+    // Nothing to rename on the "New task" line — it is selectable, so ⌘R can
+    // land on it, but it carries no task.
+    guard row >= 0, rows[row].task != nil else { return }
     beginEditingRow(row)
   }
 
@@ -1467,7 +1509,8 @@ final class SeptaskKitTaskListController: NSViewController {
   private func repaintEditingRow(_ row: Int) {
     guard let rowView = tableView.rowView(atRow: row, makeIfNecessary: false)
       as? KitCardRowView else { return }
-    rowView.isEditingTitle = rows[row].task?.id == editingTaskId
+    let taskId = rows[row].task?.id
+    rowView.isEditingTitle = taskId != nil && taskId == editingTaskId
     rowView.needsDisplay = true
   }
 
@@ -1484,6 +1527,11 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     let row = tableView.selectedRow
+    // Return on the "New task" line creates, exactly as clicking it does.
+    if rows.indices.contains(row), case .newTask = rows[row] {
+      createTask(inInbox: true)
+      return
+    }
     guard row >= 0, let task = rows[row].task else { return }
     // A section heading has no pills/notes to open a full composer for —
     // same as the SwiftUI project page, renaming it is a bare title edit.
@@ -2089,7 +2137,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { false }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
-    rows[row].task != nil
+    // The "New task" line is selectable even though it carries no task, so
+    // arrow-nav reaches it and Return activates it — same contract as SwiftUI,
+    // where the trigger row joins `keyboardOrderedTaskIds`. Every other
+    // taskless row (headers, screen title, logged footer) stays unselectable.
+    if case .newTask = rows[row] { return true }
+    return rows[row].task != nil
   }
 
   func tableViewSelectionDidChange(_ notification: Notification) {
@@ -2138,6 +2191,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         + (taskContextText(for: task) == nil ? 0 : 14)
     case .event: return SeptaskKitTheme.rowHeight
     case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
+    case .newTask: return SeptaskKitTheme.rowHeight
     }
   }
 
@@ -2157,9 +2211,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   }
 
   private func applyCardGeometry(_ rowView: KitCardRowView, atRow row: Int) {
-    let composing = rows[row].task?.id == composingTaskId
+    // Compare only when the row HAS a task: `Optional == Optional` makes
+    // nil == nil true, so every taskless row (the New task line, headers)
+    // read as composing AND title-editing whenever nothing was — which
+    // suppressed `KitCardRowView`'s selection wash, so the selectable New
+    // task line could be selected but never looked it.
+    let taskId = rows[row].task?.id
+    let composing = taskId != nil && taskId == composingTaskId
     rowView.isComposing = composing
-    rowView.isEditingTitle = rows[row].task?.id == editingTaskId
+    rowView.isEditingTitle = taskId != nil && taskId == editingTaskId
     if rows[row].isCardRow {
       rowView.isCard = true
       // The open composer is its own rounded slice (Things' elevated edit
@@ -2560,6 +2620,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.toggleLoggedExpanded() }
       return cell
 
+    case .newTask:
+      let identifier = NSUserInterfaceItemIdentifier("newTaskCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNewTaskCell
+        ?? KitNewTaskCell(identifier: identifier)
+      cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
+      return cell
+
     case .task(let task, let chip):
       if task.id == composingTaskId {
         let identifier = NSUserInterfaceItemIdentifier("composerCell")
@@ -2766,6 +2833,16 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailing.setContentHuggingPriority(.required, for: .horizontal)
     trailing.setContentCompressionResistancePriority(.required, for: .horizontal)
     trailing.setHuggingPriority(.required, for: .horizontal)
+    // Collapsed by default. The spacer and the title carry the SAME hugging
+    // (.defaultLow), so on a row with every trailing glyph hidden — exactly a
+    // freshly-created task — the tie let the spacer absorb the row's free
+    // width and the title collapsed to ~0, opening its field editor one glyph
+    // wide. Pinning it to 0 at .defaultHigh makes the title the only expandable
+    // member, while still yielding if a required constraint genuinely
+    // stretches the stack (the case this spacer exists for).
+    let shoveCollapsed = trailingShove.widthAnchor.constraint(equalToConstant: 0)
+    shoveCollapsed.priority = .defaultHigh
+    shoveCollapsed.isActive = true
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
 
@@ -3407,6 +3484,112 @@ final class KitLoggedFooterCell: NSTableCellView {
     let point = convert(event.locationInWindow, from: nil)
     if bounds.contains(point) { onTap?() }
   }
+}
+
+// MARK: - New task cell
+
+/// Foot of Today's Inbox card: the clickable "New task" line, the AppKit
+/// counterpart of SwiftUI's `QuickAddTriggerRow`.
+///
+/// Geometry is `SeptaskKitTaskCell`'s, not an approximation of it — the real
+/// `KitCheckboxView` at `tapSize`, pinned `inset + 6` from the leading edge,
+/// with the title `7` after the box at `SeptaskKitTheme.taskTitle`. The row
+/// has to line up glyph-for-glyph with the task rows it sits under.
+///
+/// Clicks go to a transparent full-bleed `NSButton` layered over that content
+/// rather than to a `hitTest`/`mouseUp` override on the cell. A bare
+/// `NSTextField` under the pointer is claimed by the table and no override on
+/// the surrounding cell runs, while `resetCursorRects` still paints the
+/// pointing hand — so a dead target looks alive. Only a real `NSControl`
+/// reliably receives the click.
+@MainActor
+final class KitNewTaskCell: NSTableCellView {
+  private let checkbox = KitCheckboxView()
+  private let label = NSTextField(labelWithString: "")
+  private let hit = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    let title = String(localized: "New task",
+                       comment: "Quick-add line at the foot of Today's Inbox")
+
+    checkbox.translatesAutoresizingMaskIntoConstraints = false
+    // Same empty-box language as SwiftUI's trigger row: never done, never
+    // Today, dashed under the v2 row language.
+    checkbox.isDone = false
+    checkbox.isToday = false
+    checkbox.isDashed = TaskRowFlags.languageV2
+    // Decorative here — the whole row is the button, so the box must not be
+    // separately clickable or focusable.
+    checkbox.isEnabled = false
+    checkbox.kitA11yIgnore()
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.taskTitle
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.stringValue = title
+    label.kitA11yIgnore()
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+
+    addSubview(checkbox)
+    addSubview(label)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
+    textField = label
+    kitA11yButton(label: title)
+
+    leadingConstraint = checkbox.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = label.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
+      checkbox.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      checkbox.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      label.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      trailingConstraint,
+      hit.leadingAnchor.constraint(equalTo: leadingAnchor),
+      hit.trailingAnchor.constraint(equalTo: trailingAnchor),
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitNewTaskCell is code-only") }
+
+  /// Same centered-column inset the task rows and the card background use.
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
+
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
+  }
+
+  @objc private func fire() { onTap?() }
 }
 
 // MARK: - Group header cell
