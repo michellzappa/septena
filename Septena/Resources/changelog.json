@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1594,
+      "build": 1596,
       "date": "2026-08-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, arrives on Mac, iPhone, and Watch",
-          "detail": "A new streamlined task app shares your Septena data, with its own settings, Quick Find, and a today-tasks watch complication.",
+          "title": "Septask, a focused task app, joins the family",
+          "detail": "A new companion app puts your Septena tasks front and center on iPhone, iPad, Mac, and Apple Watch, including a Today complication.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks now hold up everywhere",
-          "detail": "Completing a recurring task creates its next occurrence, and repeat schedules stay correct across Mac, iPhone, and Watch.",
+          "title": "Recurring tasks now work reliably everywhere",
+          "detail": "Completing a recurring task creates its next occurrence correctly, and fixed schedules survive edits across every surface.",
           "section": "tasks"
         },
         {
-          "title": "Task attachments, Things import, and Recently Deleted",
-          "detail": "Attach files to tasks, import from a Things export, and recover deleted tasks for 30 days with undo.",
+          "title": "Faster task organization",
+          "detail": "Drag tasks into areas, projects, or Today groups, multi-select for bulk actions, add project section headings, and get filing suggestions for loose captures.",
           "section": "tasks"
         },
         {
-          "title": "Log meals from a photo",
-          "detail": "Snap a meal photo and Septena analyzes it on-device to prefill the entry, and re-logged meals can be scaled by portion.",
+          "title": "Photo-based meal logging",
+          "detail": "Snap a photo of your meal and Septena analyzes it on-device to prefill macros and ingredients.",
           "section": "nutrition"
         },
         {
           "title": "Smarter training sessions",
-          "detail": "New progression hints, editable session start/end times, and an effort-weighted weekly training review.",
+          "detail": "See per-set progression hints, edit session start/end times, and review effort-weighted muscle volume after each week.",
           "section": "training"
         },
         {
-          "title": "Pin goals and track steps on the dashboard",
-          "detail": "Pin any goal to your week dashboard, and a new steps tile shows your daily activity.",
-          "section": null
+          "title": "Suggested and pinnable goals",
+          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions, and any goal can be pinned to your dashboard.",
+          "section": "goals"
         },
         {
-          "title": "Calendar events show up alongside your tasks",
-          "detail": "Today and Upcoming now weave in your calendar events, with hidden-calendar choices synced across devices.",
-          "section": "tasks"
+          "title": "Copy your grocery list",
+          "detail": "A new button copies the shopping list to the clipboard in one tap.",
+          "section": "groceries"
         },
         {
-          "title": "Clearer control over what usage data is shared",
-          "detail": "See exactly what telemetry is sent, review a recent log, and pick a level from off to full.",
+          "title": "Clearer privacy controls",
+          "detail": "Choose a graded analytics level and see exactly what telemetry is sent, with anonymized opt-out.",
           "section": null
         }
       ]
