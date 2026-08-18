@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1590,
-      "date": "2026-08-14",
+      "build": 1594,
+      "date": "2026-08-18",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "Septask is a new dedicated task app for iPhone and Mac that shares your private Septena task data.",
+          "title": "Septask, a focused task app, arrives on Mac, iPhone, and Watch",
+          "detail": "A new streamlined task app shares your Septena data, with its own settings, Quick Find, and a today-tasks watch complication.",
           "section": "tasks"
         },
         {
           "title": "Recurring tasks now hold up everywhere",
-          "detail": "Completing a recurring task reliably spawns its next occurrence, and fixed-schedule repeats keep their anchor across iOS, Mac, watch, and Septask.",
+          "detail": "Completing a recurring task creates its next occurrence, and repeat schedules stay correct across Mac, iPhone, and Watch.",
           "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Snap a photo of a meal to prefill its nutrition details on-device, and re-log a meal already logged today, scaled by a percentage if you like.",
+          "title": "Task attachments, Things import, and Recently Deleted",
+          "detail": "Attach files to tasks, import from a Things export, and recover deleted tasks for 30 days with undo.",
+          "section": "tasks"
+        },
+        {
+          "title": "Log meals from a photo",
+          "detail": "Snap a meal photo and Septena analyzes it on-device to prefill the entry, and re-logged meals can be scaled by portion.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training sessions",
-          "detail": "Get progression hints on your sets, edit a session's start and end times, and see a live marker on your progress chart.",
+          "title": "Smarter training sessions",
+          "detail": "New progression hints, editable session start/end times, and an effort-weighted weekly training review.",
           "section": "training"
         },
         {
-          "title": "Task attachments, sharing, and drag-to-file",
-          "detail": "Attach files to tasks, share into Septena or Septask from other apps, and drag tasks onto Today groups or project headings to re-home them.",
+          "title": "Pin goals and track steps on the dashboard",
+          "detail": "Pin any goal to your week dashboard, and a new steps tile shows your daily activity.",
+          "section": null
+        },
+        {
+          "title": "Calendar events show up alongside your tasks",
+          "detail": "Today and Upcoming now weave in your calendar events, with hidden-calendar choices synced across devices.",
           "section": "tasks"
         },
         {
-          "title": "Redesigned date picker and quick capture",
-          "detail": "Pick due dates faster with quick-pick pills and a calendar popover, and capture tasks instantly with Quick Find and Add Task shortcuts.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pinned goals on your dashboard",
-          "detail": "Pin goals to the week dashboard, toggle habit-backed goals right from the tile, and see contextual actions and colors.",
-          "section": "goals"
-        },
-        {
-          "title": "A more capable watch app",
-          "detail": "The watch now carries a full task list, a paged Next feed, and interactive intake tiles for quick-adding drinks and doses.",
+          "title": "Clearer control over what usage data is shared",
+          "detail": "See exactly what telemetry is sent, review a recent log, and pick a level from off to full.",
           "section": null
         }
       ]
