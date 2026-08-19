@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1600,
+      "build": 1606,
       "date": "2026-08-19",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
           "title": "Meet Septask, a focused task app",
-          "detail": "A new native app over the same private task data, now with a Mac shell, iPad tab bar, watch app, and settings that mirror Septena.",
+          "detail": "A standalone app for just your tasks, sharing the same data as Septena across iPhone, iPad, Mac, and Apple Watch.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks work reliably everywhere",
-          "detail": "Completing a recurring task now reliably creates its next occurrence, with fixes across iOS, Mac, watch, and Septask.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring in a Things database export, including project sections and headings.",
           "section": "tasks"
         },
         {
-          "title": "Meal photos analyze themselves",
-          "detail": "Snap a photo of a meal and on-device analysis prefills the macros, with an optional ingredient breakdown.",
+          "title": "Recently Deleted tasks, with 30-day recovery",
+          "detail": "Deleted tasks now sit in a recoverable list for 30 days before they're purged for good.",
+          "section": "tasks"
+        },
+        {
+          "title": "Recurring tasks now reliable everywhere",
+          "detail": "Completing a recurring task reliably spawns its next occurrence on iPhone, iPad, Mac, and watch.",
+          "section": "tasks"
+        },
+        {
+          "title": "Calendar events woven into Today and Upcoming",
+          "detail": "See your calendar alongside tasks, with hidden-calendar choices synced across devices.",
+          "section": "tasks"
+        },
+        {
+          "title": "Smarter meal logging",
+          "detail": "Snap a photo to prefill a meal's nutrition fields, or re-log a past meal scaled to a percentage.",
           "section": "nutrition"
         },
         {
-          "title": "Smarter strength training",
-          "detail": "Get per-set progression hints, editable session start and end times, and a redesigned rest timer with a watch Live Activity.",
+          "title": "Reworked training sessions",
+          "detail": "Edit session start/end times directly and get reps-before-load progression hints on your sets.",
           "section": "training"
         },
         {
-          "title": "Recently deleted tasks are recoverable",
-          "detail": "Deleted tasks now sit in a 30-day Recently Deleted list with undo.",
-          "section": "tasks"
-        },
-        {
-          "title": "Pin goals to your dashboard",
-          "detail": "Pin goals to the week dashboard and tap habit-backed ones to toggle them right there.",
-          "section": "goals"
-        },
-        {
-          "title": "Import tasks from Things",
-          "detail": "Bring over tasks, headings, and project sections from a Things database export.",
-          "section": "tasks"
-        },
-        {
           "title": "See exactly what telemetry is sent",
-          "detail": "Privacy settings now show a graded telemetry ladder and a log of what's been sent, with a clear opt-out.",
+          "detail": "A new privacy view shows the full telemetry ladder and a log of what's recently been sent, with anonymized opt-out.",
           "section": null
         }
       ]
