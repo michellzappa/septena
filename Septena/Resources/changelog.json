@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1598,
-      "date": "2026-08-18",
+      "build": 1600,
+      "date": "2026-08-19",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app for iPhone, iPad, and Mac",
-          "detail": "A new app that works on the same private task data as Septena, with its own watch app, widgets, and settings.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A new native app over the same private task data, now with a Mac shell, iPad tab bar, watch app, and settings that mirror Septena.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks are far more reliable",
-          "detail": "Completing a recurring task now reliably creates its next occurrence, and repeat schedules hold up across editing, sync, and every surface.",
+          "title": "Recurring tasks work reliably everywhere",
+          "detail": "Completing a recurring task now reliably creates its next occurrence, with fixes across iOS, Mac, watch, and Septask.",
           "section": "tasks"
         },
         {
-          "title": "Meal photos are read automatically",
-          "detail": "Take a photo of a meal and Septena analyzes it on-device to prefill the nutrition fields.",
+          "title": "Meal photos analyze themselves",
+          "detail": "Snap a photo of a meal and on-device analysis prefills the macros, with an optional ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions get progression hints and finer control",
-          "detail": "Strength sets now show a one-tap progression hint, sessions have editable start and end times, and rest between sets auto-advances.",
+          "title": "Smarter strength training",
+          "detail": "Get per-set progression hints, editable session start and end times, and a redesigned rest timer with a watch Live Activity.",
           "section": "training"
         },
         {
-          "title": "Hover and selection feel more consistent everywhere",
-          "detail": "Tiles, rows, and inline controls now respond to hover, and selection uses one consistent highlight across the app.",
-          "section": null
+          "title": "Recently deleted tasks are recoverable",
+          "detail": "Deleted tasks now sit in a 30-day Recently Deleted list with undo.",
+          "section": "tasks"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer suggested goals.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Pin goals to the week dashboard and tap habit-backed ones to toggle them right there.",
           "section": "goals"
         },
         {
-          "title": "Task attachments, bulk actions, and drag-to-file",
-          "detail": "Attach files to a task, select multiple tasks at once, and drag tasks onto projects, areas, or headings.",
+          "title": "Import tasks from Things",
+          "detail": "Bring over tasks, headings, and project sections from a Things database export.",
           "section": "tasks"
         },
         {
           "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy screen lists analytics data being sent, with graded levels from off to full.",
+          "detail": "Privacy settings now show a graded telemetry ladder and a log of what's been sent, with a clear opt-out.",
           "section": null
         }
       ]
