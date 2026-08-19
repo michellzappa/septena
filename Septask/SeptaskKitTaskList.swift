@@ -1697,6 +1697,16 @@ final class SeptaskKitTaskListController: NSViewController {
     id.hasPrefix("p-") || id.hasPrefix("a-")
   }
 
+  /// Headers that begin a NEW list section, and so carry extra air above
+  /// them (`heightOfRow`): area/project headers in a grouped list, plus
+  /// Upcoming's per-day headers — each day is its own block, so the days
+  /// need the same separation two areas get rather than running together.
+  /// Distinct from `isNavigableHeaderId` on purpose: a day header takes the
+  /// margin but is NOT clickable (there's no list to drill into).
+  private func headerStartsSection(_ id: String) -> Bool {
+    isNavigableHeaderId(id) || id.hasPrefix("day-")
+  }
+
   private func navigationTarget(forHeaderId id: String) -> TaskFilter? {
     if id.hasPrefix("p-") { return .project(String(id.dropFirst(2))) }
     if id.hasPrefix("a-") { return .area(String(id.dropFirst(2))) }
@@ -2166,14 +2176,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
     switch rows[row] {
     // Headers carry the air between cards, so they're taller than their text.
-    // Area/project headers get EXTRA margin above them (matching the
-    // sidebar's per-top-level-area treatment) — they start a new list
-    // section; "Inbox"/"Agenda" are sub-groups within Today's own flow and
-    // don't need the same visual break.
+    // Section-starting headers get EXTRA margin above them (matching the
+    // sidebar's per-top-level-area treatment); "Inbox"/"Agenda" are
+    // sub-groups within Today's own flow and don't need the same break.
     case .header(let id, _, _, _):
       // Kept in sync with `KitGroupHeaderCell.font` (17pt).
       let base = 17 * FontScale.shared.factor + 26
-      return isNavigableHeaderId(id) ? base + 10 : base
+      return headerStartsSection(id) ? base + 10 : base
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
