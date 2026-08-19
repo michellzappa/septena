@@ -485,6 +485,19 @@ struct TrainingDestinationView: View {
   /// range goal); `TrainingMetrics.hardSetsBand` resolves it with a 12–20
   /// fallback so an unset user sees the productive default.
 
+  /// Effort-rating coverage over the same window `effectiveHardSets` scores,
+  /// built from the drawer's own entry type via the shared `EffortCoverage`
+  /// rule. The hard-set number treats an unrated set as zero stimulus; this is
+  /// the denominator that says how much of the week that verdict covers.
+  private func effortCoverage(in days: Int) -> EffortCoverage {
+    let cutoff = sinceDate(daysBack: days)
+    var out = EffortCoverage()
+    for e in entries where isStrengthEntry(e) && e.date >= cutoff {
+      out.add(sets: e.sets.flatMap(Int.init) ?? 0, difficulty: e.difficulty)
+    }
+    return out
+  }
+
   private func effectiveHardSets(in days: Int) -> Double {
     let cutoff = sinceDate(daysBack: days)
     var total: Double = 0
@@ -513,6 +526,7 @@ struct TrainingDestinationView: View {
     // Trailing 7 days (today + prev 6) — the app-wide week, matching the
     // `training.hard_sets_week` goal and the watch ring.
     let thisWeekRaw = effectiveHardSets(in: 6)
+    let coverage = effortCoverage(in: 6)
     let hasData = series.contains { $0.hardSets > 0 } || thisWeekRaw > 0
     if hasData {
       let band = TrainingMetrics.hardSetsBand(context: modelContext)
@@ -542,7 +556,13 @@ struct TrainingDestinationView: View {
       let weekFmt: (Date) -> String = { d in
         Self.monthDayFormatter.string(from: d)
       }
-      let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) 8-week trend \(deltaText). Average intensity \(avgIntensity.decimalString()) out of 4."
+      // An unrated set earns no credit above, so a mostly-unrated week reads as
+      // a light one. Say so rather than letting the headline speak for sets
+      // nobody rated.
+      let coverageText = coverage.isUnderReported
+        ? "Only \(coverage.rated) of \(coverage.sets) sets rated — unrated sets earn no credit here."
+        : nil
+      let summary = "Strength volume. This week \(thisWeekValue) hard sets, target \(Int(target)). \(bandText) \(coverageText ?? "")8-week trend \(deltaText). Average intensity \(avgIntensity.decimalString()) out of 4."
 
       DrawerSection("Strength") {
         VStack(alignment: .leading, spacing: 8) {
@@ -560,6 +580,11 @@ struct TrainingDestinationView: View {
               .font(.septenaMetaMicro)
               .foregroundStyle(.secondary)
               .layoutPriority(1)
+          }
+          if let coverageText {
+            Text(coverageText)
+              .font(.septenaMetaMicro)
+              .foregroundStyle(.secondary)
           }
           Chart {
             // Productive band — shaded between target and ceiling so the
@@ -632,30 +657,13 @@ struct TrainingDestinationView: View {
   /// card's whole-body target and the reference "growth zone" tools.
   private static let muscleSetsTarget = 12
 
-  /// Sets logged per muscle over the trailing 7 days. Counts an entry's
-  /// `sets` toward its exercise's **primary** muscle only (secondary muscles
-  /// excluded in v1). Exercises with no muscle tag (cardio, mobility) drop
-  /// out naturally, so this is implicitly strength + core. Resolution:
-  /// entry name → ExerciseDefinitionEntity (by `exerciseKey`) → primaryMuscle.
+  /// Effective hard sets per muscle over the trailing 7 days, from the shared
+  /// `MuscleVolume` aggregation — the same numbers the Muscle Balance screen
+  /// this card links to shows. It previously counted raw sets toward the
+  /// primary muscle only, so tapping through to the screen (effort-weighted,
+  /// primary + secondary) produced different figures one tap apart.
   private func muscleSetsThisWeek() -> [Muscle: Int] {
-    let defs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
-    var muscleByKey: [String: Muscle] = [:]
-    for def in defs {
-      guard let m = Muscle.resolve(def.primaryMuscle) else { continue }
-      // Index by both id and name so either form of a logged name resolves.
-      let idKey = exerciseKey(def.id), nameKey = exerciseKey(def.name)
-      if muscleByKey[idKey] == nil { muscleByKey[idKey] = m }
-      if muscleByKey[nameKey] == nil { muscleByKey[nameKey] = m }
-    }
-    let cutoff = sinceDate(daysBack: 6)   // today + previous 6 = trailing 7
-    var totals: [Muscle: Int] = [:]
-    for e in entries where e.date >= cutoff {
-      guard let name = e.exercise,
-            let muscle = muscleByKey[exerciseKey(name)],
-            let s = e.sets.flatMap(Int.init), s > 0 else { continue }
-      totals[muscle, default: 0] += s
-    }
-    return totals
+    MuscleVolume.setsPerMuscle(daysBack: 6, context: modelContext)
   }
 
   /// Per-muscle "sets this week" card — every muscle group as a row with a

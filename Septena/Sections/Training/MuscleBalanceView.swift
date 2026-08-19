@@ -60,6 +60,7 @@ struct MuscleBalanceView: View {
           .listRowSeparator(.hidden)
           .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 6, trailing: 16))
       }
+      untrainedSection(totals)
       Section {
         ForEach(group.muscles) { muscle in
           MuscleBalanceRow(muscle: muscle,
@@ -73,13 +74,33 @@ struct MuscleBalanceView: View {
              ? "Weekly average per muscle · last 4 weeks"
              : "Sets per muscle · last 7 days")
       } footer: {
-        Text("Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: \(Self.zoneFloor)–\(Self.target) sets/week.")
+        Text("Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle in full and each secondary muscle at \(Int(MuscleVolume.secondaryShare * 100))%; lighter sets count partially, easy or unrated sets not at all. Growth zone: \(Self.zoneFloor)–\(Self.target) sets/week.")
       }
     }
     .navigationTitle("Muscle Balance")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
+  }
+
+  /// Names the gap. The bars say where the volume went; this says where it
+  /// didn't — the question the screen exists to answer, and the one a row of
+  /// empty bars makes you scan for. Scoped to the visible group so a Pull view
+  /// doesn't report untrained legs, and suppressed when the window holds no
+  /// volume at all: everything is untrained then, which is a blank slate
+  /// rather than a finding.
+  @ViewBuilder
+  private func untrainedSection(_ totals: [Muscle: Int]) -> some View {
+    let untrained = group.muscles.filter { (totals[$0] ?? 0) == 0 }
+    if !totals.isEmpty && !untrained.isEmpty {
+      Section {
+        Text(untrained.map(\.label).formatted(.list(type: .and)))
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+      } header: {
+        Text(window == .trend ? "Not trained · last 4 weeks" : "Not trained · last 7 days")
+      }
+    }
   }
 
   private var groupStrip: some View {
@@ -164,38 +185,71 @@ private struct MuscleBalanceRow: View {
 }
 
 /// Shared sets-per-muscle aggregation. Resolves each logged entry's exercise
-/// to its definition's `primaryMuscle` (cardio/mobility have none, so they
-/// drop out → implicitly strength + core) and sums *effective hard sets* per
-/// muscle over a trailing day window. Each set is weighted by logged effort
+/// to its definition's muscles (cardio/mobility have none, so they drop out →
+/// implicitly strength + core) and sums *effective hard sets* per muscle over
+/// a trailing day window. Each set is weighted twice: by logged effort
 /// (`TrainingMetrics.difficultyWeight`: hard/max = 1.0, moderate = 0.5,
-/// easy/unrated = 0) so this matches the headline hard-sets number and the
-/// goal ring instead of counting every raw set — including warm-ups and easy
-/// sets — as a full hard set. Per-muscle effective totals are rounded for the
-/// integer growth-zone UI.
+/// easy/unrated = 0) so warm-ups and easy sets can't read as hard ones, and by
+/// how directly the exercise trains the muscle (primary 1.0, secondary
+/// `secondaryShare`). Per-muscle effective totals are rounded for the integer
+/// growth-zone UI.
+///
+/// This is the single source for "sets per muscle" — the Training drawer's
+/// muscle-load card, this screen, and the session-conclusion review all read
+/// it, so the number can't differ between the card and the screen it opens.
 @MainActor
 enum MuscleVolume {
+  /// A secondary muscle's share of one set, relative to the primary's 1.0.
+  /// A bench press does train the triceps: crediting a full set would say it
+  /// trains them as hard as a pushdown, and crediting zero — what v1 did —
+  /// says it doesn't train them at all, which is how a "lagging triceps"
+  /// reading appears for someone pressing four times a week. 0.4 is the
+  /// fractional-set convention the hypertrophy volume literature uses for
+  /// indirect work.
+  static let secondaryShare = 0.4
+
   private static let ymd: DateFormatter = {
     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
     f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = .current; return f
   }()
 
-  static func setsPerMuscle(daysBack: Int, context: ModelContext) -> [Muscle: Int] {
+  /// `exerciseKey` → the muscles one set of that exercise credits, and by how
+  /// much. Indexed by both definition id and name so either form of a logged
+  /// name resolves; first definition to claim a key wins, matching the rest of
+  /// the training pipeline. A muscle listed as both primary and secondary
+  /// keeps the higher share rather than accumulating.
+  private static func contributions(in context: ModelContext) -> [String: [Muscle: Double]] {
     let defs = (try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
-    var muscleByKey: [String: Muscle] = [:]
+    var out: [String: [Muscle: Double]] = [:]
     for def in defs {
-      guard let m = Muscle.resolve(def.primaryMuscle) else { continue }
-      let idKey = exerciseKey(def.id), nameKey = exerciseKey(def.name)
-      if muscleByKey[idKey] == nil { muscleByKey[idKey] = m }
-      if muscleByKey[nameKey] == nil { muscleByKey[nameKey] = m }
+      var share: [Muscle: Double] = [:]
+      if let m = Muscle.resolve(def.primaryMuscle) { share[m] = 1.0 }
+      for raw in def.secondaryMuscles {
+        guard let m = Muscle.resolve(raw) else { continue }
+        share[m] = max(share[m] ?? 0, secondaryShare)
+      }
+      guard !share.isEmpty else { continue }
+      for key in [exerciseKey(def.id), exerciseKey(def.name)] where out[key] == nil {
+        out[key] = share
+      }
     }
+    return out
+  }
+
+  static func setsPerMuscle(daysBack: Int, context: ModelContext) -> [Muscle: Int] {
+    let byKey = contributions(in: context)
     let cutoffDate = Calendar.current.date(byAdding: .day, value: -daysBack, to: Date()) ?? Date()
     let cutoff = ymd.string(from: cutoffDate)
     let entries = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
     var effective: [Muscle: Double] = [:]
     for e in entries where e.date >= cutoff {
-      guard let muscle = muscleByKey[exerciseKey(e.exercise)],
+      guard let share = byKey[exerciseKey(e.exercise)],
             let s = e.sets.flatMap(Int.init), s > 0 else { continue }
-      effective[muscle, default: 0] += Double(s) * TrainingMetrics.difficultyWeight(e.difficulty)
+      let credit = Double(s) * TrainingMetrics.difficultyWeight(e.difficulty)
+      guard credit > 0 else { continue }
+      for (muscle, factor) in share {
+        effective[muscle, default: 0] += credit * factor
+      }
     }
     return effective.mapValues { Int($0.rounded()) }.filter { $0.value > 0 }
   }

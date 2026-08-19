@@ -12,6 +12,42 @@ import SwiftData
 /// when the user has set none — so nothing changes for users who never open the
 /// Goals surface, and setting a target = editing the goal keeps every surface in
 /// sync (the same targets-as-goals bridge nutrition uses).
+/// Effort-rating coverage over a window of strength work.
+///
+/// Top-level (not nested in `TrainingMetrics`) so it stays free of MainActor
+/// isolation and can be accumulated from either the SwiftData entity or the
+/// Training drawer's own value type — one rule for "counts as rated", in one
+/// place, rather than a copy per row shape.
+struct EffortCoverage: Equatable, Sendable {
+  /// Sets logged on strength entries in the window.
+  private(set) var sets = 0
+  /// Of those, sets whose entry carries a difficulty we recognize.
+  private(set) var rated = 0
+
+  var fraction: Double { sets > 0 ? Double(rated) / Double(sets) : 0 }
+
+  /// True when enough of the window is unrated that the hard-set figure
+  /// understates the work done. Under this much unrated the gap is noise, not
+  /// a finding worth putting on screen.
+  var isUnderReported: Bool { sets > 0 && fraction < 0.6 }
+
+  mutating func add(sets n: Int, difficulty: String?) {
+    guard n > 0 else { return }
+    sets += n
+    if Self.isRated(difficulty) { rated += n }
+  }
+
+  /// Whether a stored difficulty string is one we understand. Mirrors
+  /// `TrainingMetrics.difficultyWeight`'s folding — including `easy`, which
+  /// *is* a rating; it just earns no stimulus credit.
+  static func isRated(_ raw: String?) -> Bool {
+    switch (raw ?? "").lowercased() {
+    case "easy", "moderate", "medium", "hard", "max", "failure": return true
+    default:                                                     return false
+    }
+  }
+}
+
 @MainActor
 enum TrainingMetrics {
   // MARK: Metric keys — the bridge between training data and the Goals system.
@@ -55,12 +91,14 @@ enum TrainingMetrics {
 
   /// Difficulty → stimulus weight. Mirror of `TrainingEffort.canonicalKey`'s
   /// folding (kept here so SeptenaCore doesn't depend on the app UI layer):
-  /// hard/max = 1.0, moderate/medium = 0.5, easy/unrated = 0.
+  /// hard/max = 1.0, moderate/medium = 0.5, easy/unrated = 0. `failure` is the
+  /// hosted MCP gateway's word for to-failure and folds onto max — without it
+  /// a set logged through the gateway scored zero stimulus.
   static func difficultyWeight(_ raw: String?) -> Double {
     switch (raw ?? "").lowercased() {
-    case "hard", "max":        return 1.0
-    case "moderate", "medium": return 0.5
-    default:                   return 0
+    case "hard", "max", "failure": return 1.0
+    case "moderate", "medium":     return 0.5
+    default:                       return 0
     }
   }
 
@@ -72,6 +110,21 @@ enum TrainingMetrics {
       total += Double(s) * difficultyWeight(e.difficulty)
     }
     return total
+  }
+
+  /// How much of a window's strength volume actually carries an effort rating.
+  ///
+  /// `hardSets` scores an unrated set as zero stimulus, which is the right
+  /// default — an unrated set is not evidence of a hard one — but it makes the
+  /// headline number quietly speak for sets nobody rated. 6 hard sets out of
+  /// 20 logged is a very different week depending on whether 4 or 18 of them
+  /// were rated, and only the denominator can tell those apart.
+  static func effortCoverage(_ entries: [ExerciseEntryEntity]) -> EffortCoverage {
+    var out = EffortCoverage()
+    for e in entries where isStrength(e) {
+      out.add(sets: Int(e.sets ?? "") ?? 0, difficulty: e.difficulty)
+    }
+    return out
   }
 
   /// Summed `durationMin` over cardio entries.
@@ -209,8 +262,13 @@ extension TrainingMetrics {
     switch metric {
     case .oneRepMax:
       guard let w = weight, w > 0 else { return nil }
-      if let r = Int(reps ?? ""), r > 0 { return w * (1 + Double(r) / 30) }
-      return w
+      // No rep count logged — plot the load itself, which is at least a
+      // measurement. With a rep count, the shared estimator applies, and past
+      // its rep cap the day simply produces no point rather than a fantasy
+      // one (or a cliff back down to the raw load, which would read as a
+      // regression on the chart).
+      guard let r = Int(reps ?? ""), r > 0 else { return w }
+      return OneRepMax.estimate(weightKg: w, reps: r)
     case .topWeight:
       // Heaviest load actually put on the bar that day — reps ignored. The
       // honest "am I loading more?" line, distinct from e1RM which rises when

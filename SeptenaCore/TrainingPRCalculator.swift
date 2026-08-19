@@ -12,6 +12,30 @@ func exerciseKey(_ name: String) -> String {
   name.lowercased().filter { $0.isLetter || $0.isNumber }
 }
 
+/// Estimated one-rep max from a single logged set.
+///
+/// Top-level (not nested in `TrainingPRCalculator`) so it stays free of
+/// MainActor isolation: it is pure arithmetic, and both the PR baseline and
+/// the 90-day progress chart read it. Having one estimator is the point —
+/// two copies of Epley drift apart the moment one of them grows a guard.
+enum OneRepMax {
+  /// Above this many reps a submaximal estimate says more about work capacity
+  /// than about maximal strength, and the standard formulas (Epley, Brzycki,
+  /// Lombardi) diverge by double digits. Declining to estimate beats printing
+  /// a number nobody should train off, so a 20-rep set produces no e1RM at
+  /// all rather than a fantasy one.
+  static let repCap = 12
+
+  /// Epley (`w · (1 + r/30)`), or nil when the set can't honestly produce an
+  /// estimate: no load, no reps, or more reps than `repCap`. A single is the
+  /// measurement rather than an estimate, so it comes back unchanged instead
+  /// of gaining Epley's 3.3 %.
+  static func estimate(weightKg: Double?, reps: Int?) -> Double? {
+    guard let w = weightKg, w > 0, let r = reps, r >= 1, r <= repCap else { return nil }
+    return r == 1 ? w : w * (1 + Double(r) / 30)
+  }
+}
+
 // PRBaseline "best ever" stats per exercise. Drives the PR pill in
 // TrainingExerciseCard: when the current draft exceeds the relevant
 // baseline field, the card shows a "PR" badge. Computed once at
@@ -46,7 +70,11 @@ struct PRBaseline: Hashable, Sendable, Codable {
   /// Best estimated 1-rep-max across all sets for this exercise.
   /// Epley formula: weight * (1 + reps/30). Strength only.
   var e1RM: Double?
-  /// The actual lift that produced the e1RM, for display ("PR vs 60×8").
+  /// The actual lift that produced the e1RM, so a record can always name its
+  /// source — "142.5 kg est. from 100×10" is a different claim from "from
+  /// 140×1". When no set was eligible for an estimate (every one past
+  /// `OneRepMax.repCap`), this falls back to the heaviest set logged, so a
+  /// high-rep-only exercise still has a record to show.
   var bestWeight: Double?
   var bestReps: Int?
   /// Cardio peaks. Distinct so a PR can fire on either axis.
@@ -125,16 +153,28 @@ enum TrainingPRCalculator {
     var bestDist: Double?
     var bestDur: Double?
 
+    // Heaviest load ever put on the bar, regardless of reps. Tracked
+    // separately because the rep cap makes e1RM optional: without this an
+    // exercise only ever logged for 15s would show no record at all.
+    var heaviestW: Double?
+    var heaviestR: Int?
+
     for row in rows {
-      // Strength PR via Epley e1RM. Only counts when both weight AND
-      // a parseable rep count are present; sets count doesn't enter
-      // the formula because e1RM is per-set, not per-session.
-      if let w = row.weight, w > 0, let r = parseInt(row.reps), r > 0 {
-        let estimate = w * (1.0 + Double(r) / 30.0)
-        if e1RM == nil || estimate > e1RM! {
+      // Strength PR via Epley e1RM. Only counts when both weight AND a
+      // parseable rep count are present, and only inside the rep range an
+      // estimate means anything in; sets count doesn't enter the formula
+      // because e1RM is per-set, not per-session.
+      if let w = row.weight, w > 0 {
+        let r = parseInt(row.reps)
+        if let estimate = OneRepMax.estimate(weightKg: w, reps: r),
+           e1RM == nil || estimate > e1RM! {
           e1RM = estimate
           bestW = w
           bestR = r
+        }
+        if w > (heaviestW ?? 0) {
+          heaviestW = w
+          heaviestR = r
         }
       }
       if let d = row.distanceM, d > 0 {
@@ -143,6 +183,10 @@ enum TrainingPRCalculator {
       if let m = row.durationMin, m > 0 {
         bestDur = max(bestDur ?? 0, m)
       }
+    }
+    if e1RM == nil {
+      bestW = heaviestW
+      bestR = heaviestR
     }
     return PRBaseline(e1RM: e1RM, bestWeight: bestW, bestReps: bestR,
                     bestDistanceM: bestDist, bestDurationMin: bestDur,
@@ -169,11 +213,12 @@ enum TrainingPRCalculator {
          let best = baseline.bestDurationMin, m > best { return true }
       return false
     }
-    // Strength: compare estimated 1RM
-    guard let w = draft.weight, w > 0,
-          let r = parseInt(draft.reps), r > 0,
+    // Strength: compare estimated 1RM. A set past the rep cap produces no
+    // estimate, so it can't fire the pill — which is the point: 20 reps at a
+    // light load is a work-capacity set, not a strength record.
+    guard let estimate = OneRepMax.estimate(weightKg: draft.weight,
+                                            reps: parseInt(draft.reps)),
           let best = baseline.e1RM else { return false }
-    let estimate = w * (1.0 + Double(r) / 30.0)
     return estimate > best
   }
 }
