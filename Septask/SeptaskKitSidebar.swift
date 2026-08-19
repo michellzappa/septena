@@ -269,8 +269,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let open = all.filter { $0.status == .open }
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
-    // An area's count rolls up its own loose tasks plus its projects'.
-    var openByArea = Dictionary(grouping: open.compactMap(\.area), by: { $0 })
+    // An area's count is its DIRECT tasks only — the ones loose in the area,
+    // not in any of its projects. Nested projects render as their own rows
+    // with their own counts, so rolling them up would double-count (same
+    // rule the SwiftUI sidebar's `areaDirectOpen` follows).
+    let openByArea = Dictionary(grouping: open.filter { $0.project == nil }
+                                  .compactMap(\.area), by: { $0 })
       .mapValues(\.count)
     // Project completion rings, same ratio the SwiftUI sidebar draws:
     // done / (done + open), cancelled counted in neither.
@@ -343,11 +347,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         Node(.project($0, progress: progressByProject[$0.id] ?? 0),
              count: openByProject[$0.id])
       }
-      let rollUp = (openByArea[area.id] ?? 0)
-        + projects.reduce(0) { $0 + (openByProject[$1.id] ?? 0) }
-      openByArea[area.id] = rollUp
       organize.append(Node(.area(area), children: children,
-                           count: rollUp > 0 ? rollUp : nil))
+                           count: openByArea[area.id]?.nilIfZero))
     }
 
     // No group wrapper nodes — the views cluster and the areas/projects
