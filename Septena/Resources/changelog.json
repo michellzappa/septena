@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1606,
-      "date": "2026-08-19",
+      "build": 1608,
+      "date": "2026-08-20",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A standalone app for just your tasks, sharing the same data as Septena across iPhone, iPad, Mac, and Apple Watch.",
-          "section": "tasks"
-        },
-        {
-          "title": "Import your tasks from Things",
-          "detail": "Bring in a Things database export, including project sections and headings.",
-          "section": "tasks"
-        },
-        {
-          "title": "Recently Deleted tasks, with 30-day recovery",
-          "detail": "Deleted tasks now sit in a recoverable list for 30 days before they're purged for good.",
+          "title": "Septask, a new focused task app",
+          "detail": "A dedicated task app for iPhone, iPad, Mac, and Apple Watch, sharing your existing Septena task data.",
           "section": "tasks"
         },
         {
           "title": "Recurring tasks now reliable everywhere",
-          "detail": "Completing a recurring task reliably spawns its next occurrence on iPhone, iPad, Mac, and watch.",
+          "detail": "Completing a recurring task correctly spawns its next occurrence on iPhone, iPad, Mac, and watch.",
           "section": "tasks"
         },
         {
-          "title": "Calendar events woven into Today and Upcoming",
-          "detail": "See your calendar alongside tasks, with hidden-calendar choices synced across devices.",
+          "title": "Faster ways to manage tasks",
+          "detail": "A redesigned date picker with quick-pick pills, drag-to-reschedule, multi-select bulk actions, and refined keyboard shortcuts.",
           "section": "tasks"
         },
         {
-          "title": "Smarter meal logging",
-          "detail": "Snap a photo to prefill a meal's nutrition fields, or re-log a past meal scaled to a percentage.",
+          "title": "Photo-based meal logging",
+          "detail": "Take a photo of a meal and Septena analyzes it on-device to prefill the nutrition fields.",
           "section": "nutrition"
         },
         {
-          "title": "Reworked training sessions",
-          "detail": "Edit session start/end times directly and get reps-before-load progression hints on your sets.",
+          "title": "Re-log a meal at a different portion",
+          "detail": "Repeat a previously logged meal and scale it by a percentage instead of re-entering it.",
+          "section": "nutrition"
+        },
+        {
+          "title": "Training session improvements",
+          "detail": "Editable start and end times, per-set progression hints, and a Live Activity for the current session.",
           "section": "training"
         },
         {
-          "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy view shows the full telemetry ladder and a log of what's recently been sent, with anonymized opt-out.",
-          "section": null
+          "title": "Suggested goals for more sections",
+          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions.",
+          "section": "goals"
+        },
+        {
+          "title": "Copy your grocery list",
+          "detail": "A new button copies the shopping list to the clipboard.",
+          "section": "groceries"
         }
       ]
     },
