@@ -147,6 +147,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Placement items — titles / visibility refresh on every open from the
   /// current selection (see `refreshPlacementMenuItems`).
   private let todayMenuItem = NSMenuItem()
+  /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
+  /// what ⌥⌘I will actually do next.
+  private let infoMenuItem = NSMenuItem()
   private let clearScheduleMenuItem = NSMenuItem()
 
   /// The inspector follows the selection; the window owns the wiring.
@@ -1841,8 +1844,11 @@ final class SeptaskKitTaskListController: NSViewController {
     menu.delegate = self
     menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: context menu"),
                       #selector(menuRename), "r", [.command]))
-    menu.addItem(item(String(localized: "Show Info", comment: "SeptaskKit: context menu"),
-                      #selector(menuInspector), "i", [.command, .option]))
+    infoMenuItem.action = #selector(menuInspector)
+    infoMenuItem.target = self
+    infoMenuItem.keyEquivalent = "i"
+    infoMenuItem.keyEquivalentModifierMask = [.command, .option]
+    menu.addItem(infoMenuItem)
     menu.addItem(item(String(localized: "Copy", comment: "SeptaskKit: context menu"),
                       #selector(menuCopy), "c", [.command]))
     menu.addItem(item(String(localized: "Duplicate", comment: "SeptaskKit: context menu"),
@@ -2098,6 +2104,10 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
   /// nothing would change.
   private func refreshPlacementMenuItems() {
     let selection = actionableSelection
+
+    infoMenuItem.title = UserDefaults.standard.bool(forKey: SettingsKey.septaskInspectorVisible)
+      ? String(localized: "Hide Info", comment: "SeptaskKit: context menu")
+      : String(localized: "Show Info", comment: "SeptaskKit: context menu")
 
     // On Today: every row is already "on Today", so a Today action just
     // competes with Clear Schedule. Hide it; ⌘T still works via the key

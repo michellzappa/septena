@@ -31,6 +31,13 @@ enum SettingsKey {
   /// expansion by item identity and the sidebar rebuilds its nodes on every
   /// data change, so this is what makes a fold survive the next refresh.
   static let septaskSidebarCollapsed = "septena.septask.sidebarCollapsed"
+  /// Device-local mirror of whether the AppKit shell's inspector pane is open.
+  /// The pane itself is an `NSSplitViewItem`, which a SwiftUI `Commands` body
+  /// cannot observe — so `SeptaskKitWindowController` writes this on every
+  /// open and close and View ▸ Show/Hide Info titles itself from it. The
+  /// window always builds with the pane collapsed and resets this to false,
+  /// so it never survives a launch as a stale `true`.
+  static let septaskInspectorVisible = "septena.septask.inspectorVisible"
   /// Device-local mirror of `AppSettings.onboardedAt`: true once the
   /// first-run welcome has been completed (here or, after sync, on another
   /// device). The welcome gate reads this for an instant, offline-safe

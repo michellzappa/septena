@@ -101,6 +101,12 @@ struct SeptaskCommandMenus: Commands {
   }
 
   #if os(macOS)
+  /// Mirror of the AppKit shell's inspector state (see
+  /// `SettingsKey.septaskInspectorVisible`). `@AppStorage` rather than a raw
+  /// read because a `Commands` body has to re-evaluate when it flips — a
+  /// permanent "Show Info" on an open pane is what made the toggle unfindable.
+  @AppStorage(SettingsKey.septaskInspectorVisible) private var inspectorVisible = false
+
   private var sidebarCountsHidden: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
       ? false
@@ -253,7 +259,7 @@ struct SeptaskCommandMenus: Commands {
       .disabled(!canNavigate)
 
       #if os(macOS)
-      Button("Show Info") {
+      Button(inspectorVisible ? "Hide Info" : "Show Info") {
         SeptaskKitCommands.showInspector()
       }
       .keyboardShortcut("i", modifiers: [.command, .option])

@@ -43,6 +43,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var list: SeptaskKitTaskListController?
   private var next: SeptaskKitNextController?
   private var detail: KitDetailPaneController?
+  private var inspector: SeptaskKitInspectorController?
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
   private var inspectorItem: NSSplitViewItem?
@@ -82,18 +83,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     inspectorItem.minimumThickness = 260
     inspectorItem.maximumThickness = 380
     inspectorItem.isCollapsed = true
+    // The pane always builds collapsed, so the menu's mirror starts false.
+    UserDefaults.standard.set(false, forKey: SettingsKey.septaskInspectorVisible)
     split.addSplitViewItem(inspectorItem)
     split.splitView.autosaveName = "SeptaskKitSplit"
-
-    list.onToggleInspector = { [weak inspector, weak inspectorItem] in
-      guard let inspectorItem else { return }
-      guard !inspectorItem.isCollapsed else {
-        inspectorItem.animator().isCollapsed = false
-        return
-      }
-      inspector?.flushPendingEdits()
-      inspectorItem.animator().isCollapsed = true
-    }
 
     // Quick Find steers the sidebar, which drives the detail — so a jump
     // always leaves the two in agreement — then selects the row it found.
@@ -127,14 +120,23 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     self.detail = detail
     self.sidebar = sidebar
     self.splitController = split
+    self.inspector = inspector
     self.inspectorItem = inspectorItem
     self.quickFind = quickFind
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
 
-    // Wired after super.init — capturing `self` in the closure above would
+    // Wired after super.init — capturing `self` in the closures below would
     // be "used before super.init".
     sidebar.onSelect = { [weak self] destination in
       self?.show(destination)
+    }
+    list.onToggleInspector = { [weak self] in
+      self?.setInspector(visible: inspectorItem.isCollapsed)
+    }
+    // Escape inside the pane closes it — the inspector owns no chrome of its
+    // own, so the shell that added the split item does the closing.
+    inspector.onRequestClose = { [weak self] in
+      self?.setInspector(visible: false)
     }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
@@ -154,9 +156,28 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       list.focusList()
     case .next:
       guard let next, let detail else { return }
-      inspectorItem?.animator().isCollapsed = true
+      setInspector(visible: false)
       detail.display(next)
       next.claimWindowSubtitle()
+    }
+  }
+
+  /// One place that opens and closes the inspector, so every path — ⌥⌘I, the
+  /// menu item, Escape inside the pane, switching to Next — commits pending
+  /// edits, hands focus back to the list, and leaves the menu title truthful.
+  private func setInspector(visible: Bool) {
+    guard let inspectorItem else { return }
+    if !visible {
+      inspector?.flushPendingEdits()
+    }
+    inspectorItem.animator().isCollapsed = !visible
+    UserDefaults.standard.set(visible, forKey: SettingsKey.septaskInspectorVisible)
+    // Collapsing a pane that holds key focus leaves the window with nowhere to
+    // type; the list is where the person was before they opened it.
+    if !visible,
+       let responder = window?.firstResponder as? NSView,
+       responder.isDescendant(of: inspectorItem.viewController.view) {
+      list?.focusList()
     }
   }
 

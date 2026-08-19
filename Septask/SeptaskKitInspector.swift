@@ -23,6 +23,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
 
+  /// Escape asks the shell to collapse the pane. The inspector is a plain
+  /// split-view item with no chrome of its own, so it reports the intent and
+  /// `SeptaskKitWindowController` does the closing.
+  var onRequestClose: (() -> Void)?
+
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
   /// this" from "this is what the store already says".
@@ -261,6 +266,21 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   }
 
   func textDidEndEditing(_ notification: Notification) { flushPendingEdits() }
+
+  /// The standard "back out of this pane" responder method. It reaches the
+  /// controller whenever focus is inside the inspector and no field editor
+  /// claimed Escape first — a live title edit still cancels itself on the
+  /// first Escape (platform behavior), and the second one closes the pane.
+  override func cancelOperation(_ sender: Any?) { onRequestClose?() }
+
+  /// NSTextView answers Escape with autocomplete, which would swallow it, so
+  /// the notes view routes Escape to the same close as everything else.
+  func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+    guard textView === notesView,
+          commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+    onRequestClose?()
+    return true
+  }
 
   // MARK: - Dates
 
