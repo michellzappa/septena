@@ -4,6 +4,7 @@ import EventKit
 import CloudKit
 import CoreLocation
 import StoreKit
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -19,6 +20,7 @@ struct ImportExportSettingsPane: View {
 
   @Environment(SettingsStore.self) private var store
   @Environment(CKEngine.self) private var ckEngine
+  @Environment(\.modelContext) private var modelContext
   @State private var exportError: String? = nil
   @State private var importDoc: ImportExportEnvelope? = nil
   @State private var importMessage: String? = nil
@@ -27,6 +29,15 @@ struct ImportExportSettingsPane: View {
   @State private var showingFilePicker = false
   @State private var pasteBuffer: String = ""
   @State private var repairState: RepairState = .idle
+  // Training-history (CSV) import — kept separate from the JSON envelope above:
+  // different file type, different parser, different merge rule.
+  @State private var showingTrainingPicker = false
+  @State private var trainingPlan: TrainingImportPlan? = nil
+  @State private var trainingSourceText: String = ""
+  @State private var trainingMessage: String? = nil
+  @State private var trainingIsError: Bool = false
+  @State private var trainingUnit: WeightImportUnit = WeightUnit.current == .lb ? .lb : .kg
+  @State private var trainingBusy = false
 
   enum RepairState: Equatable {
     case idle
@@ -42,6 +53,7 @@ struct ImportExportSettingsPane: View {
         storageSection
         exportSection
         importSection
+        trainingImportSection
         formatSection
       case .dataTools:
         repairSection
@@ -56,6 +68,14 @@ struct ImportExportSettingsPane: View {
                   allowedContentTypes: [.json],
                   allowsMultipleSelection: false) { result in
       handleFileImport(result)
+    }
+    // `.text` alongside `.commaSeparatedText` because a few exporters hand out
+    // a .txt, and a picker that greys out the user's actual file reads as
+    // "unsupported" when it is only mislabelled.
+    .fileImporter(isPresented: $showingTrainingPicker,
+                  allowedContentTypes: [.commaSeparatedText, .text],
+                  allowsMultipleSelection: false) { result in
+      handleTrainingFileImport(result)
     }
   }
 
@@ -418,6 +438,198 @@ struct ImportExportSettingsPane: View {
       importMessage = error.localizedDescription
       importIsError = true
     }
+  }
+
+  // MARK: Training history (CSV from another app)
+
+  @ViewBuilder
+  private var trainingImportSection: some View {
+    Section {
+      Button {
+        trainingMessage = nil
+        trainingIsError = false
+        showingTrainingPicker = true
+      } label: {
+        Label("Choose CSV file…", systemImage: "figure.strengthtraining.traditional")
+      }
+      if let plan = trainingPlan {
+        trainingPreview(plan)
+      } else if let msg = trainingMessage {
+        Label(msg, systemImage: trainingIsError ? "exclamationmark.triangle" : "checkmark.circle")
+          .foregroundStyle(trainingIsError ? .red : .green)
+          .font(.callout)
+      }
+    } header: {
+      Text("Training history")
+    } footer: {
+      Text("Set-by-set exports from Strong, Hevy and FitNotes. Identical sets collapse into one entry (three rows of 60 × 10 become 3 × 10), warm-up sets are dropped because there is nowhere to mark them, and RPE/RIR becomes an effort rating. Days that already have training are left alone, so importing the same file twice changes nothing.")
+    }
+  }
+
+  @ViewBuilder
+  private func trainingPreview(_ plan: TrainingImportPlan) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack {
+        Label(plan.source.map { "Read — \($0)" } ?? "Read", systemImage: "checkmark.seal")
+          .foregroundStyle(.green)
+        Spacer()
+        Button("Clear", role: .destructive) {
+          trainingPlan = nil
+          trainingSourceText = ""
+          trainingMessage = nil
+        }
+        .buttonStyle(.borderless)
+        .font(.caption)
+      }
+      if let from = plan.from, let to = plan.to {
+        Text(from == to ? from : "\(from) → \(to)")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      Divider()
+      LabeledContent("Sessions", value: "\(plan.sessionCount)")
+      LabeledContent("Entries", value: "\(plan.entryCount)")
+      LabeledContent("Sets read", value: "\(plan.setRows)")
+      if plan.ratedSets > 0 {
+        LabeledContent("With an effort rating", value: "\(plan.ratedSets)")
+      }
+      if plan.warmupRows > 0 {
+        LabeledContent("Warm-up sets dropped", value: "\(plan.warmupRows)")
+      }
+      if plan.skippedRows > 0 {
+        LabeledContent("Rows skipped", value: "\(plan.skippedRows)")
+      }
+      LabeledContent("Exercises matched", value: "\(plan.knownNames.count)")
+      if !plan.unknownNames.isEmpty {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("New exercises (\(plan.unknownNames.count))")
+            .font(.caption.weight(.medium))
+          // Named rather than counted: these are the rows that will land under
+          // a name the app has never seen, and seeing "Hack Squat (Machine)"
+          // before importing is what lets someone fix it instead of finding it
+          // in the catalog a week later.
+          Text(plan.unknownNames.prefix(12).joined(separator: ", ")
+               + (plan.unknownNames.count > 12 ? "…" : ""))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      // The unit only needs asking about when the file never said. Strong
+      // writes a bare "Weight" column whose unit lives in that app's settings,
+      // so importing on an assumption without showing it would silently rewrite
+      // someone's numbers by a factor of 2.2.
+      if plan.declaredUnit == nil && !plan.mixedUnits {
+        Picker("Weights in", selection: $trainingUnit) {
+          ForEach(WeightImportUnit.allCases) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: trainingUnit) { _, _ in reparseTrainingPlan() }
+        Text("This file doesn't say which unit it used. Everything is stored in kg.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      } else if plan.mixedUnits {
+        Text("Mixed kg and lb — each row was converted using its own unit.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+
+      Divider()
+      HStack {
+        Spacer()
+        Button {
+          applyTrainingImport(plan)
+        } label: {
+          Label("Import", systemImage: "tray.and.arrow.down")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.orange)
+        .disabled(trainingBusy || plan.sessionCount == 0)
+      }
+    }
+  }
+
+  private func handleTrainingFileImport(_ result: Result<[URL], Error>) {
+    trainingMessage = nil
+    trainingIsError = false
+    trainingPlan = nil
+    switch result {
+    case .success(let urls):
+      guard let url = urls.first else { return }
+      let scoped = url.startAccessingSecurityScopedResource()
+      defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+      do {
+        let data = try Data(contentsOf: url)
+        // Exports out of Windows tooling are routinely Latin-1; falling back
+        // keeps a file with one "Curl à la…" in it from failing as a whole.
+        guard let text = String(data: data, encoding: .utf8)
+                ?? String(data: data, encoding: .isoLatin1) else {
+          trainingMessage = "Couldn't read that file as text."
+          trainingIsError = true
+          return
+        }
+        trainingSourceText = text
+        reparseTrainingPlan()
+      } catch {
+        trainingMessage = error.localizedDescription
+        trainingIsError = true
+      }
+    case .failure(let error):
+      trainingMessage = error.localizedDescription
+      trainingIsError = true
+    }
+  }
+
+  private func reparseTrainingPlan() {
+    guard !trainingSourceText.isEmpty else { return }
+    do {
+      trainingPlan = try TrainingHistoryImport.plan(
+        csv: trainingSourceText,
+        knownExerciseKeys: knownExerciseKeys(),
+        assumedUnit: trainingUnit)
+      trainingMessage = nil
+      trainingIsError = false
+    } catch TrainingImportError.empty {
+      trainingPlan = nil
+      trainingMessage = "That file has no rows in it."
+      trainingIsError = true
+    } catch {
+      trainingPlan = nil
+      trainingMessage = "Couldn't find a date and an exercise column in that file. Export a full workout history rather than a single workout or a summary."
+      trainingIsError = true
+    }
+  }
+
+  /// Every `exerciseKey` the app already answers to — the user's own catalog
+  /// plus the curated library, so a name only counts as new when neither knows
+  /// it.
+  private func knownExerciseKeys() -> Set<String> {
+    var keys = Set(DefaultExerciseLibrary.byKey.keys)
+    let defs = (try? modelContext.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? []
+    for def in defs {
+      keys.insert(exerciseKey(def.id))
+      keys.insert(exerciseKey(def.name))
+      for alias in def.aliases { keys.insert(exerciseKey(alias)) }
+    }
+    keys.remove("")
+    return keys
+  }
+
+  private func applyTrainingImport(_ plan: TrainingImportPlan) {
+    trainingBusy = true
+    let outcome = SeptenaServices.shared.trainingMutator.importHistory(plan.sessions)
+    trainingBusy = false
+    trainingPlan = nil
+    trainingSourceText = ""
+    var parts = ["Imported \(outcome.entriesAdded) entr\(outcome.entriesAdded == 1 ? "y" : "ies") across \(outcome.sessionsAdded) session\(outcome.sessionsAdded == 1 ? "" : "s")"]
+    if outcome.definitionsCreated > 0 {
+      parts.append("added \(outcome.definitionsCreated) new exercise\(outcome.definitionsCreated == 1 ? "" : "s") to the catalog")
+    }
+    if outcome.sessionsSkipped > 0 {
+      parts.append("skipped \(outcome.sessionsSkipped) day\(outcome.sessionsSkipped == 1 ? "" : "s") that already had training")
+    }
+    trainingMessage = parts.joined(separator: ", ") + "."
+    trainingIsError = false
   }
 
   // MARK: Helpers

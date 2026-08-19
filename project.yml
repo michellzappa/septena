@@ -806,6 +806,8 @@ targets:
       - path: SeptenaCore/SuggestionBlocks.swift
       - path: SeptenaCore/IntakeModel.swift
       - path: SeptenaCore/GutSymptomMigrationMap.swift
+      - path: SeptenaCore/ExerciseKey.swift
+      - path: SeptenaCore/TrainingHistoryImport.swift
       - path: SeptenaCore/ThingsImport/ThingsImportModels.swift
       - path: SeptenaCore/ThingsImport/ThingsDateDecoder.swift
       - path: SeptenaCore/ThingsImport/ThingsSQLiteReader.swift

@@ -2256,6 +2256,122 @@ final class TrainingMutator {
     return saved
   }
 
+  /// Result of a bulk history import, for the confirmation the user sees.
+  struct TrainingImportOutcome: Sendable, Equatable {
+    public var sessionsAdded = 0
+    public var entriesAdded = 0
+    /// Days that already carried training. Existing days win, so re-importing
+    /// the same export is a no-op rather than a duplicated year.
+    public var sessionsSkipped = 0
+    public var definitionsCreated = 0
+  }
+
+  /// Write a parsed history from another app.
+  ///
+  /// Deliberately not `addSession` in a loop. That path saves the context,
+  /// queues CloudKit and runs milestone detection **per entry** — over a
+  /// multi-year export that is thousands of saves and thousands of PR scans,
+  /// and the scans would queue a celebration for every record set in 2019.
+  /// An import is history, not something that just happened, so it inserts in
+  /// one pass, saves once, and skips milestone evaluation entirely.
+  ///
+  /// A date that already carries training is skipped whole. It is the one merge
+  /// rule that makes importing twice safe, which matters because the first
+  /// thing anyone does after an import that looks wrong is run it again.
+  @discardableResult
+  func importHistory(_ sessions: [ImportedSession]) -> TrainingImportOutcome {
+    var outcome = TrainingImportOutcome()
+    guard !sessions.isEmpty else { return outcome }
+
+    let existing = (try? context.fetch(FetchDescriptor<ExerciseEntryEntity>())) ?? []
+    // Built once. `uniqueEntryID()` fetches per call, which is fine for one
+    // logged set and quadratic for ten thousand imported ones.
+    var usedIDs = Set(existing.map(\.id))
+    let occupiedDates = Set(existing.map(\.date))
+
+    var knownKeys = Set(
+      ((try? context.fetch(FetchDescriptor<ExerciseDefinitionEntity>())) ?? [])
+        .flatMap { [exerciseKey($0.id), exerciseKey($0.name)] }
+    )
+
+    func freshID() -> String {
+      var attempt = String(UUID().uuidString.lowercased().prefix(8))
+      while usedIDs.contains(attempt) {
+        attempt = String(UUID().uuidString.lowercased().prefix(8))
+      }
+      usedIDs.insert(attempt)
+      return attempt
+    }
+
+    var pendingEntryIDs: [String] = []
+    var pendingDefinitions: [ExerciseDefinitionEntity] = []
+    var nextDefinitionIndex = nextDefinitionSortIndex()
+    let loggedAt = ISO8601DateFormatter().string(from: Date())
+
+    for session in sessions {
+      guard !occupiedDates.contains(session.date) else {
+        outcome.sessionsSkipped += 1
+        continue
+      }
+      let time = session.time.isEmpty ? "12:00" : session.time
+      let concluded = "\(session.date)T\(time):00"
+
+      for entry in session.entries {
+        let name = CanonicalExerciseName.forStorage(entry.exercise)
+        // An unmatched name becomes a catalog entry rather than a loose string,
+        // so it shows up in the picker and can be given muscle tags later —
+        // untagged, because guessing a muscle from a name we already failed to
+        // recognize would put wrong numbers on the balance screen.
+        if !knownKeys.contains(exerciseKey(name)) {
+          let type = (entry.distanceM ?? 0) > 0 || (entry.weight == nil && entry.reps == nil)
+            ? "cardio" : "strength"
+          let definition = ExerciseDefinitionEntity(id: uniqueDefinitionID(for: name),
+                                                    name: name,
+                                                    type: type,
+                                                    sortIndex: nextDefinitionIndex)
+          nextDefinitionIndex += 1
+          context.insert(definition)
+          pendingDefinitions.append(definition)
+          knownKeys.insert(exerciseKey(name))
+          knownKeys.insert(exerciseKey(definition.id))
+          outcome.definitionsCreated += 1
+        }
+
+        let entity = ExerciseEntryEntity(
+          id: freshID(),
+          date: session.date,
+          sessionType: session.sessionType,
+          exercise: name,
+          weight: entry.weight,
+          sets: entry.sets,
+          reps: entry.reps,
+          difficulty: entry.difficulty,
+          durationMin: entry.durationMin,
+          distanceM: entry.distanceM,
+          note: entry.note,
+          concludedAt: concluded,
+          loggedAt: loggedAt
+        )
+        entity.occurredAt = EventTimestamp.from(date: session.date, time: time)
+        context.insert(entity)
+        pendingEntryIDs.append(entity.id)
+        outcome.entriesAdded += 1
+      }
+      outcome.sessionsAdded += 1
+    }
+
+    guard outcome.entriesAdded > 0 || outcome.definitionsCreated > 0 else { return outcome }
+    saveContext("CK training import")
+    for definition in pendingDefinitions {
+      ckEngine?.noteExerciseDefinitionChange(id: definition.id)
+    }
+    for id in pendingEntryIDs {
+      ckEngine?.noteExerciseEntryChange(id: id)
+    }
+    postChanged()
+    return outcome
+  }
+
   /// Partial update — every parameter defaults to "leave as-is". Identity
   /// fields (date/time/sessionType/exercise) take a single optional (nil =
   /// unchanged); nullable per-set metrics take a double optional so `.some(nil)`
