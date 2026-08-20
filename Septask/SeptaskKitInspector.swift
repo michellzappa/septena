@@ -17,11 +17,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let notesView = NSTextView()
   private let whenButton = NSButton()
   private let deadlineButton = NSButton()
-  private let repeatPopUp = NSPopUpButton()
+  private let repeatButton = NSButton()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
+  /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
+  /// Escape handling. The inspector is a plain split-view item with no title
+  /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
+  /// neither of which you can find by looking at the pane.
+  private let closeButton = NSButton()
 
   /// Escape asks the shell to collapse the pane. The inspector is a plain
   /// split-view item with no chrome of its own, so it reports the intent and
@@ -75,11 +80,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       button.action = action
       button.alignment = .left
     }
+    repeatButton.bezelStyle = .rounded
+    repeatButton.target = self
+    repeatButton.action = #selector(editRepeat)
+    repeatButton.alignment = .left
     listLabel.font = SeptaskKitTheme.meta
     listLabel.textColor = SeptaskKitTheme.inkSecondary
-
-    repeatPopUp.menu = KitRecurrenceMenu.build(target: self, action: #selector(repeatChanged(_:)))
-    repeatPopUp.target = self
 
     form.orientation = .vertical
     form.alignment = .leading
@@ -90,22 +96,49 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(listLabel)
     form.addArrangedSubview(whenButton)
     form.addArrangedSubview(deadlineButton)
-    form.addArrangedSubview(repeatPopUp)
+    form.addArrangedSubview(repeatButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
-    form.setCustomSpacing(14, after: repeatPopUp)
+    form.setCustomSpacing(14, after: repeatButton)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
 
+    let closeLabel = String(localized: "Close Inspector",
+                            comment: "SeptaskKit: inspector close button")
+    closeButton.translatesAutoresizingMaskIntoConstraints = false
+    closeButton.isBordered = false
+    closeButton.bezelStyle = .inline
+    closeButton.imagePosition = .imageOnly
+    closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+    closeButton.contentTintColor = SeptaskKitTheme.iconMuted
+    closeButton.target = self
+    closeButton.action = #selector(closePane)
+    // Keyboard focus belongs to the fields — Escape and ⌥⌘I are the key
+    // paths out. Same reason the list's checkbox refuses first responder.
+    closeButton.refusesFirstResponder = true
+    closeButton.setAccessibilityLabel(closeLabel)
+    // Icon-only chrome control: the tooltip is how you learn what it does.
+    // (Distinct from task rows, which carry no tooltips by design.)
+    closeButton.toolTip = closeLabel
+
     root.addSubview(form)
     root.addSubview(placeholder)
+    // Last, so it layers above the form's title field.
+    root.addSubview(closeButton)
     NSLayoutConstraint.activate([
       form.topAnchor.constraint(equalTo: root.topAnchor),
       form.leadingAnchor.constraint(equalTo: root.leadingAnchor),
       form.trailingAnchor.constraint(equalTo: root.trailingAnchor),
       form.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-      titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      // -52, not the -28 the notes field uses: the title shares its band with
+      // the close button and must not run under it.
+      titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -52),
+      closeButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+      closeButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+      closeButton.widthAnchor.constraint(equalToConstant: 20),
+      closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
       placeholder.centerXAnchor.constraint(equalTo: root.centerXAnchor),
@@ -180,15 +213,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                   comment: "SeptaskKit: inspector deadline field")
     listLabel.stringValue = listDescription(for: next)
 
-    let repeatIndex = KitRecurrenceMenu.index(of: next.recurrence)
-    if repeatIndex >= 0 {
-      repeatPopUp.selectItem(at: repeatIndex)
-    } else {
-      // A cadence this menu doesn't offer (set in the SwiftUI sheet) — show
-      // it rather than mislabeling the task as one of the presets.
-      repeatPopUp.selectItem(at: -1)
-      repeatPopUp.setTitle(next.recurrence?.shortLabel ?? "")
-    }
+    let repeatValue = next.recurrence.map { rule in
+      let paused = next.recurrencePaused
+        ? String(localized: " (Paused)", comment: "Repeat paused suffix")
+        : ""
+      return "\(rule.shortLabel)\(paused)"
+    } ?? String(localized: "None", comment: "No repeat")
+    repeatButton.title = String(localized: "Repeat: \(repeatValue)",
+                                comment: "SeptaskKit: inspector repeat field")
   }
 
   /// Re-read the shown task from the store — used when a refresh lands while
@@ -273,6 +305,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// first Escape (platform behavior), and the second one closes the pane.
   override func cancelOperation(_ sender: Any?) { onRequestClose?() }
 
+  @objc private func closePane() {
+    // Commit first: the pane can be closed mid-edit, and the field's own
+    // end-editing notification does not fire when the view goes away.
+    flushPendingEdits()
+    onRequestClose?()
+  }
+
   /// NSTextView answers Escape with autocomplete, which would swallow it, so
   /// the notes view routes Escape to the same close as everything else.
   func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -284,13 +323,23 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   // MARK: - Dates
 
-  @objc private func repeatChanged(_ sender: NSMenuItem) {
+  @objc private func editRepeat() {
     guard let current = task else { return }
-    mutator.setRecurrence(id: current.id,
-                          recurrence: KitRecurrenceMenu.recurrence(for: sender,
-                                                                   preserving: current.recurrence))
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    refresh()
+    SeptaskKitRecurrencePanelController.present(
+      initial: current.recurrence,
+      paused: current.recurrencePaused,
+      hasScheduledDate: current.scheduled != nil
+    ) { [weak self] result in
+      guard let self else { return }
+      if let recurrence = result.recurrence {
+        self.mutator.setRecurrence(id: current.id, recurrence: recurrence)
+        self.mutator.setRecurrencePaused(id: current.id, paused: result.paused)
+      } else {
+        self.mutator.setRecurrence(id: current.id, recurrence: nil)
+      }
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      self.refresh()
+    }
   }
 
   @objc private func editWhen() { presentPopover(kind: .when, from: whenButton) }

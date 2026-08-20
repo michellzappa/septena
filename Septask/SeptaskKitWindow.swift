@@ -190,6 +190,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// claim a command.
   var isFrontmost: Bool { window?.isKeyWindow == true }
 
+  /// Bring the shell forward — used by the navigation commands, which can now
+  /// fire while a panel or the Settings window is key.
+  func focusWindow() { window?.makeKeyAndOrderFront(nil) }
+
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
   func goNext() { sidebar?.select(.next) }
   func newTask() { list?.createTask() }
@@ -213,7 +217,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .deadline: list.presentDatePopover(kind: .deadline)
     case .clearSchedule: list.clearScheduleSelection()
     case .delete: list.deleteSelection()
-    case .setRecurrence(let rule): list.setRecurrence(rule)
+    case .repeatEditor: list.presentRecurrencePanel()
+    case .createNextCopy: list.createNextCopySelection()
     case .duplicate: list.duplicateSelection()
     case .move: list.presentMoveMenu()
     }
@@ -221,8 +226,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
 
   enum RowCommand {
     case toggleComplete, cancel, toggleToday, rename, when, deadline, clearSchedule, delete
-    case duplicate, move
-    case setRecurrence(Recurrence?)
+    case duplicate, move, createNextCopy
+    case repeatEditor
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }
@@ -293,12 +298,29 @@ enum SeptaskKitCommands {
   /// take it — otherwise the whole menu reads as dead.
   static var canHandle: Bool { shell != nil }
 
+  /// Navigation targets the shell whenever one EXISTS, not only when its
+  /// window is key. Keying it to `isKeyWindow` is what made ⌘1–4 look
+  /// unreliable: Quick Find, Quick Entry and the Move panel are all
+  /// `NSPanel`s with `canBecomeKey`, and the Settings window is a window of
+  /// its own, so while any of them was up the shell was not key, `canHandle`
+  /// was false, and the whole Go menu greyed out. Row commands deliberately
+  /// stay keyed to the frontmost shell — those act on a selection, and acting
+  /// on a list you cannot see is worse than a disabled menu item.
+  static var canNavigate: Bool { shellExists }
+
   /// A shell exists, frontmost or not. Used by commands that stay available
   /// from an auxiliary window (Settings, opened over the shell).
   static var shellExists: Bool { SeptaskKitWindowController.existing != nil }
   static var canActOnSelection: Bool { shell?.canActOnSelection ?? false }
 
-  static func go(_ filter: TaskFilter) { shell?.go(to: filter) }
+  /// Fronts the shell before navigating: the command can now arrive while a
+  /// panel or the Settings window holds key, and changing the list behind a
+  /// panel that stays up would leave the user looking at the wrong thing.
+  static func go(_ filter: TaskFilter) {
+    guard let controller = SeptaskKitWindowController.existing else { return }
+    controller.focusWindow()
+    controller.go(to: filter)
+  }
   static func newTask() { shell?.newTask() }
   static func newProject() { shell?.newProject() }
   static func newArea() { shell?.newArea() }

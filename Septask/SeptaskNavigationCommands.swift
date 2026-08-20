@@ -60,11 +60,8 @@ private struct SeptaskKitRowCommands: View {
         .keyboardShortcut("m", modifiers: [.command, .shift])
       Button("Clear Schedule") { SeptaskKitCommands.row(.clearSchedule) }
         .keyboardShortcut(".", modifiers: [.command, .shift])
-      Menu("Repeat") {
-        ForEach(Array(KitRecurrenceMenu.choices.enumerated()), id: \.offset) { _, choice in
-          Button(choice.title) { SeptaskKitCommands.row(.setRecurrence(choice.rule)) }
-        }
-      }
+      Button("Repeat…") { SeptaskKitCommands.row(.repeatEditor) }
+      Button("Create Next Copy") { SeptaskKitCommands.row(.createNextCopy) }
     }
     .disabled(!SeptaskKitCommands.canActOnSelection)
   }
@@ -94,7 +91,7 @@ struct SeptaskCommandMenus: Commands {
   /// on macOS, where it's the default window — when the AppKit shell is.
   private var canNavigate: Bool {
     #if os(macOS)
-    return actions != nil || SeptaskKitCommands.canHandle
+    return actions != nil || SeptaskKitCommands.canNavigate
     #else
     return actions != nil
     #endif
@@ -178,6 +175,8 @@ struct SeptaskCommandMenus: Commands {
         .disabled(!canNavigate)
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
+        .disabled(!canNavigate)
+      Button("Repeating") { go(.repeating) }
         .disabled(!canNavigate)
       Button("Anytime") { go(.unscheduled) }
         .keyboardShortcut("3", modifiers: .command)

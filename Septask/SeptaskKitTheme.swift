@@ -166,7 +166,9 @@ enum SeptaskKitLayout {
   static let maxInset: CGFloat = 220
   /// Top/bottom `NSScrollView.contentInsets` — fixed so the list doesn't
   /// grow a taller header band as the window widens (sides still flex).
-  static let verticalInset: CGFloat = 16
+  /// Generous on purpose (Things-style): the first card sits well clear of
+  /// the title bar and the last one clears the toolbar.
+  static let verticalInset: CGFloat = 48
 
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {

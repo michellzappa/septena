@@ -84,6 +84,11 @@ final class SeptaskKitTaskListController: NSViewController {
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
     /// `shouldSelectRow` already keeps it out of selection and arrow-nav.
     case newTask
+    /// Foot of a project page — the quiet "Add Section" line, the AppKit
+    /// counterpart of `TaskListView.addSectionButton`. Until this existed the
+    /// ONLY way to make a heading was a right-click on blank space below the
+    /// list, which a project with enough tasks to fill the window doesn't have.
+    case addSection
 
     var key: String {
       switch self {
@@ -94,6 +99,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .event(let event): return "e:" + event.id
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
+      case .addSection: return "add-section"
       }
     }
 
@@ -107,7 +113,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .loggedFooter: return false
+      case .header, .screenTitle, .loggedFooter, .addSection: return false
       case .projectTarget, .event, .newTask: return true
       case .task(let task, _): return !task.isHeading
       }
@@ -151,6 +157,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// what ⌥⌘I will actually do next.
   private let infoMenuItem = NSMenuItem()
   private let clearScheduleMenuItem = NSMenuItem()
+  private let pauseRepeatMenuItem = NSMenuItem()
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -181,9 +188,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Registers `undoAction` as the inverse of a mutation just made; performing
   /// it (⌘Z) re-registers `redoAction` as ITS OWN inverse, which is what gives
   /// ⌘⇧Z (redo) for free — the standard `UndoManager` symmetric-registration
-  /// idiom. Only covers the value-level mutators (complete/uncomplete,
-  /// delete/restore, rename, move) — see docs/SEPTASK_APPKIT_PARITY.md for
-  /// what's still unwired (dates, recurrence).
+  /// idiom. Covers every value-level mutator the shell offers:
+  /// complete/uncomplete, delete/restore, rename, move,
+  /// create/duplicate/paste, and the scheduling fields (When, Deadline,
+  /// Today, repeat) via `ScheduleSnapshot`.
   private func recordUndo(name: String, undo undoAction: @escaping () -> Void,
                           redo redoAction: @escaping () -> Void) {
     kitUndoManager.setActionName(name)
@@ -192,6 +200,104 @@ final class SeptaskKitTaskListController: NSViewController {
       target.recordUndo(name: name, undo: redoAction, redo: undoAction)
     }
   }
+  /// The scheduling fields the date / Today / repeat commands touch, captured
+  /// before a change so undo can put them back. There is no second write path:
+  /// `restore` replays the SAME mutators the forward commands use.
+  private struct ScheduleSnapshot {
+    let id: String
+    let scheduled: Date?
+    let today: Bool
+    let deadline: Date?
+    let recurrence: Recurrence?
+    let recurrencePaused: Bool
+  }
+
+  private func scheduleSnapshot(_ task: SeptenaTask) -> ScheduleSnapshot {
+    ScheduleSnapshot(id: task.id,
+                     scheduled: KitDayFormat.date(fromWire: task.scheduled),
+                     today: task.today,
+                     deadline: KitDayFormat.date(fromWire: task.deadline),
+                     recurrence: task.recurrence,
+                     recurrencePaused: task.recurrencePaused)
+  }
+
+  /// Put the captured fields back. Order is load-bearing: `schedule` and
+  /// `setDeadline` both carry their own Today side effects (a deadline that
+  /// has landed can drop a row off Today), so the explicit Today flag is
+  /// written LAST and wins. `moveToToday(id:today:)` rather than
+  /// `removeFromToday` — the latter also clears any already-landed scheduled
+  /// or deadline date, which would undo more than the command did.
+  /// One fidelity limit: `todaySetOn` re-stamps to the current day, so undo
+  /// restores Today membership but not the row's original tenure age.
+  private func restoreSchedules(_ snapshots: [ScheduleSnapshot]) {
+    for snapshot in snapshots {
+      mutator.schedule(id: snapshot.id, date: snapshot.scheduled)
+      mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
+      mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
+      if snapshot.recurrence != nil {
+        mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
+      }
+      mutator.moveToToday(id: snapshot.id, today: snapshot.today)
+    }
+    reload()
+  }
+
+  /// Register undo for a change to the scheduling fields. Call it AFTER the
+  /// change: `before` is captured by the caller beforehand, and the redo side
+  /// is re-read from the store rather than predicted, because `schedule` /
+  /// `setDeadline` / `removeFromToday` each carry their own Today side
+  /// effects and modelling those here would be a second copy of that logic.
+  private func recordScheduleUndo(name: String, before: [ScheduleSnapshot]) {
+    guard !before.isEmpty else { return }
+    let wanted = Set(before.map(\.id))
+    let after = LocalCache.allTasks(in: context)
+      .filter { wanted.contains($0.id) }
+      .map(scheduleSnapshot)
+    guard !after.isEmpty else { return }
+    recordUndo(name: name,
+               undo: { [weak self] in self?.restoreSchedules(before) },
+               redo: { [weak self] in self?.restoreSchedules(after) })
+  }
+
+  /// Undo for freshly created tasks. Redo has to RE-create rather than
+  /// restore: `purge` is a real delete, so there is no row left to bring
+  /// back. Re-creating mints NEW ids, hence the box both closures read.
+  private func recordCreateUndo(name: String, ids: [String],
+                                rebuild: @escaping () -> [String]) {
+    var current = ids
+    recordUndo(name: name,
+               undo: { [weak self] in
+                 for id in current { self?.mutator.purge(id: id) }
+                 self?.reload()
+               },
+               redo: { [weak self] in
+                 current = rebuild()
+                 self?.reload()
+               })
+  }
+
+  /// Undo for a ⌘N row that has just been given a real title. The undoable
+  /// act is the CREATION, not a rename from the empty placeholder the row was
+  /// born with — reading the row's own filing back out means redo re-creates
+  /// it exactly where it was.
+  private func recordNewTaskUndo(id: String) {
+    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == id })
+    else { return }
+    let title = task.title
+    let area = task.area
+    let project = task.project
+    let scheduled = KitDayFormat.date(fromWire: task.scheduled)
+    let today = task.today
+    recordCreateUndo(name: String(localized: "New Task", comment: "SeptaskKit: undo action"),
+                     ids: [id],
+                     rebuild: { [weak self] in
+                       guard let self else { return [] }
+                       return [self.mutator.create(title: title, area: area, project: project,
+                                                   scheduled: scheduled, today: today,
+                                                   atBottom: false).id]
+                     })
+  }
+
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
   override func loadView() {
@@ -246,6 +352,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // the table is what makes the STANDARD menu item work — better than a
     // second ⌘C item in the Task menu fighting it for the binding.
     tableView.onCopy = { [weak self] in self?.copySelection() }
+    tableView.onPaste = { [weak self] in self?.pasteTasks() }
+    tableView.canPaste = { [weak self] in self?.canPasteTasks ?? false }
     tableView.canCopy = { [weak self] in self?.hasActionableSelection ?? false }
     // NOT `tableView.menu = ...`: AppKit's automatic path for a table's
     // `.menu` property paints its own native "row targeted by a context
@@ -708,6 +816,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .upcoming:
       return .screenTitle(title: String(localized: "Upcoming", comment: "Smart list title"),
                           icon: .symbol("calendar"))
+    case .repeating:
+      return .screenTitle(title: String(localized: "Repeating", comment: "Smart list title"),
+                          icon: .symbol("arrow.clockwise"))
     case .unscheduled:
       return .screenTitle(title: String(localized: "Anytime", comment: "Smart list title"),
                           icon: .symbol("rectangle.stack.fill"))
@@ -758,6 +869,9 @@ final class SeptaskKitTaskListController: NSViewController {
       let members = open.filter { $0.heading == heading.id }
       result.append(contentsOf: members.map { .task($0, chip: nil) })
     }
+    // Last, before the logged footer the caller appends — the same place
+    // `TaskListView.projectGroupedRows` puts `addSectionButton`.
+    result.append(.addSection)
     return result
   }
 
@@ -930,11 +1044,87 @@ final class SeptaskKitTaskListController: NSViewController {
     NSPasteboard.general.setString(titles.joined(separator: "\n"), forType: .string)
   }
 
-  func duplicateSelection() {
-    for task in actionableSelection {
-      _ = mutator.duplicate(task)
+  /// Paste (⌘V) — one task per non-blank line of the clipboard's text, filed
+  /// exactly where ⌘N would file it. Reached through Edit ▸ Paste (the table
+  /// implements `paste(_:)`, so the standard menu item finds it on the
+  /// responder chain), the mirror of `copySelection` above.
+  func pasteTasks() {
+    guard let text = NSPasteboard.general.string(forType: .string),
+          let context = creationContext(inInbox: false) else {
+      NSSound.beep()
+      return
     }
+    let titles = text
+      .components(separatedBy: .newlines)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    guard !titles.isEmpty else {
+      NSSound.beep()
+      return
+    }
+    // Reversed: `create` inserts at the top of its group (TaskOrder's
+    // insert-at-top, the same placement ⌘N gets), so laying the lines down
+    // back-to-front is what leaves the pasted block in reading order.
+    var created: [String] = []
+    for title in titles.reversed() {
+      let task = mutator.create(title: title, area: context.area, project: context.project,
+                                scheduled: context.scheduled, today: context.today,
+                                atBottom: false)
+      created.append(task.id)
+    }
+    recordUndo(name: String(localized: "Paste Tasks", comment: "SeptaskKit: undo action"),
+               undo: { [weak self] in
+                 for id in created { self?.mutator.purge(id: id) }
+                 self?.reload()
+               },
+               redo: { [weak self] in
+                 guard let self else { return }
+                 // Re-create rather than un-purge: a purge is a real delete,
+                 // so there is no row left to restore.
+                 var again: [String] = []
+                 for title in titles.reversed() {
+                   let task = self.mutator.create(
+                     title: title, area: context.area, project: context.project,
+                     scheduled: context.scheduled, today: context.today, atBottom: false)
+                   again.append(task.id)
+                 }
+                 created = again
+                 self.reload()
+               })
     reload()
+    // Select what just landed, so ⌘K / move / delete act on the paste.
+    let ids = Set(created)
+    let indexes = IndexSet(rows.indices.filter {
+      guard let id = rows[$0].task?.id else { return false }
+      return ids.contains(id)
+    })
+    if !indexes.isEmpty {
+      tableView.selectRowIndexes(indexes, byExtendingSelection: false)
+      tableView.scrollRowToVisible(indexes.first!)
+    }
+  }
+
+  /// Paste is offered only where a new task can actually land, and only when
+  /// the clipboard holds text — drives Edit ▸ Paste enablement.
+  var canPasteTasks: Bool {
+    guard creationContext(inInbox: false) != nil,
+          let text = NSPasteboard.general.string(forType: .string)
+    else { return false }
+    return text.contains { !$0.isWhitespace }
+  }
+
+  func duplicateSelection() {
+    let originals = actionableSelection
+    guard !originals.isEmpty else { return }
+    let ids = originals.map { mutator.duplicate($0).id }
+    reload()
+    recordCreateUndo(name: String(localized: "Duplicate Task",
+                                  comment: "SeptaskKit: undo action"),
+                     ids: ids,
+                     rebuild: { [weak self] in
+                       guard let self else { return [] }
+                       return originals.map { self.mutator.duplicate($0).id }
+                     })
   }
 
   /// File the selection. `nil` area+project is the loose "No List" case.
@@ -1012,21 +1202,63 @@ final class SeptaskKitTaskListController: NSViewController {
     moveModal.show(current: current, title: title)
   }
 
-  /// Apply a repeat rule to the selection (menu bar + context menu).
-  func setRecurrence(_ rule: Recurrence?) {
-    for task in actionableSelection {
-      // Every repeat menu in the AppKit shell picks unit + interval only, so
-      // carry each row's OWN anchor mode across the change. Resetting it to the
-      // menu's default silently rewrote a fixed "every Monday" into "a week
-      // after you tick the box" — and multi-select makes it per task, which is
-      // why this resolves here rather than at the menu.
-      let resolved = rule.map {
-        Recurrence(unit: $0.unit,
-                   interval: $0.interval,
-                   afterCompletion: task.recurrence?.afterCompletion ?? $0.afterCompletion)
+  /// Open the complete Repeat editor for the current selection. The panel is
+  /// intentionally the only AppKit rule picker: no preset submenu can silently
+  /// flatten a fixed schedule into an after-completion rule.
+  func presentRecurrencePanel() {
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    let first = selection[0]
+    let hasScheduledDate = selection.allSatisfy { $0.scheduled != nil }
+    SeptaskKitRecurrencePanelController.present(
+      initial: first.recurrence,
+      paused: first.recurrencePaused,
+      hasScheduledDate: hasScheduledDate
+    ) { [weak self] result in
+      guard let self else { return }
+      let before = selection.map(self.scheduleSnapshot)
+      for task in selection {
+        if let recurrence = result.recurrence {
+          self.mutator.setRecurrence(id: task.id, recurrence: recurrence)
+          self.mutator.setRecurrencePaused(id: task.id, paused: result.paused)
+        } else {
+          self.mutator.setRecurrence(id: task.id, recurrence: nil)
+        }
+        self.refreshComposerRow(taskId: task.id)
       }
-      mutator.setRecurrence(id: task.id, recurrence: resolved)
+      self.reload()
+      self.recordScheduleUndo(name: String(localized: "Change Repeat",
+                                           comment: "SeptaskKit: undo action"),
+                              before: before)
+      self.onStoreChanged?()
     }
+  }
+
+  /// Explicit pause/resume is kept separate from editing the cadence, so a
+  /// person can stop a series without reopening the rule controls.
+  func setRecurrencePaused(_ paused: Bool) {
+    let selection = actionableSelection.filter { $0.recurrence != nil }
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    let before = selection.map(scheduleSnapshot)
+    for task in selection {
+      mutator.setRecurrencePaused(id: task.id, paused: paused)
+      refreshComposerRow(taskId: task.id)
+    }
+    reload()
+    recordScheduleUndo(name: paused
+                       ? String(localized: "Pause Repeat", comment: "SeptaskKit: undo action")
+                       : String(localized: "Resume Repeat", comment: "SeptaskKit: undo action"),
+                       before: before)
+    onStoreChanged?()
+  }
+
+  /// Start the next copy of each selected repeating task without completing
+  /// the current one. The backend makes this idempotent, so invoking it again
+  /// after a sync delay cannot create duplicates.
+  func createNextCopySelection() {
+    let repeating = actionableSelection.filter { $0.recurrence != nil }
+    guard !repeating.isEmpty else { NSSound.beep(); return }
+    for task in repeating { _ = mutator.createNextOccurrence(id: task.id) }
     reload()
     onStoreChanged?()
   }
@@ -1136,6 +1368,18 @@ final class SeptaskKitTaskListController: NSViewController {
                 })
     }
     guard !completing.isEmpty else {
+      if isSettling {
+        // Un-checking a row that is still lingering. It's on screen, restyled
+        // done but not yet dropped, so ⌘K (or a second checkbox tap) has to
+        // read as "unchecked" right now — those seconds are exactly the window
+        // in which the completion is meant to be reversible. `reload()` is
+        // suppressed while settling (that suppression IS the linger), so
+        // restyle in place and let the settle timer's own reload resolve the
+        // list. Rows still lingering from the same batch keep their beat.
+        restyle(ids: reopening.map(\.id), to: .open)
+        for task in reopening { mutator.uncomplete(id: task.id) }
+        return
+      }
       for task in reopening { mutator.uncomplete(id: task.id) }
       reload()
       return
@@ -1159,16 +1403,7 @@ final class SeptaskKitTaskListController: NSViewController {
     isSettling = true
     // The row stays where it is, restyled as completed, for the settle window
     // — you see what you just did before it leaves.
-    let ids = Set(completing.map(\.id))
-    var restyled = IndexSet()
-    for index in rows.indices {
-      if case .task(var task, let chip) = rows[index], ids.contains(task.id) {
-        task.status = .done
-        rows[index] = .task(task, chip: chip)
-        restyled.insert(index)
-      }
-    }
-    tableView.reloadData(forRowIndexes: restyled, columnIndexes: [0])
+    restyle(ids: completing.map(\.id), to: .done)
 
     for task in completing {
       mutator.complete(id: task.id)
@@ -1204,18 +1439,28 @@ final class SeptaskKitTaskListController: NSViewController {
     }
 
     isSettling = true
-    let idSet = Set(ids)
+    restyle(ids: ids, to: .cancelled)
+    for id in ids { mutator.cancel(id: id) }
+    beginSettle()
+  }
+
+  /// Repaint the given rows at a new status WITHOUT going through the store.
+  /// This is how the settle window shows what you just did: `rows` holds
+  /// `SeptenaTask` values, so restyling means swapping the row's own copy and
+  /// reloading just those indexes. Used in both directions — checked on
+  /// complete/cancel, and back to open when a lingering row is un-checked.
+  private func restyle(ids: [String], to status: TaskStatus) {
+    let wanted = Set(ids)
     var restyled = IndexSet()
     for index in rows.indices {
-      if case .task(var task, let chip) = rows[index], idSet.contains(task.id) {
-        task.status = .cancelled
+      if case .task(var task, let chip) = rows[index], wanted.contains(task.id) {
+        task.status = status
         rows[index] = .task(task, chip: chip)
         restyled.insert(index)
       }
     }
+    guard !restyled.isEmpty else { return }
     tableView.reloadData(forRowIndexes: restyled, columnIndexes: [0])
-    for id in ids { mutator.cancel(id: id) }
-    beginSettle()
   }
 
   /// Hold the list still for the settle window, then let the completed rows
@@ -1263,13 +1508,19 @@ final class SeptaskKitTaskListController: NSViewController {
     SeptaskKitDatePopover.present(kind: kind, initial: initial,
                                   relativeTo: anchor, of: tableView) { [weak self] date, today in
       guard let self else { return }
+      let before = selection.map(self.scheduleSnapshot)
       for task in selection {
         switch kind {
         case .when:
           if today {
+            let target = KitDayFormat.todayDate()
+            guard let mode = self.rescheduleMode(for: task, newDate: target) else { continue }
+            self.mutator.reschedule(id: task.id, date: target, mode: mode)
+            self.mutator.schedule(id: task.id, date: nil)
             self.mutator.moveToToday(id: task.id)
           } else {
-            self.mutator.schedule(id: task.id, date: date)
+            guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
+            self.mutator.reschedule(id: task.id, date: date, mode: mode)
             self.mutator.removeFromToday(id: task.id)
           }
         case .deadline:
@@ -1278,21 +1529,59 @@ final class SeptaskKitTaskListController: NSViewController {
         self.mutator.acknowledge(id: task.id)
       }
       self.reload()
+      self.recordScheduleUndo(
+        name: kind == .when
+          ? String(localized: "Change When", comment: "SeptaskKit: undo action")
+          : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
+        before: before)
+    }
+  }
+
+  /// Fixed-schedule repeats get the same two-way decision as the iOS shell.
+  /// Returning nil means the user cancelled the move for that row.
+  private func rescheduleMode(for task: SeptenaTask,
+                              newDate: Date?) -> RecurrenceRescheduleMode? {
+    guard let rule = task.recurrence, !rule.afterCompletion,
+          SeptenaDate.format(newDate) != task.scheduled else {
+      return .makeException
+    }
+
+    let alert = NSAlert()
+    alert.messageText = String(localized: "Reschedule Repeating Task?",
+                               comment: "SeptaskKit: fixed recurrence move")
+    alert.informativeText = String(localized:
+      "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.",
+      comment: "SeptaskKit: fixed recurrence move")
+    alert.addButton(withTitle: String(localized: "Make Exception",
+                                      comment: "SeptaskKit: fixed recurrence move"))
+    alert.addButton(withTitle: String(localized: "Update Rule",
+                                      comment: "SeptaskKit: fixed recurrence move"))
+    alert.addButton(withTitle: String(localized: "Cancel",
+                                      comment: "SeptaskKit: fixed recurrence move"))
+    switch alert.runModal() {
+    case .alertFirstButtonReturn: return .makeException
+    case .alertSecondButtonReturn: return .updateRule
+    default: return nil
     }
   }
 
   /// ⌘⇧. — drop both the schedule and the Today pin, leaving the task in
   /// Anytime. Matches `TaskRowShortcuts.clearSchedule`.
   func clearScheduleSelection() {
+    let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
       mutator.schedule(id: task.id, date: nil)
       mutator.removeFromToday(id: task.id)
       mutator.acknowledge(id: task.id)
     }
     reload()
+    recordScheduleUndo(name: String(localized: "Clear Dates",
+                                    comment: "SeptaskKit: undo action"),
+                       before: before)
   }
 
   func toggleTodaySelection() {
+    let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
       if task.today {
         mutator.removeFromToday(id: task.id)
@@ -1302,6 +1591,9 @@ final class SeptaskKitTaskListController: NSViewController {
       mutator.acknowledge(id: task.id)
     }
     reload()
+    recordScheduleUndo(name: String(localized: "Toggle Today",
+                                    comment: "SeptaskKit: undo action"),
+                       before: before)
   }
 
   func deleteSelection() {
@@ -1338,12 +1630,18 @@ final class SeptaskKitTaskListController: NSViewController {
   private func commitRename(id: String, title: String) {
     clearEditingTitle()
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-    let isAbandonedNewTask = (id == pendingNewTaskId) && trimmed.isEmpty
+    let wasNew = (id == pendingNewTaskId)
     pendingNewTaskId = nil
-    if isAbandonedNewTask {
+    if wasNew, trimmed.isEmpty {
       // The ⌘N row was escaped/committed empty — it never really existed for
       // the user, so remove it entirely rather than soft-deleting to trash.
       mutator.purge(id: id)
+    } else if wasNew {
+      // The row was born titleless, so undo here means "un-create", not
+      // "rename back to empty" — which is what the rename branch below used
+      // to register for a brand-new row.
+      mutator.update(id: id, title: trimmed)
+      recordNewTaskUndo(id: id)
     } else if let task = rows.compactMap(\.task).first(where: { $0.id == id }),
               !trimmed.isEmpty, trimmed != task.title {
       let previousTitle = task.title
@@ -1389,6 +1687,45 @@ final class SeptaskKitTaskListController: NSViewController {
       collapseComposer(commit: true)
     }
 
+    guard let context = creationContext(inInbox: inInbox) else {
+      NSSound.beep()
+      return
+    }
+
+    // Bottom-positioned for the Inbox line: that line sits at the foot of the
+    // Inbox run, so a top-positioned create would open the editor at the TOP
+    // of the run and shove everything down — you press Return on a row at the
+    // bottom and the field appears somewhere else. `atBottom` lands the row
+    // exactly where the line was, which is the same reason SwiftUI's foot
+    // quick-add passes it ("inline captures land above the New task row").
+    // ⌘N keeps the default top capture.
+    let task = mutator.create(title: "", area: context.area, project: context.project,
+                              scheduled: context.scheduled, today: context.today,
+                              atBottom: inInbox)
+    pendingNewTaskId = task.id
+    reload(animated: false)
+    guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
+    tableView.selectRowIndexes([row], byExtendingSelection: false)
+    tableView.scrollRowToVisible(row)
+    if inInbox {
+      // The foot-of-Inbox line is a deliberately light capture affordance —
+      // click, type, done. A pill rail there would be heavier than the
+      // gesture that opened it.
+      beginEditingRow(row)
+    } else {
+      // ⌘N opens the full composer, so a new task can be given its When /
+      // Deadline / List / Repeat without a second gesture. The bare field
+      // editor is still one keystroke away as ⌘R.
+      beginComposing(id: task.id)
+    }
+  }
+
+  /// Where a newly created task should be filed, given the list being looked
+  /// at and (on mixed surfaces) the focused row. Returns nil in the two views
+  /// that cannot hold new work — Logbook and Recently Deleted. Shared by ⌘N
+  /// and paste so the two can never disagree about filing.
+  private func creationContext(inInbox: Bool)
+    -> (area: String?, project: String?, today: Bool, scheduled: Date?)? {
     var area: String?
     var project: String?
     var today = false
@@ -1420,27 +1757,12 @@ final class SeptaskKitTaskListController: NSViewController {
         project = focused.project
       }
     case .triage: break
-    case .logbook, .recentlyDeleted:
-      NSSound.beep()
-      return
+    // Repeating lists the templates that already carry a recurrence rule;
+    // a plain new task can't join it, so ⌘N stays off there — same as the
+    // two read-only lists.
+    case .repeating, .logbook, .recentlyDeleted: return nil
     }
-
-    // Bottom-positioned for the Inbox line: that line sits at the foot of the
-    // Inbox run, so a top-positioned create would open the editor at the TOP
-    // of the run and shove everything down — you press Return on a row at the
-    // bottom and the field appears somewhere else. `atBottom` lands the row
-    // exactly where the line was, which is the same reason SwiftUI's foot
-    // quick-add passes it ("inline captures land above the New task row").
-    // ⌘N keeps the default top capture.
-    let task = mutator.create(title: "", area: area, project: project,
-                              scheduled: scheduled, today: today,
-                              atBottom: inInbox)
-    pendingNewTaskId = task.id
-    reload(animated: false)
-    guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
-    tableView.selectRowIndexes([row], byExtendingSelection: false)
-    tableView.scrollRowToVisible(row)
-    beginEditingRow(row)
+    return (area, project, today, scheduled)
   }
 
   /// The task that should seed ⌘N's area/project — the table's focused row,
@@ -1608,6 +1930,27 @@ final class SeptaskKitTaskListController: NSViewController {
     view.window?.makeFirstResponder(tableView)
     composingTaskId = nil
     composerNotesHeight = nil
+
+    // ⌘N now opens the composer rather than the bare field editor, so the
+    // abandoned-new-task rule has to live here too — a row created and closed
+    // without ever being titled never existed for the user, so purge it
+    // instead of folding an empty row back into the list. Same contract as
+    // `commitRename`'s branch, and read AFTER `cell.commit()` so a title the
+    // user did type has already landed on the model.
+    if taskId == pendingNewTaskId {
+      pendingNewTaskId = nil
+      // Read the STORE, not `rows` — `SeptenaTask` is a struct, so the row
+      // array still holds the pre-commit copy and a title the user just typed
+      // would look empty here and get the row purged out from under them.
+      let title = LocalCache.allTasks(in: context)
+        .first { $0.id == taskId }?.title ?? ""
+      if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        mutator.purge(id: taskId)
+        reload()
+        return
+      }
+      recordNewTaskUndo(id: taskId)
+    }
 
     guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else {
       reload()
@@ -1826,8 +2169,8 @@ final class SeptaskKitTaskListController: NSViewController {
         self.refreshComposerRow(taskId: task.id)
 
       case .repeatRule(let anchor):
-        let menu = KitRecurrenceMenu.build(target: self, action: #selector(self.menuSetRecurrence(_:)))
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.bounds.height), in: anchor)
+        _ = anchor
+        self.presentRecurrencePanel()
         self.refreshComposerRow(taskId: task.id)
       }
     }
@@ -1891,21 +2234,22 @@ final class SeptaskKitTaskListController: NSViewController {
     clearScheduleMenuItem.keyEquivalentModifierMask = [.command, .shift]
     menu.addItem(clearScheduleMenuItem)
 
-    // Move and Repeat are closed sets, so they're submenus rather than more
-    // popovers — the standard AppKit shape for "pick one of a few". The move
-    // submenu is rebuilt on open (menuNeedsUpdate) so it can't serve a stale
-    // project list.
+    // Move remains a bounded destination submenu. Repeat is a full editor,
+    // however, so it opens a panel rather than forcing the rule through a
+    // preset submenu.
     moveMenuItem.title = String(localized: "Move to", comment: "SeptaskKit: context menu")
     moveMenuItem.keyEquivalent = "m"
     moveMenuItem.keyEquivalentModifierMask = [.command, .shift]
     menu.addItem(moveMenuItem)
 
-    let repeatItem = NSMenuItem(
-      title: String(localized: "Repeat", comment: "SeptaskKit: context menu"),
-      action: nil, keyEquivalent: "")
-    repeatItem.submenu = KitRecurrenceMenu.build(target: self,
-                                                 action: #selector(menuSetRecurrence(_:)))
-    menu.addItem(repeatItem)
+    menu.addItem(item(String(localized: "Repeat…", comment: "SeptaskKit: context menu"),
+                      #selector(menuRepeat), "", []))
+    pauseRepeatMenuItem.action = #selector(menuPauseResumeRepeat)
+    pauseRepeatMenuItem.target = self
+    pauseRepeatMenuItem.title = String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
+    menu.addItem(pauseRepeatMenuItem)
+    menu.addItem(item(String(localized: "Create Next Copy", comment: "SeptaskKit: recurrence"),
+                      #selector(menuCreateNextCopy), "", []))
     return menu
   }
 
@@ -2076,11 +2420,14 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuDeadline() { presentDatePopover(kind: .deadline) }
   @objc private func menuClearSchedule() { clearScheduleSelection() }
 
-  @objc private func menuSetRecurrence(_ sender: NSMenuItem) {
-    // `preserving: nil` on purpose — setRecurrence resolves the anchor mode
-    // per selected row, which is the only correct answer for a multi-selection.
-    setRecurrence(KitRecurrenceMenu.recurrence(for: sender, preserving: nil))
+  @objc private func menuRepeat() { presentRecurrencePanel() }
+
+  @objc private func menuPauseResumeRepeat() {
+    let selection = actionableSelection.filter { $0.recurrence != nil }
+    guard !selection.isEmpty else { return }
+    setRecurrencePaused(!selection.allSatisfy(\.recurrencePaused))
   }
+  @objc private func menuCreateNextCopy() { createNextCopySelection() }
   @objc private func menuDelete() { deleteSelection() }
 }
 
@@ -2126,6 +2473,15 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
 
     let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
     clearScheduleMenuItem.isHidden = !canClear
+
+    let repeating = !selection.isEmpty && selection.allSatisfy { $0.recurrence != nil }
+    pauseRepeatMenuItem.isHidden = !repeating
+    if repeating {
+      let paused = selection.allSatisfy(\.recurrencePaused)
+      pauseRepeatMenuItem.title = paused
+        ? String(localized: "Resume Repeat", comment: "SeptaskKit: recurrence")
+        : String(localized: "Pause Repeat", comment: "SeptaskKit: recurrence")
+    }
   }
 }
 
@@ -2202,6 +2558,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .event: return SeptaskKitTheme.rowHeight
     case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
+    // Same band as the logged footer — both are quiet meta-font page footers.
+    case .addSection: return SeptenaTypeScale.size(.footnote) + 24
     }
   }
 
@@ -2637,6 +2995,13 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.createTask(inInbox: true) }
       return cell
 
+    case .addSection:
+      let identifier = NSUserInterfaceItemIdentifier("addSectionCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitAddSectionCell
+        ?? KitAddSectionCell(identifier: identifier)
+      cell.onTap = { [weak self] in self?.menuNewSection() }
+      return cell
+
     case .task(let task, let chip):
       if task.id == composingTaskId {
         let identifier = NSUserInterfaceItemIdentifier("composerCell")
@@ -2818,7 +3183,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // DesignSpec, a glyph is a view, never baked into a formatted label.
     repeatGlyph.translatesAutoresizingMaskIntoConstraints = false
     repeatGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
-    repeatGlyph.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath",
+    repeatGlyph.image = NSImage(systemSymbolName: "arrow.clockwise",
                                 accessibilityDescription: TaskA11y.recurring)?
       .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
     repeatGlyph.setContentHuggingPriority(.required, for: .horizontal)
@@ -2923,7 +3288,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       scheduleGlyph.isHidden = true
       contextLabel.isHidden = true
       detail.stringValue = ""
-      title.toolTip = task.title
       title.font = SeptaskKitTheme.heading
       title.attributedStringValue = NSAttributedString(
         string: task.title,
@@ -2938,7 +3302,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     checkbox.isHidden = false
     checkbox.setAccessibilityElement(true)
-    title.toolTip = task.title
     title.font = SeptaskKitTheme.taskTitle
     contextLabel.font = SeptaskKitTheme.meta
     contextLabel.stringValue = contextText ?? ""
@@ -3124,12 +3487,19 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 /// and clicking the row drills into that project's own list.
 @MainActor
 final class KitProjectTargetCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
   private let progress = NSImageView()
   private let title = NSTextField(labelWithString: "")
   private let chevron = NSImageView()
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
-  private let clickRecognizer = NSClickGestureRecognizer()
+  /// The whole row is the click target, and it has to be a real `NSButton`:
+  /// `NSTableView` claims clicks on label and image cell content, so a
+  /// recognizer, a `mouseDown`/`mouseUp` pair, or a `hitTest` override on this
+  /// cell never runs. Same transparent full-bleed overlay `KitNewTaskCell`
+  /// uses. See `KitScreenTitleCell` for the archaeology.
+  private let hit = NSButton()
 
   var onTap: (() -> Void)?
 
@@ -3148,18 +3518,32 @@ final class KitProjectTargetCell: NSTableCellView {
       .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
     chevron.contentTintColor = SeptaskKitTheme.iconMuted
 
-    clickRecognizer.target = self
-    clickRecognizer.action = #selector(handleClick)
-    addGestureRecognizer(clickRecognizer)
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
+    progress.kitA11yIgnore()
+    title.kitA11yIgnore()
+    chevron.kitA11yIgnore()
 
     addSubview(progress)
     addSubview(title)
     addSubview(chevron)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
     textField = title
+    setAccessibilityElement(true)
     leadingConstraint = progress.leadingAnchor.constraint(
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
     trailingConstraint = chevron.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       progress.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -3170,6 +3554,9 @@ final class KitProjectTargetCell: NSTableCellView {
       chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
       chevron.centerYAnchor.constraint(equalTo: title.centerYAnchor),
       trailingConstraint,
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
     ])
   }
 
@@ -3179,6 +3566,7 @@ final class KitProjectTargetCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
     super.layout()
   }
 
@@ -3192,13 +3580,25 @@ final class KitProjectTargetCell: NSTableCellView {
         .foregroundColor: NSColor.labelColor,
       ])
     title.toolTip = titleText
+    // Plain title, like a navigable `KitGroupHeaderCell` — this row drills
+    // into the project, it does not open the nav menu.
+    kitA11yButton(label: titleText)
     window?.invalidateCursorRects(for: self)
   }
 
-  @objc private func handleClick() { onTap?() }
+  @objc private func fire() { onTap?() }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
 
   override func resetCursorRects() {
-    addCursorRect(bounds, cursor: .pointingHand)
+    // Scoped to the button, never the whole cell: a cursor rect does NOT go
+    // through hit-testing, so a whole-cell rect happily advertises the page
+    // padding as clickable when it is not. That false signal is what cost
+    // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
   }
 }
 
@@ -3420,9 +3820,16 @@ final class KitScreenTitleCell: NSTableCellView {
 /// column (not the wider page gutter).
 @MainActor
 final class KitLoggedFooterCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
   private let label = NSTextField(labelWithString: "")
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
+  /// A real `NSButton`, not a `hitTest`/`mouseUp` override on the cell —
+  /// `NSTableView` claims clicks on an `NSTextField` label, so none of those
+  /// overrides ever ran and this footer was inert. Transparent full-bleed
+  /// overlay, the `KitNewTaskCell` pattern.
+  private let hit = NSButton()
   var onTap: (() -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -3434,17 +3841,33 @@ final class KitLoggedFooterCell: NSTableCellView {
     label.textColor = SeptaskKitTheme.inkSecondary
     label.kitA11yIgnore()
 
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
     addSubview(label)
+    // Last, so it layers above the label and takes every click in the row.
+    addSubview(hit)
     textField = label
     setAccessibilityElement(true)
     leadingConstraint = label.leadingAnchor.constraint(
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
     trailingConstraint = label.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       label.centerYAnchor.constraint(equalTo: centerYAnchor),
       trailingConstraint,
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
     ])
   }
 
@@ -3454,6 +3877,7 @@ final class KitLoggedFooterCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
     super.layout()
   }
 
@@ -3467,32 +3891,19 @@ final class KitLoggedFooterCell: NSTableCellView {
     kitA11yButton(label: text)
   }
 
+  @objc private func fire() { onTap?() }
+
   override func accessibilityPerformPress() -> Bool {
     onTap?()
     return true
   }
 
   override func resetCursorRects() {
-    addCursorRect(bounds, cursor: .pointingHand)
-  }
-
-  /// Claim the whole footer — the `NSTextField` label would otherwise eat the
-  /// click as an `NSControl`. See `KitScreenTitleCell.hitTest`.
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    super.hitTest(point) == nil ? nil : self
-  }
-
-  /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
-  /// on a table cell view never completes, because the table's own mouseDown
-  /// tracking loop eats the mouseUp before `NSWindow.sendEvent` can feed it
-  /// to the recognizer.
-  override func mouseDown(with event: NSEvent) {
-    // Swallow — see above.
-  }
-
-  override func mouseUp(with event: NSEvent) {
-    let point = convert(event.locationInWindow, from: nil)
-    if bounds.contains(point) { onTap?() }
+    // Scoped to the button, never the whole cell: a cursor rect does NOT go
+    // through hit-testing, so a whole-cell rect happily advertises the page
+    // padding as clickable when it is not. That false signal is what cost
+    // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
   }
 }
 
@@ -3514,6 +3925,8 @@ final class KitLoggedFooterCell: NSTableCellView {
 /// reliably receives the click.
 @MainActor
 final class KitNewTaskCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
   private let checkbox = KitCheckboxView()
   private let label = NSTextField(labelWithString: "")
   private let hit = NSButton()
@@ -3565,6 +3978,7 @@ final class KitNewTaskCell: NSTableCellView {
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
     trailingConstraint = label.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -3573,10 +3987,9 @@ final class KitNewTaskCell: NSTableCellView {
       label.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       label.centerYAnchor.constraint(equalTo: centerYAnchor),
       trailingConstraint,
-      hit.leadingAnchor.constraint(equalTo: leadingAnchor),
-      hit.trailingAnchor.constraint(equalTo: trailingAnchor),
       hit.topAnchor.constraint(equalTo: topAnchor),
       hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
     ])
   }
 
@@ -3587,6 +4000,7 @@ final class KitNewTaskCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
     super.layout()
   }
 
@@ -3596,7 +4010,144 @@ final class KitNewTaskCell: NSTableCellView {
   }
 
   override func resetCursorRects() {
-    addCursorRect(bounds, cursor: .pointingHand)
+    // Scoped to the button, never the whole cell: a cursor rect does NOT go
+    // through hit-testing, so a whole-cell rect happily advertises the page
+    // padding as clickable when it is not. That false signal is what cost
+    // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
+  }
+
+  @objc private func fire() { onTap?() }
+}
+
+// MARK: - Content-column click targets
+
+/// Constraints pinning a full-bleed click target to the CONTENT COLUMN — the
+/// same band the card occupies (`KitCardRowView` insets its card by
+/// `SeptaskKitLayout.inset(for:)` on each side).
+///
+/// A click target that spans the whole row width reaches into the page's side
+/// padding, so clicking the empty gutter beside a row would fire that row's
+/// button. The padding is page, not row. Owners call `update(width:)` from
+/// their own `layout()`, alongside the inset they already apply to content.
+@MainActor
+struct KitContentColumnPin {
+  let leading: NSLayoutConstraint
+  let trailing: NSLayoutConstraint
+
+  init(_ target: NSView, in container: NSView) {
+    leading = target.leadingAnchor.constraint(equalTo: container.leadingAnchor)
+    trailing = target.trailingAnchor.constraint(equalTo: container.trailingAnchor)
+  }
+
+  var constraints: [NSLayoutConstraint] { [leading, trailing] }
+
+  func update(width: CGFloat) {
+    let inset = SeptaskKitLayout.inset(for: width)
+    leading.constant = inset
+    trailing.constant = -inset
+  }
+}
+
+// MARK: - Add-section cell
+
+/// Foot of a project page: the quiet "+ Add Section" line, the AppKit
+/// counterpart of `TaskListView.addSectionButton` — same copy, same meta font
+/// and secondary ink, left-aligned on the content column.
+///
+/// Clicks go to a transparent full-bleed `NSButton`, for the reason spelled
+/// out on `KitNewTaskCell`: `NSTableView` claims clicks on label and image
+/// content, so only a real `NSControl` reliably receives them.
+@MainActor
+final class KitAddSectionCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
+  private let plus = NSImageView()
+  private let label = NSTextField(labelWithString: "")
+  private let hit = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    let title = String(localized: "Add Section",
+                       comment: "Foot of a project page — create a section heading")
+
+    plus.translatesAutoresizingMaskIntoConstraints = false
+    plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote),
+                                     weight: .semibold))
+    plus.contentTintColor = SeptaskKitTheme.inkSecondary
+    plus.setContentHuggingPriority(.required, for: .horizontal)
+    plus.kitA11yIgnore()
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.stringValue = title
+    label.kitA11yIgnore()
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
+    addSubview(plus)
+    addSubview(label)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
+    textField = label
+    kitA11yButton(label: title)
+
+    // Same content-column origin as the logged footer, so the two page
+    // footers line up with each other and with the cards above them.
+    leadingConstraint = plus.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = label.trailingAnchor.constraint(
+      lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      plus.centerYAnchor.constraint(equalTo: centerYAnchor),
+      label.leadingAnchor.constraint(equalTo: plus.trailingAnchor, constant: 6),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      trailingConstraint,
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitAddSectionCell is code-only") }
+
+  /// Same width-dependent centered-column margin as every other row.
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
+    super.layout()
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
+
+  override func resetCursorRects() {
+    // Scoped to the button, never the whole cell: a cursor rect does NOT go
+    // through hit-testing, so a whole-cell rect happily advertises the page
+    // padding as clickable when it is not. That false signal is what cost
+    // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
   }
 
   @objc private func fire() { onTap?() }
@@ -3609,6 +4160,8 @@ final class KitNewTaskCell: NSTableCellView {
 /// entry it came from.
 @MainActor
 final class KitGroupHeaderCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
   private let icon = NSImageView()
   private let emoji = NSTextField(labelWithString: "")
   private let title = NSTextField(labelWithString: "")
@@ -3622,6 +4175,14 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// the list reads at ONE size, "Inbox" and "Agenda" included, so a glance
   /// down the list shows one consistent rung of section title.
   var onTap: (() -> Void)?
+
+  /// The click target for a navigable header, and it has to be a real
+  /// `NSButton`: `NSTableView` claims clicks on the `NSTextField` title and
+  /// the `NSImageView` glyph, so the `hitTest`/`mouseDown`/`mouseUp` overrides
+  /// this cell used to carry never ran. Transparent full-bleed overlay, the
+  /// `KitNewTaskCell` pattern. Hidden for a non-navigable header so its clicks
+  /// still reach the table and select/deselect normally.
+  private let hit = NSButton()
 
   /// Matches SwiftUI's ACTUAL group header exactly —
   /// `sectionGroupHeaderTitleStyle()` (`Theme.groupHeaderFontSize` = 15 on
@@ -3665,10 +4226,23 @@ final class KitGroupHeaderCell: NSTableCellView {
 
     count.textColor = SeptaskKitTheme.iconMuted
 
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.isHidden = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
     addSubview(icon)
     addSubview(emoji)
     addSubview(title)
     addSubview(count)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
     textField = title
     icon.kitA11yIgnore()
     emoji.kitA11yIgnore()
@@ -3679,6 +4253,7 @@ final class KitGroupHeaderCell: NSTableCellView {
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
     trailingConstraint = count.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       icon.centerYAnchor.constraint(equalTo: title.centerYAnchor),
@@ -3693,6 +4268,9 @@ final class KitGroupHeaderCell: NSTableCellView {
       count.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 8),
       count.firstBaselineAnchor.constraint(equalTo: title.firstBaselineAnchor),
       trailingConstraint,
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
     ])
   }
 
@@ -3704,6 +4282,7 @@ final class KitGroupHeaderCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + 4
     trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
     super.layout()
   }
 
@@ -3747,43 +4326,16 @@ final class KitGroupHeaderCell: NSTableCellView {
     } else {
       kitA11yHeader(label: titleText)
     }
+    // A recycled cell keeps the previous row's overlay state otherwise, which
+    // would make a plain "Inbox" header swallow clicks the table should get.
+    hit.isHidden = !isNavigable
     // Reused cells carry a stale cursor rect otherwise — a scrolled-in
     // non-navigable header could keep the pointing-hand from whatever row
     // used to occupy this recycled view.
     window?.invalidateCursorRects(for: self)
   }
 
-  /// Navigable headers claim their clicks off the `NSTextField` title and the
-  /// `NSImageView` glyph, both of which would otherwise swallow them as
-  /// `NSControl`s (see `KitScreenTitleCell.hitTest`). A non-navigable header
-  /// keeps the default so its clicks still reach the table.
-  override func hitTest(_ point: NSPoint) -> NSView? {
-    let hit = super.hitTest(point)
-    guard onTap != nil else { return hit }
-    return hit == nil ? nil : self
-  }
-
-  /// Hand-tracked, same reason as `KitScreenTitleCell` — a click recognizer
-  /// on a table cell view never completes, because the table's own mouseDown
-  /// tracking loop eats the mouseUp before `NSWindow.sendEvent` can feed it
-  /// to the recognizer. Non-navigable headers (`onTap == nil`) fall through
-  /// to the table so a click there still selects/deselects normally.
-  override func mouseDown(with event: NSEvent) {
-    guard onTap != nil else {
-      super.mouseDown(with: event)
-      return
-    }
-    // Swallow — see above.
-  }
-
-  override func mouseUp(with event: NSEvent) {
-    guard let onTap else {
-      super.mouseUp(with: event)
-      return
-    }
-    let point = convert(event.locationInWindow, from: nil)
-    if bounds.contains(point) { onTap() }
-  }
+  @objc private func fire() { onTap?() }
 
   override func accessibilityPerformPress() -> Bool {
     guard onTap != nil else { return false }
@@ -3796,7 +4348,11 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// to lean on in an `NSTableCellView`.
   override func resetCursorRects() {
     guard onTap != nil else { return }
-    addCursorRect(bounds, cursor: .pointingHand)
+    // Scoped to the button, never the whole cell: a cursor rect does NOT go
+    // through hit-testing, so a whole-cell rect happily advertises the page
+    // padding as clickable when it is not. That false signal is what cost
+    // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
   }
 }
 
@@ -3913,6 +4469,8 @@ final class SeptaskKitTableView: NSTableView {
   var onMove: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
+  var onPaste: (() -> Void)?
+  var canPaste: (() -> Bool)?
   /// Tab / Shift-Tab — two-pane keyboard nav, sidebar ⇄ list (mirrors the
   /// sidebar's own `onTab` in `KitSidebarOutlineView`).
   var onFocusSidebar: (() -> Void)?
@@ -3920,12 +4478,51 @@ final class SeptaskKitTableView: NSTableView {
   /// is not called on exit, so the table has to report this itself.
   var onDragEnded: (() -> Void)?
 
+  /// A click in the page's side padding is a click on the PAGE, not on the
+  /// row that happens to share its y. The card occupies the content column
+  /// only (`KitCardRowView` insets its card by `SeptaskKitLayout.inset` on
+  /// each side), so selection has to stop at the same edges — otherwise the
+  /// ~10% gutter either side selects whatever row is level with the pointer,
+  /// which reads as the list grabbing clicks meant for empty space.
+  ///
+  /// Deselecting is the same thing `NSTableView` already does for a click
+  /// below the last row, so the gutter behaves like the rest of the page
+  /// background. This override sits on the TABLE, not on a cell — the house
+  /// rule against `mouseDown` overrides is about cell views, whose clicks the
+  /// table claims before they ever arrive.
+  override func mouseDown(with event: NSEvent) {
+    guard isInsideContentColumn(event) else {
+      deselectAll(nil)
+      window?.makeFirstResponder(self)
+      return
+    }
+    super.mouseDown(with: event)
+  }
+
+  /// Right-click follows the same rule, so the gutter can't raise a row's
+  /// context menu for a row you didn't click.
+  override func menu(for event: NSEvent) -> NSMenu? {
+    guard isInsideContentColumn(event) else { return nil }
+    return super.menu(for: event)
+  }
+
+  private func isInsideContentColumn(_ event: NSEvent) -> Bool {
+    let x = convert(event.locationInWindow, from: nil).x
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    return x >= inset && x <= bounds.width - inset
+  }
+
   /// Standard responder-chain copy, so Edit ▸ Copy (and its ⌘C) reaches the
   /// task list without a competing menu item.
   @objc func copy(_ sender: Any?) { onCopy?() }
 
+  /// Same responder-chain contract as `copy(_:)` — Edit ▸ Paste and its ⌘V
+  /// reach the task list without a competing menu item.
+  @objc func paste(_ sender: Any?) { onPaste?() }
+
   override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
     if item.action == #selector(copy(_:)) { return canCopy?() ?? false }
+    if item.action == #selector(paste(_:)) { return canPaste?() ?? false }
     return super.validateUserInterfaceItem(item)
   }
 

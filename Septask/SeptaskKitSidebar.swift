@@ -57,7 +57,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// Stable key so selection survives a structure reload.
     var key: String {
       switch content {
-      case .filter(let filter, _, _): return "filter:\(filter.serverView)"
+      case .filter(let filter, _, _): return "filter:\(filter.navigationKey)"
       case .next: return "next"
       case .area(let area): return "area:\(area.id)"
       case .project(let project, _): return "project:\(project.id)"
@@ -222,7 +222,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       switch filter {
       case .area(let id): "area:\(id)"
       case .project(let id): "project:\(id)"
-      default: "filter:\(filter.serverView)"
+      default: "filter:\(filter.navigationKey)"
       }
     }
     // A project inside a FOLDED area has no row at all (its parent reports
@@ -312,6 +312,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                    title: String(localized: "Upcoming", comment: "Smart list title"),
                    symbol: "calendar"),
            count: LocalCache.tasks(in: context, filter: .upcoming).count.nilIfZero),
+      Node(.filter(.repeating,
+                   title: String(localized: "Repeating", comment: "Smart list title"),
+                   symbol: "arrow.clockwise"),
+           count: LocalCache.tasks(in: context, filter: .repeating).count.nilIfZero),
       Node(.filter(.unscheduled,
                    title: String(localized: "Anytime", comment: "Smart list title"),
                    symbol: "rectangle.stack.fill"),

@@ -1,5 +1,39 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-20:** three passes, all built green on `SeptaskMac`.
+
+1. **The house rule is now actually applied.** `KitProjectTargetCell`,
+   `KitGroupHeaderCell` and `KitLoggedFooterCell` — the three cells the
+   2026-08-09 note listed as "still unconverted and carrying the same bug" —
+   are real `NSButton`s now. The first still had an `NSClickGestureRecognizer`
+   (the shape proven never to fire in a cell view); the other two had the
+   hand-tracked `mouseDown`/`mouseUp` + `hitTest` overrides that the same note
+   retired. All three used the transparent full-bleed overlay from
+   `KitNewTaskCell`. There are now **zero** gesture recognizers and **zero**
+   `hitTest`/`mouseDown`/`mouseUp` overrides left in `Septask/SeptaskKit*.swift`
+   — grep for them before adding a click target and keep it that way.
+   `KitGroupHeaderCell` hides its overlay when the header is non-navigable, so
+   "Inbox"/"Agenda" clicks still reach the table.
+2. **Three parity items** — the Add Section footer (§4), ⌘N opening the
+   composer (§1), and ⌘V paste-to-create (§6). Struck below.
+3. **Undo is rounded out** (§6) — dates, recurrence, Today, create, duplicate
+   and paste are all wired now.
+
+Two bugs found and fixed while doing it, both the same root cause and worth
+knowing: **`SeptenaTask` is a struct, so the `rows` array holds pre-change
+COPIES.** Reading a just-committed field back out of `rows` gives you the
+stale value. This bit the new abandoned-⌘N-row purge (the composer commits the
+title through the mutator, `rows` still says `""`, so a task the user had just
+titled would have been purged out from under them) and it is why
+`recordScheduleUndo` re-reads its after-state from `LocalCache.allTasks`
+instead of from `rows`. `refreshTaskRowInPlace` exists for exactly this reason
+— when you need a row's post-mutation truth, go to the store.
+
+Also corrected: `commitRename` used to register a **rename** undo for a
+brand-new ⌘N row, so ⌘Z after typing the first title meant "rename it back to
+empty string" rather than "un-create it". New rows now register a `New Task`
+undo that purges.
+
 **2026-08-09:** AppKit VoiceOver floor (§6 Accessibility) — `TaskA11y` shared
 spoken vocabulary + kit wiring (checkbox, rows, sidebar disclosure, headers,
 logged footer); agent-cue `acknowledge` on composer/inspector engage.
@@ -111,10 +145,9 @@ every node and would wipe every fold.
 
 **House rule, now with evidence behind it: every click target in a
 table/outline cell is a real `NSButton`.** No gesture recognizers, no
-hand-tracked `mouseDown`/`mouseUp`, no `hitTest` overrides. Still unconverted
-and carrying the same bug: `KitGroupHeaderCell` (navigable headers),
-`KitLoggedFooterCell`, `KitProjectTargetCell` — their titles are
-`NSTextField`s, so their clicks are claimed by the table too.
+hand-tracked `mouseDown`/`mouseUp`, no `hitTest` overrides. (`KitGroupHeaderCell`,
+`KitLoggedFooterCell` and `KitProjectTargetCell` were listed here as still
+unconverted — they were converted on 2026-08-20; see the entry at the top.)
 
 Lessons for the next session: a reported symptom that survives a fix usually
 means the fix addressed a *different* layer of the same interaction; check the
@@ -209,10 +242,14 @@ much richer editor.
   reusing the same popover/menu the row commands use. Tab walks the pills.
   Autosaves on collapse. ⌘R stays a separate fast bare-title rename.
   Discuss/conversation pill NOT included — depends on §2.
-- **[ ] Create-with-attributes.** Still open: ⌘N makes a bare titled row; the
-  composer isn't offered at creation time the way it is for editing. Small
-  follow-up: open the composer immediately after ⌘N instead of the bare
-  field-editor rename.
+- **[DONE] Create-with-attributes.** ⌘N now opens the composer on the new row
+  instead of the bare field-editor rename, so a task can be given its When /
+  Deadline / List / Repeat without a second gesture. ⌘R is still the fast
+  bare-title path. The foot-of-Inbox "New task" line deliberately KEEPS the
+  bare editor — it is a light capture affordance, and a pill rail there would
+  be heavier than the click that opened it. `collapseComposer` carries the
+  abandoned-new-task purge that `commitRename` already had, so a ⌘N row closed
+  without a title is purged rather than folded back as an empty row.
 - **[P2] Hero-glide between closed row and open editor**
   (`matchedGeometryEffect` anchors on title + checkbox). Cosmetic but it's what
   makes inline editing feel continuous rather than modal.
@@ -280,14 +317,15 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
     Section), right-click blank space on a project page (New Section).
     Double-click/Return on a heading now falls back to the bare-title editor
     instead of no-op (the composer's pill rail makes no sense for a heading).
-    **[ ] Gap — discoverability.** SwiftUI shows a quiet "+ Add Section"
-    button at the foot of every project page (`TaskListView.addSectionButton`).
-    The AppKit shell has no equivalent: the only way in is a right-click on
-    blank space *below* the list, which doesn't exist once a project has
-    enough tasks to fill the window. There's no menu-bar command and no
-    shortcut either. MZ hit exactly this on 2026-08-09 ("unclear if they do
-    and where"). The fix is the SwiftUI affordance: a footer row on project
-    pages, alongside the existing right-click paths.
+    **[DONE] Discoverability.** Project pages now end with an "Add Section"
+    footer row (`Row.addSection` → `KitAddSectionCell`), the counterpart of
+    `TaskListView.addSectionButton` — same copy, same meta font and secondary
+    ink, and it routes to the same `menuNewSection()` the right-click path
+    uses. `projectGrouped` appends it last, so it lands above the logged
+    footer exactly like SwiftUI's. Unselectable, like the logged footer, so it
+    stays out of arrow-nav. Still no menu-bar command or shortcut for it —
+    that would need the SwiftUI arm too (the one-menu-bar rule), so it was
+    left out of this pass.
   - **[DONE] Filing a task under a heading by DRAGGING it there** — project
     pages now GROUP by heading (`projectGrouped`, mirroring
     `TaskListView.projectGroupedRows`: un-headed block first, then each
@@ -351,16 +389,35 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   footer plurals, delete-area/project bodies, recurrence cadences). User
   data (task/project/area titles) stays verbatim. Smoke-test with
   `-AppleLanguages (pt-BR)`.
-- **[DONE, partial] Undo / redo.** `SeptaskKitTaskListController` owns an
-  `UndoManager` (overrides `NSResponder.undoManager` — there's no
-  `NSDocument`, so `NSWindow.undoManager` is nil by default and won't do this
-  for free) with symmetric undo/redo registration, wired for: complete/reopen
-  (single + batch + the composer's checkbox), delete/restore, rename, move.
-  Standard ⌘Z / ⌘⇧Z, standard Edit menu. NOT wired: When/Deadline changes,
-  recurrence changes, Today toggle, create/duplicate. The SwiftUI shell still
-  has no undo at all, so this is net-new capability, not parity.
-- **[P2] Paste (⌘V) to create tasks** from clipboard text (multi-line → one
-  task per line). Copy already works via Edit ▸ Copy.
+- **[DONE] Undo / redo.** `SeptaskKitTaskListController` owns an `UndoManager`
+  (overrides `NSResponder.undoManager` — there's no `NSDocument`, so
+  `NSWindow.undoManager` is nil by default and won't do this for free) with
+  symmetric undo/redo registration. Now covers every value-level mutator the
+  shell offers: complete/reopen (single + batch + the composer's checkbox),
+  delete/restore, rename, move, **When / Deadline / Clear Dates / Today toggle
+  / repeat**, and **create / duplicate / paste**. Standard ⌘Z / ⌘⇧Z, standard
+  Edit menu. The SwiftUI shell still has no undo at all, so this is net-new
+  capability, not parity.
+  - Scheduling undo goes through **`ScheduleSnapshot`** — capture
+    `scheduled` / `today` / `deadline` / `recurrence` before the change,
+    replay them through the same mutators after. **Restore order is
+    load-bearing:** `schedule` and `setDeadline` each carry their own Today
+    side effects (`removeFromToday` even clears an already-landed scheduled or
+    deadline date), so the explicit Today flag is written LAST and wins, via
+    `moveToToday(id:today:)` rather than `removeFromToday`. Known fidelity
+    limit: `todaySetOn` re-stamps to the current day, so undo restores Today
+    membership but not the row's original tenure age (the gold dial resets).
+  - Creation undo **re-creates on redo** rather than restoring — `purge` is a
+    real delete, so there is no row left to bring back. That mints a new id,
+    which is why `recordCreateUndo` keeps a mutable id box both closures read.
+- **[DONE] Paste (⌘V) to create tasks** from clipboard text — one task per
+  non-blank line, filed exactly where ⌘N would file it (`creationContext` is
+  now shared by both, so they cannot disagree). `SeptaskKitTableView` answers
+  `paste(_:)` on the responder chain, the mirror of its `copy(_:)`, and
+  validates the item so Edit ▸ Paste greys out in Logbook / Recently Deleted
+  or with a non-text clipboard. Lines are created back-to-front because
+  `create` inserts at the top of its group, which is what leaves the pasted
+  block in reading order. Undoable as one action.
 - **[DONE, floor] Accessibility.** Custom-drawn checkbox, sidebar disclosure
   chevrons, task/heading rows, screen/group titles, and the logged footer
   expose VoiceOver roles/labels via `TaskA11y` + AppKit helpers in
@@ -406,8 +463,10 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
-2. **Round out undo** — dates, recurrence, Today toggle, create/duplicate.
-3. Everything else in §5/§6/§7 as it comes up.
+2. **Reminders inbox import** (§5) — the last [P2] outside §2.
+3. **Custom recurrence** (§7) — interval + `afterCompletion`; the model has
+   both and a rule set elsewhere displays but can't be edited here.
+4. Everything else in §5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 

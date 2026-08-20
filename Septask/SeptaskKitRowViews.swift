@@ -329,64 +329,6 @@ enum KitGlyph {
   }
 }
 
-// MARK: - Recurrence choices
-
-/// The repeat cadences offered in the AppKit shell, as a menu (context menu
-/// submenu) or a popup's items (inspector). A short closed set — anything
-/// more exotic is still editable in the SwiftUI repeat sheet.
-@MainActor
-enum KitRecurrenceMenu {
-  /// Menu order, with the rule each row writes. `nil` clears recurrence.
-  static var choices: [(title: String, rule: Recurrence?)] {
-    [
-      (String(localized: "Never", comment: "Recurrence cadence"), nil),
-      (String(localized: "Daily", comment: "Recurrence cadence"),
-       Recurrence(unit: .day, interval: 1)),
-      (String(localized: "Weekly", comment: "Recurrence cadence"),
-       Recurrence(unit: .week, interval: 1)),
-      (String(localized: "Every 2 Weeks", comment: "Recurrence cadence"),
-       Recurrence(unit: .week, interval: 2)),
-      (String(localized: "Monthly", comment: "Recurrence cadence"),
-       Recurrence(unit: .month, interval: 1)),
-    ]
-  }
-
-  static func build(target: AnyObject, action: Selector) -> NSMenu {
-    let menu = NSMenu()
-    for (index, choice) in choices.enumerated() {
-      let item = NSMenuItem(title: choice.title, action: action, keyEquivalent: "")
-      item.target = target
-      item.tag = index
-      menu.addItem(item)
-    }
-    return menu
-  }
-
-  /// The rule a menu row writes. `preserving` carries the task's CURRENT
-  /// anchor mode through a cadence change: this menu only picks unit +
-  /// interval, so without it, re-picking "Weekly" on a fixed-schedule task
-  /// silently rewrote "every Monday" into "a week after you tick the box" —
-  /// a semantic change the user never asked for and can't see.
-  static func recurrence(for item: NSMenuItem, preserving current: Recurrence?) -> Recurrence? {
-    guard choices.indices.contains(item.tag), let rule = choices[item.tag].rule else { return nil }
-    return Recurrence(unit: rule.unit,
-                      interval: rule.interval,
-                      afterCompletion: current?.afterCompletion ?? rule.afterCompletion)
-  }
-
-  /// Which row represents a task's current rule — an interval this menu
-  /// doesn't offer falls back to "Never" showing unselected rather than
-  /// silently mislabeling the task. Anchor mode is deliberately NOT part of
-  /// the match: both modes render as "Weekly" here, and `recurrence(for:)`
-  /// preserves whichever the task already had.
-  static func index(of recurrence: Recurrence?) -> Int {
-    guard let recurrence else { return 0 }
-    return choices.firstIndex {
-      $0.rule?.unit == recurrence.unit && $0.rule?.interval == recurrence.interval
-    } ?? -1
-  }
-}
-
 // MARK: - Move destinations
 
 /// The "Move to…" choices: no list, each area, then that area's projects, then

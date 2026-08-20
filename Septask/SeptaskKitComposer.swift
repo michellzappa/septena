@@ -7,9 +7,9 @@ import AppKit
 // `TaskComposerCard` in `.inline` mode + `TaskAttributeBar`.
 //
 // The pills don't own any pickers of their own: each opens the SAME popover or
-// menu the row commands use (`SeptaskKitDatePopover`, `KitMoveMenu`,
-// `KitRecurrenceMenu`), so the composer and the ⌘S / ⌘⇧D / ⌘⇧M / Repeat paths
-// can't drift into two different date pickers.
+// panel the row commands use (`SeptaskKitDatePopover`, `KitMoveMenu`, and the
+// full Repeat editor), so the composer and the ⌘S / ⌘⇧D / ⌘⇧M / Repeat paths
+// can't drift into two different pickers.
 //
 // Edits autosave on collapse, matching the SwiftUI inline host's contract.
 @MainActor
