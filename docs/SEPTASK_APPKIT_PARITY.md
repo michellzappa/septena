@@ -1,6 +1,6 @@
 # Septask AppKit shell — parity backlog
 
-**2026-08-20:** three passes, all built green on `SeptaskMac`.
+**2026-08-20:** one long pass, built green on `SeptaskMac` throughout.
 
 1. **The house rule is now actually applied.** `KitProjectTargetCell`,
    `KitGroupHeaderCell` and `KitLoggedFooterCell` — the three cells the
@@ -18,6 +18,52 @@
    composer (§1), and ⌘V paste-to-create (§6). Struck below.
 3. **Undo is rounded out** (§6) — dates, recurrence, Today, create, duplicate
    and paste are all wired now.
+
+4. **Grouped Today headers gained their "+"** and lost their oversized click
+   target. `KitGroupHeaderCell` now carries a trailing quick-add button — the
+   counterpart of SwiftUI's `HeaderQuickAddButton`, gated on the same
+   `showsGroupedHeaderQuickAdd` terms (grouped Today, real list only) — which
+   creates directly into that area/project via a new
+   `createTask(inArea:project:)` rather than deriving filing from the filter.
+   Bare title editor, not the composer: it is a quick-add affordance, the same
+   weight as the foot-of-Inbox "New task" line.
+
+   The header's navigation target is now the **title's own frame**, not the
+   whole row and not the tall band of air above it. That air is the card
+   separator, and making it navigate meant a click in the gap between two
+   cards jumped you into a list. `TaskListView.groupHeaderBody` had already
+   settled this for SwiftUI in a comment — "Tappable target is JUST the title
+   (+ chevron) — not the whole row… so clicks in empty horizontal space don't
+   navigate" — so this is the AppKit shell catching up, not a new opinion.
+   A full-bleed overlay would also have swallowed the new "+".
+
+5. **Selection stops at the content column.** `SeptaskKitTableView` overrides
+   `mouseDown` and `menu(for:)` to ignore clicks outside
+   `SeptaskKitLayout.inset(for:)`, deselecting instead — the ~10% page gutter
+   was selecting whatever row happened to be level with the pointer. The five
+   overlay-button cells pin their hit view to the same column via
+   `KitContentColumnPin`, and every cursor rect narrowed from `bounds` to the
+   control's own frame. NOTE this override is on the TABLE; the house rule
+   against `mouseDown` overrides is about CELL views, whose clicks the table
+   claims before they arrive.
+
+6. **The inspector has a visible close button** — the twin of the Escape
+   handling `b93d70c` added. ⌥⌘I stays the shortcut (platform-standard for an
+   inspector); the button commits pending edits before closing, because a
+   field's end-editing notification does not fire when the view goes away.
+
+7. **⌘1–4 no longer die behind a panel.** `SeptaskKitCommands.shell` required
+   `window.isKeyWindow`, and Quick Find, Quick Entry and the Move modal are
+   all `NSPanel`s with `canBecomeKey` (Settings is its own window), so with any
+   of them open the shell was not key, `canHandle` was false, and the whole Go
+   menu greyed out. Navigation now runs off `canNavigate` (a shell EXISTS) and
+   fronts the window before switching. Row commands stay key-gated on purpose.
+
+8. **⌘K un-checks inside the settle window.** The reopen path called
+   `reload()`, which is suppressed while `isSettling` — so the un-check reached
+   the store but the row stayed looking done for the full 2.5s beat. It
+   restyles in place now, via a shared `restyle(ids:to:)` used by complete,
+   cancel and reopen alike. Task rows also carry no tooltips any more.
 
 Two bugs found and fixed while doing it, both the same root cause and worth
 knowing: **`SeptenaTask` is a struct, so the `rows` array holds pre-change
