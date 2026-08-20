@@ -4,49 +4,49 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1608,
+      "build": 1614,
       "date": "2026-08-20",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a new focused task app",
-          "detail": "A dedicated task app for iPhone, iPad, Mac, and Apple Watch, sharing your existing Septena task data.",
+          "title": "Septask, a focused task app, joins Septena",
+          "detail": "A new dedicated task app shares your existing Septena task data, with its own iPhone and Mac experience.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks now reliable everywhere",
-          "detail": "Completing a recurring task correctly spawns its next occurrence on iPhone, iPad, Mac, and watch.",
+          "title": "Recurring tasks got much smarter",
+          "detail": "Pause and resume a repeating task, reschedule the whole series at once, complete one to spawn the next automatically, and browse a dedicated repeating-tasks list.",
           "section": "tasks"
         },
         {
-          "title": "Faster ways to manage tasks",
-          "detail": "A redesigned date picker with quick-pick pills, drag-to-reschedule, multi-select bulk actions, and refined keyboard shortcuts.",
+          "title": "Deleted tasks are recoverable for 30 days",
+          "detail": "Restore an accidentally deleted task from Recently Deleted before it auto-purges.",
           "section": "tasks"
         },
         {
-          "title": "Photo-based meal logging",
-          "detail": "Take a photo of a meal and Septena analyzes it on-device to prefill the nutrition fields.",
+          "title": "Meal photos now analyze themselves",
+          "detail": "Snap a photo of a meal and Septena prefills the macros and adds an ingredient breakdown automatically.",
           "section": "nutrition"
         },
         {
-          "title": "Re-log a meal at a different portion",
-          "detail": "Repeat a previously logged meal and scale it by a percentage instead of re-entering it.",
+          "title": "Re-logging a meal now scales portions in place",
+          "detail": "Adjust a re-logged meal's amount directly instead of using a separate multiplier.",
           "section": "nutrition"
         },
         {
-          "title": "Training session improvements",
-          "detail": "Editable start and end times, per-set progression hints, and a Live Activity for the current session.",
+          "title": "Training sessions gained progression hints and editable times",
+          "detail": "See one-tap progression suggestions on your sets, edit session start/end times, and review effort-weighted muscle volume after each session.",
           "section": "training"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer goal suggestions.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Pinned goals show as tiles you can tap to log progress directly from the dashboard.",
           "section": "goals"
         },
         {
-          "title": "Copy your grocery list",
-          "detail": "A new button copies the shopping list to the clipboard.",
+          "title": "Copy your grocery list with one tap",
+          "detail": "A new copy-to-clipboard button makes it easy to paste your shopping list into other apps.",
           "section": "groceries"
         }
       ]
