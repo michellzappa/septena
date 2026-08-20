@@ -303,6 +303,9 @@ struct CorrelationsHomepageView: View {
                 TierBadge(pair: pair)
               }
               .padding(.vertical, 4)
+              // `.plain` opts the row out of the cell's tap target, so without
+              // this the Spacer between sentence and badge is a dead zone.
+              .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
           }

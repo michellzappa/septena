@@ -96,6 +96,25 @@ scan appkit-inferring-moves error \
   'inferringMoves\(\)' \
   'NSTableView batches apply incrementally — an inferred move offset is stale by the time it runs. Use a plain difference (remove+insert).'
 
+# ── Row tap targets ─────────────────────────────────────────────────────────
+# `.plain` (and the plain-derived row styles) opt a Button out of the list
+# cell's tap target, so only the DRAWN label is hit-testable — the Spacer and
+# the trailing gaps become dead zones and a tap near the right edge of the row
+# silently misses. `LogRow` carries `.contentShape(Rectangle())` for exactly
+# this reason; every other full-width row Button needs it too. The check reads
+# brace structure (label, modifier chain, and button style sit on different
+# lines), so it lives in its own script rather than a grep pattern.
+row_dead_zone=$(python3 scripts/lint-row-tap-targets.py)
+if [ -n "$row_dead_zone" ]; then
+  count=$(printf '%s\n' "$row_dead_zone" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "row-dead-zone" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'A .plain row Button needs .contentShape(Rectangle()) on its label — without it the Spacer is a dead zone.'
+  printf '%s' "$DIM"; printf '%s\n' "$row_dead_zone" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

@@ -357,6 +357,9 @@ private struct IntakeCustomStarterRow: View {
         Spacer()
         Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
       }
+      // `.plain` opts the row out of the list cell's tap target, so without
+      // this the Spacer and trailing gaps are dead zones.
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .sheet(isPresented: $customizing) {
@@ -435,6 +438,9 @@ private struct IntakeDetailContent: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
+      // The row is a `.plain` Button's label — without a shape the Spacer
+      // between name and count is a dead zone.
+      .contentShape(Rectangle())
     } icon: {
       SectionGlyph(icon: kind.symbol,
                    accent: AdaptiveColor.adaptive(kind.color) ?? .secondary,

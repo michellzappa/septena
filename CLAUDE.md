@@ -328,6 +328,17 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   remove+insert; that's exactly what the incremental batch is defined for, and
   a row changing groups should leave and arrive anyway. Enforced by the
   `appkit-inferring-moves` lint rule.
+- **A `.plain` row Button is only tappable where it draws.** `.buttonStyle(.plain)`
+  (and the plain-derived `PlainHoverRowButtonStyle` / `InertButtonStyle`) opts the
+  row out of the list cell's tap target, so SwiftUI hit-tests the drawn label
+  only: the `Spacer()` and every trailing gap are dead zones, and a tap near the
+  right edge of the row silently misses. The row still *looks* full width, so it
+  reads as "the app ignored my tap". Fix: `.contentShape(Rectangle())` on the
+  label (`LogRow` carries one, which is why log rows in drawers are fine). Two
+  cases need no shape — a label with its own opaque `.background(…)` fill (that
+  shape is hit-testable), and a default-styled Button inside a `Form`/`List`
+  (the cell supplies the target). Enforced by the `row-dead-zone` rule
+  (`scripts/lint-row-tap-targets.py`, run from `scripts/lint-design.sh`).
 - **No inline `TextField` swapped into a *selectable* native `List` row.**
   Replacing a row's `Text` with a focusable `TextField` (then removing it) on
   edit corrupts a native `List`'s focus/selection on macOS — after the edit ends,

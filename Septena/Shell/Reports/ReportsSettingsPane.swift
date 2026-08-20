@@ -44,6 +44,9 @@ struct ReportsSettingsPane: View {
               Spacer()
               Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
             }
+            // `.plain` opts the row out of the list cell's tap target, so
+            // without this the Spacer and trailing gaps are dead zones.
+            .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
         }
@@ -115,6 +118,9 @@ struct ReportsSettingsPane: View {
           Image(systemName: "eye").font(.callout).foregroundStyle(.tertiary)
         }
       }
+      // `.plain` opts the row out of the list cell's tap target, so without
+      // this the Spacer and trailing gaps are dead zones.
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .contextMenu {

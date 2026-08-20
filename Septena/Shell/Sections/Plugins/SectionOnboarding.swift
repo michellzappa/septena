@@ -276,6 +276,9 @@ struct SectionOnboarding<Item: Identifiable, Extra: View>: View {
             .foregroundStyle(isSelected ? accent : Color.secondary.opacity(0.6))
         }
       }
+      // `.plain` opts the row out of the list cell's tap target, so without
+      // this the Spacer and trailing gaps are dead zones.
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .disabled(exists)
