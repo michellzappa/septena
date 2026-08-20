@@ -67,6 +67,12 @@ enum SchemaSeedRegistrar {
     _ = try await db.save(CKRecordZone(zoneID: tempZoneID))
 
     let seeds: [CKRecord] = [
+      seed(TaskCloudKitSchema.recordType, "seed-task-recurrence",
+        strings: [
+          TaskCloudKitSchema.Field.recurrencePaused,
+          TaskCloudKitSchema.Field.recurrenceSeriesID,
+          TaskCloudKitSchema.Field.recurrenceAnchorDate,
+        ]),
       seed(AreaCloudKitSchema.recordType, "seed-area", strings: [
         AreaCloudKitSchema.Field.context,
         AreaCloudKitSchema.Field.attachment,
@@ -117,6 +123,7 @@ enum SchemaSeedRegistrar {
 
     return """
     Registered missing Development-schema fields on \(saveResults.count) record types:
+    • Task.recurrencePaused, .recurrenceSeriesID, .recurrenceAnchorDate
     • Area.context, .attachment (reservedString2)
     • Project.completedAt, .context, .githubRepo, .attachment (reservedString1)
     • SessionType.kind

@@ -45,6 +45,9 @@ static let conversationJSON = "conversationJSON"
 static let recurrenceUnit = "recurrenceUnit"
 static let recurrenceInterval = "recurrenceInterval"
 static let recurrenceAfterCompletion = "recurrenceAfterCompletion"
+static let recurrencePaused = "recurrencePaused"
+static let recurrenceSeriesID = "recurrenceSeriesID"
+static let recurrenceAnchorDate = "recurrenceAnchorDate"
 
     // Provenance + freshness cue. `source`/`sourceClient` are STRING and
     // permanent; the MCP gateway sets them at create (source="mcp"). The
@@ -108,6 +111,9 @@ extension TaskEntity: CloudKitSystemFieldsBacked {
     record[TaskCloudKitSchema.Field.recurrenceUnit] = recurrenceUnit
     record[TaskCloudKitSchema.Field.recurrenceInterval] = recurrenceInterval
     record[TaskCloudKitSchema.Field.recurrenceAfterCompletion] = recurrenceAfterCompletion ? 1 : 0
+    record[TaskCloudKitSchema.Field.recurrencePaused] = recurrencePaused ? 1 : 0
+    record[TaskCloudKitSchema.Field.recurrenceSeriesID] = recurrenceSeriesID
+    record[TaskCloudKitSchema.Field.recurrenceAnchorDate] = recurrenceAnchorDate
 
     // Write plaintext under a new field name. The old `notes` field is
     // permanently ENCRYPTED_STRING in the CK schema, so attempting to
@@ -178,6 +184,13 @@ func apply(_ record: CKRecord) {
     if let v = record[TaskCloudKitSchema.Field.recurrenceAfterCompletion] as? Int {
       recurrenceAfterCompletion = v != 0
     }
+    if let v = record[TaskCloudKitSchema.Field.recurrencePaused] as? Int {
+      recurrencePaused = v != 0
+    } else if let v = record[TaskCloudKitSchema.Field.recurrencePaused] as? NSNumber {
+      recurrencePaused = v.boolValue
+    }
+    recurrenceSeriesID = optionalTaskString(record[TaskCloudKitSchema.Field.recurrenceSeriesID])
+    recurrenceAnchorDate = optionalTaskString(record[TaskCloudKitSchema.Field.recurrenceAnchorDate])
     // Read plain first, fall back to the legacy encrypted bag for records
     // that haven't been re-saved since the plaintext switch.
     notes = optionalTaskString(record[TaskCloudKitSchema.Field.notesText])

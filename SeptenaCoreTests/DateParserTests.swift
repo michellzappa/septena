@@ -103,6 +103,30 @@ import Foundation
     #expect(next == "2026-08-24")
   }
 
+  @Test func fixedScheduleExceptionAdvancesFromLogicalSlot() {
+    // The visible copy was moved from Monday Aug 24 to Wednesday Aug 26.
+    // Completing it must still produce the following Monday, not Sep 2.
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-08-26",
+      scheduled: "2026-08-26",
+      logicalScheduled: "2026-08-24",
+      unit: "week",
+      interval: 1,
+      afterCompletion: false
+    ) == "2026-08-31")
+  }
+
+  @Test func completionBasedRuleIgnoresLogicalSlot() {
+    #expect(RecurrenceDateCalculator.nextDate(
+      completedOn: "2026-08-26",
+      scheduled: "2026-08-24",
+      logicalScheduled: "2026-08-24",
+      unit: "day",
+      interval: 3,
+      afterCompletion: true
+    ) == "2026-08-29")
+  }
+
   @Test func producesStableOccurrenceIDs() {
     let first = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")
     let second = RecurrenceDateCalculator.occurrenceID(sourceTaskID: "task-1", scheduled: "2026-08-05")

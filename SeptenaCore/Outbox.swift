@@ -195,6 +195,14 @@ final class TaskMutator {
     cloudBackend.schedule(id: id, date: date)
   }
 
+  func reschedule(id: String, date: Date?, mode: RecurrenceRescheduleMode) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reschedule called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reschedule(id: id, date: date, mode: mode)
+  }
+
   func setDeadline(id: String, date: Date?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setDeadline called before CK bound — dropping", nil)
@@ -209,6 +217,23 @@ final class TaskMutator {
       return
     }
     cloudBackend.setRecurrence(id: id, recurrence: recurrence)
+  }
+
+  func setRecurrencePaused(id: String, paused: Bool) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setRecurrencePaused called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setRecurrencePaused(id: id, paused: paused)
+  }
+
+  @discardableResult
+  func createNextOccurrence(id: String) -> SeptenaTask? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] createNextOccurrence called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.createNextOccurrence(id: id)
   }
 
   func moveToArea(id: String, area: String?) {

@@ -127,6 +127,9 @@ final class CloudKitTasksBackend {
       recurrenceUnit: recurrence.unit.rawValue,
       recurrenceInterval: recurrence.interval,
       recurrenceAfterCompletion: recurrence.afterCompletion,
+      recurrencePaused: false,
+      recurrenceSeriesID: entity.recurrenceSeriesID ?? entity.id,
+      recurrenceAnchorDate: recurrence.afterCompletion ? nil : scheduled,
       position: TaskOrder.topPosition(in: context),
       pendingSync: true,
       source: entity.source,
@@ -327,9 +330,10 @@ final class CloudKitTasksBackend {
     // `appToday`, not `SeptenaDate.today`: the next occurrence must be computed
     // against the day the user is actually looking at, so time travel can
     // exercise a repeat rule. In Release the two are identical.
-    let nextDate = recurrence?.nextDate(
+    let nextDate = entity.recurrencePaused ? nil : recurrence?.nextDate(
       completedOn: DayClock.appToday,
-      scheduled: entity.scheduled
+      scheduled: entity.scheduled,
+      logicalScheduled: entity.recurrenceAnchorDate
     )
     entity.statusRaw = TaskStatus.done.rawValue
     entity.completedAt = ckCompletionTimestamp()
@@ -355,7 +359,9 @@ final class CloudKitTasksBackend {
     // completion has to take that occurrence back — otherwise one mis-tap
     // (or the undo button right beside it) permanently leaves TWO open rows:
     // the restored source AND the generated instance, both recurring.
-    if let recurrence = entity.recurrence, let completedAt = entity.completedAt {
+    if let recurrence = entity.recurrence,
+       !entity.recurrencePaused,
+       let completedAt = entity.completedAt {
       retractSpawnedOccurrence(source: entity,
                                recurrence: recurrence,
                                completedOn: String(completedAt.prefix(10)))
@@ -375,7 +381,8 @@ final class CloudKitTasksBackend {
                                         recurrence: Recurrence,
                                         completedOn: String) {
     guard let scheduled = recurrence.nextDate(completedOn: completedOn,
-                                              scheduled: source.scheduled) else { return }
+                                              scheduled: source.scheduled,
+                                              logicalScheduled: source.recurrenceAnchorDate) else { return }
     let spawnedID = Recurrence.occurrenceID(sourceTaskID: source.id, scheduled: scheduled)
     guard let spawned = fetch(id: spawnedID) else { return }
     let untouched = spawned.status == .open
@@ -510,10 +517,89 @@ final class CloudKitTasksBackend {
   }
 
   func schedule(id: String, date: Date?) {
+    // The historical API remains a safe default for every caller that does
+    // not present a Things-style fixed-rule choice: move only this visible
+    // occurrence and preserve its logical cadence slot.
+    reschedule(id: id, date: date, mode: .makeException)
+  }
+
+  /// Move a repeating task with an explicit fixed-schedule policy. Completion-
+  /// based rules always behave like a normal move, so the mode is ignored for
+  /// them. Keeping this decision in the backend makes iOS, macOS, and future
+  /// watch editing paths converge on the same state transition.
+  func reschedule(id: String, date: Date?, mode: RecurrenceRescheduleMode) {
     guard let entity = fetch(id: id) else { return }
-    entity.scheduled = SeptenaDate.format(date)
-    entity.pendingSync = true
-    commitAndPush(entity, op: "schedule")
+    guard let rule = entity.recurrence, !rule.afterCompletion else {
+      entity.scheduled = SeptenaDate.format(date)
+      entity.pendingSync = true
+      commitAndPush(entity, op: "reschedule(completion)")
+      return
+    }
+
+    let displayed = SeptenaDate.format(date)
+    guard mode == .updateRule else {
+      // Keep recurrenceAnchorDate untouched. That is the entire exception
+      // invariant: the row moves, but its next completion still advances from
+      // the original series slot.
+      entity.scheduled = displayed
+      entity.pendingSync = true
+      commitAndPush(entity, op: "reschedule(exception)")
+      return
+    }
+
+    updateFixedSeries(from: entity, rule: rule, newDisplayedDate: displayed)
+  }
+
+  /// Rebase every open copy in a series in one deterministic order. Normally
+  /// there is only one open copy, but the operation also handles early-created
+  /// copies so updating a rule cannot leave a split-brain future schedule.
+  private func updateFixedSeries(from entity: TaskEntity,
+                                 rule: Recurrence,
+                                 newDisplayedDate: String?) {
+    let seriesID = entity.recurrenceSeriesID ?? entity.id
+    let openMembers = seriesMembers(seriesID: seriesID)
+      .filter { $0.status == .open }
+      .sorted {
+        let a = $0.recurrenceAnchorDate ?? $0.scheduled ?? "9999-12-31"
+        let b = $1.recurrenceAnchorDate ?? $1.scheduled ?? "9999-12-31"
+        return a != b ? a < b : $0.id < $1.id
+      }
+
+    let newAnchor = newDisplayedDate ?? DayClock.appToday
+    var ordered = openMembers.filter { $0.id != entity.id }
+    ordered.insert(entity, at: 0)
+
+    var cursor = newAnchor
+    for member in ordered {
+      member.recurrenceSeriesID = seriesID
+      member.recurrence = rule
+      member.recurrenceAnchorDate = cursor
+      member.scheduled = member.id == entity.id ? newDisplayedDate : cursor
+      member.pendingSync = true
+      commitAndPush(member, op: "reschedule(rule)")
+
+      guard let next = rule.nextDate(completedOn: cursor,
+                                     scheduled: cursor,
+                                     logicalScheduled: cursor) else { break }
+      cursor = next
+    }
+  }
+
+  /// Create the next open copy without completing the current task. This is
+  /// intentionally idempotent: completing the source later asks for the same
+  /// deterministic occurrence id and becomes a no-op instead of duplicating.
+  @discardableResult
+  func createNextOccurrence(id: String) -> SeptenaTask? {
+    guard let entity = fetch(id: id), entity.status == .open,
+          let recurrence = entity.recurrence,
+          let nextDate = recurrence.nextDate(
+            completedOn: DayClock.appToday,
+            scheduled: entity.scheduled,
+            logicalScheduled: entity.recurrenceAnchorDate
+          ) else { return nil }
+    createRecurringOccurrence(from: entity, recurrence: recurrence, scheduled: nextDate)
+    return fetch(id: Recurrence.occurrenceID(sourceTaskID: entity.id,
+                                             scheduled: nextDate)).map(SeptenaTask.init)
   }
 
   func setDeadline(id: String, date: Date?) {
@@ -544,9 +630,58 @@ final class CloudKitTasksBackend {
 
   func setRecurrence(id: String, recurrence: Recurrence?) {
     guard let entity = fetch(id: id) else { return }
-    entity.recurrence = recurrence
-    entity.pendingSync = true
-    commitAndPush(entity, op: "setRecurrence")
+    let seriesID = entity.recurrenceSeriesID ?? entity.id
+    let members = seriesMembers(seriesID: seriesID)
+
+    guard let recurrence else {
+      // Stopping repetition is a series operation. Clear every member,
+      // including completed sources, so reopening an old copy cannot resurrect
+      // a recurrence after the user explicitly chose "Don't Repeat".
+      let targets = members.isEmpty ? [entity] : members
+      for member in targets {
+        member.recurrence = nil
+        member.recurrencePaused = false
+        member.pendingSync = true
+        commitAndPush(member, op: "setRecurrence(nil)")
+      }
+      return
+    }
+
+    let targets = members.isEmpty ? [entity] : members.filter { $0.status == .open }
+    for member in targets {
+      member.recurrenceSeriesID = seriesID
+      member.recurrence = recurrence
+      member.recurrencePaused = false
+      if recurrence.afterCompletion {
+        member.recurrenceAnchorDate = nil
+      } else if member.recurrenceAnchorDate == nil {
+        member.recurrenceAnchorDate = member.scheduled
+      }
+      member.pendingSync = true
+      commitAndPush(member, op: "setRecurrence")
+    }
+  }
+
+  /// Pause or resume every open copy in a repeating series. The rule remains
+  /// intact while paused, so resuming does not lose the cadence or create an
+  /// immediate copy; the next completion advances normally.
+  func setRecurrencePaused(id: String, paused: Bool) {
+    guard let entity = fetch(id: id), entity.recurrence != nil else { return }
+    let seriesID = entity.recurrenceSeriesID ?? entity.id
+    let members = seriesMembers(seriesID: seriesID)
+    let targets = members.isEmpty ? [entity] : members.filter { $0.status == .open }
+    for member in targets {
+      member.recurrencePaused = paused
+      member.pendingSync = true
+      commitAndPush(member, op: paused ? "recurrence.pause" : "recurrence.resume")
+    }
+  }
+
+  private func seriesMembers(seriesID: String) -> [TaskEntity] {
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.recurrenceSeriesID == seriesID }
+    )
+    return (try? context.fetch(descriptor)) ?? []
   }
 
   func moveToArea(id: String, area: String?) {

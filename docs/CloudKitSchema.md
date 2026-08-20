@@ -191,6 +191,9 @@ These six are the task backend, written by `SeptenaCore/CloudKit/*Record.swift`.
 | `position` | Double | `Double` | conditional | manual drag order; written only when `!= 0` |
 | `kind` | String | `String` (`kind`) | conditional | row shape; `"heading"` = project section divider, else absent. Written only when `== "heading"`. See `TaskKind` |
 | `heading` | String | `String?` (`heading`) | Yes | FK to owning heading's `id` for a task filed under one; absent otherwise |
+| `recurrencePaused` | Int64 | `Bool` | No | retains the repeat rule while pause suppresses new copies; **NEW — pending Dev/Prod schema registration** |
+| `recurrenceSeriesID` | String | `String?` | Yes | stable series identity shared by generated copies; **NEW — pending Dev/Prod schema registration** |
+| `recurrenceAnchorDate` | String | `String?` | Yes | logical fixed-schedule slot, separate from a one-off exception date; **NEW — pending Dev/Prod schema registration** |
 | `parentTaskId`, `remindAt`, `reservedDate1`, `reservedDate2`, `reservedString1`, `reservedInt1` | — | reserved | — | over-provisioned slots; never encoded/decoded |
 
 #### TaskAttachment — recordName `task-attachment:{id}`

@@ -275,6 +275,7 @@ final class TasksWatchStore {
     // source row must never spawn a second occurrence.
     guard (record["status"] as? String ?? "open") == "open" else { return }
     record["status"] = "done"
+    let completionDay = Self.dateFmt.string(from: Date())
     record["completedAt"] = Self.tsFmt.string(from: Date())
 
     let unit = record["recurrenceUnit"] as? String
@@ -285,10 +286,16 @@ final class TasksWatchStore {
       .map { $0 != 0 }
       ?? (record["recurrenceAfterCompletion"] as? NSNumber)?.boolValue
       ?? true
+    let paused = (record["recurrencePaused"] as? Int)
+      .map { $0 != 0 }
+      ?? (record["recurrencePaused"] as? NSNumber)?.boolValue
+      ?? false
     let nextDate = unit.flatMap {
-      TasksWatchRecurrence.nextDate(
-        completedOn: today,
+      guard !paused else { return nil }
+      return TasksWatchRecurrence.nextDate(
+        completedOn: completionDay,
         scheduled: record["scheduled"] as? String,
+        logicalScheduled: record["recurrenceAnchorDate"] as? String,
         unit: $0,
         interval: interval,
         afterCompletion: afterCompletion
@@ -304,7 +311,7 @@ final class TasksWatchStore {
           from: record,
           recordID: nextRecordID,
           scheduled: nextDate,
-          created: today,
+          created: completionDay,
           createdAt: Date()
         ))
       }

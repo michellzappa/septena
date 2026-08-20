@@ -35,6 +35,9 @@ struct TaskSnapshot: Codable {
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
+  var recurrencePaused: Bool?
+  var recurrenceSeriesID: String?
+  var recurrenceAnchorDate: String?
   var updatedAt: String?
   var deletedAt: String?
 
@@ -54,6 +57,9 @@ struct TaskSnapshot: Codable {
     self.recurrenceUnit = e.recurrenceUnit
     self.recurrenceInterval = e.recurrenceInterval
     self.recurrenceAfterCompletion = e.recurrenceAfterCompletion
+    self.recurrencePaused = e.recurrencePaused
+    self.recurrenceSeriesID = e.recurrenceSeriesID
+    self.recurrenceAnchorDate = e.recurrenceAnchorDate
     self.updatedAt = e.updatedAt
     self.deletedAt = e.deletedAt
   }
@@ -264,6 +270,9 @@ final class TasksMigrator {
       entity.recurrenceUnit = s.recurrenceUnit
       entity.recurrenceInterval = s.recurrenceInterval
       entity.recurrenceAfterCompletion = s.recurrenceAfterCompletion
+      entity.recurrencePaused = s.recurrencePaused ?? false
+      entity.recurrenceSeriesID = s.recurrenceSeriesID
+      entity.recurrenceAnchorDate = s.recurrenceAnchorDate
       entity.updatedAt = s.updatedAt
       entity.deletedAt = s.deletedAt
       if entity.modelContext == nil {

@@ -36,6 +36,21 @@ final class TaskEntity {
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
+  /// Keeps the repeat rule while preventing completion from generating the
+  /// next copy. Pause/resume is a series-level operation.
+  /// The `= false` is REQUIRED, not style: a new non-optional attribute with
+  /// no default has nothing to write into existing rows, so lightweight
+  /// migration fails with "missing attribute values on mandatory destination
+  /// attribute" and the store won't open. Every new non-optional property on
+  /// a persisted entity needs a default (or must be optional).
+  var recurrencePaused: Bool = false
+  /// Stable identity shared by every generated occurrence in one repeating
+  /// series. Legacy rows are nil and are promoted to their own id when a
+  /// repeat rule is next edited.
+  var recurrenceSeriesID: String?
+  /// The occurrence's logical slot on a fixed schedule. This deliberately
+  /// differs from `scheduled` when the user makes a one-off exception.
+  var recurrenceAnchorDate: String?
   /// Bumped every time we apply a server payload. Lets the syncer detect
   /// rows that the latest pull didn't touch (= server-side deletions).
   var lastSyncedAt: Date
@@ -118,6 +133,9 @@ final class TaskEntity {
        recurrenceUnit: String? = nil,
        recurrenceInterval: Int = 1,
        recurrenceAfterCompletion: Bool = true,
+       recurrencePaused: Bool = false,
+       recurrenceSeriesID: String? = nil,
+       recurrenceAnchorDate: String? = nil,
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
        position: Double = 0,
@@ -148,6 +166,9 @@ final class TaskEntity {
     self.recurrenceUnit = recurrenceUnit
     self.recurrenceInterval = recurrenceInterval
     self.recurrenceAfterCompletion = recurrenceAfterCompletion
+    self.recurrencePaused = recurrencePaused
+    self.recurrenceSeriesID = recurrenceSeriesID
+    self.recurrenceAnchorDate = recurrenceAnchorDate
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
     self.position = position
@@ -1683,6 +1704,7 @@ extension SeptenaTask {
       project: e.project,
       notes: e.notes,
       recurrence: e.recurrence,
+      recurrencePaused: e.recurrencePaused,
       nextOccurrence: e.status == .open
         ? e.recurrence?.nextDate(completedOn: SeptenaDate.today, scheduled: e.scheduled)
         : nil,
@@ -3690,7 +3712,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))) ?? []
-    case .today, .triage, .upcoming, .unscheduled:
+    case .today, .triage, .upcoming, .repeating, .unscheduled:
       return (try? context.fetch(FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -3795,6 +3817,9 @@ enum LocalCache {
       if let s = e.scheduled, s > today { return SeptenaTask(e) }
       if let d = e.deadline, d > today { return SeptenaTask(e) }
       return nil
+    case .repeating:
+      guard e.status == .open, e.recurrence != nil else { return nil }
+      return SeptenaTask(e)
     case .unscheduled:
       guard e.status == .open, !e.today,
             e.scheduled == nil, e.deadline == nil else { return nil }
