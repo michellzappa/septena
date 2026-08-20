@@ -23,6 +23,7 @@ struct TaskListModalPresenter: ViewModifier {
   let applyWhen: ([String], TaskListView.WhenKind, Date?) -> Void
   let applyMove: ([String], String?, String?) -> Void
   let applyRecurrence: (String, Recurrence?) -> Void
+  let applyRecurrencePaused: (String, Bool) -> Void
 
   func body(content: Content) -> some View {
     content
@@ -83,7 +84,11 @@ struct TaskListModalPresenter: ViewModifier {
       }
       .sheet(isPresented: $showingRepeatSheet) {
         RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId),
-                              hasScheduledDate: currentScheduled(repeatTargetId) != nil) { rule in
+                              hasScheduledDate: currentScheduled(repeatTargetId) != nil,
+                              initialPaused: currentTask(repeatTargetId)?.recurrencePaused ?? false,
+                              onPauseChanged: { paused in
+          if let id = repeatTargetId { applyRecurrencePaused(id, paused) }
+        }) { rule in
           if let id = repeatTargetId {
             applyRecurrence(id, rule)
           }
@@ -119,6 +124,8 @@ struct TaskListRowContextMenu: View {
   let moveAreas: [Area]
   let moveTopProjects: [Project]
   let onOpenRepeat: (SeptenaTask) -> Void
+  let onSetRepeatPaused: ([String], Bool) -> Void
+  let onCreateNextCopy: (SeptenaTask) -> Void
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
 
@@ -247,7 +254,25 @@ struct TaskListRowContextMenu: View {
       Button {
         onOpenRepeat(task)
       } label: {
-        Label("Repeat…", systemImage: "repeat")
+        Label("Repeat…", systemImage: "arrow.clockwise")
+      }
+
+      if task.recurrence != nil {
+        Button {
+          onCreateNextCopy(task)
+        } label: {
+          Label("Create Next Copy", systemImage: "plus.circle")
+        }
+      }
+    }
+
+    if !target.tasks.isEmpty && target.tasks.allSatisfy({ $0.recurrence != nil }) {
+      let paused = target.tasks.allSatisfy(\.recurrencePaused)
+      Button {
+        onSetRepeatPaused(target.ids, !paused)
+      } label: {
+        Label(paused ? "Resume Repeat" : "Pause Repeat",
+              systemImage: paused ? "play.circle" : "pause.circle")
       }
     }
 

@@ -540,7 +540,7 @@ struct TaskRow: View {
     if let accessory { accessory }
     trailingDate
     if task.recurrence != nil {
-      Image(systemName: "arrow.triangle.2.circlepath")
+      Image(systemName: "arrow.clockwise")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
         .accessibilityLabel(TaskA11y.recurring)

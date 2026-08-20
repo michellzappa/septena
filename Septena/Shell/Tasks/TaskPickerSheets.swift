@@ -226,29 +226,40 @@ struct RecurrencePickerSheet: View {
   /// silently degrades into an after-completion rule, so the toggle is held ON
   /// and explained rather than offering a choice that doesn't do what it says.
   var hasScheduledDate: Bool = true
+  let initialPaused: Bool
   let onPick: (Recurrence?) -> Void
+  let onPauseChanged: ((Bool) -> Void)?
   @Environment(\.dismiss) private var dismiss
 
   @State private var unit: Recurrence.Unit
   @State private var interval: Int
   @State private var afterCompletion: Bool
+  @State private var paused: Bool
 
   init(initial: Recurrence?, onPick: @escaping (Recurrence?) -> Void) {
     self.initial = initial
+    self.initialPaused = false
     self.onPick = onPick
+    self.onPauseChanged = nil
     _unit = State(initialValue: initial?.unit ?? .day)
     _interval = State(initialValue: initial?.interval ?? 1)
     _afterCompletion = State(initialValue: initial?.afterCompletion ?? true)
+    _paused = State(initialValue: false)
   }
 
-  init(initial: Recurrence?, hasScheduledDate: Bool, onPick: @escaping (Recurrence?) -> Void) {
+  init(initial: Recurrence?, hasScheduledDate: Bool, initialPaused: Bool = false,
+       onPick: @escaping (Recurrence?) -> Void,
+       onPauseChanged: ((Bool) -> Void)? = nil) {
     self.initial = initial
     self.hasScheduledDate = hasScheduledDate
+    self.initialPaused = initialPaused
     self.onPick = onPick
+    self.onPauseChanged = onPauseChanged
     _unit = State(initialValue: initial?.unit ?? .day)
     _interval = State(initialValue: initial?.interval ?? 1)
     // With no date the effective anchor IS completion — show what will happen.
     _afterCompletion = State(initialValue: hasScheduledDate ? (initial?.afterCompletion ?? true) : true)
+    _paused = State(initialValue: initialPaused)
   }
 
   var body: some View {
@@ -310,6 +321,21 @@ struct RecurrencePickerSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Theme.hPadding)
             .padding(.top, 8)
+        }
+
+        if initial != nil, let onPauseChanged {
+          Button {
+            paused.toggle()
+            onPauseChanged(paused)
+          } label: {
+            Label(paused ? "Resume Repeat" : "Pause Repeat",
+                  systemImage: paused ? "play.circle" : "pause.circle")
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .buttonStyle(.bordered)
+          .tint(theme.accent)
+          .padding(.horizontal, Theme.hPadding)
+          .padding(.top, 12)
         }
 
         Spacer()

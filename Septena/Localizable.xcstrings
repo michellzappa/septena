@@ -4945,6 +4945,9 @@
     "Maintainer" : {
 
     },
+    "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date." : {
+
+    },
     "Make Septena yours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5421,9 +5424,6 @@
           }
         }
       }
-    },
-    "Next Week" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Nice work." : {
       "localizations" : {

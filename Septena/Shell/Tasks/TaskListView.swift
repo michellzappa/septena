@@ -353,6 +353,23 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
+  /// Pending Things-style choice when a fixed-schedule repeating task is
+  /// moved. The date picker dismisses before this appears, so the decision is
+  /// a separate, reliable state transition instead of a race between sheets.
+  @State private var reschedulePrompt: FixedReschedulePrompt?
+
+  private struct FixedReschedulePrompt: Identifiable {
+    let id: String
+    let taskIDs: [String]
+    let date: Date?
+
+    init(taskIDs: [String], date: Date?) {
+      self.id = "\(taskIDs.joined(separator: ","))|\(SeptenaDate.format(date) ?? "none")"
+      self.taskIDs = taskIDs
+      self.date = date
+    }
+  }
+
   /// True while iOS edit mode is active — rows show native selection circles
   /// and a tap toggles membership instead of opening the editor. Always false
   /// on macOS (no edit mode; click selection is direct).
@@ -457,8 +474,39 @@ struct TaskListView: View {
         currentRecurrence: currentRecurrence,
         applyWhen: applyWhenToSelection,
         applyMove: applyMoveToSelection,
-        applyRecurrence: applyRecurrence
+        applyRecurrence: applyRecurrence,
+        applyRecurrencePaused: { id, paused in
+          Haptics.tick()
+          mutator.setRecurrencePaused(id: id, paused: paused)
+          Task { await load() }
+        }
       ))
+      .confirmationDialog(
+        "Reschedule Repeating Task?",
+        isPresented: Binding(
+          get: { reschedulePrompt != nil },
+          set: { if !$0 { reschedulePrompt = nil } }
+        ),
+        titleVisibility: .visible
+      ) {
+        Button("Make Exception") {
+          guard let prompt = reschedulePrompt else { return }
+          reschedulePrompt = nil
+          for id in prompt.taskIDs {
+            applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
+          }
+        }
+        Button("Update Rule") {
+          guard let prompt = reschedulePrompt else { return }
+          reschedulePrompt = nil
+          for id in prompt.taskIDs {
+            applyScheduledWhen(id: id, date: prompt.date, mode: .updateRule)
+          }
+        }
+        Button("Cancel", role: .cancel) { reschedulePrompt = nil }
+      } message: {
+        Text("Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.")
+      }
     let withSnackbar = content.septenaToastOverlay(store: toastStore)
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
@@ -745,7 +793,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard filter != .recentlyDeleted else { return }
+    guard filter != .recentlyDeleted, filter != .repeating else { return }
     guard !closeActiveEditIfNeeded() else { return }
     guard allowsInlineCreate else {
       a11yAnimate(.snappy(duration: 0.25)) {
@@ -820,7 +868,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted, .upcoming: return false
+    case .logbook, .recentlyDeleted, .upcoming, .repeating: return false
     default:                                    return true
     }
   }
@@ -2197,6 +2245,20 @@ struct TaskListView: View {
 
   private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
     guard !ids.isEmpty else { return }
+    guard kind == .scheduled, let date else {
+      for id in ids { applyWhen(id: id, kind: kind, date: date) }
+      return
+    }
+
+    let movedFixedIDs = ids.filter { id in
+      guard let task = currentTask(id: id), let rule = task.recurrence,
+            !rule.afterCompletion else { return false }
+      return SeptenaDate.format(date) != task.scheduled
+    }
+    if !movedFixedIDs.isEmpty {
+      reschedulePrompt = FixedReschedulePrompt(taskIDs: ids, date: date)
+      return
+    }
     for id in ids { applyWhen(id: id, kind: kind, date: date) }
   }
 
@@ -2524,6 +2586,16 @@ struct TaskListView: View {
         onOpenRepeat: { task in
           repeatTargetId = task.id
           showingRepeatSheet = true
+        },
+        onSetRepeatPaused: { ids, paused in
+          Haptics.tick()
+          for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+          Task { await load() }
+        },
+        onCreateNextCopy: { task in
+          Haptics.tick()
+          _ = mutator.createNextOccurrence(id: task.id)
+          Task { await load() }
         },
         onCancel: { ids in
           for id in ids { applyCancel(id) }
@@ -2926,7 +2998,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage: return true
+    case .project, .area, .unscheduled, .upcoming, .triage, .repeating: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false
@@ -3184,24 +3256,45 @@ struct TaskListView: View {
       //   • Future date → today=false + scheduled=date. Server auto-
       //     surfaces the task on Today when that date arrives.
       //   • Nil ("No Date") → clear both flags.
-      if let d = date {
-        if Calendar.current.isDateInToday(d) {
-          mutator.schedule(id: id, date: nil)
-          promoteToToday([id])
-        } else {
-          mutator.moveToToday(id: id, today: false)
-          mutator.schedule(id: id, date: d)
-          // Deferring drops the row off Today; confirm where it landed. No
-          // Undo — re-opening the When picker is the natural reversal.
-          showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
-        }
-      } else {
-        mutator.schedule(id: id, date: nil)
-        mutator.moveToToday(id: id, today: false)
+      if let task = currentTask(id: id),
+         let rule = task.recurrence,
+         !rule.afterCompletion,
+         date != nil,
+         SeptenaDate.format(date) != task.scheduled {
+        reschedulePrompt = FixedReschedulePrompt(taskIDs: [id], date: date)
+        return
       }
+      applyScheduledWhen(id: id, date: date, mode: .makeException)
+      return
     }
     // Scheduling is engagement — clear the agent cue so a dated proposal leaves
     // the Inbox. No-op for non-agent / already-seen rows.
+    mutator.acknowledge(id: id)
+    Task { await load() }
+  }
+
+  /// Shared scheduled-date application used both by the ordinary date path
+  /// and the fixed-repeat decision dialog. `reschedule` records the logical
+  /// slot before the Today mapping clears the displayed date.
+  private func applyScheduledWhen(id: String,
+                                  date: Date?,
+                                  mode: RecurrenceRescheduleMode) {
+    if let d = date {
+      if Calendar.current.isDateInToday(d) {
+        mutator.reschedule(id: id, date: d, mode: mode)
+        mutator.schedule(id: id, date: nil)
+        promoteToToday([id])
+      } else {
+        mutator.moveToToday(id: id, today: false)
+        mutator.reschedule(id: id, date: d, mode: mode)
+        // Deferring drops the row off Today; confirm where it landed. No
+        // Undo — re-opening the When picker is the natural reversal.
+        showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+      }
+    } else {
+      mutator.reschedule(id: id, date: nil, mode: .makeException)
+      mutator.moveToToday(id: id, today: false)
+    }
     mutator.acknowledge(id: id)
     Task { await load() }
   }

@@ -89,6 +89,16 @@ struct TaskRowActions: ViewModifier {
           moveAreas: areas,
           moveTopProjects: projects.filter { $0.area == nil && $0.status == .active },
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
+          onSetRepeatPaused: { ids, paused in
+            Haptics.tick()
+            for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+            onChange?()
+          },
+          onCreateNextCopy: { t in
+            Haptics.tick()
+            _ = mutator.createNextOccurrence(id: t.id)
+            onChange?()
+          },
           onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) }; onChange?() },
           onDelete: { _ in applyDelete(task) }
         )
@@ -111,7 +121,12 @@ struct TaskRowActions: ViewModifier {
         applyMove: { ids, areaId, projectId in
           for id in ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
         },
-        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule); onChange?() }
+        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule); onChange?() },
+        applyRecurrencePaused: { id, paused in
+          Haptics.tick()
+          mutator.setRecurrencePaused(id: id, paused: paused)
+          onChange?()
+        }
       ))
   }
 

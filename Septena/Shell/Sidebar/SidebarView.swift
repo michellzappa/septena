@@ -549,6 +549,7 @@ struct SidebarRootView: View {
     // on Today, so the user-facing count is the sum.
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.upcoming):    return counts?.upcomingCount
+    case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
     case .filter(.unscheduled): return counts?.unscheduledCount
     case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
     #if SEPTASK
