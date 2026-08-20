@@ -86,14 +86,14 @@ struct TaskListModalPresenter: ViewModifier {
         RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId),
                               hasScheduledDate: currentScheduled(repeatTargetId) != nil,
                               initialPaused: currentTask(repeatTargetId)?.recurrencePaused ?? false,
-                              onPauseChanged: { paused in
-          if let id = repeatTargetId { applyRecurrencePaused(id, paused) }
-        }) { rule in
+                              onPick: { rule in
           if let id = repeatTargetId {
             applyRecurrence(id, rule)
           }
           repeatTargetId = nil
-        }
+        }, onPauseChanged: { paused in
+          if let id = repeatTargetId { applyRecurrencePaused(id, paused) }
+        })
         .presentationDetents([.medium, .large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(Theme.cornerRadius)

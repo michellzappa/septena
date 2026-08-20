@@ -12,7 +12,8 @@ import AppKit
 // read as a dense, alien control inside the popover and answered a question
 // nobody asks here.
 //
-// The board is keyboard-first: ↑/↓ walk the rows, ←/→ walk the day strip,
+// The board is keyboard-first and walks ONE axis — time. ↓ and → step later,
+// ↑ and ← step earlier, straight through Today → the seven days → Clear.
 // Return picks, Escape closes. One highlight language throughout — the shell's
 // `SeptaskKitTheme.listSelectionFill` wash, moved by BOTH keyboard and hover,
 // so a keyboard highlight never competes with a mouse one.
@@ -182,11 +183,15 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     super.init(window: panel)
     panel.delegate = self
     panel.titleVisibility = .visible
+    // An NSWindowController has no `loadView`, so the body is built here and
+    // installed as the panel's contentView. `present` calls `showWindow`
+    // straight after init, which would otherwise put an empty panel on screen.
+    buildContent(in: panel)
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitRecurrencePanelController is code-only") }
 
-  override func loadView() {
+  private func buildContent(in panel: NSPanel) {
     let root = NSVisualEffectView()
     root.material = .popover
     root.state = .active
@@ -323,7 +328,7 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
       cancel.widthAnchor.constraint(greaterThanOrEqualToConstant: 76),
       stop.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
     ])
-    view = root
+    panel.contentView = root
     updateValues()
   }
 
@@ -418,34 +423,43 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
 // MARK: - Board
 
 /// The popover's body: a Today row, a seven-day strip, and Clear — plus the
-/// key handling that walks them. Focus is a (row, column) pair over a ragged
-/// grid, with single-cell rows above and below the strip.
+/// key handling that walks them.
+///
+/// Navigation is LINEAR, not grid-shaped: Today → each day in order → Clear.
+/// ↓ and → both step forward in time, ↑ and ← both step back, so "down" always
+/// means "later" no matter which part of the board holds focus. A ragged
+/// (row, column) model made ↓ jump from a day to Clear, which reads as a
+/// different axis than the one the user is walking.
 @MainActor
 private final class KitDateBoard: NSView {
 
+  private let kind: SeptaskKitDatePopover.Kind
   private let onPick: (Date?, Bool) -> Void
   private let onCancel: () -> Void
 
-  /// Rows of focusable cells, top to bottom. `rows[1]` is the day strip.
-  private var rows: [[KitDateCell]] = []
-  private var focusRow = 0
-  private var focusCol = 0
-  /// Column the user last chose horizontally, so walking down into the strip
-  /// and back out again doesn't lose their place.
-  private var desiredCol = 0
+  /// Every focusable cell in time order: Today, the seven days, then Clear.
+  private var cells: [KitDateCell] = []
+  private var focusIndex = 0
 
-  private static let dayWidth: CGFloat = 38
-  private static let dayHeight: CGFloat = 46
-  private static let daySpacing: CGFloat = 2
-  /// The days the strip offers: tomorrow through a week out.
-  private static let dayOffsets = Array(1...7)
+  /// Panel padding. The highlight is INSET from the popover edge (the
+  /// palette shape in `SelectionLanguage`, not the full-bleed list-row one),
+  /// so a selected row never collides with the popover's rounded corners.
+  private static let padding: CGFloat = 8
+  private static let rowHeight: CGFloat = 32
+  private static let dayWidth: CGFloat = 40
+  private static let dayHeight: CGFloat = 48
+  private static let daySpacing: CGFloat = 6
+  /// Today through a week out — the same window as SwiftUI's `WeekStrip`
+  /// (`.upcoming` = offsets 0...6), so the two surfaces offer the same days.
+  private static let dayOffsets = Array(0...6)
 
   init(kind: SeptaskKitDatePopover.Kind, initial: Date?,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
+    self.kind = kind
     self.onPick = onPick
     self.onCancel = onCancel
     super.init(frame: .zero)
-    build(kind: kind, initial: initial)
+    build(initial: initial)
   }
 
   required init?(coder: NSCoder) { fatalError("KitDateBoard is code-only") }
@@ -455,15 +469,12 @@ private final class KitDateBoard: NSView {
 
   // MARK: Build
 
-  private func build(kind: SeptaskKitDatePopover.Kind, initial: Date?) {
+  private func build(initial: Date?) {
     // The app's today (DayClock/SeptenaDate), never the wall clock.
     let today = KitDayFormat.todayDate() ?? Date()
 
-    let todayCell = KitDateCell(radius: 7, height: 30) { [weak self] in
-      switch kind {
-      case .when: self?.onPick(nil, true)
-      case .deadline: self?.onPick(today, false)
-      }
+    let todayCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.pick(today)
     }
     todayCell.fillRow(symbol: "star.fill", tint: SeptaskKitTheme.todayAccent,
                       title: kind.todayTitle)
@@ -475,16 +486,16 @@ private final class KitDateBoard: NSView {
     var dayCells: [KitDateCell] = []
     for offset in Self.dayOffsets {
       let date = KitDayFormat.day(offset: offset) ?? today
-      let cell = KitDateCell(radius: 9, height: Self.dayHeight) { [weak self] in
-        self?.onPick(date, false)
+      let cell = KitDateCell(radius: 10, height: Self.dayHeight) { [weak self] in
+        self?.pick(date)
       }
-      cell.fillDay(date)
+      cell.fillDay(date, isToday: offset == 0)
       cell.widthAnchor.constraint(equalToConstant: Self.dayWidth).isActive = true
       strip.addArrangedSubview(cell)
       dayCells.append(cell)
     }
 
-    let clearCell = KitDateCell(radius: 7, height: 30) { [weak self] in
+    let clearCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
       self?.onPick(nil, false)
     }
     clearCell.fillRow(symbol: "xmark.circle", tint: SeptaskKitTheme.iconMuted,
@@ -496,30 +507,31 @@ private final class KitDateBoard: NSView {
     let stack = NSStackView(views: [todayCell, strip, separator, clearCell])
     stack.orientation = .vertical
     stack.alignment = .leading
-    stack.spacing = 8
-    stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-    stack.setCustomSpacing(10, after: strip)
-    stack.setCustomSpacing(6, after: separator)
+    stack.spacing = 6
+    stack.setCustomSpacing(8, after: strip)
+    stack.setCustomSpacing(4, after: separator)
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
 
+    // Padding lives in these constants, NOT in `stack.edgeInsets` — the
+    // insets came out flush against the popover edge, and a constraint
+    // constant is unambiguous.
+    let pad = Self.padding
     NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: topAnchor),
-      stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-      stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-      stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
       // The strip sets the popover's width; the single-cell rows match it so
-      // their highlight spans the same column.
+      // every highlight spans the same column.
       todayCell.widthAnchor.constraint(equalTo: strip.widthAnchor),
       clearCell.widthAnchor.constraint(equalTo: strip.widthAnchor),
       separator.widthAnchor.constraint(equalTo: strip.widthAnchor),
     ])
 
-    rows = [[todayCell], dayCells, [clearCell]]
-    for row in rows {
-      for cell in row {
-        cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
-      }
+    cells = [todayCell] + dayCells + [clearCell]
+    for cell in cells {
+      cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
     }
 
     // Start on the cell that already holds the task's value, so the arrows
@@ -528,47 +540,43 @@ private final class KitDateBoard: NSView {
       guard let date = KitDayFormat.day(offset: offset) else { return false }
       return Calendar.current.isDate(date, inSameDayAs: initial)
     }) {
-      focusRow = 1
-      focusCol = index
-      desiredCol = index
+      focusIndex = index + 1   // +1: the Today row precedes the strip.
     }
     applyFocus()
+  }
+
+  /// Scheduling a task to today IS the today flag for `.when`, so the strip's
+  /// first cell and the Today row commit the same thing. `.deadline` has no
+  /// flag and always writes the date.
+  private func pick(_ date: Date) {
+    let today = KitDayFormat.todayDate() ?? Date()
+    if kind == .when, Calendar.current.isDate(date, inSameDayAs: today) {
+      onPick(nil, true)
+    } else {
+      onPick(date, false)
+    }
   }
 
   // MARK: Focus
 
   private func applyFocus() {
-    for (rowIndex, row) in rows.enumerated() {
-      for (colIndex, cell) in row.enumerated() {
-        cell.isFocused = rowIndex == focusRow && colIndex == focusCol
-      }
+    for (index, cell) in cells.enumerated() {
+      cell.isFocused = index == focusIndex
     }
   }
 
   private func focus(cell: KitDateCell) {
-    for (rowIndex, row) in rows.enumerated() {
-      guard let colIndex = row.firstIndex(where: { $0 === cell }) else { continue }
-      focusRow = rowIndex
-      focusCol = colIndex
-      desiredCol = colIndex
-      applyFocus()
-      return
-    }
-  }
-
-  private func moveRow(by delta: Int) {
-    let next = focusRow + delta
-    guard rows.indices.contains(next) else { return }
-    focusRow = next
-    focusCol = min(desiredCol, rows[next].count - 1)
+    guard let index = cells.firstIndex(where: { $0 === cell }) else { return }
+    focusIndex = index
     applyFocus()
   }
 
-  private func moveColumn(by delta: Int) {
-    let next = focusCol + delta
-    guard rows[focusRow].indices.contains(next) else { return }
-    focusCol = next
-    desiredCol = next
+  /// Clamped, not wrapping: walking off either end of a short list and
+  /// silently landing at the other end is how a user picks the wrong date.
+  private func step(_ delta: Int) {
+    let next = focusIndex + delta
+    guard cells.indices.contains(next) else { return }
+    focusIndex = next
     applyFocus()
   }
 
@@ -576,12 +584,10 @@ private final class KitDateBoard: NSView {
 
   override func keyDown(with event: NSEvent) {
     switch event.keyCode {
-    case 126: moveRow(by: -1)                            // ↑
-    case 125: moveRow(by: 1)                             // ↓
-    case 123: moveColumn(by: -1)                         // ←
-    case 124: moveColumn(by: 1)                          // →
-    case 36, 76, 49: rows[focusRow][focusCol].activate() // Return / Enter / Space
-    case 53: onCancel()                                  // Escape
+    case 126, 123: step(-1)                     // ↑ / ← — earlier
+    case 125, 124: step(1)                      // ↓ / → — later
+    case 36, 76, 49: cells[focusIndex].activate()  // Return / Enter / Space
+    case 53: onCancel()                         // Escape
     default: super.keyDown(with: event)
     }
   }
@@ -633,23 +639,25 @@ private final class KitDateCell: NSView {
     let stack = NSStackView(views: [image, label])
     stack.orientation = .horizontal
     stack.spacing = 8
-    stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+    stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
     embed(stack)
     setAccessibilityTitle(title)
   }
 
-  /// Weekday over day number — the strip's cell. Each cell names its own
-  /// weekday, so the strip needs no month header to be readable.
-  func fillDay(_ date: Date) {
+  /// Weekday over day number — the strip's cell, matched to SwiftUI's
+  /// `WeekStrip` (11pt medium weekday, 17pt semibold rounded number) so the
+  /// two surfaces read as one component. Today is marked with the gold ink
+  /// the Today row's star uses — INK, never a second background fill, which
+  /// would compete with the focus wash.
+  func fillDay(_ date: Date, isToday: Bool) {
     let weekday = NSTextField(labelWithString: Self.weekday.string(from: date))
-    weekday.font = .systemFont(ofSize: SeptenaTypeScale.size(.caption2), weight: .semibold)
+    weekday.font = .systemFont(ofSize: 11, weight: .medium)
     weekday.textColor = SeptaskKitTheme.inkSecondary
     weekday.alignment = .center
 
     let number = NSTextField(labelWithString: Self.number.string(from: date))
-    number.font = .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.body) + 2,
-                                             weight: .regular)
-    number.textColor = SeptaskKitTheme.inkPrimary
+    number.font = Self.rounded(size: 17, weight: .semibold)
+    number.textColor = isToday ? SeptaskKitTheme.todayAccent : SeptaskKitTheme.inkPrimary
     number.alignment = .center
 
     let stack = NSStackView(views: [weekday, number])
@@ -692,7 +700,14 @@ private final class KitDateCell: NSView {
 
   override func mouseUp(with event: NSEvent) { action() }
 
-  // MARK: Formatters
+  // MARK: Fonts & formatters
+
+  /// SF Rounded, the face SwiftUI's `WeekStrip` uses for the day number.
+  private static func rounded(size: CGFloat, weight: NSFont.Weight) -> NSFont {
+    let base = NSFont.systemFont(ofSize: size, weight: weight)
+    guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
+    return NSFont(descriptor: descriptor, size: size) ?? base
+  }
 
   private static let weekday: DateFormatter = {
     let formatter = DateFormatter()
