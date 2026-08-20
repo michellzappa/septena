@@ -22,7 +22,6 @@ struct AddNutritionPage: View {
   @Bindable var router: AddInfoRouter
   @State private var recent: [NutritionEntry] = []
   @State private var working = false
-  @State private var multiplierPercent = NutritionRelogging.defaultPercent
 
   private var trimmed: String {
     router.query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -37,9 +36,6 @@ struct AddNutritionPage: View {
       if candidates.isEmpty {
         Section { Text("No recent meals").foregroundStyle(.secondary) }
       } else {
-        Section {
-          NutritionMultiplierControl(percent: $multiplierPercent)
-        }
         Section("Recent") {
           ForEach(candidates) { meal in
             Button { duplicate(meal.representative) } label: {
@@ -71,14 +67,12 @@ struct AddNutritionPage: View {
 
   private func macros(for meal: MealCandidate) -> String {
     let e = meal.representative
-    let factor = NutritionRelogging.factor(for: multiplierPercent)
     let parts = [
       meal.count > 1 ? "\(meal.count)×" : nil,
-      multiplierPercent == NutritionRelogging.defaultPercent ? nil : "\(multiplierPercent)%",
-      "\(Int(NutritionRelogging.scaled(e.proteinG, by: factor).rounded()))P",
-      "\(Int(NutritionRelogging.scaled(e.fatG, by: factor).rounded()))F",
-      "\(Int(NutritionRelogging.scaled(e.carbsG, by: factor).rounded()))C",
-      "\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal",
+      "\(Int(e.proteinG.rounded()))P",
+      "\(Int(e.fatG.rounded()))F",
+      "\(Int(e.carbsG.rounded()))C",
+      "\(Int(e.kcal.rounded()))kcal",
     ].compactMap { $0 }
     return parts.joined(separator: " · ")
   }
@@ -130,7 +124,7 @@ struct AddNutritionPage: View {
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
     ) {
-      NutritionRelogging.addDuplicate(entry, percent: multiplierPercent)
+      NutritionRelogging.addDuplicate(entry)
       AddInfoSection.nutrition.notifyTilesChanged()
     }
     dismiss()
