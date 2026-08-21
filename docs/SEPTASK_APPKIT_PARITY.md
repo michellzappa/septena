@@ -1,5 +1,40 @@
 # Septask AppKit shell — parity backlog
 
+**2026-08-21 — one surface system.** Every transient surface in the shell now
+follows one rule, specified in `docs/SEPTASK_APPKIT_SURFACES.md` and built from
+`Septask/SeptaskKitSurface.swift`: **scope picks the container.** Tier 1 is an
+anchored popover for one attribute of one row (When, Deadline, Repeat, and Move
+when a single row is selected); Tier 2 is a centered command panel for anything
+app-wide or multi-row (Quick Find, Quick Entry, bulk Move); Tier 3 is an alert,
+for irreversible or forked decisions only. Naming left the dialog entirely and
+happens inline in the row, Finder-style — `KitPrompt.text` is gone, and New
+Area / New Project / New Section now land a named row and open it for editing.
+
+What changed underneath: Repeat lost its title bar, its second in-content
+heading, its hardcoded `systemBlue` badge and its OK button, and became a
+popover anchored to the row it edits; Move gained an anchored presentation and
+falls back to the panel only for a multi-selection; the date popover's radius
+14 became the shell's single 12; Quick Find and Move stopped being two copies
+of the same panel-and-table construction; the four hand-written `doCommandBy`
+switches became one; and the reschedule-repeating alert joined the other two in
+`KitPrompt`. `scripts/lint-design.sh` gained `appkit-surface-chrome`, which
+fails the build on an `NSPopover()` or a borderless panel built outside the
+surface file. Built green on `SeptaskMac` and `SeptenaMac`.
+
+**2026-08-21 bug:** `isBordered = false` on an `NSSearchField` collapses the
+BEZEL geometry its cell derives the text rect from, so the text starts at x=0 —
+directly on top of the magnifying glass. MZ caught it typing into ⌘⇧M Move;
+⇧⌘F Quick Find had the identical setup and therefore the identical bug.
+Fixed with `KitSearchFieldCell` (`SeptaskKitRowViews.swift`), which computes
+`searchButtonRect` / `cancelButtonRect` / `searchTextRect` from `bounds`
+explicitly — the documented customization point, chosen over restoring a bezel
+neither panel wants. Both panels now share `KitSearchField.applyPanelStyle()`
+so they cannot drift into the same bug twice. NOTE this is a rendering fix
+verified only by compile; if the overlap persists, the cause is that modern
+`NSSearchField` lays its buttons out as SUBVIEWS rather than through the cell,
+in which case the rect overrides are inert and the parts need positioning as
+views instead.
+
 **2026-08-20:** one long pass, built green on `SeptaskMac` throughout.
 
 1. **The house rule is now actually applied.** `KitProjectTargetCell`,
@@ -109,7 +144,8 @@ agreed at one specific window width. `viewDidLayout` now keeps
 `scrollView.contentInsets.top`/`.bottom` equal to the SAME computed pixel
 value the rows use for their sides, at every width. And replaced the flat
 "Move" `NSMenu` with `SeptaskKitMoveModal.swift` — a type-to-filter floating
-panel matching `SeptaskKitQuickFind`'s shape, the AppKit counterpart of
+panel matching `SeptaskKitQuickFind`'s shape (both are `KitFilterSurface`
+now — see `docs/SEPTASK_APPKIT_SURFACES.md`), the AppKit counterpart of
 SwiftUI's `MovePickerSheet` — and, per MZ's explicit call, restricted Move
 targets to AREAS ONLY (`KitMoveMenu.destinations` no longer lists projects;
 `Destination.project` stays a case for other callers — drag-and-drop refiling,
@@ -301,17 +337,48 @@ much richer editor.
   makes inline editing feel continuous rather than modal.
 - **[P3] Notes inline** (shell has notes in the inspector only).
 
-## 2. Task Conversations (agent threads) — entirely absent
+## 2. Task Conversations (agent threads)
 
-`ConversationCard` + `ConversationEngine` + `TaskConvo`. Nothing in the shell
-renders or writes these, and the data is live (the MCP gateway writes it).
+`KitConversationView` (`Septask/SeptaskKitConversation.swift`) renders the
+thread in the INSPECTOR, below Notes, per
+`docs/SEPTASK_CONVERSATIONS_PLAN.md`. One surface, not three — no conversation
+tab, no separate window.
 
-- **[P2] Transcript rows, question blocks with choice buttons, "other" free
-  text reply.**
-- **[P2] Artifact blocks and handoff buttons** (open URL / run action).
-- **[P2] Acceptance / end-state / assignee** (`setConvoAcceptance`,
-  `setConvoEndState`, `setConvoAssignee`).
-- **[P2] The Discuss pill** that starts a conversation from the composer.
+- **[DONE] Transcript rows, question block, "other" free text.** Same turn
+  filtering and the same "the open question IS the title" promotion as
+  `ConversationCard`: provider turns show their question, or their narration
+  dimmed; user turns show what was chosen or typed behind a green check.
+  Options are `KitPillButton`s — the shell's existing recessed-capsule
+  language, not a second button style — with an "Other…" pill that reveals a
+  text field. Replies append USER turns only, with `seq: 0` so
+  `appendConvoTurn` assigns the real sequence; `propose` turns still come
+  exclusively from the agent/gateway.
+- **[DONE] Artifact block and handoff button.** Artifact renders selectable
+  (it is usually meant to be copied out). Handoff is a REAL button only when
+  there is somewhere to go — the `open_url` / `mailto:` / `tel:` mapping is
+  copied verbatim from `ConversationCard.actionURL`, and `.none` degrades to
+  plain instruction text rather than a button that does nothing.
+- **[DONE] End state, acceptance, assignee** — read-only, per the plan.
+  `wontDo` reads grey and neutral rather than red: deciding not to do
+  something is a valid outcome, not a failure.
+- **[DONE] The Discuss pill.** In `KitComposerCell`, gated on exactly SwiftUI's
+  `showsDiscuss` terms — no conversation yet AND `OnDeviceAI.isAvailable` — so
+  a pill that could start nothing never appears. It calls
+  `ConversationEngine.advance(task:)`, a LOCAL on-device round trip with no
+  gateway in the loop, which is what makes the pill viable here at all. The
+  pill reads "Thinking…" and disables while in flight.
+
+**One deliberate deviation from the plan.** It called for
+`mutator.acknowledge(id:)` when the inspector opens on an agent-cued row. The
+inspector does NOT do that, because its own contract (see `show(_:)`) is that
+opening to peek must never ratify: the cue IS Inbox membership for agent rows,
+so acking on open would yank a proposal out of the Inbox merely because it
+became the selected row. Disposition paths ack; looking does not. The plan
+predates that rule — code wins.
+
+Still open: rendering `subtasks` (epic decompose) as anything richer than the
+stored ids, and any human override of assignee. Both were explicit v1
+non-goals.
 
 ## 3. Row cues the shell doesn't draw
 
@@ -324,11 +391,40 @@ renders or writes these, and the data is live (the MCP gateway writes it).
 - **[DONE] Agent cue ring** — drawn from `showsAgentCue()`.
   `mutator.acknowledge(id:)` runs when the composer or inspector opens on an
   agent-cued row, so engaging clears the glow (same as SwiftUI).
-- **[P3] Check celebration** (`CheckFeel.stamp` — stamp + pulse ring at the
-  box). The shell's completion feedback is the settle beat only.
-- **[P3] Promote flash** — amber ring when a row is pinned to Today.
-- **[P3] Filing-suggestion capsule** — the "→ Suggested" chip from
-  `SuggestionEngine`, and suggestions surfaced in the Move menu.
+- **[DONE] Check celebration.** `KitCheckboxView.playPulse(color:reach:)` —
+  the AppKit twin of `TaskCheckbox.pulse`, same numbers (0.9 → 1.9, opacity
+  0.55 → 0, ease-out 0.4s). A `CAShapeLayer` rather than `draw(_:)`: the ring
+  has to leave the box's 22pt hit column, so `masksToBounds` is explicitly
+  false. Fires from `fire()` on the way IN only — unchecking is a correction,
+  not an achievement — and `isDone` is still the pre-toggle state there, so it
+  plays exactly once per completion. Only `.stamp` is ported; the other three
+  feels are for non-task rows the shell doesn't draw.
+- **[DONE] Promote flash.** Two halves, like SwiftUI: the gold ring at the box
+  (`playTodayPromotePulse`, tighter 1.6 reach) and the row wash
+  (`KitCardRowView.playPromoteWash`, same 0.22 peak). The wash is stepped by a
+  timer because that row paints itself in `drawBackground` — there is no layer
+  property to animate. It is NOT a second selection language: transient, the
+  temporal accent rather than the selection token, never persistent.
+  `cancelPromoteWash()` runs in `rowViewForRow` because row views are recycled
+  and a fading wash would otherwise ride onto an unrelated task.
+  The controller holds `pendingPromoteFlash`, a one-shot set — the cue plays
+  against a cell that only exists after the reload the promote triggered, so
+  the intent has to outlive the mutation by exactly one reload.
+- **[DONE] Filing-suggestion capsule.** `KitSuggestionChipView` — a real
+  `NSButton` (it is an action, and the house rule is no gesture recognizers),
+  same metrics and fill as `KitChipView` so the two read as one family. It
+  wears the DESTINATION's name, not the word "Suggested": "→ Kitchen" says what
+  the tap will do.
+  **The gate was hoisted, not copied**: `Septena/Shell/Tasks/TaskFilingSuggestions.swift`
+  now owns "which rows are suggestible" and BOTH shells call it —
+  `TaskListView.filingRankedSuggestions` is a one-line delegation now. It lives
+  in `Shell/Tasks` rather than `SeptenaCore` because the gate reads
+  `TaskRowFlags` / `SettingsKey`, which are Shell-level; `Shell/Tasks` compiles
+  into both apps and the AppKit shell, so it is the shared layer here.
+  Applying mirrors `TaskListView.applySuggestion` step for step, including the
+  triage promote flash and undo via `TaskUndo.recordMove`.
+  Still missing: suggestions in the Move MENU (the context menu's "Suggested"
+  section) — the capsule covers the one-tap path only.
 
 ## 4. Structure CRUD — read-only today
 
@@ -417,7 +513,21 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   (heterogeneous NSTableView rows would fight the shell); a separate sidebar
   destination is the AppKit-shaped answer. Mood / nutrition suggestion sheets
   present from the page. Open-count badge via `KitNextCount`.
-- **[P2] Reminders inbox import** (`RemindersInboxSection`).
+- **[DONE] Reminders inbox import.** `SeptaskKitTaskList.swift`, "Reminders
+  inbox" section — `remindersBlock()` sits between `agenda()` and
+  `triageBand()`, the same slot SwiftUI's `remindersRow` occupies. Today only,
+  and ONLY when something is pending: no setup CTAs here, matching SwiftUI's
+  `showsSetupCTAs: false`, so a user who never nominated a list sees nothing
+  rather than a permanent prompt. Grant-access / pick-a-list stay in the hosted
+  SwiftUI Settings pane, so there is no second copy of that flow.
+  Import semantics are unchanged — title + due date as a DEADLINE + notes, then
+  delete the original so dedupe is automatic. Both paths are undoable through
+  `TaskUndo.recordCreate`; undo deliberately does NOT re-create the row in
+  Apple Reminders, since writing to another app's data on the user's behalf is
+  not ours to do. Two cells: `KitRemindersHeaderCell` (title + Import All +
+  spinner) and `KitReminderCell` (whole row is the button). Refreshed from
+  `.EKEventStoreChanged`, which fires for every list, so `refreshReminders`
+  diffs the resulting set and only reloads when the mirrored list moved.
 - **[P3] Things import** (`ThingsImportView`) — one-time migration, fine in the
   classic window.
 - **[P3] Task patterns section.**
@@ -522,19 +632,23 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   popup, and an after-completion / on-scheduled-date mode popup, with a live
   cadence sentence. `RecurrencePickerSheet` was rewritten to the same shape in
   the same change, so the two editors read as one control in two toolkits.
-- **[P3] Today "review" band** — CORRECTION to the earlier entry here, which
-  described a bucket the SwiftUI shell does not have. There is no second
-  section: `TaskListView.rolledInReview` filters the rows ALREADY on Today for
-  a `scheduled` date strictly before today, and renders one dismissible
-  banner above the cards — "N tasks rolled into Today", gold `arrow.down.
-  circle.fill` glyph, Dismiss button writing today's date to
-  `septena.newTodos.dismissedDate` so it returns tomorrow. Porting it is one
-  unselectable table row sharing that same UserDefaults key, NOT a new
-  grouping. (The old `review` bucket was only ever assigned `[]` — that is why
-  the banner never appeared before it was rewritten to read `items`.)
-- **[DONE] "Show N logged items" footer** on project/area pages — same copy,
-  same UserDefaults key as `TaskListView.scopeLoggedExpandedData`, so
-  expand/collapse state agrees between both shells.
+- **[DONE] Today "rolled into Today" banner** (the entry here used to call
+  this a "review band" and described a bucket that does not exist — see the
+  correction that follows). `SeptaskKitTaskList.swift`, "Rolled-into-Today
+  banner": `rolledInBanner(_:)` counts rows ALREADY on Today whose `scheduled`
+  is strictly before today, and emits one dismissible notice between the
+  agenda and the Reminders block — the slot SwiftUI's `newTodosBannerRow`
+  occupies. `KitRolledInBannerCell` draws its own card rather than riding
+  `KitCardRowView`, so it stays a separate notice instead of merging into the
+  agenda run, exactly as SwiftUI's own `.background` does.
+  Dismissal writes the SAME `septena.newTodos.dismissedDate` key, so
+  dismissing in one shell dismisses in the other, and it returns tomorrow.
+  **Correction, kept for the record:** there is no separate `review` bucket in
+  the SwiftUI shell. `TaskListView.rolledInReview` filters `items` — the rows
+  already on Today — and the old `review` bucket was only ever assigned `[]`,
+  which is why the banner never appeared before it was rewritten. Anyone
+  "finishing the port" by adding a second section would be building something
+  SwiftUI does not have.
 - **[P3] Logbook has no bulk clear/purge.**
 - **[P3] Calendar events are inert** — no click-through to Calendar.app.
 - **[P3] Keyboard Shortcuts sheet** (⌘/ in SwiftUI). The menu bar is arguably
@@ -550,16 +664,17 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 
 ## Suggested order — remaining
 
-1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
-   Biggest remaining feature loss; the data is live today.
-2. **Reminders inbox import** (§5) — the last [P2] outside §2.
-3. **Claude reconnect cue** (§6) — the shell has no in-app recovery
-   affordance; the macOS notification half already landed.
-4. **Row cues** (§3) — check celebration, promote flash, filing-suggestion
-   capsule. These are a reading vocabulary: a surface that can't draw a cue
-   renders the row as if the cue were absent, which is worse than an obviously
-   missing feature.
-5. Everything else in §5/§6/§7 as it comes up.
+The four items that were queued here (Reminders import, row cues, the
+rolled-into-Today banner, Task Conversations) all landed on 2026-08-21. What is
+left is the [P2]/[P3] tail:
+
+1. **Claude reconnect cue** (§6) — the shell still draws none; the macOS
+   notification half already landed.
+2. **Hero-glide between closed row and open editor** (§1) — cosmetic, but it is
+   what makes inline editing feel continuous rather than modal.
+3. **Suggestions in the Move menu** (§3) — the one-tap capsule shipped; the
+   context menu's "Suggested" section did not.
+4. Everything else in §1/§4/§5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 
