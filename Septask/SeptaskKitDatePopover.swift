@@ -145,6 +145,8 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
   private let intervalField = NSTextField(string: "1")
   private let intervalStepper = NSStepper()
   private let scheduleHint = NSTextField(labelWithString: "")
+  private let cadenceDescription = NSTextField(labelWithString: "")
+  private let modeFallback = NSTextField(labelWithString: "After completion")
   private let pauseButton = NSButton()
 
   static func present(initial: Recurrence?, paused: Bool,
@@ -179,7 +181,7 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     panel.isFloatingPanel = true
     panel.level = .floating
     panel.hidesOnDeactivate = false
-    panel.minSize = NSSize(width: 480, height: 290)
+    panel.minSize = NSSize(width: 480, height: 250)
     super.init(window: panel)
     panel.delegate = self
     panel.titleVisibility = .visible
@@ -198,32 +200,54 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     root.wantsLayer = true
     root.layer?.cornerRadius = 12
 
+    let iconBadge = NSView()
+    iconBadge.wantsLayer = true
+    iconBadge.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.18).cgColor
+    iconBadge.layer?.cornerRadius = 14
+    iconBadge.translatesAutoresizingMaskIntoConstraints = false
     let titleIcon = NSImageView(image: NSImage(systemSymbolName: "arrow.clockwise",
                                                 accessibilityDescription: nil) ?? NSImage())
-    titleIcon.contentTintColor = NSColor.controlAccentColor
+    titleIcon.contentTintColor = .systemBlue
     titleIcon.image = titleIcon.image?.withSymbolConfiguration(
-      .init(pointSize: 18, weight: .semibold))
-    titleIcon.setContentHuggingPriority(.required, for: .horizontal)
+      .init(pointSize: 17, weight: .semibold))
+    titleIcon.translatesAutoresizingMaskIntoConstraints = false
+    iconBadge.addSubview(titleIcon)
+    NSLayoutConstraint.activate([
+      iconBadge.widthAnchor.constraint(equalToConstant: 28),
+      iconBadge.heightAnchor.constraint(equalToConstant: 28),
+      titleIcon.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
+      titleIcon.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
+    ])
 
     let title = NSTextField(labelWithString: String(localized: "Repeat",
                                                     comment: "Repeat editor heading"))
     title.font = .systemFont(ofSize: 17, weight: .semibold)
-    let heading = NSStackView(views: [titleIcon, title])
-    heading.orientation = .horizontal
-    heading.spacing = 8
+    let titleGroup = NSStackView(views: [iconBadge, title])
+    titleGroup.orientation = .horizontal
+    titleGroup.alignment = .centerY
+    titleGroup.spacing = 8
 
     modePopup.addItems(withTitles: [
-      String(localized: "After completion", comment: "Repeat anchor mode"),
-      String(localized: "On scheduled date", comment: "Repeat anchor mode")
+      String(localized: "after completion", comment: "Repeat anchor mode"),
+      String(localized: "on scheduled date", comment: "Repeat anchor mode")
     ])
     modePopup.selectItem(at: initial?.afterCompletion == false ? 1 : 0)
     modePopup.target = self
     modePopup.action = #selector(modeChanged)
     modePopup.controlSize = .regular
     modePopup.widthAnchor.constraint(equalToConstant: 190).isActive = true
-    modePopup.isEnabled = hasScheduledDate
+    modePopup.isHidden = !hasScheduledDate
 
-    let modeRow = labeledRow("Repeat:", control: modePopup)
+    modeFallback.font = .systemFont(ofSize: 14)
+    modeFallback.textColor = .labelColor
+    modeFallback.isHidden = hasScheduledDate
+    modeFallback.setContentHuggingPriority(.required, for: .horizontal)
+
+    let modeControl: NSView = hasScheduledDate ? modePopup : modeFallback
+    let heading = NSStackView(views: [titleGroup, NSView(), modeControl])
+    heading.orientation = .horizontal
+    heading.alignment = .centerY
+    heading.spacing = 8
 
     intervalField.alignment = .right
     intervalField.controlSize = .regular
@@ -254,12 +278,38 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     unitPopup.action = #selector(unitChanged)
     unitPopup.widthAnchor.constraint(equalToConstant: 100).isActive = true
 
-    let everyLabel = NSTextField(labelWithString: String(localized: "Every",
-                                                         comment: "Repeat interval label"))
-    let intervalRow = NSStackView(views: [everyLabel, intervalField, intervalStepper, unitPopup])
+    intervalField.bezelStyle = .roundedBezel
+    intervalField.drawsBackground = true
+    intervalField.backgroundColor = .controlBackgroundColor
+
+    cadenceDescription.font = .systemFont(ofSize: 14)
+    cadenceDescription.textColor = .labelColor
+    cadenceDescription.lineBreakMode = .byWordWrapping
+    cadenceDescription.maximumNumberOfLines = 2
+    cadenceDescription.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    let intervalRow = NSStackView(views: [intervalField, intervalStepper, unitPopup,
+                                          cadenceDescription])
     intervalRow.orientation = .horizontal
     intervalRow.alignment = .centerY
-    intervalRow.spacing = 6
+    intervalRow.spacing = 8
+
+    let ruleCard = NSVisualEffectView()
+    ruleCard.material = .contentBackground
+    ruleCard.blendingMode = .withinWindow
+    ruleCard.state = .active
+    ruleCard.wantsLayer = true
+    ruleCard.layer?.cornerRadius = 14
+    ruleCard.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.45).cgColor
+    ruleCard.translatesAutoresizingMaskIntoConstraints = false
+    ruleCard.addSubview(intervalRow)
+    intervalRow.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+      intervalRow.topAnchor.constraint(equalTo: ruleCard.topAnchor, constant: 18),
+      intervalRow.leadingAnchor.constraint(equalTo: ruleCard.leadingAnchor, constant: 18),
+      intervalRow.trailingAnchor.constraint(equalTo: ruleCard.trailingAnchor, constant: -18),
+      intervalRow.bottomAnchor.constraint(equalTo: ruleCard.bottomAnchor, constant: -18),
+    ])
 
     scheduleHint.font = .systemFont(ofSize: 12)
     scheduleHint.textColor = .secondaryLabelColor
@@ -272,7 +322,7 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     let divider = NSBox()
     divider.boxType = .separator
 
-    var controls: [NSView] = [heading, modeRow, intervalRow, scheduleHint]
+    var controls: [NSView] = [heading, ruleCard, scheduleHint]
     if initial != nil {
       pauseButton.bezelStyle = .rounded
       pauseButton.title = paused
@@ -294,7 +344,6 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     let stop = NSButton(title: String(localized: "Don’t Repeat", comment: "Repeat editor stop"),
                         target: self, action: #selector(stopRepeating))
     stop.bezelStyle = .rounded
-    stop.contentTintColor = .systemRed
     stop.isHidden = initial == nil
     let ok = NSButton(title: String(localized: "OK", comment: "Repeat editor confirm"),
                       target: self, action: #selector(commit))
@@ -309,9 +358,11 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
 
     let stack = NSStackView(views: controls + [buttons])
     stack.orientation = .vertical
+    // AppKit's NSStackView has no `.fill` alignment (unlike SwiftUI). The
+    // child width constraints below provide the same full-width layout.
     stack.alignment = .leading
-    stack.spacing = 14
-    stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
+    stack.spacing = 12
+    stack.edgeInsets = NSEdgeInsets(top: 18, left: 24, bottom: 18, right: 24)
     stack.translatesAutoresizingMaskIntoConstraints = false
     root.addSubview(stack)
     NSLayoutConstraint.activate([
@@ -320,8 +371,7 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
       stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
       stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
       heading.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      modeRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      intervalRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+      ruleCard.widthAnchor.constraint(equalTo: stack.widthAnchor),
       scheduleHint.widthAnchor.constraint(equalTo: stack.widthAnchor),
       buttons.widthAnchor.constraint(equalTo: stack.widthAnchor),
       ok.widthAnchor.constraint(greaterThanOrEqualToConstant: 76),
@@ -329,18 +379,8 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
       stop.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
     ])
     panel.contentView = root
+    panel.setContentSize(NSSize(width: 520, height: initial == nil ? 250 : 305))
     updateValues()
-  }
-
-  private func labeledRow(_ label: String, control: NSView) -> NSStackView {
-    let text = NSTextField(labelWithString: label)
-    text.font = .systemFont(ofSize: 14)
-    text.widthAnchor.constraint(equalToConstant: 70).isActive = true
-    let row = NSStackView(views: [text, control, NSView()])
-    row.orientation = .horizontal
-    row.alignment = .centerY
-    row.spacing = 8
-    return row
   }
 
   private func unitIndex(for unit: Recurrence.Unit) -> Int {
@@ -369,19 +409,34 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     let value = min(99, max(1, initial?.interval ?? 1))
     intervalField.integerValue = value
     intervalStepper.integerValue = value
+    updateDescription()
   }
 
-  @objc private func modeChanged() {}
-  @objc private func unitChanged() {}
+  private func updateDescription() {
+    let unit = selectedUnit
+    let unitName: String
+    switch unit {
+    case .day: unitName = interval == 1 ? "day" : "days"
+    case .week: unitName = interval == 1 ? "week" : "weeks"
+    case .month: unitName = interval == 1 ? "month" : "months"
+    }
+    let anchor = afterCompletion ? "after previous item is checked off." : "after previous scheduled date."
+    cadenceDescription.stringValue = "\(interval) \(unitName) \(anchor)"
+  }
+
+  @objc private func modeChanged() { updateDescription() }
+  @objc private func unitChanged() { updateDescription() }
 
   @objc private func intervalChanged() {
     let value = interval
     intervalField.integerValue = value
     intervalStepper.integerValue = value
+    updateDescription()
   }
 
   @objc private func stepperChanged() {
     intervalField.integerValue = intervalStepper.integerValue
+    updateDescription()
   }
 
   @objc private func togglePaused() {

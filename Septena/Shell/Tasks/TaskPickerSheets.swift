@@ -216,9 +216,9 @@ struct DatePickerSheet: View {
 
 // MARK: - Recurrence picker sheet
 
-/// "Repeat" — set or clear a recurrence rule. v1: daily / weekly / monthly,
-/// interval stepper, and fixed-vs-after-completion toggle. the reference design's canonical
-/// picker has more (weekday selection, ends-rules) — to be added when needed.
+/// "Repeat" — set or clear a recurrence rule. The iOS and AppKit editors use
+/// the same compact Things-inspired structure: a mode picker in the heading,
+/// one explanatory rule card, and a small action footer.
 struct RecurrencePickerSheet: View {
   @Environment(SectionTheme.self) private var theme
   let initial: Recurrence?
@@ -265,63 +265,78 @@ struct RecurrencePickerSheet: View {
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
-        // Unit segmented
-        Picker("Unit", selection: $unit) {
-          Text("Day").tag(Recurrence.Unit.day)
-          Text("Week").tag(Recurrence.Unit.week)
-          Text("Month").tag(Recurrence.Unit.month)
+        HStack(spacing: 10) {
+          ZStack {
+            Circle()
+              .fill(theme.accent.opacity(0.18))
+            Image(systemName: "arrow.clockwise")
+              .font(.system(size: 17, weight: .semibold))
+              .foregroundStyle(theme.accent)
+          }
+          .frame(width: 30, height: 30)
+
+          Text("Repeat")
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(Theme.inkPrimary)
+
+          Spacer(minLength: 8)
+
+          if hasScheduledDate {
+            Picker("Repeat", selection: $afterCompletion) {
+              Text("after completion").tag(true)
+              Text("on scheduled date").tag(false)
+            }
+            .pickerStyle(.menu)
+            .tint(Theme.inkPrimary)
+          } else {
+            Text("after completion")
+              .font(.system(size: 15, weight: .medium))
+              .foregroundStyle(Theme.inkPrimary)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 7)
+              .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 8))
+          }
         }
-        .pickerStyle(.segmented)
         .padding(.horizontal, Theme.hPadding)
         .padding(.top, 16)
 
-        // Interval stepper
-        HStack {
-          Text("Every")
-            .font(.septenaSidebarRow)
-            .foregroundStyle(Theme.inkPrimary)
-          Spacer()
-          Stepper(value: $interval, in: 1...99) {
-            Text(intervalLabel())
-              .font(.septenaSidebarRow)
-              .foregroundStyle(Theme.inkSecondary)
-          }
-          .labelsHidden()
-          Text(intervalLabel())
-            .font(.septenaSidebarRow)
-            .foregroundStyle(Theme.inkSecondary)
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 18)
-
-        // Fixed vs after-completion toggle
-        Toggle(isOn: $afterCompletion) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("After completion")
-              .font(.septenaSidebarRow)
+        VStack(alignment: .leading, spacing: 12) {
+          HStack(spacing: 8) {
+            Text("\(interval)")
+              .font(.system(size: 17, weight: .medium))
               .foregroundStyle(Theme.inkPrimary)
-            Text(afterCompletion
-                 ? "Next instance \(intervalLabel()) after you mark this done."
-                 : "Next instance \(intervalLabel()) after the previous scheduled date.")
+              .frame(width: 44, height: 38)
+              .background(Theme.paperBackground, in: RoundedRectangle(cornerRadius: 10))
+
+            Stepper("", value: $interval, in: 1...99)
+              .labelsHidden()
+
+            Picker("Unit", selection: $unit) {
+              Text("day").tag(Recurrence.Unit.day)
+              Text("week").tag(Recurrence.Unit.week)
+              Text("month").tag(Recurrence.Unit.month)
+            }
+            .pickerStyle(.menu)
+            .tint(Theme.inkPrimary)
+
+            Text(cadenceDescription())
+              .font(.system(size: 15, weight: .medium))
+              .foregroundStyle(Theme.inkPrimary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+
+          if !hasScheduledDate {
+            Text("Give the task a date to repeat on a fixed schedule.")
               .font(.caption)
               .foregroundStyle(Theme.inkSecondary)
               .fixedSize(horizontal: false, vertical: true)
           }
         }
-        .tint(theme.accent)
-        .disabled(!hasScheduledDate)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 18)
-
-        if !hasScheduledDate {
-          Text("Give the task a date to repeat on a fixed schedule.")
-            .font(.caption)
-            .foregroundStyle(Theme.inkSecondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.hPadding)
-            .padding(.top, 8)
-        }
+        .padding(.top, 16)
 
         if initial != nil, let onPauseChanged {
           Button {
@@ -330,31 +345,17 @@ struct RecurrencePickerSheet: View {
           } label: {
             Label(paused ? "Resume Repeat" : "Pause Repeat",
                   systemImage: paused ? "play.circle" : "pause.circle")
-              .frame(maxWidth: .infinity, alignment: .leading)
           }
           .buttonStyle(.bordered)
           .tint(theme.accent)
+          .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, Theme.hPadding)
           .padding(.top, 12)
         }
 
-        Spacer()
+        Spacer(minLength: 18)
 
-        VStack(spacing: 10) {
-          Button {
-            onPick(Recurrence(unit: unit, interval: interval, afterCompletion: afterCompletion))
-            dismiss()
-          } label: {
-            Text(initial == nil ? "Set Repeat" : "Update Repeat")
-              .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 14)
-              .background(theme.accent)
-              .clipShape(Capsule())
-          }
-          .buttonStyle(.plain)
-
+        HStack(spacing: 10) {
           if initial != nil {
             Button {
               Haptics.warning()
@@ -362,35 +363,42 @@ struct RecurrencePickerSheet: View {
               dismiss()
             } label: {
               Text("Don't Repeat")
-                .scaledFont(size: 15, weight: .medium)
-                .foregroundStyle(Theme.overdueRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
+            .tint(Theme.inkPrimary)
           }
+
+          Spacer(minLength: 0)
+
+          Button("Cancel") { dismiss() }
+            .buttonStyle(.bordered)
+
+          Button("OK") {
+            onPick(Recurrence(unit: unit, interval: interval, afterCompletion: afterCompletion))
+            dismiss()
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent)
         }
         .padding(.horizontal, Theme.hPadding)
-        .padding(.bottom, 20)
+        .padding(.bottom, 18)
       }
       .navigationTitle("Repeat")
       .septenaInlineTitle()
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-      }
     }
-    .macSheetFrame(width: 420, height: 380)
+    .macSheetFrame(width: 520, height: 330)
   }
 
-  /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
-  private func intervalLabel() -> String {
+  private func cadenceDescription() -> String {
+    let unitName: String
     switch unit {
-    case .day:   return String(localized: "\(interval) days")
-    case .week:  return String(localized: "\(interval) weeks")
-    case .month: return String(localized: "\(interval) months")
+    case .day: unitName = interval == 1 ? "day" : "days"
+    case .week: unitName = interval == 1 ? "week" : "weeks"
+    case .month: unitName = interval == 1 ? "month" : "months"
     }
+    return afterCompletion
+      ? "\(unitName) after previous item is checked off."
+      : "\(unitName) after previous scheduled date."
   }
 }
 
