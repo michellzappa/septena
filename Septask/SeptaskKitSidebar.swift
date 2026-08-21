@@ -29,6 +29,74 @@ private extension Int {
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
   case next
+
+  /// The AppKit shell's smart-list destinations, in order — read from the SAME
+  /// `TaskDestinations.sidebarRoutes` the SwiftUI sidebar and `TaskNavMenu`
+  /// use, so all four surfaces (both shells' sidebars, both shells' title
+  /// dropdowns) can never disagree about which lists exist or in what order.
+  /// Recently Deleted is deliberately absent: it's appended by each surface
+  /// only when the trash is non-empty.
+  @MainActor static var smartLists: [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes.compactMap(KitSidebarDestination.init(route:))
+  }
+
+  /// Bridge from the shared `Route` vocabulary. Areas / projects carry only an
+  /// id in a `Route`, so they resolve at their own call sites (which hold the
+  /// live record) and return nil here.
+  init?(route: Route) {
+    switch route {
+    case .next:            self = .next
+    case .filter(let f):   self = .filter(f, title: route.title)
+    case .area, .project:  return nil
+    }
+  }
+
+  /// SF Symbol for the row / menu item — off `Route`, so an icon change lands
+  /// on every surface at once.
+  var symbol: String {
+    switch self {
+    case .next:             return Route.next.icon
+    case .filter(let f, _): return Route.filter(f).icon
+    }
+  }
+
+  var title: String {
+    switch self {
+    case .next:                 return Route.next.title
+    case .filter(_, let title): return title
+    }
+  }
+
+  /// The shared `Route` this destination points at — the vocabulary the
+  /// SwiftUI page titles and dropdowns speak.
+  var route: Route {
+    switch self {
+    case .next: return .next
+    case .filter(let filter, _):
+      switch filter {
+      case .area(let id):    return .area(id: id)
+      case .project(let id): return .project(id: id)
+      default:               return .filter(filter)
+      }
+    }
+  }
+
+  /// Stable selection key — the one the sidebar's `Node.key` and its
+  /// `select(_:)` lookup both speak.
+  var key: String { Self.key(for: route) }
+
+  /// The same key straight off a `Route`, for callers that only have one (the
+  /// Next page's title dropdown). A `Route` carries no title for an area or
+  /// project, and none is needed: the lookup is by key, and the row that gets
+  /// selected re-emits its own real title.
+  static func key(for route: Route) -> String {
+    switch route {
+    case .next:            return "next"
+    case .filter(let f):   return "filter:\(f.navigationKey)"
+    case .area(let id):    return "area:\(id)"
+    case .project(let id): return "project:\(id)"
+    }
+  }
 }
 
 @MainActor
@@ -216,15 +284,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   func select(_ destination: KitSidebarDestination) {
-    let key: String = switch destination {
-    case .next: "next"
-    case .filter(let filter, _):
-      switch filter {
-      case .area(let id): "area:\(id)"
-      case .project(let id): "project:\(id)"
-      default: "filter:\(filter.navigationKey)"
-      }
-    }
+    selectRow(key: destination.key)
+  }
+
+  /// Same jump, named by a shared `Route` — what the Next page's title
+  /// dropdown hands back.
+  func select(_ route: Route) {
+    selectRow(key: KitSidebarDestination.key(for: route))
+  }
+
+  private func selectRow(key: String) {
     // A project inside a FOLDED area has no row at all (its parent reports
     // zero children), so unfold just THAT area — not every one of them. A
     // blanket unfold here would undo the user's folds on every navigation.
@@ -255,6 +324,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   // MARK: - Tree
+
+  /// The trailing badge for one smart list. Today and Logbook read the two
+  /// pre-computed sums the caller passes (triage band folded into Today,
+  /// "completed today" for Logbook); the rest count their own filter.
+  private func smartListCount(_ destination: KitSidebarDestination,
+                              today: Int, doneToday: Int) -> Int? {
+    switch destination {
+    case .next: return KitNextCount.open().nilIfZero
+    case .filter(let filter, _):
+      switch filter {
+      case .today:   return today.nilIfZero
+      case .logbook: return doneToday.nilIfZero
+      default:       return LocalCache.tasks(in: context, filter: filter).count.nilIfZero
+      }
+    }
+  }
 
   private func rebuild(preserving key: String?) {
     let snapshot = StructureCache.snapshot(in: context)
@@ -302,38 +387,21 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // size rides on Today's count so nothing about it is hidden.
     // Next sits beside Today (not at the foot of the Today list) — the same
     // first-class destination iOS now uses as a tab / sidebar row.
-    var views = [
-      Node(.filter(.today,
-                   title: String(localized: "Today", comment: "Smart list title"),
-                   symbol: "sun.max.fill"),
-           count: todayCount + inboxCount > 0 ? todayCount + inboxCount : nil),
-      Node(.next, count: KitNextCount.open().nilIfZero),
-      Node(.filter(.upcoming,
-                   title: String(localized: "Upcoming", comment: "Smart list title"),
-                   symbol: "calendar"),
-           count: LocalCache.tasks(in: context, filter: .upcoming).count.nilIfZero),
-      Node(.filter(.repeating,
-                   title: String(localized: "Repeating", comment: "Smart list title"),
-                   symbol: "arrow.clockwise"),
-           count: LocalCache.tasks(in: context, filter: .repeating).count.nilIfZero),
-      Node(.filter(.unscheduled,
-                   title: String(localized: "Anytime", comment: "Smart list title"),
-                   symbol: "rectangle.stack.fill"),
-           count: LocalCache.tasks(in: context, filter: .unscheduled).count.nilIfZero),
-      Node(.filter(.logbook,
-                   title: String(localized: "Logbook", comment: "Smart list title"),
-                   symbol: "checkmark"),
-           count: doneTodayCount.nilIfZero),
-    ]
+    // Set + order come from `KitSidebarDestination.smartLists`, which reads
+    // `TaskDestinations.sidebarRoutes` — the same list the title dropdown
+    // builds from, so the two can't drift. Only the counts are sidebar work.
+    var views = KitSidebarDestination.smartLists.map { destination in
+      Node(destination.nodeContent, count: smartListCount(destination,
+                                                          today: todayCount + inboxCount,
+                                                          doneToday: doneTodayCount))
+    }
     // Only shown once there's something in it — same gate the SwiftUI
     // sidebar uses, so an empty trash doesn't sit in the list forever.
     let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
     if recentlyDeletedCount > 0 {
-      views.append(Node(.filter(.recentlyDeleted,
-                                title: String(localized: "Recently Deleted",
-                                              comment: "Smart list title"),
-                                symbol: "trash"),
-                        count: recentlyDeletedCount))
+      let deleted = KitSidebarDestination.filter(.recentlyDeleted,
+                                                 title: TaskFilter.recentlyDeleted.title)
+      views.append(Node(deleted.nodeContent, count: recentlyDeletedCount))
     }
 
     let projectsByArea = Dictionary(grouping: snapshot.projects.filter { $0.deletedAt == nil },
@@ -1046,4 +1114,17 @@ private final class KitSidebarOutlineView: NSOutlineView {
     super.keyDown(with: event)
   }
 }
+
+/// Bridge to the outline view's node model. Kept here (not on the controller)
+/// so the destination list stays the single source both the tree and the title
+/// dropdown read.
+extension KitSidebarDestination {
+  var nodeContent: SeptaskKitSidebarController.Node.Content {
+    switch self {
+    case .next:                     return .next
+    case .filter(let f, let title): return .filter(f, title: title, symbol: symbol)
+    }
+  }
+}
+
 #endif

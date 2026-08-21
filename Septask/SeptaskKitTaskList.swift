@@ -165,9 +165,11 @@ final class SeptaskKitTaskListController: NSViewController {
   var onStoreChanged: (() -> Void)?
   var onToggleInspector: (() -> Void)?
   var onQuickFind: (() -> Void)?
-  /// A grouped Today/Anytime area or project header was clicked — drill into
-  /// that list, the same destination its sidebar row goes to.
-  var onNavigateToGroup: ((TaskFilter) -> Void)?
+  /// Jump to another destination — a grouped Today/Anytime area or project
+  /// header was clicked, or the title dropdown picked a list. Carries a
+  /// `KitSidebarDestination` (not a bare `TaskFilter`) because Next is a
+  /// sidebar destination without a filter of its own.
+  var onNavigate: ((KitSidebarDestination) -> Void)?
   /// Tab pressed while the list holds focus — the window owns moving focus
   /// to the sidebar (see `focusList()`'s sibling, `focusSidebar()`).
   var onFocusSidebar: (() -> Void)?
@@ -408,11 +410,19 @@ final class SeptaskKitTaskListController: NSViewController {
     // "scroll to visible" all still measure from the real content edges.
     // Fixed vertical inset (not the width-dependent side margin) — matching
     // the sides made top/bottom swell on wide windows and read as broken.
+    // The TOP is a placeholder: `viewDidLayout` grows it to clear the title
+    // bar, whose height belongs to the toolbar and isn't knowable here.
     scrollView.automaticallyAdjustsContentInsets = false
-    scrollView.contentInsets = NSEdgeInsets(top: SeptaskKitLayout.verticalInset,
+    scrollView.contentInsets = NSEdgeInsets(top: SeptaskKitLayout.titleBarGap,
                                             left: 0,
                                             bottom: SeptaskKitLayout.verticalInset,
                                             right: 0)
+    // The window title mirrors this page's big in-content title (`screenTitle`):
+    // hidden while that title is on screen, revealed once it scrolls away — so
+    // the top of the window always NAMES the destination instead of reading as
+    // a bare strip of tasks. This is the standard NSWindow title reveal, driven
+    // by the clip view's own bounds notification; no NSEvent monitor.
+    scrollView.contentView.postsBoundsChangedNotifications = true
     view = scrollView
 
     emptyLabel.font = SeptaskKitTheme.taskTitle
@@ -448,6 +458,31 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
     })
+    observers.append(NotificationCenter.default.addObserver(
+      forName: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.syncWindowTitle() }
+    })
+  }
+
+  /// Keep the first card clear of the title bar. The bar's height is the
+  /// toolbar's, which no constant here can know, so it is MEASURED:
+  /// `contentLayoutRect` is the part of the content view the bar does not
+  /// cover, so the difference is the bar. Re-read on every layout because
+  /// the toolbar's height moves with the system's toolbar settings.
+  ///
+  /// `automaticallyAdjustsContentInsets` would do the clearing on its own,
+  /// but it owns the WHOLE inset — it would drop the deliberate gap above the
+  /// first card and the one below the last.
+  override func viewDidLayout() {
+    super.viewDidLayout()
+    guard let window = view.window, let content = window.contentView else { return }
+    let barHeight = max(0, content.bounds.height - window.contentLayoutRect.height)
+    let top = barHeight + SeptaskKitLayout.titleBarGap
+    // Guarded: an unconditional assignment during layout re-enters forever.
+    if abs(scrollView.contentInsets.top - top) > 0.5 {
+      scrollView.contentInsets.top = top
+    }
   }
 
   deinit {
@@ -467,16 +502,34 @@ final class SeptaskKitTaskListController: NSViewController {
   /// triggered it. `hasShownOnce` keeps this from also swallowing the very
   /// first call at launch, when `filter` already equals the default `.today`
   /// before anything has actually loaded.
-  func show(_ filter: TaskFilter, title: String) {
+  func show(_ filter: TaskFilter) {
     if hasShownOnce, filter == self.filter { return }
     hasShownOnce = true
     cancelSettle()
     self.filter = filter
-    view.window?.subtitle = title
     reload(animated: false)
     if tableView.numberOfRows > 0 {
       tableView.scrollRowToVisible(0)
     }
+    syncWindowTitle()
+  }
+
+  /// Hide the window title while this page's own big title is on screen, show
+  /// it once that title has scrolled out — the shell's only header. Pages with
+  /// no `screenTitle` row (none today, but the row is optional) keep it shown.
+  /// Called on every scroll, on every destination change, and by the shell
+  /// when it swaps this pane back in ahead of the first scroll event.
+  func syncWindowTitle() {
+    guard let window = view.window else { return }
+    var shown = true
+    if let first = rows.first, case .screenTitle = first {
+      // Table coordinates are flipped: the clip view's origin climbs as the
+      // list scrolls, so the title row is gone once the origin has passed its
+      // bottom edge.
+      shown = scrollView.contentView.bounds.origin.y >= tableView.rect(ofRow: 0).maxY
+    }
+    let wanted: NSWindow.TitleVisibility = shown ? .visible : .hidden
+    if window.titleVisibility != wanted { window.titleVisibility = wanted }
   }
 
   /// Give the task list keyboard focus. Called once the window is on screen
@@ -2347,67 +2400,75 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `TaskNavMenu`: every sidebar destination in the SAME order (smart
   /// lists, top-level projects, each area + its projects, Recently Deleted
   /// when non-empty), a checkmark on whichever one is current, jump on
-  /// click. Icons match `Route.icon` exactly (`NavigationState.swift`) so
-  /// this can't drift from what the sidebar itself shows. Built fresh on
-  /// every click (like `TaskNavMenu`'s lazy `menuContent`), not cached —
-  /// structure changes shouldn't leave a stale menu around.
+  /// click.
+  ///
+  /// The smart-list set and order come from
+  /// `KitSidebarDestination.smartLists` — the SAME list the AppKit sidebar
+  /// builds its rows from (and, one level down, the same
+  /// `TaskDestinations.sidebarRoutes` the SwiftUI sidebar and `TaskNavMenu`
+  /// read). That's what keeps the dropdown from drifting: it used to spell
+  /// its four rows out by hand and silently lost Next and Repeating when the
+  /// sidebar gained them. Titles and icons ride off `Route` for the same
+  /// reason. Built fresh on every click (like `TaskNavMenu`'s lazy
+  /// `menuContent`), not cached — structure changes shouldn't leave a stale
+  /// menu around.
   private func buildNavMenu() -> NSMenu {
     let menu = NSMenu()
     let snapshot = StructureCache.snapshot(in: context)
 
-    func destItem(_ title: String, icon: String, filter destFilter: TaskFilter) -> NSMenuItem {
-      let menuItem = NSMenuItem(title: title, action: #selector(navMenuSelect(_:)), keyEquivalent: "")
+    // One row per destination. Title and icon both ride off the destination
+    // (`Route`-backed), so a menu row can't label or picture a list
+    // differently from its sidebar row.
+    func destItem(_ destination: KitSidebarDestination) -> NSMenuItem {
+      let menuItem = NSMenuItem(title: destination.title,
+                                action: #selector(navMenuSelect(_:)), keyEquivalent: "")
       menuItem.target = self
-      menuItem.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
-      menuItem.representedObject = destFilter
-      menuItem.state = destFilter == filter ? .on : .off
+      menuItem.image = NSImage(systemSymbolName: destination.symbol,
+                               accessibilityDescription: nil)
+      menuItem.representedObject = destination
+      // Next is its own pane, so the task list never reads as current while
+      // it's showing — the checkmark only ever lands on a filter row.
+      if case .filter(let destFilter, _) = destination {
+        menuItem.state = destFilter == self.filter ? .on : .off
+      }
       return menuItem
     }
 
-    // Smart lists — matches `TaskDestinations.smartListRoutes` exactly (Next
-    // is deliberately absent there too — it's a sidebar destination, not a
-    // Tasks one).
-    menu.addItem(destItem(String(localized: "Today", comment: "Smart list title"),
-                          icon: "sun.max.fill", filter: .today))
-    menu.addItem(destItem(String(localized: "Upcoming", comment: "Smart list title"),
-                          icon: "calendar", filter: .upcoming))
-    menu.addItem(destItem(String(localized: "Anytime", comment: "Smart list title"),
-                          icon: "rectangle.stack.fill", filter: .unscheduled))
-    menu.addItem(destItem(String(localized: "Logbook", comment: "Smart list title"),
-                          icon: "checkmark", filter: .logbook))
+    func projectItem(_ project: Project) -> NSMenuItem {
+      destItem(.filter(.project(project.id), title: project.title))
+    }
+
+    for destination in KitSidebarDestination.smartLists {
+      menu.addItem(destItem(destination))
+    }
 
     let topLevel = snapshot.projects.filter { $0.area == nil && $0.status == .active }
     if !topLevel.isEmpty {
       menu.addItem(.separator())
-      for project in topLevel {
-        menu.addItem(destItem(project.title, icon: "number", filter: .project(project.id)))
-      }
+      for project in topLevel { menu.addItem(projectItem(project)) }
     }
 
     for area in snapshot.areas {
       let areaProjects = snapshot.projects.filter { $0.area == area.id && $0.status == .active }
       menu.addItem(.separator())
-      menu.addItem(destItem(area.title, icon: "folder", filter: .area(area.id)))
-      for project in areaProjects {
-        menu.addItem(destItem(project.title, icon: "number", filter: .project(project.id)))
-      }
+      menu.addItem(destItem(.filter(.area(area.id), title: area.title)))
+      for project in areaProjects { menu.addItem(projectItem(project)) }
     }
 
     if !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty {
       menu.addItem(.separator())
-      menu.addItem(destItem(String(localized: "Recently Deleted", comment: "Smart list title"),
-                            icon: "trash", filter: .recentlyDeleted))
+      menu.addItem(destItem(.filter(.recentlyDeleted, title: TaskFilter.recentlyDeleted.title)))
     }
 
     return menu
   }
 
   @objc private func navMenuSelect(_ sender: NSMenuItem) {
-    guard let destFilter = sender.representedObject as? TaskFilter else { return }
+    guard let destination = sender.representedObject as? KitSidebarDestination else { return }
     // Same path Quick Find and a group-header click use — steer the
     // sidebar, which drives the list, so a jump always leaves the two in
     // agreement.
-    onNavigateToGroup?(destFilter)
+    onNavigate?(destination)
   }
 
   /// Right-click on a heading row: rename (same field-editor path as any
@@ -3013,7 +3074,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.configure(title: title, icon: icon, count: count,
                      isNavigable: target != nil,
                      showsQuickAdd: showsGroupedHeaderQuickAdd && target != nil)
-      cell.onTap = target.map { filter in { [weak self] in self?.onNavigateToGroup?(filter) } }
+      cell.onTap = target.map { filter in
+        { [weak self] in self?.onNavigate?(.filter(filter, title: filter.title)) }
+      }
       cell.onQuickAdd = { [weak self] in self?.createTask(underHeaderId: id) }
       return cell
 
@@ -3035,7 +3098,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? KitProjectTargetCell(identifier: identifier)
       cell.configure(title: title, progress: progress)
       cell.onTap = { [weak self] in
-        self?.onNavigateToGroup?(.project(id))
+        self?.onNavigate?(.filter(.project(id), title: title))
       }
       return cell
 

@@ -170,6 +170,12 @@ enum SeptaskKitLayout {
   /// the title bar and the last one clears the toolbar.
   static let verticalInset: CGFloat = 48
 
+  /// Clear space between the BOTTOM of the title bar and the first row. The
+  /// bar now carries its own height (a unified toolbar), so the top gap is
+  /// measured from the bar rather than from the window edge — `verticalInset`
+  /// stays the bottom-of-list breathing room, which has no bar under it.
+  static let titleBarGap: CGFloat = 20
+
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {
     min(maxInset, max(minInset, width * marginFraction))

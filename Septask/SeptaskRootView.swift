@@ -2,14 +2,17 @@ import SwiftUI
 
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
-/// module" in both apps; Today, Next, and Upcoming are first-class destinations
-/// (Next matches the AppKit sidebar page — not a fold under Today); the
+/// module" in both apps; Today and Upcoming are first-class destinations; the
 /// trailing `search` tab is a genuine Search destination — the ONLY thing
 /// iOS 26 renders in the tab bar's detached trailing slot (a `role: .search`
 /// tab). Quick-add is NOT a tab: every list already carries a nav-bar `+`
 /// (`pageChrome`) and ⌘N, so capture lives there, not in the bar.
+///
+/// Next is NOT a tab. It stays a sidebar destination (AppKit shell, iPad
+/// split), so on iPhone it pushes inside the Tasks stack — the `.next` route
+/// below selects Tasks, not a tab of its own.
 enum SeptaskTab: Hashable {
-  case tasks, today, next, upcoming, search
+  case tasks, today, upcoming, search
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -136,7 +139,6 @@ struct SeptaskRootView: View {
       guard hSize == .compact, let last = path.last else { return }
       switch last {
       case .filter(.today):    selection = .today
-      case .next:              selection = .next
       case .filter(.upcoming): selection = .upcoming
       default:                 selection = .tasks
       }
@@ -163,9 +165,6 @@ struct SeptaskRootView: View {
       }
       Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
         NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
-      }
-      Tab("Next", systemImage: "arrow.right", value: SeptaskTab.next) {
-        NavigationStack { SeptaskNextPage() }.tint(theme.accent)
       }
       Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
         NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
