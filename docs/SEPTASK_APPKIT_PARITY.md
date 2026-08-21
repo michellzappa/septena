@@ -423,9 +423,18 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 - **[P3] Task patterns section.**
 - **[P3] Time travel sheet** (DayClock debug offset). The shell honors
   `SeptenaDate.today` everywhere, but can't *change* it.
-- **[P3] Welcome / onboarding gate.** Only on the SwiftUI window — a fresh
-  install launching into the shell sees no welcome. Needs a decision before
-  anyone but MZ installs this.
+- **[DONE] Welcome / onboarding gate.** `SeptaskKitWelcome.swift` hosts the
+  SAME `SeptaskWelcomeView` the SwiftUI gate uses, as a sheet over the shell
+  window, against the same `septask.welcome.completed` key and the same
+  demo-seed bypass. Hosted rather than ported for the same reason Settings is
+  (a welcome is a form surface, not a latency surface), so there is one
+  welcome with two presenters. The view is now internal with an explicit
+  `init(onComplete:)` — its memberwise init is `private`, because its stored
+  properties are, so the AppKit host could not otherwise construct it. The
+  sheet's style mask deliberately omits `.closable`: "Get Started" is the only
+  exit, the AppKit counterpart of `.interactiveDismissDisabled()`. Mounted
+  from `SeptaskMacAppDelegate` (both at launch and on Dock-reopen, in case the
+  shell window wasn't up the first time), NOT from `SeptaskKitWindow.swift`.
 
 ## 6. Platform integration
 
@@ -442,8 +451,24 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
   shell offers: complete/reopen (single + batch + the composer's checkbox),
   delete/restore, rename, move, **When / Deadline / Clear Dates / Today toggle
   / repeat**, and **create / duplicate / paste**. Standard ⌘Z / ⌘⇧Z, standard
-  Edit menu. The SwiftUI shell still has no undo at all, so this is net-new
-  capability, not parity.
+  Edit menu.
+  - **The stack is now SHARED, not shell-owned** (`SeptenaCore/TaskUndo.swift`).
+    Owning it here made ⌘Z a property of one of four task surfaces: a user who
+    learned it on the Mac lost it on iPhone, where ⌘Z isn't even inert — it
+    reaches whatever text field holds focus, so the mistake looks handled when
+    it wasn't. `kitUndoManager` is now a computed property returning
+    `TaskUndo.manager`; nothing else in this controller changed, it just
+    registers its inverses somewhere the other surfaces can see. The helpers
+    (`ScheduleSnapshot`, `recordCreate`, the restore-order rule) moved to core
+    verbatim, and the SwiftUI list now records complete / delete / dates /
+    Today / repeat against the same stack. iOS gets shake-to-undo and the
+    three-finger gesture for free: the app delegates override
+    `UIResponder.undoManager`, which is the last stop in the responder chain,
+    so a focused text field still wins for typing.
+    Recording stays EXPLICIT and never happens inside `TaskMutator` — the
+    mutators are also driven by CloudKit applies, the 30-day purge, recurrence
+    spawning, and the watch, and recording there would put sync traffic on the
+    user's undo stack and let ⌘Z "undo" another device's edit.
   - Scheduling undo goes through **`ScheduleSnapshot`** — capture
     `scheduled` / `today` / `deadline` / `recurrence` before the change,
     replay them through the same mutators after. **Restore order is
@@ -481,14 +506,32 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 - **[P3] Live text-size refresh** — rows pick up a new text size on the next
   reload, not immediately.
 - **[P3] Services / Share / Print menus.**
+- **[P2] Claude reconnect cue.** The shell draws none. `ClaudeReconnectCue` is
+  gated `#if SEPTASK && os(macOS)` inside `TaskListView`, which only renders in
+  the classic window — so the default shell has no in-app recovery affordance.
+  The auth path itself is fine on macOS: `ASWebAuthenticationSession` already
+  presents over an `NSWindow` anchor, and the gateway holds ONE rotating token,
+  so a Mac re-mint serves every device. The macOS pre-expiry NOTIFICATION now
+  works (`ClaudeReconnectNudge` is gated on `canImport(UserNotifications)`, and
+  `SeptaskMacAppDelegate` handles the tap), so this is the remaining half.
 
 ## 7. Smaller behavior gaps
 
-- **[P2] Recurrence presets only** — Never / Daily / Weekly / Every 2 Weeks /
-  Monthly. No custom interval and no `afterCompletion` toggle (the model has
-  both). A rule set elsewhere displays correctly but can't be edited here.
-- **[P3] Today "review" band** — overdue-scheduled rows that the SwiftUI Today
-  response separates out (`review`) are just ordinary Today rows in the shell.
+- **[DONE] Custom recurrence.** `SeptaskKitDatePopover.swift` — interval
+  `NSTextField` + `NSStepper` (1–99, clamped by a `NumberFormatter`), unit
+  popup, and an after-completion / on-scheduled-date mode popup, with a live
+  cadence sentence. `RecurrencePickerSheet` was rewritten to the same shape in
+  the same change, so the two editors read as one control in two toolkits.
+- **[P3] Today "review" band** — CORRECTION to the earlier entry here, which
+  described a bucket the SwiftUI shell does not have. There is no second
+  section: `TaskListView.rolledInReview` filters the rows ALREADY on Today for
+  a `scheduled` date strictly before today, and renders one dismissible
+  banner above the cards — "N tasks rolled into Today", gold `arrow.down.
+  circle.fill` glyph, Dismiss button writing today's date to
+  `septena.newTodos.dismissedDate` so it returns tomorrow. Porting it is one
+  unselectable table row sharing that same UserDefaults key, NOT a new
+  grouping. (The old `review` bucket was only ever assigned `[]` — that is why
+  the banner never appeared before it was rewritten to read `items`.)
 - **[DONE] "Show N logged items" footer** on project/area pages — same copy,
   same UserDefaults key as `TaskListView.scopeLoggedExpandedData`, so
   expand/collapse state agrees between both shells.
@@ -510,9 +553,13 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 1. **Task Conversations** (§2) — plan in `docs/SEPTASK_CONVERSATIONS_PLAN.md`.
    Biggest remaining feature loss; the data is live today.
 2. **Reminders inbox import** (§5) — the last [P2] outside §2.
-3. **Custom recurrence** (§7) — interval + `afterCompletion`; the model has
-   both and a rule set elsewhere displays but can't be edited here.
-4. Everything else in §5/§6/§7 as it comes up.
+3. **Claude reconnect cue** (§6) — the shell has no in-app recovery
+   affordance; the macOS notification half already landed.
+4. **Row cues** (§3) — check celebration, promote flash, filing-suggestion
+   capsule. These are a reading vocabulary: a surface that can't draw a cue
+   renders the row as if the cue were absent, which is worse than an obviously
+   missing feature.
+5. Everything else in §5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 
