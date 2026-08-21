@@ -407,7 +407,9 @@ private struct SeptaskHomePane: View {
 /// scheduler is SectionRegistry-driven and doesn't run here; task deadline
 /// reminders are the planned addition.
 private struct SeptaskNotificationsPane: View {
-  @AppStorage(SettingsKey.badgeShowOverdue) private var taskBadge: Bool = false
+  // Shared with Septena through the App Group — see `BadgeManager`.
+  @AppStorage(SettingsKey.badgeShowOverdue, store: SeptenaAppGroup.defaults)
+  private var taskBadge: Bool = false
   @AppStorage(ClaudeGatewayProvider.connectionNudgeKey) private var claudeNudge: Bool = true
 
   var body: some View {

@@ -15,7 +15,11 @@ struct TaskSettingsSections: View {
   @Environment(SettingsStore.self) private var store
   #endif
 
-  @AppStorage(SettingsKey.badgeShowOverdue)   private var taskBadge: Bool = false
+  // Shared App Group, not per-app defaults: both apps badge the same overdue
+  // tasks, so two independent opt-ins showed two dock dots for one set of work
+  // (see `BadgeManager`). One key, written by whichever app you happen to be in.
+  @AppStorage(SettingsKey.badgeShowOverdue, store: SeptenaAppGroup.defaults)
+  private var taskBadge: Bool = false
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
   #if !SEPTASK

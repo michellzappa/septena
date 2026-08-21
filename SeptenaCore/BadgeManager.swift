@@ -10,10 +10,18 @@ import AppKit
 
 // Drives the app-icon badge from local overdue-task state.
 //
-// Reacts to: the General toggle (UserDefaults `septena.badge.showOverdue`)
-// and `.septenaTasksChanged` (posted after every task mutation / CK apply).
+// Reacts to: the General toggle (`septena.badge.showOverdue`) and
+// `.septenaTasksChanged` (posted after every task mutation / CK apply).
 // Recomputes via LocalCache.overdueCount — same definition the Today sidebar
 // pill uses, so the icon and the in-app pill always agree.
+//
+// The toggle lives in the SHARED App Group, not per-app UserDefaults. Septena
+// and Septask badge the same overdue tasks off the same CloudKit zone, so two
+// independent opt-ins meant two dock dots for one set of work — which reads as
+// twice as many overdue tasks, not as two apps. One key, one owner.
+// Cross-process propagation is not live: the other app picks up a change on
+// its next launch or foreground refresh. That is enough to keep the two from
+// disagreeing, which is the actual defect.
 
 @MainActor
 @Observable
@@ -30,6 +38,9 @@ final class BadgeManager {
 
   func start(context: ModelContext) {
     contextRef = context
+    // One-shot: carry a pre-existing per-app opt-in into the group, so an
+    // update doesn't silently reset the badge to off.
+    SeptenaAppGroup.migrateIfNeeded(key: Self.defaultsKey)
     refresh()
     let center = NotificationCenter.default
     observer = center.addObserver(forName: .septenaTasksChanged,
@@ -50,7 +61,7 @@ final class BadgeManager {
   }
 
   private func refresh(context: ModelContext) {
-    let enabled = UserDefaults.standard.bool(forKey: Self.defaultsKey)
+    let enabled = SeptenaAppGroup.defaults.bool(forKey: Self.defaultsKey)
     let count = enabled ? LocalCache.overdueCount(in: context) : 0
     apply(count: enabled ? count : 0, enabled: enabled)
   }
