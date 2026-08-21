@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1629,
+      "build": 1631,
       "date": "2026-08-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, joins Septena",
-          "detail": "A dedicated task app for iPhone, iPad, and Mac that shares your Septena task data, with its own watch app, widgets, and Next feed.",
+          "title": "Meet Septask, a focused task app",
+          "detail": "A new lightweight app for just your tasks, sharing the same private data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks are far more reliable",
-          "detail": "Pause and resume a repeating series, reschedule the whole series at once, and browse a dedicated repeating-tasks list.",
+          "title": "Recurring tasks that just work",
+          "detail": "Pause, resume, and reschedule repeating tasks, and completing one now spawns its next occurrence automatically.",
           "section": "tasks"
         },
         {
-          "title": "Undo now works the same everywhere you manage tasks",
-          "detail": "One shared undo stack covers delete, move, defer, and completion across iPhone, iPad, Mac, and watch.",
+          "title": "Recover recently deleted tasks",
+          "detail": "Deleted tasks are kept for 30 days with undo before they're purged for good.",
           "section": "tasks"
         },
         {
-          "title": "Attach files and photos to tasks",
-          "detail": null,
+          "title": "Attach files to tasks and drag to organize",
+          "detail": "Add attachments, drag tasks onto Today or between projects, and file several tasks at once.",
           "section": "tasks"
         },
         {
-          "title": "Re-logging a meal now scales by portion, not a multiplier",
-          "detail": "You can also re-log a meal that's already logged today, and photo-scan can prefill a meal's fields.",
+          "title": "Import your tasks from Things",
+          "detail": "Bring over a Things database export, including its headings as project sections.",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo to log a meal",
+          "detail": "On-device photo analysis prefills a meal's details, and re-logging now scales the portion instead of just multiplying it.",
           "section": "nutrition"
         },
         {
-          "title": "Reworked training session editor",
-          "detail": "Editable start and end times, one-tap progression hints, and effort-weighted muscle volume tracking.",
+          "title": "Richer training sessions",
+          "detail": "Editable start and end times, per-set progression hints, and effort-weighted muscle volume tracking.",
           "section": "training"
         },
         {
-          "title": "Claude reconnect prompts now show up consistently",
-          "detail": "The reconnect nudge appears on Mac and in Septask too, not just iOS Septena.",
-          "section": null
-        },
-        {
-          "title": "Smoother hover, selection, and tap targets throughout",
-          "detail": "Consistent hover highlighting on tiles and rows, and fixed spots where taps near the edge of a row were missed.",
-          "section": null
+          "title": "Pin goals to your dashboard",
+          "detail": "Track favorite goals right from the home screen, with suggested goals now offered across more sections.",
+          "section": "goals"
         }
       ]
     },
