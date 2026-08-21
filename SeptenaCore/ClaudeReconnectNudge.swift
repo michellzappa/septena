@@ -1,6 +1,6 @@
 import Foundation
 
-#if canImport(UIKit)
+#if canImport(UserNotifications)
 import UserNotifications
 #endif
 
@@ -9,6 +9,18 @@ import UserNotifications
 /// recently foregrounded app claims the reminder; a running sibling withdraws
 /// its copy through a Darwin notification. Either app can always re-mint the
 /// gateway token when the user taps the reminder.
+///
+/// Runs on macOS as well as iOS. The gate is `canImport(UserNotifications)`,
+/// not `canImport(UIKit)`: `ASWebAuthenticationSession` already presents over
+/// an `NSWindow` anchor, so the Mac can mint the same token, and the gateway
+/// holds ONE rotating credential — a refresh from any app on any device
+/// replaces it. Each device still tracks its own last mint (the shared App
+/// Group and the token Keychain are both device-local), so two devices can
+/// each hold a pending reminder; whichever the user answers wins.
+///
+/// Every app that schedules this must also handle the tap. The action id is
+/// `NotificationActionID.claudeReconnect` — see `MacAppDelegate` (Septena) and
+/// `SeptaskMacAppDelegate` (Septask) for the macOS handlers.
 @MainActor
 public final class ClaudeReconnectNudge {
   public static let shared = ClaudeReconnectNudge()
@@ -17,7 +29,7 @@ public final class ClaudeReconnectNudge {
   private static let notificationMasterKey = "septena.notify.enabled"
   private static let stateChangedDarwinName = "com.septena.claudeGateway.changed"
 
-  #if canImport(UIKit)
+  #if canImport(UserNotifications)
   private var observers: [NSObjectProtocol] = []
   private var started = false
   #endif
@@ -28,7 +40,7 @@ public final class ClaudeReconnectNudge {
   /// notification permission; the owning Settings surface does that only
   /// after the user explicitly visits Notifications.
   public func start() {
-    #if canImport(UIKit)
+    #if canImport(UserNotifications)
     guard !started else {
       activate()
       return
@@ -64,7 +76,7 @@ public final class ClaudeReconnectNudge {
   /// reconnect in the app they are actually using without suppressing an
   /// already-authorized sibling app.
   public func activate() {
-    #if canImport(UIKit)
+    #if canImport(UserNotifications)
     Task { @MainActor [weak self] in await self?.claimIfEligibleAndReconcile() }
     #endif
   }
@@ -72,7 +84,7 @@ public final class ClaudeReconnectNudge {
   /// Recompute the single pending alert. Public so Settings can withdraw it
   /// immediately when its per-app toggle changes.
   public func reconcile() {
-    #if canImport(UIKit)
+    #if canImport(UserNotifications)
     Task { @MainActor [weak self] in await self?.apply() }
     #endif
   }
@@ -81,7 +93,7 @@ public final class ClaudeReconnectNudge {
   /// This is the Septask equivalent of Septena's notifications permission
   /// flow; a first launch never shows a surprise system prompt.
   public func requestAuthorizationIfNeeded() async {
-    #if canImport(UIKit)
+    #if canImport(UserNotifications)
     let center = UNUserNotificationCenter.current()
     let status = await center.notificationSettings().authorizationStatus
     if status == .notDetermined {
@@ -91,7 +103,7 @@ public final class ClaudeReconnectNudge {
     #endif
   }
 
-  #if canImport(UIKit)
+  #if canImport(UserNotifications)
   private func registerCategory() {
     let center = UNUserNotificationCenter.current()
     // Capture only immutable Sendable values in UserNotifications' completion

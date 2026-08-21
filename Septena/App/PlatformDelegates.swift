@@ -180,8 +180,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
 #if canImport(AppKit)
 import AppKit
+import UserNotifications
 
-final class MacAppDelegate: NSObject, NSApplicationDelegate {
+final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
   static weak var ckEngine: CKEngine?
   static weak var navigation: NavigationState?
   static var pendingOpenNewTask = false
@@ -197,6 +198,45 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
                    didReceiveRemoteNotification userInfo: [String: Any]) {
     Task { @MainActor in
       await Self.ckEngine?.handleRemoteNotification(userInfo)
+    }
+  }
+
+  /// Become the notification delegate so the Claude reconnect nudge's tap and
+  /// inline action route here. The Mac schedules the same nudge the phone does
+  /// (`ClaudeReconnectNudge`), and without a delegate the tap would just
+  /// foreground the app without re-minting.
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    UNUserNotificationCenter.current().delegate = self
+  }
+
+  /// Show the banner even while the app is frontmost — same honesty as iOS:
+  /// the nudge still matters if you aren't looking at Settings.
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound])
+  }
+
+  /// macOS counterpart of the iOS handler above. Only the Claude nudge is
+  /// scheduled on this platform, so this handles that one action; a plain tap
+  /// on it re-mints too (the "refresh on open" path).
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let actionID = response.actionIdentifier
+    let userInfo = response.notification.request.content.userInfo
+    Task { @MainActor in
+      // Idempotent — binds the mutators' CKEngine if this raced the scene.
+      await SeptenaServices.shared.start()
+      if actionID == NotificationActionID.claudeReconnect || userInfo["claudeReconnect"] != nil {
+        await ClaudeGatewayProvider.shared.refreshIfNeeded(force: true)
+        ClaudeReconnectNudge.shared.reconcile()
+      }
+      completionHandler()
     }
   }
 

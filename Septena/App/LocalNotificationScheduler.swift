@@ -22,9 +22,15 @@ import UserNotifications
 // so each fires at the next occurrence and is re-armed on the following
 // reconcile (cold launch, foreground, or any section data change).
 //
-// macOS has no `UserNotifications` scheduling surface we use here, so the
-// whole body is `#if canImport(UIKit)` — on Mac the scheduler is an inert
-// singleton, exactly like BadgeManager's platform split.
+// The SECTION nudges are `#if canImport(UIKit)` — on Mac that half of the
+// scheduler is inert, exactly like BadgeManager's platform split.
+//
+// The Claude reconnect nudge is NOT part of that half. It lives in
+// `ClaudeReconnectNudge` (SeptenaCore) and schedules on macOS too, so the
+// `start()` call below is deliberately outside the platform gate. The Mac can
+// re-mint the gateway token — `ASWebAuthenticationSession` presents over an
+// `NSWindow` anchor — so a Mac-only user gets the same pre-expiry reminder.
+// `MacAppDelegate` handles the tap.
 
 @MainActor
 final class LocalNotificationScheduler {
