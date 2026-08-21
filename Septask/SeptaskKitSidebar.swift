@@ -814,7 +814,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// to the count), and the count badge. Every row — filter, area, project —
   /// shares this exact layout, so nothing needs per-kind alignment.
   @MainActor
-  fileprivate final class SidebarCell: NSTableCellView {
+  fileprivate final class SidebarCell: NSTableCellView, NSTextFieldDelegate {
     let badge = NSTextField(labelWithString: "")
     /// An area's user glyph sits where the icon would — same slot, so titles
     /// stay aligned whether an area has an emoji or the muted dot.
@@ -823,6 +823,56 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// `shouldShowOutlineCellForItem`.
     let disclosure = KitDisclosureView()
     var onToggleDisclosure: (() -> Void)?
+
+    /// Inline rename — the Finder idiom, and the shell's ONE answer to
+    /// "name this thing" (see SeptaskKitSurface.swift: naming is not one of
+    /// the three surface tiers, it happens in the row that holds the name).
+    /// The label turns into a field for the duration of the edit and turns
+    /// back after, so nothing about the row's layout moves.
+    private var renameCommit: ((String) -> Void)?
+    private var titleBeforeRename = ""
+
+    func beginRename(onCommit: @escaping (String) -> Void) {
+      guard let text = textField else { return }
+      renameCommit = onCommit
+      titleBeforeRename = text.stringValue
+      text.isEditable = true
+      text.isSelectable = true
+      text.drawsBackground = true
+      text.backgroundColor = .textBackgroundColor
+      text.focusRingType = .default
+      text.delegate = self
+      text.window?.makeFirstResponder(text)
+      text.currentEditor()?.selectAll(nil)
+    }
+
+    private func endRename(commit: Bool) {
+      guard let text = textField else { return }
+      let value = text.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      let handler = renameCommit
+      renameCommit = nil
+      text.isEditable = false
+      text.isSelectable = false
+      text.drawsBackground = false
+      text.focusRingType = .none
+      text.delegate = nil
+      // An empty name is a cancel, not a rename to "" — same rule Finder uses.
+      guard commit, !value.isEmpty, value != titleBeforeRename else {
+        text.stringValue = titleBeforeRename
+        return
+      }
+      handler?(value)
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
+
+    func control(_ control: NSControl, textView: NSTextView,
+                 doCommandBy commandSelector: Selector) -> Bool {
+      guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+      endRename(commit: false)
+      window?.makeFirstResponder(nil)
+      return true
+    }
 
     init(identifier: NSUserInterfaceItemIdentifier) {
       super.init(frame: .zero)
@@ -952,13 +1002,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.selectedRow >= 0 ? outlineView.item(atRow: outlineView.selectedRow) as? Node : nil
   }
 
+  /// New Area lands a named row and opens it for editing, the way Finder
+  /// lands "untitled folder". It used to stop the whole app with a modal text
+  /// prompt to ask for a string the row can take directly.
   @objc func newArea() {
-    guard let title = KitPrompt.text(
-      title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"),
-      placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
-      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
-    ) else { return }
-    Task { try? await areasMutator.create(title: title) }
+    Task { [weak self] in
+      guard let self,
+            let area = try? await self.areasMutator.create(
+              title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"))
+      else { return }
+      self.rebuild(preserving: "area:\(area.id)")
+      self.beginRename(key: "area:\(area.id)")
+    }
   }
 
   @objc private func newProjectLoose() { newProject(inArea: nil) }
@@ -971,34 +1026,44 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc func newProject() { newProject(inArea: nil) }
 
   private func newProject(inArea areaId: String?) {
-    guard let title = KitPrompt.text(
-      title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
-      placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
-      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
-    ) else { return }
-    Task { try? await projectsMutator.create(title: title, area: areaId) }
+    Task { [weak self] in
+      guard let self,
+            let project = try? await self.projectsMutator.create(
+              title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
+              area: areaId)
+      else { return }
+      self.rebuild(preserving: "project:\(project.id)")
+      self.beginRename(key: "project:\(project.id)")
+    }
   }
 
   @objc private func renameSelected() {
-    switch selectedNode?.content {
+    guard let key = selectedKey() else { return }
+    beginRename(key: key)
+  }
+
+  /// Turn the row's label into a field and write the result through the
+  /// matching mutator. One rename path for areas and projects, and the same
+  /// one the ⌘R menu item, the context menu and a fresh row all use.
+  private func beginRename(key: String) {
+    guard let row = row(forKey: key),
+          let node = outlineView.item(atRow: row) as? Node,
+          let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: true) as? SidebarCell
+    else { return }
+    outlineView.selectRowIndexes([row], byExtendingSelection: false)
+    outlineView.scrollRowToVisible(row)
+
+    switch node.content {
     case .area(let area):
-      guard let title = KitPrompt.text(
-        title: String(localized: "Rename Area", comment: "SeptaskKit: structure CRUD"),
-        placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
-        initial: area.title,
-        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
-      )
-      else { return }
-      Task { try? await areasMutator.rename(id: area.id, to: title) }
+      cell.beginRename { [weak self] title in
+        guard let self else { return }
+        Task { try? await self.areasMutator.rename(id: area.id, to: title) }
+      }
     case .project(let project, _):
-      guard let title = KitPrompt.text(
-        title: String(localized: "Rename Project", comment: "SeptaskKit: structure CRUD"),
-        placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
-        initial: project.title,
-        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
-      )
-      else { return }
-      Task { try? await projectsMutator.rename(id: project.id, to: title) }
+      cell.beginRename { [weak self] title in
+        guard let self else { return }
+        Task { try? await self.projectsMutator.rename(id: project.id, to: title) }
+      }
     default:
       break
     }

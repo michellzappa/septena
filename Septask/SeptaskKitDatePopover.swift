@@ -1,9 +1,10 @@
 #if os(macOS)
 import AppKit
 
-// The AppKit shell's date pickers: ⌘S "When" and ⌘⇧D "Deadline", presented as
-// a native NSPopover anchored to the selected row (the platform's standard
-// device for a small scoped editor — no sheet, no modal window).
+// The AppKit shell's date pickers: ⌘S "When" and ⌘⇧D "Deadline". TIER 1
+// surfaces (SeptaskKitSurface.swift): each edits one attribute of one row, so
+// each is a popover anchored to that row — no sheet, no modal window. The
+// Repeat editor below is the third member of that family.
 //
 // Layout is a quick row over a ONE-WEEK day strip, the shape Things uses:
 // scheduling answers "which of the next few days", so the popover shows the
@@ -22,7 +23,7 @@ import AppKit
 // Clear. Every write goes through TaskMutator via the caller's closure — this
 // type owns presentation only.
 @MainActor
-final class SeptaskKitDatePopover: NSViewController {
+enum SeptaskKitDatePopover {
 
   enum Kind {
     case when
@@ -48,340 +49,232 @@ final class SeptaskKitDatePopover: NSViewController {
   /// from a dated schedule for `.when`.
   typealias Handler = (_ date: Date?, _ today: Bool) -> Void
 
-  private let kind: Kind
-  private let initial: Date?
-  private let handler: Handler
-  private var board: KitDateBoard?
-  private weak var popover: NSPopover?
-
-  init(kind: Kind, initial: Date?, handler: @escaping Handler) {
-    self.kind = kind
-    self.initial = initial
-    self.handler = handler
-    super.init(nibName: nil, bundle: nil)
-  }
-
-  required init?(coder: NSCoder) { fatalError("SeptaskKitDatePopover is code-only") }
-
-  /// Anchor to `rect` in `view` and show. Returns nothing — the handler fires
-  /// on choice, and the popover closes itself.
+  /// Anchor to `rect` in `view` and show. The handler fires on choice, and the
+  /// popover closes itself. Chrome, material and radius come from
+  /// `KitPopover` — this type owns the board, not the glass.
   static func present(kind: Kind, initial: Date?, relativeTo rect: NSRect,
                       of view: NSView, handler: @escaping Handler) {
-    let controller = SeptaskKitDatePopover(kind: kind, initial: initial, handler: handler)
-    let popover = NSPopover()
-    popover.contentViewController = controller
-    popover.behavior = .transient
-    controller.popover = popover
-    popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
-  }
-
-  override func loadView() {
-    // Genuine vibrancy, not the flat/washed-out look a bare `NSStackView`
-    // popover falls back to — same `.popover` material + rounded, masked
-    // layer as `SeptaskKitQuickFind`/`SeptaskKitQuickEntry`'s panels, so
-    // every floating AppKit surface in the shell reads as one glass family.
-    let content = NSVisualEffectView()
-    content.material = .popover
-    content.state = .active
-    content.wantsLayer = true
-    content.layer?.cornerRadius = 14
-    content.layer?.masksToBounds = true
-
-    let board = KitDateBoard(kind: kind, initial: initial) { [weak self] date, today in
-      self?.finish(date: date, today: today)
-    } onCancel: { [weak self] in
-      self?.popover?.performClose(nil)
+    let handle = KitPopoverHandle()
+    let board = KitDateBoard(kind: kind, initial: initial) { date, today in
+      handler(date, today)
+      handle.close()
+    } onCancel: {
+      handle.close()
     }
-    board.translatesAutoresizingMaskIntoConstraints = false
-    content.addSubview(board)
-    NSLayoutConstraint.activate([
-      board.topAnchor.constraint(equalTo: content.topAnchor),
-      board.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-      board.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-      board.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-    ])
-    self.board = board
-    view = content
-  }
-
-  override func viewDidAppear() {
-    super.viewDidAppear()
-    // Claim first responder so ↑/↓/←/→/Return reach the board. Without this
-    // the popover window routes keys nowhere and the picker is mouse-only.
-    if let board { view.window?.makeFirstResponder(board) }
-  }
-
-  private func finish(date: Date?, today: Bool) {
-    handler(date, today)
-    popover?.performClose(nil)
+    // `focus:` claims first responder on appear. Without it the popover routes
+    // keys nowhere and the picker is mouse-only.
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board, handle: handle)
   }
 }
 
 // MARK: - Repeat editor
 
-/// The value returned by the AppKit Repeat editor. The rule and its paused
-/// state are committed together so a resumed series can never accidentally
-/// lose its cadence (or create an occurrence while the panel is open).
+/// The value the Repeat editor commits. The rule and its paused state are
+/// committed together so a resumed series can never accidentally lose its
+/// cadence (or create an occurrence while the editor is open).
 struct SeptaskKitRecurrencePanelResult {
   let recurrence: Recurrence?
   let paused: Bool
 }
 
-/// Things-inspired Repeat editor for the native shell. Repeat is deliberately
-/// a panel, not a menu of presets: the same surface edits the cadence, anchor
-/// mode, and pause state, and it can also stop the series.
+/// The Repeat editor — a TIER 1 anchored popover, exactly like When and
+/// Deadline (SeptaskKitSurface.swift). It edits one attribute of one row, so
+/// it hangs off that row.
+///
+/// It used to be a titled floating utility window with its own title bar, a
+/// second in-content heading, a hardcoded blue icon badge, and an OK button:
+/// four kinds of chrome no other surface in the shell has, for a job the other
+/// surfaces do with none. All four are gone.
+///
+/// Commit contract is `close-commits`, the shell's contract for a surface with
+/// SEVERAL fields (the inspector's is the same): the controls edit a draft and
+/// dismissal accepts it. Writing on every step would push one CloudKit change
+/// per click of the stepper. "Don't Repeat" is terminal — it writes and closes
+/// on the spot, the way the date board's "Clear (Anytime)" row does.
 @MainActor
-final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDelegate {
-  private static var current: SeptaskKitRecurrencePanelController?
+enum SeptaskKitRepeatPopover {
+  static func present(initial: Recurrence?, paused: Bool, hasScheduledDate: Bool,
+                      relativeTo rect: NSRect, of view: NSView,
+                      onCommit: @escaping (SeptaskKitRecurrencePanelResult) -> Void) {
+    let board = KitRepeatBoard(initial: initial, paused: paused,
+                               hasScheduledDate: hasScheduledDate)
+    let handle = KitPopoverHandle()
+    board.onTerminal = { result in
+      onCommit(result)
+      handle.close()
+    }
+    KitPopover.present(board, relativeTo: rect, of: view, focus: board, handle: handle) {
+      // Dismissal accepts the draft — unless a terminal row already answered,
+      // or nothing actually changed.
+      guard let result = board.pendingResult else { return }
+      onCommit(result)
+    }
+  }
+}
+
+/// The Repeat popover's body. Same vocabulary as the date board: a stack of
+/// controls, a separator, then terminal rows in the shell's one row shape.
+@MainActor
+private final class KitRepeatBoard: NSView {
+
+  /// Fired by a terminal row ("Don't Repeat") — commits and closes at once.
+  var onTerminal: ((SeptaskKitRecurrencePanelResult) -> Void)?
 
   private let initial: Recurrence?
   private let hasScheduledDate: Bool
   private var paused: Bool
-  private let onCommit: (SeptaskKitRecurrencePanelResult) -> Void
+  /// The paused flag as opened, so `pendingResult` can tell an edit from a look.
+  private let wasPaused: Bool
   private var didFinish = false
 
-  private let modePopup = NSPopUpButton()
-  private let unitPopup = NSPopUpButton()
   private let intervalField = NSTextField(string: "1")
   private let intervalStepper = NSStepper()
-  private let scheduleHint = NSTextField(labelWithString: "")
+  private let unitControl = NSSegmentedControl()
+  private let modeControl = NSSegmentedControl()
   private let cadenceDescription = NSTextField(labelWithString: "")
-  private let modeFallback = NSTextField(labelWithString: "After completion")
-  private let pauseButton = NSButton()
+  private let scheduleHint = NSTextField(labelWithString: "")
+  private var pauseCell: KitDateCell?
 
-  static func present(initial: Recurrence?, paused: Bool,
-                      hasScheduledDate: Bool,
-                      onCommit: @escaping (SeptaskKitRecurrencePanelResult) -> Void) {
-    if let current {
-      current.window?.makeKeyAndOrderFront(nil)
-      return
-    }
-    let controller = SeptaskKitRecurrencePanelController(
-      initial: initial,
-      paused: paused,
-      hasScheduledDate: hasScheduledDate,
-      onCommit: onCommit)
-    current = controller
-    controller.showWindow(nil)
-    controller.window?.center()
-    controller.window?.makeKeyAndOrderFront(nil)
-  }
+  private static let width: CGFloat = 288
 
-  init(initial: Recurrence?, paused: Bool, hasScheduledDate: Bool,
-       onCommit: @escaping (SeptaskKitRecurrencePanelResult) -> Void) {
+  init(initial: Recurrence?, paused: Bool, hasScheduledDate: Bool) {
     self.initial = initial
     self.hasScheduledDate = hasScheduledDate
     self.paused = paused
-    self.onCommit = onCommit
-
-    let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 520, height: 320),
-                        styleMask: [.titled, .closable, .utilityWindow],
-                        backing: .buffered, defer: false)
-    panel.title = String(localized: "Repeat", comment: "Repeat editor title")
-    panel.isFloatingPanel = true
-    panel.level = .floating
-    panel.hidesOnDeactivate = false
-    panel.minSize = NSSize(width: 480, height: 250)
-    super.init(window: panel)
-    panel.delegate = self
-    panel.titleVisibility = .visible
-    // An NSWindowController has no `loadView`, so the body is built here and
-    // installed as the panel's contentView. `present` calls `showWindow`
-    // straight after init, which would otherwise put an empty panel on screen.
-    buildContent(in: panel)
+    self.wasPaused = paused
+    super.init(frame: .zero)
+    build()
   }
 
-  required init?(coder: NSCoder) { fatalError("SeptaskKitRecurrencePanelController is code-only") }
+  required init?(coder: NSCoder) { fatalError("KitRepeatBoard is code-only") }
 
-  private func buildContent(in panel: NSPanel) {
-    let root = NSVisualEffectView()
-    root.material = .popover
-    root.state = .active
-    root.wantsLayer = true
-    root.layer?.cornerRadius = 12
+  override var acceptsFirstResponder: Bool { true }
 
-    let iconBadge = NSView()
-    iconBadge.wantsLayer = true
-    iconBadge.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.18).cgColor
-    iconBadge.layer?.cornerRadius = 14
-    iconBadge.translatesAutoresizingMaskIntoConstraints = false
-    let titleIcon = NSImageView(image: NSImage(systemSymbolName: "arrow.clockwise",
-                                                accessibilityDescription: nil) ?? NSImage())
-    titleIcon.contentTintColor = .systemBlue
-    titleIcon.image = titleIcon.image?.withSymbolConfiguration(
-      .init(pointSize: 17, weight: .semibold))
-    titleIcon.translatesAutoresizingMaskIntoConstraints = false
-    iconBadge.addSubview(titleIcon)
-    NSLayoutConstraint.activate([
-      iconBadge.widthAnchor.constraint(equalToConstant: 28),
-      iconBadge.heightAnchor.constraint(equalToConstant: 28),
-      titleIcon.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
-      titleIcon.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
-    ])
+  /// What dismissal should commit — nil once a terminal row has answered (so
+  /// closing never writes twice) and nil when the draft still matches what was
+  /// opened (so looking at the editor and closing it is not an edit, and does
+  /// not push a CloudKit change or an undo entry).
+  var pendingResult: SeptaskKitRecurrencePanelResult? {
+    guard !didFinish else { return nil }
+    let rule = Recurrence(unit: selectedUnit, interval: interval,
+                          afterCompletion: afterCompletion)
+    let nextPaused = initial == nil ? false : paused
+    guard rule != initial || nextPaused != wasPaused else { return nil }
+    return SeptaskKitRecurrencePanelResult(recurrence: rule, paused: nextPaused)
+  }
 
-    let title = NSTextField(labelWithString: String(localized: "Repeat",
-                                                    comment: "Repeat editor heading"))
-    title.font = .systemFont(ofSize: 17, weight: .semibold)
-    let titleGroup = NSStackView(views: [iconBadge, title])
-    titleGroup.orientation = .horizontal
-    titleGroup.alignment = .centerY
-    titleGroup.spacing = 8
+  // MARK: Build
 
-    modePopup.addItems(withTitles: [
-      String(localized: "after completion", comment: "Repeat anchor mode"),
-      String(localized: "on scheduled date", comment: "Repeat anchor mode")
-    ])
-    modePopup.selectItem(at: initial?.afterCompletion == false ? 1 : 0)
-    modePopup.target = self
-    modePopup.action = #selector(modeChanged)
-    modePopup.controlSize = .regular
-    modePopup.widthAnchor.constraint(equalToConstant: 190).isActive = true
-    modePopup.isHidden = !hasScheduledDate
-
-    modeFallback.font = .systemFont(ofSize: 14)
-    modeFallback.textColor = .labelColor
-    modeFallback.isHidden = hasScheduledDate
-    modeFallback.setContentHuggingPriority(.required, for: .horizontal)
-
-    let modeControl: NSView = hasScheduledDate ? modePopup : modeFallback
-    let heading = NSStackView(views: [titleGroup, NSView(), modeControl])
-    heading.orientation = .horizontal
-    heading.alignment = .centerY
-    heading.spacing = 8
-
+  private func build() {
     intervalField.alignment = .right
-    intervalField.controlSize = .regular
-    intervalField.font = .systemFont(ofSize: 14)
-    intervalField.widthAnchor.constraint(equalToConstant: 44).isActive = true
+    intervalField.font = .systemFont(ofSize: SeptenaTypeScale.size(.body))
+    intervalField.bezelStyle = .roundedBezel
+    intervalField.drawsBackground = true
+    intervalField.backgroundColor = .controlBackgroundColor
     intervalField.target = self
     intervalField.action = #selector(intervalChanged)
-    intervalField.formatter = NumberFormatter()
-    (intervalField.formatter as? NumberFormatter)?.minimum = 1
-    (intervalField.formatter as? NumberFormatter)?.maximum = 99
+    let formatter = NumberFormatter()
+    formatter.minimum = 1
+    formatter.maximum = 99
+    intervalField.formatter = formatter
+    intervalField.widthAnchor.constraint(equalToConstant: 46).isActive = true
+    intervalField.setAccessibilityTitle(String(localized: "Repeat every",
+                                               comment: "SeptaskKit: repeat interval a11y"))
 
     intervalStepper.minValue = 1
     intervalStepper.maxValue = 99
     intervalStepper.increment = 1
     intervalStepper.valueWraps = false
-    intervalStepper.controlSize = .regular
     intervalStepper.target = self
     intervalStepper.action = #selector(stepperChanged)
-    intervalStepper.widthAnchor.constraint(equalToConstant: 20).isActive = true
 
-    unitPopup.addItems(withTitles: [
-      String(localized: "day", comment: "Repeat unit"),
-      String(localized: "week", comment: "Repeat unit"),
-      String(localized: "month", comment: "Repeat unit")
-    ])
-    unitPopup.selectItem(at: unitIndex(for: initial?.unit ?? .week))
-    unitPopup.target = self
-    unitPopup.action = #selector(unitChanged)
-    unitPopup.widthAnchor.constraint(equalToConstant: 100).isActive = true
+    let unitTitles = [String(localized: "day", comment: "Repeat unit"),
+                      String(localized: "week", comment: "Repeat unit"),
+                      String(localized: "month", comment: "Repeat unit")]
+    unitControl.segmentCount = unitTitles.count
+    for (index, title) in unitTitles.enumerated() {
+      unitControl.setLabel(title, forSegment: index)
+    }
+    unitControl.segmentStyle = .rounded
+    unitControl.trackingMode = .selectOne
+    unitControl.selectedSegment = unitIndex(for: initial?.unit ?? .week)
+    unitControl.target = self
+    unitControl.action = #selector(unitChanged)
 
-    intervalField.bezelStyle = .roundedBezel
-    intervalField.drawsBackground = true
-    intervalField.backgroundColor = .controlBackgroundColor
+    let cadenceRow = NSStackView(views: [intervalField, intervalStepper, unitControl])
+    cadenceRow.orientation = .horizontal
+    cadenceRow.alignment = .centerY
+    cadenceRow.spacing = 6
 
-    cadenceDescription.font = .systemFont(ofSize: 14)
-    cadenceDescription.textColor = .labelColor
+    cadenceDescription.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    cadenceDescription.textColor = SeptaskKitTheme.inkSecondary
     cadenceDescription.lineBreakMode = .byWordWrapping
     cadenceDescription.maximumNumberOfLines = 2
-    cadenceDescription.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    let intervalRow = NSStackView(views: [intervalField, intervalStepper, unitPopup,
-                                          cadenceDescription])
-    intervalRow.orientation = .horizontal
-    intervalRow.alignment = .centerY
-    intervalRow.spacing = 8
+    modeControl.segmentCount = 2
+    modeControl.setLabel(String(localized: "after completion",
+                                comment: "Repeat anchor mode"), forSegment: 0)
+    modeControl.setLabel(String(localized: "on scheduled date",
+                                comment: "Repeat anchor mode"), forSegment: 1)
+    modeControl.segmentStyle = .rounded
+    modeControl.trackingMode = .selectOne
+    modeControl.selectedSegment = initial?.afterCompletion == false ? 1 : 0
+    modeControl.target = self
+    modeControl.action = #selector(modeChanged)
+    modeControl.isHidden = !hasScheduledDate
 
-    let ruleCard = NSVisualEffectView()
-    ruleCard.material = .contentBackground
-    ruleCard.blendingMode = .withinWindow
-    ruleCard.state = .active
-    ruleCard.wantsLayer = true
-    ruleCard.layer?.cornerRadius = 14
-    ruleCard.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.45).cgColor
-    ruleCard.translatesAutoresizingMaskIntoConstraints = false
-    ruleCard.addSubview(intervalRow)
-    intervalRow.translatesAutoresizingMaskIntoConstraints = false
-    NSLayoutConstraint.activate([
-      intervalRow.topAnchor.constraint(equalTo: ruleCard.topAnchor, constant: 18),
-      intervalRow.leadingAnchor.constraint(equalTo: ruleCard.leadingAnchor, constant: 18),
-      intervalRow.trailingAnchor.constraint(equalTo: ruleCard.trailingAnchor, constant: -18),
-      intervalRow.bottomAnchor.constraint(equalTo: ruleCard.bottomAnchor, constant: -18),
-    ])
-
-    scheduleHint.font = .systemFont(ofSize: 12)
-    scheduleHint.textColor = .secondaryLabelColor
+    scheduleHint.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    scheduleHint.textColor = SeptaskKitTheme.inkSecondary
     scheduleHint.lineBreakMode = .byWordWrapping
     scheduleHint.maximumNumberOfLines = 2
     scheduleHint.isHidden = hasScheduledDate
-    scheduleHint.stringValue = String(localized: "Give the task a date to repeat on a fixed schedule.",
-                                      comment: "Repeat editor missing schedule hint")
+    scheduleHint.stringValue = String(
+      localized: "Give the task a date to repeat on a fixed schedule.",
+      comment: "Repeat editor missing schedule hint")
 
-    let divider = NSBox()
-    divider.boxType = .separator
+    var views: [NSView] = [cadenceRow, cadenceDescription]
+    views.append(hasScheduledDate ? modeControl : scheduleHint)
 
-    var controls: [NSView] = [heading, ruleCard, scheduleHint]
+    // Terminal rows — only a task that already repeats can be paused or
+    // stopped. Same row shape and same highlight as the date board's Clear.
     if initial != nil {
-      pauseButton.bezelStyle = .rounded
-      pauseButton.title = paused
-        ? String(localized: "Resume Repeat", comment: "Repeat editor pause action")
-        : String(localized: "Pause Repeat", comment: "Repeat editor pause action")
-      pauseButton.image = NSImage(systemSymbolName: paused ? "play.circle" : "pause.circle",
-                                  accessibilityDescription: nil)
-      pauseButton.imagePosition = .imageLeading
-      pauseButton.target = self
-      pauseButton.action = #selector(togglePaused)
-      pauseButton.alignment = .left
-      controls.append(pauseButton)
+      views.append(KitSurface.separator())
+
+      let pause = KitDateCell(radius: 8, height: 32) { [weak self] in self?.togglePaused() }
+      pause.fillRow(symbol: paused ? "play.circle" : "pause.circle",
+                    tint: SeptaskKitTheme.iconMuted, title: pauseTitle)
+      pauseCell = pause
+      views.append(pause)
+
+      let stop = KitDateCell(radius: 8, height: 32) { [weak self] in self?.stopRepeating() }
+      stop.fillRow(symbol: "xmark.circle", tint: SeptaskKitTheme.iconMuted,
+                   title: String(localized: "Don’t Repeat", comment: "Repeat editor stop"))
+      views.append(stop)
     }
-    controls.append(divider)
 
-    let cancel = NSButton(title: String(localized: "Cancel", comment: "Repeat editor cancel"),
-                          target: self, action: #selector(cancel))
-    cancel.bezelStyle = .rounded
-    let stop = NSButton(title: String(localized: "Don’t Repeat", comment: "Repeat editor stop"),
-                        target: self, action: #selector(stopRepeating))
-    stop.bezelStyle = .rounded
-    stop.isHidden = initial == nil
-    let ok = NSButton(title: String(localized: "OK", comment: "Repeat editor confirm"),
-                      target: self, action: #selector(commit))
-    ok.bezelStyle = .rounded
-    ok.keyEquivalent = "\r"
-    ok.hasDestructiveAction = false
-
-    let buttons = NSStackView(views: [cancel, stop, NSView(), ok])
-    buttons.orientation = .horizontal
-    buttons.alignment = .centerY
-    buttons.spacing = 8
-
-    let stack = NSStackView(views: controls + [buttons])
+    let stack = NSStackView(views: views)
     stack.orientation = .vertical
-    // AppKit's NSStackView has no `.fill` alignment (unlike SwiftUI). The
-    // child width constraints below provide the same full-width layout.
     stack.alignment = .leading
-    stack.spacing = 12
-    stack.edgeInsets = NSEdgeInsets(top: 18, left: 24, bottom: 18, right: 24)
+    stack.spacing = 8
     stack.translatesAutoresizingMaskIntoConstraints = false
-    root.addSubview(stack)
+    addSubview(stack)
+
+    let pad = KitSurface.padding + 4
     NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: root.topAnchor),
-      stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-      stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-      stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-      heading.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      ruleCard.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      scheduleHint.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      buttons.widthAnchor.constraint(equalTo: stack.widthAnchor),
-      ok.widthAnchor.constraint(greaterThanOrEqualToConstant: 76),
-      cancel.widthAnchor.constraint(greaterThanOrEqualToConstant: 76),
-      stop.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
+      widthAnchor.constraint(equalToConstant: Self.width),
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
     ])
-    panel.contentView = root
-    panel.setContentSize(NSSize(width: 520, height: initial == nil ? 250 : 305))
+    for view in views where !(view is NSStackView) {
+      view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    }
+
     updateValues()
   }
+
+  // MARK: Values
 
   private func unitIndex(for unit: Recurrence.Unit) -> Int {
     switch unit {
@@ -392,18 +285,22 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
   }
 
   private var selectedUnit: Recurrence.Unit {
-    switch unitPopup.indexOfSelectedItem {
+    switch unitControl.selectedSegment {
     case 0: return .day
     case 2: return .month
     default: return .week
     }
   }
 
-  private var interval: Int {
-    min(99, max(1, Int(intervalField.integerValue)))
-  }
+  private var interval: Int { min(99, max(1, intervalField.integerValue)) }
 
-  private var afterCompletion: Bool { modePopup.indexOfSelectedItem == 0 || !hasScheduledDate }
+  private var afterCompletion: Bool { modeControl.selectedSegment == 0 || !hasScheduledDate }
+
+  private var pauseTitle: String {
+    paused
+      ? String(localized: "Resume Repeat", comment: "Repeat editor pause action")
+      : String(localized: "Pause Repeat", comment: "Repeat editor pause action")
+  }
 
   private func updateValues() {
     let value = min(99, max(1, initial?.interval ?? 1))
@@ -413,16 +310,19 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
   }
 
   private func updateDescription() {
-    let unit = selectedUnit
     let unitName: String
-    switch unit {
+    switch selectedUnit {
     case .day: unitName = interval == 1 ? "day" : "days"
     case .week: unitName = interval == 1 ? "week" : "weeks"
     case .month: unitName = interval == 1 ? "month" : "months"
     }
-    let anchor = afterCompletion ? "after previous item is checked off." : "after previous scheduled date."
+    let anchor = afterCompletion
+      ? "after previous item is checked off."
+      : "after previous scheduled date."
     cadenceDescription.stringValue = "\(interval) \(unitName) \(anchor)"
   }
+
+  // MARK: Actions
 
   @objc private func modeChanged() { updateDescription() }
   @objc private func unitChanged() { updateDescription() }
@@ -439,39 +339,15 @@ final class SeptaskKitRecurrencePanelController: NSWindowController, NSWindowDel
     updateDescription()
   }
 
-  @objc private func togglePaused() {
+  private func togglePaused() {
     paused.toggle()
-    pauseButton.title = paused
-      ? String(localized: "Resume Repeat", comment: "Repeat editor pause action")
-      : String(localized: "Pause Repeat", comment: "Repeat editor pause action")
-    pauseButton.image = NSImage(systemSymbolName: paused ? "play.circle" : "pause.circle",
-                                accessibilityDescription: nil)
+    pauseCell?.updateRow(symbol: paused ? "play.circle" : "pause.circle", title: pauseTitle)
   }
 
-  @objc private func commit() {
-    finish(SeptaskKitRecurrencePanelResult(
-      recurrence: Recurrence(unit: selectedUnit,
-                             interval: interval,
-                             afterCompletion: afterCompletion),
-      paused: initial == nil ? false : paused))
-  }
-
-  @objc private func stopRepeating() {
-    finish(SeptaskKitRecurrencePanelResult(recurrence: nil, paused: false))
-  }
-
-  @objc private func cancel() { window?.performClose(nil) }
-
-  private func finish(_ result: SeptaskKitRecurrencePanelResult) {
+  private func stopRepeating() {
     guard !didFinish else { return }
     didFinish = true
-    onCommit(result)
-    window?.close()
-  }
-
-  func windowWillClose(_ notification: Notification) {
-    if !didFinish { didFinish = true }
-    Self.current = nil
+    onTerminal?(SeptaskKitRecurrencePanelResult(recurrence: nil, paused: false))
   }
 }
 
@@ -664,6 +540,11 @@ private final class KitDateCell: NSView {
 
   var onHover: ((KitDateCell) -> Void)?
   var isFocused = false { didSet { needsDisplay = true } }
+  /// Held so a row's label and glyph can change in place (the Repeat board's
+  /// Pause row flips between two states). Re-calling `fillRow` would stack a
+  /// second copy of the content on top of the first.
+  private weak var rowIcon: NSImageView?
+  private weak var rowLabel: NSTextField?
   /// Saturday/Sunday get a faint neutral ground so the week's shape is
   /// readable at a glance. Neutral on purpose — the accent belongs to focus
   /// alone, and focus paints OVER this rather than beside it, so the two
@@ -701,6 +582,15 @@ private final class KitDateCell: NSView {
     stack.spacing = 8
     stack.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
     embed(stack)
+    rowIcon = image
+    rowLabel = label
+    setAccessibilityTitle(title)
+  }
+
+  /// Re-label a row built by `fillRow`, keeping its one set of subviews.
+  func updateRow(symbol: String, title: String) {
+    rowIcon?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+    rowLabel?.stringValue = title
     setAccessibilityTitle(title)
   }
 

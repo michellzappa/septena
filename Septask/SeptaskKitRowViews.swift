@@ -64,7 +64,75 @@ final class KitCheckboxView: NSButton {
 
   required init?(coder: NSCoder) { fatalError("KitCheckboxView is code-only") }
 
-  @objc private func fire() { onToggle?() }
+  @objc private func fire() {
+    // Celebrate on the way IN only, like SwiftUI's `playFeel()` — unchecking
+    // is a correction, not an achievement. `isDone` is still the pre-toggle
+    // state here, so this fires exactly once per completion.
+    if !isDone { playPulse(color: SeptaskKitTheme.checkboxFill) }
+    onToggle?()
+  }
+
+  // MARK: - Cue pulses
+
+  /// The live ring, if one is mid-flight. Replaced rather than queued, so
+  /// rapid checking never stacks motion (the SwiftUI feels have the same
+  /// "ends at rest, nothing lingers" contract).
+  private var pulseLayer: CAShapeLayer?
+
+  /// One ring pulse from the box outward — the AppKit twin of `TaskCheckbox`'s
+  /// `pulse(color:reach:)`, same numbers: 0.9 → `reach`, opacity 0.55 → 0,
+  /// ease-out over 0.4s. `reach` is a multiple of the box; an ordinary check
+  /// travels 1.9, a Today promote stays tighter at 1.6.
+  ///
+  /// A layer rather than `draw(_:)` because the ring has to leave the box's
+  /// 22pt hit column, which a redraw inside `bounds` cannot do. `masksToBounds`
+  /// is explicitly false for the same reason.
+  func playPulse(color: NSColor, reach: CGFloat = 1.9) {
+    guard !KitMotion.reduce else { return }
+    wantsLayer = true
+    layer?.masksToBounds = false
+    pulseLayer?.removeFromSuperlayer()
+    guard let host = layer else { return }
+
+    let box = NSRect(x: (bounds.width - Self.boxSize) / 2,
+                     y: (bounds.height - Self.boxSize) / 2,
+                     width: Self.boxSize, height: Self.boxSize)
+    let ring = CAShapeLayer()
+    // Frame == bounds so the layer's own centre is the box's centre, which is
+    // what makes `transform.scale` expand symmetrically around the box.
+    ring.frame = bounds
+    ring.path = CGPath(roundedRect: box, cornerWidth: Self.corner,
+                       cornerHeight: Self.corner, transform: nil)
+    ring.fillColor = nil
+    ring.strokeColor = color.cgColor
+    ring.lineWidth = Self.stroke
+    ring.opacity = 0
+    host.addSublayer(ring)
+    pulseLayer = ring
+
+    let scale = CABasicAnimation(keyPath: "transform.scale")
+    scale.fromValue = 0.9
+    scale.toValue = reach
+    let fade = CABasicAnimation(keyPath: "opacity")
+    fade.fromValue = 0.55
+    fade.toValue = 0
+    let group = CAAnimationGroup()
+    group.animations = [scale, fade]
+    group.duration = 0.4
+    group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+    ring.add(group, forKey: "pulse")
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak ring, weak self] in
+      ring?.removeFromSuperlayer()
+      if self?.pulseLayer === ring { self?.pulseLayer = nil }
+    }
+  }
+
+  /// The quiet amber ring for a task pinned to Today — SwiftUI's
+  /// `playTodayPromotePulse()`, same colour and same tighter reach.
+  func playTodayPromotePulse() {
+    playPulse(color: SeptaskKitTheme.todayAccent, reach: 1.6)
+  }
 
   /// VoiceOver: real checkbox role + shared `TaskA11y` vocabulary. Press
   /// activates `onToggle` (same as a mouse click on the box).
@@ -225,6 +293,156 @@ final class KitChipView: NSView {
   }
 }
 
+/// The "→ Suggested" capsule — one tap files the row where the classifier
+/// thinks it belongs (`TaskFilingSuggestions`). Same metrics and fill as
+/// `KitChipView` so the two read as one family, but this one is a real
+/// `NSButton`: it is an ACTION, and the house rule here is that every click
+/// target is a button, never a gesture recognizer or a `mouseDown` override.
+///
+/// It wears the destination's own name rather than the word "Suggested" —
+/// "→ Kitchen" tells you what the tap will do; "→ Suggested" makes you open a
+/// menu to find out.
+@MainActor
+final class KitSuggestionChipView: NSButton {
+  var onApply: (() -> Void)?
+
+  init() {
+    super.init(frame: .zero)
+    wantsLayer = true
+    layer?.cornerRadius = 5
+    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    isBordered = false
+    setButtonType(.momentaryChange)
+    // Keyboard focus stays on the table, same contract as the checkbox — this
+    // must never become a Space-activated control on the selected row.
+    refusesFirstResponder = true
+    imagePosition = .imageLeading
+    imageHugsTitle = true
+    target = self
+    action = #selector(fire)
+    // An NSButton has no natural width in a `.fill` NSStackView — it absorbs
+    // every spare point and the capsule stretched the whole row. `KitChipView`
+    // never showed this because it is a plain NSView whose width falls out of
+    // its label constraints; a control has to say it wants to hug.
+    setContentHuggingPriority(.required, for: .horizontal)
+    setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+    (cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
+    NSLayoutConstraint.activate([
+      heightAnchor.constraint(equalToConstant: 16),
+      // A long area name truncates rather than shoving the task title out of
+      // the row — same contract as `KitChipView`'s truncating label.
+      widthAnchor.constraint(lessThanOrEqualToConstant: 140),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitSuggestionChipView is code-only") }
+
+  func configure(title: String) {
+    var config = NSImage.SymbolConfiguration(pointSize: 9, weight: .medium)
+    config = config.applying(.init(paletteColors: [SeptaskKitTheme.inkSecondary]))
+    image = NSImage(systemSymbolName: "arrow.turn.down.right",
+                    accessibilityDescription: nil)?
+      .withSymbolConfiguration(config)
+    // `attributedTitle`, not `title`: a borderless NSButton paints its label
+    // in the control's default color otherwise.
+    attributedTitle = NSAttributedString(
+      string: title,
+      attributes: [
+        .font: SeptaskKitTheme.chip,
+        .foregroundColor: SeptaskKitTheme.inkSecondary,
+      ])
+    setAccessibilityLabel(String(localized: "File under \(title)",
+                                 comment: "SeptaskKit: filing suggestion capsule"))
+    window?.invalidateCursorRects(for: self)
+  }
+
+  override var wantsUpdateLayer: Bool { true }
+
+  override func updateLayer() {
+    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+  }
+
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onApply?()
+    return true
+  }
+
+  @objc private func fire() { onApply?() }
+}
+
+// MARK: - Borderless search field
+
+/// A borderless `NSSearchField` that still lays its parts out correctly.
+///
+/// THE BUG THIS FIXES: `NSSearchFieldCell` derives the text rect from the
+/// BEZEL, so `isBordered = false` collapses that geometry and the text starts
+/// at x=0 — directly on top of the magnifying glass. Typing "vibe" into the
+/// ⌘⇧M Move panel drew the word over the glyph.
+///
+/// Both panels want a large borderless field on a `.popover` material (no
+/// search-box bezel), so the fix is to compute the three rects from `bounds`
+/// explicitly rather than to restore a bezel we don't want. Overriding
+/// `searchButtonRect` / `cancelButtonRect` / `searchTextRect` is the
+/// documented customization point for exactly this — not a workaround.
+@MainActor
+final class KitSearchFieldCell: NSSearchFieldCell {
+  /// Square side reserved for each end control, and the gap between a control
+  /// and the text. Sized off the type scale so the glyphs keep pace when the
+  /// user changes text size.
+  private var controlSide: CGFloat { max(18, (font?.pointSize ?? 16) + 4) }
+  private let gap: CGFloat = 6
+
+  private func centeredSquare(in rect: NSRect, atLeading: Bool) -> NSRect {
+    let side = controlSide
+    return NSRect(x: atLeading ? rect.minX : rect.maxX - side,
+                  y: rect.midY - side / 2,
+                  width: side, height: side)
+  }
+
+  override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
+    centeredSquare(in: rect, atLeading: true)
+  }
+
+  override func cancelButtonRect(forBounds rect: NSRect) -> NSRect {
+    // Only reserved once there is something to clear; otherwise the text may
+    // run the full width.
+    stringValue.isEmpty ? .zero : centeredSquare(in: rect, atLeading: false)
+  }
+
+  override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+    let leading = controlSide + gap
+    let trailing = stringValue.isEmpty ? 0 : controlSide + gap
+    return NSRect(x: rect.minX + leading, y: rect.minY,
+                  width: max(0, rect.width - leading - trailing),
+                  height: rect.height)
+  }
+}
+
+/// The borderless search field both floating panels use (⇧⌘F Quick Find and
+/// ⌘⇧M Move). Exists so the two can't drift — they had identical setup and
+/// therefore identical bugs.
+@MainActor
+final class KitSearchField: NSSearchField {
+  override class var cellClass: AnyClass? {
+    get { KitSearchFieldCell.self }
+    set { super.cellClass = newValue }
+  }
+
+  /// The shared look: large type, no bezel, no focus ring, immediate results.
+  /// Type comes from `KitSurface`, so a surface's field face is one number.
+  func applyPanelStyle() {
+    font = KitSurface.fieldFont
+    isBordered = false
+    drawsBackground = false
+    focusRingType = .none
+    sendsSearchStringImmediately = true
+  }
+}
+
 // MARK: - Glyph images
 
 /// Small cached images for the sidebar: the Reminders-style colored square
@@ -361,7 +579,7 @@ enum KitMoveMenu {
   /// (`pickerDestinations`) is where projects live.
   /// `emoji` rides alongside `title` rather than getting folded into it —
   /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
-  /// icon-column slot of its own); `SeptaskKitMoveModal` swaps its icon
+  /// icon-column slot of its own); `SeptaskKitMovePicker` swaps its icon
   /// column glyph for it instead, same "emoji replaces the generic glyph,
   /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
   static func destinations(areas: [Area], projects: [Project])
@@ -597,8 +815,53 @@ final class KitCardRowView: NSTableRowView {
       SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
       slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
     }
+    // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
+    // 0.22 peak, fading to nothing. It is NOT a second selection language:
+    // it is transient (gone in ~0.45s), it is the app's temporal accent
+    // rather than the selection token, and it never persists on a row.
+    if promoteWash > 0 {
+      SeptaskKitTheme.todayAccent.withAlphaComponent(promoteWash).setFill()
+      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
+    }
     NSGraphicsContext.restoreGraphicsState()
     drawDropLine()
+  }
+
+  /// Current strength of the promote wash, 0 at rest.
+  private var promoteWash: CGFloat = 0
+  private var promoteWashTimer: Timer?
+
+  /// Play the one-shot gold wash for a task just pinned to Today. Stepped by a
+  /// timer rather than a `CABasicAnimation` because this row draws itself in
+  /// `drawBackground` — there is no layer property to animate.
+  func playPromoteWash() {
+    guard !KitMotion.reduce else { return }
+    promoteWashTimer?.invalidate()
+    promoteWash = 0.22
+    needsDisplay = true
+    let start = Date()
+    let duration: TimeInterval = 0.45
+    promoteWashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { timer in
+      MainActor.assumeIsolated {
+        let progress = min(1, Date().timeIntervalSince(start) / duration)
+        self.promoteWash = 0.22 * (1 - progress)
+        self.needsDisplay = true
+        if progress >= 1 {
+          timer.invalidate()
+          self.promoteWashTimer = nil
+          self.promoteWash = 0
+        }
+      }
+    }
+  }
+
+  /// Rows are reused, so a recycled row must not inherit a wash mid-flight.
+  func cancelPromoteWash() {
+    promoteWashTimer?.invalidate()
+    promoteWashTimer = nil
+    guard promoteWash != 0 else { return }
+    promoteWash = 0
+    needsDisplay = true
   }
 
   /// No-op: selection is painted in `drawBackground`. The table's

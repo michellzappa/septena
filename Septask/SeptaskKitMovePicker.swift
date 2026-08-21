@@ -6,12 +6,16 @@ import SwiftData
 // "Move to…") — the AppKit counterpart of SwiftUI's `MovePickerSheet`
 // (Septena/Shell/Tasks/TaskPickerSheets.swift). Lists No List, loose
 // projects, then each area with its projects nested underneath — type to
-// filter, arrows + Return to choose. Same floating-panel shape as
-// `SeptaskKitQuickFind`.
+// filter, arrows + Return to choose.
+//
+// It is the surface that shows BOTH tiers of SeptaskKitSurface.swift, because
+// its scope changes with the selection: moving ONE row anchors a popover to
+// that row (Tier 1, alongside When / Deadline / Repeat), while moving a
+// multi-selection has no single row to point at and falls back to the centered
+// command panel (Tier 2, alongside Quick Find). Same body either way — one
+// destination list, one keyboard contract, two placements.
 @MainActor
-final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
-                                 NSTableViewDataSource, NSTableViewDelegate,
-                                 NSWindowDelegate {
+final class SeptaskKitMovePicker {
   private struct Row {
     let title: String
     let destination: KitMoveMenu.Destination
@@ -21,111 +25,43 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
   }
 
   private let onChoose: (KitMoveMenu.Destination) -> Void
-  private let field = NSSearchField()
-  private let tableView = NSTableView()
   private var allRows: [Row] = []
   private var rows: [Row] = []
   private var progressByProject: [String: Double] = [:]
-  private var panel: NSPanel?
   /// Marks the checkmark row — nil for a bulk move (no single "current" to
   /// mark, matching `MovePickerSheet.showCurrentSelection`).
   private var currentDestination: KitMoveMenu.Destination?
+
+  private lazy var surface: KitFilterSurface = {
+    let surface = KitFilterSurface(
+      size: NSSize(width: 420, height: 340),
+      a11yTitle: String(localized: "Move", comment: "SeptaskKit: move picker a11y title"),
+      fieldA11yTitle: String(localized: "Filter destinations",
+                             comment: "SeptaskKit: move picker search field a11y"))
+    surface.rowCount = { [weak self] in self?.rows.count ?? 0 }
+    surface.rowView = { [weak self] row in self?.cell(for: row) }
+    surface.onQueryChanged = { [weak self] in self?.reloadRows() }
+    surface.onChoose = { [weak self] row in self?.choose(row) }
+    return surface
+  }()
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
   init(onChoose: @escaping (KitMoveMenu.Destination) -> Void) {
     self.onChoose = onChoose
-    super.init()
   }
 
   // MARK: - Presentation
 
   /// `current` marks the checkmark row; `title` becomes the field's
   /// placeholder ("Move" vs "Move N Tasks", matching `MovePickerSheet`'s
-  /// navigation title exactly).
-  func show(current: KitMoveMenu.Destination?, title: String) {
+  /// navigation title exactly). `anchor` decides the tier: pass the row's rect
+  /// when exactly one row is moving, `.window` otherwise.
+  func show(current: KitMoveMenu.Destination?, title: String, anchor: KitSurfaceAnchor) {
     currentDestination = current
-    let panel = ensurePanel()
-    field.stringValue = ""
-    field.placeholderString = title
     reloadProgress()
-    reloadRows()
-    if let host = NSApp.keyWindow ?? panel.parent {
-      // Centered over the window it steers, a little above middle — same
-      // placement as Quick Find.
-      let frame = host.frame
-      let size = panel.frame.size
-      panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2,
-                                   y: frame.midY - size.height / 2 + frame.height * 0.12))
-    }
-    panel.makeKeyAndOrderFront(nil)
-    panel.makeFirstResponder(field)
-  }
-
-  private func dismiss() { panel?.orderOut(nil) }
-
-  private func ensurePanel() -> NSPanel {
-    if let panel { return panel }
-
-    let content = NSVisualEffectView()
-    content.material = .popover
-    content.state = .active
-    content.wantsLayer = true
-    content.layer?.cornerRadius = 12
-    content.layer?.masksToBounds = true
-
-    field.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
-    field.isBordered = false
-    field.drawsBackground = false
-    field.focusRingType = .none
-    field.delegate = self
-    field.translatesAutoresizingMaskIntoConstraints = false
-    field.sendsSearchStringImmediately = true
-    field.setAccessibilityTitle(String(localized: "Filter destinations",
-                                       comment: "SeptaskKit: move modal search field a11y"))
-
-    let column = NSTableColumn(identifier: .init("moveRow"))
-    tableView.addTableColumn(column)
-    tableView.headerView = nil
-    tableView.style = .plain
-    tableView.rowHeight = 34
-    tableView.backgroundColor = .clear
-    tableView.dataSource = self
-    tableView.delegate = self
-    tableView.target = self
-    tableView.action = #selector(rowClicked)
-
-    let scroll = NSScrollView()
-    scroll.documentView = tableView
-    scroll.hasVerticalScroller = true
-    scroll.drawsBackground = false
-    scroll.translatesAutoresizingMaskIntoConstraints = false
-
-    content.addSubview(field)
-    content.addSubview(scroll)
-    NSLayoutConstraint.activate([
-      field.topAnchor.constraint(equalTo: content.topAnchor, constant: 14),
-      field.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
-      field.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
-      scroll.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 10),
-      scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-      scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-      scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-    ])
-
-    let panel = MoveModalPanel(contentRect: NSRect(x: 0, y: 0, width: 420, height: 340),
-                               styleMask: [.borderless, .nonactivatingPanel],
-                               backing: .buffered, defer: false)
-    panel.contentView = content
-    panel.level = .floating
-    panel.isOpaque = false
-    panel.backgroundColor = .clear
-    panel.hasShadow = true
-    panel.delegate = self
-    panel.setAccessibilityTitle(String(localized: "Move",
-                                       comment: "SeptaskKit: move modal panel a11y title"))
-    self.panel = panel
-    return panel
+    // `show` clears the query, which reloads the rows through `onQueryChanged`.
+    surface.show(anchor: anchor, placeholder: title)
   }
 
   // MARK: - Filtering
@@ -147,7 +83,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
   }
 
   private func reloadRows() {
-    let query = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let query = surface.query.lowercased()
     let snapshot = StructureCache.snapshot(in: context)
     allRows = KitMoveMenu.pickerDestinations(areas: snapshot.areas, projects: snapshot.projects)
       .map { entry in
@@ -155,7 +91,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
             indent: entry.indent, projectId: entry.projectId)
       }
     rows = query.isEmpty ? allRows : Self.filterPickerRows(allRows, query: query)
-    tableView.reloadData()
+    surface.reload()
     selectCurrentOrFirst()
   }
 
@@ -203,54 +139,23 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
 
   private func selectCurrentOrFirst() {
     guard !rows.isEmpty else { return }
-    let target = currentDestination.flatMap { current in rows.firstIndex { $0.destination == current } } ?? 0
-    tableView.selectRowIndexes([target], byExtendingSelection: false)
-    tableView.scrollRowToVisible(target)
-  }
-
-  private func move(by delta: Int) {
-    guard !rows.isEmpty else { return }
-    let next = max(0, min(rows.count - 1, tableView.selectedRow + delta))
-    tableView.selectRowIndexes([next], byExtendingSelection: false)
-    tableView.scrollRowToVisible(next)
+    let target = currentDestination.flatMap { current in
+      rows.firstIndex { $0.destination == current }
+    } ?? 0
+    surface.select(target)
   }
 
   // MARK: - Choosing
 
-  @objc private func rowClicked() {
-    guard tableView.clickedRow >= 0 else { return }
-    tableView.selectRowIndexes([tableView.clickedRow], byExtendingSelection: false)
-    chooseSelection()
-  }
-
-  private func chooseSelection() {
-    let row = tableView.selectedRow
+  private func choose(_ row: Int) {
     guard rows.indices.contains(row) else { return }
-    dismiss()
     onChoose(rows[row].destination)
   }
 
-  // MARK: - Field / table plumbing
-
-  func controlTextDidChange(_ obj: Notification) { reloadRows() }
-
-  func control(_ control: NSControl, textView: NSTextView,
-               doCommandBy commandSelector: Selector) -> Bool {
-    switch commandSelector {
-    case #selector(NSResponder.moveUp(_:)): move(by: -1); return true
-    case #selector(NSResponder.moveDown(_:)): move(by: 1); return true
-    case #selector(NSResponder.insertNewline(_:)): chooseSelection(); return true
-    case #selector(NSResponder.cancelOperation(_:)): dismiss(); return true
-    default: return false
-    }
-  }
-
-  func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-
-  func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
-                 row: Int) -> NSView? {
+  private func cell(for row: Int) -> NSView? {
+    guard rows.indices.contains(row) else { return nil }
     let identifier = NSUserInterfaceItemIdentifier("moveRowCell")
-    let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? MoveRowCell
+    let cell = surface.tableView.makeView(withIdentifier: identifier, owner: nil) as? MoveRowCell
       ?? MoveRowCell(identifier: identifier)
     let entry = rows[row]
     let checked = currentDestination.map { $0 == entry.destination } ?? false
@@ -259,8 +164,6 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
                    indent: entry.indent, progress: progress, checked: checked)
     return cell
   }
-
-  func windowDidResignKey(_ notification: Notification) { dismiss() }
 
   /// Result row: tray / area emoji-or-folder / project pie, title, trailing
   /// checkmark on the current destination — same anatomy as
@@ -291,7 +194,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
       addSubview(title)
       addSubview(checkmark)
       textField = title
-      leadingConstraint = icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16)
+      leadingConstraint = icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: KitSurface.listInset)
       NSLayoutConstraint.activate([
         leadingConstraint,
         icon.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -302,7 +205,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
         title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
         title.centerYAnchor.constraint(equalTo: centerYAnchor),
         checkmark.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 10),
-        checkmark.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+        checkmark.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -KitSurface.listInset),
         checkmark.centerYAnchor.constraint(equalTo: centerYAnchor),
       ])
     }
@@ -311,7 +214,7 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
 
     func configure(destination: KitMoveMenu.Destination, emoji emojiGlyph: String?,
                    title titleText: String, indent: Bool, progress: Double, checked: Bool) {
-      leadingConstraint.constant = indent ? 40 : 16
+      leadingConstraint.constant = indent ? KitSurface.listInset + 24 : KitSurface.listInset
       switch destination {
       case .none:
         icon.image = NSImage(systemSymbolName: "tray.fill", accessibilityDescription: nil)?
@@ -343,11 +246,5 @@ final class SeptaskKitMoveModal: NSObject, NSSearchFieldDelegate,
       checkmark.isHidden = !checked
     }
   }
-}
-
-/// Borderless panels refuse key status by default; this one must take it so
-/// the search field can edit.
-private final class MoveModalPanel: NSPanel {
-  override var canBecomeKey: Bool { true }
 }
 #endif

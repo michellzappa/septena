@@ -525,6 +525,7 @@ struct TaskListView: View {
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
       openMove: selection.isEmpty ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      cancel: selection.isEmpty ? nil : cancelSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
@@ -566,6 +567,7 @@ struct TaskListView: View {
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
       openMove: selection.isEmpty ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      cancel: selection.isEmpty ? nil : cancelSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
@@ -2077,6 +2079,15 @@ struct TaskListView: View {
     for id in ids { applyDelete(id) }
   }
 
+  /// ⌥⌘K — retire the selected row(s) as cancelled. Selection is NOT cleared
+  /// (unlike delete): a cancelled row keeps its place through the settle beat,
+  /// so the row you acted on stays the row under the cursor.
+  private func cancelSelected() {
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    for id in ids { applyCancel(id) }
+  }
+
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
   private func clearScheduleForSelected() {
     let ids = orderedActionIDs()
@@ -2682,39 +2693,16 @@ struct TaskListView: View {
   /// `looseToday` population in `triageSection` so the filing capsule shows for
   /// self-added Inbox tasks too, not just agent proposals.
   private func isLooseTodayInboxCapture(_ task: SeptenaTask) -> Bool {
-    filter == .today && task.status == .open
-      && task.scheduled == nil && task.deadline == nil
-      && task.project == nil && task.area == nil && task.today
+    TaskFilingSuggestions.isLooseTodayInboxCapture(task, filter: filter)
   }
 
+  /// Ranked filing picks for a row. The RULES live in
+  /// `TaskFilingSuggestions` so the AppKit shell renders the same capsule off
+  /// the same gate — see that file for why a second copy is the drift we
+  /// forbid.
   private func filingRankedSuggestions(for task: SeptenaTask) -> [SuggestionEngine.Suggestion]? {
-    guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
-    guard task.status == .open else { return nil }
-    guard filter != .logbook && filter != .recentlyDeleted else { return nil }
-    guard task.project == nil else { return nil }
-
-    // Inbox → area or project. Both populations that share the Today Inbox card
-    // get the filing capsule: agent proposals (triage band) AND loose manual
-    // captures the user quick-added (project/area-less, `today == true`, so
-    // *not* in the band — but still unfiled work that wants a folding hint).
-    if task.isInTriageBand || isLooseTodayInboxCapture(task) {
-      if let top = suggestionEngine.topSuggestion(for: task.id) {
-        let ranked = suggestionEngine.suggestions[task.id] ?? [top]
-        return suggestionAlreadyMatches(task, ranked.first) ? nil : ranked
-      }
-      guard let s = suggestionEngine.suggest(forText: task.title) else { return nil }
-      return suggestionAlreadyMatches(task, s) ? nil : [s]
-    }
-
-    // Area page: area-direct → child project only.
-    if case .area(let areaId) = filter, task.area == areaId {
-      let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
-      let ranked = suggestionEngine.rankedSuggestions(forText: task.title, scope: scope)
-      guard let top = ranked.first else { return nil }
-      return suggestionAlreadyMatches(task, top) ? nil : ranked
-    }
-
-    return nil
+    TaskFilingSuggestions.ranked(for: task, filter: filter, engine: suggestionEngine,
+                                 childProjectIds: { childProjectIds(in: $0) })
   }
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
@@ -2724,9 +2712,7 @@ struct TaskListView: View {
 
   private func suggestionAlreadyMatches(_ task: SeptenaTask,
                                         _ suggestion: SuggestionEngine.Suggestion?) -> Bool {
-    guard let suggestion else { return false }
-    return (suggestion.kind == .area && task.area == suggestion.id)
-      || (suggestion.kind == .project && task.project == suggestion.id)
+    TaskFilingSuggestions.alreadyMatches(task, suggestion)
   }
 
   // MARK: - Selection

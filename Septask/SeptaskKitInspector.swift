@@ -22,6 +22,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
+  /// Task Conversations — the agent's work log for this row. Shown only when
+  /// a conversation exists; a task with no agent history gets no header and no
+  /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
+  private let conversationLabel = NSTextField(labelWithString:
+    String(localized: "Conversation", comment: "SeptaskKit: inspector section"))
+  private let conversationView = KitConversationView()
   /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
   /// Escape handling. The inspector is a plain split-view item with no title
   /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
@@ -99,7 +105,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(repeatButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
+    conversationLabel.font = SeptaskKitTheme.chip
+    conversationLabel.textColor = SeptaskKitTheme.iconMuted
+    conversationView.translatesAutoresizingMaskIntoConstraints = false
+    // A reply appends a turn, which posts a task change; re-read so the new
+    // turn lands in the transcript the same way an agent turn would.
+    conversationView.onAppend = { [weak self] in self?.refresh() }
+    form.addArrangedSubview(conversationLabel)
+    form.addArrangedSubview(conversationView)
     form.setCustomSpacing(14, after: repeatButton)
+    form.setCustomSpacing(14, after: notesScroll)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
@@ -140,6 +155,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       closeButton.widthAnchor.constraint(equalToConstant: 20),
       closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
       placeholder.centerXAnchor.constraint(equalTo: root.centerXAnchor),
       placeholder.centerYAnchor.constraint(equalTo: root.centerYAnchor),
@@ -166,7 +182,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   func show(_ next: SeptenaTask?) {
     guard next?.id != task?.id else {
       task = next
-      if let next { refreshReadOnlyFields(next) }
+      if let next {
+        refreshReadOnlyFields(next)
+        refreshConversation(next)
+      }
       return
     }
     flushPendingEdits()
@@ -193,6 +212,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       MarkdownNotesStyle.attributed(loadedNotes, fontSize: fontSize))
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     refreshReadOnlyFields(next)
+    refreshConversation(next)
   }
 
   /// The dates/list/repeat controls — safe to resync on every re-show,
@@ -221,6 +241,20 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     } ?? String(localized: "None", comment: "No repeat")
     repeatButton.title = String(localized: "Repeat: \(repeatValue)",
                                 comment: "SeptaskKit: inspector repeat field")
+  }
+
+  /// Show or hide the conversation section. Hiding the LABEL too is the point:
+  /// a task with no agent history should look like a task with no agent
+  /// history, not like one whose conversation failed to load.
+  ///
+  /// Deliberately does NOT `acknowledge` — the plan called for that, but the
+  /// inspector's own contract (see `show(_:)`) is that opening to peek must
+  /// never ratify: the cue IS Inbox membership for agent rows, so acking here
+  /// would yank a proposal out of the Inbox merely because it became the
+  /// selected row. Disposition paths ack; looking does not.
+  private func refreshConversation(_ next: SeptenaTask) {
+    let shown = conversationView.configure(taskID: next.id, convo: next.conversation)
+    conversationLabel.isHidden = !shown
   }
 
   /// Re-read the shown task from the store — used when a refresh lands while
@@ -325,10 +359,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   @objc private func editRepeat() {
     guard let current = task else { return }
-    SeptaskKitRecurrencePanelController.present(
+    SeptaskKitRepeatPopover.present(
       initial: current.recurrence,
       paused: current.recurrencePaused,
-      hasScheduledDate: current.scheduled != nil
+      hasScheduledDate: current.scheduled != nil,
+      relativeTo: repeatButton.bounds, of: repeatButton
     ) { [weak self] result in
       guard let self else { return }
       if let recurrence = result.recurrence {

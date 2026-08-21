@@ -44,8 +44,9 @@ private struct SeptaskKitRowCommands: View {
       Divider()
       Menu("Complete") {
         Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
-          .keyboardShortcut("k", modifiers: .command)
+          .keyboardShortcut(TaskRowShortcuts.markComplete)
         Button("Cancel Task") { SeptaskKitCommands.row(.cancel) }
+          .keyboardShortcut(TaskRowShortcuts.cancel)
         Divider()
         Button("Delete") { SeptaskKitCommands.row(.delete) }
           .keyboardShortcut(.delete, modifiers: .command)

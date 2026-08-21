@@ -24,6 +24,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     case list(NSView)
     case repeatRule(NSView)
     case toggleComplete
+    /// AI kickoff — starts a conversation on this task. Shown only when there
+    /// is none yet and on-device AI is available, mirroring SwiftUI's
+    /// `TaskAttributeBar.showsDiscuss`.
+    case discuss
   }
 
   var onAction: ((Action) -> Void)?
@@ -44,6 +48,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
   private let deadlinePill = KitPillButton()
   private let listPill = KitPillButton()
   private let repeatPill = KitPillButton()
+  private let discussPill = KitPillButton()
   private let notesPill = KitPillButton()
 
   private var leadingConstraint: NSLayoutConstraint!
@@ -118,7 +123,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.toggleNotes() }
-    for pill in [todayPill, whenPill, deadlinePill, listPill, repeatPill, notesPill] {
+    discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
+    discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
+    for pill in [todayPill, whenPill, deadlinePill, listPill, repeatPill, notesPill,
+                 discussPill] {
       pillRow.addArrangedSubview(pill)
     }
 
@@ -191,7 +199,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     deadlinePill.nextKeyView = listPill
     listPill.nextKeyView = repeatPill
     repeatPill.nextKeyView = notesPill
-    notesPill.nextKeyView = titleField
+    notesPill.nextKeyView = discussPill
+    discussPill.nextKeyView = titleField
   }
 
   required init?(coder: NSCoder) { fatalError("KitComposerCell is code-only") }
@@ -279,6 +288,27 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
       return String(localized: "Repeat", comment: "SeptaskKit: composer pill")
     }()
     repeatPill.isOn = task.recurrence != nil
+
+    // Same gate as SwiftUI's `showsDiscuss`: only before a conversation
+    // exists, and only when a local model can actually answer. A pill that
+    // starts nothing would be worse than no pill.
+    discussPill.isHidden = task.conversation.hasStarted || !OnDeviceAI.isAvailable
+    discussPill.isEnabled = !discussWorking
+    discussPill.title = discussWorking
+      ? String(localized: "Thinking…", comment: "SeptaskKit: discuss pill working")
+      : String(localized: "Discuss", comment: "SeptaskKit: composer pill")
+  }
+
+  /// True while `ConversationEngine.advance` is in flight — the pill says so
+  /// rather than looking inert, since the first turn can take a moment.
+  private var discussWorking = false
+
+  func setDiscussWorking(_ working: Bool) {
+    discussWorking = working
+    discussPill.isEnabled = !working
+    discussPill.title = working
+      ? String(localized: "Thinking…", comment: "SeptaskKit: discuss pill working")
+      : String(localized: "Discuss", comment: "SeptaskKit: composer pill")
   }
 
   /// Whether the notes field is on screen — the controller needs this to size

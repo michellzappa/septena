@@ -6,13 +6,13 @@ import SwiftData
 // results while the field keeps focus; Return jumps to the item — navigating
 // the window to the list that holds it and selecting the row.
 //
-// A floating panel rather than a sheet, so it never blocks the window it's
-// steering, and it reads from the same LocalCache / StructureCache snapshots
-// every other surface uses.
+// Quick Find is a TIER 2 surface (see SeptaskKitSurface.swift): it searches
+// the whole app, so there is no single row to hang it off. It is a centered
+// `KitFilterSurface` command panel — never a sheet, so it never blocks the
+// window it steers — and it reads from the same LocalCache / StructureCache
+// snapshots every other surface uses.
 @MainActor
-final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
-                                 NSTableViewDataSource, NSTableViewDelegate,
-                                 NSWindowDelegate {
+final class SeptaskKitQuickFind {
 
   /// Where choosing a result should take the window.
   struct Destination {
@@ -52,114 +52,49 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
   }
 
   private let onChoose: (Destination) -> Void
-  private let field = NSSearchField()
-  private let tableView = NSTableView()
   private var hits: [Hit] = []
-  private var panel: NSPanel?
+
+  /// Chrome, keyboard and presentation all live in the shared surface; this
+  /// type owns the search and what a hit means.
+  private lazy var surface: KitFilterSurface = {
+    let surface = KitFilterSurface(
+      size: NSSize(width: 620, height: 380),
+      a11yTitle: String(localized: "Quick Find",
+                        comment: "SeptaskKit: quick find panel a11y title"),
+      fieldA11yTitle: String(localized: "Search",
+                             comment: "SeptaskKit: quick find field a11y title"))
+    surface.rowCount = { [weak self] in self?.hits.count ?? 0 }
+    surface.rowView = { [weak self] row in self?.cell(for: row) }
+    surface.onQueryChanged = { [weak self] in self?.reloadHits() }
+    surface.onChoose = { [weak self] row in self?.choose(row) }
+    return surface
+  }()
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
   init(onChoose: @escaping (Destination) -> Void) {
     self.onChoose = onChoose
-    super.init()
   }
 
   // MARK: - Presentation
 
   func show() {
-    let panel = ensurePanel()
-    field.stringValue = ""
-    reloadHits()
-    if let host = NSApp.keyWindow ?? panel.parent {
-      // Centered over the window it steers, a little above middle.
-      let frame = host.frame
-      let size = panel.frame.size
-      panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2,
-                                   y: frame.midY - size.height / 2 + frame.height * 0.12))
-    }
-    panel.makeKeyAndOrderFront(nil)
-    panel.makeFirstResponder(field)
-  }
-
-  private func dismiss() { panel?.orderOut(nil) }
-
-  private func ensurePanel() -> NSPanel {
-    if let panel { return panel }
-
-    let content = NSVisualEffectView()
-    content.material = .popover
-    content.state = .active
-    content.wantsLayer = true
-    content.layer?.cornerRadius = 12
-    content.layer?.masksToBounds = true
-
-    field.placeholderString = String(localized: "Search tasks, projects, areas…",
-                                     comment: "SeptaskKit: quick find placeholder")
-    field.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
-    field.isBordered = false
-    field.drawsBackground = false
-    field.focusRingType = .none
-    field.delegate = self
-    field.translatesAutoresizingMaskIntoConstraints = false
-    field.sendsSearchStringImmediately = true
-    field.setAccessibilityTitle(String(localized: "Search",
-                                       comment: "SeptaskKit: quick find field a11y title"))
-
-    let column = NSTableColumn(identifier: .init("hit"))
-    tableView.addTableColumn(column)
-    tableView.headerView = nil
-    tableView.style = .plain
-    tableView.rowHeight = 34
-    tableView.backgroundColor = .clear
-    tableView.dataSource = self
-    tableView.delegate = self
-    tableView.target = self
-    tableView.action = #selector(rowClicked)
-
-    let scroll = NSScrollView()
-    scroll.documentView = tableView
-    scroll.hasVerticalScroller = true
-    scroll.drawsBackground = false
-    scroll.translatesAutoresizingMaskIntoConstraints = false
-
-    content.addSubview(field)
-    content.addSubview(scroll)
-    NSLayoutConstraint.activate([
-      field.topAnchor.constraint(equalTo: content.topAnchor, constant: 14),
-      field.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
-      field.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
-      scroll.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 10),
-      scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-      scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-      scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-    ])
-
-    let panel = QuickFindPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 380),
-                               styleMask: [.borderless, .nonactivatingPanel],
-                               backing: .buffered, defer: false)
-    panel.contentView = content
-    panel.level = .floating
-    panel.isOpaque = false
-    panel.backgroundColor = .clear
-    panel.hasShadow = true
-    panel.delegate = self
-    panel.setAccessibilityTitle(String(localized: "Quick Find",
-                                       comment: "SeptaskKit: quick find panel a11y title"))
-    self.panel = panel
-    return panel
+    surface.show(anchor: .window,
+                 placeholder: String(localized: "Search tasks, projects, areas…",
+                                     comment: "SeptaskKit: quick find placeholder"))
   }
 
   // MARK: - Search
 
   private func reloadHits() {
-    let query = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let query = surface.query.lowercased()
     let snapshot = StructureCache.snapshot(in: context)
 
     // Empty query lists the structure — the panel doubles as a jump-to-list.
     guard !query.isEmpty else {
       hits = snapshot.areas.map(Hit.area) + snapshot.projects.map(Hit.project)
-      tableView.reloadData()
-      selectFirst()
+      surface.reload()
+      surface.select(0)
       return
     }
 
@@ -186,35 +121,14 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     }
 
     hits = Array(found.prefix(60))
-    tableView.reloadData()
-    selectFirst()
-  }
-
-  private func selectFirst() {
-    guard !hits.isEmpty else { return }
-    tableView.selectRowIndexes([0], byExtendingSelection: false)
-    tableView.scrollRowToVisible(0)
-  }
-
-  private func move(by delta: Int) {
-    guard !hits.isEmpty else { return }
-    let next = max(0, min(hits.count - 1, tableView.selectedRow + delta))
-    tableView.selectRowIndexes([next], byExtendingSelection: false)
-    tableView.scrollRowToVisible(next)
+    surface.reload()
+    surface.select(0)
   }
 
   // MARK: - Choosing
 
-  @objc private func rowClicked() {
-    guard tableView.clickedRow >= 0 else { return }
-    tableView.selectRowIndexes([tableView.clickedRow], byExtendingSelection: false)
-    chooseSelection()
-  }
-
-  private func chooseSelection() {
-    let row = tableView.selectedRow
+  private func choose(_ row: Int) {
     guard hits.indices.contains(row) else { return }
-    dismiss()
 
     switch hits[row] {
     case .project(let project):
@@ -243,34 +157,15 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
     }
   }
 
-  // MARK: - Field / table plumbing
-
-  func controlTextDidChange(_ obj: Notification) { reloadHits() }
-
-  func control(_ control: NSControl, textView: NSTextView,
-               doCommandBy commandSelector: Selector) -> Bool {
-    switch commandSelector {
-    case #selector(NSResponder.moveUp(_:)): move(by: -1); return true
-    case #selector(NSResponder.moveDown(_:)): move(by: 1); return true
-    case #selector(NSResponder.insertNewline(_:)): chooseSelection(); return true
-    case #selector(NSResponder.cancelOperation(_:)): dismiss(); return true
-    default: return false
-    }
-  }
-
-  func numberOfRows(in tableView: NSTableView) -> Int { hits.count }
-
-  func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
-                 row: Int) -> NSView? {
+  private func cell(for row: Int) -> NSView? {
+    guard hits.indices.contains(row) else { return nil }
     let identifier = NSUserInterfaceItemIdentifier("hitCell")
-    let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? HitCell
+    let cell = surface.tableView.makeView(withIdentifier: identifier, owner: nil) as? HitCell
       ?? HitCell(identifier: identifier)
     let hit = hits[row]
     cell.configure(symbol: hit.symbol, title: hit.title, subtitle: hit.subtitle)
     return cell
   }
-
-  func windowDidResignKey(_ notification: Notification) { dismiss() }
 
   /// Result row: glyph, title, and where the item lives.
   private final class HitCell: NSTableCellView {
@@ -295,13 +190,13 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
       addSubview(subtitle)
       textField = title
       NSLayoutConstraint.activate([
-        icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+        icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: KitSurface.listInset),
         icon.centerYAnchor.constraint(equalTo: centerYAnchor),
         icon.widthAnchor.constraint(equalToConstant: 14),
         title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
         title.centerYAnchor.constraint(equalTo: centerYAnchor),
         subtitle.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 10),
-        subtitle.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+        subtitle.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -KitSurface.listInset),
         subtitle.centerYAnchor.constraint(equalTo: centerYAnchor),
       ])
     }
@@ -315,11 +210,5 @@ final class SeptaskKitQuickFind: NSObject, NSSearchFieldDelegate,
       subtitle.stringValue = subtitleText
     }
   }
-}
-
-/// Borderless panels refuse key status by default; this one must take it so
-/// the search field can edit.
-private final class QuickFindPanel: NSPanel {
-  override var canBecomeKey: Bool { true }
 }
 #endif

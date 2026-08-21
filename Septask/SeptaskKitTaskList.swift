@@ -77,7 +77,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case header(id: String, title: String, icon: GroupIcon, count: Int)
     case screenTitle(title: String, icon: GroupIcon)
     case projectTarget(id: String, title: String, progress: Double)
-    case task(SeptenaTask, chip: Chip?)
+    case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
     case loggedFooter(count: Int, expanded: Bool)
     /// Foot of Today's Inbox card — the clickable "New task" line, the AppKit
@@ -89,22 +89,37 @@ final class SeptaskKitTaskListController: NSViewController {
     /// ONLY way to make a heading was a right-click on blank space below the
     /// list, which a project with enough tasks to fill the window doesn't have.
     case addSection
+    /// "Import all N from Reminders" — a quiet action LINE inside the Inbox,
+    /// shown only when more than one is waiting. A line rather than a header
+    /// button because the Inbox header's trailing slot belongs to the `+`, and
+    /// a header answering to two actions is how cells grow bugs.
+    case importAllReminders(count: Int, importing: Bool)
+    /// One pending Apple Reminder, click to import. `importing` drives the
+    /// in-flight dimming so a slow EventKit delete doesn't look like a no-op.
+    case reminder(ImportedReminder, importing: Bool)
+    /// "N tasks rolled into Today" — the dismissible start-of-day notice for
+    /// work that arrived on its own because a date the user set earlier has
+    /// now come round.
+    case rolledInBanner(count: Int)
 
     var key: String {
       switch self {
       case .header(let id, _, _, _): return "h:" + id
       case .screenTitle: return "screen-title"
       case .projectTarget(let id, _, _): return "project-target:" + id
-      case .task(let task, _): return task.id
+      case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
       case .addSection: return "add-section"
+      case .reminder(let item, _): return "reminder:" + item.id
+      case .rolledInBanner: return "rolled-in-banner"
+      case .importAllReminders: return "import-all-reminders"
       }
     }
 
     var task: SeptenaTask? {
-      if case .task(let task, _) = self { return task }
+      if case .task(let task, _, _) = self { return task }
       return nil
     }
 
@@ -114,8 +129,13 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .loggedFooter, .addSection: return false
-      case .projectTarget, .event, .newTask: return true
-      case .task(let task, _): return !task.isHeading
+      // A notice, not an item: it sits on the page like a header, NOT on a
+      // card. A statement about your list must not look like a row of it.
+      case .rolledInBanner: return false
+      // Rides the Inbox card with the reminder rows it acts on.
+      case .importAllReminders: return true
+      case .projectTarget, .event, .newTask, .reminder: return true
+      case .task(let task, _, _): return !task.isHeading
       }
     }
   }
@@ -130,6 +150,25 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
+  /// Pending Apple Reminders mirrored onto Today, newest read wins. Held as
+  /// (reminder, view) pairs exactly like `RemindersInboxSection`: the
+  /// `EKReminder` is what we delete after a successful import, the
+  /// `ImportedReminder` is the value the row draws from.
+  private var reminderPairs: [(reminder: EKReminder, view: ImportedReminder)] = []
+  /// The reminder currently being imported, if any — dims its row.
+  private var importingReminderID: String?
+  /// True while Import All is in flight — disables every reminder row.
+  private var bulkImportingReminders = false
+  /// Tasks just pinned to Today, waiting for their promote cue. A one-shot
+  /// set rather than a per-row flag: the cue plays against the row's CURRENT
+  /// cell, which only exists after the reload the promote triggered, so the
+  /// intent has to outlive the mutation by exactly one reload.
+  /// The AppKit counterpart of SwiftUI's `PromoteFlashStore`.
+  private var pendingPromoteFlash: Set<String> = []
+  /// task id → top filing pick, the "→ Suggested" capsule's contents. Snapshot
+  /// per reload (like `TaskListModel.filingSuggestions`) rather than read live
+  /// off the engine, so a row and its capsule always agree.
+  private var filingSuggestions: [String: SuggestionEngine.Suggestion] = [:]
   /// Live notes-band height while the composer is open (`nil` = notes folded).
   private var composerNotesHeight: CGFloat?
   /// The row currently expanded into the inline composer, if any.
@@ -458,6 +497,14 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
     })
+    // Pending Apple Reminders. `.EKEventStoreChanged` fires for every edit in
+    // every list, so `refreshReminders` compares the resulting set and only
+    // reloads when the mirrored list actually moved.
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .EKEventStoreChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshReminders() }
+    })
     observers.append(NotificationCenter.default.addObserver(
       forName: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: .main
     ) { [weak self] _ in
@@ -512,6 +559,10 @@ final class SeptaskKitTaskListController: NSViewController {
       tableView.scrollRowToVisible(0)
     }
     syncWindowTitle()
+    // Off-main-thread EventKit read; lands via its own `reload()`. Leaving
+    // Today clears the block, so a stale mirror can't ride along to a project
+    // page.
+    refreshReminders()
   }
 
   /// Hide the window title while this page's own big title is on screen, show
@@ -594,17 +645,22 @@ final class SeptaskKitTaskListController: NSViewController {
     })
 
     let pool = LocalCache.tasks(in: context, filter: filter)
+    // Capsules first: `chipped()` reads the snapshot, so it has to be current
+    // before any row is built. Includes the triage band, which `pool` omits on
+    // Today — the band is exactly where most suggestions land.
+    refreshFilingSuggestions(
+      pool: pool + (filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []))
     // One standard title row, on every page — computed once here rather than
     // duplicated into each branch below.
     let titleRows: [Row] = screenTitleRow().map { [$0] } ?? []
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + agenda() + triageBand()
+      newRows = titleRows + agenda() + rolledInBanner(pool) + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract.
-      newRows = titleRows + agenda() + triageBand()
+      newRows = titleRows + agenda() + rolledInBanner(pool) + triageBand()
         + withoutTriage(pool).sorted(by: SeptenaTask.compareNextPageOrder).map(chipped)
         + newTaskLine
     case .upcoming:
@@ -656,7 +712,7 @@ final class SeptaskKitTaskListController: NSViewController {
               }
           }
         }
-        newRows = titleRows + direct.map { .task($0, chip: nil) }
+        newRows = titleRows + direct.map(unchipped)
           + projectRows + loggedFooterRows(completed: completed)
       }
     case .logbook:
@@ -784,15 +840,203 @@ final class SeptaskKitTaskListController: NSViewController {
   /// agent proposals (docs/TRIAGE_BAND_SPEC.md). This is why the sidebar has
   /// no separate Inbox row: the band IS the inbox, and it lives here, exactly
   /// as the SwiftUI Today renders it.
+  // MARK: - Rolled-into-Today banner
+  //
+  // The counterpart of `TaskListView.newTodosBanner`. NOTE this is a BANNER,
+  // not a bucket: there is no separate "review" section, and an earlier
+  // version of the parity doc was wrong about that. The rows it counts are
+  // already on Today; the notice just says how many of them arrived on their
+  // own because a date set earlier has now come round.
+  //
+  // Dismissal persists today's date, so it stays gone for the rest of the day
+  // and returns tomorrow — the SAME UserDefaults key SwiftUI uses, so
+  // dismissing in one shell dismisses in the other.
+
+  private static let rolledInDismissedKey = "septena.newTodos.dismissedDate"
+
+  private func rolledInBanner(_ pool: [SeptenaTask]) -> [Row] {
+    let today = SeptenaDate.today
+    guard UserDefaults.standard.string(forKey: Self.rolledInDismissedKey) != today
+    else { return [] }
+    // Read from the rows already on Today, exactly like `rolledInReview`:
+    // scheduled STRICTLY before today. A task scheduled FOR today, or merely
+    // due today, isn't "new" — the user placed it.
+    let count = pool.filter { task in
+      guard task.status == .open, let scheduled = task.scheduled, !scheduled.isEmpty
+      else { return false }
+      return String(scheduled.prefix(10)) < today
+    }.count
+    guard count > 0 else { return [] }
+    return [.rolledInBanner(count: count)]
+  }
+
+  private func dismissRolledInBanner() {
+    UserDefaults.standard.set(SeptenaDate.today, forKey: Self.rolledInDismissedKey)
+    reload()
+  }
+
+  // MARK: - Reminders inbox
+  //
+  // The AppKit counterpart of `RemindersInboxSection`. Same placement as
+  // SwiftUI's `remindersRow`: on Today only, ABOVE the Inbox, and ONLY when
+  // something is actually pending — no setup CTAs here, so a user who has
+  // never nominated a Reminders list sees nothing rather than a permanent
+  // prompt (SwiftUI passes `showsSetupCTAs: false` for exactly this).
+  // Setup lives in Settings, which is the hosted SwiftUI pane, so there is no
+  // second copy of the grant-access flow.
+  //
+  // Import semantics are the SwiftUI ones, unchanged: create a task carrying
+  // the reminder's title, due date (as a DEADLINE) and notes, then delete the
+  // original so dedupe is automatic and re-import is impossible.
+
+  /// Play the amber promote cue on every row that was just pinned to Today —
+  /// the gold ring at the checkbox plus the row wash, the two halves SwiftUI
+  /// plays together (`playTodayPromotePulse` + `playPromoteWash`). Rows that
+  /// scrolled out of view simply have no cell; the set is cleared either way,
+  /// so a cue can never fire late against an unrelated row.
+  private func playPendingPromoteFlashes() {
+    defer { pendingPromoteFlash.removeAll() }
+    guard !pendingPromoteFlash.isEmpty, !KitMotion.reduce else { return }
+    for (index, row) in rows.enumerated() {
+      guard let id = row.task?.id, pendingPromoteFlash.contains(id) else { continue }
+      (tableView.rowView(atRow: index, makeIfNecessary: false) as? KitCardRowView)?
+        .playPromoteWash()
+      (tableView.view(atColumn: 0, row: index, makeIfNecessary: false)
+        as? SeptaskKitTaskCell)?.playTodayPromotePulse()
+    }
+  }
+
+  /// The pending reminders, as Inbox rows.
+  ///
+  /// NOT a section of their own any more. A pending Apple Reminder is by
+  /// definition an Inbox item — unratified inbound work that hasn't been
+  /// placed — which is exactly what the Inbox already holds. It used to get
+  /// its own "From Reminders" header, which asserted that it was a different
+  /// KIND of thing when it is the same kind from a different source, and gave
+  /// a transient staging queue the same visual rank as your permanent Inbox.
+  ///
+  /// The Inbox already merges two populations this way (agent proposals and
+  /// loose captures), distinguished by ROW TREATMENT rather than by section.
+  /// Reminders are the third, and they wear a `↓` where a checkbox would go —
+  /// they are not tasks yet, so they must not offer a checkbox: it could only
+  /// mean "import and complete" (two acts conflated) or "complete a thing that
+  /// doesn't exist".
+  ///
+  /// They sort to the TOP of the Inbox: they are the only rows carrying an
+  /// extra step before they are even real.
+  private func reminderRows() -> [Row] {
+    guard !reminderPairs.isEmpty else { return [] }
+    var rows: [Row] = reminderPairs.map { pair in
+      Row.reminder(pair.view,
+                   importing: bulkImportingReminders
+                     || importingReminderID == pair.view.id)
+    }
+    // Bulk import only earns a line when there is a bulk to import. With one
+    // waiting, the row itself IS the one-click action.
+    if reminderPairs.count > 1 {
+      rows.append(.importAllReminders(count: reminderPairs.count,
+                                      importing: bulkImportingReminders))
+    }
+    return rows
+  }
+
+  /// Re-read the nominated list. Clears the block when access was revoked or
+  /// the list was un-nominated, so a change in Settings takes effect here
+  /// without a relaunch.
+  private func refreshReminders() {
+    let bridge = RemindersBridge.shared
+    guard filter == .today, bridge.access == .granted, let calendar = bridge.sourceList()
+    else {
+      guard !reminderPairs.isEmpty else { return }
+      reminderPairs = []
+      reload()
+      return
+    }
+    Task { @MainActor in
+      let fetched = await bridge.pendingReminders(in: calendar)
+      let pairs = fetched.map { ($0, ImportedReminder($0)) }
+      // Only rebuild when the set actually changed — `.EKEventStoreChanged`
+      // fires for every edit in every Reminders list, including ones we don't
+      // mirror, and a needless reload would fight an open editor.
+      guard pairs.map(\.1.id) != reminderPairs.map(\.view.id) else { return }
+      reminderPairs = pairs
+      reload()
+    }
+  }
+
+  private func importReminder(_ id: String) {
+    guard !bulkImportingReminders, importingReminderID == nil,
+          let pair = reminderPairs.first(where: { $0.view.id == id }) else { return }
+    importingReminderID = id
+    reload()
+    let created = mutator.create(title: pair.view.title,
+                                 deadline: pair.view.dueDate,
+                                 notes: pair.view.notes)
+    try? RemindersBridge.shared.delete([pair.reminder])
+    reminderPairs.removeAll { $0.view.id == id }
+    importingReminderID = nil
+    // Undoable like any other create. Redo re-creates (purge is a real
+    // delete), and it deliberately does NOT put the reminder back in Apple
+    // Reminders — that row is gone from EventKit and re-creating it there
+    // would be a write to another app's data on the user's behalf.
+    TaskUndo.recordCreate(
+      name: String(localized: "Import Reminder", comment: "SeptaskKit: undo action"),
+      ids: [created.id], mutator: mutator,
+      rebuild: { [weak self] in
+        guard let self else { return [] }
+        return [self.mutator.create(title: pair.view.title,
+                                    deadline: pair.view.dueDate,
+                                    notes: pair.view.notes).id]
+      })
+    reload()
+  }
+
+  private func importAllReminders() {
+    guard !bulkImportingReminders, !reminderPairs.isEmpty else { return }
+    bulkImportingReminders = true
+    reload()
+    let pairs = reminderPairs
+    var createdIDs: [String] = []
+    for pair in pairs {
+      createdIDs.append(mutator.create(title: pair.view.title,
+                                       deadline: pair.view.dueDate,
+                                       notes: pair.view.notes).id)
+    }
+    try? RemindersBridge.shared.delete(pairs.map(\.reminder))
+    reminderPairs = []
+    bulkImportingReminders = false
+    TaskUndo.recordCreate(
+      name: String(localized: "Import Reminders", comment: "SeptaskKit: undo action"),
+      ids: createdIDs, mutator: mutator,
+      rebuild: { [weak self] in
+        guard let self else { return [] }
+        return pairs.map { pair in
+          self.mutator.create(title: pair.view.title,
+                              deadline: pair.view.dueDate,
+                              notes: pair.view.notes).id
+        }
+      })
+    reload()
+  }
+
+  /// The Inbox — every unratified row, whatever its source: pending Apple
+  /// Reminders first, then agent proposals and loose captures.
+  ///
+  /// Rendered even when empty: the Inbox header carries the `+`, so it is the
+  /// capture slot whether or not anything sits in it. Matches
+  /// `TaskListView.triageSection`, which shows the section whenever
+  /// `allowsInlineCreate` regardless of row count.
   private func triageBand() -> [Row] {
     let band = LocalCache.tasks(in: context, filter: .triage)
-    // Rendered even when the band is empty: Today always offers the foot
-    // "New task" line, so the Inbox card is the capture slot whether or not
-    // anything sits in it. Matches `TaskListView.triageSection`, which shows
-    // the section whenever `allowsInlineCreate` regardless of row count.
+    let reminders = reminderRows()
+    // The count includes pending reminders — they ARE Inbox items now, and a
+    // header that excluded them would be lying about what sits below it. The
+    // bulk-import line is an action, not an item, so it doesn't count.
+    let count = band.count + reminderPairs.count
     return [.header(id: "inbox",
                     title: String(localized: "Inbox", comment: "Smart list title"),
-                    icon: .symbol("tray"), count: band.count)]
+                    icon: .symbol("tray"), count: count)]
+      + reminders
       + band.map(chipped)
   }
 
@@ -821,8 +1065,64 @@ final class SeptaskKitTaskListController: NSViewController {
   /// group doesn't already say where the task lives. Agent-authored triage
   /// rows are exactly why loose lists still need this — they can carry a
   /// project while sitting in the band.
+  /// A row with no list-membership chip — scoped pages already name their
+  /// context. It still carries a filing capsule where the gate allows one
+  /// (an area page ranks area-direct rows against that area's projects).
+  private func unchipped(_ task: SeptenaTask) -> Row {
+    .task(task, chip: nil, suggestion: filingSuggestions[task.id])
+  }
+
   private func chipped(_ task: SeptenaTask) -> Row {
-    .task(task, chip: chip(for: task))
+    .task(task, chip: chip(for: task), suggestion: filingSuggestions[task.id])
+  }
+
+  /// Per-row top filing pick, snapshotted each reload so the capsule paints on
+  /// the same frame as the row. The GATE is `TaskFilingSuggestions`, shared
+  /// with the SwiftUI list — this only decides when to ask.
+  private func refreshFilingSuggestions(pool: [SeptenaTask]) {
+    guard TaskRowFlags.filingSuggestionsEnabled else {
+      if !filingSuggestions.isEmpty { filingSuggestions = [:] }
+      return
+    }
+    let structure = StructureCache.snapshot(in: context)
+    TaskFilingSuggestions.prime(filter: filter, context: context,
+                                engine: SuggestionEngine.shared,
+                                projects: structure.projects, areas: structure.areas)
+    let childIds: (String) -> Set<String> = { areaId in
+      Set(structure.projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
+    }
+    var fresh: [String: SuggestionEngine.Suggestion] = [:]
+    for task in pool {
+      if let top = TaskFilingSuggestions.top(for: task, filter: filter,
+                                             engine: SuggestionEngine.shared,
+                                             childProjectIds: childIds) {
+        fresh[task.id] = top
+      }
+    }
+    filingSuggestions = fresh
+  }
+
+  /// One-tap filing from the capsule — the AppKit twin of
+  /// `TaskListView.applySuggestion`, same order and the same side effects.
+  private func applyFilingSuggestion(taskID: String) {
+    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == taskID }),
+          let suggestion = filingSuggestions[taskID] else { return }
+    let before = [TaskUndo.FilingSnapshot(task)]
+    let wasInTriage = task.isInTriageBand
+    // Implicit "not this": the user accepted THIS pick, so there is nothing to
+    // reject — rejection only fires when they file somewhere else. Clearing
+    // stops the engine re-offering a pick that has now been acted on.
+    SuggestionEngine.shared.clearSuggestion(for: taskID)
+    switch suggestion.kind {
+    case .area: mutator.moveToArea(id: taskID, area: suggestion.id)
+    case .project: mutator.moveToProject(id: taskID, project: suggestion.id)
+    }
+    // Filing is engagement — clears the agent cue so the row leaves the Inbox.
+    mutator.acknowledge(id: taskID)
+    if filter == .today, wasInTriage { pendingPromoteFlash.insert(taskID) }
+    TaskUndo.recordMove(before: before, context: context, mutator: mutator)
+    reload()
+    playPendingPromoteFlashes()
   }
 
   private func chip(for task: SeptenaTask) -> Chip? {
@@ -922,11 +1222,11 @@ final class SeptaskKitTaskListController: NSViewController {
       guard let h = task.heading else { return true }
       return !headingIds.contains(h)
     }
-    var result: [Row] = unheaded.map { .task($0, chip: nil) }
+    var result: [Row] = unheaded.map(unchipped)
     for heading in headings {
-      result.append(.task(heading, chip: nil))
+      result.append(.task(heading, chip: nil, suggestion: nil))
       let members = open.filter { $0.heading == heading.id }
-      result.append(contentsOf: members.map { .task($0, chip: nil) })
+      result.append(contentsOf: members.map(unchipped))
     }
     // Last, before the logged footer the caller appends — the same place
     // `TaskListView.projectGroupedRows` puts `addSectionButton`.
@@ -943,7 +1243,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let expanded = loggedExpandedIds().contains(scopeId)
     var rows: [Row] = [.loggedFooter(count: completed.count, expanded: expanded)]
     if expanded {
-      rows.append(contentsOf: completed.map { .task($0, chip: nil) })
+      rows.append(contentsOf: completed.map(unchipped))
     }
     return rows
   }
@@ -980,14 +1280,14 @@ final class SeptaskKitTaskListController: NSViewController {
       result.append(.header(id: "p-\(project.id)", title: project.title,
                             icon: .project(progress[project.id] ?? 0),
                             count: tasks.count))
-      result.append(contentsOf: tasks.map { .task($0, chip: nil) })
+      result.append(contentsOf: tasks.map(unchipped))
     }
     for area in snapshot.areas {
       if let direct = byArea[area.id], !direct.isEmpty {
         result.append(.header(id: "a-\(area.id)", title: area.title,
                               icon: area.emoji.map(GroupIcon.emoji) ?? .areaDot,
                               count: direct.count))
-        result.append(contentsOf: direct.map { .task($0, chip: nil) })
+        result.append(contentsOf: direct.map(unchipped))
       }
       for project in snapshot.projects where project.area == area.id {
         appendProject(project)
@@ -1235,10 +1535,10 @@ final class SeptaskKitTaskListController: NSViewController {
     onStoreChanged?()
   }
 
-  /// ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMoveModal`), the
+  /// ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMovePicker`), the
   /// AppKit counterpart of SwiftUI's `MovePickerSheet`. Built once, reused —
   /// it re-reads structure fresh on every `show`.
-  private lazy var moveModal = SeptaskKitMoveModal { [weak self] destination in
+  private lazy var movePicker = SeptaskKitMovePicker { [weak self] destination in
     self?.move(to: destination)
   }
 
@@ -1250,29 +1550,47 @@ final class SeptaskKitTaskListController: NSViewController {
     return KitMoveMenu.Destination.none
   }
 
-  func presentMoveMenu() {
+  /// `anchor` is the view the picker should hang off when exactly one row is
+  /// moving — the row itself by default, or the composer's List pill when the
+  /// pill asked. A multi-selection has no single row to point at, so it falls
+  /// back to the centered command panel (SeptaskKitSurface.swift, Tier 2).
+  func presentMoveMenu(anchor: KitSurfaceAnchor? = nil) {
     let selection = actionableSelection
     guard !selection.isEmpty else { return }
-    let title = selection.count > 1
-      ? String(localized: "Move \(selection.count) Tasks",
-               comment: "SeptaskKit: Move modal title (plural)")
-      : String(localized: "Move", comment: "SeptaskKit: Move modal title")
-    let current = selection.count == 1 ? currentMoveDestination(for: selection[0]) : nil
-    moveModal.show(current: current, title: title)
+    let single = selection.count == 1
+    let title = single
+      ? String(localized: "Move", comment: "SeptaskKit: Move picker title")
+      : String(localized: "Move \(selection.count) Tasks",
+               comment: "SeptaskKit: Move picker title (plural)")
+    let current = single ? currentMoveDestination(for: selection[0]) : nil
+    movePicker.show(current: current, title: title,
+                    anchor: single ? (anchor ?? selectedRowAnchor ?? .window) : .window)
   }
 
-  /// Open the complete Repeat editor for the current selection. The panel is
-  /// intentionally the only AppKit rule picker: no preset submenu can silently
-  /// flatten a fixed schedule into an after-completion rule.
-  func presentRecurrencePanel() {
+  /// The focused row's rect, for a Tier 1 surface to anchor to.
+  private var selectedRowAnchor: KitSurfaceAnchor? {
+    guard tableView.selectedRow >= 0 else { return nil }
+    return .rect(tableView.rect(ofRow: tableView.selectedRow), tableView)
+  }
+
+  /// Open the Repeat editor for the current selection, anchored to the row it
+  /// edits like When and Deadline. It is intentionally the only AppKit rule
+  /// picker: no preset submenu can silently flatten a fixed schedule into an
+  /// after-completion rule.
+  func presentRecurrencePanel(anchor: KitSurfaceAnchor? = nil) {
     let selection = actionableSelection
     guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
     let first = selection[0]
     let hasScheduledDate = selection.allSatisfy { $0.scheduled != nil }
-    SeptaskKitRecurrencePanelController.present(
+    SeptaskKitRepeatPopover.present(
       initial: first.recurrence,
       paused: first.recurrencePaused,
-      hasScheduledDate: hasScheduledDate
+      hasScheduledDate: hasScheduledDate,
+      relativeTo: rect, of: host
     ) { [weak self] result in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
@@ -1512,9 +1830,10 @@ final class SeptaskKitTaskListController: NSViewController {
     let wanted = Set(ids)
     var restyled = IndexSet()
     for index in rows.indices {
-      if case .task(var task, let chip) = rows[index], wanted.contains(task.id) {
+      if case .task(var task, let chip, let suggestion) = rows[index],
+         wanted.contains(task.id) {
         task.status = status
-        rows[index] = .task(task, chip: chip)
+        rows[index] = .task(task, chip: chip, suggestion: suggestion)
         restyled.insert(index)
       }
     }
@@ -1605,21 +1924,19 @@ final class SeptaskKitTaskListController: NSViewController {
       return .makeException
     }
 
-    let alert = NSAlert()
-    alert.messageText = String(localized: "Reschedule Repeating Task?",
-                               comment: "SeptaskKit: fixed recurrence move")
-    alert.informativeText = String(localized:
-      "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.",
-      comment: "SeptaskKit: fixed recurrence move")
-    alert.addButton(withTitle: String(localized: "Make Exception",
-                                      comment: "SeptaskKit: fixed recurrence move"))
-    alert.addButton(withTitle: String(localized: "Update Rule",
-                                      comment: "SeptaskKit: fixed recurrence move"))
-    alert.addButton(withTitle: String(localized: "Cancel",
-                                      comment: "SeptaskKit: fixed recurrence move"))
-    switch alert.runModal() {
-    case .alertFirstButtonReturn: return .makeException
-    case .alertSecondButtonReturn: return .updateRule
+    let chosen = KitPrompt.choice(
+      title: String(localized: "Reschedule Repeating Task?",
+                    comment: "SeptaskKit: fixed recurrence move"),
+      message: String(localized:
+        "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.",
+        comment: "SeptaskKit: fixed recurrence move"),
+      options: [String(localized: "Make Exception",
+                       comment: "SeptaskKit: fixed recurrence move"),
+                String(localized: "Update Rule",
+                       comment: "SeptaskKit: fixed recurrence move")])
+    switch chosen {
+    case 0: return .makeException
+    case 1: return .updateRule
     default: return nil
     }
   }
@@ -1646,10 +1963,12 @@ final class SeptaskKitTaskListController: NSViewController {
         mutator.removeFromToday(id: task.id)
       } else {
         mutator.moveToToday(id: task.id)
+        pendingPromoteFlash.insert(task.id)
       }
       mutator.acknowledge(id: task.id)
     }
     reload()
+    playPendingPromoteFlashes()
     recordScheduleUndo(name: String(localized: "Toggle Today",
                                     comment: "SeptaskKit: undo action"),
                        before: before)
@@ -2080,10 +2399,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// enough for the closed cell after a composer commit to show the new title.
   private func refreshTaskRowInPlace(id: String) {
     guard let index = rows.firstIndex(where: { $0.task?.id == id }),
-          case .task(_, let chip) = rows[index],
+          case .task(_, let chip, let suggestion) = rows[index],
           let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == id })
     else { return }
-    rows[index] = .task(fresh, chip: chip)
+    rows[index] = .task(fresh, chip: chip, suggestion: suggestion)
   }
 
   /// Animate (or jump, under Reduce Motion) a row's height to whatever
@@ -2213,6 +2532,17 @@ final class SeptaskKitTaskListController: NSViewController {
     cell.onAction = { [weak self] action in
       guard let self else { return }
       switch action {
+      case .discuss:
+        // Local on-device kickoff (`ConversationEngine.advance`), the same call
+        // SwiftUI's Discuss pill makes — no gateway in the loop, which is why
+        // the pill can exist here at all. The reload afterwards is what puts
+        // the first turn on screen in the inspector.
+        cell.setDiscussWorking(true)
+        Task { @MainActor [weak self] in
+          _ = await ConversationEngine.advance(task: task)
+          cell.setDiscussWorking(false)
+          self?.reload()
+        }
       case .toggleComplete:
         let wasOpen = task.status == .open
         self.recordUndo(name: wasOpen
@@ -2269,17 +2599,16 @@ final class SeptaskKitTaskListController: NSViewController {
           self?.refreshComposerRow(taskId: task.id)
         }
 
-      case .list:
-        // Reuses the exact "Move to" menu the context menu and ⌘⇧M pop up —
-        // one destination list, not a second picker to keep in sync. It acts
-        // on the current selection, which is this row (selecting it is how
-        // compose mode began).
-        self.presentMoveMenu()
+      case .list(let anchor):
+        // Reuses the exact destination list ⌘⇧M pops up — one picker, not a
+        // second to keep in sync — anchored to the pill the user clicked. It
+        // acts on the current selection, which is this row (selecting it is
+        // how compose mode began).
+        self.presentMoveMenu(anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
       case .repeatRule(let anchor):
-        _ = anchor
-        self.presentRecurrencePanel()
+        self.presentRecurrencePanel(anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
       }
     }
@@ -2484,15 +2813,21 @@ final class SeptaskKitTaskListController: NSViewController {
     return menu
   }
 
+  /// New Section lands as a named row and opens for editing, the way ⌘N lands
+  /// a new task and the way Finder lands a new folder. It used to stop the app
+  /// with a modal text prompt while the row it was about to create sat right
+  /// there, editable.
   @objc private func menuNewSection() {
-    guard case .project(let projectId) = filter,
-          let title = KitPrompt.text(
-            title: String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
-            placeholder: String(localized: "Section name", comment: "SeptaskKit: heading CRUD"),
-            confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm"))
-    else { return }
-    _ = mutator.createHeading(title: title, project: projectId)
+    guard case .project(let projectId) = filter else { return }
+    let heading = mutator.createHeading(
+      title: String(localized: "New Section", comment: "SeptaskKit: heading CRUD"),
+      project: projectId)
     reload()
+    guard let id = heading?.id,
+          let row = rows.firstIndex(where: { $0.task?.id == id }) else { return }
+    tableView.selectRowIndexes([row], byExtendingSelection: false)
+    tableView.scrollRowToVisible(row)
+    beginEditingRow(row)
   }
 
   @objc private func menuDeleteHeading() {
@@ -2661,7 +2996,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
     case .projectTarget: return SeptaskKitTheme.rowHeight
-    case .task(let task, _):
+    case .task(let task, _, _):
       if task.isHeading {
         // Section break between cards — room above matching SwiftUI's
         // `headingRow` top padding so the divider isn't flush to the card.
@@ -2677,6 +3012,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
+    // Reminder rows read as task rows (they become tasks on click); their
+    // header sits on the page like every other group header.
+    case .reminder: return SeptaskKitTheme.rowHeight
+    case .importAllReminders: return SeptaskKitTheme.rowHeight
+    // Meta-height notice on the page, not a full card row.
+    case .rolledInBanner: return SeptenaTypeScale.size(.footnote) + 22
     }
   }
 
@@ -2691,6 +3032,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return fresh
       }()
     rowView.selectionHighlightStyle = .none
+    // Row views are recycled: a wash still fading on the row this view USED to
+    // be would otherwise ride along onto an unrelated task.
+    rowView.cancelPromoteWash()
     applyCardGeometry(rowView, atRow: row)
     return rowView
   }
@@ -2710,12 +3054,20 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       // The open composer is its own rounded slice (Things' elevated edit
       // card) — it breaks the card run so neighbors round off against it
       // instead of squaring into a mid-card join that no longer exists.
+      // `!isComposingRow(...)`, NOT `task?.id != composingTaskId`. That
+      // comparison is the same `Optional == Optional` trap the comment above
+      // describes, and it was still live here: a TASKLESS card row (the
+      // reminder rows, the "New task" line, calendar events, the bulk-import
+      // line) has `task?.id == nil`, so with nothing composing the test read
+      // `nil != nil` → false → "my neighbour isn't on the card" → both rows
+      // rounded off and the Inbox rendered as two stacked cards with a gap
+      // instead of one run. Any run containing a taskless row was segmented.
       let previousOnCard = row > 0
         && rows[row - 1].isCardRow
-        && rows[row - 1].task?.id != composingTaskId
+        && !isComposingRow(row - 1)
       let nextOnCard = row + 1 < rows.count
         && rows[row + 1].isCardRow
-        && rows[row + 1].task?.id != composingTaskId
+        && !isComposingRow(row + 1)
       rowView.isFirstInGroup = composing || !previousOnCard
       rowView.isLastInGroup = composing || !nextOnCard
     } else {
@@ -2724,6 +3076,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     applySelectionJoins(rowView, atRow: row)
     applyDropLine(rowView, atRow: row)
     rowView.needsDisplay = true
+  }
+
+  /// Is the row at `index` the one currently expanded into the composer?
+  /// False for every taskless row, which is the point — see the note in
+  /// `applyCardGeometry`.
+  private func isComposingRow(_ index: Int) -> Bool {
+    guard let composingTaskId, let id = rows[index].task?.id else { return false }
+    return id == composingTaskId
   }
 
   /// Selection-run joins for contiguous multi-select rounding. Only joins
@@ -3124,7 +3484,33 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.menuNewSection() }
       return cell
 
-    case .task(let task, let chip):
+    case .importAllReminders(let count, let importing):
+      let identifier = NSUserInterfaceItemIdentifier("importAllRemindersCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
+        as? KitImportAllRemindersCell
+        ?? KitImportAllRemindersCell(identifier: identifier)
+      cell.configure(count: count, importing: importing)
+      cell.onTap = { [weak self] in self?.importAllReminders() }
+      return cell
+
+    case .rolledInBanner(let count):
+      let identifier = NSUserInterfaceItemIdentifier("rolledInBannerCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
+        as? KitRolledInBannerCell
+        ?? KitRolledInBannerCell(identifier: identifier)
+      cell.configure(count: count)
+      cell.onDismiss = { [weak self] in self?.dismissRolledInBanner() }
+      return cell
+
+    case .reminder(let item, let importing):
+      let identifier = NSUserInterfaceItemIdentifier("reminderCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReminderCell
+        ?? KitReminderCell(identifier: identifier)
+      cell.configure(with: item, importing: importing)
+      cell.onTap = { [weak self] in self?.importReminder(item.id) }
+      return cell
+
+    case .task(let task, let chip, let suggestion):
       if task.id == composingTaskId {
         let identifier = NSUserInterfaceItemIdentifier("composerCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitComposerCell
@@ -3137,6 +3523,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? SeptaskKitTaskCell(identifier: identifier)
       cell.configure(with: task, filter: filter, chip: chip,
                      contextText: taskContextText(for: task))
+      cell.configureSuggestion(suggestion) { [weak self] in
+        self?.applyFilingSuggestion(taskID: task.id)
+      }
       cell.onToggle = { [weak self] id in self?.toggle(id: id) }
       // Deferred one runloop tick — same reentrancy hazard as the composer's
       // `deferCommitAndCollapse` (see its doc comment): `onRename` fires from
@@ -3193,7 +3582,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 /// AppKit mirror of the SwiftUI a11y gate (`A11yMotion`): every row animation
 /// resolves through here so Reduce Motion collapses it to an instant change.
 @MainActor
-private enum KitMotion {
+enum KitMotion {
   static var reduce: Bool {
     NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
   }
@@ -3227,6 +3616,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let contextLabel = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
+  private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
   private let repeatGlyph = NSImageView()
@@ -3321,7 +3711,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, chip, scheduleGlyph, detail, repeatGlyph, notesGlyph])
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, chip, scheduleGlyph,
+                                      detail, repeatGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -3392,6 +3783,24 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     leadingConstraint.constant = inset + 6
     trailingConstraint.constant = -(inset + 8)
     super.layout()
+  }
+
+  /// Forwarded to the checkbox — the promote cue's ring half. Kept on the cell
+  /// so the controller talks to one row object, not to its internals.
+  func playTodayPromotePulse() { checkbox.playTodayPromotePulse() }
+
+  /// Show (or hide) the one-tap filing capsule. Separate from `configure` so
+  /// the controller owns the suggestion snapshot and the cell stays a renderer.
+  func configureSuggestion(_ suggestion: SuggestionEngine.Suggestion?,
+                           onApply: (() -> Void)?) {
+    guard let suggestion else {
+      suggestionChip.isHidden = true
+      suggestionChip.onApply = nil
+      return
+    }
+    suggestionChip.isHidden = false
+    suggestionChip.configure(title: suggestion.title)
+    suggestionChip.onApply = onApply
   }
 
   func configure(with task: SeptenaTask, filter: TaskFilter,
@@ -4269,6 +4678,384 @@ final class KitAddSectionCell: NSTableCellView {
     // through hit-testing, so a whole-cell rect happily advertises the page
     // padding as clickable when it is not. That false signal is what cost
     // three rounds of debugging in the 2026-08-09 pass.
+    addCursorRect(hit.frame, cursor: .pointingHand)
+  }
+
+  @objc private func fire() { onTap?() }
+}
+
+// MARK: - Rolled-into-Today banner cell
+
+/// "N tasks rolled into Today", with a Dismiss button.
+///
+/// A NOTICE, and it must not look like an item. It used to wear the same
+/// fill, radius and margin as a task card, which made a statement ABOUT your
+/// list read as a row OF it — the only action on it is "go away", so looking
+/// actionable was a lie. It now sits on the page background at meta size,
+/// like a group header does, at roughly half the height it had.
+///
+/// Still deliberately NOT a filled colour band with a filled button: per
+/// `TaskListView.newTodosBanner`, that is Things' treatment and a saturated
+/// slab is the loudest thing on a screen whose language is quiet cards. The
+/// gold is spent in exactly one place — the glyph.
+@MainActor
+final class KitRolledInBannerCell: NSTableCellView {
+  private let glyph = NSImageView()
+  private let label = NSTextField(labelWithString: "")
+  private let dismiss = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onDismiss: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    glyph.translatesAutoresizingMaskIntoConstraints = false
+    // Outline, not `.fill`: a filled disc reads as a status dot demanding
+    // attention. The outline states the fact and stops.
+    glyph.image = NSImage(systemSymbolName: "arrow.down.circle",
+                          accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote) + 1,
+                                     weight: .regular))
+    // NEUTRAL, not gold. Gold is already spoken for on this screen: it is the
+    // Today tenure dial inside checkboxes, where it carries data (days
+    // carried). Spending it again on a dismissible notice made the least
+    // important thing the only coloured thing, and made one colour mean two
+    // unrelated things. A notice should be the quietest thing on screen.
+    glyph.contentTintColor = SeptaskKitTheme.iconMuted
+    glyph.setContentHuggingPriority(.required, for: .horizontal)
+    glyph.kitA11yIgnore()
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.kitA11yIgnore()
+
+    dismiss.translatesAutoresizingMaskIntoConstraints = false
+    dismiss.isBordered = false
+    dismiss.setButtonType(.momentaryChange)
+    dismiss.refusesFirstResponder = true
+    dismiss.target = self
+    dismiss.action = #selector(fireDismiss)
+    dismiss.setContentHuggingPriority(.required, for: .horizontal)
+    let dismissTitle = String(localized: "Dismiss",
+                              comment: "SeptaskKit: dismiss the rolled-into-Today notice")
+    // Same font and ink as the message itself. Semibold made the way OUT
+    // louder than the thing being said, which is backwards for a notice you
+    // can ignore.
+    dismiss.attributedTitle = NSAttributedString(
+      string: dismissTitle,
+      attributes: [
+        .font: SeptaskKitTheme.meta,
+        .foregroundColor: SeptaskKitTheme.inkSecondary,
+      ])
+    dismiss.setAccessibilityLabel(dismissTitle)
+
+    addSubview(glyph)
+    addSubview(label)
+    addSubview(dismiss)
+    textField = label
+
+    leadingConstraint = glyph.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = dismiss.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
+      label.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 6),
+      label.centerYAnchor.constraint(equalTo: glyph.centerYAnchor),
+      dismiss.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 8),
+      trailingConstraint,
+      dismiss.centerYAnchor.constraint(equalTo: glyph.centerYAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitRolledInBannerCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    super.layout()
+  }
+
+  func configure(count: Int) {
+    label.stringValue = count == 1
+      ? String(localized: "1 task rolled into Today",
+               comment: "SeptaskKit: start-of-day rolled-in notice, singular")
+      : String(localized: "\(count) tasks rolled into Today",
+               comment: "SeptaskKit: start-of-day rolled-in notice, plural")
+    kitA11yElement(role: .staticText, label: label.stringValue, value: nil, help: nil)
+    window?.invalidateCursorRects(for: self)
+  }
+
+  override func resetCursorRects() {
+    addCursorRect(dismiss.frame, cursor: .pointingHand)
+  }
+
+  @objc private func fireDismiss() { onDismiss?() }
+}
+
+// MARK: - Reminders inbox cells
+
+/// "Import all N from Reminders" — a quiet action line at the foot of the
+/// reminder run inside the Inbox, shown only when more than one is waiting.
+///
+/// A LINE, not a header button: the Inbox header's trailing slot belongs to
+/// the `+`, and this action is consequential enough to want a full row and a
+/// sentence rather than a glyph. Same shape as the "Add Section" footer —
+/// the shell's established vocabulary for a quiet in-list action.
+///
+/// The subtitle says what it costs, because importing DELETES the originals
+/// from Apple Reminders and undo cannot reach them. That is the only place in
+/// the app where one click removes another app's data, so it says so up front
+/// rather than confirming after the fact.
+@MainActor
+final class KitImportAllRemindersCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
+  private let glyph = NSImageView()
+  private let label = NSTextField(labelWithString: "")
+  private let spinner = NSProgressIndicator()
+  private let hit = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    glyph.translatesAutoresizingMaskIntoConstraints = false
+    glyph.image = NSImage(systemSymbolName: "arrow.down.circle",
+                          accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote),
+                                     weight: .semibold))
+    glyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    glyph.setContentHuggingPriority(.required, for: .horizontal)
+    glyph.kitA11yIgnore()
+
+    label.translatesAutoresizingMaskIntoConstraints = false
+    label.font = SeptaskKitTheme.meta
+    label.textColor = SeptaskKitTheme.inkSecondary
+    label.lineBreakMode = .byTruncatingTail
+    label.kitA11yIgnore()
+
+    spinner.translatesAutoresizingMaskIntoConstraints = false
+    spinner.style = .spinning
+    spinner.controlSize = .small
+    spinner.isDisplayedWhenStopped = false
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
+    addSubview(glyph)
+    addSubview(label)
+    addSubview(spinner)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
+    textField = label
+
+    leadingConstraint = glyph.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = spinner.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
+      glyph.widthAnchor.constraint(equalToConstant: 20),
+      label.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 7),
+      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      spinner.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor,
+                                       constant: 8),
+      trailingConstraint,
+      spinner.centerYAnchor.constraint(equalTo: centerYAnchor),
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitImportAllRemindersCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
+    super.layout()
+  }
+
+  func configure(count: Int, importing: Bool) {
+    let title = importing
+      ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
+      : String(localized: "Import all \(count) from Reminders — removes them there",
+               comment: "SeptaskKit: bulk import action line")
+    label.stringValue = title
+    hit.isEnabled = !importing
+    alphaValue = importing ? 0.6 : 1
+    if importing { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+    kitA11yButton(label: title)
+    window?.invalidateCursorRects(for: self)
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
+
+  override func resetCursorRects() {
+    guard hit.isEnabled else { return }
+    addCursorRect(hit.frame, cursor: .pointingHand)
+  }
+
+  @objc private func fire() { onTap?() }
+}
+
+/// One pending Apple Reminder. The whole row is the import button — the
+/// SwiftUI row behaves the same way, and there is no second action to
+/// disambiguate from.
+@MainActor
+final class KitReminderCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
+  private let arrow = NSImageView()
+  private let title = NSTextField(labelWithString: "")
+  private let due = NSTextField(labelWithString: "")
+  private let hit = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    arrow.translatesAutoresizingMaskIntoConstraints = false
+    arrow.image = NSImage(systemSymbolName: "arrow.down", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote),
+                                     weight: .semibold))
+    arrow.contentTintColor = SeptaskKitTheme.iconMuted
+    arrow.kitA11yIgnore()
+
+    title.translatesAutoresizingMaskIntoConstraints = false
+    title.font = SeptaskKitTheme.taskTitle
+    title.textColor = SeptaskKitTheme.inkPrimary
+    title.lineBreakMode = .byTruncatingTail
+    title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    title.kitA11yIgnore()
+
+    due.translatesAutoresizingMaskIntoConstraints = false
+    due.font = SeptaskKitTheme.meta
+    due.setContentHuggingPriority(.required, for: .horizontal)
+    due.setContentCompressionResistancePriority(.required, for: .horizontal)
+    due.kitA11yIgnore()
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
+    addSubview(arrow)
+    addSubview(title)
+    addSubview(due)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
+    textField = title
+
+    leadingConstraint = arrow.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = due.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      arrow.centerYAnchor.constraint(equalTo: centerYAnchor),
+      arrow.widthAnchor.constraint(equalToConstant: 20),
+      title.leadingAnchor.constraint(equalTo: arrow.trailingAnchor, constant: 7),
+      title.centerYAnchor.constraint(equalTo: centerYAnchor),
+      due.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 8),
+      trailingConstraint,
+      due.centerYAnchor.constraint(equalTo: centerYAnchor),
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints + [
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReminderCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
+    super.layout()
+  }
+
+  func configure(with item: ImportedReminder, importing: Bool) {
+    title.stringValue = item.title
+    title.toolTip = item.title
+    if let date = item.dueDate {
+      due.stringValue = Self.shortDate(date)
+      due.textColor = Self.isOverdue(date)
+        ? SeptaskKitTheme.overdueRed
+        : SeptaskKitTheme.inkSecondary
+    } else {
+      due.stringValue = ""
+    }
+    hit.isEnabled = !importing
+    alphaValue = importing ? 0.5 : 1
+    kitA11yButton(label: String(localized: "Import “\(item.title)” from Reminders",
+                                comment: "SeptaskKit: reminder row accessibility label"))
+    window?.invalidateCursorRects(for: self)
+  }
+
+  /// Same wording as `RemindersInboxSection.shortDate`.
+  private static func shortDate(_ date: Date) -> String {
+    let cal = Calendar.current
+    if cal.isDateInToday(date) {
+      return String(localized: "Today", comment: "Smart list title")
+    }
+    if cal.isDateInTomorrow(date) {
+      return String(localized: "Tomorrow", comment: "Relative day label")
+    }
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("MMMd")
+    return f.string(from: date)
+  }
+
+  /// Reads `SeptenaDate.today` rather than `Date()`, so time travel moves this
+  /// cue with everything else.
+  private static func isOverdue(_ date: Date) -> Bool {
+    let today = SeptenaDate.startOfDay(for: SeptenaDate.today)
+      ?? Calendar.current.startOfDay(for: Date())
+    return Calendar.current.startOfDay(for: date) <= today
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
+
+  override func resetCursorRects() {
+    guard hit.isEnabled else { return }
     addCursorRect(hit.frame, cursor: .pointingHand)
   }
 

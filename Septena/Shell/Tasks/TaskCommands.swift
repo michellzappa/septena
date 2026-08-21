@@ -7,6 +7,11 @@ enum TaskRowShortcuts {
   static let copy = KeyboardShortcut("c", modifiers: .command)
   static let duplicate = KeyboardShortcut("d", modifiers: .command)
   static let markComplete = KeyboardShortcut("k", modifiers: .command)
+  // ⌥⌘K, deliberately one modifier away from ⌘K: cancelling and completing are
+  // neighbours in meaning (both retire a row to the Logbook) but opposite in
+  // outcome, so they should be neighbours on the keyboard AND impossible to
+  // hit by accident. Not a system-reserved equivalent.
+  static let cancel = KeyboardShortcut("k", modifiers: [.command, .option])
   static let toggleToday = KeyboardShortcut("t", modifiers: .command)
   static let when = KeyboardShortcut("s", modifiers: .command)
   static let deadline = KeyboardShortcut("d", modifiers: [.command, .shift])
@@ -87,6 +92,8 @@ enum TaskRowCommands {
     TaskRowCommand(id: "markComplete", title: "Mark as Complete",
                    shortcut: TaskRowShortcuts.markComplete, handler: \.toggleComplete,
                    acceptsNextList: true),
+    TaskRowCommand(id: "cancel", title: "Cancel Task",
+                   shortcut: TaskRowShortcuts.cancel, handler: \.cancel),
     TaskRowCommand(id: "toggleToday", title: "Toggle Today",
                    shortcut: TaskRowShortcuts.toggleToday, handler: \.toggleToday),
     TaskRowCommand(id: "when", title: "When…",
@@ -115,6 +122,9 @@ struct TaskActions {
   /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘K
   /// Task-menu command.
   var toggleComplete: (() -> Void)?
+  /// Retires the selected row(s) as cancelled — ⌥⌘K. Distinct from complete:
+  /// the work didn't happen, and the Logbook records that difference.
+  var cancel: (() -> Void)?
   var delete: (() -> Void)?
   var clearSchedule: (() -> Void)?
   var editDetails: (() -> Void)?
