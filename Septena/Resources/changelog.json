@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1614,
+      "build": 1618,
       "date": "2026-08-20",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, joins Septena",
-          "detail": "A new dedicated task app shares your existing Septena task data, with its own iPhone and Mac experience.",
+          "title": "Septask, a focused task app, joins the family",
+          "detail": "A dedicated app for just your tasks, on iPhone, iPad, and Mac, sharing the same data as Septena.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks got much smarter",
-          "detail": "Pause and resume a repeating task, reschedule the whole series at once, complete one to spawn the next automatically, and browse a dedicated repeating-tasks list.",
+          "title": "Recurring tasks get pause, resume, and smarter rescheduling",
+          "detail": "Pause a repeating series without deleting it, get a reschedule prompt when it's due, and browse all repeating tasks in one list.",
           "section": "tasks"
         },
         {
-          "title": "Deleted tasks are recoverable for 30 days",
-          "detail": "Restore an accidentally deleted task from Recently Deleted before it auto-purges.",
+          "title": "Redesigned repeat and date pickers",
+          "detail": "Setting or changing a task's schedule now uses fuller editors with quick-pick options.",
           "section": "tasks"
         },
         {
-          "title": "Meal photos now analyze themselves",
-          "detail": "Snap a photo of a meal and Septena prefills the macros and adds an ingredient breakdown automatically.",
+          "title": "Add attachments to tasks",
+          "detail": null,
+          "section": "tasks"
+        },
+        {
+          "title": "More accurate meal re-logging",
+          "detail": "Re-logged meals now scale by portion size instead of a flat multiplier, and you can log the same meal again the same day.",
           "section": "nutrition"
         },
         {
-          "title": "Re-logging a meal now scales portions in place",
-          "detail": "Adjust a re-logged meal's amount directly instead of using a separate multiplier.",
+          "title": "Scan a meal photo to log it",
+          "detail": "Take a photo of your food and Septena prefills the nutrition details.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions gained progression hints and editable times",
-          "detail": "See one-tap progression suggestions on your sets, edit session start/end times, and review effort-weighted muscle volume after each session.",
+          "title": "Improved training session editor",
+          "detail": "Set exact start and end times and see progression hints for your next set.",
           "section": "training"
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Pinned goals show as tiles you can tap to log progress directly from the dashboard.",
-          "section": "goals"
-        },
-        {
-          "title": "Copy your grocery list with one tap",
-          "detail": "A new copy-to-clipboard button makes it easy to paste your shopping list into other apps.",
-          "section": "groceries"
+          "title": "Fixed sleep heatmap dating",
+          "detail": "Nights now line up with the correct wake day.",
+          "section": "sleep"
         }
       ]
     },
