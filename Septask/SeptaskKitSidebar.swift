@@ -1022,6 +1022,22 @@ private final class KitSidebarOutlineView: NSOutlineView {
     onRightClick?(event)
   }
 
+  /// Selection emphasis is computed per draw (`septaskSelectionIsActive`), so
+  /// the rows must repaint when focus enters or leaves this sidebar. AppKit
+  /// posts no notification for a first-responder change — these two overrides
+  /// are the hook.
+  override func becomeFirstResponder() -> Bool {
+    let accepted = super.becomeFirstResponder()
+    if accepted { septaskRefreshSelectionEmphasis() }
+    return accepted
+  }
+
+  override func resignFirstResponder() -> Bool {
+    let resigned = super.resignFirstResponder()
+    if resigned { septaskRefreshSelectionEmphasis() }
+    return resigned
+  }
+
   override func keyDown(with event: NSEvent) {
     if event.keyCode == 48 {  // Tab / Shift-Tab — only two stops in the loop.
       onTab?()

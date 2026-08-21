@@ -415,6 +415,68 @@ enum KitMoveMenu {
   }
 }
 
+// MARK: - Selection emphasis
+
+/// Whether this row's selection should read as ACTIVE — the accent wash —
+/// rather than parked in the neutral gray.
+///
+/// Deliberately NOT `NSTableRowView.isEmphasized`. That flag is state AppKit
+/// PUSHES down onto each row view, so every row keeps its own copy of what is
+/// really one list-wide fact. Both tables here run `selectionHighlightStyle =
+/// .none` and recycle row views through `makeView(withIdentifier:)`, so a row
+/// view dequeued after the last push keeps whatever answer it last held and
+/// the copies drift apart: the selection painted blue on one task and gray on
+/// another, and arrowing could not clear it, because moving the selection only
+/// samples a different stale copy. A key-window round trip repainted every
+/// visible row at once, which is why clicking away and back appeared to fix it.
+///
+/// Emphasis belongs to the LIST, not to a row, so compute it on demand from
+/// the two conditions that define it and keep no copy to go stale.
+extension NSTableRowView {
+  var septaskSelectionIsActive: Bool {
+    guard let window, window.isKeyWindow,
+          let table = septaskEnclosingTableView,
+          let responder = window.firstResponder as? NSView
+    else { return false }
+    // The field editor for an inline rename is a DESCENDANT of the table, so
+    // a row being renamed still counts as focused (AppKit's flag said no).
+    return responder === table || responder.isDescendant(of: table)
+  }
+
+  private var septaskEnclosingTableView: NSTableView? {
+    var view: NSView? = superview
+    while let current = view {
+      if let table = current as? NSTableView { return table }
+      view = current.superview
+    }
+    return nil
+  }
+
+  /// Key-state changes move `septaskSelectionIsActive` without touching the
+  /// row, so the row has to be told to repaint. Registered per row view in
+  /// `viewDidMoveToWindow`; NotificationCenter holds observers weakly, so
+  /// there is nothing to unregister on dealloc.
+  @objc func septaskRedrawSelection() { needsDisplay = true }
+
+  func septaskObserveKeyWindow() {
+    let center = NotificationCenter.default
+    for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+      center.removeObserver(self, name: name, object: nil)
+      guard let window else { continue }
+      center.addObserver(self, selector: #selector(septaskRedrawSelection),
+                         name: name, object: window)
+    }
+  }
+}
+
+extension NSTableView {
+  /// Repaint every on-screen row's selection. Focus changes are list-wide, so
+  /// this is how a first-responder change reaches the rows.
+  func septaskRefreshSelectionEmphasis() {
+    enumerateAvailableRowViews { rowView, _ in rowView.needsDisplay = true }
+  }
+}
+
 // MARK: - Card row background
 
 /// The grouped-card surface the SwiftUI list draws its rows on: white card,
@@ -486,6 +548,14 @@ final class KitCardRowView: NSTableRowView {
     set { super.isEmphasized = newValue; needsDisplay = true }
   }
 
+  /// Selection emphasis is computed at draw time (`septaskSelectionIsActive`),
+  /// so this row repaints when its window's key state flips.
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    septaskObserveKeyWindow()
+    needsDisplay = true
+  }
+
   /// Uneven rounded rect for a card/selection slice. A fully-joined slice
   /// (both ends square) is a plain rect — exact edge, no antialiased curve
   /// for a neighbor to disagree with. One-sided joins over-extend the square
@@ -524,7 +594,7 @@ final class KitCardRowView: NSTableRowView {
     // Selection rides on the card (same clip, selection-run rounding) so it
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
-      SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
+      SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
       slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
     }
     NSGraphicsContext.restoreGraphicsState()
@@ -567,6 +637,13 @@ final class KitSidebarRowView: NSTableRowView {
   /// alongside this row view in `outlineView(_:rowViewForItem:)`.
   var extraTopMargin: CGFloat = 0
 
+  /// See `KitCardRowView.viewDidMoveToWindow`.
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    septaskObserveKeyWindow()
+    needsDisplay = true
+  }
+
   override func drawSelection(in dirtyRect: NSRect) {
     guard selectionHighlightStyle != .none else { return }
     // The pill covers only the row's CONTENT band — `bounds` minus
@@ -587,7 +664,7 @@ final class KitSidebarRowView: NSTableRowView {
                       y: bounds.minY + extraTopMargin + verticalInset,
                       width: bounds.width - 16,
                       height: contentHeight - verticalInset * 2)
-    SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
+    SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
   }
 
