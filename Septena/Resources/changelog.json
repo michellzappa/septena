@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1618,
-      "date": "2026-08-20",
+      "build": 1629,
+      "date": "2026-08-21",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, joins the family",
-          "detail": "A dedicated app for just your tasks, on iPhone, iPad, and Mac, sharing the same data as Septena.",
+          "title": "Septask, a focused task app, joins Septena",
+          "detail": "A dedicated task app for iPhone, iPad, and Mac that shares your Septena task data, with its own watch app, widgets, and Next feed.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks get pause, resume, and smarter rescheduling",
-          "detail": "Pause a repeating series without deleting it, get a reschedule prompt when it's due, and browse all repeating tasks in one list.",
+          "title": "Recurring tasks are far more reliable",
+          "detail": "Pause and resume a repeating series, reschedule the whole series at once, and browse a dedicated repeating-tasks list.",
           "section": "tasks"
         },
         {
-          "title": "Redesigned repeat and date pickers",
-          "detail": "Setting or changing a task's schedule now uses fuller editors with quick-pick options.",
+          "title": "Undo now works the same everywhere you manage tasks",
+          "detail": "One shared undo stack covers delete, move, defer, and completion across iPhone, iPad, Mac, and watch.",
           "section": "tasks"
         },
         {
-          "title": "Add attachments to tasks",
+          "title": "Attach files and photos to tasks",
           "detail": null,
           "section": "tasks"
         },
         {
-          "title": "More accurate meal re-logging",
-          "detail": "Re-logged meals now scale by portion size instead of a flat multiplier, and you can log the same meal again the same day.",
+          "title": "Re-logging a meal now scales by portion, not a multiplier",
+          "detail": "You can also re-log a meal that's already logged today, and photo-scan can prefill a meal's fields.",
           "section": "nutrition"
         },
         {
-          "title": "Scan a meal photo to log it",
-          "detail": "Take a photo of your food and Septena prefills the nutrition details.",
-          "section": "nutrition"
-        },
-        {
-          "title": "Improved training session editor",
-          "detail": "Set exact start and end times and see progression hints for your next set.",
+          "title": "Reworked training session editor",
+          "detail": "Editable start and end times, one-tap progression hints, and effort-weighted muscle volume tracking.",
           "section": "training"
         },
         {
-          "title": "Fixed sleep heatmap dating",
-          "detail": "Nights now line up with the correct wake day.",
-          "section": "sleep"
+          "title": "Claude reconnect prompts now show up consistently",
+          "detail": "The reconnect nudge appears on Mac and in Septask too, not just iOS Septena.",
+          "section": null
+        },
+        {
+          "title": "Smoother hover, selection, and tap targets throughout",
+          "detail": "Consistent hover highlighting on tiles and rows, and fixed spots where taps near the edge of a row were missed.",
+          "section": null
         }
       ]
     },
