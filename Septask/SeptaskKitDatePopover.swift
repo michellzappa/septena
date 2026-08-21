@@ -664,6 +664,11 @@ private final class KitDateCell: NSView {
 
   var onHover: ((KitDateCell) -> Void)?
   var isFocused = false { didSet { needsDisplay = true } }
+  /// Saturday/Sunday get a faint neutral ground so the week's shape is
+  /// readable at a glance. Neutral on purpose — the accent belongs to focus
+  /// alone, and focus paints OVER this rather than beside it, so the two
+  /// never read as two competing highlights.
+  private var isWeekend = false
 
   init(radius: CGFloat, height: CGFloat, action: @escaping () -> Void) {
     self.radius = radius
@@ -705,6 +710,8 @@ private final class KitDateCell: NSView {
   /// the Today row's star uses — INK, never a second background fill, which
   /// would compete with the focus wash.
   func fillDay(_ date: Date, isToday: Bool) {
+    isWeekend = Calendar.current.isDateInWeekend(date)
+
     let weekday = NSTextField(labelWithString: Self.weekday.string(from: date))
     weekday.font = .systemFont(ofSize: 11, weight: .medium)
     weekday.textColor = SeptaskKitTheme.inkSecondary
@@ -736,8 +743,16 @@ private final class KitDateCell: NSView {
   // MARK: Paint & input
 
   override func draw(_ dirtyRect: NSRect) {
-    guard isFocused else { return }
-    SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    // Focus replaces the weekend ground rather than stacking on it — the same
+    // if/else the SwiftUI `WeekStrip` uses, and the same 0.09 secondary-ink
+    // wash, so the two strips shade the weekend identically.
+    if isFocused {
+      SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    } else if isWeekend {
+      NSColor.secondaryLabelColor.withAlphaComponent(0.09).setFill()
+    } else {
+      return
+    }
     NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
   }
 

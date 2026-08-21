@@ -2091,6 +2091,14 @@ final class SeptaskKitTaskListController: NSViewController {
     id.hasPrefix("p-") || id.hasPrefix("a-")
   }
 
+  /// A header that STARTS a new section gets the extra margin above it —
+  /// area/project headers on Today/Anytime, and Upcoming's day headers, which
+  /// break the list the same way. Separate from `isNavigableHeaderId`: a day
+  /// header owns the same air but has no list to drill into.
+  private func headerStartsSection(_ id: String) -> Bool {
+    isNavigableHeaderId(id) || id.hasPrefix("day-")
+  }
+
   private func navigationTarget(forHeaderId id: String) -> TaskFilter? {
     if id.hasPrefix("p-") { return .project(String(id.dropFirst(2))) }
     if id.hasPrefix("a-") { return .area(String(id.dropFirst(2))) }
@@ -2580,14 +2588,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
     switch rows[row] {
     // Headers carry the air between cards, so they're taller than their text.
-    // Area/project headers get EXTRA margin above them (matching the
-    // sidebar's per-top-level-area treatment) — they start a new list
-    // section; "Inbox"/"Agenda" are sub-groups within Today's own flow and
-    // don't need the same visual break.
+    // Section-starting headers get EXTRA margin above them (matching the
+    // sidebar's per-top-level-area treatment) — area/project headers and
+    // Upcoming's day headers; "Inbox"/"Agenda" are sub-groups within Today's
+    // own flow and don't need the same visual break.
     case .header(let id, _, _, _):
       // Kept in sync with `KitGroupHeaderCell.font` (17pt).
       let base = 17 * FontScale.shared.factor + 26
-      return isNavigableHeaderId(id) ? base + 10 : base
+      return headerStartsSection(id) ? base + 10 : base
     // The page's own title — noticeably taller than an in-list header, the
     // same visual weight a big navigation title would carry.
     case .screenTitle: return SeptenaTypeScale.size(.title2) + 40
