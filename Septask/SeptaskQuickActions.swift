@@ -35,6 +35,11 @@ final class SeptaskAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
     return pending
   }
 
+  /// Shake-to-undo and three-finger undo — same responder-chain hookup as
+  /// Septena's `AppDelegate`. See `TaskUndo` for why one stack is shared by
+  /// all four task surfaces.
+  override var undoManager: UndoManager? { TaskUndo.manager }
+
   static func dispatch(_ action: ShortcutAction) {
     if let nav = navigation {
       Task { @MainActor in nav.pendingShortcut = action }

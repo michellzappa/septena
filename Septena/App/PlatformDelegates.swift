@@ -25,6 +25,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     return pending
   }
 
+  /// Shake-to-undo and the three-finger undo gesture, for free.
+  ///
+  /// UIKit resolves both by walking the responder chain for an `undoManager`.
+  /// The app delegate is the LAST stop in that chain, so publishing the shared
+  /// task stack here means the gestures work anywhere in the app — while a
+  /// focused `UITextField` still wins, because it supplies its own manager
+  /// earlier in the chain. That is the behavior we want: editing a title
+  /// should undo typing, not un-complete a task.
+  ///
+  /// No view bridge and no gesture recognizer: this is the platform's own
+  /// mechanism, which is why it needs one property rather than a subsystem.
+  override var undoManager: UndoManager? { TaskUndo.manager }
+
   /// Become the notification delegate so inline action taps route here.
   func application(
     _ application: UIApplication,

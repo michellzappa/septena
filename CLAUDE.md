@@ -190,6 +190,15 @@ commit on the branch first (or let the cron do it).
   UI-free, in SeptenaCore). Behavior → a `SectionPlugin` in
   `Septena/Shell/Sections/Plugins/<Name>Plugin.swift`, registered in
   `SectionRegistry.all`. Joined by the string `key`.
+- **Undo is ONE shared stack** (`SeptenaCore/TaskUndo.swift`), wrapping a single
+  process-wide `UndoManager`. Every task surface points at it — the AppKit
+  table, the SwiftUI lists, and iOS shake / three-finger undo (the app
+  delegates override `UIResponder.undoManager`, the last stop in the responder
+  chain, so a focused text field still wins for typing). **Record explicitly at
+  the user gesture, never inside a mutator**: the mutators also run for
+  CloudKit applies, the 30-day purge, recurrence spawning, and the watch, so
+  recording there would put sync traffic on the undo stack and let ⌘Z "undo" an
+  edit another device made.
 - **Disabling a section hides surfaces; it must never delete user data.**
 - **Section colors and enabled state are user/account data** (`SectionEntity`),
   not hardcoded catalog facts. `SectionTheme` is the color access point for UI.

@@ -2012,10 +2012,14 @@ struct TaskListView: View {
   /// reload lands.
   private func applyRemoveFromToday(_ ids: [String]) {
     Haptics.tick()
+    let undoBefore = scheduleSnapshots(ids)
     for id in ids {
       mutator.removeFromToday(id: id)
       mutator.acknowledge(id: id)
     }
+    TaskUndo.recordScheduleChange(
+      name: String(localized: "Remove from Today", comment: "Undo action name"),
+      before: undoBefore, context: modelContext, mutator: mutator)
     if filter == .today {
       func drop(_ list: inout [SeptenaTask]) {
         list.removeAll { ids.contains($0.id) }
@@ -2027,10 +2031,18 @@ struct TaskListView: View {
 
   /// Pin tasks to Today and play the amber promote flash on each row.
   private func promoteToToday(_ ids: [String]) {
+    let undoBefore = scheduleSnapshots(ids)
     for id in ids {
       mutator.moveToToday(id: id, today: true)
       promoteFlash.flash(id)
     }
+    // Recorded here rather than at each caller so no entry point can forget.
+    // `applyScheduledWhen` also records around its whole body; both land in
+    // one undo group because `TaskUndo.manager.groupsByEvent` is true, so a
+    // single gesture stays a single ⌘Z.
+    TaskUndo.recordScheduleChange(
+      name: String(localized: "Move to Today", comment: "Undo action name"),
+      before: undoBefore, context: modelContext, mutator: mutator)
   }
 
   /// ⌘S — open the When (schedule) picker for the focused row.
@@ -2086,7 +2098,10 @@ struct TaskListView: View {
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
     Haptics.tick()
-    mutator.setRecurrence(id: id, recurrence: rule)
+    recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
+                      [id]) {
+      mutator.setRecurrence(id: id, recurrence: rule)
+    }
     Task { await load() }
   }
 
@@ -2115,11 +2130,15 @@ struct TaskListView: View {
     // arrays power the current screen and have to be poked separately.
     removeLocally(id: id)
     mutator.delete(id: id)
+    TaskUndo.recordDelete(ids: [id], mutator: mutator)
     // Show undo snackbar (not in the Recently Deleted view — there the
     // gesture is always intentional and Restore is a first-class action).
     guard filter != .recentlyDeleted else { return }
+    // The toast routes through the SAME stack rather than calling `restore`
+    // itself, so tapping Undo and pressing ⌘Z cannot disagree, and the toast
+    // consumes the stack entry instead of leaving a stale one behind it.
     showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
-      mutator.restore(id: id)
+      TaskUndo.undo()
       Task { await load() }
     }
   }
@@ -3243,11 +3262,32 @@ struct TaskListView: View {
 
   // MARK: - When picker apply
 
+  /// Scheduling fields as they stand right now, for `TaskUndo`. Read from the
+  /// visible buckets (`currentTask`) rather than the store, so a row the user
+  /// has optimistically edited in-session snapshots what they can actually see.
+  private func scheduleSnapshots(_ ids: [String]) -> [TaskUndo.ScheduleSnapshot] {
+    ids.compactMap { currentTask(id: $0) }.map(TaskUndo.ScheduleSnapshot.init)
+  }
+
+  /// Register the scheduling change `body` just made. The undo/redo pair is
+  /// derived by re-reading the store afterwards — `schedule` / `setDeadline` /
+  /// `removeFromToday` each carry their own Today side effects, and predicting
+  /// them here would be a second copy of that logic (see `TaskUndo.restore`).
+  private func recordingSchedule(_ name: String, _ ids: [String], _ body: () -> Void) {
+    let before = scheduleSnapshots(ids)
+    body()
+    TaskUndo.recordScheduleChange(name: name, before: before,
+                                  context: modelContext, mutator: mutator)
+  }
+
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.tick()
     switch kind {
     case .deadline:
-      mutator.setDeadline(id: id, date: date)
+      recordingSchedule(String(localized: "Set Deadline", comment: "Undo action name"),
+                        [id]) {
+        mutator.setDeadline(id: id, date: date)
+      }
     case .scheduled:
       // Things-style mapping:
       //   • "Today" → pin to today (today=true), clear any scheduled date.
@@ -3279,6 +3319,12 @@ struct TaskListView: View {
   private func applyScheduledWhen(id: String,
                                   date: Date?,
                                   mode: RecurrenceRescheduleMode) {
+    let undoBefore = scheduleSnapshots([id])
+    defer {
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Schedule Task", comment: "Undo action name"),
+        before: undoBefore, context: modelContext, mutator: mutator)
+    }
     if let d = date {
       if Calendar.current.isDateInToday(d) {
         mutator.reschedule(id: id, date: d, mode: mode)
@@ -3358,6 +3404,12 @@ struct TaskListView: View {
     } else {
       mutator.uncomplete(id: task.id)
     }
+    // The shared undo stack (`TaskUndo`) — this is what makes ⌘Z, shake, and
+    // three-finger undo take back an accidental check on every surface, not
+    // just the AppKit shell. `wasDone` is the state BEFORE the toggle.
+    TaskUndo.recordCompletion(ids: [task.id],
+                              wasDone: newStatus != .done,
+                              mutator: mutator)
     // Toggling status is engagement — clear the agent cue. No-ops for
     // non-agent / already-seen rows, so this is safe to call unconditionally.
     mutator.acknowledge(id: task.id)

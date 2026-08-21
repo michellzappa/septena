@@ -182,7 +182,13 @@ final class SeptaskKitTaskListController: NSViewController {
   /// controller sits properly in the chain (a real child of the split view
   /// controller), so overriding `undoManager` here is what makes the
   /// standard Edit ▸ Undo/Redo menu items — and ⌘Z/⌘⇧Z — find it.
-  private lazy var kitUndoManager = UndoManager()
+  /// The SHARED stack (`TaskUndo`), not a controller-owned one. Undo used to
+  /// live only here, which made ⌘Z a property of one of four task surfaces;
+  /// it now belongs to the write boundary, so the same stack backs this table,
+  /// the SwiftUI lists, and iOS shake / three-finger undo. Everything below is
+  /// unchanged — the shell still registers its own inverses, it just registers
+  /// them somewhere the other surfaces can see.
+  private var kitUndoManager: UndoManager { TaskUndo.manager }
   override var undoManager: UndoManager? { kitUndoManager }
 
   /// Registers `undoAction` as the inverse of a mutation just made; performing
