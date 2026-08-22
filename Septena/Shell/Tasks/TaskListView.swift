@@ -547,6 +547,11 @@ struct TaskListView: View {
             Button(command.title) { action?() }
               .keyboardShortcut(command.shortcut)
               .disabled(action == nil)
+            ForEach(Array(command.alternateShortcuts.enumerated()), id: \.offset) { _, shortcut in
+              Button(command.title) { action?() }
+                .keyboardShortcut(shortcut)
+                .disabled(action == nil)
+            }
           }
           .opacity(0)
           .accessibilityHidden(true)
@@ -1016,6 +1021,7 @@ struct TaskListView: View {
       selectable: usesSelectionModel,
       onActivate: activateRow,
       onClear: { closeEditOrClearSelection() },
+      onMoveShortcut: openMoveForSelected,
       scrollToTick: scrollToTargetTick,
       scrollToID: scrollToTargetID,
       canvasFill: listCanvasFill,
@@ -2061,7 +2067,7 @@ struct TaskListView: View {
     whenSheet = WhenSheet(taskIds: ids, kind: .deadline)
   }
 
-  /// ⌘M — open the Move destination picker for the focused row(s).
+  /// ⌘M / ⌘⇧M — open the Move destination picker for the focused row(s).
   private func openMoveForSelected() {
     guard filter != .recentlyDeleted else { return }
     let ids = orderedActionIDs()

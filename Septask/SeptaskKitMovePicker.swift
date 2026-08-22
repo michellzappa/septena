@@ -2,7 +2,7 @@
 import AppKit
 import SwiftData
 
-// The Move command's picker (⌘⇧M / Task ▸ Move…, and the row context menu's
+// The Move command's picker (⌘M / ⌘⇧M / Task ▸ Move…, and the row context menu's
 // "Move to…") — the AppKit counterpart of SwiftUI's `MovePickerSheet`
 // (Septena/Shell/Tasks/TaskPickerSheets.swift). Lists No List, loose
 // projects, then each area with its projects nested underneath — type to

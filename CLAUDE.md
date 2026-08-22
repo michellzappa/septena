@@ -288,10 +288,11 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   tap-gesture selection — it suppresses native keyboard nav and the List's
   click-to-focus); `@FocusState`+`.focused()` to claim detail focus; **modifier
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
-  complete = `⌘K`, move = `⌘⇧M`); double-click / right-click for mouse. Do NOT
-  bind unmodified Space/Return. The shared shortcut map is `TaskRowShortcuts` in
-  `Septena/Shell/Tasks/TaskCommands.swift` — avoid system-reserved equivalents
-  there (bare `⌘M` = Minimize, bare `⌘.` = Cancel; both carry a `⇧`).
+  complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
+  Do NOT bind unmodified Space/Return. The shared shortcut map is
+  `TaskRowShortcuts` in `Septena/Shell/Tasks/TaskCommands.swift` — bare `⌘M`
+  is intentionally reclaimed by the focused task list; bare `⌘.` remains the
+  system Cancel equivalent and carries a `⇧` here.
   **Two sanctioned exceptions on the task surfaces** (both deliberate,
   documented, and NOT to be "fixed" back to the naive form):
   1. The deep task lists do NOT use native `List` — they use

@@ -1535,7 +1535,7 @@ final class SeptaskKitTaskListController: NSViewController {
     onStoreChanged?()
   }
 
-  /// ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMovePicker`), the
+  /// ⌘M / ⌘⇧M — the type-to-filter Move picker (`SeptaskKitMovePicker`), the
   /// AppKit counterpart of SwiftUI's `MovePickerSheet`. Built once, reused —
   /// it re-reads structure fresh on every `show`.
   private lazy var movePicker = SeptaskKitMovePicker { [weak self] destination in
@@ -2600,7 +2600,7 @@ final class SeptaskKitTaskListController: NSViewController {
         }
 
       case .list(let anchor):
-        // Reuses the exact destination list ⌘⇧M pops up — one picker, not a
+        // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
         // acts on the current selection, which is this row (selecting it is
         // how compose mode began).
@@ -5527,6 +5527,7 @@ final class SeptaskKitTableView: NSTableView {
     case "n": onNewTask?(); return true
     case "s": onWhen?(); return true
     case "d": onDuplicate?(); return true
+    case "m": onMove?(); return true
     case ",": SeptaskKitSettingsWindow.show(); return true
     case "\u{7F}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
     default: return super.performKeyEquivalent(with: event)

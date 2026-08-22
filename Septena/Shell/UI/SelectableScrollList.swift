@@ -218,6 +218,9 @@ struct SelectableScrollList<Content: View>: View {
   var onActivate: (String) -> Void = { _ in }
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
+  /// ⌘M / ⌘⇧M — task-surface alias for the Move command. This is optional so
+  /// the generic container stays inert for any future caller.
+  var onMoveShortcut: () -> Void = {}
   /// Monotonic tick — parent increments to force-scroll to `scrollToID`.
   var scrollToTick: Int = 0
   /// Row id to scroll into view when `scrollToTick` changes.
@@ -349,6 +352,11 @@ struct SelectableScrollList<Content: View>: View {
         onClear()
         return .handled
       }
+      .modifier(SelectableMoveShortcutModifier(
+        inputActive: inputActive,
+        selectable: selectable,
+        action: onMoveShortcut
+      ))
       .onChange(of: selection) { _, sel in
         // Keep the cursor coherent if selection is cleared/replaced externally
         // (delete, programmatic select, or the inline editor pinning the closed
@@ -508,6 +516,25 @@ struct SelectableScrollList<Content: View>: View {
     return .fullyVisible
   }
 
+}
+
+private struct SelectableMoveShortcutModifier: ViewModifier {
+  let inputActive: Bool
+  let selectable: Bool
+  let action: () -> Void
+
+  func body(content: Content) -> some View {
+    content.onKeyPress("m") { press in
+      let modifiers = press.modifiers
+      let isMoveShortcut = modifiers.contains(.command)
+        && !modifiers.contains(.option)
+        && !modifiers.contains(.control)
+        && (!modifiers.contains(.shift) || modifiers == [.command, .shift])
+      guard !inputActive, selectable, isMoveShortcut else { return .ignored }
+      action()
+      return .handled
+    }
+  }
 }
 
 private extension Dictionary where Key == String, Value == CGRect {

@@ -551,7 +551,7 @@ enum KitGlyph {
 
 /// The "Move to…" choices: no list, each area, then that area's projects, then
 /// loose projects — sidebar order throughout (`StructureCache`). Built once
-/// and shared by the context menu, the menu bar, and the ⌘⇧M popup so the
+/// and shared by the context menu, the menu bar, and the ⌘M / ⌘⇧M popup so the
 /// three can't drift.
 @MainActor
 enum KitMoveMenu {
@@ -561,7 +561,7 @@ enum KitMoveMenu {
     case project(String)
   }
 
-  /// One row in the ⌘⇧M type-to-filter picker — areas AND projects, nested
+  /// One row in the ⌘M / ⌘⇧M type-to-filter picker — areas AND projects, nested
   /// like SwiftUI `MovePickerSheet` (loose projects, then each area with its
   /// projects indented underneath).
   struct PickerRow {

@@ -59,6 +59,11 @@ private struct SeptaskKitRowCommands: View {
         .keyboardShortcut("d", modifiers: [.command, .shift])
       Button("Move…") { SeptaskKitCommands.row(.move) }
         .keyboardShortcut("m", modifiers: [.command, .shift])
+      // Bare ⌘M is intentionally reclaimed by the focused task list. Keep
+      // this alias hidden so Window ▸ Minimize cannot win the event.
+      Button("Move…") { SeptaskKitCommands.row(.move) }
+        .keyboardShortcut("m", modifiers: .command)
+        .hidden()
       Button("Clear Schedule") { SeptaskKitCommands.row(.clearSchedule) }
         .keyboardShortcut(".", modifiers: [.command, .shift])
       Button("Repeat…") { SeptaskKitCommands.row(.repeatEditor) }

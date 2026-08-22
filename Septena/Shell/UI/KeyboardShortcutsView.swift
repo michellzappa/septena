@@ -50,18 +50,19 @@ enum KeyboardShortcutsCatalogue {
 
   /// Row commands are GENERATED from `TaskRowCommands` — the same registry the
   /// Task menu and the iPad shortcut buttons render from — so this sheet can no
-  /// longer advertise a binding the app doesn't have. (It used to claim ⌘M for
-  /// Move and ⌘. for Clear Schedule; both are ⇧-modified in reality, and Copy
-  /// was missing entirely.) Only the keys that aren't row commands — the
-  /// selection/navigation keys the list handles itself — are listed by hand.
+  /// longer advertise a binding the app doesn't have. Only the keys that
+  /// aren't row commands — the selection/navigation keys the list handles
+  /// itself — are listed by hand.
   private static var taskList: KeyboardShortcutGroup {
     KeyboardShortcutGroup(title: "Task list", shortcuts: [
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
-    ] + TaskRowCommands.all.map {
-      KeyboardShortcut2(keys: $0.keycaps, label: $0.title)
+    ] + TaskRowCommands.all.flatMap { command in
+      command.allShortcuts.map { shortcut in
+        KeyboardShortcut2(keys: TaskRowCommand.keycaps(for: shortcut), label: command.title)
+      }
     })
   }
 
