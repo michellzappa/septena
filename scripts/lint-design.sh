@@ -96,6 +96,19 @@ scan appkit-inferring-moves error \
   'inferringMoves\(\)' \
   'NSTableView batches apply incrementally — an inferred move offset is stale by the time it runs. Use a plain difference (remove+insert).'
 
+# ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
+# Every popover, floating panel and filter list in the Septask AppKit shell is
+# built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
+# face and row height have one source of truth. They did not before: the shell
+# carried two corner radii, three placements for the same scope of edit, a
+# hardcoded systemBlue badge, and eighty lines of panel construction copied
+# between Quick Find and the Move picker. Build a surface through KitPopover /
+# KitSurfacePanel / KitFilterSurface instead of hand-rolling one.
+scan appkit-surface-chrome error \
+  '(NSPopover\(\)|material = \.popover|styleMask: \[\.borderless)' \
+  'Build transient surfaces via KitPopover / KitSurfacePanel (Septask/SeptaskKitSurface.swift) — do not hand-roll popover or panel chrome.' \
+  'Septask/SeptaskKitSurface\.swift'
+
 # ── Row tap targets ─────────────────────────────────────────────────────────
 # `.plain` (and the plain-derived row styles) opt a Button out of the list
 # cell's tap target, so only the DRAWN label is hit-testable — the Spacer and
