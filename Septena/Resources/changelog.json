@@ -4,50 +4,2375 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1631,
-      "date": "2026-08-21",
+      "build": 1634,
+      "date": "2026-08-22",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A new lightweight app for just your tasks, sharing the same private data as Septena.",
-          "section": "tasks"
+          "title": "docs: record the AppKit parity work and the conversations build",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Recurring tasks that just work",
-          "detail": "Pause, resume, and reschedule repeating tasks, and completing one now spawns its next occurrence automatically.",
-          "section": "tasks"
+          "title": "septask: fold Reminders into the Inbox and unify the Today top-of-list",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Recover recently deleted tasks",
-          "detail": "Deleted tasks are kept for 30 days with undo before they're purged for good.",
-          "section": "tasks"
+          "title": "xcode: sync scheme debug/launch settings from Xcode",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Attach files to tasks and drag to organize",
-          "detail": "Add attachments, drag tasks onto Today or between projects, and file several tasks at once.",
-          "section": "tasks"
+          "title": "docs: catch up the AppKit parity tracker",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring over a Things database export, including its headings as project sections.",
-          "section": "tasks"
+          "title": "xcode: register new sources and drop the deleted TaskDetailView ref",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Snap a photo to log a meal",
-          "detail": "On-device photo analysis prefills a meal's details, and re-logging now scales the portion instead of just multiplying it.",
-          "section": "nutrition"
+          "title": "chore: drop the unused TaskDetailView placeholder",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Richer training sessions",
-          "detail": "Editable start and end times, per-set progression hints, and effort-weighted muscle volume tracking.",
-          "section": "training"
+          "title": "septask: unify Next/sidebar navigation and reveal the window title",
+          "detail": null,
+          "section": null
         },
         {
-          "title": "Pin goals to your dashboard",
-          "detail": "Track favorite goals right from the home screen, with suggested goals now offered across more sections.",
-          "section": "goals"
+          "title": "septask: polish weekend shading and section-header spacing",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: recompute row selection emphasis from key-window state",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: host the first-run welcome as a sheet over the AppKit shell",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septena: fire the claude reconnect nudge on macOS too",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septena: share the overdue-badge toggle through an app group",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septena: share one undo stack across all four task surfaces",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish repeat editors across iOS and macOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: add the Today header quick-add and scope header taps to the title",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: rebuild the kit date popover on a panel controller",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "lint: add the row-dead-zone tap-target rule and fix its violations",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "nutrition: replace re-log multiplier with in-place portion scaling",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: replace the repeat menu and date popover with full editors, round out undo, and add paste/add-section",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "tasks: wire recurrence pause, next-copy, and reschedule prompt into the swiftui shell",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "tasks: add recurrence pause/resume, series-aware reschedule, and a repeating smart list",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): sync Septena scheme with Xcode-edited settings",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): regenerate watch schemes via xcodegen",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "septask: add show/hide toggle and escape-to-close for the inspector pane",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): normalize SeptaskMac scheme launch config",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): regenerate project, restoring project.yml as source of truth",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): area sidebar counts exclude tasks inside nested projects",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): restore the full-width title editor, add Today's New task line",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): normalize scheme files to Xcode's rewritten format",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): extend hover affordances across tiles, rows, and inline controls",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): correct AppKit list diffing, move picker, and title-edit state",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): regenerate project from project.yml",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): sync Septask scheme with Xcode's regenerated defaults",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): disposition-only ack and reliable AppKit checkboxes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): make Next a first-class iOS page, matching AppKit",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "disable septask global quick-entry hotkey, it conflicts with moom",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix septask sidebar fold to report zero children for a collapsed area",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish septask appkit card list rounding, composer animation, and repeat-menu anchor preservation",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "harden solid-fill cta ink against light accent colors",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "preserve recurrence anchor mode and guard fixed-schedule repeats",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore: preserve in-progress agent work",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(strings): sync Localizable.xcstrings with Xcode's on-disk format",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(scheme): sync SeptaskMac scheme with Xcode's on-disk format",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): disable global ⌃Space Quick Entry hotkey — conflicts with Moom",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(mcp): recurrence landed on the gateway too — record the pairing",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): make recurrence bulletproof across all four surfaces",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(prod-cutover): flag schema re-reconciliation needed before phase 2",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(scheme): sync Septena scheme with Xcode's on-disk format",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(strings): restore English keys Xcode re-extracted after the merge",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): sidebar fold lives in the data — collapseItem can't work here",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask-appkit): replace both wrong click-mechanism theories with the measured one",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): make the title dropdown and sidebar disclosure real NSButtons",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask-appkit): record the NSControl-swallows-clicks cause and the cursor false-signal",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): claim clicks off the NSControl subviews that were eating them",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask-appkit): correct the chevron \"stale build\" call, log the Add Section gap",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): click targets in table cells, and sidebar folds that stick",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "wip: in-flight work from parallel sessions (updater, text size, telemetry)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(septask-appkit): run SeptaskMac scheme in Debug with LLDB attached",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): localize SeptaskKit chrome and add VoiceOver floor",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask-appkit): add localization-sweep handoff for the AppKit shell",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(septask-appkit): run SeptaskMac scheme in Release without a debugger",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): add Cancel Task action, make menu today/clear-schedule state-aware",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): tint AppKit row selection with the System Settings accent",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): file tasks under headings via drag, group project pages",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask-appkit): log 2026-08-07 bug-report pass in parity backlog",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): keep card corners and scroll insets in sync after list mutations",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): resign field editor before reload, not after",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): replace Move NSMenu with type-to-filter picker, areas-only",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(triage-band): filed tasks always leave the band regardless of source",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): Next page renders blank — hosted SwiftUI child never got viewDidAppear",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): page title is a navigation dropdown, matching TaskNavMenu",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): reentrant makeFirstResponder stuck the composer/rename on Esc or click-away",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask-appkit): Next feed as a sidebar destination",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish(septask-appkit): group header fine-tuning",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask-appkit): group headers match SwiftUI's real 17pt/semibold, not a guessed offset",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish(septask-appkit): cross-pane tab focus, faded unfocused selection, chunkier headers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore: point github links at michellzappa/septena org",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish(septask-appkit): sidebar reorder, headings CRUD, Upcoming buckets, row/header sizing fixes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask): plan for Task Conversations in the AppKit shell",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): AppKit shell for SeptaskMac's task surfaces",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(a11y): gate TimeOfDayWheel's motion helper out of the widget target",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(gateway): stop Claude sign-in from hanging forever",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "build: add the design-system lint and document what it enforces",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): move hand-rolled mono fonts onto the metric tokens",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): one canonical selection language across every surface",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(a11y): route every animation through the Reduce Motion helpers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): complete the type ladder — caption, chip, and small mono rungs",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(tasks): move the settle/merge reconciliation into TaskListModel",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(tasks): start TaskListModel, move the derived-data layer into it",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(app): one injection point for the environment both apps share",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): make the quick-add row show its selection; restyle the rolled-in notice",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): stop a scrolled-out row from ending the editor's save window",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): regenerate schemes after task file split",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(tasks): break up the three largest task files",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(tasks): stop scanning whole tables from creates and view bodies",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(concurrency): retire the phantom parallel-HTTP cap, enforce with the compiler",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): key composer state to its subject so edits can't silently not save",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(nutrition): let an already-logged meal be logged again",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): task list wire for the Septask watch app",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): completing a recurring task spawns its next occurrence",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(integrations): report connection health, not just credential presence",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): steps tile backed by persisted activity days",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): default event-list lookback 7 days -> 30",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): bring the in-app server up to MCP revision 2026-07-28",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "pin changelog-stamp cron to sonnet-5 model",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "regenerate septena scheme via xcodegen",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add reps-before-load progression hints and rework training session editor",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "tint training live activity session icon with section accent",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "launch app schemes in debug with lldb",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "guard build.sh against missing watchOS simulator runtime before locking",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add copy-to-pasteboard button for the grocery shopping list",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "keep task in today when its deadline moves off today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "align inline task title box across view and edit without hero-glide",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix sleep heatmap to date oura nights to the wake day",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "restructure quick find search hosting for search tab and modal palette",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add suggested goals to chores, gut, habits, medications, mood, supplements, and symptoms",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "set app scheme launch action to release configuration",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "reorder training session-complete callbacks; register FINISHED string",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "strip the Return newline entirely when committing a task title",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "replace Septask quick-add tab with a real iOS 26 Search tab",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "use square checkbox glyphs in the watch Next feed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix phantom fasting counter when the meal anchor is 2+ days old",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add editable start/end times to training sessions",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "defer task list reload while an inline editor holds focus",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "rename the shared build lock to auto-build",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "move task row shortcuts off system-reserved key equivalents",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "trim task titles and notes at the write boundary",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "let the composer own task title editing on every surface",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "align the project progress glyph tint with project ui",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "warm the checkbox outline in sync with today tenure",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add TaskMutator.duplicate as the single task clone path",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add endedAt to training entries so sessions carry a real span",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Unify area/project ordering through StructureCache.",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "keep inline composer title single-line until it wraps",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "publish watch snapshot on Septask launch and foreground",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "collapse composer notes into an elective Notes pill",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "regenerate Xcode project",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Extract TaskListView toolbar chrome into ViewModifiers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Carry Training section accent into the live activity widget",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Add task attachments",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "bump Septask and Septena scheme format to Xcode 26",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add Septask watch app with today-tasks complication",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "show today's completed-task count on the Logbook row",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "toggle habit-backed pinned goals from dashboard tile tap",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "unify Claude gateway connection status into one display state",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Add task share targets for Septena and Septask",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Add contextual actions and colors to pinned goals",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "Allow task titles to wrap while editing",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): hoist More… to top of move menu so ⌘M marks only that item",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): apply reconnect cue toolbar after standalone chrome so face precedes plus",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(gateway): rolling calibration window with rollover finalize and manual test connection",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcode): normalize Septena scheme to version 1.3 defaults",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(septask): replace custom floating tab bar with the standard iOS 26 TabView plus separated add slot",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(security): extract BiometrySymbol so the shared reconnect cue drops the AppLock dependency",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(septask): target the floating tab control in screenshot navigation",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(tasks): assert keyboard traversal skips hidden completed today rows",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcodegen): regenerate project for embedded next fold, foundationmodels, cloudkit web token",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): embed the next feed at the foot of today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs: record the no-test, no-download rule",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): converge progress rings onto projectprogressicon",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(icons): replace sparkles with concrete domain glyphs",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(settings): consolidate connected-app panes and refresh permissions live",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): make the app accent monochrome ink, reserving hue for sections",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): add new project/area commands and a native macos sidebar",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(nav): route tasks by durable id and reveal searched tasks",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): restructure settings to mirror septena's taxonomy",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): give each window its own navigation state and command menu",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(claude): share the reconnect nudge across septena and septask via app group",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ai): add private cloud compute backend and beta model labels for ios 27",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(core-ai): fold in 2026-07-11 first-party verification pass",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): wire Next-feed writes and rows for the embedded Today fold",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(theme): adopt named font tokens over inline system fonts",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(reports-worker): validate tokens, bind report ownership to attest key, and harden served pages",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(community-worker): verify Cloudflare Access JWT for admin instead of trusting spoofable header",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(theme): add rounded hero-metric font token and adopt it for standalone stats",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): long-press per-exercise menu shared with the drawer",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): attach move shortcut to sheet item so only one row shows ⌘M",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): show filing capsule for loose today inbox captures",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(theme): adopt unified accent color across septena and septask",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(xcodegen): regenerate project for new task tests and shared list helpers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(backlog): add P2 task accessibility depth and task-order extrema cache",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(waking-day): extract wake-fraction expected value for clarity",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(tasks): disable app lock in keyboard-contract UI tests and add Septask target",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(nutrition): gate meal-photo FoundationModels on compiler(>=6.4) for Xcode 27",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(tasks): scope local task-change notifications so unrelated lists skip reload",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(tasks): add keyboard-contract UI tests with a dense opt-in seed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): make ⌘K the explicit completion command and extract list helpers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(tasks): paginate the completed logbook fetch in LocalCache",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(project): regenerate debug-launch scheme settings",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "test(fasting): pass an explicit now to computeFastingState",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): store the local MCP token in Keychain with constant-time bearer auth",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): standard escape-cancel contract and keyboard nav in the drawer",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(dashboard): coalesce widget publishes and cache task-read formatters",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(core): retire the FastAPI/outbox task path and project entities natively",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(cloudkit): apply and provide records through a background ModelActor registry",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(project): refresh generated string catalog and watch scheme",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): add photo-scan accessibility identifiers and photo-read failure notes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): analyze photo and prefill blank fields in edit meal sheet",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): real Foundation Models meal-photo analysis with timeout-bounded label fallback",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(septaskmac): launch scheme in release without debugger",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(app): restore window state and set default size/position on macOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): add Today home-screen quick action",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): drag tasks onto Today groups to re-home them via drop delegates",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): markdown-aware notes editor; scope row commands to list focus",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(training): draw progress-chart today marker over paper background",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(dashboard): clarify tile headline copy and thousands formatting",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): scale re-logged meals by an amount percentage",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(widgets): tune list gutters, row spacing, and next header glyph",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): center row checkbox on title so it stays aligned when title wraps",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): add top-weight toggle and live today marker to progress chart",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): add floating keyboard done bar for decimal-pad fields",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs: document one selection/target language per surface convention",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): soft scroll-edge on iPad and reuse selection fill for drop targets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): route page chrome into the nav bar on iPad",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): fire commit flourish on mood tile quick-log",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): commit or close the active task editor when interacting elsewhere",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): redesign date picker sheet with quick-pick pills and calendar popover",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(widgets): widen heatmap tile with left text column and larger cells",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(widgets): use native container surface instead of card gray",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): zero the iPad chrome-bar height and inset the sidebar 2×2",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): mood_list/mood_log in-app tools via MoodVocabulary",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): training session-type routines (list/create/update)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): unify re-home to clear heading + land at top",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(sidebar): sync area/project order via CloudKit position field",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs: add task drag-and-drop two-axis design note",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs: lock sharing decisions + add prod cutover checklist",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(sidebar): task drop on iPad + align area/project cards",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): one-tap progression hint on strength sets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): New To-Do Home Screen quick action",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(things-import): map native Things headings to project sections",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): project section headings",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(l10n): refresh string catalog extraction state",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(watch): restore Activity lap-over cap + own-hue track on complication rings",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): tap intake summary tiles to quick-add + share one glass-row pill",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(watch): clamp complication rings to goal and drop over-lap track-gap rendering",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): gray out and sink meals already logged today in re-log pickers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(keyboard): ⌘K completes the selected task; Add Info moves to ⌘I",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): native Settings window on macOS, split-view parity",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(appstore): dual-app App Store pipeline + Septask capture",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): localize — include the shared string catalog + declare languages",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(macos): inject DayClock into MenuBarExtra — fixes SeptenaMac boot crash",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): re-inject environment into presented sheets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): Notifications settings pane — badge + Claude nudge",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): supporter status follows the account into Septask",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): settings parity — name sync fix, Calendar/Reminders panes, MCP Skills",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): full Settings mirroring Septena — identity header + panes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): settings root mirrors Septena's design — full page, fewer rows",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): settings restructured to Septena's architecture + About Septena",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): Quick Find, ⌘K quick capture, shortcuts sheet, live badge",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): drop Things import from the welcome",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): first tab is Tasks with Septena's checkmark",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): tab bar layout — Home / Today / Upcoming + separated quick-add",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): native system tab bar on iPhone (Inbox/Today/Upcoming/Browse)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): iPhone tab bar + document the two-app model in CLAUDE.md",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(septask): hidden-title-bar window on macOS — restores rounded sidebar",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): app icon — white discs on dark gray, Septena geometry",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): same-device sibling nudge via Darwin notifications (P4)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): welcome + dedicated settings (P3)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): add native SeptaskMac target (P2)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(septask): stand up Septask — the focused task app target (P0+P1)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): drop untouched inline-create drafts via onVanish, not a timed guess",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): reveal remotely-arrived rows with an expand beat",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): unify grouped-list section chrome and leading-grid alignment",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(project): register new source files",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(ipad): build overflow-menu actions lazily and fix wide-content insets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): only Today smart-list carries an accent",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): multi-select bulk actions, copy, and scoped filing suggestions",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): unify list section headers behind HeaderQuickAdd",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(areas): one read-only context feed on areas & projects",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): keep goal-backed habits present after completion",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): add optional ingredient breakdown to meals",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs(septask): plan for standalone Tasks app over shared backend",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): host iOS smart-list grid as a clear zero-inset row, not a section header",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(time-travel): thread DayClock today/now through sections, plugins, and detail views instead of reading SeptenaDate.today/Date() directly",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): unify wide-content margins and chrome top inset into septenaTabScrollInsets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(nutrition): drop auto-launch camera for meal scan, surface a tap affordance instead",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(ui): seed sky wash synchronously so it paints on the first frame",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(watch): key watch today off the phone snapshot date and explicit now",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(app): supply DayClock today/now to watch snapshot and menu-bar today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): cap and center home-tab content columns on wide panes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(coach): rebuild coach hub as a grouped list matching the Next feed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(tasks): resolve today from DayClock across task lists, sidebar, and week strip",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): pass DayClock now into shared heatmap and histogram components",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(dashboard): drive dashboard reads, tiles, and Next feed off DayClock",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(coach): build coach context and virtue summaries from DayClock now",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(goals): evaluate goal metrics against DayClock now instead of Date()",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sections): pass now into SectionPlugin.evaluateAim for clock-driven goal metrics",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sections): read viewing date from DayClock for correct rollover and time travel",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(core): thread explicit today/now through mirror reads, task reads, and date helpers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): refine Today with a quiet calendar row, filing chips, and inline quick-add",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): reserve iPad floating-bar inset on the scroll view",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): use a single-line composer title field",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(tasks): unify row keyboard shortcuts via TaskRowShortcuts, rename Rename to Edit Details",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): ratify triage-band tasks when filing to an area or project",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): unify pointer-hover wash and neutral grouped-row fill",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): keep a sidebar row selected on iPad/macOS split surfaces",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): collapse Done Today log behind a foldable header",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): sort Next Today by urgency on sync, keep settling rows in place",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): add Today 'group by area and project' toggle with flat fallback",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): order Next 'Tasks Today' by due date and harden completion linger",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): repaint inline-edited rows immediately and align edit-row inset",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(capture): build Add Info palette from dashboard tile order with per-kind intake rows",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): unify iPad sidebar with iPhone insetGrouped home",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): show logged-items foldout on area pages, not just projects",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): shared toast store with undo for delete, move, and defer",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(chrome): unify iPad/Mac Tasks chrome with Quick Find, single sidebar toggle, non-fusing glass",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(milestone): show habit subject on streak ignition cards",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): add Start Training Session intent with cold-launch routing",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sky): bleed top wash to the edge on every platform",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(chrome): un-fuse trailing glass circles with manual glassCircle",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(chrome): hide iPad global bar below tab roots",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "tweak(logo-configurator): size preview and icon-size frame to fit",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "style(sidebar): enlarge iPad split-view row metrics and count font",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(chrome): unify top-level tab pages on one .septenaTabPage modifier",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): replace rest timer with auto-advance flow and watch Live Activity Smart Stack",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(logo-configurator): add live 128px icon-size preview",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(build): stamp bundle version + register scene delegate in Info.plist",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(gut): add numbered circle glyphs to Bristol quick-add",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): foot quick-add line with bottom-insert capture",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): unify pointer hover as a background wash",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(dashboard): render pinned goals as dashboard tiles",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(onboarding): defer section seeding to first CloudKit pull",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): move page chrome to nav bar + iPad window overlay",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): add unified SeptenaPage three-slot chrome scaffold",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): lift home chrome to the iPad tab bar and add pointer hover effects",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(training): extract shared TrainingSessionSpans for timeline + rhythm bands",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ios): register SeptenaSceneDelegate via UISceneConfigurations",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): frosted pill rows and a per-kind action drawer with chore defer",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): drop trailing row chevrons and host tiles as a section header",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): in-place inline editor, duplicate action, and merged Today inbox",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(macos): render the Next feed on the gray grouped-card canvas",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(tasks): collapse dashboard reads into a single live-table pass",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): render sectioned task lists as grouped cards on the gray canvas",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(macos): use native count-2 tap for row activation so double-click survives draggable rows",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): drop cursor at end of title on macOS inline rename instead of select-all",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(next): match Next tab list styling to the Tasks sidebar grouped background",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(widgets): unify Next and Today list widgets onto shared WidgetList primitives",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): long-press action drawer for Next rows (complete/skip/off-today/cancel)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(dashboard): preserve per-kind intake color via accentHex",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): inline task creation, pill-rail Discuss kickoff, flat composer pills",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): aging, filing-suggestion, and show-in-Next settings toggles",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): scroll the keyboard cursor into view only when it would clip",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish(tasks): inline list-jump chevron beside the title + seed project ring synchronously",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(settings): add per-section explainer copy to the section detail page",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): clear an arrived deadline when removing a task from Today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): gate the Next feed on a per-section show-in-Next toggle",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "polish(dashboard): reconnect flash pops in a green lock instead of swapping glyphs",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(tools): add standalone logo configurator",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): Things-style nav menu + native selectable scroll list for sidebar-free task navigation",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(sync): full mirror reload only on inbound CloudKit batches, not scoped local writes",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): unify arrived-today and carry-age into one Today tenure dial on the checkbox",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(cloudkit): hoist system-fields plumbing into shared CloudKitSystemFieldsBacked protocol",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): native selection and keyboard navigation in the Next feed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): reclaim list keyboard focus when a surface becomes active",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): extract shared selectableListRow selection chrome",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(sidebar): gate iOS-only APIs so macOS compiles cleanly",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): show a per-page title and count in the Next feed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(intake): tidy the quick-log sheet styling",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): add a break-fast flourish caption",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): standardize the iPad sidebar onto a NavigationSplitView column",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): neutral list selection, promote flash, and ghost-check completions",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): add a global Add Task entry point and Control Center button",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): share tile rendering with new home-screen widgets",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): import tasks from a Things database export",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(dashboard): tame day-dial twilight glow in dark mode",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): wrap long task titles and adopt a glass toast surface",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): fall back to a label for blank calendar event titles",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): replace the day-dial live glass with a day-aligned sky wash",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(community-worker): persist telemetry level and count anonymized opt-outs",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(privacy): show what telemetry is sent and a recently-sent log, anonymize opt-out",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(training): effort-weighted muscle volume and a post-session weekly review",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(privacy): show the full telemetry ladder as a checklist",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): lengthen the completion undo window",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): show only remaining events in the Today agenda",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(claude-gateway): close the loop on token expiry via CloudKit probe",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): confirmation toast, settle-preserving inbox, upcoming bucketing",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): signal Today on the checkbox, drop the right-edge chip",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): flash a closing-lock glyph on Claude reconnect",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(ui): make whole grocery/log rows tappable",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(sidebar): extract shared SidebarCount for row counts",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(calendar): sync hidden-calendar selection across devices",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): inline move-to-area/project submenus in context menus",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): rename in the composer on macOS, never inline",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(dates): use locale week-start instead of hardcoded Monday",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): time-of-day sky behind a vertically-paged Next feed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(mcp): opt-in \"keep serving after quit\" gate for soft-quit",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(privacy): graded analytics telemetry levels (off/minimal/balanced/full)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "chore(strings): add pinned-goal dashboard hint string",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): handle Esc to cancel inline task edit on macOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "style(watch): give Next suggestions a neutral accent matching iOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): make per-tracker intake nudges interactive in Next",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(sidebar): collapsible task areas with tighter rows",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): weave calendar events into Today and Upcoming",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): adopt task-row language v2 and MCP task provenance",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(goals): pin goals to the week dashboard",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor(ui): tighten row density and standardize the checkbox feel",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(ui): open macOS sidebar rows on a single click",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): only prompt discard when an edit actually changed",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): inline title rename and quick-add line",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): rename the Week tab to Today",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(ui): key sky-wash top-fade seam off device idiom, not size class",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "perf(dashboard): fetch rhythm dial data off the main thread, drop tilt parallax",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(watch): sync the track-fasting flag and publish the snapshot from iOS only",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): respect intake objectives when suggesting doses",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): sync dismissed suggestions across devices",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): quick-add task from the Tasks section header",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): compare new-task composer against its seeded draft for dirty state",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(tasks): Recently Deleted view with 30-day auto-purge and undo",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(nutrition): photo-first meal capture with on-device analysis",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "docs: move the book/strategy manifesto to the private site repo",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(intake): size the macOS quick-log chooser sheet",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(intake): fall back to a guessed SF Symbol for emoji-less methods",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(intake): continue an open container across the day rollover",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(ui): add tileHover pointer/Pencil-hover highlight to tappable cards",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(watch): ship fasting anchor not verdict so the fast morphs overnight",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(sidebar): native source-list selection on macOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(next): hoist Done-Today editors, macOS click-select, settings deep-link",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor: extract shared listKeyboardNavigation modifier",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "fix(tasks): hide recently-deleted rows and archive cancelled tasks",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(dashboard): unified daily-trend training chart",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "feat(intake): user emoji on tracker methods and varieties",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "refactor: extract shared PaletteSwatchButton color picker",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "show every enabled intake tracker on the watch next list",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add next settings pane and remove the today/week wheel toggle",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add unified community member badge across roadmap, testimonials and support",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "sync service tokens across devices via icloud keychain",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add soft-delete recently-deleted for tasks with restore and purge",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add dot-color legend popover and \"Latest\" label to What's New",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "redesign About pane and link out to the build-story journal post",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "let Readwise highlights be hidden from the daily message without disconnecting",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add community supporter badge and Mac Apple sign-in access polish",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "collapse training stacked-bars sparkline into one effort series",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "expand watch intake tiles, meal picker, and ring rendering",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "guard task editor discards and reload task rows on menu mutations",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add keyboard navigation to the Next list",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "sync recently-deleted task marker through CloudKit reservedString1",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "wire all bundle plists to build-setting version refs and enforce",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "set the watch scheme launch action back to debug",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add maker identity, seven-disc \"open\" flourish, and disc-tile about row",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add cron-maintained \"Unreleased\" changelog entry with live build number",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add sign in with apple as the App-Attest substitute for community on macOS",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "set the watch scheme launch action to release",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "round the circular fasting complication to whole hours",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "show all intake trackers on the watch summary page",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "keep watch snapshot and dashboard fresh across midnight and mid-fast",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add section enablement and usage telemetry",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add versioning workflow and the What's New changelog surface",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "migrate analytics from Plausible to a Cloudflare telemetry worker",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "bump wrangler to v4 in the community and reports workers",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "document the GoalMilestone unit field (reservedString1)",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "auto-reveal existing notes when editing a task",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "drive macOS task-list selection from tap gestures inside List",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "stop a no-op task peek from rewriting its placement",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "preserve task placement through complete and reopen",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add a watch Intakes summary page and sync bucket cutoffs to the wrist",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "surface MCP Server on iOS and fold connected apps into the AI hub",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "drop the seven-disc end flourish from the watch Next list",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "reorganize settings into seven intent-grouped hubs and surface Readwise in connected apps",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "give the membership card a hand-tuned raised-metal finish in dark mode",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "frame the Claude reconnect cue as an auth checkpoint with the device biometry mark",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "stop watch Next list crashing on rapid taps via snapshotted rows and benign-cancel handling",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "draw the watch discs mark from real circles so it renders inside a list row",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "list recent meals/sets under the watch summary-page rings as a freshness check",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "morph the watch macro complication into a fasting face during a fast",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "render activity rings via vendored WolfActivityRing for the over-100% lap",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "give every quick-add menu a full-editor escape and unify the empty-log line",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "give CLI builds their own DerivedData so they can't poison Xcode",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add a Recently done glance to the chores Log",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "lap the watch complication rings past 100%",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "keep watch summary links stable via enabled-section set and add a Next end mark",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "always open section drawers in Log mode",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "add a quiet cue for tasks that arrived in Today on their own",
+          "detail": null,
+          "section": null
+        },
+        {
+          "title": "draw macOS sidebar selection ourselves to avoid the focus flash",
+          "detail": null,
+          "section": null
         }
       ]
     },
