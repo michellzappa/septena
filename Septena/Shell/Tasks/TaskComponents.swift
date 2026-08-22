@@ -657,14 +657,16 @@ struct ScreenTitle: View {
 
 /// Which 7-day window a `WeekStrip` covers.
 enum WeekStripRange {
-  /// Today + the next 6 days. The scheduling default (When / Deadline).
+  /// Tomorrow + the next 6 days. The scheduling default (When / Deadline),
+  /// which pairs the strip with a separate Today row — today lives there, so
+  /// the strip must not repeat it.
   case upcoming
   /// The previous 6 days + today, with today rightmost. Used by the
   /// drawer time-travel picker, where you look *back* at past logs.
   case recent
 }
 
-/// Lean 7-day strip: today + next 6 days as Reminders-style chips
+/// Lean 7-day strip: tomorrow + the next 6 days as Reminders-style chips
 /// (weekday letter on top, day number below). One tap = one pick.
 /// Used by both the When and Deadline pickers so quick scheduling
 /// within the coming week never opens a full calendar.
@@ -691,7 +693,7 @@ struct WeekStrip: View {
     let today = anchorDay
     switch range {
     case .upcoming:
-      return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
+      return (1...7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     case .recent:
       return (-6...0).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     }
@@ -741,6 +743,144 @@ struct WeekStrip: View {
         }
         .buttonStyle(.plain)
       }
+    }
+  }
+}
+
+// MARK: - Task date board
+
+/// THE date board for tasks — one component, every task date surface.
+///
+/// Shape, in order: a **Today** row, a **seven-day strip starting tomorrow**,
+/// **Pick another date** (Apple's month calendar, for anything further out),
+/// and **Clear**. It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D
+/// popover (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask
+/// the question the same way in both apps.
+///
+/// Every control commits on the spot — there is no confirm button, the way the
+/// AppKit board has none. Today is a row, never also a strip cell: the strip
+/// starts tomorrow so the board can't offer the same day twice.
+///
+/// The caller decides what "Today" means. `.when` treats it as the today FLAG
+/// (`onToday`), Deadline as an ordinary date — the board only reports the
+/// gesture.
+struct TaskDateBoard: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
+  /// The dated value the board should show as chosen, or nil for none.
+  let selected: Date?
+  /// Whether the Today row itself is the current value.
+  var todayActive: Bool = false
+  /// e.g. "No Date" / "Remove Deadline". The row hides when nil.
+  var clearLabel: String?
+  let onToday: () -> Void
+  let onPick: (Date) -> Void
+  let onClear: () -> Void
+
+  @State private var calendarDate = Date()
+  @State private var showingCalendar = false
+
+  private var cal: Calendar { Calendar.current }
+  private var anchorDay: Date {
+    cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      row(symbol: "star.fill", tint: Theme.todayAccent,
+          title: String(localized: "Today", comment: "Relative date"),
+          active: todayActive) {
+        Haptics.pick()
+        onToday()
+      }
+
+      WeekStrip(selected: selected) { d in onPick(cal.startOfDay(for: d)) }
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+
+      Hairline(leadingInset: 0)
+
+      calendarButton
+        .padding(.vertical, 12)
+
+      if let clearLabel {
+        Hairline(leadingInset: 0)
+        row(symbol: "xmark.circle", tint: Theme.iconMuted,
+            title: clearLabel, active: false) {
+          Haptics.warning()
+          onClear()
+        }
+        .padding(.top, 4)
+      }
+    }
+  }
+
+  /// One full-width row — symbol, then title. The AppKit board's row shape,
+  /// wearing the inset palette highlight when it holds the current value.
+  /// `.contentShape` is required: a `.plain` button is only tappable where it
+  /// draws, so without it the trailing half of the row is a dead zone.
+  private func row(symbol: String, tint: Color, title: String, active: Bool,
+                   action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 10) {
+        Image(systemName: symbol)
+          .scaledFont(size: 17)
+          .foregroundStyle(tint)
+          .frame(width: 22)
+        Text(title)
+          .scaledFont(size: 16)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 11)
+      .contentShape(Rectangle())
+      .background(InsetSelectionBackground(isSelected: active, horizontalInset: 0))
+    }
+    .buttonStyle(.plain)
+    .accessibilityAddTraits(active ? .isSelected : [])
+  }
+
+  /// The "further out" path. The strip already covers the coming week, so the
+  /// month calendar hides behind one tap — popover on iPad/Mac, small sheet on
+  /// iPhone — and picking a day there commits it, like every other control.
+  private var calendarButton: some View {
+    Button {
+      Haptics.pick()
+      calendarDate = selected ?? anchorDay
+      showingCalendar = true
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "calendar")
+          .scaledFont(size: 17)
+          .foregroundStyle(Theme.inkSecondary)
+        Text("Pick another date")
+          .scaledFont(size: 16, weight: .medium)
+          .foregroundStyle(.primary)
+        Image(systemName: "chevron.right")
+          .scaledFont(size: 13, weight: .semibold)
+          .foregroundStyle(Theme.iconMuted)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 13)
+      .background(Capsule().fill(Theme.inkSecondary.opacity(0.08)))
+      .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .popover(isPresented: $showingCalendar) {
+      DatePicker("", selection: $calendarDate, displayedComponents: [.date])
+        .datePickerStyle(.graphical)
+        .labelsHidden()
+        .tint(theme.accent)
+        .padding(8)
+        .frame(minWidth: 300, idealWidth: 320, minHeight: 320)
+        .presentationDetents([.medium])
+        .presentationCompactAdaptation(.sheet)
+        .onChange(of: calendarDate) {
+          showingCalendar = false
+          onPick(cal.startOfDay(for: calendarDate))
+        }
     }
   }
 }

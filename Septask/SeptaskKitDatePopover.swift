@@ -6,10 +6,12 @@ import AppKit
 // each is a popover anchored to that row — no sheet, no modal window. The
 // Repeat editor below is the third member of that family.
 //
-// Layout is a quick row over a ONE-WEEK day strip, the shape Things uses:
-// scheduling answers "which of the next few days", so the popover shows the
-// next seven days as labeled cells (weekday over day number) instead of a
-// month grid. `NSDatePicker`'s `.clockAndCalendar` month was the old body; it
+// Layout is a Today row over a ONE-WEEK day strip, the shape Things uses:
+// scheduling answers "which of the next few days", so the popover shows a
+// Today row and then the next seven days as labeled cells (weekday over day
+// number) instead of a month grid. The strip starts at TOMORROW — the Today
+// row owns today, and repeating it in the strip gave the board two identical
+// first choices. `NSDatePicker`'s `.clockAndCalendar` month was the old body; it
 // read as a dense, alien control inside the popover and answered a question
 // nobody asks here.
 //
@@ -380,9 +382,12 @@ private final class KitDateBoard: NSView {
   private static let dayWidth: CGFloat = 40
   private static let dayHeight: CGFloat = 48
   private static let daySpacing: CGFloat = 6
-  /// Today through a week out — the same window as SwiftUI's `WeekStrip`
-  /// (`.upcoming` = offsets 0...6), so the two surfaces offer the same days.
-  private static let dayOffsets = Array(0...6)
+  /// TOMORROW through a week out — the same window as SwiftUI's `WeekStrip`
+  /// (`.upcoming` = offsets 1...7), so the two surfaces offer the same days.
+  /// The strip starts at tomorrow on purpose: the Today row above it already
+  /// commits today, and a strip that repeated it gave the board two first
+  /// choices that did the same thing.
+  private static let dayOffsets = Array(1...7)
 
   init(kind: SeptaskKitDatePopover.Kind, initial: Date?,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
@@ -420,7 +425,7 @@ private final class KitDateBoard: NSView {
       let cell = KitDateCell(radius: 10, height: Self.dayHeight) { [weak self] in
         self?.pick(date)
       }
-      cell.fillDay(date, isToday: offset == 0)
+      cell.fillDay(date)
       cell.widthAnchor.constraint(equalToConstant: Self.dayWidth).isActive = true
       strip.addArrangedSubview(cell)
       dayCells.append(cell)
@@ -596,10 +601,9 @@ private final class KitDateCell: NSView {
 
   /// Weekday over day number — the strip's cell, matched to SwiftUI's
   /// `WeekStrip` (11pt medium weekday, 17pt semibold rounded number) so the
-  /// two surfaces read as one component. Today is marked with the gold ink
-  /// the Today row's star uses — INK, never a second background fill, which
-  /// would compete with the focus wash.
-  func fillDay(_ date: Date, isToday: Bool) {
+  /// two surfaces read as one component. The strip holds tomorrow onward, so
+  /// no cell is today and none carries the today mark.
+  func fillDay(_ date: Date) {
     isWeekend = Calendar.current.isDateInWeekend(date)
 
     let weekday = NSTextField(labelWithString: Self.weekday.string(from: date))
@@ -609,7 +613,7 @@ private final class KitDateCell: NSView {
 
     let number = NSTextField(labelWithString: Self.number.string(from: date))
     number.font = Self.rounded(size: 17, weight: .semibold)
-    number.textColor = isToday ? SeptaskKitTheme.todayAccent : SeptaskKitTheme.inkPrimary
+    number.textColor = SeptaskKitTheme.inkPrimary
     number.alignment = .center
 
     let stack = NSStackView(views: [weekday, number])

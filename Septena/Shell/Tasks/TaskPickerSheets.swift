@@ -6,202 +6,50 @@ import SwiftUI
 
 // MARK: - Date picker sheet
 
-/// Shared picker for both "When" (scheduled) and "Deadline" (due). 7-day
-/// strip up top for the common case; a single capsule button pops the full
-/// month calendar (popover on iPad/Mac, small sheet on iPhone) for anything
-/// further out. Only the title, button labels, and clear semantics differ
-/// between the two — layout is identical.
+/// Shared picker for both "When" (scheduled) and "Deadline" (due) — the modal
+/// wrapper around `TaskDateBoard`, which owns the layout and is the same board
+/// the composer's When and Deadline pills expand and the AppKit shell's ⌘S /
+/// ⌘⇧D popover mirrors.
+///
+/// Only the title and the clear label differ between When and Deadline. Each
+/// control commits and dismisses, so there is no confirm button. What this
+/// replaced: a four-chip quick row (Today / Tomorrow / This weekend / Next
+/// week) above a strip that ALREADY held every one of those days — Today
+/// appeared twice — plus a "Set Date · Wed, Jul 8" button only the calendar
+/// path needed.
 struct DatePickerSheet: View {
-  @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
   let title: String
   let initialDate: Date?
-  let setLabel: String        // e.g. "Set Date" / "Set Deadline"
-  let updateLabel: String     // e.g. "Update Date" / "Update Deadline"
   let clearLabel: String      // e.g. "No Date" / "Remove Deadline"
   let onPick: (Date?) -> Void
   @Environment(\.dismiss) private var dismiss
-  @State private var date: Date
-  @State private var showingCalendar: Bool
-  @State private var configuredStrip = false
 
   private var cal: Calendar { Calendar.current }
-
   private var anchorDay: Date {
     cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
-  private var tomorrow: Date { cal.date(byAdding: .day, value: 1, to: anchorDay) ?? anchorDay }
-  /// The coming Saturday — or today, if today is already the weekend.
-  private var weekend: Date {
-    if cal.isDateInWeekend(anchorDay) { return anchorDay }
-    var comps = DateComponents(); comps.weekday = 7   // Saturday
-    let next = cal.nextDate(after: anchorDay, matching: comps, matchingPolicy: .nextTime)
-    return cal.startOfDay(for: next ?? anchorDay)
-  }
-  /// The upcoming Monday.
-  private var nextWeek: Date {
-    var comps = DateComponents(); comps.weekday = 2   // Monday
-    let next = cal.nextDate(after: anchorDay, matching: comps, matchingPolicy: .nextTime)
-    return cal.startOfDay(for: next ?? anchorDay)
-  }
 
-  /// Fitted sheet height: a semantic pill row + 7-day strip + calendar button +
-  /// actions. `.large` stays available as a drag-up fallback for big Dynamic
-  /// Type (or when the pills wrap to a second row on a narrow phone).
-  static let sheetHeight: CGFloat = 380
-
-  /// Locale-ordered short date for the confirm button ("Wed, Jul 8").
-  private static let setDateFmt: DateFormatter = {
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("EEEMMMd")
-    return f
-  }()
-
-  init(
-    title: String,
-    initialDate: Date? = nil,
-    setLabel: String,
-    updateLabel: String,
-    clearLabel: String,
-    onPick: @escaping (Date?) -> Void
-  ) {
-    self.title = title
-    self.initialDate = initialDate
-    self.setLabel = setLabel
-    self.updateLabel = updateLabel
-    self.clearLabel = clearLabel
-    self.onPick = onPick
-    _date = State(initialValue: initialDate ?? Date())
-    _showingCalendar = State(initialValue: false)
-  }
-
-  private func configureStripIfNeeded() {
-    guard !configuredStrip else { return }
-    configuredStrip = true
-    if initialDate == nil { date = anchorDay }
-  }
-
-  /// Language-first quick pick (Today / Tomorrow / This weekend / Next week).
-  /// Same one-tap-and-dismiss contract as the day strip; highlights when the
-  /// current value already lands on it. Matches the composer's `chip` capsule.
-  @ViewBuilder
-  private func quickChip(_ title: String, target: Date) -> some View {
-    let active = initialDate.map { cal.isDate($0, inSameDayAs: target) } ?? false
-    Button {
-      Haptics.pick()
-      onPick(cal.startOfDay(for: target)); dismiss()
-    } label: {
-      Text(title)
-        .font(.septenaLabel)
-        .foregroundStyle(active ? Theme.inkPrimary : Theme.inkSecondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .background(Capsule().fill(active ? theme.accent.opacity(0.42) : Theme.mutedSurface))
-  }
+  /// Fitted sheet height: Today row + 7-day strip + calendar button + Clear.
+  /// `.large` stays available as a drag-up fallback for big Dynamic Type.
+  static let sheetHeight: CGFloat = 320
 
   var body: some View {
     NavigationStack {
       VStack(spacing: 0) {
-        FlowLayout(spacing: 8) {
-          quickChip("Today", target: anchorDay)
-          quickChip("Tomorrow", target: tomorrow)
-          quickChip("This weekend", target: weekend)
-          quickChip("Next week", target: nextWeek)
-        }
+        TaskDateBoard(
+          selected: initialDate.map { cal.startOfDay(for: $0) },
+          todayActive: initialDate.map { cal.isDate($0, inSameDayAs: anchorDay) } ?? false,
+          clearLabel: clearLabel,
+          onToday: { commit(anchorDay) },
+          onPick: { commit($0) },
+          onClear: { commit(nil) })
         .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
-
-        WeekStrip(selected: initialDate.map { Calendar.current.startOfDay(for: $0) }) { d in
-          onPick(d); dismiss()
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 2)
-        .padding(.bottom, 8)
-        .onAppear { configureStripIfNeeded() }
-
-        Hairline()
-
-        // One prominent, capsule-weight button that pops Apple's month
-        // calendar in a single tap — popover on iPad/Mac, a small sheet on
-        // iPhone. No inline reveal; the strip already covers the common week.
-        Button {
-          Haptics.pick()
-          showingCalendar = true
-        } label: {
-          HStack(spacing: 8) {
-            Image(systemName: "calendar")
-              .scaledFont(size: 17)
-              .foregroundStyle(Theme.inkSecondary)
-            Text("Pick another date")
-              .scaledFont(size: 16, weight: .medium)
-              .foregroundStyle(.primary)
-            Image(systemName: "chevron.right")
-              .scaledFont(size: 13, weight: .semibold)
-              .foregroundStyle(Theme.iconMuted)
-          }
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 13)
-          .background(Capsule().fill(Theme.inkSecondary.opacity(0.08)))
-          .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
-          .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.top, 12)
-        .popover(isPresented: $showingCalendar) {
-          DatePicker("", selection: $date, displayedComponents: [.date])
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            .tint(theme.accent)
-            .padding(8)
-            .frame(minWidth: 300, idealWidth: 320, minHeight: 320)
-            .presentationDetents([.medium])
-            .presentationCompactAdaptation(.sheet)
-            .onChange(of: date) { showingCalendar = false }
-        }
+        .padding(.top, 6)
 
         Spacer(minLength: 0)
-
-        VStack(spacing: 6) {
-          Button {
-            onPick(Calendar.current.startOfDay(for: date))
-            dismiss()
-          } label: {
-            Text("\(initialDate == nil ? setLabel : updateLabel) · \(Self.setDateFmt.string(from: date))")
-              .scaledFont(size: 16, weight: .semibold)
-              .foregroundStyle(AdaptiveColor.inkOnSolidFill(theme.accent))
-              .lineLimit(1)
-              .minimumScaleFactor(0.8)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 12)
-              .background(theme.accent)
-              .clipShape(Capsule())
-          }
-          .buttonStyle(.plain)
-
-          // Only offer "remove" when there's actually a date to clear.
-          if initialDate != nil {
-            Button {
-              Haptics.warning()
-              onPick(nil)
-              dismiss()
-            } label: {
-              Text(clearLabel)
-                .scaledFont(size: 15, weight: .medium)
-                .foregroundStyle(Theme.overdueRed)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-          }
-        }
-        .padding(.horizontal, Theme.hPadding)
-        .padding(.bottom, 12)
       }
+      .padding(.bottom, 12)
       .navigationTitle(title)
       .septenaInlineTitle()
       .toolbar {
@@ -211,6 +59,11 @@ struct DatePickerSheet: View {
       }
     }
     .macSheetFrame(width: 420, height: Self.sheetHeight + 60)
+  }
+
+  private func commit(_ day: Date?) {
+    onPick(day.map { cal.startOfDay(for: $0) })
+    dismiss()
   }
 }
 

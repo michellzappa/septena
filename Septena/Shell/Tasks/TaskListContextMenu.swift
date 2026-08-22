@@ -35,8 +35,6 @@ struct TaskListModalPresenter: ViewModifier {
           DatePickerSheet(
             title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
             initialDate: currentScheduled(firstId),
-            setLabel: "Set Date",
-            updateLabel: "Update Date",
             clearLabel: "No Date"
           ) { date in
             applyWhen(sheet.taskIds, .scheduled, date)
@@ -48,8 +46,6 @@ struct TaskListModalPresenter: ViewModifier {
           DatePickerSheet(
             title: bulk ? "Deadline (\(sheet.taskIds.count) tasks)" : "Deadline",
             initialDate: currentDeadline(firstId),
-            setLabel: "Set Deadline",
-            updateLabel: "Update Deadline",
             clearLabel: "Remove Deadline"
           ) { date in
             applyWhen(sheet.taskIds, .deadline, date)
