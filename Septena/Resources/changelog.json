@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1638,
+      "build": 1641,
       "date": "2026-08-22",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Septask, a focused task app, arrives on iOS and Mac",
-          "detail": "A dedicated task app over your existing Septena data, with a native Mac shell, its own watch app and complication, Quick Find, and Reminders folded into the Inbox.",
+          "title": "Meet Septask, a focused tasks app",
+          "detail": "A new standalone app for just your tasks, sharing the same private data as Septena, now available on iPhone, iPad, and Mac.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks got much more reliable",
-          "detail": "Pause and resume a series, reschedule with series-aware prompts, and browse a dedicated repeating smart list.",
+          "title": "Recurring tasks are far more reliable",
+          "detail": "Pause and resume a series, reschedule it as a whole, and browse a dedicated repeating smart list; completing a recurring task now reliably spawns its next occurrence.",
           "section": "tasks"
         },
         {
           "title": "Redesigned date picker for tasks",
-          "detail": "Quick-pick pills and a calendar popover replace the old When and Deadline pickers, now unified into one.",
+          "detail": "Set When and Deadline dates from quick-pick pills or a calendar popover, unified across every task surface.",
           "section": "tasks"
         },
         {
-          "title": "Task attachments, drag-to-file, and multi-select actions",
-          "detail": "Attach files to a task, drag it onto a Today group to re-home it, and act on several tasks at once.",
+          "title": "Better task organization and safety net",
+          "detail": "Add attachments, drag tasks between groups or file them under project headings, act on several tasks at once, and recover deleted tasks for 30 days with undo.",
           "section": "tasks"
         },
         {
-          "title": "Training sessions get a reworked editor",
-          "detail": "Editable start and end times, reps-before-load progression hints, and a live marker on the progress chart.",
-          "section": "training"
-        },
-        {
-          "title": "Smarter meal logging",
-          "detail": "Re-logging a meal now scales its portion in place instead of duplicating it, and photo capture can analyze a meal on-device to prefill the entry.",
+          "title": "Photo-first meal logging",
+          "detail": "Snap a photo and let on-device analysis prefill a meal's details; re-logged meals can now be scaled by portion size.",
           "section": "nutrition"
         },
         {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms can now suggest goals, matching tasks and training.",
-          "section": "goals"
+          "title": "More training tools",
+          "detail": "Cardio exercises join the default exercise library, sessions get editable start/end times and progression hints, and the rest timer now auto-advances with a watch Live Activity.",
+          "section": "training"
         },
         {
-          "title": "Copy your grocery list to the clipboard",
-          "detail": null,
-          "section": "groceries"
+          "title": "Tasks on your wrist",
+          "detail": "Septask now has its own watch app with a today-tasks complication, and the Next feed on watch supports quick actions like complete, skip, and defer.",
+          "section": null
+        },
+        {
+          "title": "Pin goals to your dashboard",
+          "detail": "Pinned goals now show as their own dashboard tiles, and suggested goals are available for chores, gut, habits, medications, mood, supplements, and symptoms.",
+          "section": "goals"
         }
       ]
     },
