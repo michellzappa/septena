@@ -2,7 +2,11 @@
 import UIKit
 import UserNotifications
 
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+// `UIResponder`, not `NSObject` — load-bearing. `undoManager` is a
+// `UIResponder` property, so an `NSObject` delegate cannot override it (the
+// compiler says "does not override any property from its superclass") and the
+// app delegate would not sit in the responder chain the lookup walks.
+final class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   /// Captured at cold launch before NavigationState exists. The app's
   /// `.task` drains this on first render.
   private static var pending: ShortcutAction?
