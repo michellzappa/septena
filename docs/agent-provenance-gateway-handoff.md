@@ -1,7 +1,11 @@
 # Handoff: Provenance stamping in the Septena MCP gateway
 
+> **Landed — historical.** Both halves ship: the gateway stamps provenance and
+> the app reads it. Kept as the wire contract, cited by
+> `docs/agent-provenance-spec.md`.
+
 **For:** an agent working in `../septena-mcp-gateway` (Cloudflare Worker, TypeScript).
-**Goal:** When Claude creates a task via MCP, stamp the CloudKit `Task` record so the iOS app can mark it as agent-created. This is the gateway half of [agent-provenance-spec.md](agent-provenance-spec.md); the iOS half is already implemented in `septena-cloud`.
+**Goal:** When Claude creates a task via MCP, stamp the CloudKit `Task` record so the iOS app can mark it as agent-created. This is the gateway half of [agent-provenance-spec.md](agent-provenance-spec.md); the iOS half is already implemented in this repo.
 
 ## Context you need
 

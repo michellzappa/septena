@@ -1,6 +1,10 @@
 # Consumables Generalization Study
 
-Status: study / pre-plan. Owner: MZ. Date: 2026-06-10.
+> **Historical rationale.** The generalization this argues for shipped as the
+> Intake section. Kept for the *why* — the argument for one kind→item→event
+> spine instead of a section per consumable — which nothing in the code states.
+
+Status: study / pre-plan, since implemented. Owner: MZ. Date: 2026-06-10.
 
 ## 1. Why
 

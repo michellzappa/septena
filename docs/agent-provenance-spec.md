@@ -34,7 +34,7 @@ Claude (claude.ai)  ──bearer──►  Gateway Worker (mcp.septena.app)
 ```
 
 **Consequences:**
-- Writes do **not** pass through the iOS app. The trustworthy choke point for the provenance stamp is the **MCP server tool code in the gateway Worker repo** (separate from `septena-cloud`), not the app.
+- Writes do **not** pass through the iOS app. The trustworthy choke point for the provenance stamp is the **MCP server tool code in the gateway Worker repo** (separate from this repo), not the app.
 - The app's only jobs are: (a) read `source`/`acknowledgedAt` off the fetched record, (b) render the cue, (c) write `acknowledgedAt` back when the user engages, (d) never set `source = mcp` itself.
 - Precedent already shipped: `nutrition_entry_log` sets `source = "mcp"` and `NutritionEntryEntity.source` round-trips through CloudKit. This spec is "do the nutrition pattern everywhere, add the cue."
 
@@ -185,7 +185,7 @@ func showsAgentCue(_ t: TaskEntity, now: Date) -> Bool {
 **Gateway repo (`../septena-mcp-gateway`) — handed off, NOT done here.**
 See [agent-provenance-gateway-handoff.md](agent-provenance-gateway-handoff.md) for the full instructions. In short: stamp `source/sourceClient/createdAt` in `createTask`, and switch it to `createWithFieldFallback` so it can deploy before the schema learns the fields.
 
-**`septena-cloud` repo — DONE (build-verified, iOS Debug, EXIT=0):**
+**This repo — DONE (build-verified, iOS Debug, EXIT=0):**
 - [x] `TaskEntity` gains `source`, `sourceClient`, `acknowledgedAt: Date?`, `createdAt: Date` (`Persistence.swift`). Backend sets `createdAt = Date()` on user create (`TasksBackend.swift`).
 - [x] Four field keys in `TaskCloudKitSchema.Field`; `toCloudKitRecord()` write (createdAt only once non-sentinel) + `apply(_:)` read, optional-tolerant (`TaskRecord.swift`).
 - [x] `TaskCreatedAtBackfill` (`Migration.swift`, key `"tasks.createdAtBackfill.v1"`) derives `createdAt` from legacy `created`; called in `App.swift` after `OccurredAtBackfill`.

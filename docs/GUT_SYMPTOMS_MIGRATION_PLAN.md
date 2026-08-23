@@ -1,5 +1,10 @@
 # Gut → Symptoms migration plan
 
+> **Shipped — historical.** Gut is a pure Bristol log and every flag lives in
+> Symptoms. Kept because `GutPlugin.swift`, `SeptenaServices.swift`,
+> `GutSymptomMigrationMap.swift` and `CloudKit/Migration.swift` cite it by name
+> for the mapping rules. Code wins where they disagree.
+
 Move the symptom-shaped data out of the Gut bowel-movement log and into the
 Symptoms section. After this, **Gut is a pure Bristol log** (type + volume +
 note) and **every flag — blood, discomfort, and general GI symptoms — lives in

@@ -1,5 +1,10 @@
 # Task Conversations — Phase 0 build ticket
 
+> **Shipped — historical.** The engine landed: the frozen turn shape, the write
+> boundary, and the MCP verbs on both servers. Kept because `SeptenaCore/
+> TaskConvo.swift`, `Outbox.swift`, `TasksBackend.swift` and `MCPDispatch.swift`
+> cite it for the wire contract. Code wins where they disagree.
+
 **Plumbing, no UI.** Land the frozen data shape + the write boundary + the MCP
 verbs, and prove a turn round-trips from a hand-driven Claude session. Design &
 rationale live in `docs/TASK_CONVERSATIONS_PLAN.md`; this is the implementation

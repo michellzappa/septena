@@ -1,5 +1,10 @@
 # Ordering, Drag & Drop, and Headings — Plan
 
+> **Shipped — historical.** Manual ordering, drag & drop, and project headings
+> are live in both shells. Kept because `TaskListView.swift`, `Outbox.swift`,
+> `TasksBackend.swift`, `docs/DRAG_AND_DROP.md` and `docs/BACKLOG.md` cite it
+> for the fractional-order math and the heading model.
+
 Scope: Tasks/Septask (shared `Shell/Tasks` + `Shell/Sidebar`, both apps, all four
 schemes). Goal: proper manual ordering, full drag & drop (reorder in-list +
 drop into sidebar), and Things-style headings inside projects — using only

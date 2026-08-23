@@ -233,6 +233,17 @@ A logging action earns a brief, **data-matched** flourish — motion that echoes
 
 Rules: pick the motion that fits the data (a tally grows with count, a cascade scales with how many were taken); scale by `intensity`; always route through the §9 a11y helpers so Reduce Motion collapses it. Don't dilute into one generic celebration.
 
+**Why this exists** (the intent behind the mechanism, harvested from the retired `BET1_LOGCOMMIT_*` handoff docs — git has them in full):
+
+The idea started in the Mood meter, where the confirmation already changed character with what you felt: confetti for joy, a tension-snap for anger, a slow bloom for calm, a downward sink for despair. The bet was that **"the app responds to the texture of your life"** is the ownable idea, and that it should be a system-wide language rather than one screen's trick. Same grammar, different words. The payoff is emotional, not functional — the data already saved correctly; this is about rewarding the ritual rather than merely recording it.
+
+Four principles hold, and a regression against any of them is a bug:
+
+1. **The celebration matches the affect.** A warm ripple for coffee, a drop for hydration, a burst for a workout, an ignition with the streak number for a habit milestone. One generic confetti for everything is the opposite of the thesis.
+2. **Tasteful, not a party.** Single-tone, accent-colored, ~1s. A satisfying click, not a slot machine. When in doubt, less.
+3. **Confirmation, never a gate.** The flourish is layered on an action that already succeeded. It must never block, delay, or be required for the log to land. If it can't play, the log still works silently.
+4. **Invisible to those who opt out.** Reduce Motion is a hard switch, not a hint: with it on there is **no** visual, and the haptic plus a spoken VoiceOver confirmation carry the moment. This is a safety requirement as much as a preference — a full-screen flash under Reduce Motion is seizure-adjacent. Never regress it.
+
 ## 13. Homepage layout modes
 
 The dashboard is one data set (`HomepageDomainData` per section) rendered through interchangeable modes, selected via `HomepageLayoutMode`:

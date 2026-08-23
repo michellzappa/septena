@@ -1,5 +1,11 @@
 # Task Conversations — Plan
 
+> **Shipped — historical, and still the design rationale.** The loop described
+> here is built in both shells. Two things it calls for remain explicit v1
+> non-goals: rendering `subtasks` (epic decompose) as more than stored ids, and
+> any human override of assignee. This is the *why* document — read it for
+> intent, not for current behavior.
+
 **Goal (north star):** take the user from a *simple input* — a brain-dumped
 title — to *meaningful progress on every task*, by having AI ground it in real
 context, ask the few questions that clarify meaning and narrow scope, and route
