@@ -423,8 +423,20 @@ non-goals.
   into both apps and the AppKit shell, so it is the shared layer here.
   Applying mirrors `TaskListView.applySuggestion` step for step, including the
   triage promote flash and undo via `TaskUndo.recordMove`.
-  Still missing: suggestions in the Move MENU (the context menu's "Suggested"
-  section) — the capsule covers the one-tap path only.
+- **[DONE] Suggestions in the Move MENU.** `refreshSuggestedMenuSection` in
+  `SeptaskKitTaskList.swift` inserts the same "Suggested" section SwiftUI's
+  `TaskListContextMenu` shows — an `NSMenuItem.sectionHeader`, one "Move to
+  ⟨name⟩" item per ranked pick (tray glyph for an area, folder for a project),
+  and a separator — directly above the placement commands, which is the slot
+  SwiftUI puts it in. Rebuilt on every menu open from `menuNeedsUpdate`, like
+  the Move submenu, and removed again first: the context menu is built once and
+  edited in place. Single selection only — the picks are ranked for one title.
+  The gate is `TaskFilingSuggestions.ranked` (the capsule's own gate), and
+  applying goes through the same `applyFilingSuggestion(taskID:suggestion:)`
+  the capsule calls, so the runners-up carry the identical side effects
+  (clear the suggestion, `acknowledge`, triage promote flash, `recordMove`).
+  The capsule stays the one-tap path for the top pick; the menu is where the
+  runners-up live.
 
 ## 4. Structure CRUD — read-only today
 
@@ -616,14 +628,27 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 - **[P3] Live text-size refresh** — rows pick up a new text size on the next
   reload, not immediately.
 - **[P3] Services / Share / Print menus.**
-- **[P2] Claude reconnect cue.** The shell draws none. `ClaudeReconnectCue` is
-  gated `#if SEPTASK && os(macOS)` inside `TaskListView`, which only renders in
-  the classic window — so the default shell has no in-app recovery affordance.
-  The auth path itself is fine on macOS: `ASWebAuthenticationSession` already
+- **[DONE] Claude reconnect cue.** `Row.reconnectCue` + `KitReconnectCueCell`
+  (`SeptaskKitTaskList.swift`) — the AppKit twin of `ClaudeReconnectCue(.card)`,
+  in the same slot: the top of **Today only**, above the screen title, exactly
+  where `TaskListView.taskListHeader` puts the SwiftUI card. Same four states
+  (`ReconnectCueState`), same copy, same framing — the resting glyph is the
+  device's biometry mark, because a lapsed token is an auth checkpoint, not a
+  fault; the orange triangle appears only when a reconnect genuinely failed
+  (`lastError != nil`, so a user-cancel keeps the calm copy); a successful
+  re-mint holds a green `lock.fill` "Reconnected" flash for 1.6s so the row
+  closes the loop instead of silently vanishing. The whole row is the button
+  (`KitReminderCell`'s transparent-overlay pattern) — a label with dead
+  trailing space is the `row-dead-zone` bug.
+  **State comes from Observation, not a notification.** `ClaudeGatewayProvider`
+  posts `.septenaClaudeGatewayChanged` only on connect / disconnect /
+  successful refresh — the flip to `needsReauth` that MAKES this row appear
+  posts nothing. `trackClaudeGatewayState()` therefore reads the `@Observable`
+  properties inside `withObservationTracking` and re-arms on each callback.
+  The auth path itself was already fine on macOS: `ASWebAuthenticationSession`
   presents over an `NSWindow` anchor, and the gateway holds ONE rotating token,
-  so a Mac re-mint serves every device. The macOS pre-expiry NOTIFICATION now
-  works (`ClaudeReconnectNudge` is gated on `canImport(UserNotifications)`, and
-  `SeptaskMacAppDelegate` handles the tap), so this is the remaining half.
+  so a Mac re-mint serves every device. With the pre-expiry notification
+  (`ClaudeReconnectNudge` + `SeptaskMacAppDelegate`) both halves now exist.
 
 ## 7. Smaller behavior gaps
 
@@ -665,16 +690,13 @@ The shell reads areas/projects and can *file into* them, but can't manage them.
 ## Suggested order — remaining
 
 The four items that were queued here (Reminders import, row cues, the
-rolled-into-Today banner, Task Conversations) all landed on 2026-08-21. What is
-left is the [P2]/[P3] tail:
+rolled-into-Today banner, Task Conversations) all landed on 2026-08-21. The
+Claude reconnect cue (§6) and the Move menu's "Suggested" section (§3) landed
+on 2026-08-23. What is left is the [P2]/[P3] tail:
 
-1. **Claude reconnect cue** (§6) — the shell still draws none; the macOS
-   notification half already landed.
-2. **Hero-glide between closed row and open editor** (§1) — cosmetic, but it is
+1. **Hero-glide between closed row and open editor** (§1) — cosmetic, but it is
    what makes inline editing feel continuous rather than modal.
-3. **Suggestions in the Move menu** (§3) — the one-tap capsule shipped; the
-   context menu's "Suggested" section did not.
-4. Everything else in §1/§4/§5/§6/§7 as it comes up.
+2. Everything else in §1/§4/§5/§6/§7 as it comes up.
 
 ## Handoff notes for whoever picks this up next
 

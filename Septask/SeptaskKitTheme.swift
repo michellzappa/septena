@@ -82,6 +82,10 @@ enum SeptaskKitTheme {
   static let inkSecondary: NSColor = .secondaryLabelColor
   /// Theme.iconMuted — receding glyphs/meta (Reminders' non-tinted metadata).
   static let iconMuted: NSColor = .tertiaryLabelColor
+  /// Color.claudeAccent — the ONE place Claude's own color appears in the
+  /// shell (the reconnect row). A brand color, not a semantic one, so it
+  /// bridges the shared token rather than naming a system color.
+  static let claudeAccent = NSColor(Color.claudeAccent)
 
   // Surfaces. These Theme tokens are hand-built Colors (not straight system
   // semantics), so they bridge rather than name an NSColor — one source of

@@ -290,13 +290,17 @@ final class TasksWatchStore {
       .map { $0 != 0 }
       ?? (record["recurrencePaused"] as? NSNumber)?.boolValue
       ?? false
-    let nextDate = unit.flatMap {
-      guard !paused else { return nil }
-      return TasksWatchRecurrence.nextDate(
+    // A paused series still completes the occurrence, it just spawns no next
+    // one. The check sits OUTSIDE the closure on purpose: a multi-statement
+    // closure gets no result-type inference, so a `return nil` in there leaves
+    // `flatMap`'s element type unsolvable. Same shape as the Septena watch's
+    // `WatchConnectivity.saveTaskCompletion`, which hit this first.
+    let nextDate: String? = paused ? nil : unit.flatMap { unit in
+      TasksWatchRecurrence.nextDate(
         completedOn: completionDay,
         scheduled: record["scheduled"] as? String,
         logicalScheduled: record["recurrenceAnchorDate"] as? String,
-        unit: $0,
+        unit: unit,
         interval: interval,
         afterCompletion: afterCompletion
       )

@@ -62,6 +62,23 @@ final class SeptaskKitTaskListController: NSViewController {
     case symbol(String)
   }
 
+  /// What the Claude reconnect row says right now. The four states are
+  /// `ClaudeReconnectCue`'s, one for one: the calm auth checkpoint, a genuine
+  /// failure, the re-mint in flight, and the brief "you're back" flash that
+  /// closes the loop instead of letting the row vanish silently.
+  enum ReconnectCueState: Equatable {
+    case idle, failed, refreshing, reconnected
+
+    var key: String {
+      switch self {
+      case .idle: return "idle"
+      case .failed: return "failed"
+      case .refreshing: return "refreshing"
+      case .reconnected: return "reconnected"
+      }
+    }
+  }
+
   /// A calendar event flattened to a value — the row diff compares rows, and
   /// EKEvent is a live reference whose identity says nothing about content.
   struct Event: Equatable {
@@ -101,6 +118,10 @@ final class SeptaskKitTaskListController: NSViewController {
     /// work that arrived on its own because a date the user set earlier has
     /// now come round.
     case rolledInBanner(count: Int)
+    /// "Reconnect" — the Claude gateway token lapsed and only the user can
+    /// re-mint it. Today only, the slot `ClaudeReconnectCue(.card)` takes in
+    /// the SwiftUI shell.
+    case reconnectCue(state: ReconnectCueState)
 
     var key: String {
       switch self {
@@ -114,6 +135,9 @@ final class SeptaskKitTaskListController: NSViewController {
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .rolledInBanner: return "rolled-in-banner"
+      // The state rides the key so a change (idle → refreshing → reconnected)
+      // reads as a row REPLACEMENT in the diff, and the cell re-configures.
+      case .reconnectCue(let state): return "reconnect-cue:" + state.key
       case .importAllReminders: return "import-all-reminders"
       }
     }
@@ -132,6 +156,10 @@ final class SeptaskKitTaskListController: NSViewController {
       // A notice, not an item: it sits on the page like a header, NOT on a
       // card. A statement about your list must not look like a row of it.
       case .rolledInBanner: return false
+      // A control, not a notice: it draws on a card because it is something
+      // you press, the same reason SwiftUI's cue is a glass card and the
+      // rolled-in notice above is bare page.
+      case .reconnectCue: return true
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
@@ -197,6 +225,15 @@ final class SeptaskKitTaskListController: NSViewController {
   private let infoMenuItem = NSMenuItem()
   private let clearScheduleMenuItem = NSMenuItem()
   private let pauseRepeatMenuItem = NSMenuItem()
+  /// The ranked filing picks currently offered in the context menu's
+  /// "Suggested" section, best first — read back by `tag` when one is chosen.
+  /// Rebuilt on every menu open, like the Move submenu, because the answer
+  /// depends on the selected row.
+  private var menuSuggestions: [SuggestionEngine.Suggestion] = []
+  /// The items this controller inserted for that section. The context menu is
+  /// built once and edited in place, so the next open has to take the previous
+  /// section back out before inserting the current one.
+  private var suggestedMenuItems: [NSMenuItem] = []
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -510,6 +547,9 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.syncWindowTitle() }
     })
+    // The Claude reconnect row. `@Observable` state, not a notification —
+    // see `trackClaudeGatewayState`.
+    trackClaudeGatewayState()
   }
 
   /// Keep the first card clear of the title bar. The bar's height is the
@@ -656,11 +696,11 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract.
-      newRows = titleRows + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
         + withoutTriage(pool).sorted(by: SeptenaTask.compareNextPageOrder).map(chipped)
         + newTaskLine
     case .upcoming:
@@ -851,6 +891,69 @@ final class SeptaskKitTaskListController: NSViewController {
   // Dismissal persists today's date, so it stays gone for the rest of the day
   // and returns tomorrow — the SAME UserDefaults key SwiftUI uses, so
   // dismissing in one shell dismisses in the other.
+
+  // MARK: - Claude reconnect cue
+  //
+  // The AppKit twin of `ClaudeReconnectCue(.card)`, which Septask's SwiftUI
+  // shell puts at the top of Today (`TaskListView.taskListHeader`). Same
+  // gate, same copy, same tap: the app never auto-presents the Apple sign-in,
+  // so a lapsed token needs a row the user can press. Without it the fast
+  // shell had no in-app recovery at all — the connection just stopped working.
+  //
+  // Today only, like SwiftUI: it is the landing surface, and a reconnect
+  // prompt on every project page would be a nag.
+
+  /// True during the brief post-reconnect flash. Held here rather than read
+  /// off the provider because it is a UI beat, not gateway state — the same
+  /// role `justReconnected` plays in the SwiftUI cue.
+  private var justReconnectedClaude = false
+
+  private func reconnectCue() -> [Row] {
+    let provider = ClaudeGatewayProvider.shared
+    guard provider.isEnabled, provider.needsReauth || justReconnectedClaude
+    else { return [] }
+    if justReconnectedClaude { return [.reconnectCue(state: .reconnected)] }
+    if provider.isRefreshing { return [.reconnectCue(state: .refreshing)] }
+    // A real failure (network etc.) — a user-cancel leaves `lastError` nil,
+    // so the row stays in its calm default copy instead of crying wolf.
+    return [.reconnectCue(state: provider.lastError != nil ? .failed : .idle)]
+  }
+
+  private func reconnectClaude() {
+    let provider = ClaudeGatewayProvider.shared
+    guard !justReconnectedClaude, !provider.isRefreshing else { return }
+    Task { @MainActor in
+      guard await provider.refreshNow() else { return }
+      justReconnectedClaude = true
+      reload()
+      try? await Task.sleep(for: .seconds(1.6))
+      justReconnectedClaude = false
+      reload()
+    }
+  }
+
+  /// Follow the provider's observable state. `ClaudeGatewayProvider` is
+  /// `@Observable`, and it only posts `.septenaClaudeGatewayChanged` on
+  /// connect / disconnect / successful refresh — the flip to `needsReauth`
+  /// that MAKES this row appear posts nothing. So track the properties
+  /// themselves; `withObservationTracking` fires once per change, hence the
+  /// re-arm on every callback.
+  private func trackClaudeGatewayState() {
+    withObservationTracking {
+      let provider = ClaudeGatewayProvider.shared
+      _ = provider.isEnabled
+      _ = provider.needsReauth
+      _ = provider.isRefreshing
+      _ = provider.lastError
+    } onChange: { [weak self] in
+      Task { @MainActor in
+        guard let self else { return }
+        self.trackClaudeGatewayState()
+        // The cue only renders on Today; nothing else in the list moves.
+        if self.filter == .today { self.reload() }
+      }
+    }
+  }
 
   private static let rolledInDismissedKey = "septena.newTodos.dismissedDate"
 
@@ -1088,9 +1191,7 @@ final class SeptaskKitTaskListController: NSViewController {
     TaskFilingSuggestions.prime(filter: filter, context: context,
                                 engine: SuggestionEngine.shared,
                                 projects: structure.projects, areas: structure.areas)
-    let childIds: (String) -> Set<String> = { areaId in
-      Set(structure.projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
-    }
+    let childIds = Self.childProjectIds(in: structure.projects)
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     for task in pool {
       if let top = TaskFilingSuggestions.top(for: task, filter: filter,
@@ -1102,11 +1203,20 @@ final class SeptaskKitTaskListController: NSViewController {
     filingSuggestions = fresh
   }
 
-  /// One-tap filing from the capsule — the AppKit twin of
-  /// `TaskListView.applySuggestion`, same order and the same side effects.
+  /// One-tap filing from the capsule — always the TOP pick.
   private func applyFilingSuggestion(taskID: String) {
-    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == taskID }),
-          let suggestion = filingSuggestions[taskID] else { return }
+    guard let suggestion = filingSuggestions[taskID] else { return }
+    applyFilingSuggestion(taskID: taskID, suggestion: suggestion)
+  }
+
+  /// File a task into one ranked pick — the AppKit twin of
+  /// `TaskListView.applySuggestion`, same order and the same side effects.
+  /// Both offers share it: the capsule passes its top pick, the context
+  /// menu's "Suggested" section passes whichever row the user chose.
+  private func applyFilingSuggestion(taskID: String,
+                                     suggestion: SuggestionEngine.Suggestion) {
+    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == taskID })
+    else { return }
     let before = [TaskUndo.FilingSnapshot(task)]
     let wasInTriage = task.isInTriageBand
     // Implicit "not this": the user accepted THIS pick, so there is nothing to
@@ -2868,6 +2978,16 @@ final class SeptaskKitTaskListController: NSViewController {
     else { return }
     move(to: destination)
   }
+
+  /// A pick from the "Suggested" section. The tag indexes `menuSuggestions`,
+  /// which `menuNeedsUpdate` rebuilt for the row that is still selected.
+  @objc private func menuApplySuggestion(_ sender: NSMenuItem) {
+    let selection = actionableSelection
+    guard selection.count == 1, let task = selection.first,
+          menuSuggestions.indices.contains(sender.tag) else { return }
+    applyFilingSuggestion(taskID: task.id, suggestion: menuSuggestions[sender.tag])
+  }
+
   @objc private func menuWhen() { presentDatePopover(kind: .when) }
   @objc private func menuDeadline() { presentDatePopover(kind: .deadline) }
   @objc private func menuClearSchedule() { clearScheduleSelection() }
@@ -2895,7 +3015,61 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
                                              projects: snapshot.projects,
                                              target: self,
                                              action: #selector(menuMoveTo(_:)))
+    refreshSuggestedMenuSection(menu, projects: snapshot.projects)
     refreshPlacementMenuItems()
+  }
+
+  /// The "Suggested" section — the same ranked filing picks the row capsule
+  /// offers, as menu items. The capsule is the one-tap path for the TOP pick;
+  /// this is where the runners-up live, exactly like the SwiftUI menu's
+  /// `Section("Suggested")` (`TaskListContextMenu`). Single selection only:
+  /// the picks are ranked for one title, so a multi-selection has no subject.
+  private func refreshSuggestedMenuSection(_ menu: NSMenu, projects: [Project]) {
+    for item in suggestedMenuItems { menu.removeItem(item) }
+    suggestedMenuItems = []
+    menuSuggestions = []
+
+    let selection = actionableSelection
+    guard selection.count == 1, let task = selection.first else { return }
+    // Same GATE as the capsule — `TaskFilingSuggestions` decides which rows
+    // are suggestible, so the menu and the capsule can never disagree.
+    guard let ranked = TaskFilingSuggestions.ranked(
+      for: task, filter: filter, engine: SuggestionEngine.shared,
+      childProjectIds: Self.childProjectIds(in: projects)), !ranked.isEmpty
+    else { return }
+
+    // Above the placement commands, so the section sits where SwiftUI puts it
+    // — read the row, then act on where it should go.
+    let anchor = menu.index(of: todayMenuItem)
+    guard anchor >= 0 else { return }
+
+    menuSuggestions = ranked
+    var items: [NSMenuItem] = [
+      NSMenuItem.sectionHeader(title: String(localized: "Suggested",
+                                             comment: "SeptaskKit: context menu section"))
+    ]
+    for (index, suggestion) in ranked.enumerated() {
+      let item = NSMenuItem(title: String(localized: "Move to \(suggestion.title)",
+                                          comment: "SeptaskKit: filing suggestion menu item"),
+                            action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
+      item.target = self
+      item.tag = index
+      item.image = NSImage(systemSymbolName: suggestion.kind == .area ? "tray" : "folder",
+                           accessibilityDescription: nil)
+      items.append(item)
+    }
+    items.append(.separator())
+    for (offset, item) in items.enumerated() { menu.insertItem(item, at: anchor + offset) }
+    suggestedMenuItems = items
+  }
+
+  /// Area → its active child projects, the shape `TaskFilingSuggestions` asks
+  /// for. One builder, so the capsule and the menu rank an area-direct row
+  /// against the same set of destinations.
+  private static func childProjectIds(in projects: [Project]) -> (String) -> Set<String> {
+    { areaId in
+      Set(projects.filter { $0.area == areaId && $0.status == .active }.map(\.id))
+    }
   }
 
   /// Directional Today labels; hide the Today item on the Today list (you're
@@ -3018,6 +3192,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .importAllReminders: return SeptaskKitTheme.rowHeight
     // Meta-height notice on the page, not a full card row.
     case .rolledInBanner: return SeptenaTypeScale.size(.footnote) + 22
+    // A pressable card row, so it stands at row height like the rest.
+    case .reconnectCue: return SeptaskKitTheme.rowHeight
     }
   }
 
@@ -3500,6 +3676,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         ?? KitRolledInBannerCell(identifier: identifier)
       cell.configure(count: count)
       cell.onDismiss = { [weak self] in self?.dismissRolledInBanner() }
+      return cell
+
+    case .reconnectCue(let state):
+      let identifier = NSUserInterfaceItemIdentifier("reconnectCueCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
+        as? KitReconnectCueCell
+        ?? KitReconnectCueCell(identifier: identifier)
+      cell.configure(state: state)
+      cell.onTap = { [weak self] in self?.reconnectClaude() }
       return cell
 
     case .reminder(let item, let importing):
@@ -4797,6 +4982,164 @@ final class KitRolledInBannerCell: NSTableCellView {
   }
 
   @objc private func fireDismiss() { onDismiss?() }
+}
+
+// MARK: - Claude reconnect cue cell
+
+/// "Reconnect" — the row that re-mints the Claude gateway token. The AppKit
+/// twin of `ClaudeReconnectCue(.card)`: same glyph vocabulary, same copy,
+/// same one-press action.
+///
+/// The default framing is a SECURITY CHECKPOINT, not a fault. The token lapses
+/// by design, so the resting glyph is the device's biometry mark ("verify it's
+/// you"), and the orange warning triangle appears only when a reconnect
+/// genuinely failed. The whole row is the button, like `KitReminderCell` —
+/// a `.plain`-style label with dead trailing space is the row-dead-zone bug.
+@MainActor
+final class KitReconnectCueCell: NSTableCellView {
+  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
+  private var hitPin: KitContentColumnPin!
+  private let glyph = NSImageView()
+  private let title = NSTextField(labelWithString: "")
+  private let subtitle = NSTextField(labelWithString: "")
+  private let spinner = NSProgressIndicator()
+  private let hit = NSButton()
+  private var leadingConstraint: NSLayoutConstraint!
+  private var trailingConstraint: NSLayoutConstraint!
+  var onTap: (() -> Void)?
+
+  init(identifier: NSUserInterfaceItemIdentifier) {
+    super.init(frame: .zero)
+    self.identifier = identifier
+
+    glyph.translatesAutoresizingMaskIntoConstraints = false
+    glyph.setContentHuggingPriority(.required, for: .horizontal)
+    glyph.kitA11yIgnore()
+
+    title.translatesAutoresizingMaskIntoConstraints = false
+    title.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline), weight: .semibold)
+    title.setContentHuggingPriority(.required, for: .horizontal)
+    title.setContentCompressionResistancePriority(.required, for: .horizontal)
+    title.kitA11yIgnore()
+
+    subtitle.translatesAutoresizingMaskIntoConstraints = false
+    subtitle.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline))
+    subtitle.textColor = SeptaskKitTheme.iconMuted
+    subtitle.lineBreakMode = .byTruncatingTail
+    subtitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    subtitle.kitA11yIgnore()
+
+    spinner.translatesAutoresizingMaskIntoConstraints = false
+    spinner.style = .spinning
+    spinner.controlSize = .small
+    spinner.isDisplayedWhenStopped = false
+    spinner.kitA11yIgnore()
+
+    hit.translatesAutoresizingMaskIntoConstraints = false
+    hit.isBordered = false
+    hit.isTransparent = true
+    hit.title = ""
+    hit.setButtonType(.momentaryChange)
+    hit.refusesFirstResponder = true
+    hit.target = self
+    hit.action = #selector(fire)
+    hit.kitA11yIgnore()
+
+    addSubview(glyph)
+    addSubview(title)
+    addSubview(subtitle)
+    addSubview(spinner)
+    // Last, so it layers above the content and takes every click in the row.
+    addSubview(hit)
+    textField = title
+
+    leadingConstraint = glyph.leadingAnchor.constraint(
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+    trailingConstraint = spinner.trailingAnchor.constraint(
+      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
+    hitPin = KitContentColumnPin(hit, in: self)
+    NSLayoutConstraint.activate([
+      leadingConstraint,
+      glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
+      glyph.widthAnchor.constraint(equalToConstant: 20),
+      title.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 7),
+      title.centerYAnchor.constraint(equalTo: centerYAnchor),
+      subtitle.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 8),
+      subtitle.centerYAnchor.constraint(equalTo: centerYAnchor),
+      spinner.leadingAnchor.constraint(greaterThanOrEqualTo: subtitle.trailingAnchor,
+                                       constant: 8),
+      trailingConstraint,
+      spinner.centerYAnchor.constraint(equalTo: centerYAnchor),
+      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ] + hitPin.constraints)
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitReconnectCueCell is code-only") }
+
+  override func layout() {
+    let inset = SeptaskKitLayout.inset(for: bounds.width)
+    leadingConstraint.constant = inset + 6
+    trailingConstraint.constant = -(inset + 8)
+    hitPin.update(width: bounds.width)
+    super.layout()
+  }
+
+  func configure(state: SeptaskKitTaskListController.ReconnectCueState) {
+    let reconnected = state == .reconnected
+    title.stringValue = reconnected
+      ? String(localized: "Reconnected", comment: "Claude gateway reconnect cue")
+      : String(localized: "Reconnect", comment: "Claude gateway reconnect cue")
+    title.textColor = reconnected ? .systemGreen : SeptaskKitTheme.claudeAccent
+
+    switch state {
+    case .reconnected:
+      // A green lock, not a check: the connection is SECURE again, echoing the
+      // biometry language of the resting state.
+      glyph.image = Self.symbol("lock.fill")
+      glyph.contentTintColor = .systemGreen
+      subtitle.stringValue = ""
+    case .failed:
+      glyph.image = Self.symbol("exclamationmark.triangle.fill")
+      glyph.contentTintColor = .systemOrange
+      subtitle.stringValue = String(localized: "Couldn’t reconnect — tap to retry",
+                                    comment: "Claude gateway reconnect cue")
+    case .idle, .refreshing:
+      // Biometry mark (Face/Touch/Optic ID): a lapsed token is an auth
+      // checkpoint, not a problem to alarm about.
+      glyph.image = Self.symbol(BiometrySymbol.systemName)
+      glyph.contentTintColor = SeptaskKitTheme.claudeAccent
+      subtitle.stringValue = String(localized: "Verify it’s you to reconnect",
+                                    comment: "Claude gateway reconnect cue")
+    }
+
+    if state == .refreshing { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+    // Pressing again mid-flight or during the flash would do nothing — say so
+    // in the cursor and the hit target rather than swallowing the click.
+    hit.isEnabled = state != .refreshing && !reconnected
+    kitA11yButton(label: reconnected
+      ? String(localized: "Reconnected", comment: "Claude gateway reconnect cue")
+      : String(localized: "Reconnect Claude", comment: "Claude gateway reconnect cue"))
+    window?.invalidateCursorRects(for: self)
+  }
+
+  private static func symbol(_ name: String) -> NSImage? {
+    NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.subheadline),
+                                     weight: .regular))
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onTap?()
+    return true
+  }
+
+  override func resetCursorRects() {
+    guard hit.isEnabled else { return }
+    addCursorRect(hit.frame, cursor: .pointingHand)
+  }
+
+  @objc private func fire() { onTap?() }
 }
 
 // MARK: - Reminders inbox cells

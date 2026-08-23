@@ -524,7 +524,10 @@ private struct SelectableMoveShortcutModifier: ViewModifier {
   let action: () -> Void
 
   func body(content: Content) -> some View {
-    content.onKeyPress("m") { press in
+    // `keys:`, not the bare-Character overload — that one hands the closure
+    // no `KeyPress`, so the modifiers this shortcut is defined by are
+    // unreadable there.
+    content.onKeyPress(keys: ["m"]) { press in
       let modifiers = press.modifiers
       let isMoveShortcut = modifiers.contains(.command)
         && !modifiers.contains(.option)

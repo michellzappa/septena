@@ -951,6 +951,11 @@ struct WeekDashboardView: View {
     defer { networkLoading = false }
     // Oura + Withings in parallel; each is timed independently so the Perf log
     // shows the per-provider latency that adds up to the stall.
+    //
+    // `try?` on purpose — a dead Oura / Withings credential must not take the
+    // dashboard down with it. The failure isn't lost: each provider records
+    // it (see `ConnectionHealth`) and the Settings row + detail pane surface
+    // it, while the tiles keep painting the CloudKit-mirrored history.
     async let ouraTimed = PerfTrace.span("net.oura") {
       try? await OuraProvider.shared.fetchHistory(days: Self.historyDays)
     }
