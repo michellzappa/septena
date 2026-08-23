@@ -108,6 +108,66 @@ shell work, and keep it current as items land.
   no accessibility permission). It contends with Things' identical binding
   while Things is running — that's the OS, not a bug.
 
+**Hazards proven the hard way.** Each of these cost a session or more, and
+none is guessable from the API. They were harvested out of
+`docs/SEPTASK_APPKIT_PARITY.md`'s session log when that file was cut back to a
+gap list; git holds the full narrative.
+
+- **Every click target in a table/outline cell is a real `NSButton`.** No
+  gesture recognizers, no hand-tracked `mouseDown`/`mouseUp`, no `hitTest`
+  overrides. Measured in a scratch harness: `NSTableView` **claims
+  hit-testing for label and image cell content**, so a click on an
+  `NSTextField` or `NSImageView` never reaches the surrounding view at all. A
+  bare custom `NSView` that draws itself IS hit normally (which is why
+  `KitCheckboxView` worked and looked like proof the hand-rolled path was
+  sound — it isn't). And a click *recognizer* can never fire in a cell:
+  `NSTableView.mouseDown` runs an event-tracking loop pulling events with
+  `nextEventMatchingMask:`, which never pass back through `NSWindow.sendEvent`
+  — the only place AppKit feeds gesture recognizers.
+- **The pointing-hand cursor proves nothing.** `resetCursorRects` does not go
+  through hit-testing, so a dead control can advertise itself as live for
+  three debugging rounds. Scope cursor rects to the button's own frame.
+- **The sidebar fold lives in the DATA, not in the outline view.**
+  `shouldShowOutlineCellForItem = false` (which this sidebar sets to hide the
+  native triangle in favour of a Things-style trailing chevron) opts the item
+  out of expansion entirely — `collapseItem` becomes a silent no-op. So a
+  folded area reports zero children from `numberOfChildrenOfItem` and
+  `collapsedKeys` is the source of truth. Follow-on trap: `isItemExpanded` is
+  therefore always true, so chevron direction reads `collapsedKeys`, and the
+  didExpand/didCollapse handlers must NOT record the fold — the post-rebuild
+  `expandItem(nil, expandChildren: true)` fires didExpand for every node and
+  would wipe every fold.
+- **`SeptenaTask` is a struct, so the `rows` array holds pre-change COPIES.**
+  Reading a just-committed field back out of `rows` gives the stale value.
+  When you need a row's post-mutation truth, go to the store
+  (`LocalCache.allTasks`, `refreshTaskRowInPlace`) — this is why
+  `recordScheduleUndo` re-reads its after-state rather than trusting `rows`.
+- **A `configure()`-style method on a reused cell must not blindly overwrite
+  `titleField`/`notesView`** — only on a genuinely NEW item. A
+  refresh-after-side-effect call (a pill press, a background sync) landing
+  mid-edit silently reverts what the user typed. See
+  `SeptaskKitInspectorController.show(_:)` and `KitComposerCell.refreshPills`
+  vs `.configure`.
+- **Card corner-rounding goes stale on SURVIVING rows.** The diff path only
+  reloads rows whose own `Row` value changed, never a neighbour that became
+  first/last because an adjacent row was inserted or removed, so a card's new
+  bottom row can stay square forever. `refreshCardGeometry()` walks the
+  on-screen row views after every diff.
+- **`isBordered = false` on an `NSSearchField` collapses the BEZEL geometry**
+  its cell derives the text rect from, so text starts at x=0, on top of the
+  magnifying glass. `KitSearchFieldCell` computes the part rects from
+  `bounds`; both panels share `KitSearchField.applyPanelStyle()`.
+- **Opening the inspector must never ratify an agent cue.** The cue IS Inbox
+  membership for agent rows, so acking on open would yank a proposal out of
+  the Inbox merely because it became the selected row. Disposition paths ack;
+  looking does not.
+- **Before concluding a fix failed, check the built binary's timestamp against
+  the fix commit** — a stale build has impersonated a live bug here more than
+  once. And when reasoning about AppKit internals, build a throwaway harness
+  and measure, taking geometry FROM the framework (`frameOfCell`, a laid-out
+  subview's `convert(bounds, to: nil)`): a probe with hand-set frames will
+  happily test empty space and report nonsense.
+
 ## Icon Notes (2026-07-02)
 
 Septask's icon is generated, not designed by hand — regenerate rather than

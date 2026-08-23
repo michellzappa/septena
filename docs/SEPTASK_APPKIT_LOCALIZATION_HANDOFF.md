@@ -1,9 +1,12 @@
 # Septask AppKit shell — localization handoff
 
-**For a new agent.** Date: 2026-08-08. Scope: wrap every user-facing string in
-`Septask/SeptaskKit*.swift` (macOS AppKit shell) so it goes through the existing
-String Catalog. This is the **[P1]** gap in `docs/SEPTASK_APPKIT_PARITY.md` §6 —
-it gets worse the longer it waits (more literals to sweep).
+**Done, kept for the method.** Date: 2026-08-08. Scope: wrap every user-facing
+string in `Septask/SeptaskKit*.swift` (macOS AppKit shell) so it goes through
+the existing String Catalog. The work landed; the backlog entry it referenced
+has been retired from `docs/SEPTASK_APPKIT_PARITY.md`. What is still open is
+the last line of "Definition of done" — MZ verifying with a non-English
+`-AppleLanguages` launch. Read on for the sweep procedure if you are localizing
+a new AppKit surface.
 
 ---
 
@@ -23,7 +26,7 @@ nearby SwiftUI wording — otherwise leave pt-BR empty for the cron/translator).
 ## Context (read these first)
 
 1. `docs/SEPTASK.md` → **"AppKit shell on macOS"** — working rules for the kit.
-2. `docs/SEPTASK_APPKIT_PARITY.md` §6 Localization — the backlog entry.
+2. `docs/SEPTASK_APPKIT_PARITY.md` — the shell's remaining gap list.
 3. `docs/LOCALIZATION_PLAN.md` → **"Convention (the structure)"** — one catalog,
    `String(localized:comment:)`, data English / UX translated / user values
    verbatim. Do **not** invent a second catalog or `.strings` files.
@@ -101,7 +104,7 @@ one-liners that already exist in the catalog under the same English key).
    Do **not** hand-edit `project.pbxproj`. After catalog changes,
    `xcodegen generate` is fine but usually unnecessary for `.xcstrings` content.
 5. **Build once:** `scripts/build.sh SeptaskMac 'platform=macOS'`.
-6. **Mark done** in `docs/SEPTASK_APPKIT_PARITY.md` §6 — flip Localization to
+6. **Mark done** in `docs/SEPTASK_APPKIT_PARITY.md` — flip Localization to
    **[DONE]** and drop it from the suggested-order list.
 
 **Do NOT** launch the app, boot a simulator, or download runtimes — compile is
@@ -137,7 +140,8 @@ the only green gate (see root `CLAUDE.md`). Ask the user to smoke-test with
 - [x] Shared concepts reuse existing catalog keys (logged footer, smart-list
       titles, recurrence labels, delete-section / delete-project copy).
 - [x] `scripts/build.sh SeptaskMac 'platform=macOS'` green.
-- [x] `docs/SEPTASK_APPKIT_PARITY.md` §6 Localization marked **[DONE]**.
+- [x] Backlog entry closed (since retired from
+      `docs/SEPTASK_APPKIT_PARITY.md`).
 - [ ] User asked to verify with a non-English `-AppleLanguages` launch.
 
 ---
