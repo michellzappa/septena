@@ -410,7 +410,12 @@ struct TaskComposerCard: View {
     .onKeyPress(keys: [.tab]) { press in
       moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
     }
-    .onKeyPress(.space) { activateFocused() }
+    // Sanctioned exception to the "never bind Space on a task surface" rule:
+    // this is the COMPOSER's own Tab focus loop, not a selected list row.
+    // `activateFocused()` returns .ignored unless a pill actually holds the
+    // cursor, so Space never reaches the row checkbox behind an inline
+    // composer — it fires a pill the user tabbed to, and nothing otherwise.
+    .onKeyPress(.space) { activateFocused() }  // septena-lint:allow task-space-binding
     .onKeyPress(.return) { activateFocused() }
     .a11yAnimation(.snappy(duration: 0.22), value: showsNotesField)
   }

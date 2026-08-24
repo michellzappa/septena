@@ -128,6 +128,44 @@ if [ -n "$row_dead_zone" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Space must never complete a task ────────────────────────────────────────
+# On macOS, Space activates the first button in a selected row — the checkbox —
+# so a bare Space silently completed the task the user was only looking at. It
+# read as the task vanishing (it went to the Logbook). Both surfaces already
+# hold the line: the SwiftUI checkbox is `.focusable(false)`, the AppKit one is
+# `refusesFirstResponder = true`. Neither guard is load-bearing anywhere else in
+# the file, so a refactor drops it without a compile error and the bug returns
+# silently. Assert PRESENCE (the inverse of every other rule here), and ban
+# binding Space on the task surfaces at all.
+require() {
+  local rule="$1" file="$2" pattern="$3" msg="$4"
+  grep -qE "$pattern" "$file" 2>/dev/null && return 0
+  printf '%s✗ %s%s\n' "$RED" "$rule" "$OFF"
+  errors=$((errors + 1))
+  printf '  %s\n' "$msg"
+  printf '%s    %s  (missing: %s)%s\n\n' "$DIM" "$file" "$pattern" "$OFF"
+}
+
+require checkbox-space-guard Septena/Shell/Tasks/TaskCheckbox.swift \
+  '\.focusable\(false\)' \
+  'TaskCheckbox must stay .focusable(false) — a focusable checkbox in a selected List row is completed by Space.'
+
+require checkbox-space-guard Septask/SeptaskKitRowViews.swift \
+  'refusesFirstResponder = true' \
+  'KitCheckboxView must keep refusesFirstResponder = true — otherwise Space activates the completion.'
+
+space_bound=$(grep -rnE '(onKeyPress\(\.space|keyboardShortcut\(\.space)' --include="*.swift" \
+  Septena/Shell/Tasks Septena/Shell/UI/SelectableScrollList.swift \
+  Septena/Shell/UI/ListKeyboardNavigation.swift Septask 2>/dev/null \
+  | grep -v 'septena-lint:allow task-space-binding')
+if [ -n "$space_bound" ]; then
+  printf '%s✗ %s%s\n' "$RED" "task-space-binding" "$OFF"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘K completes).'
+  printf '%s' "$DIM"; printf '%s\n' "$space_bound" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \
