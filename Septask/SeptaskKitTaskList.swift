@@ -2180,16 +2180,23 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
 
-    // Bottom-positioned for the Inbox line: that line sits at the foot of the
-    // Inbox run, so a top-positioned create would open the editor at the TOP
-    // of the run and shove everything down — you press Return on a row at the
-    // bottom and the field appears somewhere else. `atBottom` lands the row
-    // exactly where the line was, which is the same reason SwiftUI's foot
-    // quick-add passes it ("inline captures land above the New task row").
-    // ⌘N keeps the default top capture.
+    // Bottom-positioned for anything landing in the Inbox run: the "New task"
+    // line sits at the FOOT of that run, so a top-positioned create opens the
+    // editor at the top and shoves everything down — you ask for a new task at
+    // the bottom of the list and the field appears somewhere else. `atBottom`
+    // lands the row exactly where the line was, which is the same reason
+    // SwiftUI's foot quick-add passes it ("inline captures land above the New
+    // task row").
+    //
+    // This is keyed on the DESTINATION, not on which gesture asked. A loose
+    // capture (no area, no project) is an Inbox row wherever it was typed, so
+    // ⌘N from the Inbox page and ⌘N on Today with no list inherited both land
+    // on the line — not above it. A ⌘N that inherits a list from the focused
+    // row still files into that group at the top, unchanged.
+    let landsInInboxRun = inInbox || (context.area == nil && context.project == nil)
     let task = mutator.create(title: "", area: context.area, project: context.project,
                               scheduled: context.scheduled, today: context.today,
-                              atBottom: inInbox)
+                              atBottom: landsInInboxRun)
     pendingNewTaskId = task.id
     reload(animated: false)
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
