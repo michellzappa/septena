@@ -388,6 +388,10 @@ final class KitSuggestionChipView: NSButton {
 /// explicitly rather than to restore a bezel we don't want. Overriding
 /// `searchButtonRect` / `cancelButtonRect` / `searchTextRect` is the
 /// documented customization point for exactly this — not a workaround.
+///
+/// Those three rects place the DRAWN text only. The field editor needs
+/// `edit(withFrame:…)` / `select(withFrame:…)` as well, or the fix holds for
+/// the placeholder and drops the moment the user types.
 @MainActor
 final class KitSearchFieldCell: NSSearchFieldCell {
   /// Square side reserved for each end control, and the gap between a control
@@ -414,11 +418,34 @@ final class KitSearchFieldCell: NSSearchFieldCell {
   }
 
   override func searchTextRect(forBounds rect: NSRect) -> NSRect {
-    let leading = controlSide + gap
-    let trailing = stringValue.isEmpty ? 0 : controlSide + gap
-    return NSRect(x: rect.minX + leading, y: rect.minY,
-                  width: max(0, rect.width - leading - trailing),
+    // Reserve BOTH ends always, even while the field is empty. The cancel
+    // button appears the moment the first character lands, so a rect that only
+    // reserved the trailing side once `stringValue` was non-empty made the text
+    // rect change width mid-keystroke — and the field editor, whose frame is
+    // set once when editing starts, kept the empty-field width and ran the last
+    // characters under the cancel button.
+    let inset = controlSide + gap
+    return NSRect(x: rect.minX + inset, y: rect.minY,
+                  width: max(0, rect.width - inset * 2),
                   height: rect.height)
+  }
+
+  // The rect overrides above place the DRAWN text. They do not place the FIELD
+  // EDITOR, which is what you look at from the first keystroke on: AppKit sizes
+  // that from the cell frame it is handed, so the typed string started at x=0
+  // and ran over the magnifying glass while the placeholder above it sat
+  // correctly inset. Hand the editor the same text rect the drawing path uses,
+  // so the field reads identically before, during, and after editing.
+  override func edit(withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+                     delegate: Any?, event: NSEvent?) {
+    super.edit(withFrame: searchTextRect(forBounds: rect), in: controlView,
+               editor: editor, delegate: delegate, event: event)
+  }
+
+  override func select(withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+                       delegate: Any?, start: Int, length: Int) {
+    super.select(withFrame: searchTextRect(forBounds: rect), in: controlView,
+                 editor: editor, delegate: delegate, start: start, length: length)
   }
 }
 

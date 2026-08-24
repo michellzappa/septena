@@ -137,11 +137,27 @@ final class SeptaskKitMovePicker {
     return result
   }
 
+  /// With no query, mark where the task already lives. With a query, select the
+  /// first row that matches the query ITSELF.
+  ///
+  /// Both fallbacks matter. `filterPickerRows` emits an area whenever one of its
+  /// projects matches, so a query that names a project alone still puts the
+  /// parent area first in the list — selecting row 0 there meant typing a
+  /// project name and pressing Return filed the task into the AREA. And the
+  /// `currentDestination` checkmark must not win once a query is typed, or
+  /// filtering down to a project inside the task's current area re-selected that
+  /// area for the same wrong result.
   private func selectCurrentOrFirst() {
     guard !rows.isEmpty else { return }
-    let target = currentDestination.flatMap { current in
-      rows.firstIndex { $0.destination == current }
-    } ?? 0
+    let query = surface.query.lowercased()
+    let target: Int
+    if query.isEmpty {
+      target = currentDestination.flatMap { current in
+        rows.firstIndex { $0.destination == current }
+      } ?? 0
+    } else {
+      target = rows.firstIndex { $0.title.lowercased().contains(query) } ?? 0
+    }
     surface.select(target)
   }
 
