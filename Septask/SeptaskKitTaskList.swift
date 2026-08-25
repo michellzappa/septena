@@ -4048,7 +4048,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // dial for days carried on Today, corner dot for unread agent context on a
     // committed row (proposals are excluded — they already read as dashed),
     // and the cue ring while an agent row is fresh and unengaged.
-    checkbox.tenureFill = done ? nil : task.todayTenureFill()
+    // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
+    // flag the SwiftUI row reads (`TaskCheckboxModel`) — without it the AppKit
+    // Today list kept drawing gold after the user turned aging off.
+    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled) ? nil : task.todayTenureFill()
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
     checkbox.agentCue = !done && task.showsAgentCue()
 

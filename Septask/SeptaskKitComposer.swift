@@ -248,7 +248,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     checkbox.isDone = task.status != .open
     checkbox.isDashed = task.status == .open && task.isInTriageBand
     checkbox.isToday = task.today
-    checkbox.tenureFill = task.todayTenureFill()
+    checkbox.tenureFill = TaskRowFlags.agingEnabled ? task.todayTenureFill() : nil
     checkbox.cornerDot = task.conversation.hasStarted && !task.isInTriageBand
     checkbox.agentCue = task.showsAgentCue()
 
