@@ -6,18 +6,25 @@ import AppKit
 // each is a popover anchored to that row — no sheet, no modal window. The
 // Repeat editor below is the third member of that family.
 //
-// Layout is a Today row over a ONE-WEEK day strip, the shape Things uses:
-// scheduling answers "which of the next few days", so the popover shows a
-// Today row and then the next seven days as labeled cells (weekday over day
-// number) instead of a month grid. The strip starts at TOMORROW — the Today
-// row owns today, and repeating it in the strip gave the board two identical
-// first choices. `NSDatePicker`'s `.clockAndCalendar` month was the old body; it
-// read as a dense, alien control inside the popover and answered a question
-// nobody asks here.
+// Layout is a ONE-WEEK day strip starting at TODAY, then "Pick another date",
+// then Clear: scheduling answers "which of the next few days", so the popover
+// shows seven labeled cells (weekday over day number) instead of a month grid.
+// Today is the strip's FIRST CELL, and its weekday line reads "Today". There
+// used to be a separate Today row above a strip that started tomorrow — one
+// question asked by two controls in two vocabularies — and the two were
+// collapsed into the strip.
+//
+// Anything further out than the strip lives behind "Pick another date", which
+// swaps the board for `NSDatePicker`'s month calendar in place (a nested
+// popover would dismiss this transient one). That row is the AppKit twin of
+// SwiftUI's, so both boards offer the same four things: the week, a month, a
+// clear, and nothing else.
 //
 // The board is keyboard-first and walks ONE axis — time. ↓ and → step later,
-// ↑ and ← step earlier, straight through Today → the seven days → Clear.
-// Return picks, Escape closes. One highlight language throughout — the shell's
+// ↑ and ← step earlier, straight through the seven days → Pick another date →
+// Clear. Return picks, Escape closes. On the calendar page the same four keys
+// move the date itself (←/→ a day, ↑/↓ a week), Return commits it and Escape
+// returns to the week. One highlight language throughout — the shell's
 // `SeptaskKitTheme.listSelectionFill` wash, moved by BOTH keyboard and hover,
 // so a keyboard highlight never competes with a mouse one.
 //
@@ -30,12 +37,6 @@ enum SeptaskKitDatePopover {
   enum Kind {
     case when
     case deadline
-
-    /// First row. `.when`'s Today is the today FLAG, not a scheduled date;
-    /// `.deadline`'s Today is an ordinary date.
-    var todayTitle: String {
-      String(localized: "Today", comment: "Relative date")
-    }
 
     var clearTitle: String {
       switch self {
@@ -355,14 +356,14 @@ private final class KitRepeatBoard: NSView {
 
 // MARK: - Board
 
-/// The popover's body: a Today row, a seven-day strip, and Clear — plus the
-/// key handling that walks them.
+/// The popover's body: a seven-day strip starting today, "Pick another date",
+/// and Clear — plus the key handling that walks them.
 ///
-/// Navigation is LINEAR, not grid-shaped: Today → each day in order → Clear.
-/// ↓ and → both step forward in time, ↑ and ← both step back, so "down" always
-/// means "later" no matter which part of the board holds focus. A ragged
-/// (row, column) model made ↓ jump from a day to Clear, which reads as a
-/// different axis than the one the user is walking.
+/// Navigation is LINEAR, not grid-shaped: each day in order → Pick another
+/// date → Clear. ↓ and → both step forward in time, ↑ and ← both step back, so
+/// "down" always means "later" no matter which part of the board holds focus.
+/// A ragged (row, column) model made ↓ jump from a day to Clear, which reads
+/// as a different axis than the one the user is walking.
 @MainActor
 private final class KitDateBoard: NSView {
 
@@ -370,24 +371,40 @@ private final class KitDateBoard: NSView {
   private let onPick: (Date?, Bool) -> Void
   private let onCancel: () -> Void
 
-  /// Every focusable cell in time order: Today, the seven days, then Clear.
+  /// Every focusable cell in time order: the seven days, then Pick another
+  /// date, then Clear.
   private var cells: [KitDateCell] = []
   private var focusIndex = 0
+
+  /// The one child of `pageHost` — the week board, or the month calendar.
+  private let pageHost = NSView()
+  private var boardPage: NSView?
+  private var calendarPage: NSView?
+  private let calendar = NSDatePicker()
+  private var setCell: KitDateCell?
+  /// The date the calendar page holds. Committed only by "Set", never by
+  /// moving through months, so paging the calendar can't schedule anything.
+  private var calendarDate = Date()
+  private var showingCalendar: Bool { calendarPage?.superview != nil }
 
   /// Panel padding. The highlight is INSET from the popover edge (the
   /// palette shape in `SelectionLanguage`, not the full-bleed list-row one),
   /// so a selected row never collides with the popover's rounded corners.
   private static let padding: CGFloat = 8
   private static let rowHeight: CGFloat = 32
-  private static let dayWidth: CGFloat = 40
+  /// 44, not 40, so the first cell's "Today" label fits without shrinking.
+  private static let dayWidth: CGFloat = 44
   private static let dayHeight: CGFloat = 48
   private static let daySpacing: CGFloat = 6
-  /// TOMORROW through a week out — the same window as SwiftUI's `WeekStrip`
-  /// (`.upcoming` = offsets 1...7), so the two surfaces offer the same days.
-  /// The strip starts at tomorrow on purpose: the Today row above it already
-  /// commits today, and a strip that repeated it gave the board two first
-  /// choices that did the same thing.
-  private static let dayOffsets = Array(1...7)
+  /// TODAY through six days out — the same window as SwiftUI's `WeekStrip`
+  /// (`.upcoming` = offsets 0...6), so the two surfaces offer the same days.
+  private static let dayOffsets = Array(0...6)
+  /// The strip sets the popover's width, and the calendar page matches it, so
+  /// the popover doesn't resize when the pages swap.
+  private static var boardWidth: CGFloat {
+    CGFloat(dayOffsets.count) * dayWidth
+      + CGFloat(dayOffsets.count - 1) * daySpacing
+  }
 
   init(kind: SeptaskKitDatePopover.Kind, initial: Date?,
        onPick: @escaping (Date?, Bool) -> Void, onCancel: @escaping () -> Void) {
@@ -406,14 +423,27 @@ private final class KitDateBoard: NSView {
   // MARK: Build
 
   private func build(initial: Date?) {
+    pageHost.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(pageHost)
+    // Padding lives in these constants, NOT in `stack.edgeInsets` — the
+    // insets came out flush against the popover edge, and a constraint
+    // constant is unambiguous.
+    let pad = Self.padding
+    NSLayoutConstraint.activate([
+      pageHost.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+      pageHost.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+      pageHost.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+      pageHost.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+      pageHost.widthAnchor.constraint(equalToConstant: Self.boardWidth),
+    ])
+
+    buildBoardPage(initial: initial)
+    showBoard()
+  }
+
+  private func buildBoardPage(initial: Date?) {
     // The app's today (DayClock/SeptenaDate), never the wall clock.
     let today = KitDayFormat.todayDate() ?? Date()
-
-    let todayCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
-      self?.pick(today)
-    }
-    todayCell.fillRow(symbol: "star.fill", tint: SeptaskKitTheme.todayAccent,
-                      title: kind.todayTitle)
 
     let strip = NSStackView()
     strip.orientation = .horizontal
@@ -425,11 +455,18 @@ private final class KitDateBoard: NSView {
       let cell = KitDateCell(radius: 10, height: Self.dayHeight) { [weak self] in
         self?.pick(date)
       }
-      cell.fillDay(date)
+      cell.fillDay(date, isToday: offset == 0)
       cell.widthAnchor.constraint(equalToConstant: Self.dayWidth).isActive = true
       strip.addArrangedSubview(cell)
       dayCells.append(cell)
     }
+
+    let calendarCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      self?.showCalendar()
+    }
+    calendarCell.fillRow(symbol: "calendar", tint: SeptaskKitTheme.inkSecondary,
+                         title: String(localized: "Pick another date",
+                                       comment: "SeptaskKit: date popover calendar row"))
 
     let clearCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
       self?.onPick(nil, false)
@@ -437,53 +474,152 @@ private final class KitDateBoard: NSView {
     clearCell.fillRow(symbol: "xmark.circle", tint: SeptaskKitTheme.iconMuted,
                       title: kind.clearTitle)
 
-    let separator = NSBox()
-    separator.boxType = .separator
+    let topSeparator = NSBox()
+    topSeparator.boxType = .separator
+    let bottomSeparator = NSBox()
+    bottomSeparator.boxType = .separator
 
-    let stack = NSStackView(views: [todayCell, strip, separator, clearCell])
+    let stack = NSStackView(views: [strip, topSeparator, calendarCell,
+                                    bottomSeparator, clearCell])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 6
     stack.setCustomSpacing(8, after: strip)
-    stack.setCustomSpacing(4, after: separator)
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    addSubview(stack)
+    stack.setCustomSpacing(4, after: topSeparator)
+    stack.setCustomSpacing(8, after: calendarCell)
+    stack.setCustomSpacing(4, after: bottomSeparator)
 
-    // Padding lives in these constants, NOT in `stack.edgeInsets` — the
-    // insets came out flush against the popover edge, and a constraint
-    // constant is unambiguous.
-    let pad = Self.padding
-    NSLayoutConstraint.activate([
-      stack.topAnchor.constraint(equalTo: topAnchor, constant: pad),
-      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-      stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
-      stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
-      // The strip sets the popover's width; the single-cell rows match it so
-      // every highlight spans the same column.
-      todayCell.widthAnchor.constraint(equalTo: strip.widthAnchor),
-      clearCell.widthAnchor.constraint(equalTo: strip.widthAnchor),
-      separator.widthAnchor.constraint(equalTo: strip.widthAnchor),
-    ])
+    // The strip sets the width; the single-cell rows match it so every
+    // highlight spans the same column.
+    for view in [calendarCell, clearCell, topSeparator, bottomSeparator] as [NSView] {
+      view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
+    }
 
-    cells = [todayCell] + dayCells + [clearCell]
+    cells = dayCells + [calendarCell, clearCell]
     for cell in cells {
       cell.onHover = { [weak self] hovered in self?.focus(cell: hovered) }
     }
 
     // Start on the cell that already holds the task's value, so the arrows
-    // walk from where the user is rather than from the top.
+    // walk from where the user is rather than from the top. With no value,
+    // that is today — the first cell.
     if let initial, let index = Self.dayOffsets.firstIndex(where: { offset in
       guard let date = KitDayFormat.day(offset: offset) else { return false }
       return Calendar.current.isDate(date, inSameDayAs: initial)
     }) {
-      focusIndex = index + 1   // +1: the Today row precedes the strip.
+      focusIndex = index
     }
+    boardPage = stack
+  }
+
+  // MARK: Pages
+
+  private func show(page: NSView) {
+    pageHost.subviews.forEach { $0.removeFromSuperview() }
+    page.translatesAutoresizingMaskIntoConstraints = false
+    pageHost.addSubview(page)
+    NSLayoutConstraint.activate([
+      page.topAnchor.constraint(equalTo: pageHost.topAnchor),
+      page.leadingAnchor.constraint(equalTo: pageHost.leadingAnchor),
+      page.trailingAnchor.constraint(equalTo: pageHost.trailingAnchor),
+      page.bottomAnchor.constraint(equalTo: pageHost.bottomAnchor),
+    ])
+    window?.makeFirstResponder(self)
+  }
+
+  private func showBoard() {
+    guard let boardPage else { return }
+    show(page: boardPage)
     applyFocus()
   }
 
+  /// The "further out" path. The strip already covers the coming week, so the
+  /// month calendar hides behind one row — and it takes the board's place
+  /// rather than opening a second popover, which would dismiss this transient
+  /// one on the spot.
+  private func showCalendar() {
+    calendarDate = currentFocusDate() ?? KitDayFormat.todayDate() ?? Date()
+    show(page: calendarPage ?? buildCalendarPage())
+    calendar.dateValue = calendarDate
+    refreshSetCell()
+  }
+
+  private func buildCalendarPage() -> NSView {
+    calendar.datePickerStyle = .clockAndCalendar
+    calendar.datePickerElements = [.yearMonthDay]
+    calendar.datePickerMode = .single
+    calendar.drawsBackground = false
+    calendar.isBezeled = false
+    // The BOARD keeps key focus on this page: the four arrows move the date
+    // itself (←/→ a day, ↑/↓ a week) and Return commits, which is the same
+    // one-axis model the week strip walks. Handing first responder to the
+    // picker would leave Return and Escape doing nothing.
+    calendar.refusesFirstResponder = true
+    calendar.target = self
+    calendar.action = #selector(calendarChanged)
+
+    let set = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
+      guard let self else { return }
+      self.pick(Calendar.current.startOfDay(for: self.calendarDate))
+    }
+    set.fillRow(symbol: "checkmark.circle", tint: SeptaskKitTheme.inkPrimary, title: "")
+    setCell = set
+
+    let separator = NSBox()
+    separator.boxType = .separator
+
+    let stack = NSStackView(views: [calendar, separator, set])
+    stack.orientation = .vertical
+    stack.alignment = .centerX
+    stack.spacing = 6
+    stack.setCustomSpacing(8, after: calendar)
+    stack.setCustomSpacing(4, after: separator)
+    set.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    separator.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+    // The Set row is the page's only focusable cell, so it always wears the
+    // highlight — there is nowhere else for focus to be.
+    set.isFocused = true
+    calendarPage = stack
+    return stack
+  }
+
+  @objc private func calendarChanged() {
+    calendarDate = calendar.dateValue
+    refreshSetCell()
+  }
+
+  private func moveCalendar(byDays days: Int) {
+    guard let next = Calendar.current.date(byAdding: .day, value: days, to: calendarDate)
+    else { return }
+    calendarDate = next
+    calendar.dateValue = next
+    refreshSetCell()
+  }
+
+  private func refreshSetCell() {
+    let title = String(format: String(localized: "Set %@",
+                                      comment: "SeptaskKit: date popover commit row"),
+                       Self.setFormatter.string(from: calendarDate))
+    setCell?.updateRow(symbol: "checkmark.circle", title: title)
+  }
+
+  private static let setFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.setLocalizedDateFormatFromTemplate("EEEMMMd")
+    return formatter
+  }()
+
+  /// The date the focused strip cell stands for, so the calendar opens where
+  /// the user already was rather than on today.
+  private func currentFocusDate() -> Date? {
+    guard Self.dayOffsets.indices.contains(focusIndex) else { return nil }
+    return KitDayFormat.day(offset: Self.dayOffsets[focusIndex])
+  }
+
   /// Scheduling a task to today IS the today flag for `.when`, so the strip's
-  /// first cell and the Today row commit the same thing. `.deadline` has no
-  /// flag and always writes the date.
+  /// first cell writes the flag, not a dated schedule — and so does the
+  /// calendar page when the user lands back on today. `.deadline` has no flag
+  /// and always writes the date.
   private func pick(_ date: Date) {
     let today = KitDayFormat.todayDate() ?? Date()
     if kind == .when, Calendar.current.isDate(date, inSameDayAs: today) {
@@ -519,6 +655,20 @@ private final class KitDateBoard: NSView {
   // MARK: Keys
 
   override func keyDown(with event: NSEvent) {
+    // Same four keys, same axis, on both pages: on the week they move focus
+    // through time, on the calendar they move the date through time.
+    if showingCalendar {
+      switch event.keyCode {
+      case 126: moveCalendar(byDays: -7)        // ↑ — a week earlier
+      case 125: moveCalendar(byDays: 7)         // ↓ — a week later
+      case 123: moveCalendar(byDays: -1)        // ← — a day earlier
+      case 124: moveCalendar(byDays: 1)         // → — a day later
+      case 36, 76, 49: setCell?.activate()      // Return / Enter / Space
+      case 53: showBoard()                      // Escape — back to the week
+      default: super.keyDown(with: event)
+      }
+      return
+    }
     switch event.keyCode {
     case 126, 123: step(-1)                     // ↑ / ← — earlier
     case 125, 124: step(1)                      // ↓ / → — later
@@ -528,7 +678,11 @@ private final class KitDateBoard: NSView {
     }
   }
 
-  override func cancelOperation(_ sender: Any?) { onCancel() }
+  /// Escape drills back out of the calendar before it closes the popover, so
+  /// one key never skips a level.
+  override func cancelOperation(_ sender: Any?) {
+    if showingCalendar { showBoard() } else { onCancel() }
+  }
 }
 
 // MARK: - Cell
@@ -555,6 +709,10 @@ private final class KitDateCell: NSView {
   /// alone, and focus paints OVER this rather than beside it, so the two
   /// never read as two competing highlights.
   private var isWeekend = false
+  /// Today's cell carries a faint neutral ground of its own — the mark the
+  /// separate Today row used to carry. Neutral for the same reason the
+  /// weekend ground is: focus paints OVER it, never beside it.
+  private var isToday = false
 
   init(radius: CGFloat, height: CGFloat, action: @escaping () -> Void) {
     self.radius = radius
@@ -601,15 +759,21 @@ private final class KitDateCell: NSView {
 
   /// Weekday over day number — the strip's cell, matched to SwiftUI's
   /// `WeekStrip` (11pt medium weekday, 17pt semibold rounded number) so the
-  /// two surfaces read as one component. The strip holds tomorrow onward, so
-  /// no cell is today and none carries the today mark.
-  func fillDay(_ date: Date) {
+  /// two surfaces read as one component. The strip starts at today, whose
+  /// cell reads "Today" on the weekday line instead of the weekday name.
+  func fillDay(_ date: Date, isToday: Bool) {
     isWeekend = Calendar.current.isDateInWeekend(date)
+    self.isToday = isToday
 
-    let weekday = NSTextField(labelWithString: Self.weekday.string(from: date))
+    let weekdayText = isToday
+      ? String(localized: "Today", comment: "Relative date")
+      : Self.weekday.string(from: date)
+    let weekday = NSTextField(labelWithString: weekdayText)
     weekday.font = .systemFont(ofSize: 11, weight: .medium)
     weekday.textColor = SeptaskKitTheme.inkSecondary
     weekday.alignment = .center
+    weekday.maximumNumberOfLines = 1
+    weekday.lineBreakMode = .byTruncatingTail
 
     let number = NSTextField(labelWithString: Self.number.string(from: date))
     number.font = Self.rounded(size: 17, weight: .semibold)
@@ -642,6 +806,8 @@ private final class KitDateCell: NSView {
     // wash, so the two strips shade the weekend identically.
     if isFocused {
       SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    } else if isToday {
+      NSColor.labelColor.withAlphaComponent(0.12).setFill()
     } else if isWeekend {
       NSColor.secondaryLabelColor.withAlphaComponent(0.09).setFill()
     } else {

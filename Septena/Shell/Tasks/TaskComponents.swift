@@ -657,19 +657,25 @@ struct ScreenTitle: View {
 
 /// Which 7-day window a `WeekStrip` covers.
 enum WeekStripRange {
-  /// Tomorrow + the next 6 days. The scheduling default (When / Deadline),
-  /// which pairs the strip with a separate Today row — today lives there, so
-  /// the strip must not repeat it.
+  /// Today + the next 6 days, today FIRST. The scheduling default
+  /// (When / Deadline). Today is a cell of the strip, not a separate row above
+  /// it: one control, one axis, and the leading cell is the answer people pick
+  /// most. (It was the other way round — a Today row over a strip that started
+  /// tomorrow — until the two shapes were collapsed into one.)
   case upcoming
   /// The previous 6 days + today, with today rightmost. Used by the
   /// drawer time-travel picker, where you look *back* at past logs.
   case recent
 }
 
-/// Lean 7-day strip: tomorrow + the next 6 days as Reminders-style chips
-/// (weekday letter on top, day number below). One tap = one pick.
+/// Lean 7-day strip: today + the next 6 days as Reminders-style chips
+/// (weekday on top, day number below). One tap = one pick.
 /// Used by both the When and Deadline pickers so quick scheduling
 /// within the coming week never opens a full calendar.
+///
+/// The leading cell of `.upcoming` is TODAY, and its weekday line reads
+/// "Today" rather than the weekday name — it carries the word the separate
+/// Today row used to carry.
 struct WeekStrip: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
@@ -693,7 +699,7 @@ struct WeekStrip: View {
     let today = anchorDay
     switch range {
     case .upcoming:
-      return (1...7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
+      return (0...6).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     case .recent:
       return (-6...0).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     }
@@ -717,8 +723,12 @@ struct WeekStrip: View {
           // selected day is then separated from "today" by a full-weight
           // stroke rather than by fill strength alone.
           VStack(spacing: 2) {
-            Text(Self.weekdayFmt.string(from: d))
+            Text(isToday
+                 ? String(localized: "Today", comment: "Relative date")
+                 : Self.weekdayFmt.string(from: d))
               .scaledFont(size: 11, weight: .medium)
+              .lineLimit(1)
+              .minimumScaleFactor(0.7)
               .foregroundStyle(isSelected ? theme.accent : Theme.inkSecondary)
             Text("\(Self.cal.component(.day, from: d))")
               .scaledFont(size: 17, weight: .semibold, design: .rounded)
@@ -751,15 +761,18 @@ struct WeekStrip: View {
 
 /// THE date board for tasks — one component, every task date surface.
 ///
-/// Shape, in order: a **Today** row, a **seven-day strip starting tomorrow**,
-/// **Pick another date** (Apple's month calendar, for anything further out),
-/// and **Clear**. It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D
-/// popover (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask
-/// the question the same way in both apps.
+/// Shape, in order: a **seven-day strip starting TODAY**, **Pick another
+/// date** (Apple's month calendar, for anything further out), and **Clear**.
+/// It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D popover
+/// (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask the
+/// question the same way in both apps.
 ///
-/// Every control commits on the spot — there is no confirm button, the way the
-/// AppKit board has none. Today is a row, never also a strip cell: the strip
-/// starts tomorrow so the board can't offer the same day twice.
+/// Today is the strip's FIRST CELL, not a row above it. The board used to
+/// carry both — a Today row over a strip that started tomorrow — which asked
+/// one question (which day?) with two controls in two vocabularies. One strip
+/// answers it on one axis, and the cell people pick most is the leading one.
+///
+/// Every control commits on the spot — there is no confirm button.
 ///
 /// The caller decides what "Today" means. `.when` treats it as the today FLAG
 /// (`onToday`), Deadline as an ordinary date — the board only reports the
@@ -787,16 +800,16 @@ struct TaskDateBoard: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      row(symbol: "star.fill", tint: Theme.todayAccent,
-          title: String(localized: "Today", comment: "Relative date"),
-          active: todayActive) {
-        Haptics.pick()
-        onToday()
+      // `todayActive` is the today FLAG, which carries no date — the strip
+      // takes a date, so map the flag onto today's cell here.
+      WeekStrip(selected: selected ?? (todayActive ? anchorDay : nil)) { d in
+        let day = cal.startOfDay(for: d)
+        // Today's cell reports the Today GESTURE, so `.when` can keep writing
+        // the flag rather than a dated schedule.
+        if cal.isDate(day, inSameDayAs: anchorDay) { onToday() } else { onPick(day) }
       }
-
-      WeekStrip(selected: selected) { d in onPick(cal.startOfDay(for: d)) }
-        .padding(.top, 4)
-        .padding(.bottom, 10)
+      .padding(.top, 4)
+      .padding(.bottom, 10)
 
       Hairline(leadingInset: 0)
 

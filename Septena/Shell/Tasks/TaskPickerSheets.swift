@@ -16,7 +16,8 @@ import SwiftUI
 /// replaced: a four-chip quick row (Today / Tomorrow / This weekend / Next
 /// week) above a strip that ALREADY held every one of those days — Today
 /// appeared twice — plus a "Set Date · Wed, Jul 8" button only the calendar
-/// path needed.
+/// path needed. The separate Today row went the same way; today is the
+/// strip's first cell.
 struct DatePickerSheet: View {
   @Environment(DayClock.self) private var clock
   let title: String
@@ -30,9 +31,9 @@ struct DatePickerSheet: View {
     cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
 
-  /// Fitted sheet height: Today row + 7-day strip + calendar button + Clear.
+  /// Fitted sheet height: 7-day strip (today first) + calendar button + Clear.
   /// `.large` stays available as a drag-up fallback for big Dynamic Type.
-  static let sheetHeight: CGFloat = 320
+  static let sheetHeight: CGFloat = 276
 
   var body: some View {
     NavigationStack {
