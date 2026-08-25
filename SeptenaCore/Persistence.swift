@@ -3513,6 +3513,90 @@ extension ActivityDayEntity: CloudKitSystemFieldsBacked {
 
 // MARK: - LocalStore
 
+#if os(macOS)
+/// Where the Mac apps keep the local SwiftData mirror.
+///
+/// NOT the App Group container. `ModelConfiguration`'s `groupContainer`
+/// defaults to `.automatic`, and both Mac apps carry
+/// `com.apple.security.application-groups`, so SwiftData used to put the store
+/// at `~/Library/Group Containers/group.com.septena.cloud/Library/Application
+/// Support/Septena.store`. macOS 15 guards `~/Library/Group Containers/*`
+/// behind the App Data TCC service (`kTCCServiceSystemPolicyAppData`), and the
+/// app-group entitlement only waives that for SANDBOXED apps — neither Mac app
+/// sets `com.apple.security.app-sandbox`. So every launch raised "Septask
+/// would like to access data from other apps", and the grant did not stick:
+/// tccd recorded it and prompted again on the next launch of the same,
+/// unchanged bundle.
+///
+/// `~/Library/Application Support/Septena/` is not a container, so no TCC
+/// service guards it. Both Mac apps point at the SAME file, exactly as they
+/// did inside the group container — this MOVES the store, it does not split
+/// it. iOS is untouched: it has no App Data prompt, and the iOS widgets read
+/// the group's UserDefaults suite (never this file), so nothing there gains
+/// from the move.
+enum MacStoreLocation {
+  /// The three files SQLite keeps in WAL mode. All of them travel together or
+  /// the store opens short of its most recent writes.
+  private static let suffixes = ["", "-wal", "-shm"]
+
+  static var url: URL? {
+    guard let support = FileManager.default
+      .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+    return support
+      .appendingPathComponent("Septena", isDirectory: true)
+      .appendingPathComponent("Septena.store")
+  }
+
+  /// The old home inside the group container. Resolved ONLY when the new store
+  /// is absent — `containerURL(forSecurityApplicationGroupIdentifier:)` is
+  /// itself a group-container access, and asking for it on every launch is the
+  /// prompt this whole type exists to stop.
+  private static var legacyURL: URL? {
+    FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: SeptenaAppGroup.suite)?
+      .appendingPathComponent("Library/Application Support/Septena.store")
+  }
+
+  /// Copy the store out of the group container, once, before it is opened.
+  ///
+  /// COPY, not move: the group-container files stay put as a backstop, because
+  /// a half-finished move of a 30 MB SQLite trio is unrecoverable and a stale
+  /// duplicate is not. Delete them by hand once the new store has proven
+  /// itself. The migrating launch raises the App Data prompt one last time —
+  /// reading the old file requires it; every launch after this one never
+  /// touches the group container again.
+  static func migrateIfNeeded() {
+    let fm = FileManager.default
+    guard let destination = url else { return }
+    // Already migrated (or a fresh install) — do not go near the group.
+    guard !fm.fileExists(atPath: destination.path) else { return }
+    guard let source = legacyURL, fm.fileExists(atPath: source.path) else { return }
+
+    do {
+      try fm.createDirectory(at: destination.deletingLastPathComponent(),
+                             withIntermediateDirectories: true)
+      for suffix in suffixes {
+        let from = URL(fileURLWithPath: source.path + suffix)
+        let to = URL(fileURLWithPath: destination.path + suffix)
+        guard fm.fileExists(atPath: from.path) else { continue }
+        try fm.copyItem(at: from, to: to)
+      }
+      Log.persistence.notice("Migrated local store out of the App Group container.")
+    } catch {
+      // Leave NOTHING half-copied: a store carrying a stale -wal reads as
+      // corrupt, and the container init below would fatalError on it. Clearing
+      // the destination sends this launch back to the group-container store,
+      // which is still intact, and the migration retries next launch.
+      for suffix in suffixes {
+        try? fm.removeItem(at: URL(fileURLWithPath: destination.path + suffix))
+      }
+      Log.persistence.error(
+        "Local store migration failed, keeping the App Group copy: \(error.localizedDescription, privacy: .public)")
+    }
+  }
+}
+#endif
+
 @MainActor
 final class LocalStore {
   static let shared = LocalStore()
@@ -3553,9 +3637,25 @@ final class LocalStore {
     // Screenshot / UI-test builds (`-SeptenaSeed`) run against a throwaway
     // in-memory store so the app boots offline with seeded demo data and never
     // touches the real on-disk store. Release builds force `isOn` false.
-    let config = DemoSeedMode.isOn
-      ? ModelConfiguration("Septena", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-      : ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+    let config: ModelConfiguration
+    if DemoSeedMode.isOn {
+      config = ModelConfiguration("Septena", schema: schema, isStoredInMemoryOnly: true,
+                                  cloudKitDatabase: .none)
+    } else {
+      #if os(macOS)
+      // An explicit URL outside the App Group container — see MacStoreLocation
+      // for why. The fallback keeps a build that can't resolve Application
+      // Support on the old path rather than failing to open at all.
+      MacStoreLocation.migrateIfNeeded()
+      if let url = MacStoreLocation.url {
+        config = ModelConfiguration("Septena", schema: schema, url: url, cloudKitDatabase: .none)
+      } else {
+        config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+      }
+      #else
+      config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+      #endif
+    }
     do {
       container = try ModelContainer(for: schema, configurations: [config])
     } catch let error {
