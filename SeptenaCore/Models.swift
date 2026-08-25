@@ -1712,6 +1712,17 @@ struct AppSettings: Codable {
   var morningCutoffHour: Int? = nil
   var afternoonCutoffHour: Int? = nil
 
+  /// The day the "N rolled into today" banner was last dismissed, as an ISO
+  /// `yyyy-MM-dd` string. Synced because the banner reports one fact about the
+  /// ACCOUNT ("these tasks rolled over"), not about a device — dismissing it on
+  /// the Mac and meeting it again on the phone is the same notice twice. The
+  /// device-local `septena.newTodos.dismissedDate` UserDefaults key stays as
+  /// the instant, offline-safe mirror; reads take the LATER of the two so a
+  /// stale synced value can never un-dismiss today's banner. Nil → never
+  /// dismissed. Defaulted so the existing memberwise-init call sites stay
+  /// source-stable.
+  var rolledInDismissedOn: String? = nil
+
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
   /// marker: synced so a returning user's *new* device never re-shows the

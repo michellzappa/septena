@@ -955,11 +955,12 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
-  private static let rolledInDismissedKey = "septena.newTodos.dismissedDate"
-
   private func rolledInBanner(_ pool: [SeptenaTask]) -> [Row] {
     let today = SeptenaDate.today
-    guard UserDefaults.standard.string(forKey: Self.rolledInDismissedKey) != today
+    // Account-wide, not per-device: `SettingsMirror` resolves the synced
+    // dismissal against the device-local mirror, so dismissing on one device
+    // clears the banner on all of them.
+    guard SettingsMirror.rolledInDismissedOn(context: context) != today
     else { return [] }
     // Read from the rows already on Today, exactly like `rolledInReview`:
     // scheduled STRICTLY before today. A task scheduled FOR today, or merely
@@ -974,7 +975,8 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func dismissRolledInBanner() {
-    UserDefaults.standard.set(SeptenaDate.today, forKey: Self.rolledInDismissedKey)
+    SettingsMirror.dismissRolledIn(on: SeptenaDate.today, context: context,
+                                   engine: SeptenaServices.shared.ckEngine)
     reload()
   }
 

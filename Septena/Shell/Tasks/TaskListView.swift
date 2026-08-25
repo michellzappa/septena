@@ -3589,8 +3589,10 @@ struct TaskListView: View {
     // running it here and on appear trains at most once.
     refreshFilingSuggestions()
     // Refresh dismissed state — banner reappears next day automatically.
+    // Account-wide: `SettingsMirror` resolves the synced dismissal against the
+    // device-local mirror, so a dismissal on any device lands here too.
     if filter == .today {
-      let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
+      let last = SettingsMirror.rolledInDismissedOn(context: modelContext)
       newTodosDismissed = (last == clock.today)
     }
     refreshCalendarEvents()
@@ -3709,7 +3711,8 @@ struct TaskListView: View {
       Spacer(minLength: Theme.iconTextGap)
       Button {
         Haptics.tick()
-        UserDefaults.standard.set(clock.today, forKey: "septena.newTodos.dismissedDate")
+        SettingsMirror.dismissRolledIn(on: clock.today, context: modelContext,
+                                       engine: SeptenaServices.shared.ckEngine)
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
         Text("Dismiss")
