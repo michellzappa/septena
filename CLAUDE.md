@@ -43,19 +43,23 @@ takes a shared `mkdir` lock at `/tmp/auto-build.lock.d` so builds serialize
 across every session and the cron. The compile is the only green gate before the
 cron pushes — a tree that doesn't build must never be left behind.
 
-**The iOS `Septena` scheme can't build when no watchOS simulator runtime matches
-the SDK the active Xcode ships** (e.g. Xcode 26.6 ships watchOS 26.5; runtimes
-installed are 26.2 + 27.0). It embeds the watch app, so xcodebuild resolves a
-watch destination and dies — either at the scheme precondition ("watchOS 26.5
-must be installed") or further down in `actool` on the complication's asset
-catalog. Same mismatch, two different-looking errors, neither self-explanatory.
+**Neither iOS scheme can build when no watchOS simulator runtime matches the
+SDK the active Xcode ships** (e.g. Xcode 26.6 ships watchOS 26.5; runtimes
+installed are 26.2 + 27.0). `Septena` embeds `SeptenaWatch` and `Septask` embeds
+`SeptaskWatch`, so xcodebuild resolves a watch destination and dies — either at
+the scheme precondition ("watchOS 26.5 must be installed") or further down in
+`actool` on the complication's asset catalog. Same mismatch, two different-looking errors, neither self-explanatory.
 **Nothing is wrong with the project** — Xcode.app builds fine because you pick a
 concrete destination it can resolve. `scripts/build.sh` now detects this before
 taking the lock and exits 2 with guidance. When the change doesn't touch watch
-code, gate it on macOS instead — it compiles the same shared sources:
+code, gate it on the Mac schemes instead — they compile the same shared sources:
 
 ```bash
 scripts/build.sh SeptenaMac 'platform=macOS'
+```
+
+```bash
+scripts/build.sh SeptaskMac 'platform=macOS'
 ```
 
 If the change *does* touch watch code, **stop and tell the user** — installing a

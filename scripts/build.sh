@@ -31,9 +31,10 @@ REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" \
 # says what to do about it. Checking here costs ~200ms and saves a full build
 # cycle plus a lock hold that the cron and 3-5 parallel sessions are queued on.
 # NEVER auto-install the runtime: that's a multi-GB download and the user's call.
-# Only `Septena` embeds SeptenaWatch (see the target's `dependencies:` in
-# project.yml) — SeptenaMac / Septask / SeptaskMac don't, and must not be gated.
-if [ "$SCHEME" = "Septena" ]; then
+# Both iOS app schemes embed a watch app (see each target's `dependencies:` in
+# project.yml: Septena→SeptenaWatch, Septask→SeptaskWatch) — the Mac schemes
+# don't, and must not be gated.
+if [ "$SCHEME" = "Septena" ] || [ "$SCHEME" = "Septask" ]; then
   want="$(xcodebuild -showsdks 2>/dev/null \
           | sed -n 's/.*-sdk watchsimulator\([0-9][0-9.]*\).*/\1/p' | head -1)"
   if [ -n "$want" ] && ! xcrun simctl list runtimes 2>/dev/null \
@@ -49,6 +50,7 @@ target. Nothing is wrong with the project — Xcode.app works because you pick a
 concrete destination it can resolve.
   * Change doesn't touch watch code? Gate it on macOS instead:
         scripts/build.sh SeptenaMac 'platform=macOS'
+        scripts/build.sh SeptaskMac 'platform=macOS'
   * Change DOES touch watch code? Stop and tell the user: only they can decide
     to install the watchOS $want runtime (multi-GB). Do not download it.
 EOF
