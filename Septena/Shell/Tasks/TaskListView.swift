@@ -727,6 +727,16 @@ struct TaskListView: View {
       model.resetSession()
       clearSelection()
       expandedEditId = nil
+      // Drop the inline-create placeholders this filter owned BEFORE forgetting
+      // them. An inline add inserts a real, empty-titled TaskEntity up front
+      // (`startCreate` → `deferPush`), and the editor's `onVanish` is what
+      // normally purges it when nothing was typed — but `onVanish` checks
+      // `draftEditIds`, which this clear had already emptied. Switching lists
+      // with a capture line open therefore stranded a titleless row in the
+      // store, where it renders as a blank Inbox task and counts toward every
+      // Inbox badge. Only EMPTY drafts are dropped: `purgeDraftIfEmpty` leaves
+      // anything the user actually typed alone.
+      for id in draftEditIds { purgeDraftIfEmpty(id: id) }
       draftEditIds = []
       quickAddDraftId = nil
       quickAddDraftAtTop = false
@@ -944,9 +954,16 @@ struct TaskListView: View {
   }
 
   /// Drop an inline-create placeholder that never received a title.
+  ///
+  /// The title comes from the STORE, not from `currentTask`. `currentTask`
+  /// reads the list that is rendered right now, so on a filter swap (where the
+  /// new filter's rows are already in `items`) a draft the user had typed into
+  /// resolves to nil — and a nil title reads as empty, which would purge real
+  /// work. A row that is genuinely gone from the store returns nil here too and
+  /// needs no purge, so the point read is right in both directions.
   private func purgeDraftIfEmpty(id: String) {
-    let trimmed = currentTask(id: id)?.title
-      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard let stored = LocalCache.task(id: id, in: modelContext) else { return }
+    let trimmed = stored.title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.isEmpty else { return }
     clearQuickAddCaptureSlot(for: id)
     mutator.purge(id: id)
