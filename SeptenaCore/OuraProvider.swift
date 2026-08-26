@@ -185,8 +185,7 @@ final class OuraStore {
     }
     // Nothing changed ⇒ no save, no CloudKit fan-out, no UI refresh.
     guard !touched.isEmpty else { return }
-    do { try context.save() }
-    catch { SeptenaLog.error("OuraStore: save failed", error) }
+    StoreHealth.save(context, op: "OuraStore.apply")
     for id in touched {
       ckEngine?.noteOuraNightChange(id: id)
     }

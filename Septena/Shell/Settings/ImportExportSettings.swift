@@ -704,7 +704,7 @@ enum ImportExportService {
         skipped += rows.count
       }
     }
-    try ctx.save()
+    try StoreHealth.saveOrThrow(ctx, op: "ImportExport.apply")
     return ApplyResult(applied: applied, skipped: skipped)
   }
 }

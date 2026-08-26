@@ -762,11 +762,9 @@ final class ChecklistMutator {
   }
 
   private func saveContext(_ label: String) {
-    do {
-      try context.save()
-    } catch {
-      SeptenaLog.error(label, error)
-    }
+    // Every startup/reconcile write in this file funnels here, so this is also
+    // the one place they all get the failed-save rollback (`StoreHealth.save`).
+    StoreHealth.save(context, op: label)
   }
 
   /// One mutator, three sections — callers pass the section key of the
@@ -950,9 +948,11 @@ final class GoalMutator {
     postChanged()
   }
 
+  /// `StoreHealth.save` logs the real error and rolls the context back. A
+  /// failed save that keeps its pending changes wedges every later save on
+  /// this shared context — see `StoreHealth`.
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1024,8 +1024,7 @@ final class CoachVoiceMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1095,8 +1094,7 @@ final class CoachMessageMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1195,8 +1193,7 @@ final class GutMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1272,8 +1269,7 @@ final class ActivityMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 }
 
@@ -1426,8 +1422,7 @@ final class SymptomsMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1689,8 +1684,7 @@ final class MedicationsMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -1992,8 +1986,7 @@ final class IntakeMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -2151,8 +2144,7 @@ final class GroceryMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -2559,8 +2551,7 @@ final class TrainingMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -2823,8 +2814,7 @@ final class NutritionMutator {
   }
 
   private func saveContext(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {
@@ -2957,8 +2947,7 @@ final class MoodMutator {
   }
 
   private func save(_ label: String) {
-    do { try context.save() }
-    catch { SeptenaLog.error(label, error) }
+    StoreHealth.save(context, op: label)
   }
 
   private func postChanged() {

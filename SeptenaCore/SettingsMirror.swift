@@ -173,10 +173,7 @@ enum SettingsMirror {
     // account) gets an accent now so it doesn't land gray. Fresh-account seeds
     // are disabled and stay colorless until the user enables them in the welcome.
     if seedEnabled { assignAutoColorIfNeeded(entity, context: context) }
-    do { try context.save() } catch {
-      SeptenaLog.error("SettingsMirror.seedManifestSection", error)
-      return false
-    }
+    guard StoreHealth.save(context, op: "SettingsMirror.seedManifestSection") else { return false }
     return true
   }
 
@@ -198,7 +195,7 @@ enum SettingsMirror {
       row.hasOnboarded = true
     }
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.backfillHasOnboardedForLegacySections")
     } catch {
       SeptenaLog.error("SettingsMirror.backfillHasOnboarded", error)
     }
@@ -217,7 +214,7 @@ enum SettingsMirror {
     entity.hasOnboarded = hasOnboarded
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionHasOnboarded")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionHasOnboarded", error)
@@ -260,7 +257,7 @@ enum SettingsMirror {
     }
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionEnabled")
       engine?.noteSectionChange(id: key)
       NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
     } catch {
@@ -343,7 +340,7 @@ enum SettingsMirror {
     entity.updatedAt = .now
     if entity.modelContext == nil { context.insert(entity) }
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.upsert")
       if changed { engine?.noteSettingsChange() }
     } catch {
       SeptenaLog.error("SettingsMirror.upsert settings", error)
@@ -392,7 +389,7 @@ enum SettingsMirror {
     }
 
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.replaceSections")
       for id in changedIDs { engine?.noteSectionChange(id: id) }
     } catch {
       SeptenaLog.error("SettingsMirror.replace sections", error)
@@ -416,7 +413,7 @@ enum SettingsMirror {
     if enabled { assignAutoColorIfNeeded(entity, context: context) }
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionEnabled")
       engine?.noteSectionChange(id: key)
       // Tell the app a section's enabled-state changed so data-driven surfaces
       // refresh — including the Spotlight index, where `SpotlightIndexer` purges
@@ -443,7 +440,7 @@ enum SettingsMirror {
     entity.color = hex
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionColor")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionColor", error)
@@ -464,7 +461,7 @@ enum SettingsMirror {
     entity.showInToday = showInToday
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionShowInToday")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionShowInToday", error)
@@ -488,7 +485,7 @@ enum SettingsMirror {
     entity.showInSpotlight = showInSpotlight
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionShowInSpotlight")
       engine?.noteSectionChange(id: key)
       NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
     } catch {

@@ -152,8 +152,7 @@ final class WithingsStore {
     // Unchanged re-fetch ⇒ no save, no CloudKit fan-out, no UI refresh, and
     // no body-goal re-evaluation (the trailing average can't have moved).
     guard !touched.isEmpty else { return }
-    do { try context.save() }
-    catch { SeptenaLog.error("WithingsStore: save failed", error) }
+    StoreHealth.save(context, op: "WithingsStore.apply")
     for id in touched {
       ckEngine?.noteWithingsRowChange(id: id)
     }
