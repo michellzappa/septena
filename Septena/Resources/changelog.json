@@ -4,7 +4,7 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1661,
+      "build": 1665,
       "date": "2026-08-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
@@ -48,6 +48,11 @@
           "title": "Copy your grocery list",
           "detail": "Add items straight to the clipboard from the grocery shopping list.",
           "section": "groceries"
+        },
+        {
+          "title": "Pasted text stays on one line in a task title",
+          "detail": "Pasting several lines into a new task now joins them into one title instead of cutting it short or running the words together, and it no longer saves the task before you are done.",
+          "section": "tasks"
         }
       ]
     },
