@@ -40,6 +40,33 @@ struct TaskRowActions: ViewModifier {
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(\.septenaToast) private var toastStore
+  @Environment(\.modelContext) private var modelContext
+
+  // MARK: - Undo
+  //
+  // This menu is the SHARED per-row action surface, so every mutation it makes
+  // has to land on the one shared stack (`TaskUndo`) — otherwise ⌘Z / shake
+  // works on the deep Tasks list (which records) and silently does nothing
+  // after the same gesture from a row menu on Next, a drawer, or the Septask
+  // rows. Recording is explicit and sits at the GESTURE, never inside the
+  // mutator (see `TaskUndo` for why).
+
+  /// Scheduling fields as they stand right now, read from the store — the same
+  /// source `TaskUndo.recordScheduleChange` re-reads for the redo side, so the
+  /// two halves can't disagree.
+  private func scheduleSnapshots(_ ids: [String]) -> [TaskUndo.ScheduleSnapshot] {
+    LocalCache.allTasks(in: modelContext)
+      .filter { ids.contains($0.id) }
+      .map(TaskUndo.ScheduleSnapshot.init)
+  }
+
+  /// Run `body` and register the scheduling change it made.
+  private func recordingSchedule(_ name: String, _ ids: [String], _ body: () -> Void) {
+    let before = scheduleSnapshots(ids)
+    body()
+    TaskUndo.recordScheduleChange(name: name, before: before,
+                                  context: modelContext, mutator: mutator)
+  }
 
   func body(content: Content) -> some View {
     content
@@ -59,16 +86,21 @@ struct TaskRowActions: ViewModifier {
           onApplySuggestion: { _, _ in },
           onMoveToToday: { ids, today in
             Haptics.tick()
-            if today {
-              for id in ids {
-                mutator.moveToToday(id: id, today: true)
-                mutator.acknowledge(id: id)
-                promoteFlash.flash(id)
-              }
-            } else {
-              for id in ids {
-                mutator.removeFromToday(id: id)
-                mutator.acknowledge(id: id)
+            recordingSchedule(today
+                                ? String(localized: "Move to Today", comment: "Undo action name")
+                                : String(localized: "Remove from Today", comment: "Undo action name"),
+                              ids) {
+              if today {
+                for id in ids {
+                  mutator.moveToToday(id: id, today: true)
+                  mutator.acknowledge(id: id)
+                  promoteFlash.flash(id)
+                }
+              } else {
+                for id in ids {
+                  mutator.removeFromToday(id: id)
+                  mutator.acknowledge(id: id)
+                }
               }
             }
             onChange?()
@@ -91,15 +123,30 @@ struct TaskRowActions: ViewModifier {
           onOpenRepeat: { t in repeatTargetId = t.id; showingRepeatSheet = true },
           onSetRepeatPaused: { ids, paused in
             Haptics.tick()
-            for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+            recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
+                              ids) {
+              for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+            }
             onChange?()
           },
           onCreateNextCopy: { t in
             Haptics.tick()
-            _ = mutator.createNextOccurrence(id: t.id)
+            if let copy = mutator.createNextOccurrence(id: t.id) {
+              TaskUndo.recordCreate(
+                name: String(localized: "Create Next Copy", comment: "Undo action name"),
+                ids: [copy.id], mutator: mutator,
+                rebuild: { [mutator] in
+                  mutator.createNextOccurrence(id: t.id).map { [$0.id] } ?? []
+                })
+            }
             onChange?()
           },
-          onCancel: { ids in Haptics.warning(); for id in ids { mutator.cancel(id: id) }; onChange?() },
+          onCancel: { ids in
+            Haptics.warning()
+            for id in ids { mutator.cancel(id: id) }
+            TaskUndo.recordCancel(ids: ids, mutator: mutator)
+            onChange?()
+          },
           onDelete: { _ in applyDelete(task) }
         )
       }
@@ -121,10 +168,20 @@ struct TaskRowActions: ViewModifier {
         applyMove: { ids, areaId, projectId in
           for id in ids { applyMove(id: id, areaId: areaId, projectId: projectId) }
         },
-        applyRecurrence: { id, rule in Haptics.tick(); mutator.setRecurrence(id: id, recurrence: rule); onChange?() },
+        applyRecurrence: { id, rule in
+          Haptics.tick()
+          recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
+                            [id]) {
+            mutator.setRecurrence(id: id, recurrence: rule)
+          }
+          onChange?()
+        },
         applyRecurrencePaused: { id, paused in
           Haptics.tick()
-          mutator.setRecurrencePaused(id: id, paused: paused)
+          recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
+                            [id]) {
+            mutator.setRecurrencePaused(id: id, paused: paused)
+          }
           onChange?()
         }
       ))
@@ -134,32 +191,40 @@ struct TaskRowActions: ViewModifier {
   // scheduled date vs. cleared. Kept in lockstep with that method.
   private func applyWhen(id: String, kind: TaskListView.WhenKind, date: Date?) {
     Haptics.tick()
-    switch kind {
-    case .deadline:
-      mutator.setDeadline(id: id, date: date)
-    case .scheduled:
-      if let d = date {
-        if Calendar.current.isDateInToday(d) {
-          mutator.schedule(id: id, date: nil)
-          mutator.moveToToday(id: id, today: true)
-          promoteFlash.flash(id)
+    let name = kind == .deadline
+      ? String(localized: "Set Deadline", comment: "Undo action name")
+      : String(localized: "Schedule Task", comment: "Undo action name")
+    recordingSchedule(name, [id]) {
+      switch kind {
+      case .deadline:
+        mutator.setDeadline(id: id, date: date)
+      case .scheduled:
+        if let d = date {
+          if Calendar.current.isDateInToday(d) {
+            mutator.schedule(id: id, date: nil)
+            mutator.moveToToday(id: id, today: true)
+            promoteFlash.flash(id)
+          } else {
+            mutator.moveToToday(id: id, today: false)
+            mutator.schedule(id: id, date: d)
+            toastStore?.show("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+          }
         } else {
+          mutator.schedule(id: id, date: nil)
           mutator.moveToToday(id: id, today: false)
-          mutator.schedule(id: id, date: d)
-          toastStore?.show("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
         }
-      } else {
-        mutator.schedule(id: id, date: nil)
-        mutator.moveToToday(id: id, today: false)
       }
+      mutator.acknowledge(id: id)
     }
-    mutator.acknowledge(id: id)
     onChange?()
   }
 
   private func duplicateTask(_ task: SeptenaTask) {
     Haptics.tick()
-    mutator.duplicate(task)
+    let copy = mutator.duplicate(task)
+    TaskUndo.recordCreate(name: String(localized: "Duplicate Task", comment: "Undo action name"),
+                          ids: [copy.id], mutator: mutator,
+                          rebuild: { [mutator] in [mutator.duplicate(task).id] })
     onChange?()
   }
 
@@ -170,6 +235,9 @@ struct TaskRowActions: ViewModifier {
     let prevArea = task.area
     let prevProject = task.project
     let wasInTriage = task.isInTriageBand
+    let undoBefore = LocalCache.allTasks(in: modelContext)
+      .filter { $0.id == id }
+      .map(TaskUndo.FilingSnapshot.init)
     if projectId != nil {
       mutator.moveToProject(id: id, project: projectId)
     } else {
@@ -177,6 +245,10 @@ struct TaskRowActions: ViewModifier {
       mutator.moveToProject(id: id, project: nil)
     }
     mutator.acknowledge(id: id)
+    // The toast's own Undo button stays — it's the discoverable affordance on
+    // iOS. This is the same reversal on the shared stack, so ⌘Z / shake reach
+    // it too once the toast has gone.
+    TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     onChange?()
     let destName =
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
@@ -198,6 +270,7 @@ struct TaskRowActions: ViewModifier {
     Haptics.warning()
     let title = task.title
     mutator.delete(id: task.id)
+    TaskUndo.recordDelete(ids: [task.id], mutator: mutator)
     onChange?()
     toastStore?.show(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
       mutator.restore(id: task.id)

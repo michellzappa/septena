@@ -162,6 +162,12 @@ enum SettingsKey {
   /// on Today undone (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`).
   /// Absent → on. Read by `TaskCheckboxModel`.
   static let tasksShowAging = "septena.tasks.showAging"
+  /// How many lines a task row's title may occupy before it truncates, on
+  /// iPhone / iPad. 1 = the old single line, 2 = the default, 3 = long titles
+  /// stay readable at the cost of taller rows. Absent → 2. Read by `TaskRow`.
+  /// iOS only: the AppKit rows are a fixed-height table (`SeptaskKitTheme.rowHeight`)
+  /// where titles truncate by design.
+  static let tasksTitleLines = "septena.tasks.titleLines"
   /// Whether the on-device classifier suggests where to file inbox tasks
   /// (`SuggestionEngine` → inbox chips, context-menu "Move to…", composer
   /// "Suggested list" chip). Absent → on. Read by `TaskListView` / composer.

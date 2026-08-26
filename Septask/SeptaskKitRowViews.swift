@@ -233,7 +233,7 @@ final class KitCheckboxView: NSButton {
     path.lineWidth = 1.6
     path.lineCapStyle = .round
     path.lineJoinStyle = .round
-    NSColor.white.setStroke()
+    SeptaskKitTheme.checkboxCheck.setStroke()
     path.stroke()
   }
 }

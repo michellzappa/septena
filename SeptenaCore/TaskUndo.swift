@@ -213,6 +213,17 @@ enum TaskUndo {
            })
   }
 
+  /// Cancel / reopen. Cancelling parks a task as "won't do" rather than
+  /// finishing it, so the inverse is `uncomplete` (status → open) — the same
+  /// inverse the AppKit shell already uses, hoisted here so the SwiftUI row
+  /// menu can't invent a different one.
+  static func recordCancel(ids: [String], mutator: TaskMutator) {
+    guard !ids.isEmpty else { return }
+    record(name: String(localized: "Cancel Task", comment: "Undo action name"),
+           undo: { for id in ids { mutator.uncomplete(id: id) } },
+           redo: { for id in ids { mutator.cancel(id: id) } })
+  }
+
   /// Soft-delete → Recently Deleted. Recoverable by design, so the inverse is
   /// simply `restore`. Permanent delete (`purge`) is deliberately NOT undoable
   /// — there is nothing left to restore, and offering ⌘Z there would lie.

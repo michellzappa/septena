@@ -366,12 +366,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       relativeTo: repeatButton.bounds, of: repeatButton
     ) { [weak self] result in
       guard let self else { return }
+      let before = [TaskUndo.ScheduleSnapshot(current)]
       if let recurrence = result.recurrence {
         self.mutator.setRecurrence(id: current.id, recurrence: recurrence)
         self.mutator.setRecurrencePaused(id: current.id, paused: result.paused)
       } else {
         self.mutator.setRecurrence(id: current.id, recurrence: nil)
       }
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change Repeat", comment: "SeptaskKit: undo action"),
+        before: before, context: self.context, mutator: self.mutator)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
     }
@@ -390,6 +394,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     SeptaskKitDatePopover.present(kind: kind, initial: initial,
                                   relativeTo: button.bounds, of: button) { [weak self] date, today in
       guard let self else { return }
+      // Same shared stack as the list's own date popover — an inspector edit
+      // has to be as undoable as the ⌘S one, or ⌘Z means different things on
+      // two panes of one window.
+      let before = [TaskUndo.ScheduleSnapshot(current)]
       switch kind {
       case .when:
         if today {
@@ -402,6 +410,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         self.mutator.setDeadline(id: current.id, date: date)
       }
       self.mutator.acknowledge(id: current.id)
+      TaskUndo.recordScheduleChange(
+        name: kind == .when
+          ? String(localized: "Change When", comment: "SeptaskKit: undo action")
+          : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
+        before: before, context: self.context, mutator: self.mutator)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
     }

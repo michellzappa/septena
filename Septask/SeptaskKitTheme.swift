@@ -72,6 +72,11 @@ enum SeptaskKitTheme {
   static let checkboxStroke: NSColor = .secondaryLabelColor
   /// Theme.checkboxFill (done box) — same family, slightly heavier.
   static let checkboxFill: NSColor = .labelColor.withAlphaComponent(0.78)
+  /// Theme.checkboxCheck — the check glyph inside a done box. NOT white:
+  /// `checkboxFill` is label ink, which is near-white in dark mode, so a white
+  /// check vanished the instant you ticked a row. This flips with the
+  /// appearance alongside the fill.
+  static let checkboxCheck: NSColor = .textBackgroundColor
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
   /// Theme.overdueRed — late deadlines, platform red.

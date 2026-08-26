@@ -212,6 +212,10 @@ struct CheckableRow<Trailing: View>: View {
   /// SwiftUI mis-reports a vertical-axis field's baseline). nil (non-task rows)
   /// keeps the intrinsic height. See `TaskComposerCard.titleField`.
   var titleBandHeight: CGFloat? = nil
+  /// How many lines the title may occupy before it truncates. Task rows pass
+  /// the user's Settings ▸ Tasks ▸ "Title lines" choice on iOS (see
+  /// `SettingsKey.tasksTitleLines`); everything else keeps the two-line default.
+  var titleLineLimit: Int = 2
   /// Neutral selection capsule while this row's detail/edit modal is open
   /// (drawer surfaces — the deep list paints via `listRowBackground` instead).
   var isSelected: Bool = false
@@ -253,7 +257,7 @@ struct CheckableRow<Trailing: View>: View {
       .font(.septenaTaskTitle)
       .strikethrough(isInactive)
       .opacity(isInactive ? 0.5 : 1)
-      .lineLimit(2)
+      .lineLimit(titleLineLimit)
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
       .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
@@ -477,6 +481,19 @@ struct TaskRow: View {
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(DayClock.self) private var clock
 
+  /// Settings ▸ Tasks ▸ Rows ▸ "Title lines". iPhone/iPad only — the macOS
+  /// AppKit list is a fixed-height table whose titles truncate by design, and
+  /// the SwiftUI Mac rows sit in the same dense list, so both stay at two.
+  @AppStorage(SettingsKey.tasksTitleLines) private var titleLinesSetting: Int = 2
+
+  private var titleLineLimit: Int {
+    #if os(iOS)
+    return min(3, max(1, titleLinesSetting))
+    #else
+    return 2
+    #endif
+  }
+
   private var todayAnchor: Date {
     Calendar.current.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
@@ -518,6 +535,7 @@ struct TaskRow: View {
       // field (closest reliable view↔edit match). Normal rows already stand at
       // this height (the checkbox sets it), so nothing visibly changes here.
       titleBandHeight: Theme.checkboxTap,
+      titleLineLimit: titleLineLimit,
       isSelected: isSelected,
       isListSelected: isListSelected,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),

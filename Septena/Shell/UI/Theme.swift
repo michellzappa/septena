@@ -151,6 +151,24 @@ enum Theme {
     #endif
   }()
 
+  /// Ink for the check GLYPH inside a done checkbox.
+  ///
+  /// `checkboxFill` is label ink — near-black in light, near-WHITE in dark —
+  /// so the hardcoded white check this replaces was white-on-white the moment
+  /// you ticked a box in dark mode. The glyph has to be the *background*
+  /// counterpart of the fill, which flips with the appearance the same way the
+  /// fill does. Same trap as `.background(Color.accentColor).foregroundStyle(.white)`
+  /// (see CLAUDE.md, "the app accent is adaptive INK, not a hue").
+  static let checkboxCheck: Color = {
+    #if os(macOS)
+    return Color(nsColor: .textBackgroundColor)
+    #elseif canImport(UIKit)
+    return Color(uiColor: .systemBackground)
+    #else
+    return Color.white
+    #endif
+  }()
+
   /// Icon color when an icon should recede behind row text. `.tertiary`
   /// matches what Reminders uses for non-tinted glyphs (calendar, bell,
   /// flag-outline) in row metadata.

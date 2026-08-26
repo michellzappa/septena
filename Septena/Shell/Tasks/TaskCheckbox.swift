@@ -253,7 +253,9 @@ struct TaskCheckbox: View {
             .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)
           Image(systemName: "checkmark")
             .scaledFont(size: Self.checkSize, weight: .bold)
-            .foregroundStyle(.white)
+            // NOT `.white` — the fill is adaptive label ink, so a white check
+            // disappears into a white box in dark mode. See `Theme.checkboxCheck`.
+            .foregroundStyle(Theme.checkboxCheck)
             .scaleEffect(isDone ? 1 : 0.25)
             .opacity(isDone ? 1 : 0)
             .a11yAnimation(isDone ? Theme.Motion.check : Theme.Motion.quick, value: isDone)

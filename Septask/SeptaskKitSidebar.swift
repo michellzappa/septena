@@ -531,6 +531,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     guard !ids.isEmpty else { return false }
 
     let mutator = SeptenaServices.shared.taskMutator
+    // A sidebar drop is a user gesture like any other, so it goes on the ONE
+    // shared undo stack (`TaskUndo`). Which kind of snapshot depends on what
+    // the drop changed: the three smart lists move DATES, an area / project
+    // row moves FILING.
+    let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
+    let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
+    let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
     for id in ids {
       switch action {
       case .today:
@@ -547,6 +554,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       case .project(let projectId):
         mutator.moveToProject(id: id, project: projectId)
       }
+    }
+    switch action {
+    case .today:
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Move to Today", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+    case .scheduleTomorrow, .anytime:
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+    case .area, .project:
+      TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
     }
     // Local mutations don't broadcast on their own; both shells (and the
     // counts here) listen for this.
