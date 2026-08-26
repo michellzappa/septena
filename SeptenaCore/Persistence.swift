@@ -3669,6 +3669,147 @@ final class LocalStore {
   }
 }
 
+// MARK: - StoreHealth (read/write failure accounting)
+
+/// Every SwiftData read in this file used to be written `(try? fetch(…)) ?? []`,
+/// which makes a THROWN fetch and an empty table the same value. When the main
+/// context wedged, every count in the app painted 0, the sidebar memoized those
+/// zeros, and the only recovery was a force quit — with nothing in the log to
+/// say what happened, because the error was discarded at the `try?`.
+///
+/// This type is the single place reads and writes report failure. It does two
+/// jobs:
+///
+/// 1. **Logs the real error.** SwiftData and Core Data put the actionable part
+///    in the `NSError` `userInfo` (`NSDetailedErrors` for a multi-error save,
+///    `NSValidationErrorKey` / `NSConstraintConflict` for a constraint hit).
+///    `localizedDescription` alone says "The operation couldn't be completed."
+/// 2. **Publishes a failure token** so a caller that runs several reads can ask
+///    whether any of them failed, and keep its last good values instead of
+///    caching zeros over them (see `SidebarRootView.load`).
+///
+/// It is accounting, not policy: nothing here decides what a caller does with a
+/// failed read.
+@MainActor
+enum StoreHealth {
+  /// Monotonic count of failed reads this process. Callers snapshot it before a
+  /// read pass and compare after — a changed value means "at least one read in
+  /// that pass threw, do not trust the result".
+  private(set) static var readFailures = 0
+  /// Monotonic count of failed saves this process.
+  private(set) static var saveFailures = 0
+  private(set) static var lastFailureSummary: String?
+
+  /// Snapshot the read-failure counter before a multi-read pass.
+  static func readToken() -> Int { readFailures }
+
+  /// True when any read failed since `token` was taken.
+  static func readsFailed(since token: Int) -> Bool { readFailures != token }
+
+  /// One fetch, with the error kept instead of discarded. Returns `[]` on
+  /// failure exactly like the old `try?` did, so call sites keep their shape —
+  /// but the failure is now counted and logged.
+  static func fetch<E: PersistentModel>(_ context: ModelContext,
+                                        _ descriptor: FetchDescriptor<E>,
+                                        _ site: StaticString = #function) -> [E] {
+    do {
+      return try context.fetch(descriptor)
+    } catch {
+      readFailures += 1
+      let summary = "\(E.self) read failed at \(site): \(detail(error))"
+      lastFailureSummary = summary
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      return []
+    }
+  }
+
+  /// Save, and un-wedge the context when the save fails.
+  ///
+  /// A failed `save()` leaves its pending changes in the context. Every later
+  /// save retries them and fails the same way, so one bad write silently stops
+  /// ALL later writes from persisting and can make subsequent fetches throw —
+  /// the app-wide "everything reads 0 until I force quit" state. `rollback()`
+  /// discards the one change that could not be written, which costs that single
+  /// mutation and keeps every later one working. Losing one write beats losing
+  /// every write after it.
+  ///
+  /// `nonisolated` because not every writer is on the main actor:
+  /// `ChecklistMirror` and `CloudKitRecordRegistry` save background contexts on
+  /// purpose. It touches only the context it was handed, so it is safe from any
+  /// isolation; the shared failure counter is updated back on the main actor.
+  @discardableResult
+  nonisolated static func save(_ context: ModelContext, op: String) -> Bool {
+    do {
+      try context.save()
+      return true
+    } catch {
+      let summary = "save failed (op=\(op)): \(detail(error))"
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      context.rollback()
+      Log.persistence.error("[StoreHealth] rolled back after op=\(op, privacy: .public) — that one change is lost, later writes keep working")
+      Task { @MainActor in noteSaveFailure(summary) }
+      return false
+    }
+  }
+
+  /// The throwing variant, for writers whose `do`/`catch` already gates
+  /// follow-up work (a CloudKit push, a notification) on the save succeeding.
+  /// Control flow is unchanged — the error still reaches the existing `catch` —
+  /// but the context is logged and rolled back on the way out, so the failed
+  /// change cannot wedge every later save.
+  nonisolated static func saveOrThrow(_ context: ModelContext, op: String) throws {
+    do {
+      try context.save()
+    } catch {
+      let summary = "save failed (op=\(op)): \(detail(error))"
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      context.rollback()
+      Task { @MainActor in noteSaveFailure(summary) }
+      throw error
+    }
+  }
+
+  private static func noteSaveFailure(_ summary: String) {
+    saveFailures += 1
+    lastFailureSummary = summary
+  }
+
+  /// The parts of an `NSError` that actually name the problem. A SwiftData save
+  /// error wraps its real causes in `NSDetailedErrors`; a constraint or
+  /// validation failure names the entity and key in its own `userInfo`.
+  /// `localizedDescription` on its own says only "The operation couldn't be
+  /// completed", which is why the old logs were useless.
+  nonisolated static func detail(_ error: Error) -> String {
+    let ns = error as NSError
+    var parts = ["\(ns.domain)/\(ns.code) \(ns.localizedDescription)"]
+    if let detailed = ns.userInfo["NSDetailedErrors"] as? [NSError] {
+      for sub in detailed.prefix(5) {
+        parts.append("· \(sub.domain)/\(sub.code) \(sub.localizedDescription) \(keys(of: sub))")
+      }
+    } else {
+      let k = keys(of: ns)
+      if !k.isEmpty { parts.append(k) }
+    }
+    return parts.joined(separator: " ")
+  }
+
+  /// The non-sensitive keys of an error's `userInfo` — entity and attribute
+  /// names and conflict descriptions, never a task title or note body.
+  nonisolated private static func keys(of error: NSError) -> String {
+    var out: [String] = []
+    if let object = error.userInfo["NSValidationErrorObject"] as? NSObject {
+      out.append("object=\(type(of: object))")
+    }
+    if let key = error.userInfo["NSValidationErrorKey"] as? String {
+      out.append("key=\(key)")
+    }
+    if let conflicts = error.userInfo["conflictList"] {
+      out.append("conflicts=\(String(describing: conflicts).prefix(400))")
+    }
+    return out.isEmpty ? "" : "[\(out.joined(separator: " "))]"
+  }
+}
+
 // MARK: - LocalCache (synchronous reads for instant render)
 
 /// Snapshot reads from the local store. Views call these at the top of
@@ -3680,9 +3821,9 @@ enum LocalCache {
   /// still includes `pendingDeletion` rows (openCount semantics count them).
   @MainActor
   static func liveEntities(in context: ModelContext) -> [TaskEntity] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.deletedAt == nil }
-    ))) ?? []
+    ))
   }
 
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
@@ -3699,12 +3840,12 @@ enum LocalCache {
   /// Unassigned inbox/logbook rows don't teach filing targets.
   @MainActor
   static func trainingTasks(in context: ModelContext) -> [SeptenaTask] {
-    let candidates = (try? context.fetch(FetchDescriptor<TaskEntity>(
+    let candidates = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion && e.kind != "heading"
       },
       sortBy: [SortDescriptor(\.id)]
-    ))) ?? []
+    ))
     return candidates.compactMap { entity in
       guard entity.status != .cancelled,
             entity.area != nil || entity.project != nil else { return nil }
@@ -3717,12 +3858,12 @@ enum LocalCache {
   /// project's done/total.
   @MainActor
   static func tasksWithProject(in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    )))?.map(SeptenaTask.init) ?? []
+    )).map(SeptenaTask.init)
   }
 
   /// Completion ratios for project headers. Keep this as an entity aggregate
@@ -3730,12 +3871,12 @@ enum LocalCache {
   /// task merely to compute two integer counters.
   @MainActor
   static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    ))) ?? []
+    ))
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
     for row in rows {
@@ -3762,15 +3903,15 @@ enum LocalCache {
   @MainActor
   static func headings(inProject projectId: String,
                        in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project == projectId && e.kind == "heading"
       }
-    )))?
+    ))
       .sorted { TaskOrder.key($0) != TaskOrder.key($1)
                   ? TaskOrder.key($0) < TaskOrder.key($1) : $0.id < $1.id }
-      .map(SeptenaTask.init) ?? []
+      .map(SeptenaTask.init)
   }
 
   /// Predicate-narrowed fetch for each list filter. Open smart lists still
@@ -3782,9 +3923,9 @@ enum LocalCache {
                                     in context: ModelContext) -> [TaskEntity] {
     switch filter {
     case .recentlyDeleted:
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { $0.deletedAt != nil }
-      ))) ?? []
+      ))
     case .logbook:
       // The archive can be thousands of rows long. Sort and limit in
       // SwiftData before materializing DTOs; `TaskListView` grows this page on
@@ -3797,27 +3938,27 @@ enum LocalCache {
         sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
       )
       if let limit { descriptor.fetchLimit = limit }
-      return (try? context.fetch(descriptor)) ?? []
+      return StoreHealth.fetch(context, descriptor)
     case .project(let pid):
       let projectId = pid
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.project == projectId
         }
-      ))) ?? []
+      ))
     case .area(let aid):
       let areaId = aid
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
-      ))) ?? []
+      ))
     case .today, .triage, .upcoming, .repeating, .unscheduled:
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
         }
-      ))) ?? []
+      ))
     }
   }
 
@@ -3857,6 +3998,18 @@ enum LocalCache {
     return result
   }
 
+  /// One task by id, straight from the store. The by-id read a view needs when
+  /// it must NOT depend on whichever list is currently rendered — deciding
+  /// whether an inline-create placeholder is still empty, for instance, where
+  /// reading a list that has already moved on would mistake "not in this list"
+  /// for "has no title".
+  @MainActor
+  static func task(id: String, in context: ModelContext) -> SeptenaTask? {
+    var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    descriptor.fetchLimit = 1
+    return StoreHealth.fetch(context, descriptor).first.map(SeptenaTask.init)
+  }
+
   /// Point-read used to decide whether a scoped local mutation can affect an
   /// already-visible task list. The lookup is limited in SwiftData; matching
   /// reuses the same filter conversion as list rendering so a task moving into
@@ -3866,7 +4019,7 @@ enum LocalCache {
                           in context: ModelContext) -> Bool {
     var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
     descriptor.fetchLimit = 1
-    guard let entity = try? context.fetch(descriptor).first else { return false }
+    guard let entity = StoreHealth.fetch(context, descriptor).first else { return false }
     let today = SeptenaDate.today
     if filter == .today {
       return convert(entity, filter: .today, today: today) != nil
@@ -3959,7 +4112,7 @@ enum LocalCache {
   /// called when a visible open row actually vanished, so a full fetch is fine.
   static func completedIDs(among ids: Set<String>, in context: ModelContext) -> Set<String> {
     guard !ids.isEmpty else { return [] }
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return Set(rows.compactMap { e in
       (ids.contains(e.id) && e.status == .done && !e.pendingDeletion && e.deletedAt == nil)
         ? e.id : nil
@@ -3973,7 +4126,7 @@ enum LocalCache {
   /// inspector. Cheap; iterates entities once.
   @MainActor
   static func logTaskStateSummary(in context: ModelContext) {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     let today = SeptenaDate.today
     var open = 0, done = 0, cancelled = 0
     var todayFlag = 0, scheduledLE = 0, dueLE = 0
@@ -3993,8 +4146,8 @@ enum LocalCache {
       if e.pendingDeletion { pendingDel += 1 }
       if e.cloudKitSystemFields != nil { withSystemFields += 1 }
     }
-    let areas = (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []
-    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+    let areas = StoreHealth.fetch(context, FetchDescriptor<AreaEntity>())
+    let projects = StoreHealth.fetch(context, FetchDescriptor<ProjectEntity>())
     let areasWithCK = areas.filter { $0.cloudKitSystemFields != nil }.count
     let projectsWithCK = projects.filter { $0.cloudKitSystemFields != nil }.count
 
@@ -4036,7 +4189,7 @@ enum LocalCache {
     // (a deadline of today counts as overdue), and scheduled dates never
     // count. Keep these two definitions in lockstep.
     let today = SeptenaDate.today
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
       guard e.deletedAt == nil, !e.pendingDeletion,
             e.status == .open, let d = e.deadline, d <= today else { return acc }
@@ -4050,21 +4203,21 @@ enum LocalCache {
       sortBy: [SortDescriptor(\.sortIndex, order: .reverse),
                SortDescriptor(\.updatedAt, order: .reverse)]
     )
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Goal.init)
   }
 
   @MainActor
   static func areas(in context: ModelContext) -> [Area] {
     let descriptor = FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.title)])
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Area.init)
   }
 
   @MainActor
   static func projects(in context: ModelContext) -> [Project] {
     let descriptor = FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.title)])
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Project.init)
   }
 }
@@ -4090,10 +4243,17 @@ enum StructureCache {
   static func snapshot(in context: ModelContext) -> (areas: [Area], projects: [Project]) {
     installObserverIfNeeded()
     if let cached { return cached }
+    let token = StoreHealth.readToken()
     let snap = (
       areas: TaskStructureOrder.orderedAreas(LocalCache.areas(in: context)),
       projects: TaskStructureOrder.orderedProjects(LocalCache.projects(in: context))
     )
+    // A failed read looks exactly like an empty store. Memoizing THAT would
+    // pin an empty sidebar for the rest of the process, because only a
+    // structure change drops the cache — and no structure change is coming.
+    // Return the empty snapshot for this render, keep the cache unset, and
+    // let the next call try the store again.
+    guard !StoreHealth.readsFailed(since: token) else { return snap }
     cached = snap
     return snap
   }
