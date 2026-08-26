@@ -167,7 +167,7 @@ final class TaskAttachmentStore {
       contentType: values.contentType?.identifier ?? "application/octet-stream",
       byteCount: bytes, position: Double(attachments(taskID: taskID).count), localFilename: stored)
     context.insert(entity)
-    try context.save()
+    try StoreHealth.saveOrThrow(context, op: "TaskAttachmentRecord.add")
     engine.noteTaskAttachmentChange(id: id)
     TaskChange.post(taskID)
   }
@@ -177,7 +177,7 @@ final class TaskAttachmentStore {
     let id = entity.id
     if let url = TaskAttachmentFiles.url(for: entity) { try? FileManager.default.removeItem(at: url) }
     context.delete(entity)
-    try? context.save()
+    StoreHealth.save(context, op: "TaskAttachmentRecord.remove")
     engine.noteTaskAttachmentDeletion(id: id)
     TaskChange.post(taskID)
   }

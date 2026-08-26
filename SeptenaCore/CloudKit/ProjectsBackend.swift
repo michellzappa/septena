@@ -127,8 +127,13 @@ final class CloudKitProjectsBackend: ProjectsBackend {
   private func commitAndPush(_ entity: ProjectEntity, op: String, deletion: Bool = false) {
     let id = entity.id
     let title = entity.title
-    do { try context.save() } catch {
-      SeptenaLog.error("CK projects: context.save failed", error)
+    // A rolled-back save means the change no longer exists locally, so it
+    // must not be pushed to CloudKit as if it did. Same rule as
+    // `CloudKitTasksBackend.commitAndPush`.
+    guard StoreHealth.save(context, op: "project.\(op)") else {
+      SeptenaLog.error("[CK] project \(op) id=\(id) NOT pushed — local save failed and rolled back")
+      NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
+      return
     }
     if deletion {
       engine.noteProjectDeletion(id: id)
@@ -227,9 +232,7 @@ final class CloudKitProjectsBackend: ProjectsBackend {
       if entity.position != newPos { entity.position = newPos; changed.append(id) }
     }
     guard !changed.isEmpty else { return }
-    do { try context.save() } catch {
-      SeptenaLog.error("CK projects: reorder save failed", error)
-    }
+    guard StoreHealth.save(context, op: "project.reorder") else { return }
     for id in changed { engine.noteProjectChange(id: id) }
     SeptenaLog.info("[CK] project reorder → \(changed.count) repositioned")
     NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
