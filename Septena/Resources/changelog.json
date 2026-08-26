@@ -4,50 +4,50 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1654,
-      "date": "2026-08-25",
+      "build": 1661,
+      "date": "2026-08-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app",
-          "detail": "A new companion app puts just your tasks front and center, sharing the same private data as Septena, with its own Mac, iPhone, iPad, and Watch experience.",
+          "title": "Septask, a focused task app",
+          "detail": "A new app that puts just your tasks front and center, sharing the same private data as Septena, with a watch companion.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks are far more reliable",
-          "detail": "Completing a repeating task now reliably spawns its next occurrence, and you can pause, resume, or reschedule a whole series.",
+          "title": "Recurring tasks are more reliable",
+          "detail": "Completing a repeating task now reliably spawns its next occurrence, and you can pause, resume, or reschedule a series.",
           "section": "tasks"
         },
         {
-          "title": "Undo works everywhere, and deleted tasks can come back",
-          "detail": "One shared undo stack now covers every task view, the completion-undo window is longer, and a Recently Deleted list keeps removed tasks recoverable for 30 days.",
+          "title": "Recover deleted tasks and attach files",
+          "detail": "Deleted tasks land in Recently Deleted for 30 days with one-tap restore, and tasks can now carry attachments.",
           "section": "tasks"
         },
         {
-          "title": "Redesigned date picker and calendar events in Today",
-          "detail": "Setting a task's date now uses quick-pick pills and a calendar popover, and your calendar events appear alongside tasks in Today and Upcoming, with hidden-calendar choices synced across devices.",
-          "section": "tasks"
-        },
-        {
-          "title": "Photo-first meal logging",
-          "detail": "Snap a photo of your meal and have it analyzed on-device to prefill nutrition details, including an optional ingredient breakdown.",
+          "title": "Snap a photo to log a meal",
+          "detail": "On-device photo analysis prefills a meal's details, and re-logging a meal can scale it by amount and include an ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Import your tasks from Things",
-          "detail": "Bring over an existing Things database, including its project sections and headings.",
-          "section": "tasks"
-        },
-        {
-          "title": "Training sessions get progression hints and richer editing",
-          "detail": "Strength sets now suggest a one-tap progression, sessions carry real start/end times, and effort-weighted muscle volume shows up in a post-session review.",
+          "title": "More training tools",
+          "detail": "Cardio exercises, progression hints, editable session start/end times, an auto-advancing rest timer, and an effort-weighted weekly review.",
           "section": "training"
         },
         {
-          "title": "See exactly what telemetry is sent",
-          "detail": "Privacy settings now show a full ladder of analytics levels and a recently-sent log, with anonymized counts even when you opt out.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Goals can be pinned to the week dashboard with contextual actions and colors, and more sections now suggest goals to track.",
+          "section": "goals"
+        },
+        {
+          "title": "Steadier saving and syncing",
+          "detail": "Failed saves and reads are now detected and rolled back instead of silently corrupting your data.",
           "section": null
+        },
+        {
+          "title": "Copy your grocery list",
+          "detail": "Add items straight to the clipboard from the grocery shopping list.",
+          "section": "groceries"
         }
       ]
     },
