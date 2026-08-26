@@ -482,6 +482,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate, NSTextFieldDel
     deferCommitAndCollapse()
   }
 
+  /// A title is one line. A pasted multi-line string would otherwise sit in the
+  /// field with its breaks intact and clip at the first one. Notes keeps its
+  /// breaks — that field is prose (`textDidChange` below).
+  func controlTextDidChange(_ obj: Notification) {
+    guard let field = obj.object as? NSTextField, field === titleField else { return }
+    field.septaskFlattenPastedLineBreaks()
+  }
+
   func textDidChange(_ notification: Notification) {
     guard let textView = notification.object as? NSTextView, textView === notesView else { return }
     MarkdownNotesStyle.restyle(textView, fontSize: SeptaskKitTheme.notesFontSize)

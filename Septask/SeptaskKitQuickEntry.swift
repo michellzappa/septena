@@ -126,6 +126,12 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   // MARK: - NSTextFieldDelegate / NSWindowDelegate
 
+  /// One task, one line: flatten a pasted multi-line string as it lands rather
+  /// than letting the panel hold breaks it will never save.
+  func controlTextDidChange(_ obj: Notification) {
+    field.septaskFlattenPastedLineBreaks()
+  }
+
   func control(_ control: NSControl, textView: NSTextView,
                doCommandBy commandSelector: Selector) -> Bool {
     switch commandSelector {

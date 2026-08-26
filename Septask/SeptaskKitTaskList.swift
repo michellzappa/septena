@@ -4186,6 +4186,12 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
   }
 
+  /// Rename holds one line too — flatten a pasted block before it reaches
+  /// `controlTextDidEndEditing` and gets written as the title.
+  func controlTextDidChange(_ obj: Notification) {
+    title.septaskFlattenPastedLineBreaks()
+  }
+
   func controlTextDidEndEditing(_ obj: Notification) {
     guard editing else { return }
     editing = false

@@ -438,4 +438,39 @@ final class KitFilterSurface: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
 
   func windowDidResignKey(_ notification: Notification) { dismissPanel() }
 }
+
+// MARK: - Single-line title fields
+
+extension NSTextField {
+
+  /// Flatten a pasted multi-line string as it lands, so a title field can only
+  /// ever hold one line.
+  ///
+  /// AppKit's field editor ends editing on a typed Return, but it accepts a
+  /// PASTED line break as ordinary text: the string keeps the breaks, the cell
+  /// clips at the first one, and the row (laid out for exactly one line) shows
+  /// a title that doesn't match what was pasted. Every title field calls this
+  /// from `controlTextDidChange`; `TaskTitleText.singleLine` joins the lines
+  /// with one space so the words don't fuse.
+  ///
+  /// The caret lands at the end — a paste puts it there anyway, and the field
+  /// editor's offsets are stale once the text is rewritten.
+  func septaskFlattenPastedLineBreaks() {
+    let editor = currentEditor()
+    let raw = editor?.string ?? stringValue
+    guard raw.contains(where: \.isNewline) else { return }
+    let flat = TaskTitleText.singleLine(raw)
+    guard let editor else { stringValue = flat; return }
+    // Rewriting the text drops the run attributes the rename path installed on
+    // the field editor (the row's own face), so re-assert them over the whole
+    // string — otherwise a paste changes the title's font mid-edit.
+    let attributes = (editor as? NSTextView)?.typingAttributes
+    editor.string = flat
+    if let attributes, let storage = (editor as? NSTextView)?.textStorage {
+      storage.setAttributes(attributes,
+                            range: NSRange(location: 0, length: storage.length))
+    }
+    editor.selectedRange = NSRange(location: (flat as NSString).length, length: 0)
+  }
+}
 #endif

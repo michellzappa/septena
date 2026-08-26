@@ -336,3 +336,30 @@ final class TaskMutator {
     cloudBackend.unacknowledge(id: id)
   }
 }
+
+// MARK: - Title text
+
+/// A task title is ALWAYS one line — every task surface (row, widget, watch,
+/// AppKit cell) lays out one line and truncates. So a pasted multi-line string
+/// must never reach the store, and must never even *render* as a break inside
+/// the editor. Title editors call this on every change; the field then shows
+/// exactly what will be saved.
+enum TaskTitleText {
+
+  /// Flatten a pasted block: each line is trimmed, empty lines drop, and the
+  /// lines join with ONE space. "buy milk\n\n  buy eggs" → "buy milk buy eggs".
+  static func singleLine(_ raw: String) -> String {
+    guard raw.contains(where: \.isNewline) else { return raw }
+    return raw.split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+      .joined(separator: " ")
+  }
+
+  /// Remove line breaks with NOTHING in their place — the Return-to-save path,
+  /// where the break is a keystroke the user meant as "commit", not text. A
+  /// space here would leave a stray gap wherever the caret sat mid-title.
+  static func withoutLineBreaks(_ raw: String) -> String {
+    String(raw.filter { !$0.isNewline })
+  }
+}
