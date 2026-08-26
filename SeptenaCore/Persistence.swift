@@ -4110,6 +4110,7 @@ enum LocalCache {
   /// checking in place) apart from a row that left a list for some other
   /// reason (deleted, deferred, rescheduled off the filter). Cheap and only
   /// called when a visible open row actually vanished, so a full fetch is fine.
+  @MainActor
   static func completedIDs(among ids: Set<String>, in context: ModelContext) -> Set<String> {
     guard !ids.isEmpty else { return [] }
     let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
