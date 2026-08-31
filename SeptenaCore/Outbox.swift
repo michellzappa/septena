@@ -312,7 +312,16 @@ final class TaskMutator {
       source: source
     )
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
-    if let rule = task.recurrence { setRecurrence(id: copy.id, recurrence: rule) }
+    if let rule = task.recurrence {
+      setRecurrence(id: copy.id, recurrence: rule)
+      // `setRecurrence` resets the pause across the series it writes, so a
+      // copy of a PAUSED repeat came back ACTIVE and started spawning
+      // occurrences the original was deliberately holding back. Carry the
+      // pause over. (The copy gets its OWN series id — `create` sets none, so
+      // `setRecurrence` seeds it from the copy — which is why this has to be
+      // re-asserted here rather than inherited.)
+      if task.recurrencePaused { setRecurrencePaused(id: copy.id, paused: true) }
+    }
     return copy
   }
 
