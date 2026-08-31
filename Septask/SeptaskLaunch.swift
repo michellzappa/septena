@@ -42,6 +42,11 @@ enum SeptaskLaunch {
     ClaudeReconnectNudge.shared.activate()
     SeptaskDiagnosticsCoordinator.shared.start()
     try? await services.ckEngine.fetchChanges()
+    // Opened after midnight (or after a few days away): a backgrounded app
+    // does not reliably receive `NSCalendarDayChanged`, so the foreground is
+    // the reliable place to advance fixed-schedule repeats. Idempotent —
+    // keep in parity with Septena's `.active` branch in App.swift.
+    services.taskMutator.catchUpFixedSchedules()
     await ClaudeGatewayProvider.shared.refreshIfNeeded()
     ClaudeReconnectNudge.shared.reconcile()
   }

@@ -1696,22 +1696,28 @@ final class SeptaskKitTaskListController: NSViewController {
       NSSound.beep()
       return
     }
-    let first = selection[0]
-    let hasScheduledDate = selection.allSatisfy { $0.scheduled != nil }
     SeptaskKitRepeatPopover.present(
-      initial: first.recurrence,
-      paused: first.recurrencePaused,
-      hasScheduledDate: hasScheduledDate,
+      selection: SeptaskKitRepeatSelection(selection),
       relativeTo: rect, of: host
     ) { [weak self] result in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
       for task in selection {
-        if let recurrence = result.recurrence {
-          self.mutator.setRecurrence(id: task.id, recurrence: recurrence)
-          self.mutator.setRecurrencePaused(id: task.id, paused: result.paused)
-        } else {
+        if result.clears {
           self.mutator.setRecurrence(id: task.id, recurrence: nil)
+        } else {
+          // Overlay only the axes the editor answered onto THIS row's own
+          // rule. Handing the editor's whole draft to every row is what used
+          // to flatten a mixed selection onto row one's cadence.
+          self.mutator.setRecurrence(id: task.id,
+                                     recurrence: result.applied(to: task.recurrence))
+          // `setRecurrence` clears the pause across the series, so editing
+          // the cadence of a PAUSED series would silently resume it.
+          // Re-assert the pause being kept (or the one just chosen); the
+          // false case needs no write, since setRecurrence already cleared it.
+          if result.paused ?? task.recurrencePaused {
+            self.mutator.setRecurrencePaused(id: task.id, paused: true)
+          }
         }
         self.refreshComposerRow(taskId: task.id)
       }

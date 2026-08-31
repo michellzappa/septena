@@ -103,13 +103,14 @@ final class CloudKitTasksBackend {
   /// Inserts the next instance as a complete, recurring TaskEntity in one
   /// local save. The deterministic id makes this safe when two surfaces
   /// complete the same source row close together.
+  @discardableResult
   private func createRecurringOccurrence(from entity: TaskEntity,
                                          recurrence: Recurrence,
-                                         scheduled: String) {
+                                         scheduled: String) -> Bool {
     let id = Recurrence.occurrenceID(sourceTaskID: entity.id, scheduled: scheduled)
     guard fetch(id: id) == nil else {
       SeptenaLog.info("[CK] recurrence.create id=\(id) already exists — idempotent no-op")
-      return
+      return false
     }
 
     let next = TaskEntity(
@@ -149,6 +150,7 @@ final class CloudKitTasksBackend {
     )
     context.insert(next)
     commitAndPush(next, op: "recurrence.create")
+    return true
   }
 
   // MARK: Conversation (Task Conversations — docs/TASK_CONVERSATIONS_PHASE0.md)
@@ -608,6 +610,123 @@ final class CloudKitTasksBackend {
                                              scheduled: nextDate)).map(SeptenaTask.init)
   }
 
+  // MARK: Fixed-schedule catch-up
+
+  /// How many missed occurrences ONE run will materialize for a single
+  /// series. Past this the series is dormant rather than merely late, and
+  /// back-filling it is noise: a weekly task untouched since spring should
+  /// put *this* week's copy on the list, not forty stale ones.
+  private static let maxCatchUp = 8
+
+  /// Guard rail on the cadence walk — a corrupt anchor date must not spin.
+  /// Ten years of a daily rule still fits well inside it.
+  private static let catchUpWalkLimit = 5_000
+
+  /// Materialize the fixed-schedule occurrences whose day has already come.
+  ///
+  /// A completion-based rule genuinely has nothing to do until you tick the
+  /// box — its next date is anchored to the tick. A FIXED one is a promise
+  /// about dates: "every Friday" means a Friday task exists on Friday whether
+  /// or not last Friday's got done. Until this ran, `complete` was the only
+  /// thing in the app that ever advanced a series, so an uncompleted fixed
+  /// repeat froze on ONE perpetually-overdue row and looked like a repeat
+  /// that had stopped working.
+  ///
+  /// The overdue rows are left exactly where they are — unfinished work is
+  /// still the user's, and rescheduling it would erase the fact that it was
+  /// missed. Catch-up only adds the copies that should already exist.
+  ///
+  /// Idempotent by construction: every occurrence id is derived from
+  /// (source id, scheduled date), so a second run — or a second device, or a
+  /// later `complete` on the same source — asks for ids that already exist
+  /// and no-ops. Safe to call on every launch, foreground, and day rollover,
+  /// which is exactly how it is wired.
+  /// `today` defaults to `DayClock.appToday` — resolved in the body, not as a
+  /// default argument, because a default-argument expression is evaluated
+  /// nonisolated and `appToday` is main-actor state.
+  @discardableResult
+  func catchUpFixedSchedules(today explicitToday: String? = nil) -> Int {
+    let today = explicitToday ?? DayClock.appToday
+    let descriptor = FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.recurrenceUnit != nil }
+    )
+    let candidates = ((try? context.fetch(descriptor)) ?? []).filter {
+      $0.status == .open
+        && !$0.recurrencePaused
+        && !$0.isHeading
+        && $0.deletedAt == nil
+        && !$0.pendingDeletion
+        && $0.recurrence?.afterCompletion == false
+    }
+    guard !candidates.isEmpty else { return 0 }
+
+    // One head per series: the open copy holding the LATEST logical slot.
+    // Walking from anywhere else would re-create copies the series already
+    // has. Ties break on id so two devices pick the same head and therefore
+    // derive the same occurrence ids.
+    var heads: [String: TaskEntity] = [:]
+    for task in candidates {
+      guard let slot = task.recurrenceAnchorDate ?? task.scheduled else { continue }
+      let seriesID = task.recurrenceSeriesID ?? task.id
+      guard let held = heads[seriesID] else { heads[seriesID] = task; continue }
+      let heldSlot = held.recurrenceAnchorDate ?? held.scheduled ?? ""
+      if slot > heldSlot || (slot == heldSlot && task.id > held.id) { heads[seriesID] = task }
+    }
+
+    var created = 0
+    for head in heads.values.sorted(by: { $0.id < $1.id }) {
+      created += catchUp(head: head, today: today)
+    }
+    if created > 0 {
+      SeptenaLog.info("[CK] recurrence.catchUp created \(created) occurrence(s) through \(today)")
+    }
+    return created
+  }
+
+  /// Walk one series' cadence from its head to today, creating what is
+  /// missing. Every copy is made FROM THE HEAD rather than chained off the
+  /// previous copy: the ids stay deterministic either way, but deriving them
+  /// all from one row means a device that starts the walk late lands on the
+  /// same ids as one that ran every day.
+  private func catchUp(head: TaskEntity, today: String) -> Int {
+    guard let rule = head.recurrence,
+          // The series' LOGICAL slot, not the visible date — a one-off
+          // exception moved the row, it did not move the cadence.
+          let start = head.recurrenceAnchorDate ?? head.scheduled,
+          start < today else { return 0 }
+
+    var slots: [String] = []
+    var cursor = start
+    var steps = 0
+    while steps < Self.catchUpWalkLimit {
+      steps += 1
+      guard let next = rule.nextDate(completedOn: cursor, scheduled: cursor,
+                                     logicalScheduled: cursor),
+            next > cursor else { break }
+      if next > today { break }
+      slots.append(next)
+      cursor = next
+    }
+    guard let latest = slots.last else { return 0 }
+
+    if slots.count > Self.maxCatchUp {
+      // Say what was dropped. A silent truncation here reads as "the repeat
+      // is broken again" the next time someone counts the rows.
+      SeptenaLog.info("""
+        [CK] recurrence.catchUp id=\(head.id) dormant since \(start) — \
+        materializing \(latest) only, skipping \(slots.count - 1) missed slot(s)
+        """)
+      slots = [latest]
+    }
+
+    var created = 0
+    for slot in slots where createRecurringOccurrence(from: head, recurrence: rule,
+                                                      scheduled: slot) {
+      created += 1
+    }
+    return created
+  }
+
   func setDeadline(id: String, date: Date?) {
     guard let entity = fetch(id: id) else { return }
     // Deadline is rendering-only (Things-style): the Today filter unions
@@ -653,7 +772,11 @@ final class CloudKitTasksBackend {
       return
     }
 
-    let targets = members.isEmpty ? [entity] : members.filter { $0.status == .open }
+    // The addressed row is ALWAYS a target. `members` filtered to open rows
+    // alone, so setting a rule on a series whose only rows are finished — a
+    // task edited from the Logbook, or the occurrence you just ticked — wrote
+    // nothing at all and reported success.
+    let targets = seriesTargets(entity: entity, members: members)
     for member in targets {
       member.recurrenceSeriesID = seriesID
       member.recurrence = recurrence
@@ -675,12 +798,22 @@ final class CloudKitTasksBackend {
     guard let entity = fetch(id: id), entity.recurrence != nil else { return }
     let seriesID = entity.recurrenceSeriesID ?? entity.id
     let members = seriesMembers(seriesID: seriesID)
-    let targets = members.isEmpty ? [entity] : members.filter { $0.status == .open }
+    let targets = seriesTargets(entity: entity, members: members)
     for member in targets {
       member.recurrencePaused = paused
       member.pendingSync = true
       commitAndPush(member, op: paused ? "recurrence.pause" : "recurrence.resume")
     }
+  }
+
+  /// The rows a series-wide rule edit writes to: every OPEN copy, plus the
+  /// row the caller actually named — which may itself be finished. Editing a
+  /// rule is a statement about the series, so it must never silently write to
+  /// nothing.
+  private func seriesTargets(entity: TaskEntity, members: [TaskEntity]) -> [TaskEntity] {
+    var targets = members.filter { $0.status == .open && $0.id != entity.id }
+    targets.insert(entity, at: 0)
+    return targets
   }
 
   private func seriesMembers(seriesID: String) -> [TaskEntity] {

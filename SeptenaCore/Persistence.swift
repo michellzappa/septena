@@ -1705,8 +1705,15 @@ extension SeptenaTask {
       notes: e.notes,
       recurrence: e.recurrence,
       recurrencePaused: e.recurrencePaused,
+      // Pass the series' LOGICAL slot, the way `complete` does — without it
+      // the preview rebases on a one-off exception date and shows a next
+      // occurrence the completion will not actually create. (`DayClock.appToday`
+      // would match `complete` exactly, but this initializer is nonisolated;
+      // the two differ only under time travel.)
       nextOccurrence: e.status == .open
-        ? e.recurrence?.nextDate(completedOn: SeptenaDate.today, scheduled: e.scheduled)
+        ? e.recurrence?.nextDate(completedOn: SeptenaDate.today,
+                                 scheduled: e.scheduled,
+                                 logicalScheduled: e.recurrenceAnchorDate)
         : nil,
       updatedAt: e.updatedAt,
       deletedAt: e.deletedAt,

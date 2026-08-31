@@ -52,6 +52,9 @@ final class SeptenaServices {
   /// mutators; replays its result to any caller. Nil until first
   /// `start()`; non-nil thereafter so repeated calls coalesce.
   private var startTask: Task<Void, Never>?
+  /// Held for the process's lifetime — `SeptenaServices` is the shared
+  /// singleton, so there is no deinit to balance it against.
+  private var dayRolloverObserver: NSObjectProtocol?
 
   private init() {
     let context = LocalStore.shared.container.mainContext
@@ -248,6 +251,18 @@ final class SeptenaServices {
         // and idempotent: a no-op once the queue is clean.
         ckEngine.dropPendingReadwiseQuoteChanges()
       }
+      // Fixed-schedule repeats are a promise about DATES, so the series has
+      // to advance when the date does — not only when someone ticks a box.
+      // This covers a session that is running when the day flips (the Mac
+      // case). A backgrounded app does not reliably get
+      // `NSCalendarDayChanged`, which is why both roots also run the
+      // catch-up on foreground, and `absorbRemoteChanges` runs it at launch.
+      // All three are the same idempotent call.
+      dayRolloverObserver = NotificationCenter.default.addObserver(
+        forName: .NSCalendarDayChanged, object: nil, queue: .main
+      ) { _ in
+        Task { @MainActor in SeptenaServices.shared.taskMutator.catchUpFixedSchedules() }
+      }
     }
     startTask = task
     await task.value
@@ -298,6 +313,10 @@ final class SeptenaServices {
     SomedayStatusMigrator.runIfNeeded(context: context, engine: ckEngine)
     // Undo Septask peek/select acks that exiled undated MCP proposals to Anytime.
     PeekAckProposalRecovery.runIfNeeded(context: context, mutator: taskMutator)
+    // Advance fixed-schedule repeats to today. AFTER the fetch on purpose:
+    // occurrences another device already created are in the mirror by now, so
+    // the deterministic-id guard sees them and this adds only what is missing.
+    taskMutator.catchUpFixedSchedules()
     if !RuntimeProfile.current.isTasksOnly {
       // Fold any retired `bedtime` medication bucket into `evening`.
       medicationsMutator.migrateBedtimeBuckets()

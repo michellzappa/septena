@@ -132,6 +132,12 @@ struct SeptenaApp: App {
             Task { @MainActor in
               await services.start()
               SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+              // Opened after midnight (or after a few days away): a
+              // backgrounded app does not reliably receive
+              // `NSCalendarDayChanged`, so the foreground is the reliable
+              // place to advance fixed-schedule repeats. Idempotent — keep in
+              // parity with `SeptaskLaunch.activate()`.
+              services.taskMutator.catchUpFixedSchedules()
             }
             // Present the support moment armed in a prior session — before the
             // fresh milestone check below, so a thank-you ask and a brand-new

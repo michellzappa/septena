@@ -236,6 +236,18 @@ final class TaskMutator {
     return cloudBackend.createNextOccurrence(id: id)
   }
 
+  /// Materialize the fixed-schedule occurrences whose day has already come.
+  /// Idempotent and cheap to repeat — see `TasksBackend.catchUpFixedSchedules`
+  /// for why it is safe on every launch, foreground, and day rollover.
+  @discardableResult
+  func catchUpFixedSchedules() -> Int {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] catchUpFixedSchedules called before CK bound — dropping", nil)
+      return 0
+    }
+    return cloudBackend.catchUpFixedSchedules()
+  }
+
   func moveToArea(id: String, area: String?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] moveToArea called before CK bound — dropping", nil)

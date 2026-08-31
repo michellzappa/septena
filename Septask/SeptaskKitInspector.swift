@@ -360,18 +360,21 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   @objc private func editRepeat() {
     guard let current = task else { return }
     SeptaskKitRepeatPopover.present(
-      initial: current.recurrence,
-      paused: current.recurrencePaused,
-      hasScheduledDate: current.scheduled != nil,
+      selection: SeptaskKitRepeatSelection([current]),
       relativeTo: repeatButton.bounds, of: repeatButton
     ) { [weak self] result in
       guard let self else { return }
       let before = [TaskUndo.ScheduleSnapshot(current)]
-      if let recurrence = result.recurrence {
-        self.mutator.setRecurrence(id: current.id, recurrence: recurrence)
-        self.mutator.setRecurrencePaused(id: current.id, paused: result.paused)
-      } else {
+      if result.clears {
         self.mutator.setRecurrence(id: current.id, recurrence: nil)
+      } else {
+        // Same patch overlay as the list's editor — one row is just a
+        // selection of one.
+        self.mutator.setRecurrence(id: current.id,
+                                   recurrence: result.applied(to: current.recurrence))
+        if result.paused ?? current.recurrencePaused {
+          self.mutator.setRecurrencePaused(id: current.id, paused: true)
+        }
       }
       TaskUndo.recordScheduleChange(
         name: String(localized: "Change Repeat", comment: "SeptaskKit: undo action"),
