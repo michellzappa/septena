@@ -216,8 +216,8 @@ struct TaskAttributeBar: View {
     // One transition for every inline panel — they all slide down from the rail.
     Group {
       switch expanded {
-      case .when:       InlineWhenPanel(draft: $draft, accent: accent)
-      case .deadline:   InlineDatePanel(date: $draft.deadline, accent: accent)
+      case .when:       InlineWhenPanel(draft: $draft)
+      case .deadline:   InlineDatePanel(date: $draft.deadline)
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
                                           hasScheduledDate: draft.scheduled != nil,
                                           accent: accent) {
@@ -344,119 +344,57 @@ private struct AttributePill: View {
     }
   }
 }
-
 // MARK: - Inline "When" editor
 
 /// The scheduling control — the single home for Today and a planning date, so
-/// neither needs its own pill. Quick chips (Today / Tomorrow / Weekend) sit
-/// above a graphical calendar; picking today normalizes back to the
-/// pinned-Today state. Leaving it unset keeps the task in Anytime. Expanded
-/// under the When pill.
+/// neither needs its own pill. Body is `TaskDateBoard`, the app's one task
+/// date board, so the pill expands the SAME Today row / week strip / calendar
+/// / Clear the When sheet and the AppKit ⌘S popover show. It used to be three
+/// bespoke chips (Today / Tomorrow / Weekend) over a full month calendar — a
+/// third date vocabulary in a surface that already had two.
+///
+/// Picking today normalizes back to the pinned-Today state. Leaving it unset
+/// keeps the task in Anytime.
 private struct InlineWhenPanel: View {
   @Binding var draft: TaskDraft
-  let accent: Color
+
+  var body: some View {
+    TaskDateBoard(
+      selected: draft.scheduled,
+      todayActive: draft.onToday && draft.scheduled == nil,
+      clearLabel: (draft.scheduled != nil || draft.onToday) ? "No Date" : nil,
+      onToday: { a11yAnimate(.snappy(duration: 0.2)) { draft.setToday() } },
+      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } },
+      onClear: { a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() } })
+    .padding(12)
+    .background(Theme.secondaryGroupedBackground,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+  }
+}
+
+// MARK: - Inline date editor
+
+/// The Deadline pill's body — the same `TaskDateBoard` the When pill expands,
+/// writing a plain `Date?`. Its Today row is an ordinary date (a deadline has
+/// no today flag), which is the only way Deadline differs from When here.
+/// It used to be a bare month calendar with no relative choices at all.
+private struct InlineDatePanel: View {
+  @Binding var date: Date?
   @Environment(DayClock.self) private var clock
 
   private var cal: Calendar { Calendar.current }
   private var today: Date {
     cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
-  private var tomorrow: Date { cal.date(byAdding: .day, value: 1, to: today) ?? today }
-  /// Next Saturday.
-  private var weekend: Date {
-    var comps = DateComponents(); comps.weekday = 7
-    let next = cal.nextDate(after: today, matching: comps, matchingPolicy: .nextTime) ?? today
-    return cal.startOfDay(for: next)
-  }
-
-  private var isSet: Bool { draft.scheduled != nil || draft.onToday }
-
-  private var calendarBinding: Binding<Date> {
-    Binding(get: { draft.scheduled ?? today },
-            set: { d in a11yAnimate(.snappy(duration: 0.2)) { draft.setScheduled(d) } })
-  }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(spacing: 8) {
-        chip("Today", active: draft.onToday && draft.scheduled == nil) {
-          draft.setToday()
-        }
-        chip("Tomorrow", active: isSameDay(draft.scheduled, tomorrow)) { draft.setScheduled(tomorrow) }
-        chip("Weekend", active: isSameDay(draft.scheduled, weekend)) { draft.setScheduled(weekend) }
-      }
-
-      DatePicker("", selection: calendarBinding, displayedComponents: [.date])
-        .datePickerStyle(.graphical)
-        .tint(accent)
-
-      if isSet {
-        Button(role: .destructive) {
-          a11yAnimate(.snappy(duration: 0.2)) { draft.clearWhen() }
-        } label: {
-          Label("Clear", systemImage: "xmark.circle").font(.septenaLabel)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.overdueRed)
-      }
-    }
-    .padding(12)
-    .background(Theme.secondaryGroupedBackground,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-  }
-
-  private func isSameDay(_ a: Date?, _ b: Date) -> Bool {
-    a.map { cal.isDate($0, inSameDayAs: b) } ?? false
-  }
-
-  @ViewBuilder
-  private func chip(_ title: String, active: Bool, _ action: @escaping () -> Void) -> some View {
-    Button { a11yAnimate(.snappy(duration: 0.2)) { action() } } label: {
-      Text(title)
-        .font(.septenaLabel)
-        .foregroundStyle(active ? Theme.inkPrimary : Theme.inkSecondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .background(Capsule().fill(active ? accent.opacity(0.42) : Theme.mutedSurface))
-  }
-}
-
-// MARK: - Inline date editor
-
-/// A graphical calendar that writes a `Date?`. Selecting a day sets it;
-/// "Clear" removes it. Lives inside the composer card when the Deadline pill
-/// is expanded.
-private struct InlineDatePanel: View {
-  @Binding var date: Date?
-  let accent: Color
-  @Environment(DayClock.self) private var clock
-
-  private var bound: Binding<Date> {
-    let anchor = Calendar.current.startOfDay(
-      for: SeptenaDate.parse(clock.today) ?? clock.now)
-    return Binding(get: { date ?? anchor },
-            set: { date = Calendar.current.startOfDay(for: $0) })
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      DatePicker("", selection: bound, displayedComponents: [.date])
-        .datePickerStyle(.graphical)
-        .tint(accent)
-      if date != nil {
-        Button(role: .destructive) {
-          a11yAnimate(.snappy(duration: 0.2)) { date = nil }
-        } label: {
-          Label("Clear", systemImage: "xmark.circle")
-            .font(.septenaLabel)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Theme.overdueRed)
-      }
-    }
+    TaskDateBoard(
+      selected: date,
+      todayActive: date.map { cal.isDate($0, inSameDayAs: today) } ?? false,
+      clearLabel: date != nil ? "Remove Deadline" : nil,
+      onToday: { a11yAnimate(.snappy(duration: 0.2)) { date = today } },
+      onPick: { d in a11yAnimate(.snappy(duration: 0.2)) { date = cal.startOfDay(for: d) } },
+      onClear: { a11yAnimate(.snappy(duration: 0.2)) { date = nil } })
     .padding(12)
     .background(Theme.secondaryGroupedBackground,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous))

@@ -1,6 +1,11 @@
 # Consumables Generalization — Execution Plan
 
-Status: build started. Owner: MZ. Date: 2026-06-10.
+> **Shipped — historical.** The Intake kind→item→event spine is live
+> (`SeptenaCore/IntakeModel.swift`, the Intake section, the MCP `intake_*`
+> verbs). Kept because ten source files cite it for the locked decisions and
+> schema. Code wins where they disagree.
+
+Status: shipped (was "build started"). Owner: MZ. Date: 2026-06-10.
 Companion to the rationale doc [`CONSUMABLES_GENERALIZATION_STUDY.md`](CONSUMABLES_GENERALIZATION_STUDY.md)
 — that doc argues *why* and *what*; this doc is the *how*, the locked
 decisions, the schema, and the milestone gates. Where they conflict, the study

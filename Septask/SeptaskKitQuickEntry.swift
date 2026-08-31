@@ -3,7 +3,9 @@ import AppKit
 import Carbon.HIToolbox
 
 // Things-style Quick Entry for the AppKit shell: floats a small capture
-// panel without switching apps. Return files the capture to the Inbox (the
+// panel without switching apps. A TIER 2 surface (SeptaskKitSurface.swift) —
+// it captures into the app at large, so it has no row to anchor to and wears
+// the shared `KitSurfacePanel` chrome. Return files the capture to the Inbox (the
 // triage band — the app's one home for loose captures); ⌘Return sends it
 // straight to Today; Esc or clicking away dismisses. Writes go through
 // TaskMutator like every other surface.
@@ -20,7 +22,7 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   static let shared = SeptaskKitQuickEntry()
 
-  private var panel: NSPanel?
+  private var panel: KitSurfacePanel?
   private let field = NSTextField()
   private static var hotKeyRef: EventHotKeyRef?
 
@@ -63,20 +65,12 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     panel?.orderOut(nil)
   }
 
-  private func ensurePanel() -> NSPanel {
+  private func ensurePanel() -> KitSurfacePanel {
     if let panel { return panel }
-
-    let width: CGFloat = 560
-    let content = NSVisualEffectView()
-    content.material = .popover
-    content.state = .active
-    content.wantsLayer = true
-    content.layer?.cornerRadius = 12
-    content.layer?.masksToBounds = true
 
     field.placeholderString = String(localized: "New task…",
                                      comment: "SeptaskKit: quick entry placeholder")
-    field.font = .systemFont(ofSize: SeptenaTypeScale.size(.title3))
+    field.font = KitSurface.fieldFont
     field.isBordered = false
     field.drawsBackground = false
     field.focusRingType = .none
@@ -90,27 +84,24 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     hint.textColor = SeptaskKitTheme.iconMuted
     hint.translatesAutoresizingMaskIntoConstraints = false
 
-    content.addSubview(field)
-    content.addSubview(hint)
+    let body = NSView()
+    body.addSubview(field)
+    body.addSubview(hint)
+    let inset = KitSurface.listInset + 2
     NSLayoutConstraint.activate([
-      field.topAnchor.constraint(equalTo: content.topAnchor, constant: 16),
-      field.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 18),
-      field.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -18),
+      field.topAnchor.constraint(equalTo: body.topAnchor, constant: 16),
+      field.leadingAnchor.constraint(equalTo: body.leadingAnchor, constant: inset),
+      field.trailingAnchor.constraint(equalTo: body.trailingAnchor, constant: -inset),
       hint.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 10),
       hint.leadingAnchor.constraint(equalTo: field.leadingAnchor),
-      hint.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
+      hint.bottomAnchor.constraint(equalTo: body.bottomAnchor, constant: -12),
     ])
 
-    let panel = QuickEntryPanel(
-      contentRect: NSRect(x: 0, y: 0, width: width, height: 78),
-      styleMask: [.borderless, .nonactivatingPanel],
-      backing: .buffered, defer: false)
-    panel.contentView = content
-    panel.level = .floating
-    panel.isOpaque = false
-    panel.backgroundColor = .clear
-    panel.hasShadow = true
-    panel.hidesOnDeactivate = false
+    let panel = KitSurfacePanel.make(
+      size: NSSize(width: 560, height: 78),
+      a11yTitle: String(localized: "Quick Entry",
+                        comment: "SeptaskKit: quick entry panel a11y title"))
+    panel.install(body)
     panel.delegate = self
     panel.onCommandReturn = { [weak self] in self?.save(today: true) }
     self.panel = panel
@@ -135,6 +126,12 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   // MARK: - NSTextFieldDelegate / NSWindowDelegate
 
+  /// One task, one line: flatten a pasted multi-line string as it lands rather
+  /// than letting the panel hold breaks it will never save.
+  func controlTextDidChange(_ obj: Notification) {
+    field.septaskFlattenPastedLineBreaks()
+  }
+
   func control(_ control: NSControl, textView: NSTextView,
                doCommandBy commandSelector: Selector) -> Bool {
     switch commandSelector {
@@ -156,21 +153,4 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
   }
 }
 
-/// Borderless panels refuse key status by default; this one must take it so
-/// the field can edit. ⌘Return is caught here because command-keys route via
-/// performKeyEquivalent, not the field editor.
-private final class QuickEntryPanel: NSPanel {
-  var onCommandReturn: (() -> Void)?
-
-  override var canBecomeKey: Bool { true }
-
-  override func performKeyEquivalent(with event: NSEvent) -> Bool {
-    if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-       event.keyCode == 36 {
-      onCommandReturn?()
-      return true
-    }
-    return super.performKeyEquivalent(with: event)
-  }
-}
 #endif

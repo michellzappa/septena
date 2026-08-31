@@ -1,10 +1,15 @@
 # Training → CloudKit Migration Handoff
 
-Last updated: 2026-05-23
-Status: **not started** — design only, ready to implement
+> **Shipped — historical.** Training runs on CloudKit + SwiftData; sessions,
+> entries and the exercise library are live, and `docs/CloudKitSchema.md` holds
+> the authoritative field table. Kept for the migration reasoning and because
+> `README.md` links it. The "Status: not started" line it used to carry was
+> three months out of date.
+
+Last updated: 2026-05-23 (status corrected 2026-08-23)
 
 Sibling repos:
-- iOS: `/Users/mz/Dev/septena-cloud`
+- iOS: `/Users/mz/Dev/septena` (this repo; formerly `septena-cloud`)
 - FastAPI: `/Users/mz/Dev/septena-app`
 
 This is a focused handoff for **the Training section**. The general

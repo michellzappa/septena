@@ -60,7 +60,19 @@ actor CloudKitRecordRegistry {
   func finishBatch() -> ChangeSet {
     let result = changes
     guard result.touchedTasks || result.touchedStructure || result.touchedData else { return result }
-    PerfTrace.spanSync("ck.applyBatch.save") { try? modelContext.save() }
+    // Same rule as the main context (`StoreHealth.save`): a failed save leaves
+    // its pending changes behind, so every later batch retries them and fails
+    // the same way. This actor writes the SAME store as the main context, so a
+    // wedged batch context also means inbound CloudKit changes stop landing
+    // while the app still looks online. Log the real error and roll back.
+    PerfTrace.spanSync("ck.applyBatch.save") {
+      do {
+        try modelContext.save()
+      } catch {
+        SeptenaLog.error("[CKEngine] applyBatch save failed: \(StoreHealth.detail(error))")
+        modelContext.rollback()
+      }
+    }
     changes = ChangeSet()
     return result
   }

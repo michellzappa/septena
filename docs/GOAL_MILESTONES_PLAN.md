@@ -1,7 +1,8 @@
 # Goal Milestones
 
-> **STATUS: BUILT 2026-06-10** (uncommitted; iOS + macOS + watchOS schemes
-> green). Implementation notes where reality diverged from the plan:
+> **STATUS: SHIPPED 2026-06-10** (committed since; `MilestoneEngine.swift`,
+> `MilestonePresenter.swift`, and the `Milestone` rows in `CloudKitSchema.md`
+> are the truth — this file is kept because those three cite it). Implementation notes where reality diverged from the plan:
 > - Detection runs **inside the mutators** (`ChecklistMutator.setHabitState`,
 >   `TrainingMutator.addEntry`, `WithingsStore.upsert`), so every write path
 >   (views, App Intents, MCP) detects — not just view-side call sites.

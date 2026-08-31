@@ -36,6 +36,21 @@ final class TaskEntity {
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
+  /// Keeps the repeat rule while preventing completion from generating the
+  /// next copy. Pause/resume is a series-level operation.
+  /// The `= false` is REQUIRED, not style: a new non-optional attribute with
+  /// no default has nothing to write into existing rows, so lightweight
+  /// migration fails with "missing attribute values on mandatory destination
+  /// attribute" and the store won't open. Every new non-optional property on
+  /// a persisted entity needs a default (or must be optional).
+  var recurrencePaused: Bool = false
+  /// Stable identity shared by every generated occurrence in one repeating
+  /// series. Legacy rows are nil and are promoted to their own id when a
+  /// repeat rule is next edited.
+  var recurrenceSeriesID: String?
+  /// The occurrence's logical slot on a fixed schedule. This deliberately
+  /// differs from `scheduled` when the user makes a one-off exception.
+  var recurrenceAnchorDate: String?
   /// Bumped every time we apply a server payload. Lets the syncer detect
   /// rows that the latest pull didn't touch (= server-side deletions).
   var lastSyncedAt: Date
@@ -118,6 +133,9 @@ final class TaskEntity {
        recurrenceUnit: String? = nil,
        recurrenceInterval: Int = 1,
        recurrenceAfterCompletion: Bool = true,
+       recurrencePaused: Bool = false,
+       recurrenceSeriesID: String? = nil,
+       recurrenceAnchorDate: String? = nil,
        lastSyncedAt: Date = .distantPast,
        sortIndex: Int = 0,
        position: Double = 0,
@@ -148,6 +166,9 @@ final class TaskEntity {
     self.recurrenceUnit = recurrenceUnit
     self.recurrenceInterval = recurrenceInterval
     self.recurrenceAfterCompletion = recurrenceAfterCompletion
+    self.recurrencePaused = recurrencePaused
+    self.recurrenceSeriesID = recurrenceSeriesID
+    self.recurrenceAnchorDate = recurrenceAnchorDate
     self.lastSyncedAt = lastSyncedAt
     self.sortIndex = sortIndex
     self.position = position
@@ -1683,6 +1704,7 @@ extension SeptenaTask {
       project: e.project,
       notes: e.notes,
       recurrence: e.recurrence,
+      recurrencePaused: e.recurrencePaused,
       nextOccurrence: e.status == .open
         ? e.recurrence?.nextDate(completedOn: SeptenaDate.today, scheduled: e.scheduled)
         : nil,
@@ -3491,6 +3513,90 @@ extension ActivityDayEntity: CloudKitSystemFieldsBacked {
 
 // MARK: - LocalStore
 
+#if os(macOS)
+/// Where the Mac apps keep the local SwiftData mirror.
+///
+/// NOT the App Group container. `ModelConfiguration`'s `groupContainer`
+/// defaults to `.automatic`, and both Mac apps carry
+/// `com.apple.security.application-groups`, so SwiftData used to put the store
+/// at `~/Library/Group Containers/group.com.septena.cloud/Library/Application
+/// Support/Septena.store`. macOS 15 guards `~/Library/Group Containers/*`
+/// behind the App Data TCC service (`kTCCServiceSystemPolicyAppData`), and the
+/// app-group entitlement only waives that for SANDBOXED apps — neither Mac app
+/// sets `com.apple.security.app-sandbox`. So every launch raised "Septask
+/// would like to access data from other apps", and the grant did not stick:
+/// tccd recorded it and prompted again on the next launch of the same,
+/// unchanged bundle.
+///
+/// `~/Library/Application Support/Septena/` is not a container, so no TCC
+/// service guards it. Both Mac apps point at the SAME file, exactly as they
+/// did inside the group container — this MOVES the store, it does not split
+/// it. iOS is untouched: it has no App Data prompt, and the iOS widgets read
+/// the group's UserDefaults suite (never this file), so nothing there gains
+/// from the move.
+enum MacStoreLocation {
+  /// The three files SQLite keeps in WAL mode. All of them travel together or
+  /// the store opens short of its most recent writes.
+  private static let suffixes = ["", "-wal", "-shm"]
+
+  static var url: URL? {
+    guard let support = FileManager.default
+      .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+    return support
+      .appendingPathComponent("Septena", isDirectory: true)
+      .appendingPathComponent("Septena.store")
+  }
+
+  /// The old home inside the group container. Resolved ONLY when the new store
+  /// is absent — `containerURL(forSecurityApplicationGroupIdentifier:)` is
+  /// itself a group-container access, and asking for it on every launch is the
+  /// prompt this whole type exists to stop.
+  private static var legacyURL: URL? {
+    FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: SeptenaAppGroup.suite)?
+      .appendingPathComponent("Library/Application Support/Septena.store")
+  }
+
+  /// Copy the store out of the group container, once, before it is opened.
+  ///
+  /// COPY, not move: the group-container files stay put as a backstop, because
+  /// a half-finished move of a 30 MB SQLite trio is unrecoverable and a stale
+  /// duplicate is not. Delete them by hand once the new store has proven
+  /// itself. The migrating launch raises the App Data prompt one last time —
+  /// reading the old file requires it; every launch after this one never
+  /// touches the group container again.
+  static func migrateIfNeeded() {
+    let fm = FileManager.default
+    guard let destination = url else { return }
+    // Already migrated (or a fresh install) — do not go near the group.
+    guard !fm.fileExists(atPath: destination.path) else { return }
+    guard let source = legacyURL, fm.fileExists(atPath: source.path) else { return }
+
+    do {
+      try fm.createDirectory(at: destination.deletingLastPathComponent(),
+                             withIntermediateDirectories: true)
+      for suffix in suffixes {
+        let from = URL(fileURLWithPath: source.path + suffix)
+        let to = URL(fileURLWithPath: destination.path + suffix)
+        guard fm.fileExists(atPath: from.path) else { continue }
+        try fm.copyItem(at: from, to: to)
+      }
+      Log.persistence.notice("Migrated local store out of the App Group container.")
+    } catch {
+      // Leave NOTHING half-copied: a store carrying a stale -wal reads as
+      // corrupt, and the container init below would fatalError on it. Clearing
+      // the destination sends this launch back to the group-container store,
+      // which is still intact, and the migration retries next launch.
+      for suffix in suffixes {
+        try? fm.removeItem(at: URL(fileURLWithPath: destination.path + suffix))
+      }
+      Log.persistence.error(
+        "Local store migration failed, keeping the App Group copy: \(error.localizedDescription, privacy: .public)")
+    }
+  }
+}
+#endif
+
 @MainActor
 final class LocalStore {
   static let shared = LocalStore()
@@ -3531,9 +3637,25 @@ final class LocalStore {
     // Screenshot / UI-test builds (`-SeptenaSeed`) run against a throwaway
     // in-memory store so the app boots offline with seeded demo data and never
     // touches the real on-disk store. Release builds force `isOn` false.
-    let config = DemoSeedMode.isOn
-      ? ModelConfiguration("Septena", schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-      : ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+    let config: ModelConfiguration
+    if DemoSeedMode.isOn {
+      config = ModelConfiguration("Septena", schema: schema, isStoredInMemoryOnly: true,
+                                  cloudKitDatabase: .none)
+    } else {
+      #if os(macOS)
+      // An explicit URL outside the App Group container — see MacStoreLocation
+      // for why. The fallback keeps a build that can't resolve Application
+      // Support on the old path rather than failing to open at all.
+      MacStoreLocation.migrateIfNeeded()
+      if let url = MacStoreLocation.url {
+        config = ModelConfiguration("Septena", schema: schema, url: url, cloudKitDatabase: .none)
+      } else {
+        config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+      }
+      #else
+      config = ModelConfiguration("Septena", schema: schema, cloudKitDatabase: .none)
+      #endif
+    }
     do {
       container = try ModelContainer(for: schema, configurations: [config])
     } catch let error {
@@ -3544,6 +3666,147 @@ final class LocalStore {
       Log.persistence.fault("ModelContainer init failed; local store preserved: \(error.localizedDescription, privacy: .public)")
       fatalError("Local database could not be opened. Its files were preserved; install a compatible repair build rather than deleting Septena data. \(error)")
     }
+  }
+}
+
+// MARK: - StoreHealth (read/write failure accounting)
+
+/// Every SwiftData read in this file used to be written `(try? fetch(…)) ?? []`,
+/// which makes a THROWN fetch and an empty table the same value. When the main
+/// context wedged, every count in the app painted 0, the sidebar memoized those
+/// zeros, and the only recovery was a force quit — with nothing in the log to
+/// say what happened, because the error was discarded at the `try?`.
+///
+/// This type is the single place reads and writes report failure. It does two
+/// jobs:
+///
+/// 1. **Logs the real error.** SwiftData and Core Data put the actionable part
+///    in the `NSError` `userInfo` (`NSDetailedErrors` for a multi-error save,
+///    `NSValidationErrorKey` / `NSConstraintConflict` for a constraint hit).
+///    `localizedDescription` alone says "The operation couldn't be completed."
+/// 2. **Publishes a failure token** so a caller that runs several reads can ask
+///    whether any of them failed, and keep its last good values instead of
+///    caching zeros over them (see `SidebarRootView.load`).
+///
+/// It is accounting, not policy: nothing here decides what a caller does with a
+/// failed read.
+@MainActor
+enum StoreHealth {
+  /// Monotonic count of failed reads this process. Callers snapshot it before a
+  /// read pass and compare after — a changed value means "at least one read in
+  /// that pass threw, do not trust the result".
+  private(set) static var readFailures = 0
+  /// Monotonic count of failed saves this process.
+  private(set) static var saveFailures = 0
+  private(set) static var lastFailureSummary: String?
+
+  /// Snapshot the read-failure counter before a multi-read pass.
+  static func readToken() -> Int { readFailures }
+
+  /// True when any read failed since `token` was taken.
+  static func readsFailed(since token: Int) -> Bool { readFailures != token }
+
+  /// One fetch, with the error kept instead of discarded. Returns `[]` on
+  /// failure exactly like the old `try?` did, so call sites keep their shape —
+  /// but the failure is now counted and logged.
+  static func fetch<E: PersistentModel>(_ context: ModelContext,
+                                        _ descriptor: FetchDescriptor<E>,
+                                        _ site: StaticString = #function) -> [E] {
+    do {
+      return try context.fetch(descriptor)
+    } catch {
+      readFailures += 1
+      let summary = "\(E.self) read failed at \(site): \(detail(error))"
+      lastFailureSummary = summary
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      return []
+    }
+  }
+
+  /// Save, and un-wedge the context when the save fails.
+  ///
+  /// A failed `save()` leaves its pending changes in the context. Every later
+  /// save retries them and fails the same way, so one bad write silently stops
+  /// ALL later writes from persisting and can make subsequent fetches throw —
+  /// the app-wide "everything reads 0 until I force quit" state. `rollback()`
+  /// discards the one change that could not be written, which costs that single
+  /// mutation and keeps every later one working. Losing one write beats losing
+  /// every write after it.
+  ///
+  /// `nonisolated` because not every writer is on the main actor:
+  /// `ChecklistMirror` and `CloudKitRecordRegistry` save background contexts on
+  /// purpose. It touches only the context it was handed, so it is safe from any
+  /// isolation; the shared failure counter is updated back on the main actor.
+  @discardableResult
+  nonisolated static func save(_ context: ModelContext, op: String) -> Bool {
+    do {
+      try context.save()
+      return true
+    } catch {
+      let summary = "save failed (op=\(op)): \(detail(error))"
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      context.rollback()
+      Log.persistence.error("[StoreHealth] rolled back after op=\(op, privacy: .public) — that one change is lost, later writes keep working")
+      Task { @MainActor in noteSaveFailure(summary) }
+      return false
+    }
+  }
+
+  /// The throwing variant, for writers whose `do`/`catch` already gates
+  /// follow-up work (a CloudKit push, a notification) on the save succeeding.
+  /// Control flow is unchanged — the error still reaches the existing `catch` —
+  /// but the context is logged and rolled back on the way out, so the failed
+  /// change cannot wedge every later save.
+  nonisolated static func saveOrThrow(_ context: ModelContext, op: String) throws {
+    do {
+      try context.save()
+    } catch {
+      let summary = "save failed (op=\(op)): \(detail(error))"
+      Log.persistence.error("[StoreHealth] \(summary, privacy: .public)")
+      context.rollback()
+      Task { @MainActor in noteSaveFailure(summary) }
+      throw error
+    }
+  }
+
+  private static func noteSaveFailure(_ summary: String) {
+    saveFailures += 1
+    lastFailureSummary = summary
+  }
+
+  /// The parts of an `NSError` that actually name the problem. A SwiftData save
+  /// error wraps its real causes in `NSDetailedErrors`; a constraint or
+  /// validation failure names the entity and key in its own `userInfo`.
+  /// `localizedDescription` on its own says only "The operation couldn't be
+  /// completed", which is why the old logs were useless.
+  nonisolated static func detail(_ error: Error) -> String {
+    let ns = error as NSError
+    var parts = ["\(ns.domain)/\(ns.code) \(ns.localizedDescription)"]
+    if let detailed = ns.userInfo["NSDetailedErrors"] as? [NSError] {
+      for sub in detailed.prefix(5) {
+        parts.append("· \(sub.domain)/\(sub.code) \(sub.localizedDescription) \(keys(of: sub))")
+      }
+    } else {
+      let k = keys(of: ns)
+      if !k.isEmpty { parts.append(k) }
+    }
+    return parts.joined(separator: " ")
+  }
+
+  /// The non-sensitive keys of an error's `userInfo` — entity and attribute
+  /// names and conflict descriptions, never a task title or note body.
+  nonisolated private static func keys(of error: NSError) -> String {
+    var out: [String] = []
+    if let object = error.userInfo["NSValidationErrorObject"] as? NSObject {
+      out.append("object=\(type(of: object))")
+    }
+    if let key = error.userInfo["NSValidationErrorKey"] as? String {
+      out.append("key=\(key)")
+    }
+    if let conflicts = error.userInfo["conflictList"] {
+      out.append("conflicts=\(String(describing: conflicts).prefix(400))")
+    }
+    return out.isEmpty ? "" : "[\(out.joined(separator: " "))]"
   }
 }
 
@@ -3558,9 +3821,9 @@ enum LocalCache {
   /// still includes `pendingDeletion` rows (openCount semantics count them).
   @MainActor
   static func liveEntities(in context: ModelContext) -> [TaskEntity] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.deletedAt == nil }
-    ))) ?? []
+    ))
   }
 
   /// Every non-trashed task as a wire DTO — sidebar roll-ups, aggregates.
@@ -3577,12 +3840,12 @@ enum LocalCache {
   /// Unassigned inbox/logbook rows don't teach filing targets.
   @MainActor
   static func trainingTasks(in context: ModelContext) -> [SeptenaTask] {
-    let candidates = (try? context.fetch(FetchDescriptor<TaskEntity>(
+    let candidates = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion && e.kind != "heading"
       },
       sortBy: [SortDescriptor(\.id)]
-    ))) ?? []
+    ))
     return candidates.compactMap { entity in
       guard entity.status != .cancelled,
             entity.area != nil || entity.project != nil else { return nil }
@@ -3595,12 +3858,12 @@ enum LocalCache {
   /// project's done/total.
   @MainActor
   static func tasksWithProject(in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    )))?.map(SeptenaTask.init) ?? []
+    )).map(SeptenaTask.init)
   }
 
   /// Completion ratios for project headers. Keep this as an entity aggregate
@@ -3608,12 +3871,12 @@ enum LocalCache {
   /// task merely to compute two integer counters.
   @MainActor
   static func projectCompletionRatios(in context: ModelContext) -> [String: Double] {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project != nil && e.kind != "heading"
       }
-    ))) ?? []
+    ))
     var done: [String: Int] = [:]
     var total: [String: Int] = [:]
     for row in rows {
@@ -3640,15 +3903,15 @@ enum LocalCache {
   @MainActor
   static func headings(inProject projectId: String,
                        in context: ModelContext) -> [SeptenaTask] {
-    (try? context.fetch(FetchDescriptor<TaskEntity>(
+    StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
       predicate: #Predicate { e in
         e.deletedAt == nil && !e.pendingDeletion
           && e.project == projectId && e.kind == "heading"
       }
-    )))?
+    ))
       .sorted { TaskOrder.key($0) != TaskOrder.key($1)
                   ? TaskOrder.key($0) < TaskOrder.key($1) : $0.id < $1.id }
-      .map(SeptenaTask.init) ?? []
+      .map(SeptenaTask.init)
   }
 
   /// Predicate-narrowed fetch for each list filter. Open smart lists still
@@ -3660,9 +3923,9 @@ enum LocalCache {
                                     in context: ModelContext) -> [TaskEntity] {
     switch filter {
     case .recentlyDeleted:
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { $0.deletedAt != nil }
-      ))) ?? []
+      ))
     case .logbook:
       // The archive can be thousands of rows long. Sort and limit in
       // SwiftData before materializing DTOs; `TaskListView` grows this page on
@@ -3675,27 +3938,27 @@ enum LocalCache {
         sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
       )
       if let limit { descriptor.fetchLimit = limit }
-      return (try? context.fetch(descriptor)) ?? []
+      return StoreHealth.fetch(context, descriptor)
     case .project(let pid):
       let projectId = pid
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.project == projectId
         }
-      ))) ?? []
+      ))
     case .area(let aid):
       let areaId = aid
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
-      ))) ?? []
-    case .today, .triage, .upcoming, .unscheduled:
-      return (try? context.fetch(FetchDescriptor<TaskEntity>(
+      ))
+    case .today, .triage, .upcoming, .repeating, .unscheduled:
+      return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
         }
-      ))) ?? []
+      ))
     }
   }
 
@@ -3735,6 +3998,18 @@ enum LocalCache {
     return result
   }
 
+  /// One task by id, straight from the store. The by-id read a view needs when
+  /// it must NOT depend on whichever list is currently rendered — deciding
+  /// whether an inline-create placeholder is still empty, for instance, where
+  /// reading a list that has already moved on would mistake "not in this list"
+  /// for "has no title".
+  @MainActor
+  static func task(id: String, in context: ModelContext) -> SeptenaTask? {
+    var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
+    descriptor.fetchLimit = 1
+    return StoreHealth.fetch(context, descriptor).first.map(SeptenaTask.init)
+  }
+
   /// Point-read used to decide whether a scoped local mutation can affect an
   /// already-visible task list. The lookup is limited in SwiftData; matching
   /// reuses the same filter conversion as list rendering so a task moving into
@@ -3744,7 +4019,7 @@ enum LocalCache {
                           in context: ModelContext) -> Bool {
     var descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.id == id })
     descriptor.fetchLimit = 1
-    guard let entity = try? context.fetch(descriptor).first else { return false }
+    guard let entity = StoreHealth.fetch(context, descriptor).first else { return false }
     let today = SeptenaDate.today
     if filter == .today {
       return convert(entity, filter: .today, today: today) != nil
@@ -3795,6 +4070,9 @@ enum LocalCache {
       if let s = e.scheduled, s > today { return SeptenaTask(e) }
       if let d = e.deadline, d > today { return SeptenaTask(e) }
       return nil
+    case .repeating:
+      guard e.status == .open, e.recurrence != nil else { return nil }
+      return SeptenaTask(e)
     case .unscheduled:
       guard e.status == .open, !e.today,
             e.scheduled == nil, e.deadline == nil else { return nil }
@@ -3832,9 +4110,10 @@ enum LocalCache {
   /// checking in place) apart from a row that left a list for some other
   /// reason (deleted, deferred, rescheduled off the filter). Cheap and only
   /// called when a visible open row actually vanished, so a full fetch is fine.
+  @MainActor
   static func completedIDs(among ids: Set<String>, in context: ModelContext) -> Set<String> {
     guard !ids.isEmpty else { return [] }
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return Set(rows.compactMap { e in
       (ids.contains(e.id) && e.status == .done && !e.pendingDeletion && e.deletedAt == nil)
         ? e.id : nil
@@ -3848,7 +4127,7 @@ enum LocalCache {
   /// inspector. Cheap; iterates entities once.
   @MainActor
   static func logTaskStateSummary(in context: ModelContext) {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     let today = SeptenaDate.today
     var open = 0, done = 0, cancelled = 0
     var todayFlag = 0, scheduledLE = 0, dueLE = 0
@@ -3868,8 +4147,8 @@ enum LocalCache {
       if e.pendingDeletion { pendingDel += 1 }
       if e.cloudKitSystemFields != nil { withSystemFields += 1 }
     }
-    let areas = (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []
-    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+    let areas = StoreHealth.fetch(context, FetchDescriptor<AreaEntity>())
+    let projects = StoreHealth.fetch(context, FetchDescriptor<ProjectEntity>())
     let areasWithCK = areas.filter { $0.cloudKitSystemFields != nil }.count
     let projectsWithCK = projects.filter { $0.cloudKitSystemFields != nil }.count
 
@@ -3911,7 +4190,7 @@ enum LocalCache {
     // (a deadline of today counts as overdue), and scheduled dates never
     // count. Keep these two definitions in lockstep.
     let today = SeptenaDate.today
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
       guard e.deletedAt == nil, !e.pendingDeletion,
             e.status == .open, let d = e.deadline, d <= today else { return acc }
@@ -3925,21 +4204,21 @@ enum LocalCache {
       sortBy: [SortDescriptor(\.sortIndex, order: .reverse),
                SortDescriptor(\.updatedAt, order: .reverse)]
     )
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Goal.init)
   }
 
   @MainActor
   static func areas(in context: ModelContext) -> [Area] {
     let descriptor = FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.title)])
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Area.init)
   }
 
   @MainActor
   static func projects(in context: ModelContext) -> [Project] {
     let descriptor = FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.title)])
-    let rows = (try? context.fetch(descriptor)) ?? []
+    let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Project.init)
   }
 }
@@ -3965,10 +4244,17 @@ enum StructureCache {
   static func snapshot(in context: ModelContext) -> (areas: [Area], projects: [Project]) {
     installObserverIfNeeded()
     if let cached { return cached }
+    let token = StoreHealth.readToken()
     let snap = (
       areas: TaskStructureOrder.orderedAreas(LocalCache.areas(in: context)),
       projects: TaskStructureOrder.orderedProjects(LocalCache.projects(in: context))
     )
+    // A failed read looks exactly like an empty store. Memoizing THAT would
+    // pin an empty sidebar for the rest of the process, because only a
+    // structure change drops the cache — and no structure change is coming.
+    // Return the empty snapshot for this render, keep the cache unset, and
+    // let the next call try the store again.
+    guard !StoreHealth.readsFailed(since: token) else { return snap }
     cached = snap
     return snap
   }

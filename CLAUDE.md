@@ -43,19 +43,23 @@ takes a shared `mkdir` lock at `/tmp/auto-build.lock.d` so builds serialize
 across every session and the cron. The compile is the only green gate before the
 cron pushes — a tree that doesn't build must never be left behind.
 
-**The iOS `Septena` scheme can't build when no watchOS simulator runtime matches
-the SDK the active Xcode ships** (e.g. Xcode 26.6 ships watchOS 26.5; runtimes
-installed are 26.2 + 27.0). It embeds the watch app, so xcodebuild resolves a
-watch destination and dies — either at the scheme precondition ("watchOS 26.5
-must be installed") or further down in `actool` on the complication's asset
-catalog. Same mismatch, two different-looking errors, neither self-explanatory.
+**Neither iOS scheme can build when no watchOS simulator runtime matches the
+SDK the active Xcode ships** (e.g. Xcode 26.6 ships watchOS 26.5; runtimes
+installed are 26.2 + 27.0). `Septena` embeds `SeptenaWatch` and `Septask` embeds
+`SeptaskWatch`, so xcodebuild resolves a watch destination and dies — either at
+the scheme precondition ("watchOS 26.5 must be installed") or further down in
+`actool` on the complication's asset catalog. Same mismatch, two different-looking errors, neither self-explanatory.
 **Nothing is wrong with the project** — Xcode.app builds fine because you pick a
 concrete destination it can resolve. `scripts/build.sh` now detects this before
 taking the lock and exits 2 with guidance. When the change doesn't touch watch
-code, gate it on macOS instead — it compiles the same shared sources:
+code, gate it on the Mac schemes instead — they compile the same shared sources:
 
 ```bash
 scripts/build.sh SeptenaMac 'platform=macOS'
+```
+
+```bash
+scripts/build.sh SeptaskMac 'platform=macOS'
 ```
 
 If the change *does* touch watch code, **stop and tell the user** — installing a
@@ -190,6 +194,15 @@ commit on the branch first (or let the cron do it).
   UI-free, in SeptenaCore). Behavior → a `SectionPlugin` in
   `Septena/Shell/Sections/Plugins/<Name>Plugin.swift`, registered in
   `SectionRegistry.all`. Joined by the string `key`.
+- **Undo is ONE shared stack** (`SeptenaCore/TaskUndo.swift`), wrapping a single
+  process-wide `UndoManager`. Every task surface points at it — the AppKit
+  table, the SwiftUI lists, and iOS shake / three-finger undo (the app
+  delegates override `UIResponder.undoManager`, the last stop in the responder
+  chain, so a focused text field still wins for typing). **Record explicitly at
+  the user gesture, never inside a mutator**: the mutators also run for
+  CloudKit applies, the 30-day purge, recurrence spawning, and the watch, so
+  recording there would put sync traffic on the undo stack and let ⌘Z "undo" an
+  edit another device made.
 - **Disabling a section hides surfaces; it must never delete user data.**
 - **Section colors and enabled state are user/account data** (`SectionEntity`),
   not hardcoded catalog facts. `SectionTheme` is the color access point for UI.
@@ -279,10 +292,11 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   tap-gesture selection — it suppresses native keyboard nav and the List's
   click-to-focus); `@FocusState`+`.focused()` to claim detail focus; **modifier
   menu shortcuts** for every keyboard action on the selected row (rename = `⌘R`,
-  complete = `⌘K`, move = `⌘⇧M`); double-click / right-click for mouse. Do NOT
-  bind unmodified Space/Return. The shared shortcut map is `TaskRowShortcuts` in
-  `Septena/Shell/Tasks/TaskCommands.swift` — avoid system-reserved equivalents
-  there (bare `⌘M` = Minimize, bare `⌘.` = Cancel; both carry a `⇧`).
+  complete = `⌘K`, move = `⌘M` / `⌘⇧M`); double-click / right-click for mouse.
+  Do NOT bind unmodified Space/Return. The shared shortcut map is
+  `TaskRowShortcuts` in `Septena/Shell/Tasks/TaskCommands.swift` — bare `⌘M`
+  is intentionally reclaimed by the focused task list; bare `⌘.` remains the
+  system Cancel equivalent and carries a `⇧` here.
   **Two sanctioned exceptions on the task surfaces** (both deliberate,
   documented, and NOT to be "fixed" back to the naive form):
   1. The deep task lists do NOT use native `List` — they use
@@ -328,6 +342,17 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   remove+insert; that's exactly what the incremental batch is defined for, and
   a row changing groups should leave and arrive anyway. Enforced by the
   `appkit-inferring-moves` lint rule.
+- **A `.plain` row Button is only tappable where it draws.** `.buttonStyle(.plain)`
+  (and the plain-derived `PlainHoverRowButtonStyle` / `InertButtonStyle`) opts the
+  row out of the list cell's tap target, so SwiftUI hit-tests the drawn label
+  only: the `Spacer()` and every trailing gap are dead zones, and a tap near the
+  right edge of the row silently misses. The row still *looks* full width, so it
+  reads as "the app ignored my tap". Fix: `.contentShape(Rectangle())` on the
+  label (`LogRow` carries one, which is why log rows in drawers are fine). Two
+  cases need no shape — a label with its own opaque `.background(…)` fill (that
+  shape is hit-testable), and a default-styled Button inside a `Form`/`List`
+  (the cell supplies the target). Enforced by the `row-dead-zone` rule
+  (`scripts/lint-row-tap-targets.py`, run from `scripts/lint-design.sh`).
 - **No inline `TextField` swapped into a *selectable* native `List` row.**
   Replacing a row's `Text` with a focusable `TextField` (then removing it) on
   edit corrupts a native `List`'s focus/selection on macOS — after the edit ends,

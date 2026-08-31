@@ -353,6 +353,23 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
 
+  /// Pending Things-style choice when a fixed-schedule repeating task is
+  /// moved. The date picker dismisses before this appears, so the decision is
+  /// a separate, reliable state transition instead of a race between sheets.
+  @State private var reschedulePrompt: FixedReschedulePrompt?
+
+  private struct FixedReschedulePrompt: Identifiable {
+    let id: String
+    let taskIDs: [String]
+    let date: Date?
+
+    init(taskIDs: [String], date: Date?) {
+      self.id = "\(taskIDs.joined(separator: ","))|\(SeptenaDate.format(date) ?? "none")"
+      self.taskIDs = taskIDs
+      self.date = date
+    }
+  }
+
   /// True while iOS edit mode is active — rows show native selection circles
   /// and a tap toggles membership instead of opening the editor. Always false
   /// on macOS (no edit mode; click selection is direct).
@@ -457,8 +474,39 @@ struct TaskListView: View {
         currentRecurrence: currentRecurrence,
         applyWhen: applyWhenToSelection,
         applyMove: applyMoveToSelection,
-        applyRecurrence: applyRecurrence
+        applyRecurrence: applyRecurrence,
+        applyRecurrencePaused: { id, paused in
+          Haptics.tick()
+          mutator.setRecurrencePaused(id: id, paused: paused)
+          Task { await load() }
+        }
       ))
+      .confirmationDialog(
+        "Reschedule Repeating Task?",
+        isPresented: Binding(
+          get: { reschedulePrompt != nil },
+          set: { if !$0 { reschedulePrompt = nil } }
+        ),
+        titleVisibility: .visible
+      ) {
+        Button("Make Exception") {
+          guard let prompt = reschedulePrompt else { return }
+          reschedulePrompt = nil
+          for id in prompt.taskIDs {
+            applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
+          }
+        }
+        Button("Update Rule") {
+          guard let prompt = reschedulePrompt else { return }
+          reschedulePrompt = nil
+          for id in prompt.taskIDs {
+            applyScheduledWhen(id: id, date: prompt.date, mode: .updateRule)
+          }
+        }
+        Button("Cancel", role: .cancel) { reschedulePrompt = nil }
+      } message: {
+        Text("Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.")
+      }
     let withSnackbar = content.septenaToastOverlay(store: toastStore)
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
@@ -477,6 +525,7 @@ struct TaskListView: View {
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
       openMove: selection.isEmpty ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      cancel: selection.isEmpty ? nil : cancelSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
@@ -498,6 +547,11 @@ struct TaskListView: View {
             Button(command.title) { action?() }
               .keyboardShortcut(command.shortcut)
               .disabled(action == nil)
+            ForEach(Array(command.alternateShortcuts.enumerated()), id: \.offset) { _, shortcut in
+              Button(command.title) { action?() }
+                .keyboardShortcut(shortcut)
+                .disabled(action == nil)
+            }
           }
           .opacity(0)
           .accessibilityHidden(true)
@@ -518,6 +572,7 @@ struct TaskListView: View {
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
       openMove: selection.isEmpty ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
+      cancel: selection.isEmpty ? nil : cancelSelected,
       delete: selection.isEmpty ? nil : deleteSelected,
       clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
@@ -672,6 +727,16 @@ struct TaskListView: View {
       model.resetSession()
       clearSelection()
       expandedEditId = nil
+      // Drop the inline-create placeholders this filter owned BEFORE forgetting
+      // them. An inline add inserts a real, empty-titled TaskEntity up front
+      // (`startCreate` → `deferPush`), and the editor's `onVanish` is what
+      // normally purges it when nothing was typed — but `onVanish` checks
+      // `draftEditIds`, which this clear had already emptied. Switching lists
+      // with a capture line open therefore stranded a titleless row in the
+      // store, where it renders as a blank Inbox task and counts toward every
+      // Inbox badge. Only EMPTY drafts are dropped: `purgeDraftIfEmpty` leaves
+      // anything the user actually typed alone.
+      for id in draftEditIds { purgeDraftIfEmpty(id: id) }
       draftEditIds = []
       quickAddDraftId = nil
       quickAddDraftAtTop = false
@@ -745,7 +810,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard filter != .recentlyDeleted else { return }
+    guard filter != .recentlyDeleted, filter != .repeating else { return }
     guard !closeActiveEditIfNeeded() else { return }
     guard allowsInlineCreate else {
       a11yAnimate(.snappy(duration: 0.25)) {
@@ -820,7 +885,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted, .upcoming: return false
+    case .logbook, .recentlyDeleted, .upcoming, .repeating: return false
     default:                                    return true
     }
   }
@@ -889,9 +954,16 @@ struct TaskListView: View {
   }
 
   /// Drop an inline-create placeholder that never received a title.
+  ///
+  /// The title comes from the STORE, not from `currentTask`. `currentTask`
+  /// reads the list that is rendered right now, so on a filter swap (where the
+  /// new filter's rows are already in `items`) a draft the user had typed into
+  /// resolves to nil — and a nil title reads as empty, which would purge real
+  /// work. A row that is genuinely gone from the store returns nil here too and
+  /// needs no purge, so the point read is right in both directions.
   private func purgeDraftIfEmpty(id: String) {
-    let trimmed = currentTask(id: id)?.title
-      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard let stored = LocalCache.task(id: id, in: modelContext) else { return }
+    let trimmed = stored.title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.isEmpty else { return }
     clearQuickAddCaptureSlot(for: id)
     mutator.purge(id: id)
@@ -966,6 +1038,7 @@ struct TaskListView: View {
       selectable: usesSelectionModel,
       onActivate: activateRow,
       onClear: { closeEditOrClearSelection() },
+      onMoveShortcut: openMoveForSelected,
       scrollToTick: scrollToTargetTick,
       scrollToID: scrollToTargetID,
       canvasFill: listCanvasFill,
@@ -1964,10 +2037,14 @@ struct TaskListView: View {
   /// reload lands.
   private func applyRemoveFromToday(_ ids: [String]) {
     Haptics.tick()
+    let undoBefore = scheduleSnapshots(ids)
     for id in ids {
       mutator.removeFromToday(id: id)
       mutator.acknowledge(id: id)
     }
+    TaskUndo.recordScheduleChange(
+      name: String(localized: "Remove from Today", comment: "Undo action name"),
+      before: undoBefore, context: modelContext, mutator: mutator)
     if filter == .today {
       func drop(_ list: inout [SeptenaTask]) {
         list.removeAll { ids.contains($0.id) }
@@ -1979,10 +2056,18 @@ struct TaskListView: View {
 
   /// Pin tasks to Today and play the amber promote flash on each row.
   private func promoteToToday(_ ids: [String]) {
+    let undoBefore = scheduleSnapshots(ids)
     for id in ids {
       mutator.moveToToday(id: id, today: true)
       promoteFlash.flash(id)
     }
+    // Recorded here rather than at each caller so no entry point can forget.
+    // `applyScheduledWhen` also records around its whole body; both land in
+    // one undo group because `TaskUndo.manager.groupsByEvent` is true, so a
+    // single gesture stays a single ⌘Z.
+    TaskUndo.recordScheduleChange(
+      name: String(localized: "Move to Today", comment: "Undo action name"),
+      before: undoBefore, context: modelContext, mutator: mutator)
   }
 
   /// ⌘S — open the When (schedule) picker for the focused row.
@@ -1999,7 +2084,7 @@ struct TaskListView: View {
     whenSheet = WhenSheet(taskIds: ids, kind: .deadline)
   }
 
-  /// ⌘M — open the Move destination picker for the focused row(s).
+  /// ⌘M / ⌘⇧M — open the Move destination picker for the focused row(s).
   private func openMoveForSelected() {
     guard filter != .recentlyDeleted else { return }
     let ids = orderedActionIDs()
@@ -2015,6 +2100,15 @@ struct TaskListView: View {
     Haptics.warning()
     clearSelection()
     for id in ids { applyDelete(id) }
+  }
+
+  /// ⌥⌘K — retire the selected row(s) as cancelled. Selection is NOT cleared
+  /// (unlike delete): a cancelled row keeps its place through the settle beat,
+  /// so the row you acted on stays the row under the cursor.
+  private func cancelSelected() {
+    let ids = orderedActionIDs()
+    guard !ids.isEmpty else { return }
+    for id in ids { applyCancel(id) }
   }
 
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
@@ -2038,7 +2132,10 @@ struct TaskListView: View {
 
   private func applyRecurrence(id: String, rule: Recurrence?) {
     Haptics.tick()
-    mutator.setRecurrence(id: id, recurrence: rule)
+    recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
+                      [id]) {
+      mutator.setRecurrence(id: id, recurrence: rule)
+    }
     Task { await load() }
   }
 
@@ -2067,11 +2164,15 @@ struct TaskListView: View {
     // arrays power the current screen and have to be poked separately.
     removeLocally(id: id)
     mutator.delete(id: id)
+    TaskUndo.recordDelete(ids: [id], mutator: mutator)
     // Show undo snackbar (not in the Recently Deleted view — there the
     // gesture is always intentional and Restore is a first-class action).
     guard filter != .recentlyDeleted else { return }
+    // The toast routes through the SAME stack rather than calling `restore`
+    // itself, so tapping Undo and pressing ⌘Z cannot disagree, and the toast
+    // consumes the stack entry instead of leaving a stale one behind it.
     showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
-      mutator.restore(id: id)
+      TaskUndo.undo()
       Task { await load() }
     }
   }
@@ -2197,6 +2298,20 @@ struct TaskListView: View {
 
   private func applyWhenToSelection(_ ids: [String], kind: WhenKind, date: Date?) {
     guard !ids.isEmpty else { return }
+    guard kind == .scheduled, let date else {
+      for id in ids { applyWhen(id: id, kind: kind, date: date) }
+      return
+    }
+
+    let movedFixedIDs = ids.filter { id in
+      guard let task = currentTask(id: id), let rule = task.recurrence,
+            !rule.afterCompletion else { return false }
+      return SeptenaDate.format(date) != task.scheduled
+    }
+    if !movedFixedIDs.isEmpty {
+      reschedulePrompt = FixedReschedulePrompt(taskIDs: ids, date: date)
+      return
+    }
     for id in ids { applyWhen(id: id, kind: kind, date: date) }
   }
 
@@ -2525,6 +2640,16 @@ struct TaskListView: View {
           repeatTargetId = task.id
           showingRepeatSheet = true
         },
+        onSetRepeatPaused: { ids, paused in
+          Haptics.tick()
+          for id in ids { mutator.setRecurrencePaused(id: id, paused: paused) }
+          Task { await load() }
+        },
+        onCreateNextCopy: { task in
+          Haptics.tick()
+          _ = mutator.createNextOccurrence(id: task.id)
+          Task { await load() }
+        },
         onCancel: { ids in
           for id in ids { applyCancel(id) }
         },
@@ -2591,39 +2716,16 @@ struct TaskListView: View {
   /// `looseToday` population in `triageSection` so the filing capsule shows for
   /// self-added Inbox tasks too, not just agent proposals.
   private func isLooseTodayInboxCapture(_ task: SeptenaTask) -> Bool {
-    filter == .today && task.status == .open
-      && task.scheduled == nil && task.deadline == nil
-      && task.project == nil && task.area == nil && task.today
+    TaskFilingSuggestions.isLooseTodayInboxCapture(task, filter: filter)
   }
 
+  /// Ranked filing picks for a row. The RULES live in
+  /// `TaskFilingSuggestions` so the AppKit shell renders the same capsule off
+  /// the same gate — see that file for why a second copy is the drift we
+  /// forbid.
   private func filingRankedSuggestions(for task: SeptenaTask) -> [SuggestionEngine.Suggestion]? {
-    guard TaskRowFlags.filingSuggestionsEnabled else { return nil }
-    guard task.status == .open else { return nil }
-    guard filter != .logbook && filter != .recentlyDeleted else { return nil }
-    guard task.project == nil else { return nil }
-
-    // Inbox → area or project. Both populations that share the Today Inbox card
-    // get the filing capsule: agent proposals (triage band) AND loose manual
-    // captures the user quick-added (project/area-less, `today == true`, so
-    // *not* in the band — but still unfiled work that wants a folding hint).
-    if task.isInTriageBand || isLooseTodayInboxCapture(task) {
-      if let top = suggestionEngine.topSuggestion(for: task.id) {
-        let ranked = suggestionEngine.suggestions[task.id] ?? [top]
-        return suggestionAlreadyMatches(task, ranked.first) ? nil : ranked
-      }
-      guard let s = suggestionEngine.suggest(forText: task.title) else { return nil }
-      return suggestionAlreadyMatches(task, s) ? nil : [s]
-    }
-
-    // Area page: area-direct → child project only.
-    if case .area(let areaId) = filter, task.area == areaId {
-      let scope = SuggestionEngine.SuggestionScope.projects(childProjectIds(in: areaId))
-      let ranked = suggestionEngine.rankedSuggestions(forText: task.title, scope: scope)
-      guard let top = ranked.first else { return nil }
-      return suggestionAlreadyMatches(task, top) ? nil : ranked
-    }
-
-    return nil
+    TaskFilingSuggestions.ranked(for: task, filter: filter, engine: suggestionEngine,
+                                 childProjectIds: { childProjectIds(in: $0) })
   }
 
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
@@ -2633,9 +2735,7 @@ struct TaskListView: View {
 
   private func suggestionAlreadyMatches(_ task: SeptenaTask,
                                         _ suggestion: SuggestionEngine.Suggestion?) -> Bool {
-    guard let suggestion else { return false }
-    return (suggestion.kind == .area && task.area == suggestion.id)
-      || (suggestion.kind == .project && task.project == suggestion.id)
+    TaskFilingSuggestions.alreadyMatches(task, suggestion)
   }
 
   // MARK: - Selection
@@ -2926,7 +3026,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage: return true
+    case .project, .area, .unscheduled, .upcoming, .triage, .repeating: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false
@@ -3171,11 +3271,32 @@ struct TaskListView: View {
 
   // MARK: - When picker apply
 
+  /// Scheduling fields as they stand right now, for `TaskUndo`. Read from the
+  /// visible buckets (`currentTask`) rather than the store, so a row the user
+  /// has optimistically edited in-session snapshots what they can actually see.
+  private func scheduleSnapshots(_ ids: [String]) -> [TaskUndo.ScheduleSnapshot] {
+    ids.compactMap { currentTask(id: $0) }.map(TaskUndo.ScheduleSnapshot.init)
+  }
+
+  /// Register the scheduling change `body` just made. The undo/redo pair is
+  /// derived by re-reading the store afterwards — `schedule` / `setDeadline` /
+  /// `removeFromToday` each carry their own Today side effects, and predicting
+  /// them here would be a second copy of that logic (see `TaskUndo.restore`).
+  private func recordingSchedule(_ name: String, _ ids: [String], _ body: () -> Void) {
+    let before = scheduleSnapshots(ids)
+    body()
+    TaskUndo.recordScheduleChange(name: name, before: before,
+                                  context: modelContext, mutator: mutator)
+  }
+
   private func applyWhen(id: String, kind: WhenKind, date: Date?) {
     Haptics.tick()
     switch kind {
     case .deadline:
-      mutator.setDeadline(id: id, date: date)
+      recordingSchedule(String(localized: "Set Deadline", comment: "Undo action name"),
+                        [id]) {
+        mutator.setDeadline(id: id, date: date)
+      }
     case .scheduled:
       // Things-style mapping:
       //   • "Today" → pin to today (today=true), clear any scheduled date.
@@ -3184,24 +3305,51 @@ struct TaskListView: View {
       //   • Future date → today=false + scheduled=date. Server auto-
       //     surfaces the task on Today when that date arrives.
       //   • Nil ("No Date") → clear both flags.
-      if let d = date {
-        if Calendar.current.isDateInToday(d) {
-          mutator.schedule(id: id, date: nil)
-          promoteToToday([id])
-        } else {
-          mutator.moveToToday(id: id, today: false)
-          mutator.schedule(id: id, date: d)
-          // Deferring drops the row off Today; confirm where it landed. No
-          // Undo — re-opening the When picker is the natural reversal.
-          showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
-        }
-      } else {
-        mutator.schedule(id: id, date: nil)
-        mutator.moveToToday(id: id, today: false)
+      if let task = currentTask(id: id),
+         let rule = task.recurrence,
+         !rule.afterCompletion,
+         date != nil,
+         SeptenaDate.format(date) != task.scheduled {
+        reschedulePrompt = FixedReschedulePrompt(taskIDs: [id], date: date)
+        return
       }
+      applyScheduledWhen(id: id, date: date, mode: .makeException)
+      return
     }
     // Scheduling is engagement — clear the agent cue so a dated proposal leaves
     // the Inbox. No-op for non-agent / already-seen rows.
+    mutator.acknowledge(id: id)
+    Task { await load() }
+  }
+
+  /// Shared scheduled-date application used both by the ordinary date path
+  /// and the fixed-repeat decision dialog. `reschedule` records the logical
+  /// slot before the Today mapping clears the displayed date.
+  private func applyScheduledWhen(id: String,
+                                  date: Date?,
+                                  mode: RecurrenceRescheduleMode) {
+    let undoBefore = scheduleSnapshots([id])
+    defer {
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Schedule Task", comment: "Undo action name"),
+        before: undoBefore, context: modelContext, mutator: mutator)
+    }
+    if let d = date {
+      if Calendar.current.isDateInToday(d) {
+        mutator.reschedule(id: id, date: d, mode: mode)
+        mutator.schedule(id: id, date: nil)
+        promoteToToday([id])
+      } else {
+        mutator.moveToToday(id: id, today: false)
+        mutator.reschedule(id: id, date: d, mode: mode)
+        // Deferring drops the row off Today; confirm where it landed. No
+        // Undo — re-opening the When picker is the natural reversal.
+        showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+      }
+    } else {
+      mutator.reschedule(id: id, date: nil, mode: .makeException)
+      mutator.moveToToday(id: id, today: false)
+    }
     mutator.acknowledge(id: id)
     Task { await load() }
   }
@@ -3265,6 +3413,12 @@ struct TaskListView: View {
     } else {
       mutator.uncomplete(id: task.id)
     }
+    // The shared undo stack (`TaskUndo`) — this is what makes ⌘Z, shake, and
+    // three-finger undo take back an accidental check on every surface, not
+    // just the AppKit shell. `wasDone` is the state BEFORE the toggle.
+    TaskUndo.recordCompletion(ids: [task.id],
+                              wasDone: newStatus != .done,
+                              mutator: mutator)
     // Toggling status is engagement — clear the agent cue. No-ops for
     // non-agent / already-seen rows, so this is safe to call unconditionally.
     mutator.acknowledge(id: task.id)
@@ -3452,8 +3606,10 @@ struct TaskListView: View {
     // running it here and on appear trains at most once.
     refreshFilingSuggestions()
     // Refresh dismissed state — banner reappears next day automatically.
+    // Account-wide: `SettingsMirror` resolves the synced dismissal against the
+    // device-local mirror, so a dismissal on any device lands here too.
     if filter == .today {
-      let last = UserDefaults.standard.string(forKey: "septena.newTodos.dismissedDate")
+      let last = SettingsMirror.rolledInDismissedOn(context: modelContext)
       newTodosDismissed = (last == clock.today)
     }
     refreshCalendarEvents()
@@ -3572,7 +3728,8 @@ struct TaskListView: View {
       Spacer(minLength: Theme.iconTextGap)
       Button {
         Haptics.tick()
-        UserDefaults.standard.set(clock.today, forKey: "septena.newTodos.dismissedDate")
+        SettingsMirror.dismissRolledIn(on: clock.today, context: modelContext,
+                                       engine: SeptenaServices.shared.ckEngine)
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
       } label: {
         Text("Dismiss")

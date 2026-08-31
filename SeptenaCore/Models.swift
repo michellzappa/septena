@@ -65,6 +65,10 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var project: String?
   var notes: String?
   var recurrence: Recurrence?
+  /// True when the repeat rule is retained but temporarily stops generating
+  /// future copies. This is local task state, not part of the HTTP recurrence
+  /// payload, so old server responses continue to decode as false.
+  var recurrencePaused: Bool = false
   /// For open recurring tasks: the date the next instance would land if
   /// completed today. Computed server-side per request; absent on non-
   /// recurring or already-completed tasks. Used to render
@@ -292,6 +296,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     project: String?,
     notes: String?,
     recurrence: Recurrence?,
+    recurrencePaused: Bool = false,
     nextOccurrence: String? = nil,
     updatedAt: String?,
     deletedAt: String?,
@@ -317,6 +322,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.project = project
     self.notes = notes
     self.recurrence = recurrence
+    self.recurrencePaused = recurrencePaused
     self.nextOccurrence = nextOccurrence
     self.updatedAt = updatedAt
     self.deletedAt = deletedAt
@@ -424,9 +430,21 @@ struct Recurrence: Codable, Hashable {
   /// late advances until it reaches the next future occurrence, rather than
   /// creating another already-overdue copy.
   func nextDate(completedOn: String, scheduled: String?) -> String? {
+    nextDate(completedOn: completedOn, scheduled: scheduled, logicalScheduled: nil)
+  }
+
+  /// Calculates the next occurrence using the series' logical slot rather
+  /// than necessarily the date currently shown on the task. A fixed-schedule
+  /// occurrence can be moved as a one-off exception; in that case `scheduled`
+  /// is the exception date while `logicalScheduled` remains on the original
+  /// cadence. Completion must advance from the latter.
+  func nextDate(completedOn: String,
+                scheduled: String?,
+                logicalScheduled: String?) -> String? {
     RecurrenceDateCalculator.nextDate(
       completedOn: completedOn,
       scheduled: scheduled,
+      logicalScheduled: logicalScheduled,
       unit: unit.rawValue,
       interval: interval,
       afterCompletion: afterCompletion
@@ -439,6 +457,16 @@ struct Recurrence: Codable, Hashable {
   static func occurrenceID(sourceTaskID: String, scheduled: String) -> String {
     RecurrenceDateCalculator.occurrenceID(sourceTaskID: sourceTaskID, scheduled: scheduled)
   }
+}
+
+/// How a fixed-schedule repeating task responds when its visible date moves.
+/// Completion-based repeats never need this choice; their next date is always
+/// anchored to the completion date.
+enum RecurrenceRescheduleMode: Hashable {
+  /// Move only this occurrence. The series keeps its prior logical slot.
+  case makeException
+  /// Move this occurrence and rebase future occurrences from the new date.
+  case updateRule
 }
 
 // MARK: - Project (Septena)
@@ -645,6 +673,7 @@ enum TaskFilter: Equatable, Hashable {
   /// retired when the triage band absorbed it.
   case triage
   case upcoming
+  case repeating
   case unscheduled
   case logbook
   case recentlyDeleted
@@ -656,10 +685,27 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return "today"
     case .triage: return "triage"
     case .upcoming: return "upcoming"
+    case .repeating: return "all"
     case .unscheduled: return "unscheduled"
     case .logbook: return "logbook"
     case .recentlyDeleted: return "all"
     case .project, .area: return "all"
+    }
+  }
+
+  /// Stable local identity for navigation. `serverView` intentionally maps
+  /// several local lists to `all`, so it must not be used as a sidebar key.
+  var navigationKey: String {
+    switch self {
+    case .today: return "today"
+    case .triage: return "triage"
+    case .upcoming: return "upcoming"
+    case .repeating: return "repeating"
+    case .unscheduled: return "unscheduled"
+    case .logbook: return "logbook"
+    case .recentlyDeleted: return "recentlyDeleted"
+    case .project(let id): return "project.\(id)"
+    case .area(let id): return "area.\(id)"
     }
   }
 
@@ -671,6 +717,7 @@ enum TaskFilter: Equatable, Hashable {
     case .today: return String(localized: "Today", comment: "Task filter")
     case .triage: return String(localized: "Inbox", comment: "Task filter")
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
+    case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
     case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")
@@ -1664,6 +1711,17 @@ struct AppSettings: Codable {
   /// defaults (12 / 17). Defaulted so memberwise-init call sites stay stable.
   var morningCutoffHour: Int? = nil
   var afternoonCutoffHour: Int? = nil
+
+  /// The day the "N rolled into today" banner was last dismissed, as an ISO
+  /// `yyyy-MM-dd` string. Synced because the banner reports one fact about the
+  /// ACCOUNT ("these tasks rolled over"), not about a device — dismissing it on
+  /// the Mac and meeting it again on the phone is the same notice twice. The
+  /// device-local `septena.newTodos.dismissedDate` UserDefaults key stays as
+  /// the instant, offline-safe mirror; reads take the LATER of the two so a
+  /// stale synced value can never un-dismiss today's banner. Nil → never
+  /// dismissed. Defaulted so the existing memberwise-init call sites stay
+  /// source-stable.
+  var rolledInDismissedOn: String? = nil
 
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"

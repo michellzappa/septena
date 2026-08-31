@@ -174,6 +174,7 @@ enum RecurrenceDateCalculator {
 
   static func nextDate(completedOn: String,
                        scheduled: String?,
+                       logicalScheduled: String? = nil,
                        unit: String,
                        interval: Int,
                        afterCompletion: Bool) -> String? {
@@ -182,7 +183,9 @@ enum RecurrenceDateCalculator {
     }
     let anchor = afterCompletion
       ? completedDate
-      : (scheduled.flatMap { formatter.date(from: String($0.prefix(10))) } ?? completedDate)
+      : ((logicalScheduled ?? scheduled).flatMap {
+          formatter.date(from: String($0.prefix(10)))
+        } ?? completedDate)
     let component: Calendar.Component
     switch unit {
     case "day": component = .day

@@ -185,8 +185,7 @@ final class OuraStore {
     }
     // Nothing changed ⇒ no save, no CloudKit fan-out, no UI refresh.
     guard !touched.isEmpty else { return }
-    do { try context.save() }
-    catch { SeptenaLog.error("OuraStore: save failed", error) }
+    StoreHealth.save(context, op: "OuraStore.apply")
     for id in touched {
       ckEngine?.noteOuraNightChange(id: id)
     }
@@ -251,6 +250,28 @@ final class OuraProvider {
 
   var hasToken: Bool { token?.isEmpty == false }
 
+  // MARK: Connection health
+  //
+  // See `ConnectionHealth` — "a PAT sits in the Keychain" is not "Oura is
+  // syncing". Oura's twist on the general problem: the nights on screen come
+  // from the CloudKit-mirrored store, not from the network, so a revoked
+  // token doesn't empty anything out. The chart just quietly stops at the
+  // last night that made it in, which reads as a quiet week rather than a
+  // broken connection. Every fetch records its outcome here and the status
+  // surfaces read `connectionDisplayState` instead of `hasToken`.
+
+  private var health = ConnectionHealth(namespace: "oura")
+
+  /// When the last network fetch succeeded. `nil` = never (on this device).
+  var lastFetchAt: Date? { health.lastFetchAt }
+  /// Why the last network fetch failed, or `nil` if it succeeded.
+  var lastError: String? { health.lastError }
+  /// Settings-facing summary — one source of truth for the Integrations row
+  /// and the Oura detail pane so they can never disagree.
+  var connectionDisplayState: ConnectionDisplayState {
+    health.displayState(hasCredentials: hasToken)
+  }
+
   private let session: URLSession
   private let keychainAccount = "septena.oura.pat"
 
@@ -270,11 +291,15 @@ final class OuraProvider {
     guard !trimmed.isEmpty else { clearToken(); return }
     Self.storeToken(trimmed, account: keychainAccount)
     token = trimmed
+    // A new token deserves a clean slate — the old token's 401 must not keep
+    // the row red until the next fetch lands.
+    health.reset()
   }
 
   func clearToken() {
     Self.deleteToken(account: keychainAccount)
     token = nil
+    health.reset()
   }
 
   // MARK: Fetch
@@ -287,11 +312,29 @@ final class OuraProvider {
   /// When no token is set, returns whatever the local store has — the
   /// app still shows historical CloudKit-synced data on a fresh
   /// install before the user pastes their PAT.
+  ///
+  /// Success and failure are both recorded on the provider, so a caller that
+  /// swallows the error with `try?` (the dashboard does, deliberately) still
+  /// leaves the status surfaces able to say the section stopped updating and
+  /// why.
   func fetchHistory(days: Int) async throws -> [OuraNight] {
     guard let token = token, !token.isEmpty else {
+      // No credential, so nothing to be healthy or unhealthy about — the
+      // display state already reads `.disconnected`, and recording anything
+      // here would just overwrite the last real verdict.
       return OuraStore.shared.history(days: days)
     }
+    do {
+      let rows = try await performFetch(days: days, token: token)
+      health.recordSuccess()
+      return rows
+    } catch {
+      health.recordFailure(error)
+      throw error
+    }
+  }
 
+  private func performFetch(days: Int, token: String) async throws -> [OuraNight] {
     let cal = Calendar(identifier: .gregorian)
     let today = Date()
     let start = cal.date(byAdding: .day, value: -days, to: today) ?? today

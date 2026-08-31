@@ -173,10 +173,7 @@ enum SettingsMirror {
     // account) gets an accent now so it doesn't land gray. Fresh-account seeds
     // are disabled and stay colorless until the user enables them in the welcome.
     if seedEnabled { assignAutoColorIfNeeded(entity, context: context) }
-    do { try context.save() } catch {
-      SeptenaLog.error("SettingsMirror.seedManifestSection", error)
-      return false
-    }
+    guard StoreHealth.save(context, op: "SettingsMirror.seedManifestSection") else { return false }
     return true
   }
 
@@ -198,7 +195,7 @@ enum SettingsMirror {
       row.hasOnboarded = true
     }
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.backfillHasOnboardedForLegacySections")
     } catch {
       SeptenaLog.error("SettingsMirror.backfillHasOnboarded", error)
     }
@@ -217,7 +214,7 @@ enum SettingsMirror {
     entity.hasOnboarded = hasOnboarded
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionHasOnboarded")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionHasOnboarded", error)
@@ -260,7 +257,7 @@ enum SettingsMirror {
     }
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionEnabled")
       engine?.noteSectionChange(id: key)
       NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
     } catch {
@@ -287,6 +284,47 @@ enum SettingsMirror {
     upsert(settings: settings, context: context, engine: engine)
   }
 
+  // MARK: - "Rolled into today" banner dismissal
+
+  /// Device-local mirror of `AppSettings.rolledInDismissedOn`. Read first so
+  /// the banner decision is instant and correct offline; both task surfaces
+  /// (SwiftUI `TaskListView`, AppKit `SeptaskKitTaskList`) already read this
+  /// key, so syncing through it leaves their read paths unchanged.
+  static let rolledInDismissedKey = "septena.newTodos.dismissedDate"
+
+  /// The day the rolled-in banner was last dismissed — the LATER of the synced
+  /// value and the device-local mirror.
+  ///
+  /// Taking the later of the two is what makes this safe in both directions. A
+  /// device that dismissed offline keeps its dismissal until it pushes. A
+  /// device receiving an older synced payload (a sibling that has not opened
+  /// since yesterday) cannot un-dismiss today's banner. ISO `yyyy-MM-dd` sorts
+  /// lexically, so the comparison is a plain string compare.
+  static func rolledInDismissedOn(context: ModelContext) -> String? {
+    let local = UserDefaults.standard.string(forKey: rolledInDismissedKey)
+    let synced = loadSettings(context: context)?.rolledInDismissedOn
+    switch (local, synced) {
+    case let (l?, s?): return max(l, s)
+    case let (l?, nil): return l
+    case let (nil, s?): return s
+    case (nil, nil): return nil
+    }
+  }
+
+  /// Dismiss the banner for `day` on every device. Writes the device-local
+  /// mirror first (so this device's next reload is correct with no round trip),
+  /// then pushes the synced field. Idempotent — a repeat dismissal for the same
+  /// day changes no bytes, so `upsert` notes no change and nothing is pushed.
+  static func dismissRolledIn(on day: String, context: ModelContext, engine: CKEngine?) {
+    UserDefaults.standard.set(day, forKey: rolledInDismissedKey)
+    var settings = loadSettings(context: context)
+      ?? AppSettings(sectionOrder: nil, targets: nil, units: nil, time: nil,
+                     theme: nil, eink: nil, nutrition: nil, hkSync: nil)
+    guard settings.rolledInDismissedOn != day else { return }
+    settings.rolledInDismissedOn = day
+    upsert(settings: settings, context: context, engine: engine)
+  }
+
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
@@ -302,7 +340,7 @@ enum SettingsMirror {
     entity.updatedAt = .now
     if entity.modelContext == nil { context.insert(entity) }
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.upsert")
       if changed { engine?.noteSettingsChange() }
     } catch {
       SeptenaLog.error("SettingsMirror.upsert settings", error)
@@ -351,7 +389,7 @@ enum SettingsMirror {
     }
 
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.replaceSections")
       for id in changedIDs { engine?.noteSectionChange(id: id) }
     } catch {
       SeptenaLog.error("SettingsMirror.replace sections", error)
@@ -375,7 +413,7 @@ enum SettingsMirror {
     if enabled { assignAutoColorIfNeeded(entity, context: context) }
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionEnabled")
       engine?.noteSectionChange(id: key)
       // Tell the app a section's enabled-state changed so data-driven surfaces
       // refresh — including the Spotlight index, where `SpotlightIndexer` purges
@@ -402,7 +440,7 @@ enum SettingsMirror {
     entity.color = hex
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionColor")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionColor", error)
@@ -423,7 +461,7 @@ enum SettingsMirror {
     entity.showInToday = showInToday
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionShowInToday")
       engine?.noteSectionChange(id: key)
     } catch {
       SeptenaLog.error("SettingsMirror.setSectionShowInToday", error)
@@ -447,7 +485,7 @@ enum SettingsMirror {
     entity.showInSpotlight = showInSpotlight
     entity.updatedAt = .now
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "SettingsMirror.setSectionShowInSpotlight")
       engine?.noteSectionChange(id: key)
       NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
     } catch {

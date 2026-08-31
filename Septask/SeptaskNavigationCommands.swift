@@ -44,8 +44,9 @@ private struct SeptaskKitRowCommands: View {
       Divider()
       Menu("Complete") {
         Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
-          .keyboardShortcut("k", modifiers: .command)
+          .keyboardShortcut(TaskRowShortcuts.markComplete)
         Button("Cancel Task") { SeptaskKitCommands.row(.cancel) }
+          .keyboardShortcut(TaskRowShortcuts.cancel)
         Divider()
         Button("Delete") { SeptaskKitCommands.row(.delete) }
           .keyboardShortcut(.delete, modifiers: .command)
@@ -58,13 +59,15 @@ private struct SeptaskKitRowCommands: View {
         .keyboardShortcut("d", modifiers: [.command, .shift])
       Button("Move…") { SeptaskKitCommands.row(.move) }
         .keyboardShortcut("m", modifiers: [.command, .shift])
+      // Bare ⌘M is intentionally reclaimed by the focused task list. Keep
+      // this alias hidden so Window ▸ Minimize cannot win the event.
+      Button("Move…") { SeptaskKitCommands.row(.move) }
+        .keyboardShortcut("m", modifiers: .command)
+        .hidden()
       Button("Clear Schedule") { SeptaskKitCommands.row(.clearSchedule) }
         .keyboardShortcut(".", modifiers: [.command, .shift])
-      Menu("Repeat") {
-        ForEach(Array(KitRecurrenceMenu.choices.enumerated()), id: \.offset) { _, choice in
-          Button(choice.title) { SeptaskKitCommands.row(.setRecurrence(choice.rule)) }
-        }
-      }
+      Button("Repeat…") { SeptaskKitCommands.row(.repeatEditor) }
+      Button("Create Next Copy") { SeptaskKitCommands.row(.createNextCopy) }
     }
     .disabled(!SeptaskKitCommands.canActOnSelection)
   }
@@ -94,13 +97,19 @@ struct SeptaskCommandMenus: Commands {
   /// on macOS, where it's the default window — when the AppKit shell is.
   private var canNavigate: Bool {
     #if os(macOS)
-    return actions != nil || SeptaskKitCommands.canHandle
+    return actions != nil || SeptaskKitCommands.canNavigate
     #else
     return actions != nil
     #endif
   }
 
   #if os(macOS)
+  /// Mirror of the AppKit shell's inspector state (see
+  /// `SettingsKey.septaskInspectorVisible`). `@AppStorage` rather than a raw
+  /// read because a `Commands` body has to re-evaluate when it flips — a
+  /// permanent "Show Info" on an open pane is what made the toggle unfindable.
+  @AppStorage(SettingsKey.septaskInspectorVisible) private var inspectorVisible = false
+
   private var sidebarCountsHidden: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
       ? false
@@ -172,6 +181,8 @@ struct SeptaskCommandMenus: Commands {
         .disabled(!canNavigate)
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
+        .disabled(!canNavigate)
+      Button("Repeating") { go(.repeating) }
         .disabled(!canNavigate)
       Button("Anytime") { go(.unscheduled) }
         .keyboardShortcut("3", modifiers: .command)
@@ -253,7 +264,7 @@ struct SeptaskCommandMenus: Commands {
       .disabled(!canNavigate)
 
       #if os(macOS)
-      Button("Show Info") {
+      Button(inspectorVisible ? "Hide Info" : "Show Info") {
         SeptaskKitCommands.showInspector()
       }
       .keyboardShortcut("i", modifiers: [.command, .option])

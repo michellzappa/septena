@@ -426,8 +426,6 @@ final class MilestoneMutator {
   }
 
   private func save(_ label: String) {
-    do { try context.save() } catch {
-      SeptenaLog.info("[Milestones] save failed (\(label)): \(error.localizedDescription)")
-    }
+    StoreHealth.save(context, op: "Milestones.\(label)")
   }
 }

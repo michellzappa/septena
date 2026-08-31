@@ -107,6 +107,13 @@ enum TaskA11y {
            comment: "A11y: sidebar disclosure chevron, expanded")
   }
 
+  /// Trailing "+" on a grouped Today header. Same words as SwiftUI's
+  /// `HeaderQuickAddButton(accessibilityLabel:)`, so both shells speak alike.
+  static func addTaskTo(_ title: String) -> String {
+    String(localized: "Add task to \(title)",
+           comment: "A11y: quick-add button on a Today area/project header")
+  }
+
   static func navigationTitle(_ title: String) -> String {
     String(localized: "\(title), navigation menu",
            comment: "A11y: project/area/smart-list page title that opens the nav menu")

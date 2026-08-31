@@ -22,7 +22,11 @@ import UserNotifications
 //   • warm activation → `windowScene(_:performActionFor:)`.
 // `dispatch` publishes immediately if `NavigationState` is alive, else
 // stashes for `SeptaskApp.task` to drain on first render.
-final class SeptaskAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+// `UIResponder`, not `NSObject` — load-bearing. `undoManager` is a
+// `UIResponder` property, so an `NSObject` delegate cannot override it (the
+// compiler says "does not override any property from its superclass") and the
+// app delegate would not sit in the responder chain the lookup walks.
+final class SeptaskAppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   /// Captured at cold launch before `NavigationState` exists; drained by
   /// `SeptaskApp.task`.
   private static var pending: ShortcutAction?
@@ -34,6 +38,11 @@ final class SeptaskAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
     defer { pending = nil }
     return pending
   }
+
+  /// Shake-to-undo and three-finger undo — same responder-chain hookup as
+  /// Septena's `AppDelegate`. See `TaskUndo` for why one stack is shared by
+  /// all four task surfaces.
+  override var undoManager: UndoManager? { TaskUndo.manager }
 
   static func dispatch(_ action: ShortcutAction) {
     if let nav = navigation {

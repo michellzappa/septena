@@ -65,13 +65,17 @@ struct SidebarRootView: View {
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
     let agg = SidebarSeed.aggregate ?? {
+      let token = StoreHealth.readToken()
       let stats = TaskReads.dashboardStats(today: SeptenaDate.today,
                                            now: Date(),
                                            context: ctx)
       var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: ctx), today: SeptenaDate.today)
       agg.counts = stats.counts
       agg.doneTodayCount = stats.history.daily.last?.done ?? 0
-      SidebarSeed.aggregate = agg
+      // Only memoize a pass in which every read succeeded — see `load()`. A
+      // failed pass paints this frame from empty values, then `load()` fixes
+      // it; memoizing it would make the zeros permanent.
+      if !StoreHealth.readsFailed(since: token) { SidebarSeed.aggregate = agg }
       return agg
     }()
     _counts = State(initialValue: agg.counts)
@@ -549,6 +553,7 @@ struct SidebarRootView: View {
     // on Today, so the user-facing count is the sum.
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
     case .filter(.upcoming):    return counts?.upcomingCount
+    case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
     case .filter(.unscheduled): return counts?.unscheduledCount
     case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
     #if SEPTASK
@@ -990,21 +995,35 @@ struct SidebarRootView: View {
     // CloudKit is the only backend and LocalCache is authoritative. One
     // structure memo read, one live-task pass for roll-ups, one combined
     // counts+history scan for smart-list badges.
+    //
+    // Every read below returns `[]` on failure, which is indistinguishable
+    // from an empty store — so a wedged context would paint 0 on every tile
+    // AND memoize those zeros into `SidebarSeed`, where they stay for the rest
+    // of the process. Take a read-failure token first and discard the whole
+    // pass if any read threw: the previous, correct values stay on screen and
+    // the next pass tries again.
+    let token = StoreHealth.readToken()
     let structure = StructureCache.snapshot(in: modelContext)
-    areas = structure.areas
-    projects = structure.projects
     let stats = TaskReads.dashboardStats(today: clock.today,
                                          now: clock.now,
                                          context: modelContext)
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
-    apply(aggregate: agg)
-    SidebarSeed.aggregate = agg
-    recentlyDeletedCount = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
+    let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
     #if SEPTASK
+    // Reads the Next response cache, not the store — safe either way.
     nextOpenCount = SeptaskNextFeed.openCount(today: clock.today, now: clock.now)
     #endif
+    guard !StoreHealth.readsFailed(since: token) else {
+      SeptenaLog.error("[Sidebar] load aborted — a store read failed; keeping the last good counts")
+      return
+    }
+    areas = structure.areas
+    projects = structure.projects
+    apply(aggregate: agg)
+    SidebarSeed.aggregate = agg
+    recentlyDeletedCount = deleted
     reconcileSidebarSelection()
   }
 

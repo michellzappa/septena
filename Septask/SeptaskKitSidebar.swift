@@ -29,6 +29,74 @@ private extension Int {
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
   case next
+
+  /// The AppKit shell's smart-list destinations, in order — read from the SAME
+  /// `TaskDestinations.sidebarRoutes` the SwiftUI sidebar and `TaskNavMenu`
+  /// use, so all four surfaces (both shells' sidebars, both shells' title
+  /// dropdowns) can never disagree about which lists exist or in what order.
+  /// Recently Deleted is deliberately absent: it's appended by each surface
+  /// only when the trash is non-empty.
+  @MainActor static var smartLists: [KitSidebarDestination] {
+    TaskDestinations.sidebarRoutes.compactMap(KitSidebarDestination.init(route:))
+  }
+
+  /// Bridge from the shared `Route` vocabulary. Areas / projects carry only an
+  /// id in a `Route`, so they resolve at their own call sites (which hold the
+  /// live record) and return nil here.
+  init?(route: Route) {
+    switch route {
+    case .next:            self = .next
+    case .filter(let f):   self = .filter(f, title: route.title)
+    case .area, .project:  return nil
+    }
+  }
+
+  /// SF Symbol for the row / menu item — off `Route`, so an icon change lands
+  /// on every surface at once.
+  var symbol: String {
+    switch self {
+    case .next:             return Route.next.icon
+    case .filter(let f, _): return Route.filter(f).icon
+    }
+  }
+
+  var title: String {
+    switch self {
+    case .next:                 return Route.next.title
+    case .filter(_, let title): return title
+    }
+  }
+
+  /// The shared `Route` this destination points at — the vocabulary the
+  /// SwiftUI page titles and dropdowns speak.
+  var route: Route {
+    switch self {
+    case .next: return .next
+    case .filter(let filter, _):
+      switch filter {
+      case .area(let id):    return .area(id: id)
+      case .project(let id): return .project(id: id)
+      default:               return .filter(filter)
+      }
+    }
+  }
+
+  /// Stable selection key — the one the sidebar's `Node.key` and its
+  /// `select(_:)` lookup both speak.
+  var key: String { Self.key(for: route) }
+
+  /// The same key straight off a `Route`, for callers that only have one (the
+  /// Next page's title dropdown). A `Route` carries no title for an area or
+  /// project, and none is needed: the lookup is by key, and the row that gets
+  /// selected re-emits its own real title.
+  static func key(for route: Route) -> String {
+    switch route {
+    case .next:            return "next"
+    case .filter(let f):   return "filter:\(f.navigationKey)"
+    case .area(let id):    return "area:\(id)"
+    case .project(let id): return "project:\(id)"
+    }
+  }
 }
 
 @MainActor
@@ -57,7 +125,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// Stable key so selection survives a structure reload.
     var key: String {
       switch content {
-      case .filter(let filter, _, _): return "filter:\(filter.serverView)"
+      case .filter(let filter, _, _): return "filter:\(filter.navigationKey)"
       case .next: return "next"
       case .area(let area): return "area:\(area.id)"
       case .project(let project, _): return "project:\(project.id)"
@@ -216,15 +284,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   func select(_ destination: KitSidebarDestination) {
-    let key: String = switch destination {
-    case .next: "next"
-    case .filter(let filter, _):
-      switch filter {
-      case .area(let id): "area:\(id)"
-      case .project(let id): "project:\(id)"
-      default: "filter:\(filter.serverView)"
-      }
-    }
+    selectRow(key: destination.key)
+  }
+
+  /// Same jump, named by a shared `Route` — what the Next page's title
+  /// dropdown hands back.
+  func select(_ route: Route) {
+    selectRow(key: KitSidebarDestination.key(for: route))
+  }
+
+  private func selectRow(key: String) {
     // A project inside a FOLDED area has no row at all (its parent reports
     // zero children), so unfold just THAT area — not every one of them. A
     // blanket unfold here would undo the user's folds on every navigation.
@@ -255,6 +324,22 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   // MARK: - Tree
+
+  /// The trailing badge for one smart list. Today and Logbook read the two
+  /// pre-computed sums the caller passes (triage band folded into Today,
+  /// "completed today" for Logbook); the rest count their own filter.
+  private func smartListCount(_ destination: KitSidebarDestination,
+                              today: Int, doneToday: Int) -> Int? {
+    switch destination {
+    case .next: return KitNextCount.open().nilIfZero
+    case .filter(let filter, _):
+      switch filter {
+      case .today:   return today.nilIfZero
+      case .logbook: return doneToday.nilIfZero
+      default:       return LocalCache.tasks(in: context, filter: filter).count.nilIfZero
+      }
+    }
+  }
 
   private func rebuild(preserving key: String?) {
     let snapshot = StructureCache.snapshot(in: context)
@@ -302,34 +387,21 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // size rides on Today's count so nothing about it is hidden.
     // Next sits beside Today (not at the foot of the Today list) — the same
     // first-class destination iOS now uses as a tab / sidebar row.
-    var views = [
-      Node(.filter(.today,
-                   title: String(localized: "Today", comment: "Smart list title"),
-                   symbol: "sun.max.fill"),
-           count: todayCount + inboxCount > 0 ? todayCount + inboxCount : nil),
-      Node(.next, count: KitNextCount.open().nilIfZero),
-      Node(.filter(.upcoming,
-                   title: String(localized: "Upcoming", comment: "Smart list title"),
-                   symbol: "calendar"),
-           count: LocalCache.tasks(in: context, filter: .upcoming).count.nilIfZero),
-      Node(.filter(.unscheduled,
-                   title: String(localized: "Anytime", comment: "Smart list title"),
-                   symbol: "rectangle.stack.fill"),
-           count: LocalCache.tasks(in: context, filter: .unscheduled).count.nilIfZero),
-      Node(.filter(.logbook,
-                   title: String(localized: "Logbook", comment: "Smart list title"),
-                   symbol: "checkmark"),
-           count: doneTodayCount.nilIfZero),
-    ]
+    // Set + order come from `KitSidebarDestination.smartLists`, which reads
+    // `TaskDestinations.sidebarRoutes` — the same list the title dropdown
+    // builds from, so the two can't drift. Only the counts are sidebar work.
+    var views = KitSidebarDestination.smartLists.map { destination in
+      Node(destination.nodeContent, count: smartListCount(destination,
+                                                          today: todayCount + inboxCount,
+                                                          doneToday: doneTodayCount))
+    }
     // Only shown once there's something in it — same gate the SwiftUI
     // sidebar uses, so an empty trash doesn't sit in the list forever.
     let recentlyDeletedCount = LocalCache.tasks(in: context, filter: .recentlyDeleted).count
     if recentlyDeletedCount > 0 {
-      views.append(Node(.filter(.recentlyDeleted,
-                                title: String(localized: "Recently Deleted",
-                                              comment: "Smart list title"),
-                                symbol: "trash"),
-                        count: recentlyDeletedCount))
+      let deleted = KitSidebarDestination.filter(.recentlyDeleted,
+                                                 title: TaskFilter.recentlyDeleted.title)
+      views.append(Node(deleted.nodeContent, count: recentlyDeletedCount))
     }
 
     let projectsByArea = Dictionary(grouping: snapshot.projects.filter { $0.deletedAt == nil },
@@ -459,6 +531,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     guard !ids.isEmpty else { return false }
 
     let mutator = SeptenaServices.shared.taskMutator
+    // A sidebar drop is a user gesture like any other, so it goes on the ONE
+    // shared undo stack (`TaskUndo`). Which kind of snapshot depends on what
+    // the drop changed: the three smart lists move DATES, an area / project
+    // row moves FILING.
+    let dropped = LocalCache.allTasks(in: context).filter { ids.contains($0.id) }
+    let scheduleBefore = dropped.map(TaskUndo.ScheduleSnapshot.init)
+    let filingBefore = dropped.map(TaskUndo.FilingSnapshot.init)
     for id in ids {
       switch action {
       case .today:
@@ -475,6 +554,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       case .project(let projectId):
         mutator.moveToProject(id: id, project: projectId)
       }
+    }
+    switch action {
+    case .today:
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Move to Today", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+    case .scheduleTomorrow, .anytime:
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+    case .area, .project:
+      TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
     }
     // Local mutations don't broadcast on their own; both shells (and the
     // counts here) listen for this.
@@ -742,7 +833,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// to the count), and the count badge. Every row — filter, area, project —
   /// shares this exact layout, so nothing needs per-kind alignment.
   @MainActor
-  fileprivate final class SidebarCell: NSTableCellView {
+  fileprivate final class SidebarCell: NSTableCellView, NSTextFieldDelegate {
     let badge = NSTextField(labelWithString: "")
     /// An area's user glyph sits where the icon would — same slot, so titles
     /// stay aligned whether an area has an emoji or the muted dot.
@@ -751,6 +842,56 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// `shouldShowOutlineCellForItem`.
     let disclosure = KitDisclosureView()
     var onToggleDisclosure: (() -> Void)?
+
+    /// Inline rename — the Finder idiom, and the shell's ONE answer to
+    /// "name this thing" (see SeptaskKitSurface.swift: naming is not one of
+    /// the three surface tiers, it happens in the row that holds the name).
+    /// The label turns into a field for the duration of the edit and turns
+    /// back after, so nothing about the row's layout moves.
+    private var renameCommit: ((String) -> Void)?
+    private var titleBeforeRename = ""
+
+    func beginRename(onCommit: @escaping (String) -> Void) {
+      guard let text = textField else { return }
+      renameCommit = onCommit
+      titleBeforeRename = text.stringValue
+      text.isEditable = true
+      text.isSelectable = true
+      text.drawsBackground = true
+      text.backgroundColor = .textBackgroundColor
+      text.focusRingType = .default
+      text.delegate = self
+      text.window?.makeFirstResponder(text)
+      text.currentEditor()?.selectAll(nil)
+    }
+
+    private func endRename(commit: Bool) {
+      guard let text = textField else { return }
+      let value = text.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+      let handler = renameCommit
+      renameCommit = nil
+      text.isEditable = false
+      text.isSelectable = false
+      text.drawsBackground = false
+      text.focusRingType = .none
+      text.delegate = nil
+      // An empty name is a cancel, not a rename to "" — same rule Finder uses.
+      guard commit, !value.isEmpty, value != titleBeforeRename else {
+        text.stringValue = titleBeforeRename
+        return
+      }
+      handler?(value)
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
+
+    func control(_ control: NSControl, textView: NSTextView,
+                 doCommandBy commandSelector: Selector) -> Bool {
+      guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+      endRename(commit: false)
+      window?.makeFirstResponder(nil)
+      return true
+    }
 
     init(identifier: NSUserInterfaceItemIdentifier) {
       super.init(frame: .zero)
@@ -880,13 +1021,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.selectedRow >= 0 ? outlineView.item(atRow: outlineView.selectedRow) as? Node : nil
   }
 
+  /// New Area lands a named row and opens it for editing, the way Finder
+  /// lands "untitled folder". It used to stop the whole app with a modal text
+  /// prompt to ask for a string the row can take directly.
   @objc func newArea() {
-    guard let title = KitPrompt.text(
-      title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"),
-      placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
-      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
-    ) else { return }
-    Task { try? await areasMutator.create(title: title) }
+    Task { [weak self] in
+      guard let self,
+            let area = try? await self.areasMutator.create(
+              title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"))
+      else { return }
+      self.rebuild(preserving: "area:\(area.id)")
+      self.beginRename(key: "area:\(area.id)")
+    }
   }
 
   @objc private func newProjectLoose() { newProject(inArea: nil) }
@@ -899,34 +1045,44 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   @objc func newProject() { newProject(inArea: nil) }
 
   private func newProject(inArea areaId: String?) {
-    guard let title = KitPrompt.text(
-      title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
-      placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
-      confirmTitle: String(localized: "Create", comment: "SeptaskKit: prompt confirm")
-    ) else { return }
-    Task { try? await projectsMutator.create(title: title, area: areaId) }
+    Task { [weak self] in
+      guard let self,
+            let project = try? await self.projectsMutator.create(
+              title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
+              area: areaId)
+      else { return }
+      self.rebuild(preserving: "project:\(project.id)")
+      self.beginRename(key: "project:\(project.id)")
+    }
   }
 
   @objc private func renameSelected() {
-    switch selectedNode?.content {
+    guard let key = selectedKey() else { return }
+    beginRename(key: key)
+  }
+
+  /// Turn the row's label into a field and write the result through the
+  /// matching mutator. One rename path for areas and projects, and the same
+  /// one the ⌘R menu item, the context menu and a fresh row all use.
+  private func beginRename(key: String) {
+    guard let row = row(forKey: key),
+          let node = outlineView.item(atRow: row) as? Node,
+          let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: true) as? SidebarCell
+    else { return }
+    outlineView.selectRowIndexes([row], byExtendingSelection: false)
+    outlineView.scrollRowToVisible(row)
+
+    switch node.content {
     case .area(let area):
-      guard let title = KitPrompt.text(
-        title: String(localized: "Rename Area", comment: "SeptaskKit: structure CRUD"),
-        placeholder: String(localized: "Area name", comment: "SeptaskKit: structure CRUD"),
-        initial: area.title,
-        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
-      )
-      else { return }
-      Task { try? await areasMutator.rename(id: area.id, to: title) }
+      cell.beginRename { [weak self] title in
+        guard let self else { return }
+        Task { try? await self.areasMutator.rename(id: area.id, to: title) }
+      }
     case .project(let project, _):
-      guard let title = KitPrompt.text(
-        title: String(localized: "Rename Project", comment: "SeptaskKit: structure CRUD"),
-        placeholder: String(localized: "Project name", comment: "SeptaskKit: structure CRUD"),
-        initial: project.title,
-        confirmTitle: String(localized: "Rename", comment: "SeptaskKit: prompt confirm")
-      )
-      else { return }
-      Task { try? await projectsMutator.rename(id: project.id, to: title) }
+      cell.beginRename { [weak self] title in
+        guard let self else { return }
+        Task { try? await self.projectsMutator.rename(id: project.id, to: title) }
+      }
     default:
       break
     }
@@ -1018,6 +1174,22 @@ private final class KitSidebarOutlineView: NSOutlineView {
     onRightClick?(event)
   }
 
+  /// Selection emphasis is computed per draw (`septaskSelectionIsActive`), so
+  /// the rows must repaint when focus enters or leaves this sidebar. AppKit
+  /// posts no notification for a first-responder change — these two overrides
+  /// are the hook.
+  override func becomeFirstResponder() -> Bool {
+    let accepted = super.becomeFirstResponder()
+    if accepted { septaskRefreshSelectionEmphasis() }
+    return accepted
+  }
+
+  override func resignFirstResponder() -> Bool {
+    let resigned = super.resignFirstResponder()
+    if resigned { septaskRefreshSelectionEmphasis() }
+    return resigned
+  }
+
   override func keyDown(with event: NSEvent) {
     if event.keyCode == 48 {  // Tab / Shift-Tab — only two stops in the loop.
       onTab?()
@@ -1026,4 +1198,17 @@ private final class KitSidebarOutlineView: NSOutlineView {
     super.keyDown(with: event)
   }
 }
+
+/// Bridge to the outline view's node model. Kept here (not on the controller)
+/// so the destination list stays the single source both the tree and the title
+/// dropdown read.
+extension KitSidebarDestination {
+  var nodeContent: SeptaskKitSidebarController.Node.Content {
+    switch self {
+    case .next:                     return .next
+    case .filter(let f, let title): return .filter(f, title: title, symbol: symbol)
+    }
+  }
+}
+
 #endif

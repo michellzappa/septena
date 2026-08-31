@@ -275,6 +275,7 @@ final class TasksWatchStore {
     // source row must never spawn a second occurrence.
     guard (record["status"] as? String ?? "open") == "open" else { return }
     record["status"] = "done"
+    let completionDay = Self.dateFmt.string(from: Date())
     record["completedAt"] = Self.tsFmt.string(from: Date())
 
     let unit = record["recurrenceUnit"] as? String
@@ -285,11 +286,21 @@ final class TasksWatchStore {
       .map { $0 != 0 }
       ?? (record["recurrenceAfterCompletion"] as? NSNumber)?.boolValue
       ?? true
-    let nextDate = unit.flatMap {
+    let paused = (record["recurrencePaused"] as? Int)
+      .map { $0 != 0 }
+      ?? (record["recurrencePaused"] as? NSNumber)?.boolValue
+      ?? false
+    // A paused series still completes the occurrence, it just spawns no next
+    // one. The check sits OUTSIDE the closure on purpose: a multi-statement
+    // closure gets no result-type inference, so a `return nil` in there leaves
+    // `flatMap`'s element type unsolvable. Same shape as the Septena watch's
+    // `WatchConnectivity.saveTaskCompletion`, which hit this first.
+    let nextDate: String? = paused ? nil : unit.flatMap { unit in
       TasksWatchRecurrence.nextDate(
-        completedOn: today,
+        completedOn: completionDay,
         scheduled: record["scheduled"] as? String,
-        unit: $0,
+        logicalScheduled: record["recurrenceAnchorDate"] as? String,
+        unit: unit,
         interval: interval,
         afterCompletion: afterCompletion
       )
@@ -304,7 +315,7 @@ final class TasksWatchStore {
           from: record,
           recordID: nextRecordID,
           scheduled: nextDate,
-          created: today,
+          created: completionDay,
           createdAt: Date()
         ))
       }

@@ -4,50 +4,55 @@
   "releases": [
     {
       "version": "Unreleased",
-      "build": 1598,
-      "date": "2026-08-18",
+      "build": 1665,
+      "date": "2026-08-26",
       "name": "In development",
       "summary": "Changes since 0.7.0, refreshed automatically as work lands.",
       "highlights": [
         {
-          "title": "Meet Septask, a focused task app for iPhone, iPad, and Mac",
-          "detail": "A new app that works on the same private task data as Septena, with its own watch app, widgets, and settings.",
+          "title": "Septask, a focused task app",
+          "detail": "A new app that puts just your tasks front and center, sharing the same private data as Septena, with a watch companion.",
           "section": "tasks"
         },
         {
-          "title": "Recurring tasks are far more reliable",
-          "detail": "Completing a recurring task now reliably creates its next occurrence, and repeat schedules hold up across editing, sync, and every surface.",
+          "title": "Recurring tasks are more reliable",
+          "detail": "Completing a repeating task now reliably spawns its next occurrence, and you can pause, resume, or reschedule a series.",
           "section": "tasks"
         },
         {
-          "title": "Meal photos are read automatically",
-          "detail": "Take a photo of a meal and Septena analyzes it on-device to prefill the nutrition fields.",
+          "title": "Recover deleted tasks and attach files",
+          "detail": "Deleted tasks land in Recently Deleted for 30 days with one-tap restore, and tasks can now carry attachments.",
+          "section": "tasks"
+        },
+        {
+          "title": "Snap a photo to log a meal",
+          "detail": "On-device photo analysis prefills a meal's details, and re-logging a meal can scale it by amount and include an ingredient breakdown.",
           "section": "nutrition"
         },
         {
-          "title": "Training sessions get progression hints and finer control",
-          "detail": "Strength sets now show a one-tap progression hint, sessions have editable start and end times, and rest between sets auto-advances.",
+          "title": "More training tools",
+          "detail": "Cardio exercises, progression hints, editable session start/end times, an auto-advancing rest timer, and an effort-weighted weekly review.",
           "section": "training"
         },
         {
-          "title": "Hover and selection feel more consistent everywhere",
-          "detail": "Tiles, rows, and inline controls now respond to hover, and selection uses one consistent highlight across the app.",
-          "section": null
-        },
-        {
-          "title": "Suggested goals for more sections",
-          "detail": "Chores, gut, habits, medications, mood, supplements, and symptoms now offer suggested goals.",
+          "title": "Pin goals to your dashboard",
+          "detail": "Goals can be pinned to the week dashboard with contextual actions and colors, and more sections now suggest goals to track.",
           "section": "goals"
         },
         {
-          "title": "Task attachments, bulk actions, and drag-to-file",
-          "detail": "Attach files to a task, select multiple tasks at once, and drag tasks onto projects, areas, or headings.",
-          "section": "tasks"
+          "title": "Steadier saving and syncing",
+          "detail": "Failed saves and reads are now detected and rolled back instead of silently corrupting your data.",
+          "section": null
         },
         {
-          "title": "See exactly what telemetry is sent",
-          "detail": "A new privacy screen lists analytics data being sent, with graded levels from off to full.",
-          "section": null
+          "title": "Copy your grocery list",
+          "detail": "Add items straight to the clipboard from the grocery shopping list.",
+          "section": "groceries"
+        },
+        {
+          "title": "Pasted text stays on one line in a task title",
+          "detail": "Pasting several lines into a new task now joins them into one title instead of cutting it short or running the words together, and it no longer saves the task before you are done.",
+          "section": "tasks"
         }
       ]
     },

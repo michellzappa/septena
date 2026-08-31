@@ -72,6 +72,11 @@ enum SeptaskKitTheme {
   static let checkboxStroke: NSColor = .secondaryLabelColor
   /// Theme.checkboxFill (done box) — same family, slightly heavier.
   static let checkboxFill: NSColor = .labelColor.withAlphaComponent(0.78)
+  /// Theme.checkboxCheck — the check glyph inside a done box. NOT white:
+  /// `checkboxFill` is label ink, which is near-white in dark mode, so a white
+  /// check vanished the instant you ticked a row. This flips with the
+  /// appearance alongside the fill.
+  static let checkboxCheck: NSColor = .textBackgroundColor
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
   /// Theme.overdueRed — late deadlines, platform red.
@@ -82,6 +87,10 @@ enum SeptaskKitTheme {
   static let inkSecondary: NSColor = .secondaryLabelColor
   /// Theme.iconMuted — receding glyphs/meta (Reminders' non-tinted metadata).
   static let iconMuted: NSColor = .tertiaryLabelColor
+  /// Color.claudeAccent — the ONE place Claude's own color appears in the
+  /// shell (the reconnect row). A brand color, not a semantic one, so it
+  /// bridges the shared token rather than naming a system color.
+  static let claudeAccent = NSColor(Color.claudeAccent)
 
   // Surfaces. These Theme tokens are hand-built Colors (not straight system
   // semantics), so they bridge rather than name an NSColor — one source of
@@ -166,7 +175,15 @@ enum SeptaskKitLayout {
   static let maxInset: CGFloat = 220
   /// Top/bottom `NSScrollView.contentInsets` — fixed so the list doesn't
   /// grow a taller header band as the window widens (sides still flex).
-  static let verticalInset: CGFloat = 16
+  /// Generous on purpose (Things-style): the first card sits well clear of
+  /// the title bar and the last one clears the toolbar.
+  static let verticalInset: CGFloat = 48
+
+  /// Clear space between the BOTTOM of the title bar and the first row. The
+  /// bar now carries its own height (a unified toolbar), so the top gap is
+  /// measured from the bar rather than from the window edge — `verticalInset`
+  /// stays the bottom-of-list breathing room, which has no bar under it.
+  static let titleBarGap: CGFloat = 20
 
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {

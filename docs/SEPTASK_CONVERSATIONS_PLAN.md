@@ -1,6 +1,13 @@
 # Task Conversations in the AppKit shell — plan
 
-Not built yet. This is the plan for §2 of `docs/SEPTASK_APPKIT_PARITY.md`,
+**BUILT (2026-08-21).** All six steps landed; see the §2 entry in
+`docs/SEPTASK_APPKIT_PARITY.md` for what shipped and the one deliberate
+deviation (no `acknowledge` on inspector open — the inspector's peek contract
+wins over this plan's instruction, which predates it). The code is
+`Septask/SeptaskKitConversation.swift` plus the inspector and composer wiring.
+This document is kept as the reasoning record, not as an open task list.
+
+This was the plan for §2 of `docs/SEPTASK_APPKIT_PARITY.md`,
 written to be picked up cold. Read `docs/SEPTASK.md` ("AppKit shell on
 macOS") for the shell's working rules first — everything here follows them:
 presentation-only, mutators as the write boundary, no re-derived semantics.

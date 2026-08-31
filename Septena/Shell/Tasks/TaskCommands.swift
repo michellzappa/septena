@@ -7,13 +7,19 @@ enum TaskRowShortcuts {
   static let copy = KeyboardShortcut("c", modifiers: .command)
   static let duplicate = KeyboardShortcut("d", modifiers: .command)
   static let markComplete = KeyboardShortcut("k", modifiers: .command)
+  // ⌥⌘K, deliberately one modifier away from ⌘K: cancelling and completing are
+  // neighbours in meaning (both retire a row to the Logbook) but opposite in
+  // outcome, so they should be neighbours on the keyboard AND impossible to
+  // hit by accident. Not a system-reserved equivalent.
+  static let cancel = KeyboardShortcut("k", modifiers: [.command, .option])
   static let toggleToday = KeyboardShortcut("t", modifiers: .command)
   static let when = KeyboardShortcut("s", modifiers: .command)
   static let deadline = KeyboardShortcut("d", modifiers: [.command, .shift])
-  // ⌘⇧M, not ⌘M: bare ⌘M is the system Window ▸ Minimize equivalent, so a plain
-  // ⌘M here would shadow Minimize whenever a task list is focused (Things uses
-  // ⌘⇧M for exactly this reason).
+  // Keep ⌘⇧M for compatibility, but the focused task list also accepts the
+  // bare ⌘M alias. Septask/Septena deliberately reclaim it because it is never
+  // useful to minimize while working in a task list.
   static let move = KeyboardShortcut("m", modifiers: [.command, .shift])
+  static let moveBare = KeyboardShortcut("m", modifiers: .command)
   // ⌘⇧., not ⌘.: bare ⌘. is the universal system Cancel / iPad hardware-Escape
   // key, so a plain ⌘. would silently unschedule selected rows when a user hits
   // it to "escape".
@@ -27,15 +33,18 @@ enum TaskRowShortcuts {
 /// This is the single registry every surface renders from — the macOS Task
 /// menu, the iPad hidden-shortcut buttons, the row context menu, and the
 /// human-facing Keyboard Shortcuts sheet. They used to each spell the list out
-/// by hand and had drifted: the catalogue advertised ⌘M for Move and ⌘. for
-/// Clear Schedule (the real bindings are ⌘⇧M / ⌘⇧., deliberately, see above),
-/// the context menu's Copy carried no shortcut at all, and the iPad buttons had
-/// empty titles so the hold-⌘ HUD showed blank rows. Add a command here and
-/// every surface picks it up.
+/// by hand and had drifted: the catalogue advertised ⌘. for Clear Schedule
+/// (the real binding is ⌘⇧.), the context menu's Copy carried no shortcut at
+/// all, and the iPad buttons had empty titles so the hold-⌘ HUD showed blank
+/// rows. Add a command here and every surface picks it up.
 struct TaskRowCommand: Identifiable {
   let id: String
   let title: String
   let shortcut: KeyboardShortcut
+  /// Extra bindings handled by the focused task surface. A menu item can show
+  /// only one key equivalent, so these aliases are registered by the surface
+  /// itself and included in the shortcuts catalogue.
+  var alternateShortcuts: [KeyboardShortcut] = []
   /// The handler slot on `TaskActions`. Nil there means "not available for the
   /// current selection", which disables the menu item.
   let handler: KeyPath<TaskActions, (() -> Void)?>
@@ -44,17 +53,24 @@ struct TaskRowCommand: Identifiable {
   /// A menu separator precedes this item.
   var separatorBefore: Bool = false
 
-  /// The shortcut rendered as keycap tokens, e.g. ["⌘", "⇧", "M"] — so the
-  /// Keyboard Shortcuts sheet displays the real binding rather than a
-  /// hand-copied guess at it.
+  /// The primary shortcut rendered as keycap tokens, e.g. ["⌘", "⇧", "M"] —
+  /// so callers can display the real binding rather than a hand-copied guess.
   var keycaps: [String] {
+    Self.keycaps(for: shortcut)
+  }
+
+  static func keycaps(for shortcut: KeyboardShortcut) -> [String] {
     var caps: [String] = []
     if shortcut.modifiers.contains(.control) { caps.append("⌃") }
     if shortcut.modifiers.contains(.option)  { caps.append("⌥") }
     if shortcut.modifiers.contains(.shift)   { caps.append("⇧") }
     if shortcut.modifiers.contains(.command) { caps.append("⌘") }
-    caps.append(Self.keycap(for: shortcut.key))
+    caps.append(keycap(for: shortcut.key))
     return caps
+  }
+
+  var allShortcuts: [KeyboardShortcut] {
+    [shortcut] + alternateShortcuts
   }
 
   /// Compare on `character` rather than the `KeyEquivalent` cases themselves so
@@ -87,6 +103,8 @@ enum TaskRowCommands {
     TaskRowCommand(id: "markComplete", title: "Mark as Complete",
                    shortcut: TaskRowShortcuts.markComplete, handler: \.toggleComplete,
                    acceptsNextList: true),
+    TaskRowCommand(id: "cancel", title: "Cancel Task",
+                   shortcut: TaskRowShortcuts.cancel, handler: \.cancel),
     TaskRowCommand(id: "toggleToday", title: "Toggle Today",
                    shortcut: TaskRowShortcuts.toggleToday, handler: \.toggleToday),
     TaskRowCommand(id: "when", title: "When…",
@@ -94,7 +112,9 @@ enum TaskRowCommands {
     TaskRowCommand(id: "deadline", title: "Deadline…",
                    shortcut: TaskRowShortcuts.deadline, handler: \.openDeadline),
     TaskRowCommand(id: "move", title: "Move…",
-                   shortcut: TaskRowShortcuts.move, handler: \.openMove),
+                   shortcut: TaskRowShortcuts.move,
+                   alternateShortcuts: [TaskRowShortcuts.moveBare],
+                   handler: \.openMove),
     TaskRowCommand(id: "clearSchedule", title: "Clear Schedule",
                    shortcut: TaskRowShortcuts.clearSchedule, handler: \.clearSchedule,
                    separatorBefore: true),
@@ -115,6 +135,9 @@ struct TaskActions {
   /// Toggles done/open on the selected row(s) — invoked by the explicit ⌘K
   /// Task-menu command.
   var toggleComplete: (() -> Void)?
+  /// Retires the selected row(s) as cancelled — ⌥⌘K. Distinct from complete:
+  /// the work didn't happen, and the Logbook records that difference.
+  var cancel: (() -> Void)?
   var delete: (() -> Void)?
   var clearSchedule: (() -> Void)?
   var editDetails: (() -> Void)?
@@ -162,6 +185,15 @@ struct TaskCommandsMenu: View {
       Button(command.title) { action?() }
         .keyboardShortcut(command.shortcut)
         .disabled(action == nil)
+      // NSMenuItem has one visible key-equivalent slot. Keep the alias as a
+      // hidden command item; the task surface also handles it directly so the
+      // binding remains focused on the list rather than Window ▸ Minimize.
+      ForEach(Array(command.alternateShortcuts.enumerated()), id: \.offset) { _, shortcut in
+        Button(command.title) { action?() }
+          .keyboardShortcut(shortcut)
+          .hidden()
+          .disabled(action == nil)
+      }
     }
   }
 }

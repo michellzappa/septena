@@ -24,6 +24,15 @@ struct TaskNavMenu<Trigger: View>: View {
   @Environment(NavigationState.self) private var nav
   @Environment(\.modelContext) private var modelContext
 
+  /// The destination to draw the checkmark on. Defaults to whatever `nav` is
+  /// showing. A host that doesn't drive `nav` names its destination directly —
+  /// the AppKit shell's Next pane owns a per-pane `NavigationState` stub that
+  /// nothing observes, so `nav.path` there is always empty.
+  var current: Route? = nil
+  /// Where a pick goes. Defaults to `nav.go(to:)` — the SwiftUI shells' whole
+  /// navigation model. The AppKit shell passes a closure that steers its own
+  /// sidebar instead, which is what drives its panes.
+  var onNavigate: ((Route) -> Void)? = nil
   @ViewBuilder var label: () -> Trigger
 
   var body: some View {
@@ -93,10 +102,14 @@ struct TaskNavMenu<Trigger: View>: View {
   /// still shows emoji.)
   @ViewBuilder
   private func destButton(_ route: Route, title: String? = nil) -> some View {
-    let isCurrent = nav.path.last?.sameDestination(as: route) == true
-    Toggle(isOn: Binding(get: { isCurrent }, set: { if $0 { nav.go(to: route) } })) {
+    let isCurrent = (current ?? nav.path.last)?.sameDestination(as: route) == true
+    Toggle(isOn: Binding(get: { isCurrent }, set: { if $0 { navigate(to: route) } })) {
       Label(title ?? route.title, systemImage: route.icon)
     }
+  }
+
+  private func navigate(to route: Route) {
+    if let onNavigate { onNavigate(route) } else { nav.go(to: route) }
   }
 }
 

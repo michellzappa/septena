@@ -269,6 +269,19 @@ struct SeptaskNextFeed: View {
 /// as sheets here on macOS so the AppKit host doesn't need its own modal
 /// switch; on iOS `SeptaskRootView` already owns that sheet.
 struct SeptaskNextPage: View {
+  /// Where a pick from this page's title dropdown goes. Left nil in the
+  /// SwiftUI shells, where `TaskNavMenu`'s own `NavigationState` drives
+  /// navigation; the AppKit shell passes a closure that steers its sidebar.
+  var onNavigate: ((Route) -> Void)? = nil
+  /// Reports whether this page's own big title is still on screen — the
+  /// AppKit shell hands its window title back and forth against it, exactly
+  /// as `SeptaskKitTaskListController.syncWindowTitle` does for a task page.
+  /// Unused by the SwiftUI shells, which have a nav bar instead.
+  var onHeaderVisibilityChange: ((Bool) -> Void)? = nil
+
+  /// Measured, not assumed — the title grows with the text-size preference.
+  @State private var headerHeight: CGFloat = 0
+
   #if os(macOS)
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
@@ -295,6 +308,7 @@ struct SeptaskNextPage: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 0) {
         pageHeader
+          .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
         SeptaskNextFeed()
       }
       .padding(.bottom, 24)
@@ -306,6 +320,15 @@ struct SeptaskNextPage: View {
   private var macPage: some View {
     @Bindable var nav = nav
     return scrollContent
+      // The window title takes over once this page's own title scrolls away —
+      // the same handoff every AppKit list page does from its clip view. Here
+      // the scroll view is SwiftUI's, so the standard scroll-geometry reader
+      // supplies the offset instead of a bounds notification.
+      .onScrollGeometryChange(for: Bool.self) { geometry in
+        geometry.contentOffset.y + geometry.contentInsets.top < headerHeight
+      } action: { _, headerVisible in
+        onHeaderVisibilityChange?(headerVisible)
+      }
       .sheet(item: $nav.presentedModal) { modal in
         switch modal {
         case .addInfo(let section) where section == .nutrition:
@@ -321,22 +344,31 @@ struct SeptaskNextPage: View {
   }
   #endif
 
+  /// The page title, drawn by the SAME component every task page uses —
+  /// `ScreenTitleMenuLabel` inside `TaskNavMenu`. So Next's title now sits on
+  /// the shared leading grid at the shared rung, and it IS the destination
+  /// dropdown. It used to be a bare `Text` at its own size: the one page
+  /// whose title named the page but couldn't navigate away from it.
   private var pageHeader: some View {
-    HStack(spacing: Theme.iconTextGap) {
-      Image(systemName: "arrow.right")
-        .scaledFont(size: 22, weight: .semibold)
-        .foregroundStyle(Theme.inkSecondary)
-        .frame(width: 28, alignment: .center)
-      Text("Next")
-        .scaledFont(size: 28, weight: .bold, relativeTo: .largeTitle)
-        .foregroundStyle(Theme.inkPrimary)
-      Spacer()
+    let title = HStack(spacing: 0) {
+      TaskNavMenu(current: .next, onNavigate: onNavigate) {
+        ScreenTitleMenuLabel(icon: Route.next.icon,
+                             iconTint: Theme.inkSecondary,
+                             title: Route.next.title)
+      }
+      Spacer(minLength: 0)
     }
-    .padding(.leading, TaskCardMetrics.headerLeading)
     .padding(.trailing, TaskCardMetrics.margin)
-    .padding(.top, 28)
-    .padding(.bottom, 8)
-    .frame(maxWidth: .infinity, alignment: .leading)
+    #if os(macOS)
+    // `ScreenTitleMenuLabel` carries the SwiftUI shells' own 12pt top pad,
+    // which assumes a nav bar above it. The AppKit shell has a unified
+    // toolbar the content runs UNDER, and clears it by `titleBarGap` on
+    // every list page — so top the difference up rather than letting Next's
+    // title sit closer to the bar than every other page's does.
+    return title.padding(.top, max(0, SeptaskKitLayout.titleBarGap - 12))
+    #else
+    return title
+    #endif
   }
 
   #if os(macOS)

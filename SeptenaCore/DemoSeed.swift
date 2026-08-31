@@ -65,7 +65,7 @@ public enum DemoSeed {
     seedGoals(ctx)
     seedGroceries(ctx)
     seedSections(ctx)
-    try? ctx.save()
+    StoreHealth.save(ctx, op: "DemoSeed.populate")
   }
 
   // MARK: - date helpers (offset 0 = today, negative = past)

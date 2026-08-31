@@ -207,8 +207,9 @@ a human disposition — it should always leave the band, for either population.
 `isInTriageBand` (`SeptenaTask`/`TaskEntity`) now guards `project == nil &&
 area == nil` before either branch; rule 2 is effectively "regardless of
 `scheduled`/`deadline`" only, not `project`. This also happens to close the
-"acknowledge never gets called" gap in some write paths (docs/
-SEPTASK_APPKIT_PARITY.md, §4/§6) — once a filed task always leaves the band on
+"acknowledge never gets called" gap in some write paths (the AppKit shell's
+structure-CRUD and undo work; see git history for
+docs/SEPTASK_APPKIT_PARITY.md) — once a filed task always leaves the band on
 its own, an unacknowledged-forever agent row filed into a project no longer
 gets stuck double-listed until the 7-day decay.
 

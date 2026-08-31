@@ -487,6 +487,9 @@ struct MedicationDefinitionsSheet: View {
         Image(systemName: exists ? "checkmark.circle.fill" : "plus.circle")
           .foregroundStyle(exists ? Color.secondary : Color.accentColor)
       }
+      // `.plain` opts the row out of the list cell's tap target, so without
+      // this the Spacer and trailing gaps are dead zones.
+      .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
     .disabled(exists)

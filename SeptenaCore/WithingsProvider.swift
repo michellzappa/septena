@@ -152,8 +152,7 @@ final class WithingsStore {
     // Unchanged re-fetch ⇒ no save, no CloudKit fan-out, no UI refresh, and
     // no body-goal re-evaluation (the trailing average can't have moved).
     guard !touched.isEmpty else { return }
-    do { try context.save() }
-    catch { SeptenaLog.error("WithingsStore: save failed", error) }
+    StoreHealth.save(context, op: "WithingsStore.apply")
     for id in touched {
       ckEngine?.noteWithingsRowChange(id: id)
     }
@@ -253,6 +252,29 @@ final class WithingsProvider {
   /// `connect`, `refreshTokens`, or `disconnect` change them.
   private(set) var hasTokens: Bool = false
 
+  // MARK: Connection health
+  //
+  // See `ConnectionHealth` — "tokens sit in the Keychain" is not "Withings is
+  // syncing". Withings is the most exposed of the three: the refresh token
+  // rotates on every use, so one interrupted refresh can leave a pair that
+  // will never work again, and the weigh-ins on screen come from the
+  // CloudKit-mirrored store rather than the network — the chart simply stops
+  // advancing, which is indistinguishable from not stepping on the scale.
+  // Every fetch records its outcome here and the status surfaces read
+  // `connectionDisplayState` instead of `hasTokens`.
+
+  private var health = ConnectionHealth(namespace: "withings")
+
+  /// When the last network fetch succeeded. `nil` = never (on this device).
+  var lastFetchAt: Date? { health.lastFetchAt }
+  /// Why the last network fetch failed, or `nil` if it succeeded.
+  var lastError: String? { health.lastError }
+  /// Settings-facing summary — one source of truth for the Integrations row
+  /// and the Withings detail pane so they can never disagree.
+  var connectionDisplayState: ConnectionDisplayState {
+    health.displayState(hasCredentials: hasTokens)
+  }
+
   private let session: URLSession
   private let accessAccount  = "septena.withings.access"
   private let refreshAccount = "septena.withings.refresh"
@@ -298,6 +320,9 @@ final class WithingsProvider {
     }
 
     try await exchangeCode(code)
+    // Fresh authorization deserves a clean slate — the previous connection's
+    // rejection must not keep the row red until the next fetch lands.
+    health.reset()
   }
 
   /// Wipe tokens. Doesn't revoke server-side — Withings's revoke
@@ -308,6 +333,7 @@ final class WithingsProvider {
     Self.deleteItem(account: refreshAccount)
     Self.deleteItem(account: expiresAccount)
     hasTokens = false
+    health.reset()
   }
 
   // MARK: Fetch
@@ -321,9 +347,30 @@ final class WithingsProvider {
   /// When no tokens are set, returns whatever's in the local store —
   /// CloudKit-mirrored history still shows on a fresh device before
   /// the user re-connects.
+  ///
+  /// Success and failure are both recorded on the provider, so a caller that
+  /// swallows the error with `try?` (the dashboard does, deliberately) still
+  /// leaves the status surfaces able to say the section stopped updating and
+  /// why.
   func fetchHistory(days: Int) async throws -> [WithingsRow] {
+    // No credential, so nothing to be healthy or unhealthy about — the
+    // display state already reads `.disconnected`, and recording anything
+    // here would just overwrite the last real verdict.
     guard hasTokens else { return WithingsStore.shared.history(days: days) }
+    do {
+      let rows = try await performFetch(days: days)
+      health.recordSuccess()
+      return rows
+    } catch {
+      // A refresh that Withings rejected has already called `disconnect()`
+      // deep inside this fetch, which resets health — so record *after*, or
+      // the reason the user has to reconnect is wiped before they see it.
+      health.recordFailure(error)
+      throw error
+    }
+  }
 
+  private func performFetch(days: Int) async throws -> [WithingsRow] {
     let cal = Calendar(identifier: .gregorian)
     let today = Date()
     let start = cal.date(byAdding: .day, value: -days, to: today) ?? today

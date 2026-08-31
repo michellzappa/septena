@@ -50,12 +50,14 @@ struct TasksWatchWire: Codable, Equatable, Sendable {
 enum TasksWatchRecurrence {
   static func nextDate(completedOn: String,
                        scheduled: String?,
+                       logicalScheduled: String? = nil,
                        unit: String,
                        interval: Int,
                        afterCompletion: Bool) -> String? {
     RecurrenceDateCalculator.nextDate(
       completedOn: completedOn,
       scheduled: scheduled,
+      logicalScheduled: logicalScheduled,
       unit: unit,
       interval: interval,
       afterCompletion: afterCompletion
@@ -88,6 +90,16 @@ enum TasksWatchRecurrence {
     next["recurrenceUnit"] = source["recurrenceUnit"]
     next["recurrenceInterval"] = source["recurrenceInterval"]
     next["recurrenceAfterCompletion"] = source["recurrenceAfterCompletion"]
+    next["recurrencePaused"] = 0
+    // A generated copy belongs to the same series as its source. The logical
+    // slot is the newly generated date for fixed schedules; completion-based
+    // rules intentionally leave it empty and anchor from the next completion.
+    next["recurrenceSeriesID"] = (source["recurrenceSeriesID"] as? String)
+      ?? source.recordID.recordName
+    let fixed = ((source["recurrenceAfterCompletion"] as? Int)
+      ?? (source["recurrenceAfterCompletion"] as? NSNumber)?.intValue
+      ?? 1) == 0
+    next["recurrenceAnchorDate"] = fixed ? scheduled : nil
     next["source"] = source["source"]
     next["sourceClient"] = source["sourceClient"]
     if source["source"] as? String == "mcp" {

@@ -40,9 +40,22 @@ private struct SeptaskWelcomeGate: ViewModifier {
   }
 }
 
-private struct SeptaskWelcomeView: View {
+/// Internal, not private: the macOS AppKit shell hosts this same view in a
+/// sheet (`SeptaskKitWelcome`) because the SwiftUI window it used to ride no
+/// longer opens at launch. One welcome, two presenters — never a second copy.
+struct SeptaskWelcomeView: View {
   @Environment(SectionTheme.self) private var theme
   @AppStorage(SeptaskWelcome.completedKey) private var completed = false
+
+  /// Called after `completed` flips, so an AppKit host can end its sheet.
+  /// `nil` for the SwiftUI gate, whose binding closes on the same flag.
+  private let onComplete: (() -> Void)?
+
+  /// Explicit init: the memberwise one is `private` (its stored properties
+  /// are), so another file could not construct this view without it.
+  init(onComplete: (() -> Void)? = nil) {
+    self.onComplete = onComplete
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -104,6 +117,7 @@ private struct SeptaskWelcomeView: View {
       Divider()
       Button {
         completed = true
+        onComplete?()
       } label: {
         Text("Get Started")
           .font(.headline)

@@ -43,6 +43,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var list: SeptaskKitTaskListController?
   private var next: SeptaskKitNextController?
   private var detail: KitDetailPaneController?
+  private var inspector: SeptaskKitInspectorController?
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
   private var inspectorItem: NSSplitViewItem?
@@ -82,18 +83,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     inspectorItem.minimumThickness = 260
     inspectorItem.maximumThickness = 380
     inspectorItem.isCollapsed = true
+    // The pane always builds collapsed, so the menu's mirror starts false.
+    UserDefaults.standard.set(false, forKey: SettingsKey.septaskInspectorVisible)
     split.addSplitViewItem(inspectorItem)
     split.splitView.autosaveName = "SeptaskKitSplit"
-
-    list.onToggleInspector = { [weak inspector, weak inspectorItem] in
-      guard let inspectorItem else { return }
-      guard !inspectorItem.isCollapsed else {
-        inspectorItem.animator().isCollapsed = false
-        return
-      }
-      inspector?.flushPendingEdits()
-      inspectorItem.animator().isCollapsed = true
-    }
 
     // Quick Find steers the sidebar, which drives the detail — so a jump
     // always leaves the two in agreement — then selects the row it found.
@@ -106,16 +99,36 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onQuickFind = { [weak quickFind] in quickFind?.show() }
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
-    list.onNavigateToGroup = { [weak sidebar] filter in sidebar?.select(filter) }
+    list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
+    // The Next page's title dropdown is the same affordance on a SwiftUI page,
+    // so it lands in the same place — a `Route`, because that's the vocabulary
+    // `TaskNavMenu` speaks.
+    next.onNavigate = { [weak sidebar] route in sidebar?.select(route) }
 
     let window = NSWindow(contentViewController: split)
     window.title = String(localized: "Septask (AppKit)",
                           comment: "SeptaskKit: window title")
-    // Matches the SwiftUI scene's `.windowStyle(.hiddenTitleBar)`: content
-    // runs under a transparent title bar, traffic lights float over the
-    // sidebar. The title still names the window in the Window menu.
-    window.titleVisibility = .hidden
-    window.titlebarAppearsTransparent = true
+    // Full-size content view, so the list scrolls UNDER the title bar and the
+    // sidebar runs the whole window height — plus a toolbar, which is what
+    // gives that bar its MATERIAL. The toolbar frosts the band and adds the
+    // automatic hairline separator once content is under it, instead of
+    // letting rows collide with the title; and it splits correctly over a
+    // `.sidebar` split item (sidebar material on the left, content material
+    // over the list), which a bare `titlebarAppearsTransparent` bar cannot do.
+    // The toolbar carries no items on purpose: it exists for the title, the
+    // material, and the drag region.
+    let toolbar = NSToolbar(identifier: "SeptaskKitToolbar")
+    toolbar.displayMode = .iconOnly
+    toolbar.allowsUserCustomization = false
+    window.toolbar = toolbar
+    window.toolbarStyle = .unified
+    // The title names the DESTINATION ("Today", "Next", a project) — the same
+    // string the SwiftUI shell puts in its page header. Hiding it left nothing
+    // to name the window: the list ran straight to the top edge and the drag
+    // strip read as a row of tasks. `SeptaskKitTaskListController` reveals and
+    // hides it against its own in-content page title; the string set here only
+    // covers the frame before the sidebar picks its default.
+    window.titleVisibility = .visible
     window.styleMask.insert(.fullSizeContentView)
     window.setContentSize(NSSize(width: 980, height: 700))
     window.center()
@@ -127,14 +140,23 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     self.detail = detail
     self.sidebar = sidebar
     self.splitController = split
+    self.inspector = inspector
     self.inspectorItem = inspectorItem
     self.quickFind = quickFind
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
 
-    // Wired after super.init — capturing `self` in the closure above would
+    // Wired after super.init — capturing `self` in the closures below would
     // be "used before super.init".
     sidebar.onSelect = { [weak self] destination in
       self?.show(destination)
+    }
+    list.onToggleInspector = { [weak self] in
+      self?.setInspector(visible: inspectorItem.isCollapsed)
+    }
+    // Escape inside the pane closes it — the inspector owns no chrome of its
+    // own, so the shell that added the split item does the closing.
+    inspector.onRequestClose = { [weak self] in
+      self?.setInspector(visible: false)
     }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
@@ -149,14 +171,46 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     switch destination {
     case .filter(let filter, let title):
       guard let list, let detail else { return }
+      // The title is set HERE, not inside `list.show`, which returns early
+      // when the destination is already current — coming back to Today from
+      // Next hits exactly that early return, and a title set behind it would
+      // stay reading "Next".
+      window?.title = title
       detail.display(list)
-      list.show(filter, title: title)
+      list.show(filter)
+      // Ahead of the first scroll event, so a fresh page starts in the right
+      // state (and coming back from Next, where the title is always shown).
+      list.syncWindowTitle()
       list.focusList()
     case .next:
       guard let next, let detail else { return }
-      inspectorItem?.animator().isCollapsed = true
+      setInspector(visible: false)
+      window?.title = Route.next.title
       detail.display(next)
-      next.claimWindowSubtitle()
+      // Same handoff as a task page: the page's own big title owns the top of
+      // the window until it scrolls away. Next is a hosted SwiftUI page, so it
+      // reports its own scroll position rather than being read off a clip view
+      // — but the shell applies the identical rule, ahead of the first report.
+      next.syncWindowTitle()
+    }
+  }
+
+  /// One place that opens and closes the inspector, so every path — ⌥⌘I, the
+  /// menu item, Escape inside the pane, switching to Next — commits pending
+  /// edits, hands focus back to the list, and leaves the menu title truthful.
+  private func setInspector(visible: Bool) {
+    guard let inspectorItem else { return }
+    if !visible {
+      inspector?.flushPendingEdits()
+    }
+    inspectorItem.animator().isCollapsed = !visible
+    UserDefaults.standard.set(visible, forKey: SettingsKey.septaskInspectorVisible)
+    // Collapsing a pane that holds key focus leaves the window with nowhere to
+    // type; the list is where the person was before they opened it.
+    if !visible,
+       let responder = window?.firstResponder as? NSView,
+       responder.isDescendant(of: inspectorItem.viewController.view) {
+      list?.focusList()
     }
   }
 
@@ -169,8 +223,15 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// claim a command.
   var isFrontmost: Bool { window?.isKeyWindow == true }
 
+  /// Bring the shell forward — used by the navigation commands, which can now
+  /// fire while a panel or the Settings window is key.
+  func focusWindow() { window?.makeKeyAndOrderFront(nil) }
+
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
-  func goNext() { sidebar?.select(.next) }
+  // Spelled out: `select` is overloaded for TaskFilter / KitSidebarDestination
+  // / Route, and both KitSidebarDestination and Route have a `next`, so the
+  // leading-dot form is ambiguous.
+  func goNext() { sidebar?.select(KitSidebarDestination.next) }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
@@ -192,7 +253,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .deadline: list.presentDatePopover(kind: .deadline)
     case .clearSchedule: list.clearScheduleSelection()
     case .delete: list.deleteSelection()
-    case .setRecurrence(let rule): list.setRecurrence(rule)
+    case .repeatEditor: list.presentRecurrencePanel()
+    case .createNextCopy: list.createNextCopySelection()
     case .duplicate: list.duplicateSelection()
     case .move: list.presentMoveMenu()
     }
@@ -200,8 +262,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
 
   enum RowCommand {
     case toggleComplete, cancel, toggleToday, rename, when, deadline, clearSchedule, delete
-    case duplicate, move
-    case setRecurrence(Recurrence?)
+    case duplicate, move, createNextCopy
+    case repeatEditor
   }
 
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }
@@ -272,12 +334,29 @@ enum SeptaskKitCommands {
   /// take it — otherwise the whole menu reads as dead.
   static var canHandle: Bool { shell != nil }
 
+  /// Navigation targets the shell whenever one EXISTS, not only when its
+  /// window is key. Keying it to `isKeyWindow` is what made ⌘1–4 look
+  /// unreliable: Quick Find, Quick Entry and the Move panel are all
+  /// `NSPanel`s with `canBecomeKey`, and the Settings window is a window of
+  /// its own, so while any of them was up the shell was not key, `canHandle`
+  /// was false, and the whole Go menu greyed out. Row commands deliberately
+  /// stay keyed to the frontmost shell — those act on a selection, and acting
+  /// on a list you cannot see is worse than a disabled menu item.
+  static var canNavigate: Bool { shellExists }
+
   /// A shell exists, frontmost or not. Used by commands that stay available
   /// from an auxiliary window (Settings, opened over the shell).
   static var shellExists: Bool { SeptaskKitWindowController.existing != nil }
   static var canActOnSelection: Bool { shell?.canActOnSelection ?? false }
 
-  static func go(_ filter: TaskFilter) { shell?.go(to: filter) }
+  /// Fronts the shell before navigating: the command can now arrive while a
+  /// panel or the Settings window holds key, and changing the list behind a
+  /// panel that stays up would leave the user looking at the wrong thing.
+  static func go(_ filter: TaskFilter) {
+    guard let controller = SeptaskKitWindowController.existing else { return }
+    controller.focusWindow()
+    controller.go(to: filter)
+  }
   static func newTask() { shell?.newTask() }
   static func newProject() { shell?.newProject() }
   static func newArea() { shell?.newArea() }

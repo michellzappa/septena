@@ -296,17 +296,28 @@ struct TaskComposerCard: View {
       // Save first, THEN let the host decide about an untouched draft — both in
       // the one teardown event so purge can never front-run the autosave.
       .onDisappear { persistOnce(); onVanish?() }
-      .onChange(of: draft.title) { _, newValue in
-        // A vertical-axis TextField turns Return into a newline at the cursor;
-        // we treat that as "save". Remove the newline ENTIRELY (not a space) so
-        // the title is exactly what it was before Enter — replacing it with a
-        // space, then only trimming the ends, left a stray space wherever the
-        // cursor sat mid-title. A single-line title never keeps a newline, so
-        // this also flattens a pasted multi-line string.
-        if newValue.contains("\n") {
-          draft.title = newValue.replacingOccurrences(of: "\n", with: "")
+      .onChange(of: draft.title) { oldValue, newValue in
+        // A title is one line, so a line break in the field is never text —
+        // it is one of two gestures, and they end differently:
+        //
+        //   Return — a vertical-axis TextField turns Return into a newline at
+        //     the caret; we treat that as "save". Remove the break ENTIRELY
+        //     (not a space) so the title is exactly what it was before Enter —
+        //     a space, then trimming only the ends, left a stray gap wherever
+        //     the caret sat mid-title. A typed Return is the ONLY change in
+        //     the value, which is exactly how it is told apart from a paste.
+        //
+        //   Paste — a multi-line clipboard string. Flatten it to one line here
+        //     so the field never *shows* a break (the row is laid out for one
+        //     line), joining the lines with a space so the words don't fuse.
+        //     A paste must NOT commit: the user is still editing.
+        guard newValue.contains(where: \.isNewline) else { updateSuggestion(); return }
+        if TaskTitleText.withoutLineBreaks(newValue) == oldValue {
+          draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
+        } else {
+          draft.title = TaskTitleText.singleLine(newValue)
         }
         updateSuggestion()
       }
@@ -410,7 +421,12 @@ struct TaskComposerCard: View {
     .onKeyPress(keys: [.tab]) { press in
       moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
     }
-    .onKeyPress(.space) { activateFocused() }
+    // Sanctioned exception to the "never bind Space on a task surface" rule:
+    // this is the COMPOSER's own Tab focus loop, not a selected list row.
+    // `activateFocused()` returns .ignored unless a pill actually holds the
+    // cursor, so Space never reaches the row checkbox behind an inline
+    // composer — it fires a pill the user tabbed to, and nothing otherwise.
+    .onKeyPress(.space) { activateFocused() }  // septena-lint:allow task-space-binding
     .onKeyPress(.return) { activateFocused() }
     .a11yAnimation(.snappy(duration: 0.22), value: showsNotesField)
   }

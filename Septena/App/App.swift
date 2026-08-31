@@ -457,6 +457,7 @@ struct SeptenaApp: App {
           .keyboardShortcut("1", modifiers: [.command, .option])
         Button("Upcoming") { navigation.pendingTab = .tasks; navigation.path = [.filter(.upcoming)] }
           .keyboardShortcut("2", modifiers: [.command, .option])
+        Button("Repeating") { navigation.pendingTab = .tasks; navigation.path = [.filter(.repeating)] }
         Button("Anytime")  { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
           .keyboardShortcut("3", modifiers: [.command, .option])
 

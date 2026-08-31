@@ -370,6 +370,9 @@ struct TasksDestinationView: View {
       // Uncomplete — abort any in-flight fade and restore to the open list,
       // whether the row is still settling in Today or already sitting in Done.
       mutator.uncomplete(id: task.id)
+      // The drawer shares the one undo stack with every other task surface —
+      // a check here has to be as reversible as a check on the deep list.
+      TaskUndo.recordCompletion(ids: [task.id], wasDone: true, mutator: mutator)
       settle.cancel(task.id)
       var reopened = task
       reopened.status = .open
@@ -386,6 +389,7 @@ struct TasksDestinationView: View {
       // Complete — flip in place so the checkbox fills and the title strikes,
       // then schedule the fade-out into Done.
       mutator.complete(id: task.id)
+      TaskUndo.recordCompletion(ids: [task.id], wasDone: false, mutator: mutator)
       motion.run(Theme.Motion.settle) {
         if let i = openTasks.firstIndex(where: { $0.id == task.id }) {
           openTasks[i].status = .done
@@ -566,6 +570,7 @@ struct TasksDestinationView: View {
   private func toggleInbox(_ task: SeptenaTask) {
     guard task.status != .done else { return }
     mutator.complete(id: task.id)
+    TaskUndo.recordCompletion(ids: [task.id], wasDone: false, mutator: mutator)
     var done = task
     done.status = .done
     done.completedAt = clock.today + "T00:00:00"

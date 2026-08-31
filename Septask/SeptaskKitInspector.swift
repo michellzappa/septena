@@ -17,11 +17,27 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let notesView = NSTextView()
   private let whenButton = NSButton()
   private let deadlineButton = NSButton()
-  private let repeatPopUp = NSPopUpButton()
+  private let repeatButton = NSButton()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
   private let form = NSStackView()
+  /// Task Conversations — the agent's work log for this row. Shown only when
+  /// a conversation exists; a task with no agent history gets no header and no
+  /// empty box (docs/SEPTASK_CONVERSATIONS_PLAN.md).
+  private let conversationLabel = NSTextField(labelWithString:
+    String(localized: "Conversation", comment: "SeptaskKit: inspector section"))
+  private let conversationView = KitConversationView()
+  /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
+  /// Escape handling. The inspector is a plain split-view item with no title
+  /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
+  /// neither of which you can find by looking at the pane.
+  private let closeButton = NSButton()
+
+  /// Escape asks the shell to collapse the pane. The inspector is a plain
+  /// split-view item with no chrome of its own, so it reports the intent and
+  /// `SeptaskKitWindowController` does the closing.
+  var onRequestClose: (() -> Void)?
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
@@ -70,11 +86,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       button.action = action
       button.alignment = .left
     }
+    repeatButton.bezelStyle = .rounded
+    repeatButton.target = self
+    repeatButton.action = #selector(editRepeat)
+    repeatButton.alignment = .left
     listLabel.font = SeptaskKitTheme.meta
     listLabel.textColor = SeptaskKitTheme.inkSecondary
-
-    repeatPopUp.menu = KitRecurrenceMenu.build(target: self, action: #selector(repeatChanged(_:)))
-    repeatPopUp.target = self
 
     form.orientation = .vertical
     form.alignment = .leading
@@ -85,23 +102,60 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(listLabel)
     form.addArrangedSubview(whenButton)
     form.addArrangedSubview(deadlineButton)
-    form.addArrangedSubview(repeatPopUp)
+    form.addArrangedSubview(repeatButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
-    form.setCustomSpacing(14, after: repeatPopUp)
+    conversationLabel.font = SeptaskKitTheme.chip
+    conversationLabel.textColor = SeptaskKitTheme.iconMuted
+    conversationView.translatesAutoresizingMaskIntoConstraints = false
+    // A reply appends a turn, which posts a task change; re-read so the new
+    // turn lands in the transcript the same way an agent turn would.
+    conversationView.onAppend = { [weak self] in self?.refresh() }
+    form.addArrangedSubview(conversationLabel)
+    form.addArrangedSubview(conversationView)
+    form.setCustomSpacing(14, after: repeatButton)
+    form.setCustomSpacing(14, after: notesScroll)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
 
+    let closeLabel = String(localized: "Close Inspector",
+                            comment: "SeptaskKit: inspector close button")
+    closeButton.translatesAutoresizingMaskIntoConstraints = false
+    closeButton.isBordered = false
+    closeButton.bezelStyle = .inline
+    closeButton.imagePosition = .imageOnly
+    closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+    closeButton.contentTintColor = SeptaskKitTheme.iconMuted
+    closeButton.target = self
+    closeButton.action = #selector(closePane)
+    // Keyboard focus belongs to the fields — Escape and ⌥⌘I are the key
+    // paths out. Same reason the list's checkbox refuses first responder.
+    closeButton.refusesFirstResponder = true
+    closeButton.setAccessibilityLabel(closeLabel)
+    // Icon-only chrome control: the tooltip is how you learn what it does.
+    // (Distinct from task rows, which carry no tooltips by design.)
+    closeButton.toolTip = closeLabel
+
     root.addSubview(form)
     root.addSubview(placeholder)
+    // Last, so it layers above the form's title field.
+    root.addSubview(closeButton)
     NSLayoutConstraint.activate([
       form.topAnchor.constraint(equalTo: root.topAnchor),
       form.leadingAnchor.constraint(equalTo: root.leadingAnchor),
       form.trailingAnchor.constraint(equalTo: root.trailingAnchor),
       form.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-      titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      // -52, not the -28 the notes field uses: the title shares its band with
+      // the close button and must not run under it.
+      titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -52),
+      closeButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+      closeButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+      closeButton.widthAnchor.constraint(equalToConstant: 20),
+      closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
       placeholder.centerXAnchor.constraint(equalTo: root.centerXAnchor),
       placeholder.centerYAnchor.constraint(equalTo: root.centerYAnchor),
@@ -128,7 +182,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   func show(_ next: SeptenaTask?) {
     guard next?.id != task?.id else {
       task = next
-      if let next { refreshReadOnlyFields(next) }
+      if let next {
+        refreshReadOnlyFields(next)
+        refreshConversation(next)
+      }
       return
     }
     flushPendingEdits()
@@ -155,6 +212,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       MarkdownNotesStyle.attributed(loadedNotes, fontSize: fontSize))
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     refreshReadOnlyFields(next)
+    refreshConversation(next)
   }
 
   /// The dates/list/repeat controls — safe to resync on every re-show,
@@ -175,15 +233,28 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
                                   comment: "SeptaskKit: inspector deadline field")
     listLabel.stringValue = listDescription(for: next)
 
-    let repeatIndex = KitRecurrenceMenu.index(of: next.recurrence)
-    if repeatIndex >= 0 {
-      repeatPopUp.selectItem(at: repeatIndex)
-    } else {
-      // A cadence this menu doesn't offer (set in the SwiftUI sheet) — show
-      // it rather than mislabeling the task as one of the presets.
-      repeatPopUp.selectItem(at: -1)
-      repeatPopUp.setTitle(next.recurrence?.shortLabel ?? "")
-    }
+    let repeatValue = next.recurrence.map { rule in
+      let paused = next.recurrencePaused
+        ? String(localized: " (Paused)", comment: "Repeat paused suffix")
+        : ""
+      return "\(rule.shortLabel)\(paused)"
+    } ?? String(localized: "None", comment: "No repeat")
+    repeatButton.title = String(localized: "Repeat: \(repeatValue)",
+                                comment: "SeptaskKit: inspector repeat field")
+  }
+
+  /// Show or hide the conversation section. Hiding the LABEL too is the point:
+  /// a task with no agent history should look like a task with no agent
+  /// history, not like one whose conversation failed to load.
+  ///
+  /// Deliberately does NOT `acknowledge` — the plan called for that, but the
+  /// inspector's own contract (see `show(_:)`) is that opening to peek must
+  /// never ratify: the cue IS Inbox membership for agent rows, so acking here
+  /// would yank a proposal out of the Inbox merely because it became the
+  /// selected row. Disposition paths ack; looking does not.
+  private func refreshConversation(_ next: SeptenaTask) {
+    let shown = conversationView.configure(taskID: next.id, convo: next.conversation)
+    conversationLabel.isHidden = !shown
   }
 
   /// Re-read the shown task from the store — used when a refresh lands while
@@ -262,15 +333,52 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   func textDidEndEditing(_ notification: Notification) { flushPendingEdits() }
 
+  /// The standard "back out of this pane" responder method. It reaches the
+  /// controller whenever focus is inside the inspector and no field editor
+  /// claimed Escape first — a live title edit still cancels itself on the
+  /// first Escape (platform behavior), and the second one closes the pane.
+  override func cancelOperation(_ sender: Any?) { onRequestClose?() }
+
+  @objc private func closePane() {
+    // Commit first: the pane can be closed mid-edit, and the field's own
+    // end-editing notification does not fire when the view goes away.
+    flushPendingEdits()
+    onRequestClose?()
+  }
+
+  /// NSTextView answers Escape with autocomplete, which would swallow it, so
+  /// the notes view routes Escape to the same close as everything else.
+  func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+    guard textView === notesView,
+          commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+    onRequestClose?()
+    return true
+  }
+
   // MARK: - Dates
 
-  @objc private func repeatChanged(_ sender: NSMenuItem) {
+  @objc private func editRepeat() {
     guard let current = task else { return }
-    mutator.setRecurrence(id: current.id,
-                          recurrence: KitRecurrenceMenu.recurrence(for: sender,
-                                                                   preserving: current.recurrence))
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    refresh()
+    SeptaskKitRepeatPopover.present(
+      initial: current.recurrence,
+      paused: current.recurrencePaused,
+      hasScheduledDate: current.scheduled != nil,
+      relativeTo: repeatButton.bounds, of: repeatButton
+    ) { [weak self] result in
+      guard let self else { return }
+      let before = [TaskUndo.ScheduleSnapshot(current)]
+      if let recurrence = result.recurrence {
+        self.mutator.setRecurrence(id: current.id, recurrence: recurrence)
+        self.mutator.setRecurrencePaused(id: current.id, paused: result.paused)
+      } else {
+        self.mutator.setRecurrence(id: current.id, recurrence: nil)
+      }
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change Repeat", comment: "SeptaskKit: undo action"),
+        before: before, context: self.context, mutator: self.mutator)
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      self.refresh()
+    }
   }
 
   @objc private func editWhen() { presentPopover(kind: .when, from: whenButton) }
@@ -286,6 +394,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     SeptaskKitDatePopover.present(kind: kind, initial: initial,
                                   relativeTo: button.bounds, of: button) { [weak self] date, today in
       guard let self else { return }
+      // Same shared stack as the list's own date popover — an inspector edit
+      // has to be as undoable as the ⌘S one, or ⌘Z means different things on
+      // two panes of one window.
+      let before = [TaskUndo.ScheduleSnapshot(current)]
       switch kind {
       case .when:
         if today {
@@ -298,6 +410,11 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         self.mutator.setDeadline(id: current.id, date: date)
       }
       self.mutator.acknowledge(id: current.id)
+      TaskUndo.recordScheduleChange(
+        name: kind == .when
+          ? String(localized: "Change When", comment: "SeptaskKit: undo action")
+          : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
+        before: before, context: self.context, mutator: self.mutator)
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
     }

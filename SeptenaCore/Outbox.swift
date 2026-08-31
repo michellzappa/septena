@@ -195,6 +195,14 @@ final class TaskMutator {
     cloudBackend.schedule(id: id, date: date)
   }
 
+  func reschedule(id: String, date: Date?, mode: RecurrenceRescheduleMode) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reschedule called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reschedule(id: id, date: date, mode: mode)
+  }
+
   func setDeadline(id: String, date: Date?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setDeadline called before CK bound — dropping", nil)
@@ -209,6 +217,23 @@ final class TaskMutator {
       return
     }
     cloudBackend.setRecurrence(id: id, recurrence: recurrence)
+  }
+
+  func setRecurrencePaused(id: String, paused: Bool) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setRecurrencePaused called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setRecurrencePaused(id: id, paused: paused)
+  }
+
+  @discardableResult
+  func createNextOccurrence(id: String) -> SeptenaTask? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] createNextOccurrence called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.createNextOccurrence(id: id)
   }
 
   func moveToArea(id: String, area: String?) {
@@ -309,5 +334,32 @@ final class TaskMutator {
       return
     }
     cloudBackend.unacknowledge(id: id)
+  }
+}
+
+// MARK: - Title text
+
+/// A task title is ALWAYS one line — every task surface (row, widget, watch,
+/// AppKit cell) lays out one line and truncates. So a pasted multi-line string
+/// must never reach the store, and must never even *render* as a break inside
+/// the editor. Title editors call this on every change; the field then shows
+/// exactly what will be saved.
+enum TaskTitleText {
+
+  /// Flatten a pasted block: each line is trimmed, empty lines drop, and the
+  /// lines join with ONE space. "buy milk\n\n  buy eggs" → "buy milk buy eggs".
+  static func singleLine(_ raw: String) -> String {
+    guard raw.contains(where: \.isNewline) else { return raw }
+    return raw.split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+      .joined(separator: " ")
+  }
+
+  /// Remove line breaks with NOTHING in their place — the Return-to-save path,
+  /// where the break is a keystroke the user meant as "commit", not text. A
+  /// space here would leave a stray gap wherever the caret sat mid-title.
+  static func withoutLineBreaks(_ raw: String) -> String {
+    String(raw.filter { !$0.isNewline })
   }
 }

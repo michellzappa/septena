@@ -23,6 +23,7 @@ struct TaskListModalPresenter: ViewModifier {
   let applyWhen: ([String], TaskListView.WhenKind, Date?) -> Void
   let applyMove: ([String], String?, String?) -> Void
   let applyRecurrence: (String, Recurrence?) -> Void
+  let applyRecurrencePaused: (String, Bool) -> Void
 
   func body(content: Content) -> some View {
     content
@@ -34,8 +35,6 @@ struct TaskListModalPresenter: ViewModifier {
           DatePickerSheet(
             title: bulk ? "When (\(sheet.taskIds.count) tasks)" : "When",
             initialDate: currentScheduled(firstId),
-            setLabel: "Set Date",
-            updateLabel: "Update Date",
             clearLabel: "No Date"
           ) { date in
             applyWhen(sheet.taskIds, .scheduled, date)
@@ -47,8 +46,6 @@ struct TaskListModalPresenter: ViewModifier {
           DatePickerSheet(
             title: bulk ? "Deadline (\(sheet.taskIds.count) tasks)" : "Deadline",
             initialDate: currentDeadline(firstId),
-            setLabel: "Set Deadline",
-            updateLabel: "Update Deadline",
             clearLabel: "Remove Deadline"
           ) { date in
             applyWhen(sheet.taskIds, .deadline, date)
@@ -83,12 +80,16 @@ struct TaskListModalPresenter: ViewModifier {
       }
       .sheet(isPresented: $showingRepeatSheet) {
         RecurrencePickerSheet(initial: currentRecurrence(repeatTargetId),
-                              hasScheduledDate: currentScheduled(repeatTargetId) != nil) { rule in
+                              hasScheduledDate: currentScheduled(repeatTargetId) != nil,
+                              initialPaused: currentTask(repeatTargetId)?.recurrencePaused ?? false,
+                              onPick: { rule in
           if let id = repeatTargetId {
             applyRecurrence(id, rule)
           }
           repeatTargetId = nil
-        }
+        }, onPauseChanged: { paused in
+          if let id = repeatTargetId { applyRecurrencePaused(id, paused) }
+        })
         .presentationDetents([.medium, .large])
         .presentationBackground(.thinMaterial)
         .presentationCornerRadius(Theme.cornerRadius)
@@ -119,6 +120,8 @@ struct TaskListRowContextMenu: View {
   let moveAreas: [Area]
   let moveTopProjects: [Project]
   let onOpenRepeat: (SeptenaTask) -> Void
+  let onSetRepeatPaused: ([String], Bool) -> Void
+  let onCreateNextCopy: (SeptenaTask) -> Void
   let onCancel: ([String]) -> Void
   let onDelete: (TaskListView.ActionTarget) -> Void
 
@@ -203,9 +206,9 @@ struct TaskListRowContextMenu: View {
       } label: {
         Label("More…", systemImage: "ellipsis")
       }
-      // ⌘M lives on the sheet-opening item, not the parent Menu: a shortcut on
+      // ⌘⇧M lives on the sheet-opening item, not the parent Menu: a shortcut on
       // the Menu container propagates to every submenu row (Inbox, each area,
-      // each project, More…), so all of them showed ⌘M. Attaching it here — the
+      // each project, More…), so all of them showed ⌘⇧M. Attaching it here — the
       // action that mirrors the menu-bar "Move…" — marks only the one item.
       .keyboardShortcut(TaskRowShortcuts.move)
 
@@ -247,7 +250,25 @@ struct TaskListRowContextMenu: View {
       Button {
         onOpenRepeat(task)
       } label: {
-        Label("Repeat…", systemImage: "repeat")
+        Label("Repeat…", systemImage: "arrow.clockwise")
+      }
+
+      if task.recurrence != nil {
+        Button {
+          onCreateNextCopy(task)
+        } label: {
+          Label("Create Next Copy", systemImage: "plus.circle")
+        }
+      }
+    }
+
+    if !target.tasks.isEmpty && target.tasks.allSatisfy({ $0.recurrence != nil }) {
+      let paused = target.tasks.allSatisfy(\.recurrencePaused)
+      Button {
+        onSetRepeatPaused(target.ids, !paused)
+      } label: {
+        Label(paused ? "Resume Repeat" : "Pause Repeat",
+              systemImage: paused ? "play.circle" : "pause.circle")
       }
     }
 

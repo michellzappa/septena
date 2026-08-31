@@ -35,6 +35,9 @@ struct TaskSnapshot: Codable {
   var recurrenceUnit: String?
   var recurrenceInterval: Int
   var recurrenceAfterCompletion: Bool
+  var recurrencePaused: Bool?
+  var recurrenceSeriesID: String?
+  var recurrenceAnchorDate: String?
   var updatedAt: String?
   var deletedAt: String?
 
@@ -54,6 +57,9 @@ struct TaskSnapshot: Codable {
     self.recurrenceUnit = e.recurrenceUnit
     self.recurrenceInterval = e.recurrenceInterval
     self.recurrenceAfterCompletion = e.recurrenceAfterCompletion
+    self.recurrencePaused = e.recurrencePaused
+    self.recurrenceSeriesID = e.recurrenceSeriesID
+    self.recurrenceAnchorDate = e.recurrenceAnchorDate
     self.updatedAt = e.updatedAt
     self.deletedAt = e.deletedAt
   }
@@ -264,6 +270,9 @@ final class TasksMigrator {
       entity.recurrenceUnit = s.recurrenceUnit
       entity.recurrenceInterval = s.recurrenceInterval
       entity.recurrenceAfterCompletion = s.recurrenceAfterCompletion
+      entity.recurrencePaused = s.recurrencePaused ?? false
+      entity.recurrenceSeriesID = s.recurrenceSeriesID
+      entity.recurrenceAnchorDate = s.recurrenceAnchorDate
       entity.updatedAt = s.updatedAt
       entity.deletedAt = s.deletedAt
       if entity.modelContext == nil {
@@ -327,7 +336,7 @@ final class TasksMigrator {
       entity.updatedAt = .now
       if entity.modelContext == nil { context.insert(entity) }
     }
-    try context.save()
+    try StoreHealth.saveOrThrow(context, op: "Migration.importFromJSON")
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     let areaCount = file.areas?.count ?? 0
     let projectCount = file.projects?.count ?? 0
@@ -401,7 +410,7 @@ final class TasksMigrator {
         logger.info("Repair ignored unknown CK record type \(record.recordType, privacy: .public)")
       }
     }
-    try context.save()
+    try StoreHealth.saveOrThrow(context, op: "Migration.repairMergeWithCloudKit")
 
     let taskDescriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.pendingDeletion == false && $0.deletedAt == nil }
@@ -487,7 +496,7 @@ final class TasksMigrator {
     for entity in existingProjects { context.delete(entity) }
     for entity in existingSettings { context.delete(entity) }
     for entity in existingSections { context.delete(entity) }
-    try context.save()
+    try StoreHealth.saveOrThrow(context, op: "Migration.replaceLocalMirrorFromCloudKit")
 
     var cloudTasks = 0
     var cloudAreas = 0
@@ -515,7 +524,7 @@ final class TasksMigrator {
         logger.info("Replace-local ignored unknown CK record type \(record.recordType, privacy: .public)")
       }
     }
-    try context.save()
+    try StoreHealth.saveOrThrow(context, op: "Migration.replaceLocalMirrorFromCloudKit")
 
     engine.start()
     do {
@@ -823,7 +832,7 @@ enum OccurredAtBackfill {
     fixed += repair(ExerciseEntryEntity.self, context: context)
     if fixed > 0 {
       do {
-        try context.save()
+        try StoreHealth.saveOrThrow(context, op: "Migration.runIfNeeded")
       } catch {
         // Leave the gate unset so a later launch retries the repair.
         SeptenaLog.error("OccurredAtBackfill.save", error)
@@ -960,7 +969,7 @@ enum SomedayStatusMigrator {
       return 0
     }
     do {
-      try context.save()
+      try StoreHealth.saveOrThrow(context, op: "Migration.runIfNeeded")
     } catch {
       // Leave the gate unset so a later launch retries the rewrite.
       SeptenaLog.error("SomedayStatusMigrator.save", error)

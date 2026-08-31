@@ -64,7 +64,75 @@ final class KitCheckboxView: NSButton {
 
   required init?(coder: NSCoder) { fatalError("KitCheckboxView is code-only") }
 
-  @objc private func fire() { onToggle?() }
+  @objc private func fire() {
+    // Celebrate on the way IN only, like SwiftUI's `playFeel()` — unchecking
+    // is a correction, not an achievement. `isDone` is still the pre-toggle
+    // state here, so this fires exactly once per completion.
+    if !isDone { playPulse(color: SeptaskKitTheme.checkboxFill) }
+    onToggle?()
+  }
+
+  // MARK: - Cue pulses
+
+  /// The live ring, if one is mid-flight. Replaced rather than queued, so
+  /// rapid checking never stacks motion (the SwiftUI feels have the same
+  /// "ends at rest, nothing lingers" contract).
+  private var pulseLayer: CAShapeLayer?
+
+  /// One ring pulse from the box outward — the AppKit twin of `TaskCheckbox`'s
+  /// `pulse(color:reach:)`, same numbers: 0.9 → `reach`, opacity 0.55 → 0,
+  /// ease-out over 0.4s. `reach` is a multiple of the box; an ordinary check
+  /// travels 1.9, a Today promote stays tighter at 1.6.
+  ///
+  /// A layer rather than `draw(_:)` because the ring has to leave the box's
+  /// 22pt hit column, which a redraw inside `bounds` cannot do. `masksToBounds`
+  /// is explicitly false for the same reason.
+  func playPulse(color: NSColor, reach: CGFloat = 1.9) {
+    guard !KitMotion.reduce else { return }
+    wantsLayer = true
+    layer?.masksToBounds = false
+    pulseLayer?.removeFromSuperlayer()
+    guard let host = layer else { return }
+
+    let box = NSRect(x: (bounds.width - Self.boxSize) / 2,
+                     y: (bounds.height - Self.boxSize) / 2,
+                     width: Self.boxSize, height: Self.boxSize)
+    let ring = CAShapeLayer()
+    // Frame == bounds so the layer's own centre is the box's centre, which is
+    // what makes `transform.scale` expand symmetrically around the box.
+    ring.frame = bounds
+    ring.path = CGPath(roundedRect: box, cornerWidth: Self.corner,
+                       cornerHeight: Self.corner, transform: nil)
+    ring.fillColor = nil
+    ring.strokeColor = color.cgColor
+    ring.lineWidth = Self.stroke
+    ring.opacity = 0
+    host.addSublayer(ring)
+    pulseLayer = ring
+
+    let scale = CABasicAnimation(keyPath: "transform.scale")
+    scale.fromValue = 0.9
+    scale.toValue = reach
+    let fade = CABasicAnimation(keyPath: "opacity")
+    fade.fromValue = 0.55
+    fade.toValue = 0
+    let group = CAAnimationGroup()
+    group.animations = [scale, fade]
+    group.duration = 0.4
+    group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+    ring.add(group, forKey: "pulse")
+
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak ring, weak self] in
+      ring?.removeFromSuperlayer()
+      if self?.pulseLayer === ring { self?.pulseLayer = nil }
+    }
+  }
+
+  /// The quiet amber ring for a task pinned to Today — SwiftUI's
+  /// `playTodayPromotePulse()`, same colour and same tighter reach.
+  func playTodayPromotePulse() {
+    playPulse(color: SeptaskKitTheme.todayAccent, reach: 1.6)
+  }
 
   /// VoiceOver: real checkbox role + shared `TaskA11y` vocabulary. Press
   /// activates `onToggle` (same as a mouse click on the box).
@@ -165,7 +233,7 @@ final class KitCheckboxView: NSButton {
     path.lineWidth = 1.6
     path.lineCapStyle = .round
     path.lineJoinStyle = .round
-    NSColor.white.setStroke()
+    SeptaskKitTheme.checkboxCheck.setStroke()
     path.stroke()
   }
 }
@@ -222,6 +290,183 @@ final class KitChipView: NSView {
 
   override func updateLayer() {
     layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+  }
+}
+
+/// The "→ Suggested" capsule — one tap files the row where the classifier
+/// thinks it belongs (`TaskFilingSuggestions`). Same metrics and fill as
+/// `KitChipView` so the two read as one family, but this one is a real
+/// `NSButton`: it is an ACTION, and the house rule here is that every click
+/// target is a button, never a gesture recognizer or a `mouseDown` override.
+///
+/// It wears the destination's own name rather than the word "Suggested" —
+/// "→ Kitchen" tells you what the tap will do; "→ Suggested" makes you open a
+/// menu to find out.
+@MainActor
+final class KitSuggestionChipView: NSButton {
+  var onApply: (() -> Void)?
+
+  init() {
+    super.init(frame: .zero)
+    wantsLayer = true
+    layer?.cornerRadius = 5
+    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+    isBordered = false
+    setButtonType(.momentaryChange)
+    // Keyboard focus stays on the table, same contract as the checkbox — this
+    // must never become a Space-activated control on the selected row.
+    refusesFirstResponder = true
+    imagePosition = .imageLeading
+    imageHugsTitle = true
+    target = self
+    action = #selector(fire)
+    // An NSButton has no natural width in a `.fill` NSStackView — it absorbs
+    // every spare point and the capsule stretched the whole row. `KitChipView`
+    // never showed this because it is a plain NSView whose width falls out of
+    // its label constraints; a control has to say it wants to hug.
+    setContentHuggingPriority(.required, for: .horizontal)
+    setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+    (cell as? NSButtonCell)?.lineBreakMode = .byTruncatingTail
+    NSLayoutConstraint.activate([
+      heightAnchor.constraint(equalToConstant: 16),
+      // A long area name truncates rather than shoving the task title out of
+      // the row — same contract as `KitChipView`'s truncating label.
+      widthAnchor.constraint(lessThanOrEqualToConstant: 140),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitSuggestionChipView is code-only") }
+
+  func configure(title: String) {
+    var config = NSImage.SymbolConfiguration(pointSize: 9, weight: .medium)
+    config = config.applying(.init(paletteColors: [SeptaskKitTheme.inkSecondary]))
+    image = NSImage(systemSymbolName: "arrow.turn.down.right",
+                    accessibilityDescription: nil)?
+      .withSymbolConfiguration(config)
+    // `attributedTitle`, not `title`: a borderless NSButton paints its label
+    // in the control's default color otherwise.
+    attributedTitle = NSAttributedString(
+      string: title,
+      attributes: [
+        .font: SeptaskKitTheme.chip,
+        .foregroundColor: SeptaskKitTheme.inkSecondary,
+      ])
+    setAccessibilityLabel(String(localized: "File under \(title)",
+                                 comment: "SeptaskKit: filing suggestion capsule"))
+    window?.invalidateCursorRects(for: self)
+  }
+
+  override var wantsUpdateLayer: Bool { true }
+
+  override func updateLayer() {
+    layer?.backgroundColor = SeptaskKitTheme.chipFill.cgColor
+  }
+
+  override func resetCursorRects() {
+    addCursorRect(bounds, cursor: .pointingHand)
+  }
+
+  override func accessibilityPerformPress() -> Bool {
+    onApply?()
+    return true
+  }
+
+  @objc private func fire() { onApply?() }
+}
+
+// MARK: - Borderless search field
+
+/// A borderless `NSSearchField` that still lays its parts out correctly.
+///
+/// THE BUG THIS FIXES: `NSSearchFieldCell` derives the text rect from the
+/// BEZEL, so `isBordered = false` collapses that geometry and the text starts
+/// at x=0 — directly on top of the magnifying glass. Typing "vibe" into the
+/// ⌘⇧M Move panel drew the word over the glyph.
+///
+/// Both panels want a large borderless field on a `.popover` material (no
+/// search-box bezel), so the fix is to compute the three rects from `bounds`
+/// explicitly rather than to restore a bezel we don't want. Overriding
+/// `searchButtonRect` / `cancelButtonRect` / `searchTextRect` is the
+/// documented customization point for exactly this — not a workaround.
+///
+/// Those three rects place the DRAWN text only. The field editor needs
+/// `edit(withFrame:…)` / `select(withFrame:…)` as well, or the fix holds for
+/// the placeholder and drops the moment the user types.
+@MainActor
+final class KitSearchFieldCell: NSSearchFieldCell {
+  /// Square side reserved for each end control, and the gap between a control
+  /// and the text. Sized off the type scale so the glyphs keep pace when the
+  /// user changes text size.
+  private var controlSide: CGFloat { max(18, (font?.pointSize ?? 16) + 4) }
+  private let gap: CGFloat = 6
+
+  private func centeredSquare(in rect: NSRect, atLeading: Bool) -> NSRect {
+    let side = controlSide
+    return NSRect(x: atLeading ? rect.minX : rect.maxX - side,
+                  y: rect.midY - side / 2,
+                  width: side, height: side)
+  }
+
+  override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
+    centeredSquare(in: rect, atLeading: true)
+  }
+
+  override func cancelButtonRect(forBounds rect: NSRect) -> NSRect {
+    // Only reserved once there is something to clear; otherwise the text may
+    // run the full width.
+    stringValue.isEmpty ? .zero : centeredSquare(in: rect, atLeading: false)
+  }
+
+  override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+    // Reserve BOTH ends always, even while the field is empty. The cancel
+    // button appears the moment the first character lands, so a rect that only
+    // reserved the trailing side once `stringValue` was non-empty made the text
+    // rect change width mid-keystroke — and the field editor, whose frame is
+    // set once when editing starts, kept the empty-field width and ran the last
+    // characters under the cancel button.
+    let inset = controlSide + gap
+    return NSRect(x: rect.minX + inset, y: rect.minY,
+                  width: max(0, rect.width - inset * 2),
+                  height: rect.height)
+  }
+
+  // The rect overrides above place the DRAWN text. They do not place the FIELD
+  // EDITOR, which is what you look at from the first keystroke on: AppKit sizes
+  // that from the cell frame it is handed, so the typed string started at x=0
+  // and ran over the magnifying glass while the placeholder above it sat
+  // correctly inset. Hand the editor the same text rect the drawing path uses,
+  // so the field reads identically before, during, and after editing.
+  override func edit(withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+                     delegate: Any?, event: NSEvent?) {
+    super.edit(withFrame: searchTextRect(forBounds: rect), in: controlView,
+               editor: editor, delegate: delegate, event: event)
+  }
+
+  override func select(withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+                       delegate: Any?, start: Int, length: Int) {
+    super.select(withFrame: searchTextRect(forBounds: rect), in: controlView,
+                 editor: editor, delegate: delegate, start: start, length: length)
+  }
+}
+
+/// The borderless search field both floating panels use (⇧⌘F Quick Find and
+/// ⌘⇧M Move). Exists so the two can't drift — they had identical setup and
+/// therefore identical bugs.
+@MainActor
+final class KitSearchField: NSSearchField {
+  override class var cellClass: AnyClass? {
+    get { KitSearchFieldCell.self }
+    set { super.cellClass = newValue }
+  }
+
+  /// The shared look: large type, no bezel, no focus ring, immediate results.
+  /// Type comes from `KitSurface`, so a surface's field face is one number.
+  func applyPanelStyle() {
+    font = KitSurface.fieldFont
+    isBordered = false
+    drawsBackground = false
+    focusRingType = .none
+    sendsSearchStringImmediately = true
   }
 }
 
@@ -329,69 +574,11 @@ enum KitGlyph {
   }
 }
 
-// MARK: - Recurrence choices
-
-/// The repeat cadences offered in the AppKit shell, as a menu (context menu
-/// submenu) or a popup's items (inspector). A short closed set — anything
-/// more exotic is still editable in the SwiftUI repeat sheet.
-@MainActor
-enum KitRecurrenceMenu {
-  /// Menu order, with the rule each row writes. `nil` clears recurrence.
-  static var choices: [(title: String, rule: Recurrence?)] {
-    [
-      (String(localized: "Never", comment: "Recurrence cadence"), nil),
-      (String(localized: "Daily", comment: "Recurrence cadence"),
-       Recurrence(unit: .day, interval: 1)),
-      (String(localized: "Weekly", comment: "Recurrence cadence"),
-       Recurrence(unit: .week, interval: 1)),
-      (String(localized: "Every 2 Weeks", comment: "Recurrence cadence"),
-       Recurrence(unit: .week, interval: 2)),
-      (String(localized: "Monthly", comment: "Recurrence cadence"),
-       Recurrence(unit: .month, interval: 1)),
-    ]
-  }
-
-  static func build(target: AnyObject, action: Selector) -> NSMenu {
-    let menu = NSMenu()
-    for (index, choice) in choices.enumerated() {
-      let item = NSMenuItem(title: choice.title, action: action, keyEquivalent: "")
-      item.target = target
-      item.tag = index
-      menu.addItem(item)
-    }
-    return menu
-  }
-
-  /// The rule a menu row writes. `preserving` carries the task's CURRENT
-  /// anchor mode through a cadence change: this menu only picks unit +
-  /// interval, so without it, re-picking "Weekly" on a fixed-schedule task
-  /// silently rewrote "every Monday" into "a week after you tick the box" —
-  /// a semantic change the user never asked for and can't see.
-  static func recurrence(for item: NSMenuItem, preserving current: Recurrence?) -> Recurrence? {
-    guard choices.indices.contains(item.tag), let rule = choices[item.tag].rule else { return nil }
-    return Recurrence(unit: rule.unit,
-                      interval: rule.interval,
-                      afterCompletion: current?.afterCompletion ?? rule.afterCompletion)
-  }
-
-  /// Which row represents a task's current rule — an interval this menu
-  /// doesn't offer falls back to "Never" showing unselected rather than
-  /// silently mislabeling the task. Anchor mode is deliberately NOT part of
-  /// the match: both modes render as "Weekly" here, and `recurrence(for:)`
-  /// preserves whichever the task already had.
-  static func index(of recurrence: Recurrence?) -> Int {
-    guard let recurrence else { return 0 }
-    return choices.firstIndex {
-      $0.rule?.unit == recurrence.unit && $0.rule?.interval == recurrence.interval
-    } ?? -1
-  }
-}
-
 // MARK: - Move destinations
 
 /// The "Move to…" choices: no list, each area, then that area's projects, then
 /// loose projects — sidebar order throughout (`StructureCache`). Built once
-/// and shared by the context menu, the menu bar, and the ⌘⇧M popup so the
+/// and shared by the context menu, the menu bar, and the ⌘M / ⌘⇧M popup so the
 /// three can't drift.
 @MainActor
 enum KitMoveMenu {
@@ -401,7 +588,7 @@ enum KitMoveMenu {
     case project(String)
   }
 
-  /// One row in the ⌘⇧M type-to-filter picker — areas AND projects, nested
+  /// One row in the ⌘M / ⌘⇧M type-to-filter picker — areas AND projects, nested
   /// like SwiftUI `MovePickerSheet` (loose projects, then each area with its
   /// projects indented underneath).
   struct PickerRow {
@@ -419,7 +606,7 @@ enum KitMoveMenu {
   /// (`pickerDestinations`) is where projects live.
   /// `emoji` rides alongside `title` rather than getting folded into it —
   /// `build()` prefixes the menu title with it (a plain `NSMenuItem` has no
-  /// icon-column slot of its own); `SeptaskKitMoveModal` swaps its icon
+  /// icon-column slot of its own); `SeptaskKitMovePicker` swaps its icon
   /// column glyph for it instead, same "emoji replaces the generic glyph,
   /// never both" rule `KitScreenTitleCell`/`SidebarCell` already follow.
   static func destinations(areas: [Area], projects: [Project])
@@ -470,6 +657,68 @@ enum KitMoveMenu {
     let all = destinations(areas: areas, projects: projects)
     guard all.indices.contains(item.tag) else { return nil }
     return all[item.tag].target
+  }
+}
+
+// MARK: - Selection emphasis
+
+/// Whether this row's selection should read as ACTIVE — the accent wash —
+/// rather than parked in the neutral gray.
+///
+/// Deliberately NOT `NSTableRowView.isEmphasized`. That flag is state AppKit
+/// PUSHES down onto each row view, so every row keeps its own copy of what is
+/// really one list-wide fact. Both tables here run `selectionHighlightStyle =
+/// .none` and recycle row views through `makeView(withIdentifier:)`, so a row
+/// view dequeued after the last push keeps whatever answer it last held and
+/// the copies drift apart: the selection painted blue on one task and gray on
+/// another, and arrowing could not clear it, because moving the selection only
+/// samples a different stale copy. A key-window round trip repainted every
+/// visible row at once, which is why clicking away and back appeared to fix it.
+///
+/// Emphasis belongs to the LIST, not to a row, so compute it on demand from
+/// the two conditions that define it and keep no copy to go stale.
+extension NSTableRowView {
+  var septaskSelectionIsActive: Bool {
+    guard let window, window.isKeyWindow,
+          let table = septaskEnclosingTableView,
+          let responder = window.firstResponder as? NSView
+    else { return false }
+    // The field editor for an inline rename is a DESCENDANT of the table, so
+    // a row being renamed still counts as focused (AppKit's flag said no).
+    return responder === table || responder.isDescendant(of: table)
+  }
+
+  private var septaskEnclosingTableView: NSTableView? {
+    var view: NSView? = superview
+    while let current = view {
+      if let table = current as? NSTableView { return table }
+      view = current.superview
+    }
+    return nil
+  }
+
+  /// Key-state changes move `septaskSelectionIsActive` without touching the
+  /// row, so the row has to be told to repaint. Registered per row view in
+  /// `viewDidMoveToWindow`; NotificationCenter holds observers weakly, so
+  /// there is nothing to unregister on dealloc.
+  @objc func septaskRedrawSelection() { needsDisplay = true }
+
+  func septaskObserveKeyWindow() {
+    let center = NotificationCenter.default
+    for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
+      center.removeObserver(self, name: name, object: nil)
+      guard let window else { continue }
+      center.addObserver(self, selector: #selector(septaskRedrawSelection),
+                         name: name, object: window)
+    }
+  }
+}
+
+extension NSTableView {
+  /// Repaint every on-screen row's selection. Focus changes are list-wide, so
+  /// this is how a first-responder change reaches the rows.
+  func septaskRefreshSelectionEmphasis() {
+    enumerateAvailableRowViews { rowView, _ in rowView.needsDisplay = true }
   }
 }
 
@@ -544,6 +793,14 @@ final class KitCardRowView: NSTableRowView {
     set { super.isEmphasized = newValue; needsDisplay = true }
   }
 
+  /// Selection emphasis is computed at draw time (`septaskSelectionIsActive`),
+  /// so this row repaints when its window's key state flips.
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    septaskObserveKeyWindow()
+    needsDisplay = true
+  }
+
   /// Uneven rounded rect for a card/selection slice. A fully-joined slice
   /// (both ends square) is a plain rect — exact edge, no antialiased curve
   /// for a neighbor to disagree with. One-sided joins over-extend the square
@@ -582,11 +839,56 @@ final class KitCardRowView: NSTableRowView {
     // Selection rides on the card (same clip, selection-run rounding) so it
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
-      SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
+      SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
       slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
+    }
+    // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
+    // 0.22 peak, fading to nothing. It is NOT a second selection language:
+    // it is transient (gone in ~0.45s), it is the app's temporal accent
+    // rather than the selection token, and it never persists on a row.
+    if promoteWash > 0 {
+      SeptaskKitTheme.todayAccent.withAlphaComponent(promoteWash).setFill()
+      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
     }
     NSGraphicsContext.restoreGraphicsState()
     drawDropLine()
+  }
+
+  /// Current strength of the promote wash, 0 at rest.
+  private var promoteWash: CGFloat = 0
+  private var promoteWashTimer: Timer?
+
+  /// Play the one-shot gold wash for a task just pinned to Today. Stepped by a
+  /// timer rather than a `CABasicAnimation` because this row draws itself in
+  /// `drawBackground` — there is no layer property to animate.
+  func playPromoteWash() {
+    guard !KitMotion.reduce else { return }
+    promoteWashTimer?.invalidate()
+    promoteWash = 0.22
+    needsDisplay = true
+    let start = Date()
+    let duration: TimeInterval = 0.45
+    promoteWashTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { timer in
+      MainActor.assumeIsolated {
+        let progress = min(1, Date().timeIntervalSince(start) / duration)
+        self.promoteWash = 0.22 * (1 - progress)
+        self.needsDisplay = true
+        if progress >= 1 {
+          timer.invalidate()
+          self.promoteWashTimer = nil
+          self.promoteWash = 0
+        }
+      }
+    }
+  }
+
+  /// Rows are reused, so a recycled row must not inherit a wash mid-flight.
+  func cancelPromoteWash() {
+    promoteWashTimer?.invalidate()
+    promoteWashTimer = nil
+    guard promoteWash != 0 else { return }
+    promoteWash = 0
+    needsDisplay = true
   }
 
   /// No-op: selection is painted in `drawBackground`. The table's
@@ -625,6 +927,13 @@ final class KitSidebarRowView: NSTableRowView {
   /// alongside this row view in `outlineView(_:rowViewForItem:)`.
   var extraTopMargin: CGFloat = 0
 
+  /// See `KitCardRowView.viewDidMoveToWindow`.
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    septaskObserveKeyWindow()
+    needsDisplay = true
+  }
+
   override func drawSelection(in dirtyRect: NSRect) {
     guard selectionHighlightStyle != .none else { return }
     // The pill covers only the row's CONTENT band — `bounds` minus
@@ -645,7 +954,7 @@ final class KitSidebarRowView: NSTableRowView {
                       y: bounds.minY + extraTopMargin + verticalInset,
                       width: bounds.width - 16,
                       height: contentHeight - verticalInset * 2)
-    SeptaskKitTheme.listSelectionFill(emphasized: isEmphasized).setFill()
+    SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
     NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
   }
 

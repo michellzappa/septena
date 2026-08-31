@@ -1463,6 +1463,9 @@
     "After 5 minutes" : {
 
     },
+    "after completion" : {
+
+    },
     "After completion" : {
       "localizations" : {
         "pt-BR" : {
@@ -2829,6 +2832,9 @@
         }
       }
     },
+    "day" : {
+
+    },
     "Day" : {
       "localizations" : {
         "pt-BR" : {
@@ -3311,6 +3317,7 @@
       }
     },
     "Every" : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -3346,9 +3353,6 @@
           }
         }
       }
-    },
-    "Every 2 Weeks" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Every entry is a quiet vote for who you're becoming — private, and yours alone. Choose what you'd like to track; add, rename, or hide sections anytime." : {
 
@@ -4945,6 +4949,9 @@
     "Maintainer" : {
 
     },
+    "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date." : {
+
+    },
     "Make Septena yours" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5216,6 +5223,9 @@
         }
       }
     },
+    "month" : {
+
+    },
     "Month" : {
       "localizations" : {
         "pt-BR" : {
@@ -5393,6 +5403,7 @@
       }
     },
     "Next instance %@ after the previous scheduled date." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5403,6 +5414,7 @@
       }
     },
     "Next instance %@ after you mark this done." : {
+      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5421,9 +5433,6 @@
           }
         }
       }
-    },
-    "Next Week" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "Nice work." : {
       "localizations" : {
@@ -5937,6 +5946,9 @@
 
     },
     "On Mac: quit Things, copy Things Database.thingsdatabase from ~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/, then choose it here." : {
+
+    },
+    "on scheduled date" : {
 
     },
     "On-device coaches that reflect your logged data back to you." : {
@@ -8753,6 +8765,9 @@
 
     },
     "Weave your calendar's events into Today and Upcoming. Grant access and choose which calendars to show in Related Settings below." : {
+
+    },
+    "week" : {
 
     },
     "Week" : {

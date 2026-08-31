@@ -1,10 +1,15 @@
 # Nutrition → CloudKit Migration Handoff
 
-Last updated: 2026-05-24
-Status: **not started** — design locked, ready to implement
+> **Shipped — historical.** Nutrition runs on CloudKit + SwiftData through
+> `NutritionMutator`; the record shapes below live for real in
+> `docs/CloudKitSchema.md`, which is the authoritative field table. This file is
+> kept for the migration reasoning and because `README.md` links it. The
+> "Status: not started" line it used to carry was four months out of date.
+
+Last updated: 2026-05-24 (status corrected 2026-08-23)
 
 Sibling repos:
-- iOS: `/Users/mz/Dev/septena-cloud`
+- iOS: `/Users/mz/Dev/septena` (this repo; formerly `septena-cloud`)
 - FastAPI: `/Users/mz/Dev/septena-app`
 
 Follows the proven recipe from

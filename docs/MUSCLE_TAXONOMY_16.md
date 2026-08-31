@@ -90,7 +90,7 @@ users; the stored tag is an override the user (or this backfill) sets.
 
 ## Work inventory
 
-**iOS / Core (`septena-cloud`)**
+**iOS / Core (this repo; formerly `septena-cloud`)**
 - `SeptenaCore/Models.swift` — expand `Muscle` enum (16 cases, `label`, order),
   add legacy `Muscle(legacy:)` / fallback resolver.
 - `SeptenaCore/DefaultExerciseLibrary.swift` — re-tag ~120 exercises to the new

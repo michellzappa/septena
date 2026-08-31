@@ -49,7 +49,7 @@ enum TrainingConfigStore {
     entity.aliases = aliases
     entity.archived = archived
     entity.updatedAt = .now
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.upsertExerciseDefinition")
     ckEngine.noteExerciseDefinitionChange(id: id)
     return entity
   }
@@ -60,7 +60,7 @@ enum TrainingConfigStore {
     )
     guard let entity = (try? context.fetch(descriptor))?.first else { return }
     context.delete(entity)
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.deleteExerciseDefinition")
     ckEngine.noteExerciseDefinitionDeletion(id: id)
   }
 
@@ -71,7 +71,7 @@ enum TrainingConfigStore {
     guard let entity = (try? context.fetch(descriptor))?.first else { return }
     entity.archived = archived
     entity.updatedAt = .now
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.setExerciseDefinitionArchived")
     ckEngine.noteExerciseDefinitionChange(id: id)
   }
 
@@ -111,7 +111,7 @@ enum TrainingConfigStore {
     // a user-chosen kind when an unrelated edit flows through here.
     if let kind { entity.kindRaw = kind.rawValue }
     entity.updatedAt = .now
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.upsertSessionType")
     ckEngine.noteSessionTypeChange(id: id)
     return entity
   }
@@ -122,7 +122,7 @@ enum TrainingConfigStore {
     )
     guard let entity = (try? context.fetch(descriptor))?.first else { return }
     context.delete(entity)
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.deleteSessionType")
     ckEngine.noteSessionTypeDeletion(id: id)
   }
 
@@ -133,7 +133,7 @@ enum TrainingConfigStore {
     guard let entity = (try? context.fetch(descriptor))?.first else { return }
     entity.archived = archived
     entity.updatedAt = .now
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.setSessionTypeArchived")
     ckEngine.noteSessionTypeChange(id: id)
   }
 
@@ -148,7 +148,7 @@ enum TrainingConfigStore {
         ckEngine.noteSessionTypeChange(id: id)
       }
     }
-    try? context.save()
+    StoreHealth.save(context, op: "TrainingConfigStore.reorderSessionTypes")
   }
 
   // MARK: - Slug helper

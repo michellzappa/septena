@@ -96,6 +96,76 @@ scan appkit-inferring-moves error \
   'inferringMoves\(\)' \
   'NSTableView batches apply incrementally — an inferred move offset is stale by the time it runs. Use a plain difference (remove+insert).'
 
+# ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
+# Every popover, floating panel and filter list in the Septask AppKit shell is
+# built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
+# face and row height have one source of truth. They did not before: the shell
+# carried two corner radii, three placements for the same scope of edit, a
+# hardcoded systemBlue badge, and eighty lines of panel construction copied
+# between Quick Find and the Move picker. Build a surface through KitPopover /
+# KitSurfacePanel / KitFilterSurface instead of hand-rolling one.
+scan appkit-surface-chrome error \
+  '(NSPopover\(\)|material = \.popover|styleMask: \[\.borderless)' \
+  'Build transient surfaces via KitPopover / KitSurfacePanel (Septask/SeptaskKitSurface.swift) — do not hand-roll popover or panel chrome.' \
+  'Septask/SeptaskKitSurface\.swift'
+
+# ── Row tap targets ─────────────────────────────────────────────────────────
+# `.plain` (and the plain-derived row styles) opt a Button out of the list
+# cell's tap target, so only the DRAWN label is hit-testable — the Spacer and
+# the trailing gaps become dead zones and a tap near the right edge of the row
+# silently misses. `LogRow` carries `.contentShape(Rectangle())` for exactly
+# this reason; every other full-width row Button needs it too. The check reads
+# brace structure (label, modifier chain, and button style sit on different
+# lines), so it lives in its own script rather than a grep pattern.
+row_dead_zone=$(python3 scripts/lint-row-tap-targets.py)
+if [ -n "$row_dead_zone" ]; then
+  count=$(printf '%s\n' "$row_dead_zone" | wc -l | tr -d ' ')
+  printf '%s✗ %s%s  (%s)\n' "$RED" "row-dead-zone" "$OFF" "$count"
+  errors=$((errors + 1))
+  printf '  %s\n' 'A .plain row Button needs .contentShape(Rectangle()) on its label — without it the Spacer is a dead zone.'
+  printf '%s' "$DIM"; printf '%s\n' "$row_dead_zone" | head -8 | sed 's/^/    /'
+  [ "$count" -gt 8 ] && printf '    … and %s more\n' "$((count - 8))"
+  printf '%s\n' "$OFF"
+fi
+
+# ── Space must never complete a task ────────────────────────────────────────
+# On macOS, Space activates the first button in a selected row — the checkbox —
+# so a bare Space silently completed the task the user was only looking at. It
+# read as the task vanishing (it went to the Logbook). Both surfaces already
+# hold the line: the SwiftUI checkbox is `.focusable(false)`, the AppKit one is
+# `refusesFirstResponder = true`. Neither guard is load-bearing anywhere else in
+# the file, so a refactor drops it without a compile error and the bug returns
+# silently. Assert PRESENCE (the inverse of every other rule here), and ban
+# binding Space on the task surfaces at all.
+require() {
+  local rule="$1" file="$2" pattern="$3" msg="$4"
+  grep -qE "$pattern" "$file" 2>/dev/null && return 0
+  printf '%s✗ %s%s\n' "$RED" "$rule" "$OFF"
+  errors=$((errors + 1))
+  printf '  %s\n' "$msg"
+  printf '%s    %s  (missing: %s)%s\n\n' "$DIM" "$file" "$pattern" "$OFF"
+}
+
+require checkbox-space-guard Septena/Shell/Tasks/TaskCheckbox.swift \
+  '\.focusable\(false\)' \
+  'TaskCheckbox must stay .focusable(false) — a focusable checkbox in a selected List row is completed by Space.'
+
+require checkbox-space-guard Septask/SeptaskKitRowViews.swift \
+  'refusesFirstResponder = true' \
+  'KitCheckboxView must keep refusesFirstResponder = true — otherwise Space activates the completion.'
+
+space_bound=$(grep -rnE '(onKeyPress\(\.space|keyboardShortcut\(\.space)' --include="*.swift" \
+  Septena/Shell/Tasks Septena/Shell/UI/SelectableScrollList.swift \
+  Septena/Shell/UI/ListKeyboardNavigation.swift Septask 2>/dev/null \
+  | grep -v 'septena-lint:allow task-space-binding')
+if [ -n "$space_bound" ]; then
+  printf '%s✗ %s%s\n' "$RED" "task-space-binding" "$OFF"
+  errors=$((errors + 1))
+  printf '  %s\n' 'Do not bind Space on a task surface — it collides with the row checkbox. Use a modifier shortcut (⌘K completes).'
+  printf '%s' "$DIM"; printf '%s\n' "$space_bound" | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

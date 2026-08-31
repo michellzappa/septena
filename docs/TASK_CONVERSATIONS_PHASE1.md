@@ -1,5 +1,10 @@
 # Task Conversations — Phase 1 build ticket
 
+> **Shipped — historical.** The choice card and ball-in-court badge are live in
+> both shells (SwiftUI `ConversationCard`, AppKit `KitConversationView`). Kept
+> because `TaskComposer.swift`, `ConversationCard.swift` and `ConvoDerived.swift`
+> cite it. Code wins where they disagree.
+
 **Make it visible and tappable.** Phase 0 landed the engine (shape + mutator + MCP
 verbs, both servers). Phase 1 turns the conversation from MCP-only JSON into a
 surface in the app: a **choice card** on the task detail + a **ball-in-court badge**

@@ -212,6 +212,10 @@ struct CheckableRow<Trailing: View>: View {
   /// SwiftUI mis-reports a vertical-axis field's baseline). nil (non-task rows)
   /// keeps the intrinsic height. See `TaskComposerCard.titleField`.
   var titleBandHeight: CGFloat? = nil
+  /// How many lines the title may occupy before it truncates. Task rows pass
+  /// the user's Settings ▸ Tasks ▸ "Title lines" choice on iOS (see
+  /// `SettingsKey.tasksTitleLines`); everything else keeps the two-line default.
+  var titleLineLimit: Int = 2
   /// Neutral selection capsule while this row's detail/edit modal is open
   /// (drawer surfaces — the deep list paints via `listRowBackground` instead).
   var isSelected: Bool = false
@@ -253,7 +257,7 @@ struct CheckableRow<Trailing: View>: View {
       .font(.septenaTaskTitle)
       .strikethrough(isInactive)
       .opacity(isInactive ? 0.5 : 1)
-      .lineLimit(2)
+      .lineLimit(titleLineLimit)
       .truncationMode(.tail)
       .fixedSize(horizontal: false, vertical: true)
       .matchedHeroGeometry(titleMatchID, heroMatchNS, isSource: heroMatchIsSource)
@@ -477,6 +481,19 @@ struct TaskRow: View {
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(DayClock.self) private var clock
 
+  /// Settings ▸ Tasks ▸ Rows ▸ "Title lines". iPhone/iPad only — the macOS
+  /// AppKit list is a fixed-height table whose titles truncate by design, and
+  /// the SwiftUI Mac rows sit in the same dense list, so both stay at two.
+  @AppStorage(SettingsKey.tasksTitleLines) private var titleLinesSetting: Int = 2
+
+  private var titleLineLimit: Int {
+    #if os(iOS)
+    return min(3, max(1, titleLinesSetting))
+    #else
+    return 2
+    #endif
+  }
+
   private var todayAnchor: Date {
     Calendar.current.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
   }
@@ -518,6 +535,7 @@ struct TaskRow: View {
       // field (closest reliable view↔edit match). Normal rows already stand at
       // this height (the checkbox sets it), so nothing visibly changes here.
       titleBandHeight: Theme.checkboxTap,
+      titleLineLimit: titleLineLimit,
       isSelected: isSelected,
       isListSelected: isListSelected,
       promoteFlashTrigger: promoteFlash.trigger(for: task.id),
@@ -540,7 +558,7 @@ struct TaskRow: View {
     if let accessory { accessory }
     trailingDate
     if task.recurrence != nil {
-      Image(systemName: "arrow.triangle.2.circlepath")
+      Image(systemName: "arrow.clockwise")
         .scaledFont(size: 12)
         .foregroundStyle(Theme.inkSecondary)
         .accessibilityLabel(TaskA11y.recurring)
@@ -657,17 +675,25 @@ struct ScreenTitle: View {
 
 /// Which 7-day window a `WeekStrip` covers.
 enum WeekStripRange {
-  /// Today + the next 6 days. The scheduling default (When / Deadline).
+  /// Today + the next 6 days, today FIRST. The scheduling default
+  /// (When / Deadline). Today is a cell of the strip, not a separate row above
+  /// it: one control, one axis, and the leading cell is the answer people pick
+  /// most. (It was the other way round — a Today row over a strip that started
+  /// tomorrow — until the two shapes were collapsed into one.)
   case upcoming
   /// The previous 6 days + today, with today rightmost. Used by the
   /// drawer time-travel picker, where you look *back* at past logs.
   case recent
 }
 
-/// Lean 7-day strip: today + next 6 days as Reminders-style chips
-/// (weekday letter on top, day number below). One tap = one pick.
+/// Lean 7-day strip: today + the next 6 days as Reminders-style chips
+/// (weekday on top, day number below). One tap = one pick.
 /// Used by both the When and Deadline pickers so quick scheduling
 /// within the coming week never opens a full calendar.
+///
+/// The leading cell of `.upcoming` is TODAY, and its weekday line reads
+/// "Today" rather than the weekday name — it carries the word the separate
+/// Today row used to carry.
 struct WeekStrip: View {
   @Environment(SectionTheme.self) private var theme
   @Environment(DayClock.self) private var clock
@@ -691,7 +717,7 @@ struct WeekStrip: View {
     let today = anchorDay
     switch range {
     case .upcoming:
-      return (0..<7).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
+      return (0...6).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     case .recent:
       return (-6...0).compactMap { Self.cal.date(byAdding: .day, value: $0, to: today) }
     }
@@ -715,8 +741,12 @@ struct WeekStrip: View {
           // selected day is then separated from "today" by a full-weight
           // stroke rather than by fill strength alone.
           VStack(spacing: 2) {
-            Text(Self.weekdayFmt.string(from: d))
+            Text(isToday
+                 ? String(localized: "Today", comment: "Relative date")
+                 : Self.weekdayFmt.string(from: d))
               .scaledFont(size: 11, weight: .medium)
+              .lineLimit(1)
+              .minimumScaleFactor(0.7)
               .foregroundStyle(isSelected ? theme.accent : Theme.inkSecondary)
             Text("\(Self.cal.component(.day, from: d))")
               .scaledFont(size: 17, weight: .semibold, design: .rounded)
@@ -741,6 +771,147 @@ struct WeekStrip: View {
         }
         .buttonStyle(.plain)
       }
+    }
+  }
+}
+
+// MARK: - Task date board
+
+/// THE date board for tasks — one component, every task date surface.
+///
+/// Shape, in order: a **seven-day strip starting TODAY**, **Pick another
+/// date** (Apple's month calendar, for anything further out), and **Clear**.
+/// It is the SwiftUI twin of the AppKit shell's ⌘S / ⌘⇧D popover
+/// (`Septask/SeptaskKitDatePopover.swift`), so When and Deadline ask the
+/// question the same way in both apps.
+///
+/// Today is the strip's FIRST CELL, not a row above it. The board used to
+/// carry both — a Today row over a strip that started tomorrow — which asked
+/// one question (which day?) with two controls in two vocabularies. One strip
+/// answers it on one axis, and the cell people pick most is the leading one.
+///
+/// Every control commits on the spot — there is no confirm button.
+///
+/// The caller decides what "Today" means. `.when` treats it as the today FLAG
+/// (`onToday`), Deadline as an ordinary date — the board only reports the
+/// gesture.
+struct TaskDateBoard: View {
+  @Environment(SectionTheme.self) private var theme
+  @Environment(DayClock.self) private var clock
+  /// The dated value the board should show as chosen, or nil for none.
+  let selected: Date?
+  /// Whether the Today row itself is the current value.
+  var todayActive: Bool = false
+  /// e.g. "No Date" / "Remove Deadline". The row hides when nil.
+  var clearLabel: String?
+  let onToday: () -> Void
+  let onPick: (Date) -> Void
+  let onClear: () -> Void
+
+  @State private var calendarDate = Date()
+  @State private var showingCalendar = false
+
+  private var cal: Calendar { Calendar.current }
+  private var anchorDay: Date {
+    cal.startOfDay(for: SeptenaDate.parse(clock.today) ?? clock.now)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      // `todayActive` is the today FLAG, which carries no date — the strip
+      // takes a date, so map the flag onto today's cell here.
+      WeekStrip(selected: selected ?? (todayActive ? anchorDay : nil)) { d in
+        let day = cal.startOfDay(for: d)
+        // Today's cell reports the Today GESTURE, so `.when` can keep writing
+        // the flag rather than a dated schedule.
+        if cal.isDate(day, inSameDayAs: anchorDay) { onToday() } else { onPick(day) }
+      }
+      .padding(.top, 4)
+      .padding(.bottom, 10)
+
+      Hairline(leadingInset: 0)
+
+      calendarButton
+        .padding(.vertical, 12)
+
+      if let clearLabel {
+        Hairline(leadingInset: 0)
+        row(symbol: "xmark.circle", tint: Theme.iconMuted,
+            title: clearLabel, active: false) {
+          Haptics.warning()
+          onClear()
+        }
+        .padding(.top, 4)
+      }
+    }
+  }
+
+  /// One full-width row — symbol, then title. The AppKit board's row shape,
+  /// wearing the inset palette highlight when it holds the current value.
+  /// `.contentShape` is required: a `.plain` button is only tappable where it
+  /// draws, so without it the trailing half of the row is a dead zone.
+  private func row(symbol: String, tint: Color, title: String, active: Bool,
+                   action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 10) {
+        Image(systemName: symbol)
+          .scaledFont(size: 17)
+          .foregroundStyle(tint)
+          .frame(width: 22)
+        Text(title)
+          .scaledFont(size: 16)
+          .foregroundStyle(Theme.inkPrimary)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 11)
+      .contentShape(Rectangle())
+      .background(InsetSelectionBackground(isSelected: active, horizontalInset: 0))
+    }
+    .buttonStyle(.plain)
+    .accessibilityAddTraits(active ? .isSelected : [])
+  }
+
+  /// The "further out" path. The strip already covers the coming week, so the
+  /// month calendar hides behind one tap — popover on iPad/Mac, small sheet on
+  /// iPhone — and picking a day there commits it, like every other control.
+  private var calendarButton: some View {
+    Button {
+      Haptics.pick()
+      calendarDate = selected ?? anchorDay
+      showingCalendar = true
+    } label: {
+      HStack(spacing: 8) {
+        Image(systemName: "calendar")
+          .scaledFont(size: 17)
+          .foregroundStyle(Theme.inkSecondary)
+        Text("Pick another date")
+          .scaledFont(size: 16, weight: .medium)
+          .foregroundStyle(.primary)
+        Image(systemName: "chevron.right")
+          .scaledFont(size: 13, weight: .semibold)
+          .foregroundStyle(Theme.iconMuted)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 13)
+      .background(Capsule().fill(Theme.inkSecondary.opacity(0.08)))
+      .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 0.5))
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .popover(isPresented: $showingCalendar) {
+      DatePicker("", selection: $calendarDate, displayedComponents: [.date])
+        .datePickerStyle(.graphical)
+        .labelsHidden()
+        .tint(theme.accent)
+        .padding(8)
+        .frame(minWidth: 300, idealWidth: 320, minHeight: 320)
+        .presentationDetents([.medium])
+        .presentationCompactAdaptation(.sheet)
+        .onChange(of: calendarDate) {
+          showingCalendar = false
+          onPick(cal.startOfDay(for: calendarDate))
+        }
     }
   }
 }

@@ -17,6 +17,16 @@ final class SeptaskKitNextController: NSViewController {
   private let navigation = NavigationState()
   private var host: NSHostingController<AnyView>?
 
+  /// Where a pick from the page's title dropdown goes. The shell steers its
+  /// sidebar, which drives the panes — the same contract the task list's
+  /// `onNavigate` uses, so a jump always leaves the two in agreement. Set
+  /// before this pane is first displayed.
+  var onNavigate: ((Route) -> Void)?
+
+  /// Whether the page's own big title is still on screen. The hosted page
+  /// reports it; `syncWindowTitle` applies it.
+  private var headerVisible = true
+
   override func loadView() { view = NSView() }
 
   /// The hosting controller is added as a CHILD view controller rather than
@@ -34,7 +44,13 @@ final class SeptaskKitNextController: NSViewController {
     settings.reloadFromMirror(context: LocalStore.shared.container.mainContext)
     theme.paintFromCache()
 
-    let root = SeptaskNextPage()
+    let root = SeptaskNextPage(
+      onNavigate: { [weak self] route in self?.onNavigate?(route) },
+      onHeaderVisibilityChange: { [weak self] visible in
+        guard let self else { return }
+        self.headerVisible = visible
+        self.syncWindowTitle()
+      })
       .septenaSharedEnvironment(navigation: navigation, theme: theme,
                                 settings: settings,
                                 dayClock: SeptaskMacRuntime.dayClock,
@@ -56,9 +72,15 @@ final class SeptaskKitNextController: NSViewController {
     ])
   }
 
-  /// Match the task list's subtitle convention when this pane is front.
-  func claimWindowSubtitle() {
-    view.window?.subtitle = String(localized: "Next", comment: "Smart list title")
+  /// Hide the window title while this page's own big title is on screen, show
+  /// it once that title has scrolled away — the identical rule (and identical
+  /// name) as `SeptaskKitTaskListController.syncWindowTitle`, so the top of
+  /// the window reads the same however you got here. Called by the shell when
+  /// it swaps this pane in, ahead of the page's first scroll report.
+  func syncWindowTitle() {
+    guard let window = view.window else { return }
+    let wanted: NSWindow.TitleVisibility = headerVisible ? .hidden : .visible
+    if window.titleVisibility != wanted { window.titleVisibility = wanted }
   }
 }
 

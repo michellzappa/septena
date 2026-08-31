@@ -49,16 +49,7 @@ extension Route {
   }
 
   private static func filterKey(_ f: TaskFilter) -> String {
-    switch f {
-    case .today:           return "today"
-    case .triage:          return "triage"
-    case .upcoming:        return "upcoming"
-    case .unscheduled:     return "unscheduled"
-    case .logbook:         return "logbook"
-    case .recentlyDeleted: return "recentlyDeleted"
-    case .project(let id): return "project.\(id)"
-    case .area(let id):    return "area.\(id)"
-    }
+    f.navigationKey
   }
 
   private static func filterIcon(_ f: TaskFilter) -> String {
@@ -66,6 +57,7 @@ extension Route {
     case .today:           return "sun.max.fill"
     case .triage:          return "tray.full"
     case .upcoming:        return "calendar"
+    case .repeating:       return "arrow.clockwise"
     case .unscheduled:     return "rectangle.stack.fill"
     case .logbook:         return "checkmark"
     case .recentlyDeleted: return "trash"
@@ -87,6 +79,7 @@ enum TaskDestinations {
   static let smartListRoutes: [Route] = [
     .filter(.today),
     .filter(.upcoming),
+    .filter(.repeating),
     .filter(.unscheduled),
     .filter(.logbook),
   ]

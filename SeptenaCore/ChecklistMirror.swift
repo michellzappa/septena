@@ -107,7 +107,7 @@ enum ChecklistMirror {
       context.delete(def)
     }
 
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceHabitsDay")
   }
 
   static func replaceAllHabitsHistory(_ response: HabitsRangeResponse, context: ModelContext) {
@@ -167,7 +167,7 @@ enum ChecklistMirror {
     for def in existingDefs where !seenDefinitionIDs.contains(def.id) {
       context.delete(def)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceAllHabitsHistory")
   }
 
   /// Local history aggregation for the Habits dashboard tile + destination view.
@@ -441,7 +441,7 @@ enum ChecklistMirror {
       context.delete(def)
     }
 
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceSupplementsDay")
   }
 
   static func replaceAllSupplementsHistory(_ response: SupplementsRangeResponse, context: ModelContext) {
@@ -498,7 +498,7 @@ enum ChecklistMirror {
     for def in existingDefs where !seenDefinitionIDs.contains(def.id) {
       context.delete(def)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceAllSupplementsHistory")
   }
 
   static func loadChores(context: ModelContext, today: String) -> [ChoreItem] {
@@ -540,7 +540,7 @@ enum ChecklistMirror {
     for row in existing where !incomingIDs.contains(row.id) {
       context.delete(row)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceChores")
   }
 
   static func replaceAllChoresExport(_ response: ChoresExportResponse, context: ModelContext) {
@@ -589,7 +589,7 @@ enum ChecklistMirror {
     for row in existingDefs where !seenDefinitionIDs.contains(row.id) {
       context.delete(row)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceAllChoresExport")
   }
 
   private static func choreItem(_ row: ChoreSnapshotEntity) -> ChoreItem? {
@@ -691,7 +691,7 @@ enum ChecklistMirror {
     for entity in existing where !seen.contains(entity.id) {
       context.delete(entity)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceGroceryItems")
   }
 
   /// Build a `GutDayResponse` from local SwiftData. Mirrors the shape
@@ -835,7 +835,7 @@ enum ChecklistMirror {
     for entity in existingCats where !seenCats.contains(entity.id) {
       context.delete(entity)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceGroceryCategories")
   }
 
   static func loadGroceryItems(context: ModelContext) -> [GroceryItem] {
@@ -952,7 +952,7 @@ enum ChecklistMirror {
       context.delete(entity)
     }
 
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceSupplementDefs")
   }
 
   /// Server's `file` field (`2026-05-23--chest-press--01.json`) is fine as
@@ -1316,7 +1316,7 @@ enum ChecklistMirror {
       )
       context.insert(summary)
     }
-    try? context.save()
+    StoreHealth.save(context, op: "ChecklistMirror.replaceNutrition")
   }
 
   static func loadNutritionEntries(context: ModelContext, since: String? = nil) -> [NutritionEntry] {

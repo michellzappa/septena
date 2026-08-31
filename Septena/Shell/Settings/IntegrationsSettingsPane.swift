@@ -88,21 +88,27 @@ struct ConnectedAppsSettingsSections: View {
 
     Section {
       // Oura — direct iOS client (Personal Access Token). Replaces the
-      // old FastAPI proxy at /api/health/oura.
+      // old FastAPI proxy at /api/health/oura. Status comes from the last
+      // *fetch*, not from "a token exists": the nights on screen come from
+      // the CloudKit-mirrored store, so a revoked PAT leaves the chart
+      // sitting there looking fine while it quietly stops advancing.
       NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.oura)) {
         stateRow(title: "Oura",
                  systemImage: "circle.circle",
-                 state: ouraProvider.hasToken ? "Connected" : "Grant",
-                 isGranted: ouraProvider.hasToken)
+                 state: ouraProvider.connectionDisplayState.label,
+                 isGranted: ouraProvider.connectionDisplayState.isHealthy)
       }
 
       // Withings — direct iOS client (OAuth2). Replaces the old
-      // FastAPI proxy at /api/health/withings.
+      // FastAPI proxy at /api/health/withings. Same last-fetch status as
+      // Oura, and it matters more here: the refresh token rotates on every
+      // use, so one interrupted refresh can leave a pair that will never
+      // work again.
       NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.withings)) {
         stateRow(title: "Withings",
                  systemImage: "scalemass",
-                 state: withingsProvider.hasTokens ? "Connected" : "Connect",
-                 isGranted: withingsProvider.hasTokens)
+                 state: withingsProvider.connectionDisplayState.label,
+                 isGranted: withingsProvider.connectionDisplayState.isHealthy)
       }
 
       // GitHub — read-only contribution calendar via the GraphQL API.
@@ -512,8 +518,18 @@ private struct OuraIntegrationDetail: View {
         HStack {
           Label("Status", systemImage: "circle.circle")
           Spacer()
-          Text(provider.hasToken ? "Connected" : "Not configured")
-            .foregroundStyle(provider.hasToken ? .green : .secondary)
+          Text(provider.connectionDisplayState.label)
+            .foregroundStyle(provider.connectionDisplayState.isHealthy ? .green : .secondary)
+        }
+        ConnectionHealthRows(lastFetchAt: provider.lastFetchAt,
+                             lastError: provider.lastError)
+        // A PAT that Oura no longer honors is the common failure, and the
+        // fix is a new token — say so where the error is, not in a support
+        // page the user has to go find.
+        if provider.connectionDisplayState == .needsAttention {
+          Text("Personal access tokens can be revoked or expire. Create a replacement at cloud.ouraring.com and paste it above — the nights backfill on the next refresh.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         Button {
           Task { await runTest() }
@@ -678,8 +694,18 @@ private struct WithingsIntegrationDetail: View {
         HStack {
           Label("Status", systemImage: "scalemass")
           Spacer()
-          Text(provider.hasTokens ? "Connected" : "Not connected")
-            .foregroundStyle(provider.hasTokens ? .green : .secondary)
+          Text(provider.connectionDisplayState.label)
+            .foregroundStyle(provider.connectionDisplayState.isHealthy ? .green : .secondary)
+        }
+        ConnectionHealthRows(lastFetchAt: provider.lastFetchAt,
+                             lastError: provider.lastError)
+        // Withings's refresh token rotates on every use, so the recovery is
+        // reconnecting, not waiting — and the tokens may already be gone
+        // (a rejected refresh calls `disconnect()` itself).
+        if provider.connectionDisplayState == .needsAttention {
+          Text("Withings sign-in expires periodically. Disconnect and connect again to re-authorize — the weigh-ins backfill on the next refresh.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
 
         if provider.hasTokens {

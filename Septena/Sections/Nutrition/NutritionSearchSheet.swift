@@ -20,7 +20,6 @@ struct NutritionSearchSheet: View {
 
   let entries: [NutritionEntry]
   @State private var query: String = ""
-  @State private var multiplierPercent = NutritionRelogging.defaultPercent
 
   private struct Candidate: Identifiable {
     let id: String
@@ -71,9 +70,6 @@ struct NutritionSearchSheet: View {
               .foregroundStyle(.secondary)
           }
         } else {
-          Section {
-            NutritionMultiplierControl(percent: $multiplierPercent)
-          }
           ForEach(filtered) { c in
             Button { duplicate(c.representative) } label: {
               row(c)
@@ -109,14 +105,12 @@ struct NutritionSearchSheet: View {
       if let emoji = e.emoji, !emoji.isEmpty { return "\(emoji) \(head)" }
       return head
     }()
-    let factor = NutritionRelogging.factor(for: multiplierPercent)
     let macros = [
       c.count > 1 ? "\(c.count)×" : nil,
-      multiplierPercent == NutritionRelogging.defaultPercent ? nil : "\(multiplierPercent)%",
-      "\(Int(NutritionRelogging.scaled(e.proteinG, by: factor).rounded()))P",
-      "\(Int(NutritionRelogging.scaled(e.fatG, by: factor).rounded()))F",
-      "\(Int(NutritionRelogging.scaled(e.carbsG, by: factor).rounded()))C",
-      "\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal",
+      "\(Int(e.proteinG.rounded()))P",
+      "\(Int(e.fatG.rounded()))F",
+      "\(Int(e.carbsG.rounded()))C",
+      "\(Int(e.kcal.rounded()))kcal",
     ].compactMap { $0 }.joined(separator: " · ")
 
     return VStack(alignment: .leading, spacing: 2) {
@@ -138,7 +132,7 @@ struct NutritionSearchSheet: View {
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
     ) {
-      NutritionRelogging.addDuplicate(entry, percent: multiplierPercent)
+      NutritionRelogging.addDuplicate(entry)
       AddInfoSection.nutrition.notifyTilesChanged()
     }
     dismiss()

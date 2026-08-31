@@ -243,7 +243,7 @@ struct NutritionDestinationView: View {
         meals: allDistinctMeals,
         colors: MealChipColors(protein: proteinColor, fat: fatColor,
                                carbs: carbsColor, kcal: kcalColor),
-        onPick: { entry, percent in logAgainNow(entry, percent: percent) },
+        onPick: { entry in logAgainNow(entry) },
         onCreateNew: { creating = true },
         onScan: { scanning = true }
       )
@@ -311,8 +311,7 @@ struct NutritionDestinationView: View {
   }
 
   /// Re-log an existing meal at the current moment.
-  private func logAgainNow(_ entry: NutritionEntry,
-                           percent: Int = NutritionRelogging.defaultPercent) {
+  private func logAgainNow(_ entry: NutritionEntry) {
     NutritionCommit.commitMeal(
       loggedAt: .now,
       today: clock.today,
@@ -320,9 +319,18 @@ struct NutritionDestinationView: View {
       announce: "Logged \(entry.foods.first ?? "meal").",
       logCommit: logCommit
     ) {
-      NutritionRelogging.addDuplicate(entry, percent: percent)
+      NutritionRelogging.addDuplicate(entry)
       AddInfoSection.nutrition.notifyTilesChanged()
     }
+  }
+
+  /// Scale a meal that is already on the day — 50%–200% of what it holds now.
+  /// Duplicating stays a 1:1 copy; this is the "I ate half of that" path.
+  private func scale(_ entry: NutritionEntry, percent: Int) {
+    NutritionRelogging.scale(entry, percent: percent)
+    AddInfoSection.nutrition.notifyTilesChanged()
+    Haptics.success()
+    Task { await reload() }
   }
 
   private func delete(_ entry: NutritionEntry) {
@@ -810,6 +818,7 @@ struct NutritionDestinationView: View {
       Button { logAgainNow(e) } label: {
         Label("Log again now", systemImage: "arrow.clockwise")
       }
+      NutritionScaleMenu { percent in scale(e, percent: percent) }
       Button(role: .destructive) { delete(e) } label: {
         Label("Delete", systemImage: "trash")
       }
@@ -1015,7 +1024,7 @@ struct MealRelogSearchView: View {
   let meals: [UsualMeal]
   let colors: MealChipColors
   /// Re-log the picked meal now. The sheet dismisses itself first.
-  let onPick: (NutritionEntry, Int) -> Void
+  let onPick: (NutritionEntry) -> Void
   /// Open the rare hand-authoring path. The sheet dismisses itself first.
   let onCreateNew: () -> Void
   /// Open the photo-first scan path. The sheet dismisses itself first.
@@ -1023,7 +1032,6 @@ struct MealRelogSearchView: View {
 
   @Environment(\.dismiss) private var dismiss
   @State private var query = ""
-  @State private var multiplierPercent = NutritionRelogging.defaultPercent
 
   private var filtered: [UsualMeal] {
     let q = query.lowercased().trimmingCharacters(in: .whitespaces)
@@ -1053,13 +1061,10 @@ struct MealRelogSearchView: View {
           ContentUnavailableView.search(text: query)
         } else {
           List {
-            Section {
-              NutritionMultiplierControl(percent: $multiplierPercent)
-            }
             ForEach(filtered) { meal in
               Button {
                 dismiss()
-                onPick(meal.template, multiplierPercent)
+                onPick(meal.template)
               } label: {
                 mealRow(meal)
               }
@@ -1098,7 +1103,6 @@ struct MealRelogSearchView: View {
 
   private func mealRow(_ meal: UsualMeal) -> some View {
     let e = meal.template
-    let factor = NutritionRelogging.factor(for: multiplierPercent)
     return HStack(alignment: .center, spacing: 10) {
       if let emoji = e.emoji, !emoji.isEmpty { Text(emoji) }
       VStack(alignment: .leading, spacing: 2) {
@@ -1111,17 +1115,13 @@ struct MealRelogSearchView: View {
             .lineLimit(1)
         }
         HStack(spacing: 6) {
-          if multiplierPercent != NutritionRelogging.defaultPercent {
-            Text("\(multiplierPercent)%").foregroundStyle(.secondary)
-            Text("·").foregroundStyle(.secondary.opacity(0.5))
-          }
-          Text("\(Int(NutritionRelogging.scaled(e.proteinG, by: factor).rounded()))P").foregroundStyle(colors.protein)
+          Text("\(Int(e.proteinG.rounded()))P").foregroundStyle(colors.protein)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(NutritionRelogging.scaled(e.fatG, by: factor).rounded()))F").foregroundStyle(colors.fat)
+          Text("\(Int(e.fatG.rounded()))F").foregroundStyle(colors.fat)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(NutritionRelogging.scaled(e.carbsG, by: factor).rounded()))C").foregroundStyle(colors.carbs)
+          Text("\(Int(e.carbsG.rounded()))C").foregroundStyle(colors.carbs)
           Text("·").foregroundStyle(.secondary.opacity(0.5))
-          Text("\(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded()))kcal").foregroundStyle(colors.kcal)
+          Text("\(Int(e.kcal.rounded()))kcal").foregroundStyle(colors.kcal)
         }
         .font(.septenaMetaMicro.weight(.semibold))
         .lineLimit(1)
@@ -1140,8 +1140,8 @@ struct MealRelogSearchView: View {
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityLabel(meal.loggedToday
-      ? "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Already logged today. Tap to log again."
-      : "\(e.foods.first ?? "meal"), \(Int(NutritionRelogging.scaled(e.kcal, by: factor).rounded())) kcal, \(multiplierPercent) percent. Tap to log again now.")
+      ? "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Already logged today. Tap to log again."
+      : "\(e.foods.first ?? "meal"), \(Int(e.kcal.rounded())) kcal. Tap to log again now.")
   }
 }
 

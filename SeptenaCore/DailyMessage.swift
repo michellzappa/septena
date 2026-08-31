@@ -262,7 +262,7 @@ public final class QuoteStore {
     let descriptor = FetchDescriptor<QuoteEntity>(predicate: #Predicate { $0.id == id })
     guard let entity = try? context.fetch(descriptor).first else { return }
     context.delete(entity)
-    do { try context.save() } catch { SeptenaLog.error("QuoteStore: delete save failed", error) }
+    StoreHealth.save(context, op: "DailyMessage.delete")
     // Readwise rows are device-local; only user-authored lines sync. See `save`.
     if !id.hasPrefix("readwise:") { ckEngine?.noteQuoteDeletion(id: id) }
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
@@ -276,8 +276,7 @@ public final class QuoteStore {
     let rows = all(origin: "readwise")
     guard !rows.isEmpty else { return }
     for entity in rows { context.delete(entity) }
-    do { try context.save() }
-    catch { SeptenaLog.error("QuoteStore: deleteAll save failed", error); return }
+    guard StoreHealth.save(context, op: "QuoteStore.deleteAll") else { return }
     // Readwise rows are device-local — no CloudKit deletions to enqueue (that's
     // what kept a disconnect from hanging on a large library).
     NotificationCenter.default.post(name: .septenaQuotesChanged, object: nil)
@@ -324,8 +323,7 @@ public final class QuoteStore {
   }
 
   private func save(touching ids: [String]) {
-    do { try context.save() }
-    catch { SeptenaLog.error("QuoteStore: save failed", error); return }
+    guard StoreHealth.save(context, op: "QuoteStore.save") else { return }
     // Only user-authored quotes sync to CloudKit. Readwise highlights are
     // device-local (re-imported per device from the user's own token), so a
     // multi-thousand-highlight library never floods the sync engine — the cause
