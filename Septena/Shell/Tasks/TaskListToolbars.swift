@@ -106,6 +106,10 @@ struct TaskListStandaloneChrome: ViewModifier {
   #endif
   let embedded: Bool
   let recentlyDeleted: Bool
+  /// Today only — the grouping option is Today-scoped, and a "···" that
+  /// appears on every list to hold one inapplicable row is worse than none.
+  /// iPad regular is served by the sidebar's "···" instead (see below).
+  let showsViewOptions: Bool
 
   func body(content: Content) -> some View {
     #if os(iOS)
@@ -121,6 +125,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       content.pageChrome(
         id: "tasks",
         title: "Tasks",
+        localActions: { showsViewOptions ? AnyView(TaskViewOptions()) : nil },
         add: recentlyDeleted ? nil : .action { nav.shouldStartCreating = true }
       )
     }

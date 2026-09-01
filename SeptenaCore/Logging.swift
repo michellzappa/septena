@@ -33,6 +33,12 @@ extension Notification.Name {
   /// Posted by the macOS menu bar's "New To-Do" item. ContentView
   /// listens and starts an inline draft on Inbox — same flow as ⌘N.
   static let septenaOpenQuickAdd = Notification.Name("septena.openQuickAdd")
+  /// Posted when a task *view* option flips (currently only
+  /// `SettingsKey.todayGroupByList`, from the View menu / the Tasks "···"
+  /// menu / Settings). SwiftUI surfaces bind the key through `@AppStorage` and
+  /// repaint themselves; Septask's AppKit list reads `UserDefaults` directly
+  /// and has no observation of it, so it needs this nudge to rebuild its rows.
+  static let septenaTaskViewOptionsChanged = Notification.Name("septena.taskViewOptionsChanged")
   /// Posted whenever the Claude gateway's token state changes (refreshed,
   /// connected, disconnected). The notification scheduler re-arms the
   /// pre-expiry reconnect nudge off the new `lastRefreshAt`.

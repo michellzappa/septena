@@ -496,6 +496,10 @@ struct SeptenaApp: App {
             navigation.sidebarVisibility == .detailOnly ? .all : .detailOnly
         }
         .keyboardShortcut("/", modifiers: .command)
+
+        // Task list view options, same rows Septask's View menu carries.
+        Divider()
+        TaskViewOptions()
       }
       // ⌘, opens the Settings sheet — standard macOS Preferences shortcut.
       // Replaces the system app-settings menu item so it routes to ours

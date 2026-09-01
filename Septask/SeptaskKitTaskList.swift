@@ -534,6 +534,14 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
     })
+    // View ▸ Group Today by List. This table reads the setting straight from
+    // UserDefaults, so it needs telling — and a full rebuild, not a diff
+    // (see `refreshViewOptions`).
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .septenaTaskViewOptionsChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.refreshViewOptions() }
+    })
     // Pending Apple Reminders. `.EKEventStoreChanged` fires for every edit in
     // every list, so `refreshReminders` compares the resulting set and only
     // reloads when the mirrored list actually moved.
@@ -647,6 +655,21 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.needsLayout = true
   }
 
+  /// View ▸ Group Today by List flipped. Not a `reload()`: the setting is read
+  /// globally (`todayGroupsByList`, and `taskContextText` through it), not
+  /// carried in the `Row` value, so the animated diff can't see that a
+  /// surviving row now wants a context subtitle and a taller slot — it kept
+  /// its cached one-line height and clipped the second line. Rebuild hard
+  /// (`animated: false` takes `apply`'s `reloadData()` path) and invalidate
+  /// every height, the same treatment a text-size change needs.
+  func refreshViewOptions() {
+    reload(animated: false)
+    if tableView.numberOfRows > 0 {
+      tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tableView.numberOfRows))
+    }
+    tableView.needsLayout = true
+  }
+
   /// Select and reveal a row by task id — how a jump (Quick Find) lands on
   /// the thing it was asked to find. No-op when the task isn't in this list.
   func select(taskId: String) {
@@ -699,10 +722,38 @@ final class SeptaskKitTaskListController: NSViewController {
       newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
     case .today:
-      // Flat Today: due-first ordering, per the setting's documented contract.
+      // Flat Today: due-first ordering, per the setting's documented contract
+      // — but only for CLASSIFIED work. The Inbox run still leads the page:
+      // the triage band, then the loose rows, then the "New task" line that
+      // closes it, exactly as `groupedByList(_:inboxFooter:)` orders them one
+      // case up. Sorting the loose rows in with the rest scattered Inbox
+      // through the list and pushed the capture line to the very bottom.
+      // SwiftUI's `ungroupedOpenItems` makes the same split — it renders only
+      // tasks carrying a project or area, because Inbox is drawn above it.
+      let rest = withoutTriage(pool)
+      let loose = rest.filter { $0.project == nil && $0.area == nil }
+      // Flat still follows the SIDEBAR's order — area by area, each area's
+      // projects after its direct work — so removing the headers changes what
+      // you SEE, not the sequence you already know. `TaskListOrder.byList` is
+      // the same ordering `groupedByList` emits its headers in.
+      let structure = StructureCache.snapshot(in: context)
+      let classified = TaskListOrder.byList(
+        rest.filter { $0.project != nil || $0.area != nil },
+        areas: structure.areas, projects: structure.projects)
+      // One divider under the Inbox run, drawn as an ordinary group header so
+      // it breaks the card exactly the way an area / project header does in
+      // grouped mode — flat Today collapses the MANY list headers into this
+      // single one, it doesn't drop the idea of a divider.
+      let listsHeader: [Row] = classified.isEmpty ? [] : [
+        .header(id: Self.flatListsHeaderId,
+                title: String(localized: "Lists",
+                              comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
+                icon: .symbol("list.bullet"), count: classified.count)
+      ]
       newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
-        + withoutTriage(pool).sorted(by: SeptenaTask.compareNextPageOrder).map(chipped)
-        + newTaskLine
+        + loose.map(chipped) + newTaskLine
+        + listsHeader
+        + classified.map(chipped)
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
     case .unscheduled:
@@ -1454,6 +1505,11 @@ final class SeptaskKitTaskListController: NSViewController {
       var changed = IndexSet()
       for index in new.indices where new[index] != old[index] { changed.insert(index) }
       if !changed.isEmpty {
+        // Heights are CACHED: `reloadData(forRowIndexes:)` re-renders a cell
+        // but never re-asks `heightOfRow`, so a row that just gained (or lost)
+        // its context subtitle would draw two lines in a one-line slot and
+        // clip. Invalidate first, then re-render.
+        tableView.noteHeightOfRows(withIndexesChanged: changed)
         tableView.reloadData(forRowIndexes: changed, columnIndexes: [0])
       }
       return
@@ -1498,6 +1554,8 @@ final class SeptaskKitTaskListController: NSViewController {
       }
     }
     if !changed.isEmpty {
+      // Same cached-height rule as the equal-keys path above.
+      tableView.noteHeightOfRows(withIndexesChanged: changed)
       tableView.reloadData(forRowIndexes: changed, columnIndexes: [0])
     }
   }
@@ -2592,8 +2650,14 @@ final class SeptaskKitTaskListController: NSViewController {
   /// area/project headers on Today/Anytime, and Upcoming's day headers, which
   /// break the list the same way. Separate from `isNavigableHeaderId`: a day
   /// header owns the same air but has no list to drill into.
+  /// Flat Today's single "Lists" divider (see the `.today` branch of `reload`).
+  static let flatListsHeaderId = "today-lists"
+
   private func headerStartsSection(_ id: String) -> Bool {
-    isNavigableHeaderId(id) || id.hasPrefix("day-")
+    // The flat divider stands where an area / project header would, so it
+    // takes the same extra break above it — "Inbox"/"Agenda" are sub-groups
+    // inside Today's own flow and deliberately don't.
+    isNavigableHeaderId(id) || id.hasPrefix("day-") || id == Self.flatListsHeaderId
   }
 
   private func navigationTarget(forHeaderId id: String) -> TaskFilter? {
@@ -3195,7 +3259,6 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return KitComposerCell.height(notesHeight: composerNotesHeight)
       }
       return SeptaskKitTheme.rowHeight
-        + (taskContextText(for: task) == nil ? 0 : 14)
     case .event: return SeptaskKitTheme.rowHeight
     case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
@@ -3813,7 +3876,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
   private let checkbox = KitCheckboxView()
   private let title = NSTextField(labelWithString: "")
-  private let contextLabel = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
@@ -3864,13 +3926,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     title.setContentHuggingPriority(.defaultLow, for: .horizontal)
     title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-    contextLabel.font = SeptaskKitTheme.meta
-    contextLabel.textColor = SeptaskKitTheme.inkSecondary
-    contextLabel.maximumNumberOfLines = 1
-    contextLabel.lineBreakMode = .byTruncatingTail
-    contextLabel.isHidden = true
-    contextLabel.translatesAutoresizingMaskIntoConstraints = false
-    contextLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
     notesGlyph.translatesAutoresizingMaskIntoConstraints = false
     notesGlyph.contentTintColor = SeptaskKitTheme.iconMuted
@@ -3936,7 +3991,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
     addSubview(checkbox)
     addSubview(title)
-    addSubview(contextLabel)
     addSubview(trailing)
     textField = title
     // Row announces as one unit (title + notes); the checkbox stays its own
@@ -3959,11 +4013,12 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       // editor) always spans the row — empty create titles have ~0 intrinsic
       // width, which is what made ⌘N open a one-glyph-wide editor.
       title.trailingAnchor.constraint(equalTo: trailing.leadingAnchor, constant: -8),
-      contextLabel.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-      contextLabel.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
-      trailing.leadingAnchor.constraint(greaterThanOrEqualTo: contextLabel.trailingAnchor, constant: 8),
       trailingConstraint,
-      trailing.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+      // The row's centerline, NOT the title's: with a context line the title
+      // sits high inside the taller row, and a chip pinned to it rode up with
+      // it while the checkbox stayed centered — two different alignments on
+      // one row.
+      trailing.centerYAnchor.constraint(equalTo: centerYAnchor),
     ])
   }
 
@@ -4017,7 +4072,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       notesGlyph.isHidden = true
       chip.isHidden = true
       scheduleGlyph.isHidden = true
-      contextLabel.isHidden = true
       detail.stringValue = ""
       title.font = SeptaskKitTheme.heading
       title.attributedStringValue = NSAttributedString(
@@ -4034,9 +4088,6 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     checkbox.isHidden = false
     checkbox.setAccessibilityElement(true)
     title.font = SeptaskKitTheme.taskTitle
-    contextLabel.font = SeptaskKitTheme.meta
-    contextLabel.stringValue = contextText ?? ""
-    contextLabel.isHidden = contextText == nil
     let done = task.status != .open
     checkbox.isDone = done
     // The box carries readiness and Today the same way TaskCheckbox does:
@@ -4069,12 +4120,32 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       titleAttributes[.foregroundColor] = SeptaskKitTheme.inkSecondary
       titleAttributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
     }
-    title.attributedStringValue = NSAttributedString(string: task.title,
-                                                     attributes: titleAttributes)
+    // The list name rides the TITLE LINE as a dimmed suffix rather than a
+    // second line: it keeps rows single-height (a subtitle cost +14pt each,
+    // ~a quarter of a screenful on a long Today) and keeps the reading order
+    // left-to-right — title, then where it lives — instead of parking the
+    // answer in a right-edge pill, which reads as a filterable token and sat
+    // next to the genuinely tappable filing capsule. A long title truncates
+    // the suffix away with it; that is the accepted cost of the one-line row.
+    let composed = NSMutableAttributedString(string: task.title, attributes: titleAttributes)
+    if let contextText, !contextText.isEmpty {
+      composed.append(NSAttributedString(
+        string: "  " + contextText,
+        // Deliberately NOT `titleAttributes`: the suffix keeps its quiet meta
+        // font and never takes the strikethrough of a completed title — the
+        // task is done, its list is not.
+        attributes: [.font: SeptaskKitTheme.meta,
+                     .foregroundColor: SeptaskKitTheme.inkSecondary]))
+    }
+    title.attributedStringValue = composed
 
     let hasNotes = !(task.notes ?? "").isEmpty
     notesGlyph.isHidden = !hasNotes
-    if let chipValue {
+    // The chip and the inline title suffix answer the SAME question — "which
+    // list is this in" — so a row never wears both. The suffix wins where it
+    // is shown (flat Today): it sits on the title line where the eye already
+    // is, and a pill repeating it on the far right is noise, not emphasis.
+    if let chipValue, contextText == nil {
       chip.isHidden = false
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {

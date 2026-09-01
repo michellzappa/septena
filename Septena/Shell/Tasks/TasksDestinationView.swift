@@ -317,7 +317,9 @@ struct TasksDestinationView: View {
     triageTasks = LocalCache.tasks(in: modelContext, filter: .triage)
     var todayOpen = LocalCache.tasks(in: modelContext, filter: .today)
     if !todayGroupByList {
-      todayOpen.sort(by: SeptenaTask.compareNextPageOrder)
+      // Flat drops the headers, not the sequence — same sidebar order the
+      // grouped drawer shows (`TaskListOrder.byList`).
+      todayOpen = TaskListOrder.byList(todayOpen, areas: areas, projects: projects)
     }
     openTasks = todayOpen
     let today = clock.today
@@ -446,7 +448,7 @@ struct TasksDestinationView: View {
 
     var freshToday = LocalCache.tasks(in: modelContext, filter: .today)
     if !todayGroupByList {
-      freshToday.sort(by: SeptenaTask.compareNextPageOrder)
+      freshToday = TaskListOrder.byList(freshToday, areas: areas, projects: projects)
     }
     let freshTriage = LocalCache.tasks(in: modelContext, filter: .triage)
 

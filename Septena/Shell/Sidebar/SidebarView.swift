@@ -426,6 +426,18 @@ struct SidebarRootView: View {
 
   @ViewBuilder
   private var tasksMenuExtraRows: some View {
+    #if os(iOS)
+    // iPad regular: the detail pane must not publish chrome (the sidebar owns
+    // the window's gear/···/+), so Today's view options ride here instead of
+    // in `TaskListStandaloneChrome`. Gated on Today being the current route
+    // for the same reason the detail gates on its filter. macOS gets these
+    // from the View menu, which is where a Mac user looks for them.
+    if usesPushNavigation,
+       effectiveSidebarRoute.sameDestination(as: .filter(.today)) {
+      TaskViewOptions()
+      Divider()
+    }
+    #endif
     Button {
       showingNewArea = true
       newAreaName = ""

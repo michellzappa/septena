@@ -86,17 +86,19 @@ struct TaskSettingsSections: View {
             .font(.caption).foregroundStyle(.secondary)
         }
       }
-      Toggle(isOn: $todayGroupByList) {
+      // Same switch as View ▸ Group Today by List; `announcing` is what keeps
+      // Septask's AppKit list in step when it's flipped from here.
+      Toggle(isOn: TaskViewOptions.announcing($todayGroupByList)) {
         VStack(alignment: .leading, spacing: 1) {
           Text("Group by area and project")
-          Text("Off shows one flat list under Inbox with each task's list as a subtitle.")
+          Text("Off shows one flat list under Inbox, in the same order, with each task's list as a subtitle.")
             .font(.caption).foregroundStyle(.secondary)
         }
       }
     } header: {
       Text("Today")
     } footer: {
-      Text("Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list sorts overdue and due-first, then pinned tasks.")
+      Text("Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list keeps the same area and project order, under a single divider, with each task's list shown as a subtitle instead of a heading.")
     }
     #if !SEPTASK
     Section {

@@ -281,6 +281,12 @@ struct SeptaskCommandMenus: Commands {
       }
       .disabled(!SeptaskKitCommands.canHandle)
       #endif
+
+      // View options for the lists themselves. Not shell-gated: it writes a
+      // stored preference both shells read, and on iPadOS this same group is
+      // what fills the hardware menu bar.
+      Divider()
+      TaskViewOptions()
     }
 
     // Standard macOS text-size affordances: the View menu exposes both a
