@@ -54,16 +54,24 @@ enum KeyboardShortcutsCatalogue {
   /// aren't row commands — the selection/navigation keys the list handles
   /// itself — are listed by hand.
   private static var taskList: KeyboardShortcutGroup {
-    KeyboardShortcutGroup(title: "Task list", shortcuts: [
+    var shortcuts = [
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
-    ] + TaskRowCommands.all.flatMap { command in
+    ]
+    #if SEPTASK
+    // AppKit-list only (Septask's table owns this key directly), so it isn't a
+    // `TaskRowCommands` entry — listing it there would advertise it in Septena.
+    shortcuts.append(KeyboardShortcut2(keys: ["⌥", "⌘", "M"],
+                                       label: "Move to suggested list"))
+    #endif
+    shortcuts += TaskRowCommands.all.flatMap { command in
       command.allShortcuts.map { shortcut in
         KeyboardShortcut2(keys: TaskRowCommand.keycaps(for: shortcut), label: command.title)
       }
-    })
+    }
+    return KeyboardShortcutGroup(title: "Task list", shortcuts: shortcuts)
   }
 
   private static var quickCaptureLabel: String {

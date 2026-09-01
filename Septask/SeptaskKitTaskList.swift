@@ -42,6 +42,7 @@ enum KitDrag {
 //   ⌘N — new task in this list    ⌘, — settings
 //   ⌘R, Return, double-click — rename via the field editor (Esc cancels)
 //   ⌘⌫ — delete (soft; lands in Recently Deleted)
+//   ⌥⌘M — file into the suggested list (the "→ Suggested" capsule's pick)
 //   Space — deliberately unbound (the "Space completes the task" trap);
 //           the checkbox refuses first responder for the same reason.
 @MainActor
@@ -431,6 +432,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onClearSchedule = { [weak self] in self?.clearScheduleSelection() }
     tableView.onDuplicate = { [weak self] in self?.duplicateSelection() }
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
+    tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     // Edit ▸ Copy targets the first responder, so implementing `copy(_:)` on
     // the table is what makes the STANDARD menu item work — better than a
@@ -1270,19 +1272,43 @@ final class SeptaskKitTaskListController: NSViewController {
                                      suggestion: SuggestionEngine.Suggestion) {
     guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == taskID })
     else { return }
-    let before = [TaskUndo.FilingSnapshot(task)]
-    let wasInTriage = task.isInTriageBand
-    // Implicit "not this": the user accepted THIS pick, so there is nothing to
-    // reject — rejection only fires when they file somewhere else. Clearing
-    // stops the engine re-offering a pick that has now been acted on.
-    SuggestionEngine.shared.clearSuggestion(for: taskID)
-    switch suggestion.kind {
-    case .area: mutator.moveToArea(id: taskID, area: suggestion.id)
-    case .project: mutator.moveToProject(id: taskID, project: suggestion.id)
+    applyFilingSuggestions([(task, suggestion)])
+  }
+
+  /// ⌥⌘M — file every selected row into ITS OWN top pick, the keyboard twin of
+  /// tapping each row's "→ Suggested" capsule. Rows the gate gave no pick are
+  /// simply absent from `filingSuggestions`, so a mixed selection files what it
+  /// can and leaves the rest alone — the shortcut is a no-op exactly when no
+  /// capsule is on screen.
+  func fileSuggestedSelection() {
+    applyFilingSuggestions(actionableSelection.compactMap { task in
+      filingSuggestions[task.id].map { (task, $0) }
+    })
+  }
+
+  /// One batch, one undo entry, one reload. Filing row-by-row through repeated
+  /// `applyFilingSuggestion` would push N entries onto the SHARED undo stack
+  /// (⌘Z would then un-file the batch a row at a time) and reload between each,
+  /// which invalidates the `filingSuggestions` snapshot mid-loop.
+  private func applyFilingSuggestions(
+    _ picks: [(task: SeptenaTask, suggestion: SuggestionEngine.Suggestion)]
+  ) {
+    guard !picks.isEmpty else { return }
+    let before = picks.map { TaskUndo.FilingSnapshot($0.task) }
+    for (task, suggestion) in picks {
+      let wasInTriage = task.isInTriageBand
+      // Implicit "not this": the user accepted THIS pick, so there is nothing
+      // to reject — rejection only fires when they file somewhere else.
+      // Clearing stops the engine re-offering a pick that has been acted on.
+      SuggestionEngine.shared.clearSuggestion(for: task.id)
+      switch suggestion.kind {
+      case .area: mutator.moveToArea(id: task.id, area: suggestion.id)
+      case .project: mutator.moveToProject(id: task.id, project: suggestion.id)
+      }
+      // Filing is engagement — clears the agent cue so the row leaves the Inbox.
+      mutator.acknowledge(id: task.id)
+      if filter == .today, wasInTriage { pendingPromoteFlash.insert(task.id) }
     }
-    // Filing is engagement — clears the agent cue so the row leaves the Inbox.
-    mutator.acknowledge(id: taskID)
-    if filter == .today, wasInTriage { pendingPromoteFlash.insert(taskID) }
     TaskUndo.recordMove(before: before, context: context, mutator: mutator)
     reload()
     playPendingPromoteFlashes()
@@ -3133,6 +3159,13 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
                             action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
       item.target = self
       item.tag = index
+      // The top pick is what ⌥⌘M files into, so it wears the binding — the
+      // menu is where a keyboard shortcut with no button of its own gets
+      // discovered. The table handles the key itself; this only advertises it.
+      if index == 0 {
+        item.keyEquivalent = "m"
+        item.keyEquivalentModifierMask = [.command, .option]
+      }
       item.image = NSImage(systemSymbolName: suggestion.kind == .area ? "tray" : "folder",
                            accessibilityDescription: nil)
       items.append(item)
@@ -5873,6 +5906,8 @@ final class SeptaskKitTableView: NSTableView {
   var onQuickFind: (() -> Void)?
   var onDuplicate: (() -> Void)?
   var onMove: (() -> Void)?
+  /// ⌥⌘M — file the selection into its suggested list (the row capsule's pick).
+  var onFileSuggested: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -5935,11 +5970,17 @@ final class SeptaskKitTableView: NSTableView {
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
     let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-    // ⌥⌘I — the platform's inspector toggle.
-    if flags == [.command, .option],
-       event.charactersIgnoringModifiers?.lowercased() == "i" {
-      onToggleInspector?()
-      return true
+    if flags == [.command, .option] {
+      switch event.charactersIgnoringModifiers?.lowercased() {
+      // ⌥⌘I — the platform's inspector toggle.
+      case "i": onToggleInspector?(); return true
+      // ⌥⌘M — file into the SUGGESTED list, deliberately one modifier from
+      // ⌘M (Move…): same family — both answer "where does this go?" — but the
+      // suggested one commits without a picker, so it must be impossible to
+      // hit by accident. Same relationship ⌥⌘K has to ⌘K.
+      case "m": onFileSuggested?(); return true
+      default: return super.performKeyEquivalent(with: event)
+      }
     }
 
     // ⌘⇧D / ⌘⇧. — deliberately the shifted forms (bare ⌘. is the system
