@@ -3535,33 +3535,52 @@ extension ActivityDayEntity: CloudKitSystemFieldsBacked {
 /// tccd recorded it and prompted again on the next launch of the same,
 /// unchanged bundle.
 ///
-/// `~/Library/Application Support/Septena/` is not a container, so no TCC
-/// service guards it. Both Mac apps point at the SAME file, exactly as they
-/// did inside the group container — this MOVES the store, it does not split
-/// it. iOS is untouched: it has no App Data prompt, and the iOS widgets read
-/// the group's UserDefaults suite (never this file), so nothing there gains
-/// from the move.
+/// `~/Library/Application Support/Septena/` was the first answer and it was
+/// WRONG — macOS also guards a per-app subdirectory of Application Support
+/// under the same App Data service, and a folder called "Septena" is another
+/// app as far as Septask (`com.septena.tasks.mac`) is concerned. Opening the
+/// store is the first thing either app does, so the prompt came back on every
+/// launch, verbatim.
+///
+/// `~/Library/Septena/` is the home now: none of the three roots the App Data
+/// service guards (`~/Library/Containers`, `~/Library/Group Containers`,
+/// `~/Library/Application Support/<app>`) covers a plain `~/Library`
+/// subdirectory. Both Mac apps point at the SAME file, exactly as they did
+/// inside the group container — this MOVES the store, it does not split it.
+/// iOS is untouched: it has no App Data prompt, and the iOS widgets read the
+/// group's UserDefaults suite (never this file), so nothing there gains from
+/// the move.
 enum MacStoreLocation {
   /// The three files SQLite keeps in WAL mode. All of them travel together or
   /// the store opens short of its most recent writes.
   private static let suffixes = ["", "-wal", "-shm"]
 
   static var url: URL? {
-    guard let support = FileManager.default
-      .urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
-    return support
+    guard let library = FileManager.default
+      .urls(for: .libraryDirectory, in: .userDomainMask).first else { return nil }
+    return library
       .appendingPathComponent("Septena", isDirectory: true)
       .appendingPathComponent("Septena.store")
   }
 
-  /// The old home inside the group container. Resolved ONLY when the new store
-  /// is absent — `containerURL(forSecurityApplicationGroupIdentifier:)` is
-  /// itself a group-container access, and asking for it on every launch is the
-  /// prompt this whole type exists to stop.
-  private static var legacyURL: URL? {
-    FileManager.default
-      .containerURL(forSecurityApplicationGroupIdentifier: SeptenaAppGroup.suite)?
-      .appendingPathComponent("Library/Application Support/Septena.store")
+  /// The two homes this store has had, newest first. Both are resolved ONLY
+  /// when the current store is absent: reading either is itself an App Data
+  /// access, and doing it on every launch is the prompt this whole type exists
+  /// to stop. (`containerURL(forSecurityApplicationGroupIdentifier:)` is a
+  /// group-container access merely to ASK.)
+  private static var legacyURLs: [URL] {
+    var found: [URL] = []
+    if let support = FileManager.default
+      .urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+      found.append(support
+        .appendingPathComponent("Septena", isDirectory: true)
+        .appendingPathComponent("Septena.store"))
+    }
+    if let group = FileManager.default
+      .containerURL(forSecurityApplicationGroupIdentifier: SeptenaAppGroup.suite) {
+      found.append(group.appendingPathComponent("Library/Application Support/Septena.store"))
+    }
+    return found
   }
 
   /// Copy the store out of the group container, once, before it is opened.
@@ -3577,7 +3596,7 @@ enum MacStoreLocation {
     guard let destination = url else { return }
     // Already migrated (or a fresh install) — do not go near the group.
     guard !fm.fileExists(atPath: destination.path) else { return }
-    guard let source = legacyURL, fm.fileExists(atPath: source.path) else { return }
+    guard let source = legacyURLs.first(where: { fm.fileExists(atPath: $0.path) }) else { return }
 
     do {
       try fm.createDirectory(at: destination.deletingLastPathComponent(),
@@ -3598,7 +3617,7 @@ enum MacStoreLocation {
         try? fm.removeItem(at: URL(fileURLWithPath: destination.path + suffix))
       }
       Log.persistence.error(
-        "Local store migration failed, keeping the App Group copy: \(error.localizedDescription, privacy: .public)")
+        "Local store migration failed, keeping the previous copy: \(error.localizedDescription, privacy: .public)")
     }
   }
 }

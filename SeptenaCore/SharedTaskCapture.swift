@@ -79,6 +79,15 @@ enum SharedTaskCaptureQueue {
 @MainActor
 enum SharedTaskCaptureImporter {
   static func importPending(using mutator: TaskMutator) {
+    // No Mac target embeds a share extension (neither SeptenaMac nor
+    // SeptaskMac lists one in project.yml), so nothing on a Mac ever writes
+    // this queue — and reading it costs a container access: the group
+    // container is behind the App Data TCC service for a non-sandboxed app,
+    // which is a "would like to access data from other apps" prompt on every
+    // launch that no grant makes stick. See `SeptenaAppGroup.suiteName`.
+    #if os(macOS)
+    return
+    #else
     #if SEPTASK
     let destination = SharedTaskCaptureDestination.septask
     #else
@@ -92,6 +101,7 @@ enum SharedTaskCaptureImporter {
                          notes: notes.isEmpty ? nil : notes, source: "share_extension")
       SharedTaskCaptureQueue.finish(claimedURL)
     }
+    #endif
   }
 }
 #endif
