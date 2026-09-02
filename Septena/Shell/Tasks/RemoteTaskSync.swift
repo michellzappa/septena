@@ -24,7 +24,10 @@ enum RemoteTaskSync {
 
   /// One-shot amber wash when a row lands on Today from another device. Silent
   /// — no haptics (same contract as ghost-check). Capped so a batch sync
-  /// doesn't pulse the whole list.
+  /// doesn't pulse the whole list — the first `cap` Today rows in LIST order,
+  /// so the ones that flash are the ones nearest the top, not whichever ids a
+  /// `Set` happened to yield first. `SeptaskKitTaskList.queueTodayArrivalFlashes`
+  /// is the AppKit twin; keep the cap and the ordering rule in step.
   @MainActor
   static func flashTodayPromotes(
     ids: Set<String>,
@@ -33,10 +36,11 @@ enum RemoteTaskSync {
     cap: Int = 3
   ) {
     guard !ids.isEmpty else { return }
-    let tasksByID = Dictionary(tasks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-    for id in ids.prefix(cap) {
-      guard let task = tasksByID[id], task.isOnToday else { continue }
-      store.flash(id)
+    var flashed = 0
+    for task in tasks where ids.contains(task.id) && task.isOnToday {
+      store.flash(task.id)
+      flashed += 1
+      if flashed >= cap { break }
     }
   }
 

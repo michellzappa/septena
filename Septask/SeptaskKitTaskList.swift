@@ -191,9 +191,16 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Tasks just pinned to Today, waiting for their promote cue. A one-shot
   /// set rather than a per-row flag: the cue plays against the row's CURRENT
   /// cell, which only exists after the reload the promote triggered, so the
-  /// intent has to outlive the mutation by exactly one reload.
+  /// intent has to outlive the mutation by exactly one reload. Rows that
+  /// arrive on Today from ANOTHER device queue here too
+  /// (`queueTodayArrivalFlashes`), so a remote promote lands with the same
+  /// cue a local one does.
   /// The AppKit counterpart of SwiftUI's `PromoteFlashStore`.
   private var pendingPromoteFlash: Set<String> = []
+  /// How many remote arrivals per reload get the promote cue — a batch sync
+  /// after a day away must not pulse the whole list. Same cap as
+  /// `RemoteTaskSync.flashTodayPromotes`.
+  private static let arrivalFlashCap = 3
   /// task id → top filing pick, the "→ Suggested" capsule's contents. Snapshot
   /// per reload (like `TaskListModel.filingSuggestions`) rather than read live
   /// off the engine, so a row and its capsule always agree.
@@ -519,8 +526,15 @@ final class SeptaskKitTaskListController: NSViewController {
                  .septenaDataChanged] {
       observers.append(NotificationCenter.default.addObserver(
         forName: name, object: nil, queue: .main
-      ) { [weak self] _ in
-        MainActor.assumeIsolated { self?.reload() }
+      ) { [weak self] note in
+        // A local mutation names its ids (`TaskChange.post`); a CloudKit
+        // batch, a structure change and a migration don't. The ids keep this
+        // process's own edits off the passive-sync cues (`ghostCheck…` /
+        // `queueTodayArrivalFlashes` in `reload`) — the mutator posts
+        // SYNCHRONOUSLY, so this reload has already run by the time the
+        // calling site gets its new id back, which is why the exclusion has
+        // to ride on the notification rather than on a "just created" set.
+        MainActor.assumeIsolated { self?.reload(locallyChanged: note.changedTaskIDs ?? []) }
       })
     }
     observers.append(NotificationCenter.default.addObserver(
@@ -699,11 +713,17 @@ final class SeptaskKitTaskListController: NSViewController {
       : UserDefaults.standard.bool(forKey: SettingsKey.todayGroupByList)
   }
 
-  private func reload(animated: Bool = true) {
+  /// `locallyChanged` is the id set a local mutation's notification carried
+  /// (empty for a CloudKit batch or a direct call). Those rows are this
+  /// process's own doing and are kept off the passive-sync cues below.
+  private func reload(animated: Bool = true, locallyChanged: Set<String> = []) {
     // Every edit funnels through commitRename, which reloads — so a skipped
     // refresh here is picked up the moment the edit ends. The settle window
     // ends in a reload of its own, so skipping here is likewise not a loss.
     if isTitleEditorActive || isSettling || composingTaskId != nil { return }
+
+    // What's on screen right now, for the passive-sync diff below.
+    let priorTasks = rows.compactMap(\.task)
 
     let selected = Set(tableView.selectedRowIndexes.compactMap { row in
       rows.indices.contains(row) ? rows[row].task?.id : nil
@@ -813,6 +833,28 @@ final class SeptaskKitTaskListController: NSViewController {
       newRows = titleRows + pool.prefix(200).map(chipped)
     default:
       newRows = titleRows + pool.map(chipped)
+    }
+
+    // Passive-sync cues — the AppKit half of `TaskListModel.merge`. A change
+    // another device made should look like a touch, not a blink: a row
+    // completed elsewhere gets the same check-then-linger beat a local ⌘K
+    // does (and holds this reload back for the settle window, exactly as a
+    // local completion does), and a row that landed on Today from elsewhere
+    // gets the promote cue on top of the diff's slide-in. Only on an animated
+    // diff against a populated list — a filter swap (`show`) and the first
+    // paint rebuild cold, where "arrived" would mean the whole page.
+    if animated, !priorTasks.isEmpty {
+      let freshIDs = Set(newRows.compactMap { $0.task?.id })
+      if ghostCheckRemoteCompletions(prior: priorTasks, freshIDs: freshIDs,
+                                     excluding: locallyChanged) {
+        return
+      }
+      let priorIDs = Set(priorTasks.map(\.id))
+      queueTodayArrivalFlashes(newRows.compactMap { row in
+        guard let task = row.task, !priorIDs.contains(task.id),
+              !locallyChanged.contains(task.id) else { return nil }
+        return task
+      })
     }
 
     apply(newRows, animated: animated)
@@ -1101,6 +1143,66 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Re-read the nominated list. Clears the block when access was revoked or
   /// the list was un-nominated, so a change in Settings takes effect here
   /// without a relaunch.
+  // MARK: - Passive-sync cues
+
+  /// Ghost-check: rows that were open on screen, are gone from the fresh
+  /// read, and are `.done` in the store were completed on ANOTHER device.
+  /// Replay the local beat for them — checkbox pulse, restyled checked in
+  /// place, then the settle window's own reload fades them out — instead of
+  /// letting the diff yank them. Silent: no sound, no celebration, the same
+  /// contract as SwiftUI's `ghostCheckRemoteCompletions`.
+  ///
+  /// Returns true when it took the reload over: the fresh rows are NOT
+  /// applied, the settle-end reload picks them up (any arrivals in the same
+  /// batch get their cue then). Lists that keep completed rows (Logbook,
+  /// Recently Deleted) never ghost — there a remote completion is
+  /// present-but-flipped, which the ordinary content diff repaints.
+  ///
+  /// `excluding` are this process's own ids: a local completion has already
+  /// restyled and opened the window before its notification lands
+  /// (`apply(completing:)`), and an undo/redo's `complete` is a deliberate
+  /// gesture that takes the immediate path, not a phantom one.
+  private func ghostCheckRemoteCompletions(prior: [SeptenaTask],
+                                           freshIDs: Set<String>,
+                                           excluding: Set<String>) -> Bool {
+    switch filter {
+    case .logbook, .recentlyDeleted: return false
+    default: break
+    }
+    let vanished = Set(prior.compactMap { task in
+      task.status == .open && !freshIDs.contains(task.id) && !excluding.contains(task.id)
+        ? task.id : nil
+    })
+    guard !vanished.isEmpty else { return false }
+    // Store read, not a fresh-list read: a completed row is absent from every
+    // drop-done filter, so the list alone can't tell "done" from "deleted"
+    // or "moved away" — only the first earns the beat.
+    let ghosted = LocalCache.completedIDs(among: vanished, in: context)
+    guard !ghosted.isEmpty else { return false }
+    for (index, row) in rows.enumerated() where ghosted.contains(row.task?.id ?? "") {
+      (tableView.view(atColumn: 0, row: index, makeIfNecessary: false)
+        as? SeptaskKitTaskCell)?.playGhostCheckPulse()
+    }
+    restyle(ids: Array(ghosted), to: .done)
+    beginSettle()
+    return true
+  }
+
+  /// Rows that just arrived from another device and landed on Today get the
+  /// promote cue (gold ring + row wash) on top of the diff's slide-in — the
+  /// AppKit half of `RemoteTaskSync.flashTodayPromotes`. Capped in list
+  /// order so a batch sync pulses the first few, not the page. Played one
+  /// turn later: the cue needs the row's CELL, which the insert batch only
+  /// has once it has laid out.
+  private func queueTodayArrivalFlashes(_ arrived: [SeptenaTask]) {
+    let landed = arrived.filter(\.isOnToday).prefix(Self.arrivalFlashCap)
+    guard !landed.isEmpty else { return }
+    for task in landed { pendingPromoteFlash.insert(task.id) }
+    DispatchQueue.main.async { [weak self] in
+      self?.playPendingPromoteFlashes()
+    }
+  }
+
   private func refreshReminders() {
     let bridge = RemindersBridge.shared
     guard filter == .today, bridge.access == .granted, let calendar = bridge.sourceList()
@@ -4076,6 +4178,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   /// Forwarded to the checkbox — the promote cue's ring half. Kept on the cell
   /// so the controller talks to one row object, not to its internals.
   func playTodayPromotePulse() { checkbox.playTodayPromotePulse() }
+
+  /// The ordinary check-landing ring, played for a completion that happened
+  /// on another device (`ghostCheckRemoteCompletions`) — the same pulse a
+  /// click plays in `KitCheckboxView.fire`, so a phantom check reads as a
+  /// touch. The click path keeps its own trigger; this one is controller-driven.
+  func playGhostCheckPulse() {
+    guard !KitMotion.reduce else { return }
+    checkbox.playPulse(color: SeptaskKitTheme.checkboxFill)
+  }
 
   /// Show (or hide) the one-tap filing capsule. Separate from `configure` so
   /// the controller owns the suggestion snapshot and the cell stays a renderer.
