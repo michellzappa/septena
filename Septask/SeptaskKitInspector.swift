@@ -38,6 +38,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// split-view item with no chrome of its own, so it reports the intent and
   /// `SeptaskKitWindowController` does the closing.
   var onRequestClose: (() -> Void)?
+  /// ⌘↩ inside the pane — commit and hand the keyboard back to the list, the
+  /// same "leave notes" gesture the inline composer answers. The pane stays
+  /// open; ⌘↩ is the notes exit, Escape is the pane's.
+  var onRequestFocusList: (() -> Void)?
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
@@ -49,7 +53,12 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
   override func loadView() {
-    let root = NSView()
+    let root = KitInspectorRootView()
+    root.onCommandReturn = { [weak self] in
+      guard let self else { return }
+      flushPendingEdits()
+      onRequestFocusList?()
+    }
 
     titleField.font = .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
     titleField.isBordered = false
@@ -263,7 +272,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// avoids pointless work while actively typing.
   func refresh() {
     guard let id = task?.id, !isEditing else { return }
-    let fresh = LocalCache.allTasks(in: context).first { $0.id == id }
+    // The inspector needs one row, not a complete live-task snapshot. This is
+    // called after every AppKit store refresh, so a point read matters here.
+    let fresh = LocalCache.task(id: id, in: context)
     show(fresh)
   }
 
@@ -293,26 +304,25 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// writes when a value actually differs from what was loaded.
   func flushPendingEdits() {
     guard let current = task else { return }
-    var changed = false
-
+    var titlePatch: String?
     let title = titleField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     if !title.isEmpty, title != loadedTitle {
-      mutator.update(id: current.id, title: title)
+      titlePatch = title
       loadedTitle = title
-      changed = true
     }
 
     let notes = notesView.string
-    if notes != loadedNotes {
-      // Empty clears the note rather than storing an empty string.
-      mutator.update(id: current.id, notes: notes.isEmpty ? nil : notes)
+    let notesChanged = notes != loadedNotes
+    if notesChanged {
       loadedNotes = notes
-      changed = true
     }
 
-    if changed {
-      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
-    }
+    guard titlePatch != nil || notesChanged else { return }
+    // Blur can commit title and notes together. One backend update means one
+    // SwiftData save and one task-change notification instead of up to three
+    // refresh cascades. An empty string deliberately clears stored notes.
+    mutator.update(id: current.id, title: titlePatch,
+                   notes: notesChanged ? notes : nil)
   }
 
   func controlTextDidBeginEditing(_ obj: Notification) {
@@ -421,6 +431,33 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
       self.refresh()
     }
+  }
+}
+
+/// The inspector's root view — exists only to catch ⌘↩ for the pane. ⌘↩ has
+/// no standard text binding, so neither the notes view nor the title's field
+/// editor would ever see it as a command; a key equivalent on the root is
+/// the one hook that covers both fields. Fires only while the keyboard is
+/// inside the pane, so the list's own ⌘↩ (composer notes) keeps winning when
+/// focus is out there.
+@MainActor
+final class KitInspectorRootView: NSView {
+  var onCommandReturn: (() -> Void)?
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    let isReturn = event.keyCode == 36 || event.keyCode == 76
+    if isReturn, flags.contains(.command),
+       flags.isDisjoint(with: [.shift, .option, .control]),
+       let responder = window?.firstResponder as? NSView, responder.isDescendant(of: self) {
+      // Deferred a tick: the commit's sync mutator notification can call
+      // `makeFirstResponder` back into the list while this key event is still
+      // on the stack — same hazard `KitComposerCell.deferCommitAndCollapse`
+      // documents.
+      DispatchQueue.main.async { [weak self] in self?.onCommandReturn?() }
+      return true
+    }
+    return super.performKeyEquivalent(with: event)
   }
 }
 #endif

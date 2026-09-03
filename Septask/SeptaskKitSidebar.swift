@@ -152,6 +152,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// pure-area id list" (what the mutators' `reorder(orderedIDs:)` expects).
   private var organizeStartIndex = 0
   private var observers: [NSObjectProtocol] = []
+  /// A task edit can emit several synchronous notifications. Sidebar counts
+  /// are expensive aggregate reads, so rebuild once after the gesture settles
+  /// on the main run loop and preserve the latest selection key.
+  private var rebuildWorkItem: DispatchWorkItem?
+  private var pendingPreservedKey: String?
   /// Which areas the user has folded shut, by `Node.key`. THE source of truth
   /// for the fold — `numberOfChildrenOfItem` reads it (see the long comment
   /// there for why NSOutlineView's own expansion can't be used).
@@ -262,7 +267,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       observers.append(NotificationCenter.default.addObserver(
         forName: name, object: nil, queue: .main
       ) { [weak self] _ in
-        MainActor.assumeIsolated { self?.rebuild(preserving: self?.selectedKey()) }
+        MainActor.assumeIsolated { self?.scheduleRebuild() }
       })
     }
     observers.append(NotificationCenter.default.addObserver(
@@ -273,7 +278,26 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   deinit {
+    rebuildWorkItem?.cancel()
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
+  }
+
+  /// Coalesce task/structure/data notifications into one aggregate pass. The
+  /// notification itself remains synchronous for mutation correctness; only
+  /// this sidebar's derived-count repaint waits until the current gesture has
+  /// finished emitting changes.
+  private func scheduleRebuild() {
+    pendingPreservedKey = selectedKey()
+    guard rebuildWorkItem == nil else { return }
+    let work = DispatchWorkItem { [weak self] in
+      guard let self else { return }
+      self.rebuildWorkItem = nil
+      let key = self.pendingPreservedKey
+      self.pendingPreservedKey = nil
+      self.rebuild(preserving: key)
+    }
+    rebuildWorkItem = work
+    DispatchQueue.main.async(execute: work)
   }
 
   /// Point the sidebar at a destination (Quick Find, or any other jump).
@@ -325,10 +349,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   // MARK: - Tree
 
-  /// The trailing badge for one smart list. Today and Logbook read the two
-  /// pre-computed sums the caller passes (triage band folded into Today,
-  /// "completed today" for Logbook); the rest count their own filter.
+  /// The trailing badge for one smart list. Counts are computed from the one
+  /// live-task snapshot in `rebuild`; avoid asking `LocalCache` to refetch the
+  /// open table once per sidebar destination.
   private func smartListCount(_ destination: KitSidebarDestination,
+                              counts: [TaskFilter: Int],
                               today: Int, doneToday: Int) -> Int? {
     switch destination {
     case .next: return KitNextCount.open().nilIfZero
@@ -336,22 +361,40 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       switch filter {
       case .today:   return today.nilIfZero
       case .logbook: return doneToday.nilIfZero
-      default:       return LocalCache.tasks(in: context, filter: filter).count.nilIfZero
+      default:       return counts[filter]?.nilIfZero
       }
     }
   }
 
   private func rebuild(preserving key: String?) {
+    // A direct rebuild (for example after creating an area/project) supersedes
+    // any notification-driven rebuild that has not run yet.
+    if rebuildWorkItem != nil {
+      rebuildWorkItem?.cancel()
+      rebuildWorkItem = nil
+      pendingPreservedKey = nil
+    }
     let snapshot = StructureCache.snapshot(in: context)
 
-    // Counts. Inbox/Today membership is view logic that must not be
-    // re-derived here (drift) — those two go through the canonical filters.
-    // Project/area counts come from one live-table pass.
-    let inboxCount = LocalCache.tasks(in: context, filter: .triage).count
-    let todayCount = LocalCache.tasks(in: context, filter: .today)
-      .filter { !$0.isInTriageBand }.count
+    // Counts come from one live-task pass. The filter semantics below mirror
+    // `LocalCache.convert`, but sharing this snapshot avoids refetching the
+    // entire open table for every smart-list badge on every task edit.
     let all = LocalCache.allTasks(in: context).filter { !$0.isHeading }
     let open = all.filter { $0.status == .open }
+    let today = SeptenaDate.today
+    let inboxCount = open.filter { $0.isInTriageBand }.count
+    let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
+    let smartCounts: [TaskFilter: Int] = [
+      .upcoming: open.filter { task in
+        guard !task.today else { return false }
+        return task.scheduled.map { $0 > today } == true
+          || task.deadline.map { $0 > today } == true
+      }.count,
+      .repeating: open.filter { $0.recurrence != nil }.count,
+      .unscheduled: open.filter {
+        !$0.today && $0.scheduled == nil && $0.deadline == nil
+      }.count,
+    ]
     let openByProject = Dictionary(grouping: open.compactMap(\.project), by: { $0 })
       .mapValues(\.count)
     // An area's count is its DIRECT tasks only — the ones loose in the area,
@@ -378,8 +421,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // `doneTodayCount`), not the full archive size — the archive can run to
     // thousands of rows, and that number wouldn't mean anything useful in a
     // sidebar badge anyway.
-    let doneTodayCount = LocalCache.tasks(in: context, filter: .logbook)
-      .filter { ($0.completedAt ?? "").hasPrefix(SeptenaDate.today) }.count
+    let doneTodayCount = all.filter {
+      ($0.status == .done || $0.status == .cancelled)
+        && ($0.completedAt ?? "").hasPrefix(today)
+    }.count
 
     // Symbols come from `Route.filterIcon`; no separate Inbox row — loose
     // captures live in the triage band on top of Today (the same structure
@@ -392,6 +437,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // builds from, so the two can't drift. Only the counts are sidebar work.
     var views = KitSidebarDestination.smartLists.map { destination in
       Node(destination.nodeContent, count: smartListCount(destination,
+                                                          counts: smartCounts,
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
     }
@@ -549,10 +595,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         mutator.schedule(id: id, date: nil)
         mutator.removeFromToday(id: id)
       case .area(let areaId):
-        mutator.moveToProject(id: id, project: nil)
-        mutator.moveToArea(id: id, area: areaId)
+        mutator.moveToList(id: id, area: areaId, project: nil)
       case .project(let projectId):
-        mutator.moveToProject(id: id, project: projectId)
+        mutator.moveToList(id: id, area: nil, project: projectId)
       }
     }
     switch action {
@@ -567,9 +612,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     case .area, .project:
       TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
     }
-    // Local mutations don't broadcast on their own; both shells (and the
-    // counts here) listen for this.
-    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     return true
   }
 

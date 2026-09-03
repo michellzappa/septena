@@ -256,6 +256,17 @@ final class TaskMutator {
     cloudBackend.moveToArea(id: id, area: area)
   }
 
+  /// Move a task to one final filing destination in a single local save and
+  /// notification. `project` wins over `area`, matching the model's invariant
+  /// that a task cannot belong directly to both at once.
+  func moveToList(id: String, area: String?, project: String?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] moveToList called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.moveToList(id: id, area: area, project: project)
+  }
+
   func moveToProject(id: String, project: String?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] moveToProject called before CK bound — dropping", nil)

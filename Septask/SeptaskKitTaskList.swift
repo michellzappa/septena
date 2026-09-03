@@ -40,7 +40,10 @@ enum KitDrag {
 //   ↑/↓, ⇧-arrows, type-select, Home/End — native NSTableView
 //   ⌘K — toggle complete          ⌘T — toggle Today
 //   ⌘N — new task in this list    ⌘, — settings
-//   ⌘R, Return, double-click — rename via the field editor (Esc cancels)
+//   ⌘R — bare rename via the field editor (Esc cancels)
+//   Return, double-click — inline composer on the title (Return / Esc fold it)
+//   ⌘↩ — notes: opens the composer straight into notes; from inside notes it
+//        commits and folds. ↓ on the title's last line drops into notes.
 //   ⌘⌫ — delete (soft; lands in Recently Deleted)
 //   ⌥⌘M — file into the suggested list (the "→ Suggested" capsule's pick)
 //   Space — deliberately unbound (the "Space completes the task" trap);
@@ -206,7 +209,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// off the engine, so a row and its capsule always agree.
   private var filingSuggestions: [String: SuggestionEngine.Suggestion] = [:]
   /// Live notes-band height while the composer is open (`nil` = notes folded).
-  private var composerNotesHeight: CGFloat?
+  /// The open composer row's live height (wrapping title + notes + rail),
+  /// cached from `KitComposerCell.expandedHeight` so `heightOfRow` never has
+  /// to reach into a cell. Nil while no row is composing.
+  private var composerRowHeight: CGFloat?
   /// The row currently expanded into the inline composer, if any.
   private var composingTaskId: String?
   /// The row with a live bare title field editor (⌘N / ⌘R), if any — drives
@@ -223,6 +229,12 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Completed rows are lingering on screen; refreshes wait (see `beginSettle`).
   private var isSettling = false
   private var settleWorkItem: DispatchWorkItem?
+  /// Notifications are synchronous, but a single user gesture can emit several
+  /// of them (move-to-area, date changes, batch completion). Keep the payload
+  /// and repaint once on the next run-loop turn instead of rebuilding the table
+  /// once per field write.
+  private var reloadWorkItem: DispatchWorkItem?
+  private var pendingReloadIDs: Set<String> = []
   /// Held so its submenu can be refreshed from the live structure on open.
   private let moveMenuItem = NSMenuItem()
   /// Placement items — titles / visibility refresh on every open from the
@@ -373,7 +385,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// born with — reading the row's own filing back out means redo re-creates
   /// it exactly where it was.
   private func recordNewTaskUndo(id: String) {
-    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == id })
+    guard let task = LocalCache.task(id: id, in: context)
     else { return }
     let title = task.title
     let area = task.area
@@ -391,6 +403,35 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  /// "No Tasks" is a lie while CloudKit is still pulling an existing account
+  /// down for the first time — the list is empty because the data hasn't
+  /// arrived, not because there is none. Swap in the sync copy until the
+  /// bootstrap fetch completes.
+  private func refreshEmptyLabel() {
+    let engine = SeptenaServices.shared.ckEngine
+    emptyLabel.stringValue = engine.isBootstrapping
+      ? engine.bootstrapStatusText
+      : String(localized: "No Tasks", comment: "SeptaskKit: empty list")
+  }
+
+  /// `CKEngine` is `@Observable`, which drives SwiftUI automatically but does
+  /// nothing for an NSViewController. Re-arm a one-shot observation after each
+  /// change so the count keeps ticking and the label settles back to "No Tasks"
+  /// when the bootstrap ends.
+  private func observeBootstrapState() {
+    withObservationTracking {
+      let engine = SeptenaServices.shared.ckEngine
+      _ = engine.isBootstrapping
+      _ = engine.bootstrapFetchedCount
+    } onChange: { [weak self] in
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        self.refreshEmptyLabel()
+        self.observeBootstrapState()
+      }
+    }
+  }
 
   override func loadView() {
     let column = NSTableColumn(identifier: .init("task"))
@@ -429,6 +470,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
+    tableView.onEditNotes = { [weak self] in self?.toggleNotesEditing() }
     tableView.onOpenComposer = { [weak self] in self?.beginComposingSelectedRow() }
     tableView.onDelete = { [weak self] in self?.deleteSelection() }
     tableView.onNewTask = { [weak self] in self?.createTask() }
@@ -518,6 +560,8 @@ final class SeptaskKitTaskListController: NSViewController {
       emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
       emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
     ])
+    refreshEmptyLabel()
+    observeBootstrapState()
 
     // CloudKit batches post .septenaTasksChanged; mutations made in the
     // SwiftUI window don't post anything (its views refresh themselves), so
@@ -530,11 +574,10 @@ final class SeptaskKitTaskListController: NSViewController {
         // A local mutation names its ids (`TaskChange.post`); a CloudKit
         // batch, a structure change and a migration don't. The ids keep this
         // process's own edits off the passive-sync cues (`ghostCheck…` /
-        // `queueTodayArrivalFlashes` in `reload`) — the mutator posts
-        // SYNCHRONOUSLY, so this reload has already run by the time the
-        // calling site gets its new id back, which is why the exclusion has
-        // to ride on the notification rather than on a "just created" set.
-        MainActor.assumeIsolated { self?.reload(locallyChanged: note.changedTaskIDs ?? []) }
+        // `queueTodayArrivalFlashes` in `reload`). Notifications are posted
+        // synchronously, but the actual repaint is coalesced so a multi-field
+        // gesture does not rebuild the whole page once per write.
+        MainActor.assumeIsolated { self?.scheduleReload(locallyChanged: note.changedTaskIDs ?? []) }
       })
     }
     observers.append(NotificationCenter.default.addObserver(
@@ -597,6 +640,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   deinit {
+    reloadWorkItem?.cancel()
     for observer in observers { NotificationCenter.default.removeObserver(observer) }
   }
 
@@ -713,6 +757,33 @@ final class SeptaskKitTaskListController: NSViewController {
       : UserDefaults.standard.bool(forKey: SettingsKey.todayGroupByList)
   }
 
+  /// Defer one repaint to the next main-run-loop turn and merge all task ids
+  /// posted during the current gesture. Direct callers of `reload()` cancel
+  /// this work and consume the same ids, so legacy explicit reloads remain
+  /// immediate without causing a second pass.
+  private func scheduleReload(locallyChanged ids: Set<String>) {
+    pendingReloadIDs.formUnion(ids)
+    guard reloadWorkItem == nil else { return }
+    let work = DispatchWorkItem { [weak self] in
+      guard let self else { return }
+      self.reloadWorkItem = nil
+      self.reload()
+    }
+    reloadWorkItem = work
+    DispatchQueue.main.async(execute: work)
+  }
+
+  /// Take pending notification metadata for an immediate reload. If the
+  /// caller is currently editing/settling/composing, `reload()` returns before
+  /// this is called, leaving the metadata queued for the next real repaint.
+  private func takePendingReloadIDs() -> Set<String> {
+    reloadWorkItem?.cancel()
+    reloadWorkItem = nil
+    let ids = pendingReloadIDs
+    pendingReloadIDs.removeAll()
+    return ids
+  }
+
   /// `locallyChanged` is the id set a local mutation's notification carried
   /// (empty for a CloudKit batch or a direct call). Those rows are this
   /// process's own doing and are kept off the passive-sync cues below.
@@ -721,6 +792,8 @@ final class SeptaskKitTaskListController: NSViewController {
     // refresh here is picked up the moment the edit ends. The settle window
     // ends in a reload of its own, so skipping here is likewise not a loss.
     if isTitleEditorActive || isSettling || composingTaskId != nil { return }
+
+    let locallyChanged = locallyChanged.union(takePendingReloadIDs())
 
     // What's on screen right now, for the passive-sync diff below.
     let priorTasks = rows.compactMap(\.task)
@@ -859,6 +932,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
     apply(newRows, animated: animated)
     emptyLabel.isHidden = !rows.isEmpty
+    refreshEmptyLabel()
     onStoreChanged?()
 
     if !selected.isEmpty {
@@ -1372,7 +1446,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// menu's "Suggested" section passes whichever row the user chose.
   private func applyFilingSuggestion(taskID: String,
                                      suggestion: SuggestionEngine.Suggestion) {
-    guard let task = LocalCache.allTasks(in: context).first(where: { $0.id == taskID })
+    guard let task = LocalCache.task(id: taskID, in: context)
     else { return }
     applyFilingSuggestions([(task, suggestion)])
   }
@@ -1593,25 +1667,10 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Completion ratio per project — done / (done + open), matching the
   /// sidebar's ring. Cancelled rows don't count either way.
   private func projectProgress() -> [String: Double] {
-    var done: [String: Int] = [:]
-    var open: [String: Int] = [:]
-    for task in LocalCache.allTasks(in: context) where !task.isHeading {
-      guard let project = task.project else { continue }
-      switch task.status {
-      case .done: done[project, default: 0] += 1
-      case .open: open[project, default: 0] += 1
-      case .cancelled: break
-      }
-    }
-    var result: [String: Double] = [:]
-    for (project, doneCount) in done {
-      let total = doneCount + (open[project] ?? 0)
-      result[project] = total > 0 ? Double(doneCount) / Double(total) : 0
-    }
-    for project in open.keys where result[project] == nil {
-      result[project] = 0
-    }
-    return result
+    // Keep this aggregate at the entity layer: the AppKit list asks for it on
+    // every grouped refresh, and allocating one DTO per live task here is
+    // unnecessary work.
+    LocalCache.projectCompletionRatios(in: context)
   }
 
   /// Animated structural diff: rows keep identity by `key`, so completes fade
@@ -1796,13 +1855,11 @@ final class SeptaskKitTaskListController: NSViewController {
     func apply(_ destination: KitMoveMenu.Destination, project: String?, area: String?, id: String) {
       switch destination {
       case .none:
-        mutator.moveToProject(id: id, project: nil)
-        mutator.moveToArea(id: id, area: nil)
+        mutator.moveToList(id: id, area: nil, project: nil)
       case .area(let areaId):
-        mutator.moveToProject(id: id, project: nil)
-        mutator.moveToArea(id: id, area: areaId)
+        mutator.moveToList(id: id, area: areaId, project: nil)
       case .project(let projectId):
-        mutator.moveToProject(id: id, project: projectId)
+        mutator.moveToList(id: id, area: nil, project: projectId)
       }
     }
 
@@ -2390,6 +2447,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let landsInInboxRun = inInbox || (context.area == nil && context.project == nil)
     let task = mutator.create(title: "", area: context.area, project: context.project,
                               scheduled: context.scheduled, today: context.today,
+                              deferPush: true,
                               atBottom: landsInInboxRun)
     pendingNewTaskId = task.id
     reload(animated: false)
@@ -2487,7 +2545,7 @@ final class SeptaskKitTaskListController: NSViewController {
       collapseComposer(commit: true)
     }
     let task = mutator.create(title: "", area: area, project: project,
-                              scheduled: nil, today: true, atBottom: false)
+                              scheduled: nil, today: true, deferPush: true, atBottom: false)
     pendingNewTaskId = task.id
     reload(animated: false)
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
@@ -2598,6 +2656,35 @@ final class SeptaskKitTaskListController: NSViewController {
     beginComposing(id: task.id)
   }
 
+  /// ⌘↩ — the notes toggle. On a closed selected row it opens the composer
+  /// straight into notes (revealed, caret at the end); on an open row it
+  /// drops the caret into notes; from inside notes it commits and folds the
+  /// row. Return is the title's enter/exit, this is the notes'.
+  func toggleNotesEditing() {
+    if let id = composingTaskId {
+      guard let cell = composerCell(for: id) else { return }
+      if cell.isEditingNotes {
+        // Deferred one tick for the same first-responder reentrancy reason as
+        // `KitComposerCell.deferCommitAndCollapse` — the key event that asked
+        // is still on the stack.
+        DispatchQueue.main.async { [weak self] in self?.collapseComposer(commit: true) }
+      } else {
+        cell.focusNotes()
+      }
+      return
+    }
+    guard filter != .recentlyDeleted else { return }
+    let row = tableView.selectedRow
+    guard row >= 0, let task = rows[row].task, !task.isHeading else { return }
+    beginComposing(id: task.id, focusNotes: true)
+  }
+
+  /// The live composer cell for `id`, if it is on screen.
+  private func composerCell(for id: String) -> KitComposerCell? {
+    guard let row = rows.firstIndex(where: { $0.task?.id == id }) else { return nil }
+    return tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitComposerCell
+  }
+
   @objc private func beginEditFromDoubleClick() {
     guard tableView.clickedRow >= 0, rows[tableView.clickedRow].task != nil else { return }
     tableView.selectRowIndexes([tableView.clickedRow], byExtendingSelection: false)
@@ -2606,7 +2693,8 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Inline composer (title + elective pills + notes)
 
-  func beginComposing(id: String) {
+  /// `focusNotes` opens straight into the notes field (⌘↩) instead of the title.
+  func beginComposing(id: String, focusNotes: Bool = false) {
     guard composingTaskId != id else { return }
     // Switching rows: fold the open one instantly so two height animations
     // don't fight; the newly opened row still expands.
@@ -2627,6 +2715,14 @@ final class SeptaskKitTaskListController: NSViewController {
     if let rowView = tableView.rowView(atRow: row, makeIfNecessary: false) as? KitCardRowView {
       applyCardGeometry(rowView, atRow: row)
     }
+    // Measure at the row's REAL width before the height animation asks
+    // `heightOfRow` — `wireComposer` ran inside `viewFor:`, before the table
+    // gave the cell its frame, so a title that wraps was still an unknown.
+    // Without this the row opens one line tall and jumps on the next pass.
+    if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
+        as? KitComposerCell {
+      composerRowHeight = cell.expandedHeight
+    }
     refreshCardGeometry()
     tableView.scrollRowToVisible(row)
     animateComposerHeight(ofRow: row)
@@ -2637,7 +2733,7 @@ final class SeptaskKitTaskListController: NSViewController {
             let cell = self.tableView.view(atColumn: 0, row: freshRow, makeIfNecessary: false)
               as? KitComposerCell
       else { return }
-      cell.focusTitle()
+      if focusNotes { cell.focusNotes() } else { cell.focusTitle() }
     }
   }
 
@@ -2660,7 +2756,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // chrome attached through the shrink.
     view.window?.makeFirstResponder(tableView)
     composingTaskId = nil
-    composerNotesHeight = nil
+    composerRowHeight = nil
 
     // ⌘N now opens the composer rather than the bare field editor, so the
     // abandoned-new-task rule has to live here too — a row created and closed
@@ -2673,8 +2769,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // Read the STORE, not `rows` — `SeptenaTask` is a struct, so the row
       // array still holds the pre-commit copy and a title the user just typed
       // would look empty here and get the row purged out from under them.
-      let title = LocalCache.allTasks(in: context)
-        .first { $0.id == taskId }?.title ?? ""
+      let title = LocalCache.task(id: taskId, in: context)?.title ?? ""
       if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         mutator.purge(id: taskId)
         reload()
@@ -2694,7 +2789,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // sits in the closed-row band, so the glyphs stay put as pills clip away.
     // Swapping to the task cell *before* the shrink would center the title
     // in the still-tall frame (a visible jump).
-    animateComposerHeight(ofRow: row, animated: animated) { [weak self] in
+    animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
       guard let self else { return }
       self.tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
       self.refreshCardGeometry()
@@ -2711,15 +2806,18 @@ final class SeptaskKitTaskListController: NSViewController {
   private func refreshTaskRowInPlace(id: String) {
     guard let index = rows.firstIndex(where: { $0.task?.id == id }),
           case .task(_, let chip, let suggestion) = rows[index],
-          let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == id })
+          let fresh = LocalCache.task(id: id, in: context)
     else { return }
     rows[index] = .task(fresh, chip: chip, suggestion: suggestion)
   }
 
   /// Animate (or jump, under Reduce Motion) a row's height to whatever
-  /// `heightOfRow` currently returns — used for composer open/close and the
-  /// notes-pill expand inside an already-open composer.
+  /// `heightOfRow` currently returns — used for composer open/close, the
+  /// notes expand inside an already-open composer, and typing growth. With
+  /// `reveal` (every path but collapse) the list then scrolls so the taller
+  /// row — or the caret, if the row outgrows the viewport — stays in view.
   private func animateComposerHeight(ofRow row: Int, animated: Bool = true,
+                                     reveal: Bool = true,
                                      completion: (() -> Void)? = nil) {
     guard rows.indices.contains(row) else {
       completion?()
@@ -2731,6 +2829,7 @@ final class SeptaskKitTaskListController: NSViewController {
         ctx.duration = 0
         tableView.noteHeightOfRows(withIndexesChanged: [row])
       }
+      if reveal { revealComposerRow(row) }
       completion?()
       return
     }
@@ -2741,8 +2840,39 @@ final class SeptaskKitTaskListController: NSViewController {
       tableView.noteHeightOfRows(withIndexesChanged: [row])
     }, completionHandler: {
       // AppKit may call this off the main actor; hop back before touching UI.
-      DispatchQueue.main.async { completion?() }
+      DispatchQueue.main.async { [weak self] in
+        if reveal { self?.revealComposerRow(row) }
+        completion?()
+      }
     })
+  }
+
+  /// Keep the open row in view after its height changed. A row that fits the
+  /// viewport is shown whole — the expand pushed its notes/pills below the
+  /// fold at a fixed window height, this pulls them back. A row taller than
+  /// the viewport follows the caret instead: that's the line being typed,
+  /// and showing the row's top would hide it. `scrollToVisible` respects the
+  /// scroll view's content insets, like `scrollRowToVisible`.
+  private func revealComposerRow(_ row: Int) {
+    guard rows.indices.contains(row) else { return }
+    let rowRect = tableView.rect(ofRow: row)
+    if rowRect.height <= tableView.visibleRect.height {
+      tableView.scrollToVisible(rowRect)
+    } else if let caret = composerCaretRect() {
+      tableView.scrollToVisible(caret.insetBy(dx: 0, dy: -SeptaskKitTheme.rowHeight))
+    }
+  }
+
+  /// The insertion point of whichever composer text view holds the keyboard,
+  /// in table coordinates; nil when no text view in the list is editing.
+  private func composerCaretRect() -> NSRect? {
+    guard let editor = view.window?.firstResponder as? NSTextView,
+          editor.isDescendant(of: tableView), let window = editor.window else { return nil }
+    let caret = editor.selectedRange()
+    let onScreen = editor.firstRect(forCharacterRange: NSRange(location: caret.location, length: 0),
+                                    actualRange: nil)
+    guard onScreen.height > 0 else { return nil }
+    return tableView.convert(window.convertFromScreen(onScreen), from: nil)
   }
 
   /// Re-read the task from the store and refresh the composer cell's PILLS —
@@ -2810,7 +2940,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Never call this on a refresh; see `refreshComposerRow`.
   private func wireComposer(_ cell: KitComposerCell, task: SeptenaTask) {
     cell.configure(with: task, listName: listName(for: task))
-    composerNotesHeight = cell.currentNotesHeight
+    composerRowHeight = cell.expandedHeight
     bindComposerActions(cell, task: task)
   }
 
@@ -2821,28 +2951,32 @@ final class SeptaskKitTaskListController: NSViewController {
     cell.onNotesVisibilityChanged = { [weak self, weak cell] in
       guard let self, let cell,
             let row = self.rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
-      self.composerNotesHeight = cell.currentNotesHeight
+      self.composerRowHeight = cell.expandedHeight
       self.animateComposerHeight(ofRow: row)
     }
-    cell.onNotesHeightChanged = { [weak self, weak cell] in
+    cell.onContentHeightChanged = { [weak self, weak cell] in
       guard let self, let cell,
             let row = self.rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
-      let next = cell.currentNotesHeight
-      guard self.composerNotesHeight != next else { return }
-      self.composerNotesHeight = next
-      // Typing growth should track the caret immediately — no open/close easing.
+      let next = cell.expandedHeight
+      guard self.composerRowHeight != next else { return }
+      self.composerRowHeight = next
+      // Typing growth (a title wrapping onto a new line, notes growing) should
+      // track the caret immediately — no open/close easing.
       self.animateComposerHeight(ofRow: row, animated: false)
     }
 
     cell.onCommit = { [weak self] title, notes in
       guard let self else { return }
       let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-      if !trimmed.isEmpty, trimmed != task.title {
-        self.mutator.update(id: task.id, title: trimmed)
-      }
-      if notes != task.notes {
-        self.mutator.update(id: task.id, notes: notes)
-      }
+      let titleChanged = !trimmed.isEmpty && trimmed != task.title
+      let notesChanged = notes != task.notes
+      guard titleChanged || notesChanged else { return }
+      // Title and notes are one logical edit. Send one save/notification; an
+      // empty notes string is intentional because the backend uses it to clear
+      // the optional notes field.
+      self.mutator.update(id: task.id,
+                          title: titleChanged ? trimmed : nil,
+                          notes: notesChanged ? (notes ?? "") : nil)
     }
     cell.onCollapse = { [weak self] in self?.collapseComposer(commit: false) }
 
@@ -3391,7 +3525,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         return SeptaskKitTheme.heading.pointSize + 28
       }
       if task.id == composingTaskId {
-        return KitComposerCell.height(notesHeight: composerNotesHeight)
+        return composerRowHeight ?? KitComposerCell.baseHeight
       }
       return SeptaskKitTheme.rowHeight
     case .event: return SeptaskKitTheme.rowHeight
@@ -3797,13 +3931,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     for id in ids {
       guard let task = byId[id] else { continue }
       var moved = false
-      if task.project != targetProject {
-        mutator.moveToProject(id: id, project: targetProject)
-        moved = true
-      }
       // Area only matters outside a project group (a project implies its area).
-      if targetProject == nil, task.area != targetArea {
-        mutator.moveToArea(id: id, area: targetArea)
+      let destinationChanged = task.project != targetProject
+        || (targetProject == nil && task.area != targetArea)
+      if destinationChanged {
+        mutator.moveToList(id: id, area: targetArea, project: targetProject)
         moved = true
       }
       if moved { mutator.acknowledge(id: id) }
@@ -6008,6 +6140,8 @@ final class SeptaskKitTableView: NSTableView {
   var onBeginEdit: (() -> Void)?
   /// Return / double-click — the full inline composer.
   var onOpenComposer: (() -> Void)?
+  /// ⌘↩ — the notes toggle: open the selection's notes, or leave them.
+  var onEditNotes: (() -> Void)?
   var onDelete: (() -> Void)?
   var onNewTask: (() -> Void)?
   var onWhen: (() -> Void)?
@@ -6111,6 +6245,11 @@ final class SeptaskKitTableView: NSTableView {
       return super.performKeyEquivalent(with: event)
     }
     switch event.charactersIgnoringModifiers {
+    // ⌘↩ / ⌘keypad-Enter. Caught here rather than in the composer cell so it
+    // works on a CLOSED selected row too (open straight into notes), and so
+    // the text views' key bindings never see it — ⌘↩ has no standard text
+    // binding, a text view would just beep.
+    case "\r", "\u{3}": onEditNotes?(); return true
     case "k": onToggleComplete?(); return true
     case "t": onToggleToday?(); return true
     case "r": onBeginEdit?(); return true

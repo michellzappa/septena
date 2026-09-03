@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import SwiftUI
 
 // SeptaskKit — the AppKit shell spike (see docs/SEPTASK.md).
 //
@@ -122,6 +123,25 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     toolbar.allowsUserCustomization = false
     window.toolbar = toolbar
     window.toolbarStyle = .unified
+
+    // Sync status rides a TITLEBAR ACCESSORY, not a toolbar item. The toolbar
+    // above is deliberately item-less (title, material, drag region), and
+    // giving it one item means giving it a delegate and an item vocabulary it
+    // otherwise has no use for. An accessory reaches the same strip of chrome
+    // and stays out of that decision. `SyncIndicator` draws nothing when idle,
+    // so the accessory collapses to zero width between syncs; it only takes
+    // space while a fetch/send is in flight, or during the first-run download
+    // where it also carries the running item count.
+    let syncHost = NSHostingView(
+      rootView: SyncIndicator()
+        .environment(SeptenaServices.shared.ckEngine)
+        .padding(.trailing, 12)
+    )
+    syncHost.frame.size = syncHost.fittingSize
+    let syncAccessory = NSTitlebarAccessoryViewController()
+    syncAccessory.view = syncHost
+    syncAccessory.layoutAttribute = .trailing
+    window.addTitlebarAccessoryViewController(syncAccessory)
     // The title names the DESTINATION ("Today", "Next", a project) — the same
     // string the SwiftUI shell puts in its page header. Hiding it left nothing
     // to name the window: the list ran straight to the top edge and the drag
@@ -158,6 +178,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     inspector.onRequestClose = { [weak self] in
       self?.setInspector(visible: false)
     }
+    // ⌘↩ in the pane's title/notes commits and returns the keyboard to the
+    // list — the pane stays open, following the selection as before.
+    inspector.onRequestFocusList = { [weak list] in list?.focusList() }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
     // (start() memoizes), load-bearing if this window somehow opens first.

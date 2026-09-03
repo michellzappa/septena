@@ -1492,7 +1492,7 @@
     "Agenda" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
-    "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list sorts overdue and due-first, then pinned tasks." : {
+    "Aging starts the day after a task lands on Today and deepens over a week — a quiet signal that you keep deferring it. Resets when you move it off Today or check it off. A flat Today list keeps the same area and project order, under a single divider, with each task's list shown as a subtitle instead of a heading." : {
 
     },
     "AI & MCP" : {
@@ -2638,16 +2638,6 @@
     },
     "Count" : {
 
-    },
-    "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: %@–%@ sets/week." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle; lighter sets count partially, easy or unrated sets not at all. Growth zone: %1$@–%2$@ sets/week."
-          }
-        }
-      }
     },
     "Courage" : {
       "localizations" : {
@@ -4153,6 +4143,9 @@
       }
     },
     "How a task conversation moves" : {
+
+    },
+    "How far a long task title wraps before it truncates. Taller rows fit fewer tasks on screen." : {
 
     },
     "How far AI may reach" : {
@@ -5933,7 +5926,7 @@
     "Off shows each item only during its slot. Tasks and chores have no time of day, so they always stay until done." : {
 
     },
-    "Off shows one flat list under Inbox with each task's list as a subtitle." : {
+    "Off shows one flat list under Inbox, in the same order, with each task's list as a subtitle." : {
 
     },
     "OK" : {
@@ -5980,6 +5973,9 @@
       }
     },
     "Onboarding" : {
+
+    },
+    "One" : {
 
     },
     "One app for every corner of your life" : {
@@ -6758,6 +6754,9 @@
           }
         }
       }
+    },
+    "Rows" : {
+
     },
     "Rows with 90-day heatmap grid. Optimized for consistency." : {
       "localizations" : {
@@ -8230,6 +8229,9 @@
     "This week's preview" : {
 
     },
+    "Three" : {
+
+    },
     "Three gold rings — the previous thank-you, for comparison" : {
 
     },
@@ -8489,6 +8491,9 @@
       }
     },
     "Turned-off sections disappear from the home tab but keep all their data. Turn one back on anytime." : {
+
+    },
+    "Two" : {
 
     },
     "Two months free" : {

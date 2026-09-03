@@ -852,6 +852,34 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "moveToArea")
   }
 
+  /// Apply the final area/project placement as one mutation. The AppKit shell
+  /// uses this for drag/menu moves so clearing the old axis and setting the new
+  /// one do not become two saves and two app-wide notifications.
+  func moveToList(id: String, area: String?, project: String?) {
+    guard let entity = fetch(id: id) else { return }
+    let targetArea = project == nil ? area : nil
+    let ratifying = (targetArea != nil || project != nil) && entity.isInTriageBand
+    let entersNewHome = (targetArea != nil || project != nil)
+      && (entity.area != targetArea || entity.project != project)
+
+    entity.area = targetArea
+    entity.project = project
+    if entersNewHome, !entity.isHeading {
+      entity.heading = nil
+      entity.position = TaskOrder.topPosition(in: context)
+    }
+    if ratifying {
+      entity.today = true
+      entity.todaySetOn = SeptenaDate.today
+    }
+    entity.pendingSync = true
+    commitAndPush(entity, op: "moveToList")
+
+    if entity.isHeading {
+      rehomeHeadingMembers(headingID: id, toProject: project)
+    }
+  }
+
   func moveToProject(id: String, project: String?) {
     guard let entity = fetch(id: id) else { return }
     let ratifying = project != nil && entity.isInTriageBand
