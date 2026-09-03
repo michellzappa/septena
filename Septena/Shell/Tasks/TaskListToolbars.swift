@@ -52,7 +52,7 @@ struct TaskListNewTaskButton: View {
     } label: {
       Image(systemName: "plus")
     }
-    .buttonStyle(.glassProminent)
+    .glassProminentButtonStyleCompat()
     .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
     .accessibilityLabel("New Task")
   }

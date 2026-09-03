@@ -14,6 +14,10 @@ enum OnDeviceAI {
   }
 
   static var status: Status {
+    // Foundation Models is a macOS/iOS 26 framework. Below that floor there is
+    // no on-device model at all — the same practical situation as ineligible
+    // hardware: permanent, with nothing for the user to act on.
+    guard #available(macOS 26.0, iOS 26.0, *) else { return .deviceNotEligible }
     switch availability {
     case .available: return .available
     case .unavailable(.deviceNotEligible): return .deviceNotEligible
@@ -23,12 +27,14 @@ enum OnDeviceAI {
     }
   }
 
+  @available(macOS 26.0, iOS 26.0, *)
   static var availability: SystemLanguageModel.Availability {
     SystemLanguageModel.default.availability
   }
 
   static var isAvailable: Bool {
-    SystemLanguageModel.default.isAvailable
+    guard #available(macOS 26.0, iOS 26.0, *) else { return false }
+    return SystemLanguageModel.default.isAvailable
   }
 
   /// True only where the on-device model can accept image input — iOS 27+ with
@@ -67,6 +73,9 @@ enum OnDeviceAI {
   }
 
   static var unavailableReason: String? {
+    guard #available(macOS 26.0, iOS 26.0, *) else {
+      return "Self-discovery needs Apple Intelligence, which requires macOS 26 or newer."
+    }
     switch availability {
     case .available:
       return nil

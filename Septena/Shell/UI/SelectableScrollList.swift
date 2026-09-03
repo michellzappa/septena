@@ -309,7 +309,7 @@ struct SelectableScrollList<Content: View>: View {
           .contentShape(Rectangle())
           .onTapGesture { onClear() }
       }
-      .scrollEdgeEffectStyle(.soft, for: .top)
+      .softTopScrollEdgeEffectCompat()
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,

@@ -244,7 +244,7 @@ struct DrawerModeToggle: View {
     // Identical to the trailing "+" (`DrawerActionButton`): the toolbar floats a
     // bare `.glassProminent` circle, `.tint` fills it, and the style forces a
     // white glyph — so light accents go through `fillForWhiteInk`.
-    .buttonStyle(.glassProminent)
+    .glassProminentButtonStyleCompat()
     .tint(AdaptiveColor.fillForWhiteInk(accent))
   }
 }
@@ -706,7 +706,7 @@ struct DrawerActionButton: View {
         .accessibilityLabel(quickAdd.title)
     }
     .keyboardShortcut("n", modifiers: .command)
-    .buttonStyle(.glassProminent)
+    .glassProminentButtonStyleCompat()
     // `.glassProminent` forces a white glyph — darken light accents (lime/yellow)
     // so white clears large-text AA instead of washing toward an unreadable
     // chartreuse. Hand-rolled CTAs use `inkOnSolidFill` and keep the authored hue.

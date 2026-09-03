@@ -12,7 +12,12 @@ import Foundation
 @MainActor
 enum ConversationEngine {
   private static var syncProviders: [AIProviderKind: any ReasoningProvider] {
-    var p: [AIProviderKind: any ReasoningProvider] = [.onDevice: OnDeviceReasoningProvider()]
+    // Foundation Models (and so the on-device provider) is macOS/iOS 26+.
+    // Below that floor the dictionary is simply empty for `.onDevice` and the
+    // router falls through to the async provider, exactly as it does when the
+    // model is present but unavailable.
+    var p: [AIProviderKind: any ReasoningProvider] = [:]
+    if #available(macOS 26.0, iOS 26.0, *) { p[.onDevice] = OnDeviceReasoningProvider() }
     #if compiler(>=6.4)
     if #available(iOS 27.0, macOS 27.0, *) { p[.applePCC] = PCCReasoningProvider() }
     #endif

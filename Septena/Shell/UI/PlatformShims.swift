@@ -897,3 +897,45 @@ struct InlineCardChrome: ViewModifier {
     #endif
   }
 }
+
+// MARK: - macOS 26 API compatibility
+//
+// Liquid Glass button styles and scroll-edge effects are macOS 26 / iOS 26
+// symbols. The shipping deployment target is 26.0, so these are used directly
+// everywhere else; these shims exist so the Mac app can also be built against a
+// macOS 15 floor, where they degrade to the pre-Glass system styles.
+
+extension View {
+  /// `.buttonStyle(.glass)` on 26+, the bordered system style below it.
+  @ViewBuilder
+  func glassButtonStyleCompat() -> some View {
+    if #available(macOS 26.0, iOS 26.0, *) {
+      self.buttonStyle(.glass)
+    } else {
+      self.buttonStyle(.bordered)
+    }
+  }
+
+  /// `.buttonStyle(.glassProminent)` on 26+, `.borderedProminent` below it.
+  /// Call sites tint these for white ink; `.borderedProminent` also draws a
+  /// white glyph on the tint, so `fillForWhiteInk` stays correct either way.
+  @ViewBuilder
+  func glassProminentButtonStyleCompat() -> some View {
+    if #available(macOS 26.0, iOS 26.0, *) {
+      self.buttonStyle(.glassProminent)
+    } else {
+      self.buttonStyle(.borderedProminent)
+    }
+  }
+
+  /// Soft top scroll-edge effect on 26+; a no-op below it (pre-26 scroll views
+  /// simply have no edge effect to configure).
+  @ViewBuilder
+  func softTopScrollEdgeEffectCompat() -> some View {
+    if #available(macOS 26.0, iOS 26.0, *) {
+      self.scrollEdgeEffectStyle(.soft, for: .top)
+    } else {
+      self
+    }
+  }
+}

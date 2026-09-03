@@ -301,7 +301,7 @@ extension View {
     self
       .scrollContentBackground(.hidden)
       .homeTabScrollSurface()
-      .scrollEdgeEffectStyle(.soft, for: .top)
+      .softTopScrollEdgeEffectCompat()
       .navigationTitle("")
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)

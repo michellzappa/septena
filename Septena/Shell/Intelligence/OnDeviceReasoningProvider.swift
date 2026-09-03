@@ -6,11 +6,13 @@ import FoundationModels
 // (confirm); steps that need the web / deep reasoning escalate (router falls
 // through to the user's Claude, or — on iOS 27 — Private Cloud Compute).
 
+@available(macOS 26.0, iOS 26.0, *)
 @Generable
 private struct ConfirmReadings: Codable {
   let readings: [String]
 }
 
+@available(macOS 26.0, iOS 26.0, *)
 @MainActor
 struct OnDeviceReasoningProvider: ReasoningProvider {
   var kind: AIProviderKind { .onDevice }

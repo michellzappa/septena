@@ -18,6 +18,7 @@ struct TaskListView: View {
   @Environment(TaskMutator.self) private var mutator
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  @Environment(CKEngine.self) private var ckEngine
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
   @Environment(\.usesPushNavigation) private var usesPushNavigation
@@ -1428,6 +1429,28 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var emptyStateRow: some View {
+    // A first sync on a new device pulls the whole account down. Until it
+    // lands the list is empty for a reason that has nothing to do with the
+    // user, so say that instead of "Nothing here yet" — and say it even where
+    // there IS an inline capture affordance, since the emptiness is what
+    // misleads, not the missing button.
+    if showsEmptyTaskList && ckEngine.isBootstrapping {
+      ContentUnavailableView {
+        Label("Getting your data", systemImage: "icloud.and.arrow.down")
+      } description: {
+        Text(ckEngine.bootstrapStatusText)
+          .monospacedDigit()
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.top, 40)
+      .plainListChrome()
+    } else {
+      settledEmptyStateRow
+    }
+  }
+
+  @ViewBuilder
+  private var settledEmptyStateRow: some View {
     // A creatable list that's empty already offers a "New task" line (Today's
     // Inbox card, or the top quick-add on a project / area) — the big "Nothing
     // here yet" card under it is redundant, and on an area that only holds

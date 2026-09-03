@@ -78,7 +78,7 @@ struct ClaudeReconnectCue: View {
         .frame(width: 30, height: 30)
         .accessibilityLabel(justReconnected ? "Reconnected" : "Reconnect Claude")
     }
-    .buttonStyle(.glass)
+    .glassButtonStyleCompat()
     .buttonBorderShape(.circle)
     .tint(Color.claudeAccent)
     .disabled(justReconnected)

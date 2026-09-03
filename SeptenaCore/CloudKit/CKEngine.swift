@@ -80,6 +80,31 @@ var accountStatus: CKAccountStatus = .couldNotDetermine
   /// observe `isSyncing` to show a sync indicator while > 0.
   private(set) var inflightSyncCount: Int = 0
   var isSyncing: Bool { inflightSyncCount > 0 }
+
+  /// True from `start()` until the first full fetch pass completes, and only
+  /// when there was no persisted engine state to resume from — i.e. this
+  /// device is pulling an existing account down for the first time. Views need
+  /// this because `isSyncing` alone can't tell "downloading everything" from
+  /// "saving one edit", and the two want very different UI: a bootstrap leaves
+  /// the app looking empty for reasons that have nothing to do with the user.
+  private(set) var isBootstrapping: Bool = false
+
+  /// Records folded in during the current bootstrap, so the UI can show a
+  /// number that visibly moves. Deliberately not a percentage: CKSyncEngine
+  /// reports no total up front, so any progress bar would be invented.
+  private(set) var bootstrapFetchedCount: Int = 0
+
+  /// One-line status for the first-run download. Lives here rather than in a
+  /// view so the SwiftUI indicator and the AppKit list's empty label can't
+  /// drift apart. No count until the first batch lands, so nothing ever
+  /// flashes "0 items".
+  var bootstrapStatusText: String {
+    bootstrapFetchedCount > 0
+      ? String(localized: "Syncing… \(bootstrapFetchedCount) items",
+               comment: "CloudKit first-run download, with a running record count")
+      : String(localized: "Syncing…",
+               comment: "CloudKit first-run download, before any records have arrived")
+  }
   private var lastSendFailureSummary: String?
 
 init() {
@@ -125,9 +150,14 @@ init() {
   /// to actually sync).
 func start() {
     guard engine == nil else { return }
+    // No persisted engine state means nothing has ever synced on this device,
+    // so the fetch below pulls the whole account rather than a delta.
+    let resumeState = loadStateSerialization()
+    isBootstrapping = (resumeState == nil)
+    bootstrapFetchedCount = 0
     let configuration = CKSyncEngine.Configuration(
       database: database,
-      stateSerialization: loadStateSerialization(),
+      stateSerialization: resumeState,
       delegate: self
     )
     let engine = CKSyncEngine(configuration)
@@ -518,6 +548,7 @@ func handleEvent(
 
     case .fetchedRecordZoneChanges(let changes):
       Log.cloudKit.debug("[CKEngine] fetched: +\(changes.modifications.count) ~ -\(changes.deletions.count) reset=\(self.applyingResetCascade)")
+      if isBootstrapping { bootstrapFetchedCount += changes.modifications.count }
       // Materialize into the registry's background ModelActor. This keeps
       // large CloudKit pulls from monopolizing the UI actor.
       let callbacks = await MainActor.run {
@@ -600,8 +631,16 @@ func handleEvent(
       let finishBatch = await MainActor.run { self.applyDidFinishBatch }
       await finishBatch?(!freshServerRecords.isEmpty)
 
+    case .didFetchChanges:
+      // A fetch pass finished. If that was the bootstrap, everything the
+      // account had is now local and later fetches are ordinary deltas.
+      if isBootstrapping {
+        logger.info("CKEngine bootstrap complete: \(self.bootstrapFetchedCount, privacy: .public) records")
+        isBootstrapping = false
+      }
+
     case .fetchedDatabaseChanges, .sentDatabaseChanges,
-         .willFetchChanges, .didFetchChanges,
+         .willFetchChanges,
          .willFetchRecordZoneChanges, .didFetchRecordZoneChanges,
          .willSendChanges, .didSendChanges:
       break
