@@ -480,7 +480,8 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onToggleComplete = { [weak self] in self?.toggleCompleteSelection() }
     tableView.onToggleToday = { [weak self] in self?.toggleTodaySelection() }
     tableView.onBeginEdit = { [weak self] in self?.beginEditSelectedRow() }
-    tableView.onEditNotes = { [weak self] in self?.toggleNotesEditing() }
+    tableView.onCommitEditing = { [weak self] in self?.commitComposerEditing() }
+    tableView.onOpenNotes = { [weak self] in self?.beginComposingSelectedRowInNotes() }
     tableView.onOpenComposer = { [weak self] in self?.beginComposingSelectedRow() }
     tableView.onDelete = { [weak self] in self?.deleteSelection() }
     tableView.onNewTask = { [weak self] in self?.createTask() }
@@ -2678,23 +2679,31 @@ final class SeptaskKitTaskListController: NSViewController {
     beginComposing(id: task.id)
   }
 
-  /// ⌘↩ — the notes toggle. On a closed selected row it opens the composer
-  /// straight into notes (revealed, caret at the end); on an open row it
-  /// drops the caret into notes; from inside notes it commits and folds the
-  /// row. Return is the title's enter/exit, this is the notes'.
-  func toggleNotesEditing() {
-    if let id = composingTaskId {
-      guard let cell = composerCell(for: id) else { return }
-      if cell.isEditingNotes {
-        // Deferred one tick for the same first-responder reentrancy reason as
-        // `KitComposerCell.deferCommitAndCollapse` — the key event that asked
-        // is still on the stack.
-        DispatchQueue.main.async { [weak self] in self?.collapseComposer(commit: true) }
-      } else {
-        cell.focusNotes()
-      }
-      return
-    }
+  /// ⌘↩ — commit and close the open row, wherever the caret happens to be
+  /// (title, notes, or a focused pill). ONE meaning, matching the platform's
+  /// ⌘↩ ("finish this": Mail's Send, a sheet's default action) and matching
+  /// Escape, which already commits and folds.
+  ///
+  /// It deliberately does NOT descend into notes any more. Overloading it as
+  /// "go one level deeper" from the title while it meant "exit entirely" from
+  /// notes made it not its own inverse: two presses from the title landed on a
+  /// closed row rather than back where you started, and — since Return in
+  /// notes is prose, not a submit — there was no way back up to the title at
+  /// all. Descending is `↓` on the title's last line or Tab, both of which
+  /// read top-to-bottom instead of as a chord.
+  func commitComposerEditing() {
+    guard composingTaskId != nil else { return }
+    // Deferred one tick for the same first-responder reentrancy reason as
+    // `KitComposerCell.deferCommitAndCollapse` — the key event that asked is
+    // still on the stack.
+    DispatchQueue.main.async { [weak self] in self?.collapseComposer(commit: true) }
+  }
+
+  /// ⌥↩ — open the closed selected row straight into its notes (revealed,
+  /// caret at the end). One modifier off Return, which opens the same composer
+  /// into the title; ⌘↩ no longer does this, it only ever finishes.
+  func beginComposingSelectedRowInNotes() {
+    guard composingTaskId == nil else { return }
     guard filter != .recentlyDeleted else { return }
     let row = tableView.selectedRow
     guard row >= 0, let task = rows[row].task, !task.isHeading else { return }
@@ -2715,7 +2724,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   // MARK: - Inline composer (title + elective pills + notes)
 
-  /// `focusNotes` opens straight into the notes field (⌘↩) instead of the title.
+  /// `focusNotes` opens straight into the notes field (⌥↩) instead of the title.
   func beginComposing(id: String, focusNotes: Bool = false) {
     guard composingTaskId != id else { return }
     // Switching rows: fold the open one instantly so two height animations
@@ -6162,8 +6171,10 @@ final class SeptaskKitTableView: NSTableView {
   var onBeginEdit: (() -> Void)?
   /// Return / double-click — the full inline composer.
   var onOpenComposer: (() -> Void)?
-  /// ⌘↩ — the notes toggle: open the selection's notes, or leave them.
-  var onEditNotes: (() -> Void)?
+  /// ⌘↩ — commit and close the open row, from wherever the caret is.
+  var onCommitEditing: (() -> Void)?
+  /// ⌥↩ — open a closed selected row straight into its notes.
+  var onOpenNotes: (() -> Void)?
   var onDelete: (() -> Void)?
   var onNewTask: (() -> Void)?
   var onWhen: (() -> Void)?
@@ -6267,11 +6278,12 @@ final class SeptaskKitTableView: NSTableView {
       return super.performKeyEquivalent(with: event)
     }
     switch event.charactersIgnoringModifiers {
-    // ⌘↩ / ⌘keypad-Enter. Caught here rather than in the composer cell so it
-    // works on a CLOSED selected row too (open straight into notes), and so
-    // the text views' key bindings never see it — ⌘↩ has no standard text
-    // binding, a text view would just beep.
-    case "\r", "\u{3}": onEditNotes?(); return true
+    // ⌘↩ / ⌘keypad-Enter — commit and close, the platform's "finish this"
+    // (Mail's Send, a sheet's default action). Caught here rather than in the
+    // composer cell so ONE handler covers the caret being in the title, in
+    // notes, or on a pill, and so the text views' key bindings never see it —
+    // ⌘↩ has no standard text binding, a text view would just beep.
+    case "\r", "\u{3}": onCommitEditing?(); return true
     case "k": onToggleComplete?(); return true
     case "t": onToggleToday?(); return true
     case "r": onBeginEdit?(); return true
@@ -6286,9 +6298,14 @@ final class SeptaskKitTableView: NSTableView {
   }
 
   override func keyDown(with event: NSEvent) {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
     switch event.keyCode {
     case 36, 76:  // Return / keypad Enter — opens the composer, not a bare rename.
-      onOpenComposer?()
+      // ⌥↩ opens the same composer but with the caret already in notes. It
+      // arrives here rather than in `performKeyEquivalent` because that only
+      // handles command-key combinations; Option alone falls through to the
+      // regular key path.
+      if flags.contains(.option) { onOpenNotes?() } else { onOpenComposer?() }
     case 48:  // Tab / Shift-Tab — only two stops in the loop, so either
       // direction just crosses to the sidebar (no field editor is live here;
       // one is first responder instead and eats Tab before this fires).

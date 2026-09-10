@@ -23,12 +23,14 @@ import AppKit
 // can't drift into two different pickers.
 //
 // Edits autosave on collapse, matching the SwiftUI inline host's contract.
-// Keyboard: Return in the title (or Esc anywhere) commits and folds. ⌘↩ is
-// the NOTES toggle — it reveals and focuses notes, and from inside notes it
-// commits and folds; the table catches it (`SeptaskKitTableView.onEditNotes`)
-// so the same key also opens a closed selected row straight into notes. ↓ on
-// the title's last line drops the caret into notes (↑/↓ then stay inside
-// notes); Tab walks title → notes → pills (Shift-Tab back).
+// Keyboard, one meaning per key: Return in the title enters and leaves it.
+// ⌘↩ (or Esc) commits and folds from ANYWHERE in the open row — title,
+// notes, or a pill — which is the platform's "finish this"; the table catches
+// it (`SeptaskKitTableView.onCommitEditing`) so one handler covers every
+// caret position. Going DEEPER is a separate gesture, never ⌘↩: ↓ on the
+// title's last line drops the caret into notes (↑/↓ then stay inside notes),
+// Tab walks title → notes → pills (Shift-Tab back), and ⌥↩ on a closed row
+// opens straight into notes.
 @MainActor
 final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
@@ -83,6 +85,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var trailingConstraint: NSLayoutConstraint!
   private var titleHeightConstraint: NSLayoutConstraint!
   private var notesHeightConstraint: NSLayoutConstraint!
+  /// False only before `configure(with:)` has run — an open row always shows
+  /// its notes. Kept as a guard so a cell the table measures before it is
+  /// configured doesn't reserve notes height it isn't drawing yet.
   private var notesShown = false
   /// Last measured heights. Both drive their scroll view's constraint and
   /// `expandedHeight`; the title is never shorter than one line.
@@ -166,6 +171,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     titleView.placeholder = String(localized: "New Task",
                                    comment: "SeptaskKit: composer title placeholder")
     Self.styleTextView(titleView, in: titleScroll)
+    // A task title is ONE line, enforced in the view itself (see
+    // `isSingleLine`) so no delegate wiring — present or absent — can put a
+    // break in it.
+    titleView.isSingleLine = true
+    titleView.onLineBreakAttempt = { [weak self] in self?.deferCommitAndCollapse() }
 
     notesView.isRichText = true
     notesView.textContainerInset = Self.notesInset
@@ -176,6 +186,18 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
                                    comment: "SeptaskKit: composer notes placeholder")
     Self.styleTextView(notesView, in: notesScroll)
     notesScroll.isHidden = true
+
+    // THE delegate assignment. Without it every `NSTextViewDelegate` method
+    // below is dead code: Return inserted a line break instead of committing,
+    // Tab inserted a tab, Escape and ↓-into-notes never fired, the pasted
+    // line-break flattening never ran, and text-edit undo landed on the shared
+    // task stack instead of the row-local one. It was missing from the day the
+    // composer landed — the cell CONFORMS to the protocol, which reads as
+    // wired, and the two behaviors that did work (Esc, ⌘↩) work through the
+    // responder chain and the table's `performKeyEquivalent`, so the gap stayed
+    // invisible.
+    titleView.delegate = self
+    notesView.delegate = self
 
     pillRow.orientation = .horizontal
     pillRow.spacing = 6
@@ -189,7 +211,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
-    notesPill.onPress = { [weak self] _ in self?.toggleNotes() }
+    notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
     for pill in [todayPill, whenPill, deadlinePill, listPill, repeatPill, notesPill,
@@ -326,9 +348,14 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.textStorage?.setAttributedString(
       MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
     notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
-    notesShown = !notes.isEmpty
-    notesScroll.isHidden = !notesShown
-    notesPill.isOn = notesShown
+    // An open row ALWAYS shows its notes field, empty or not: the open row is
+    // the task's whole document, and a field that appears only once it has
+    // content hides the fact that notes exist at all. The empty field's
+    // "Notes" placeholder is the affordance. `notesPill.isOn` now reports
+    // whether there ARE notes, not whether the field is on screen.
+    notesShown = true
+    notesScroll.isHidden = false
+    notesPill.isOn = !notes.isEmpty
     titleView.needsDisplay = true
     notesView.needsDisplay = true
     updateKeyChain()
@@ -430,18 +457,38 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Title → notes while notes are on screen, straight to the rail otherwise;
   /// notes → rail is fixed.
   private func updateKeyChain() {
-    titleView.nextKeyView = notesShown ? notesView : todayPill
+    titleView.nextKeyView = notesView
   }
 
-  /// True while the notes field holds the keyboard — what ⌘↩ toggles on.
-  var isEditingNotes: Bool { window?.firstResponder === notesView }
-
-  /// Reveal notes if they're folded and put the caret at their end.
-  func focusNotes() {
-    if !notesShown {
-      toggleNotes()  // reveals, resizes the row, and focuses
-      return
+  /// Tab order inside the open row: title ⇄ notes, then out to the rail when
+  /// the rail can actually take focus. With Full Keyboard Access off — the
+  /// default — the pills can't become first responder at all, so Tab cycles
+  /// between the two text fields rather than dead-ending on a button that
+  /// silently refuses the focus.
+  private func moveComposerFocus(forward: Bool) {
+    let current = window?.firstResponder
+    let target: NSView
+    if forward {
+      target = current === titleView ? notesView : (firstFocusablePill ?? titleView)
+    } else {
+      target = current === notesView ? titleView : notesView
     }
+    window?.makeFirstResponder(target)
+    if let text = target as? NSTextView {
+      let end = (text.string as NSString).length
+      text.setSelectedRange(NSRange(location: end, length: 0))
+    }
+  }
+
+  /// The first rail pill that will actually accept the keyboard, or nil when
+  /// none will (Full Keyboard Access off).
+  private var firstFocusablePill: NSView? {
+    pillRow.arrangedSubviews.first { $0.acceptsFirstResponder && !$0.isHidden }
+  }
+
+  /// Put the caret at the end of the notes field. It is always on screen for
+  /// an open row, so there is nothing to reveal first.
+  func focusNotes() {
     window?.makeFirstResponder(notesView)
     let end = (notesView.string as NSString).length
     notesView.setSelectedRange(NSRange(location: end, length: 0))
@@ -459,16 +506,6 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     let glyph = min(manager.glyphIndexForCharacter(at: caret), glyphCount - 1)
     let line = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
     return line.maxY >= manager.usedRect(for: container).maxY - 1
-  }
-
-  private func toggleNotes() {
-    notesShown.toggle()
-    notesScroll.isHidden = !notesShown
-    notesPill.isOn = notesShown
-    updateKeyChain()
-    recomputeContentHeights(notify: false)
-    onNotesVisibilityChanged?()
-    if notesShown { window?.makeFirstResponder(notesView) }
   }
 
   // MARK: - Measurement
@@ -538,12 +575,12 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     switch commandSelector {
     // Return opened the row, so Return in the title closes it. Notes is prose
     // — Return inserts a line there; ⌘↩ (caught by the table, see
-    // `SeptaskKitTaskListController.toggleNotesEditing`) is its exit.
+    // `SeptaskKitTaskListController.commitComposerEditing`) or Esc is its exit.
     case #selector(NSResponder.insertNewline(_:)) where textView === titleView:
       deferCommitAndCollapse()
       return true
     // ↓ on the title's LAST line moves the caret into notes, revealing them
-    // if folded — the open row reads top-to-bottom like a document. Notes
+    // the open row reads top-to-bottom like a document. Notes
     // never hands focus back up on ↑: it's prose, the caret stays inside.
     case #selector(NSResponder.moveDown(_:))
       where textView === titleView && caretOnLastLine(of: titleView):
@@ -555,14 +592,18 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     case #selector(NSResponder.cancelOperation(_:)):
       deferCommitAndCollapse()
       return true
-    // Tab moves the keyboard cursor along the composer instead of inserting
-    // a tab character — same as the SwiftUI form's `.tab` handler on both
-    // fields. `nextKeyView` decides where (title → notes → rail).
+    // Tab moves the keyboard cursor along the composer instead of inserting a
+    // tab character. Routed EXPLICITLY rather than through
+    // `window?.selectNextKeyView` and the `nextKeyView` chain: the pills are
+    // `NSButton`s, and an NSControl only joins the key-view loop when the
+    // system's Full Keyboard Access is switched on (it's off by default). So
+    // the loop skipped the whole rail and walked out of the row entirely —
+    // Tab appeared to do nothing.
     case #selector(NSResponder.insertTab(_:)):
-      window?.selectNextKeyView(nil)
+      moveComposerFocus(forward: true)
       return true
     case #selector(NSResponder.insertBacktab(_:)):
-      window?.selectPreviousKeyView(nil)
+      moveComposerFocus(forward: false)
       return true
     default:
       return false
@@ -636,6 +677,58 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 final class KitComposerTextView: NSTextView {
   var placeholder = "" {
     didSet { needsDisplay = true }
+  }
+
+  /// A task title is one line. A break in it isn't a formatting choice, it's
+  /// corrupt data — it can't render in a closed row, in the sidebar, on the
+  /// watch, or in any of the other surfaces that draw a title as one line — so
+  /// it is refused HERE, in the view, where nothing can route around it.
+  ///
+  /// The delegate normally turns Return into commit-and-close before these
+  /// overrides ever run. That is exactly why this backstop exists: the
+  /// delegate was never assigned, so the `doCommandBy` handler was dead and
+  /// Return put a newline straight into the title. Belt and braces — the
+  /// delegate is wired now, and a title still cannot hold a break if it ever
+  /// comes loose again.
+  var isSingleLine = false
+
+  /// What to do instead of breaking the line — Return still means "finish".
+  var onLineBreakAttempt: (() -> Void)?
+
+  override func insertNewline(_ sender: Any?) {
+    guard !isSingleLine else { onLineBreakAttempt?(); return }
+    super.insertNewline(sender)
+  }
+
+  override func insertLineBreak(_ sender: Any?) {
+    guard !isSingleLine else { onLineBreakAttempt?(); return }
+    super.insertLineBreak(sender)
+  }
+
+  /// ⌥↩ / ⌃↩ inside a text view. Silently refused rather than treated as a
+  /// commit: it's the "I meant a soft break" key, and answering it by closing
+  /// the row would be a surprise.
+  override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {
+    guard !isSingleLine else { return }
+    super.insertNewlineIgnoringFieldEditor(sender)
+  }
+
+  /// Typed, dictated, autocompleted, or pasted text all land here. Joining on
+  /// a space matches `TaskTitleText.singleLine`, so a multi-line paste reads
+  /// the same whichever path flattened it.
+  override func insertText(_ string: Any, replacementRange: NSRange) {
+    guard isSingleLine else {
+      super.insertText(string, replacementRange: replacementRange)
+      return
+    }
+    switch string {
+    case let text as String where text.contains(where: \.isNewline):
+      super.insertText(TaskTitleText.singleLine(text), replacementRange: replacementRange)
+    case let text as NSAttributedString where text.string.contains(where: \.isNewline):
+      super.insertText(TaskTitleText.singleLine(text.string), replacementRange: replacementRange)
+    default:
+      super.insertText(string, replacementRange: replacementRange)
+    }
   }
 
   override func draw(_ dirtyRect: NSRect) {
