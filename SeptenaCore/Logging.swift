@@ -148,13 +148,66 @@ enum Log {
   }
 }
 
+/// Master switch for the app's *diagnostic* output — the informational logging
+/// and the `PerfTrace` spans. Errors are never gated; they are rare and they are
+/// the only record of something going wrong.
+///
+/// OFF by default in Release, so a shipping build (and, since the Run schemes
+/// build Release, an ordinary ⌘R speed test) pays nothing: no string building,
+/// no `os_log` calls, no signposts. ON by default in Debug.
+///
+/// Override either way with a launch argument, so the tracing is one scheme
+/// edit away when you actually want to read it:
+///     -SeptenaVerbose      force diagnostics on  (e.g. to use PerfTrace in Release)
+///     -SeptenaQuiet        force diagnostics off
+/// Which configuration this binary was compiled as.
+///
+/// Exists because "is this actually a Release build?" is otherwise unanswerable
+/// from the device, and it's the first question worth settling whenever the app
+/// feels slower than it should — a Debug binary running under the debugger is a
+/// completely different animal, and Xcode will happily keep running a stale one
+/// after the project is regenerated underneath it. Surfaced in Settings ▸ About.
+public enum BuildConfig {
+  public static var isDebug: Bool {
+    #if DEBUG
+    return true
+    #else
+    return false
+    #endif
+  }
+
+  /// "Debug" / "Release" — shown verbatim in the About pane.
+  public static var name: String { isDebug ? "Debug" : "Release" }
+}
+
+public enum Diagnostics {
+  /// Resolved once — this is read on hot paths and must not re-scan
+  /// `CommandLine.arguments` per call.
+  public static let enabled: Bool = {
+    let args = CommandLine.arguments
+    if args.contains("-SeptenaQuiet") { return false }
+    if args.contains("-SeptenaVerbose") { return true }
+    #if DEBUG
+    return true
+    #else
+    return false
+    #endif
+  }()
+}
+
 /// Back-compat general-purpose facade. Pre-dates `Log`; kept so existing
 /// `SeptenaLog.info/error` call sites keep working, now routed through the
 /// unified `os.Logger` (category "General") instead of bare `print()`.
 enum SeptenaLog {
   private static let logger = Logger(subsystem: Log.subsystem, category: "General")
 
+  /// Gated on `Diagnostics.enabled`. The `@autoclosure` is what makes the gate
+  /// worth having: the message is never built when diagnostics are off, so an
+  /// interpolated log line on a hot path costs a bool check.
   static func info(_ msg: @autoclosure () -> String) {
+    guard Diagnostics.enabled else { return }
+    // Bound to a local first: `logger.info`'s interpolation is itself an
+    // escaping autoclosure, which a non-escaping parameter can't be fed into.
     let text = msg()
     logger.info("\(text, privacy: .public)")
   }
@@ -199,10 +252,15 @@ enum PerfTrace {
   }
 
   /// Time an async span. Logs `name <ms>ms — <detail>` when slow.
+  ///
+  /// A no-op passthrough when `Diagnostics.enabled` is false — no signpost, no
+  /// clock read, no detail string. That matters precisely when it's off: these
+  /// wrap the hot paths, and a speed test shouldn't be measuring the tracing.
   @discardableResult
   static func span<T>(_ name: StaticString,
                       _ detail: @autoclosure () -> String = "",
                       _ body: () async throws -> T) async rethrows -> T {
+    guard Diagnostics.enabled else { return try await body() }
     let state = signposter.beginInterval(name)
     let start = nowNanos()
     defer {
@@ -212,11 +270,12 @@ enum PerfTrace {
     return try await body()
   }
 
-  /// Time a synchronous span.
+  /// Time a synchronous span. No-op passthrough when diagnostics are off.
   @discardableResult
   static func spanSync<T>(_ name: StaticString,
                           _ detail: @autoclosure () -> String = "",
                           _ body: () throws -> T) rethrows -> T {
+    guard Diagnostics.enabled else { return try body() }
     let state = signposter.beginInterval(name)
     let start = nowNanos()
     defer {

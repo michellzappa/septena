@@ -92,7 +92,18 @@ struct SeptenaApp: App {
         // Keep the in-memory section cache aligned with the SwiftData mirror
         // whenever life-data changes — including inbound CloudKit batches that
         // land after the launch refresh (tab bar, dashboard tiles, Settings).
-        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+        //
+        // UNSCOPED POSTS ONLY. `SettingsEntity` / `SectionEntity` are written by
+        // exactly three paths — the Settings panes, `SettingsMirror`, and the
+        // manifest seeder — and every one of them posts unscoped. A *scoped*
+        // post ("habits", "nutrition", …) is a life-data write that cannot have
+        // touched the section mirror, so re-reading it there was pure waste:
+        // two fetches + a JSON decode + two `ResponseCache` writes, then a fresh
+        // array/dictionary into two `@Observable` stores — i.e. a whole-tree
+        // repaint plus disk I/O on every single logged habit, meal, or dose.
+        // That is the "tapping a log feels laggy" cost. See `isCloudKitBatch`.
+        .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+          guard note.isCloudKitBatch else { return }
           settingsStore.reloadFromMirror(context: localStore.container.mainContext)
           theme.paintFromCache()
         }

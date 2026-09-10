@@ -31,6 +31,10 @@ struct TileDisplayData: Equatable, Sendable {
   var headline: String
   var headlineStats: [TileStatWire]
   var history: HistoryWire?
+  /// One ISO day per `history` element, in the same order. Set by domains
+  /// whose series can be sparse so the heatmap keys cells by date instead of
+  /// back-dating from today by index. Nil = a dense day-per-element series.
+  var historyDates: [String]? = nil
   var trailingTodayPending: Bool
 
   var accent: Color { AdaptiveColor.adaptive(accentHex) ?? .accentColor }
@@ -45,6 +49,9 @@ struct TileWidgetWire: Codable, Equatable, Sendable {
   var headline: String
   var headlineStats: [TileStatWire]
   var history: HistoryWire?
+  /// See `TileDisplayData.historyDates`. Optional so payloads written before
+  /// this key existed still decode (synthesized `decodeIfPresent`).
+  var historyDates: [String]? = nil
   var trailingTodayPending: Bool
   var updatedAt: Date
 
@@ -57,6 +64,7 @@ struct TileWidgetWire: Codable, Equatable, Sendable {
       headline: headline,
       headlineStats: headlineStats,
       history: history,
+      historyDates: historyDates,
       trailingTodayPending: trailingTodayPending
     )
   }
@@ -69,6 +77,7 @@ struct TileWidgetWire: Codable, Equatable, Sendable {
     headline = data.headline
     headlineStats = data.headlineStats
     history = data.history
+    historyDates = data.historyDates
     trailingTodayPending = data.trailingTodayPending
     self.updatedAt = updatedAt
   }
@@ -81,6 +90,7 @@ struct TileWidgetWire: Codable, Equatable, Sendable {
       && headline == other.headline
       && headlineStats == other.headlineStats
       && history == other.history
+      && historyDates == other.historyDates
       && trailingTodayPending == other.trailingTodayPending
   }
 }

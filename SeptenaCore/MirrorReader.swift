@@ -3,6 +3,10 @@ import SwiftData
 /// Shared off-main reader for the `@MainActor`-free mirror functions
 /// (`ChecklistMirror`, `SettingsMirror.loadSettings`).
 ///
+/// Lives in SeptenaCore rather than the app shell because headless work needs it
+/// too — `WatchSnapshotPublisher` builds the whole Next/widget payload through
+/// it instead of on the main actor.
+///
 /// Section destination views run their `reload()` reads on the view's main
 /// context, which hitches the push transition while a section's day/history
 /// is fetched. Routing those reads through this background `@ModelActor`

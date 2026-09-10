@@ -11,9 +11,25 @@ enum HeatmapLevels {
 
   /// Pre-computed ISO-date → 0…4 level map for the grid's `getDay`
   /// closure. Shared by `HeatmapDomainRow` and `HeatmapDomainCard`.
-  static func buildLevelMap(from history: HistoryWire?, windowDays: Int, today: Date) -> [String: Int] {
+  ///
+  /// Pass `dates` — one ISO day per element of the series, in the same order —
+  /// whenever the source can be *sparse*. Without it the mapping is positional
+  /// (last element = today, each earlier index one day back), which is only
+  /// correct for a dense day-per-element series: a source that omits days with
+  /// no data (Oura nights when the ring wasn't worn, nutrition days with no
+  /// meals) would otherwise collapse the gaps and shift every earlier value
+  /// one day later. `dates` is authoritative when its count matches the series.
+  static func buildLevelMap(from history: HistoryWire?,
+                            dates: [String]? = nil,
+                            windowDays: Int,
+                            today: Date) -> [String: Int] {
     var levels = levels(for: history)
     guard !levels.isEmpty else { return [:] }
+    if let dates, dates.count == levels.count {
+      var map: [String: Int] = [:]
+      for (iso, level) in zip(dates, levels) { map[iso] = level }
+      return map
+    }
     if levels.count > windowDays {
       levels = Array(levels.suffix(windowDays))
     }

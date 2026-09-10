@@ -402,7 +402,6 @@
       }
     },
     "%@ ref%@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1722,7 +1721,6 @@
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
     "area: %@   project: %@   status: %@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2639,6 +2637,16 @@
     "Count" : {
 
     },
+    "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle in full and each secondary muscle at %@%%; lighter sets count partially, easy or unrated sets not at all. Growth zone: %@–%@ sets/week." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Counts hard sets (within ~1 rep of failure) toward the exercise's primary muscle in full and each secondary muscle at %1$@%%; lighter sets count partially, easy or unrated sets not at all. Growth zone: %2$@–%3$@ sets/week."
+          }
+        }
+      }
+    },
     "Courage" : {
       "localizations" : {
         "pt-BR" : {
@@ -2687,7 +2695,6 @@
 
     },
     "Creates %@ with recordName `%@:%@`. Existing dangling references will resolve on next fetch." : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3563,7 +3570,6 @@
 
     },
     "Fix by creating the missing record (CloudKit Console → Create New Record) with recordName matching the referenced id." : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -4200,8 +4206,10 @@
         }
       }
     },
+    "id: %@" : {
+
+    },
     "id: %@   area: %@" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5150,7 +5158,6 @@
 
     },
     "Missing Areas" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5161,7 +5168,6 @@
       }
     },
     "Missing Projects" : {
-      "extractionState" : "stale",
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
@@ -5180,6 +5186,9 @@
           }
         }
       }
+    },
+    "Mixed kg and lb — each row was converted using its own unit." : {
+
     },
     "ml" : {
       "shouldTranslate" : false
@@ -5353,6 +5362,9 @@
           }
         }
       }
+    },
+    "New exercises (%@)" : {
+
     },
     "New Project" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
@@ -7177,6 +7189,9 @@
         }
       }
     },
+    "Set-by-set exports from Strong, Hevy and FitNotes. Identical sets collapse into one entry (three rows of 60 × 10 become 3 × 10), warm-up sets are dropped because there is nowhere to mark them, and RPE/RIR becomes an effort rating. Days that already have training are left alone, so importing the same file twice changes nothing." : {
+
+    },
     "Sets per muscle" : {
 
     },
@@ -8184,6 +8199,9 @@
         }
       }
     },
+    "This file doesn't say which unit it used. Everything is stored in kg." : {
+
+    },
     "This goal will also appear in the %@ section." : {
       "localizations" : {
         "pt-BR" : {
@@ -8413,6 +8431,9 @@
           }
         }
       }
+    },
+    "Training history" : {
+
     },
     "Tranquil" : {
       "localizations" : {

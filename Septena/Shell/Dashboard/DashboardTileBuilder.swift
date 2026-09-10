@@ -478,7 +478,11 @@ enum DashboardTileBuilder {
         // real night back a day.) Today's night may still be unsynced (nil →
         // 0); the sparkline trims that trailing zero via trailingTodayPending,
         // and the heatmap just shows today empty until the ring syncs.
-        let bars = ctx.ouraNights.reversed().map { $0.sleepScore ?? 0 }
+        // `ctx.ouraNights` is dense when it comes straight off the network, but
+        // the no-token / cache fallback reads `OuraStore.history`, which only
+        // holds nights that carried data — so ship the dates alongside.
+        let nights = Array(ctx.ouraNights.reversed())
+        let bars = nights.map { $0.sleepScore ?? 0 }
         return HomepageDomainData(
           domain: .sleep,
           title: String(localized: "Sleep", comment: "Section name"),
@@ -492,6 +496,7 @@ enum DashboardTileBuilder {
           ],
           progress: nil,
           history: .bars(bars),
+          historyDates: nights.map(\.date),
           tap: .openSheet(.sleep),
           trailingTodayPending: true,
           autoscaleSparkline: true
@@ -506,15 +511,22 @@ enum DashboardTileBuilder {
         // History series: the heatmap metric preference picks which series
         // every mode renders. Only honor the "fasting" pick when the master
         // toggle is on, otherwise the picker preference is dormant.
-        let history: HistorySeries = {
+        //
+        // Both sources are SPARSE — `daily` carries one point per day that has
+        // entries and the fasting loop skips days it can't bracket — so each
+        // series ships its own ISO dates. Without them the heatmap would
+        // back-date positionally and shift every value earlier than a gap.
+        let (history, historyDates): (HistorySeries, [String]?) = {
           if ctx.nutritionTrackFasting, metric == .fasting {
             let windows = ctx.nutritionStats?.fasting ?? []
             let hours = windows.map { Int(($0.hours ?? 0).rounded()) }
-            return .bars(hours.isEmpty ? Array(repeating: 0, count: 90) : hours)
+            if hours.isEmpty { return (.bars(Array(repeating: 0, count: 90)), nil) }
+            return (.bars(hours), windows.map(\.date))
           }
-          let bars = ctx.nutritionStats?.daily.map { Int($0.proteinG) }
-                    ?? Array(repeating: 0, count: 90)
-          return .bars(bars)
+          guard let daily = ctx.nutritionStats?.daily, !daily.isEmpty else {
+            return (.bars(Array(repeating: 0, count: 90)), nil)
+          }
+          return (.bars(daily.map { Int($0.proteinG) }), daily.map(\.date))
         }()
 
         if ctx.nutritionTrackFasting, case .fasting(_, let since, let totalMin) = state {
@@ -534,6 +546,7 @@ enum DashboardTileBuilder {
                             target: max(targetMin, 1),
                             unit: "h"),
             history: history,
+            historyDates: historyDates,
             tap: .openSheet(.nutrition)
           )
         }
@@ -553,6 +566,7 @@ enum DashboardTileBuilder {
                           target: max(proteinTarget, 1),
                           unit: "g"),
           history: history,
+          historyDates: historyDates,
           tap: .openSheet(.nutrition)
         )
       }

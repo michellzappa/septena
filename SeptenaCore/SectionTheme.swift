@@ -108,6 +108,12 @@ final class SectionTheme {
   /// Used when publishing widget snapshots so the extension needn't run
   /// `SectionTheme`.
   private(set) var tokenByKey: [String: String] = [:]
+  /// The section list the two dictionaries above were last built from. Lets
+  /// `applySections` bail out when nothing moved — see there for why that
+  /// matters. `@ObservationIgnored` because it is bookkeeping, not state any
+  /// view renders. Cleared by `setColor`, which edits `accentByKey` directly
+  /// and so invalidates the correspondence.
+  @ObservationIgnored private var lastAppliedSections: [SectionConfig]?
 
   /// Hydrate from the local mirror / disk cache during construction so the
   /// very first frame the dashboard renders already has the user's accent
@@ -183,10 +189,23 @@ final class SectionTheme {
   /// the SwiftData/CloudKit write is already done by the caller; this just
   /// keeps the in-memory accent cache in sync without a full `refresh()`.
   func setColor(_ raw: String, for sectionKey: String) {
+    // Editing the cache out of band breaks its correspondence with
+    // `lastAppliedSections`, so drop the token — the next `applySections` must
+    // rebuild rather than short-circuit on a stale "nothing moved".
+    lastAppliedSections = nil
     if let c = parseColor(raw) { accentByKey[sectionKey] = c }
   }
 
+  /// Rebuild the accent caches from a section list.
+  ///
+  /// Returns early when the list is byte-identical to the one already applied.
+  /// `accentByKey` / `tokenByKey` are `@Observable`, and essentially every
+  /// surface in the app resolves a color through `color(for:)`, so assigning
+  /// fresh dictionaries invalidates the whole tree. Repainting from an
+  /// unchanged mirror — which is what an inbound CloudKit batch or a
+  /// settings-level post usually is — was doing exactly that for nothing.
   private func applySections(_ sections: [SectionConfig]) {
+    guard sections != lastAppliedSections else { return }
     var byKey: [String: Color] = [:]
     var tokens: [String: String] = [:]
     for s in sections {
@@ -195,6 +214,7 @@ final class SectionTheme {
     }
     accentByKey = byKey
     tokenByKey = tokens
+    lastAppliedSections = sections
   }
 
   // MARK: - Color string parsing

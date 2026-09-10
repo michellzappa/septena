@@ -51,6 +51,40 @@ enum NextFeed {
   /// on-device and the list stays valid all day.
   @MainActor
   static func flat(context: ModelContext, date: String, now: Date) -> [NextItem] {
+    flat(context: context, date: date, now: now, tasks: todayTasks(context: context))
+  }
+
+  /// The task half of the feed — the ONLY part bound to the main actor, because
+  /// `LocalCache` is (`TaskEntity` reads go through the main context). Split out
+  /// so a caller that wants the feed off-main can read this much on the main
+  /// actor, hand the resulting value type across, and build the rest on a
+  /// background context. See `WatchSnapshotPublisher.publish`.
+  @MainActor
+  static func todayTasks(context: ModelContext) -> [NextTaskRow] {
+    let areaTitle = Dictionary(LocalCache.areas(in: context).map { ($0.id, $0.title) },
+                               uniquingKeysWith: { a, _ in a })
+    let projectTitle = Dictionary(LocalCache.projects(in: context).map { ($0.id, $0.title) },
+                                  uniquingKeysWith: { a, _ in a })
+    return LocalCache.tasks(in: context, filter: .today)
+      .filter { $0.status == .open }
+      .map { task in
+        let list = task.project.flatMap { projectTitle[$0] }
+          ?? task.area.flatMap { areaTitle[$0] }
+        return NextTaskRow(id: task.id, title: task.title,
+                           subtitle: list, overdue: task.isOverdue)
+      }
+  }
+
+  /// The feed, given a task list already read on the main actor.
+  ///
+  /// `nonisolated`: everything here — the suggestions engine, `ChecklistMirror`,
+  /// `SettingsMirror` — is a pure read over the `context` it is handed, so this
+  /// runs happily on a background `ModelContext`. That matters because it is the
+  /// expensive half (the suggestions pass alone sweeps 14 days of nutrition and
+  /// 30 days of training), and it used to run on the main actor once per logged
+  /// item via the watch snapshot.
+  nonisolated static func flat(context: ModelContext, date: String, now: Date,
+                               tasks: [NextTaskRow]) -> [NextItem] {
     var entries: [NextEntry] = []
 
     // Suggestions always lead — they're not a section and don't participate
@@ -59,17 +93,9 @@ enum NextFeed {
       NextSuggestionsModel.visibleSuggestions(context: context, now: now).map(NextEntry.suggestion))
 
     // Today's open tasks, tagged with their project/area under the title.
-    let areaTitle = Dictionary(LocalCache.areas(in: context).map { ($0.id, $0.title) },
-                               uniquingKeysWith: { a, _ in a })
-    let projectTitle = Dictionary(LocalCache.projects(in: context).map { ($0.id, $0.title) },
-                                  uniquingKeysWith: { a, _ in a })
-    let taskEntries: [NextEntry] = LocalCache.tasks(in: context, filter: .today)
-      .filter { $0.status == .open }
-      .map { task in
-        let list = task.project.flatMap { projectTitle[$0] }
-          ?? task.area.flatMap { areaTitle[$0] }
-        return .task(id: task.id, title: task.title, subtitle: list, overdue: task.isOverdue)
-      }
+    let taskEntries: [NextEntry] = tasks.map {
+      .task(id: $0.id, title: $0.title, subtitle: $0.subtitle, overdue: $0.overdue)
+    }
 
     // Chores / habits (all buckets) / supplements — already formatted by the
     // ritual builder; bucket each Next block by its declared kind so they
@@ -94,6 +120,15 @@ enum NextFeed {
 
     return entries.enumerated().map { index, entry in entry.asNextItem(sortKey: index) }
   }
+}
+
+/// A Today task, already resolved to plain strings. The value type that lets the
+/// main-actor task read and the off-main feed build be separate steps.
+struct NextTaskRow: Sendable {
+  let id: String
+  let title: String
+  let subtitle: String?
+  let overdue: Bool
 }
 
 /// One composed Next row, before it's flattened to the `NextItem` wire format.

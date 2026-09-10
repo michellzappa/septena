@@ -107,10 +107,11 @@ struct HeatmapTileRow: View {
 
   private var levelByIso: [String: Int] {
     #if WIDGET_EXTENSION
-    HeatmapLevels.buildLevelMap(from: display.history, windowDays: windowDays, today: Date())
+    HeatmapLevels.buildLevelMap(from: display.history, dates: display.historyDates,
+                                windowDays: windowDays, today: Date())
     #else
-    HeatmapLevels.buildLevelMap(from: display.history, windowDays: windowDays,
-                                today: dayClock.now)
+    HeatmapLevels.buildLevelMap(from: display.history, dates: display.historyDates,
+                                windowDays: windowDays, today: dayClock.now)
     #endif
   }
 }

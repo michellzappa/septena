@@ -26,33 +26,27 @@ enum ChecklistMirror {
     }
     let buckets = orderedBuckets.isEmpty ? fallbackHabitBuckets : orderedBuckets
 
-    var grouped: [String: [[String: Any]]] = [:]
-    var doneCount = 0
+    // Built directly. This used to assemble `[String: Any]` dictionaries and
+    // push them through `JSONSerialization` → `JSONDecoder` to land on the very
+    // same value — a leftover of the FastAPI era, still being paid on every
+    // habits read (which is every Next rebuild, i.e. after every logged item).
+    // The `done_count` / `total` / `percent` keys it also computed aren't even
+    // on `HabitsDayResponse`; the decoder dropped them.
+    var grouped: [String: [HabitDayItem]] = [:]
     for def in defs {
       let state = stateByID[def.id]
-      let done = state?.done ?? false
-      let skipped = state?.skipped ?? false
-      if done { doneCount += 1 }
-      grouped[def.bucket, default: []].append([
-        "id": def.id,
-        "name": def.title,
-        "emoji": def.emoji as Any,
-        "bucket": def.bucket,
-        "done": done,
-        "skipped": skipped,
-        "note": state?.note as Any,
-        "time": state.map { EventTimestamp.hhmm(from: $0.occurredAt) } as Any,
-      ])
+      grouped[def.bucket, default: []].append(HabitDayItem(
+        id: def.id,
+        name: def.title,
+        emoji: def.emoji,
+        bucket: def.bucket,
+        done: state?.done ?? false,
+        skipped: state?.skipped ?? false,
+        note: state?.note,
+        time: state.map { EventTimestamp.hhmm(from: $0.occurredAt) }))
     }
 
-    return decode(HabitsDayResponse.self, from: [
-      "date": date,
-      "buckets": buckets,
-      "grouped": grouped,
-      "done_count": doneCount,
-      "total": defs.count,
-      "percent": defs.isEmpty ? 0 : Int(round((Double(doneCount) * 100) / Double(defs.count))),
-    ])
+    return HabitsDayResponse(date: date, buckets: buckets, grouped: grouped)
   }
 
   static func replaceHabitsDay(_ response: HabitsDayResponse, context: ModelContext) {
@@ -372,27 +366,21 @@ enum ChecklistMirror {
     ))) ?? []
     let stateByID = Dictionary(uniqueKeysWithValues: states.map { ($0.supplementID, $0) })
 
-    let items: [[String: Any]] = defs.map { def in
+    // Built directly — see `loadHabitsDay` for why the JSON round-trip went.
+    let items: [SupplementDayItem] = defs.map { def in
       let state = stateByID[def.id]
-      return [
-        "id": def.id,
-        "name": def.title,
-        "emoji": def.emoji as Any,
-        "bucket": def.bucket as Any,
-        "done": state?.done ?? false,
-        "skipped": state?.skipped ?? false,
-        "note": state?.note as Any,
-        "time": state.map { EventTimestamp.hhmm(from: $0.occurredAt) } as Any,
-      ]
+      return SupplementDayItem(
+        id: def.id,
+        name: def.title,
+        emoji: def.emoji,
+        bucket: def.bucket,
+        done: state?.done ?? false,
+        skipped: state?.skipped ?? false,
+        note: state?.note,
+        time: state.map { EventTimestamp.hhmm(from: $0.occurredAt) })
     }
 
-    return decode(SupplementsDayResponse.self, from: [
-      "date": date,
-      "items": items,
-      "done_count": items.filter { ($0["done"] as? Bool) == true }.count,
-      "total": items.count,
-      "percent": items.isEmpty ? 0 : Int(round((Double(items.filter { ($0["done"] as? Bool) == true }.count) * 100) / Double(items.count))),
-    ])
+    return SupplementsDayResponse(date: date, items: items)
   }
 
   static func replaceSupplementsDay(_ response: SupplementsDayResponse, context: ModelContext) {
@@ -506,11 +494,23 @@ enum ChecklistMirror {
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
     ))) ?? []
     if !canonicalDefs.isEmpty {
+      // Newest-first, and only the two actions the fold reads. This used to be
+      // an unbounded, unfiltered fetch of every chore event the account had
+      // ever recorded — sorted ascending, then re-sorted again per chore inside
+      // `choreItem` — on every Next-feed build, i.e. after every logged item.
+      // `choreItem` now walks each group from the newest end and stops as soon
+      // as it has what it needs, so a chore usually costs one or two rows.
+      // Only the two actions the fold consumes; everything else in the event
+      // log (notes, renames, …) hits `choreItem`'s `default: continue`, so
+      // filtering here keeps those rows out of memory entirely.
       let events = (try? context.fetch(FetchDescriptor<ChoreEventEntity>(
-        sortBy: [SortDescriptor(\.sortKey)]
+        predicate: #Predicate { $0.action == "complete" || $0.action == "defer" },
+        sortBy: [SortDescriptor(\.sortKey, order: .reverse)]
       ))) ?? []
       let eventsByChore = Dictionary(grouping: events, by: \.choreID)
-      return canonicalDefs.map { choreItem($0, events: eventsByChore[$0.id] ?? [], today: today) }
+      return canonicalDefs.map {
+        choreItem($0, newestFirst: eventsByChore[$0.id] ?? [], today: today)
+      }
     }
     let rows = (try? context.fetch(FetchDescriptor<ChoreSnapshotEntity>(
       sortBy: [SortDescriptor(\.sortIndex), SortDescriptor(\.title, comparator: .localizedStandard)]
@@ -593,54 +593,58 @@ enum ChecklistMirror {
   }
 
   private static func choreItem(_ row: ChoreSnapshotEntity) -> ChoreItem? {
-    decode(ChoreItem.self, from: [
-      "id": row.id,
-      "name": row.title,
-      "emoji": row.emoji as Any,
-      "due_date": row.dueDate as Any,
-      "last_completed": row.lastCompleted as Any,
-      "last_completed_time": row.lastCompletedTime as Any,
-      "days_overdue": row.daysOverdue,
-      "cadence_days": row.cadenceDays as Any,
-    ])
+    ChoreItem(fromFallbackID: row.id, name: row.title, emoji: row.emoji,
+              dueDate: row.dueDate, lastCompleted: row.lastCompleted,
+              lastCompletedTime: row.lastCompletedTime,
+              daysOverdue: row.daysOverdue, cadenceDays: row.cadenceDays)
   }
 
-  private static func choreItem(_ def: ChoreDefinitionEntity, events: [ChoreEventEntity], today: String) -> ChoreItem {
-    var dueDate = today
+  /// Fold a chore's event log down to its due date + last completion.
+  ///
+  /// `newestFirst` is the chore's `complete`/`defer` events in DESCENDING
+  /// `sortKey` order. Replaying forward (the old shape) meant reading every
+  /// event ever recorded for the chore, but the result only ever depends on the
+  /// tail: the due date comes from the single newest complete-or-defer, and the
+  /// last-completed stamp from the newest `complete`. Walking backwards lets us
+  /// stop the moment both are known — normally after one or two rows.
+  private static func choreItem(_ def: ChoreDefinitionEntity,
+                                newestFirst events: [ChoreEventEntity],
+                                today: String) -> ChoreItem {
+    var dueDate: String?
     var lastCompleted: String?
     var lastCompletedTime: String?
 
-    for event in events.sorted(by: { $0.sortKey < $1.sortKey }) {
+    for event in events {
       switch event.action {
       case "complete":
-        lastCompleted = event.date
-        lastCompletedTime = EventTimestamp.hhmm(from: event.occurredAt)
-        if let next = shift(date: event.date, byDays: def.cadenceDays) {
-          dueDate = next
+        if lastCompleted == nil {
+          lastCompleted = event.date
+          lastCompletedTime = EventTimestamp.hhmm(from: event.occurredAt)
+          // The newest complete also sets the due date, unless a later defer
+          // (seen first, since we walk backwards) already claimed it.
+          if dueDate == nil, let next = shift(date: event.date, byDays: def.cadenceDays) {
+            dueDate = next
+          }
         }
       case "defer":
-        if let newDue = event.newDueDate {
-          dueDate = newDue
-        }
+        // A defer only wins if nothing newer has set the due date. It says
+        // nothing about completion, so keep scanning for the last `complete`.
+        if dueDate == nil, let newDue = event.newDueDate { dueDate = newDue }
       default:
         continue
       }
+      if dueDate != nil, lastCompleted != nil { break }
     }
 
-    let overdue = daysBetween(start: dueDate, end: today)
-    return decode(ChoreItem.self, from: [
-      "id": def.id,
-      "name": def.title,
-      "emoji": def.emoji as Any,
-      "due_date": dueDate,
-      "last_completed": lastCompleted as Any,
-      "last_completed_time": lastCompletedTime as Any,
-      "days_overdue": overdue,
-      "cadence_days": def.cadenceDays,
-    ]) ?? ChoreItem(fromFallbackID: def.id, name: def.title, emoji: def.emoji,
-                    dueDate: dueDate, lastCompleted: lastCompleted,
-                    lastCompletedTime: lastCompletedTime, daysOverdue: overdue,
-                    cadenceDays: def.cadenceDays)
+    let due = dueDate ?? today
+    let overdue = daysBetween(start: due, end: today)
+    // Built directly rather than through `decode` — the dictionary → JSON →
+    // decoder round-trip produced exactly this value, once per chore, on every
+    // read.
+    return ChoreItem(fromFallbackID: def.id, name: def.title, emoji: def.emoji,
+                     dueDate: due, lastCompleted: lastCompleted,
+                     lastCompletedTime: lastCompletedTime, daysOverdue: overdue,
+                     cadenceDays: def.cadenceDays)
   }
 
   private static func shift(date: String, byDays: Int) -> String? {
@@ -652,14 +656,6 @@ enum ChecklistMirror {
     guard let startDate = SeptenaDate.parse(start),
           let endDate = SeptenaDate.parse(end) else { return 0 }
     return Calendar.current.dateComponents([.day], from: startDate, to: endDate).day ?? 0
-  }
-
-  private static func decode<T: Decodable>(_ type: T.Type, from object: [String: Any]) -> T? {
-    guard JSONSerialization.isValidJSONObject(object),
-          let data = try? JSONSerialization.data(withJSONObject: object.compactMapValues { $0 }) else {
-      return nil
-    }
-    return try? JSONDecoder().decode(T.self, from: data)
   }
 
   // MARK: - Gut (CloudKit-backed)
@@ -1460,12 +1456,16 @@ enum ChecklistMirror {
     let todayMealCount = todayEntries.isEmpty ? nil : todayEntries.count
     let todayLatestMeal: String? = todayEntries.map(\.loggedAt).max().map { nutritionTimeStr($0) }
 
-    // Fasting windows: last meal of day N-1 → first meal of day N
+    // Fasting windows: last meal of day N-1 → first meal of day N.
+    // Walk the offsets in reverse so the array comes out OLDEST-FIRST, matching
+    // `daily` above and the convention every `.bars` series renderer assumes
+    // (last element = most recent). Order-independent for the other consumers,
+    // which all key by date — but the dashboard sparkline drew it backwards.
     var fasting: [FastingWindow] = []
     var yesterdayLastMeal: String?
     let firstOfDay: [String: Date] = byDay.compactMapValues { $0.map(\.loggedAt).min() }
     let lastOfDay:  [String: Date] = byDay.compactMapValues { $0.map(\.loggedAt).max() }
-    for offset in 0..<days {
+    for offset in (0..<days).reversed() {
       guard let dayDate = cal.date(byAdding: .day, value: -offset, to: todayDate) else { continue }
       let dayStr = dayKey(dayDate)
       guard let prevDate = cal.date(byAdding: .day, value: -1, to: dayDate) else { continue }

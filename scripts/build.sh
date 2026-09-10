@@ -7,8 +7,16 @@
 # Builds the repo this script LIVES in (not the cwd), so it does the right thing
 # when called as "<main-worktree>/scripts/build.sh" from elsewhere.
 #
-# Usage:  scripts/build.sh [scheme] [destination]
-#   defaults: Septena (iOS, embeds watch+widgets+live activity), generic/platform=iOS
+# Usage:  scripts/build.sh [scheme] [destination] [configuration]
+#   defaults: Septena (iOS, embeds watch+widgets+live activity),
+#             generic/platform=iOS, Release
+#
+# Release is the default because it is what the app actually ships as, and
+# because Debug — even at `-Osize` — differs behaviorally (assertions, no
+# cross-module optimization, and a pile of `#if DEBUG` branches). Verifying on
+# Release means the green gate matches what runs on device. Pass a third
+# argument (or set SEPTENA_CONFIG) for a Debug compile:
+#     scripts/build.sh SeptenaMac 'platform=macOS' Debug
 set -o pipefail
 
 LOCKDIR="/tmp/auto-build.lock.d"
@@ -17,6 +25,7 @@ MAX_WAIT=1800       # give up after 30m of waiting
 
 SCHEME="${1:-Septena}"
 DEST="${2:-generic/platform=iOS}"
+CONFIG="${3:-${SEPTENA_CONFIG:-Release}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" \
@@ -34,7 +43,20 @@ REPO="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" \
 # Both iOS app schemes embed a watch app (see each target's `dependencies:` in
 # project.yml: Septena→SeptenaWatch, Septask→SeptaskWatch) — the Mac schemes
 # don't, and must not be gated.
-if [ "$SCHEME" = "Septena" ] || [ "$SCHEME" = "Septask" ]; then
+# Loud, unmissable notice while the watch apps are unembedded (the
+# WATCH_EMBED_DISABLED escape hatch in project.yml). Easy to set and forget, and
+# forgetting it ships an App Store build with no watch app.
+if grep -q '^ *#- target: Septena\?Watch\|WATCH_EMBED_DISABLED' "$REPO/project.yml" 2>/dev/null; then
+  echo "build.sh: ⛔️  WATCH_EMBED_DISABLED is active in project.yml — the watch"
+  echo "build.sh:     apps are NOT embedded. Fine for local speed testing; restore"
+  echo "build.sh:     before archiving. See the banner in project.yml."
+fi
+
+# Skip the watchOS runtime precondition when the watch apps aren't embedded —
+# without the dependency, xcodebuild never resolves a watch destination.
+if grep -q 'WATCH_EMBED_DISABLED' "$REPO/project.yml" 2>/dev/null; then
+  :
+elif [ "$SCHEME" = "Septena" ] || [ "$SCHEME" = "Septask" ]; then
   want="$(xcodebuild -showsdks 2>/dev/null \
           | sed -n 's/.*-sdk watchsimulator\([0-9][0-9.]*\).*/\1/p' | head -1)"
   if [ -n "$want" ] && ! xcrun simctl list runtimes 2>/dev/null \
@@ -95,6 +117,6 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
 # mismatches seen 2026-07-11), so each toolchain gets its own cache.
 DERIVED="/tmp/septena-agent-derived/$(printf '%s' "$REPO|${DEVELOPER_DIR:-default}" | shasum | cut -c1-12)"
 
-echo "build.sh: building $SCHEME [$DEST] in $REPO (derived: $DERIVED)"
-( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration Debug \
+echo "build.sh: building $SCHEME [$DEST] $CONFIG in $REPO (derived: $DERIVED)"
+( cd "$REPO" && xcodebuild -scheme "$SCHEME" -destination "$DEST" -configuration "$CONFIG" \
     -derivedDataPath "$DERIVED" build )

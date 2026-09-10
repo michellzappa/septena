@@ -39,12 +39,24 @@ enum SettingsMirror {
   // `@MainActor` and only this read opts out).
   nonisolated static func loadSettings(context: ModelContext) -> AppSettings? {
     let singletonID = SettingsCloudKitSchema.singletonID
-    let descriptor = FetchDescriptor<SettingsEntity>(
+    var descriptor = FetchDescriptor<SettingsEntity>(
       predicate: #Predicate { $0.id == singletonID }
     )
+    descriptor.fetchLimit = 1   // it's a singleton by definition
     guard let entity = try? context.fetch(descriptor).first else { return nil }
-    return try? JSONDecoder().decode(AppSettings.self, from: entity.payloadData)
+    return settingsCache.value(forPayload: entity.payloadData)
   }
+
+  /// Memoized decode of the settings singleton, keyed by the payload bytes.
+  ///
+  /// `loadSettings` has ~20 direct call sites and `loadSections` calls it too
+  /// (for `sectionOrder` alone), which puts it on essentially every read path in
+  /// the app — the Next feed, the watch snapshot, the suggestions engine, the
+  /// root data-changed listener. Each call was allocating a fresh `JSONDecoder`
+  /// and re-decoding the whole blob (targets, units, macros, reports, the Next
+  /// skip map…) to answer one question. The payload changes only when settings
+  /// are written, so comparing the bytes is a cheap, exact cache key.
+  private static let settingsCache = SettingsPayloadCache()
 
   // `nonisolated`: a pure context read (mirrors `loadSettings`), so the Next
   // suggestions scorer can resolve enabled sections on a background context
@@ -502,5 +514,31 @@ enum SettingsMirror {
       predicate: #Predicate { $0.id == key }
     )
     return (try? context.fetch(descriptor).first)?.showInSpotlight ?? true
+  }
+}
+
+/// Byte-keyed memo for the decoded settings blob. `@unchecked Sendable` with an
+/// explicit lock: `loadSettings` is `nonisolated` and genuinely runs on both the
+/// main actor and background model actors, and `AppSettings` is a value type
+/// that is safe to hand across once decoded.
+private final class SettingsPayloadCache: @unchecked Sendable {
+  private let lock = NSLock()
+  private var payload: Data?
+  private var decoded: AppSettings?
+  private let decoder = JSONDecoder()
+
+  func value(forPayload data: Data) -> AppSettings? {
+    lock.lock()
+    if payload == data {
+      defer { lock.unlock() }
+      return decoded
+    }
+    // Decode under the lock: it also serializes access to `decoder`, which is a
+    // reference type and must not be entered concurrently.
+    let fresh = try? decoder.decode(AppSettings.self, from: data)
+    payload = data
+    decoded = fresh
+    lock.unlock()
+    return fresh
   }
 }

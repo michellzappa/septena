@@ -150,8 +150,8 @@ private struct HeatmapDomainCard: View {
 
   private var levelByIso: [String: Int] {
     let today = SeptenaDate.parse(clock.today) ?? Date()
-    return HeatmapLevels.buildLevelMap(from: data.history?.wire, windowDays: windowDays,
-                                       today: today)
+    return HeatmapLevels.buildLevelMap(from: data.history?.wire, dates: data.historyDates,
+                                       windowDays: windowDays, today: today)
   }
 }
 

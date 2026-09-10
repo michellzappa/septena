@@ -17,6 +17,15 @@ import SwiftData
 
 @Model
 final class TaskEntity {
+  // Query-shape indexes. Every list read funnels through
+  // `LocalCache.fetchEntities(for:)`, whose predicates are all built from these
+  // columns — `deletedAt == nil && !pendingDeletion && statusRaw == "open"` for
+  // the day feeds, plus `project` / `area` for the detail lists and
+  // `completedAt` for the logbook's sort. Unindexed, each of those was a full
+  // table scan of every task the account has ever held, on the main thread, on
+  // every sidebar click and every sync pulse.
+  #Index<TaskEntity>([\.deletedAt], [\.statusRaw], [\.project], [\.area], [\.completedAt])
+
   @Attribute(.unique) var id: String
   var title: String
   var statusRaw: String
@@ -250,6 +259,9 @@ final class TaskEntity {
 
 @Model
 final class ProjectEntity {
+  // Mirrors `TaskEntity` — the sidebar filters on both columns.
+  #Index<ProjectEntity>([\.deletedAt], [\.area])
+
   @Attribute(.unique) var id: String
   var title: String
   var statusRaw: String
@@ -465,6 +477,9 @@ final class HabitDefinitionEntity {
 
 @Model
 final class HabitDayStateEntity {
+  // Read by day (`date == today`) and by habit (streak history).
+  #Index<HabitDayStateEntity>([\.date], [\.habitID])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -532,6 +547,9 @@ final class SupplementDefinitionEntity {
 
 @Model
 final class SupplementDayStateEntity {
+  // Read by day, and by supplement when deleting a definition's history.
+  #Index<SupplementDayStateEntity>([\.date], [\.supplementID])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -569,6 +587,9 @@ final class SupplementDayStateEntity {
 
 @Model
 final class GoalEntity {
+  // Goals are resolved by their metric key (intake caps, macro targets, …).
+  #Index<GoalEntity>([\.metricKey])
+
   @Attribute(.unique) var id: String
   var text: String
   var sections: [String]
@@ -651,6 +672,9 @@ final class GoalEntity {
 /// detected them — CloudKit-fetched rows fold in quietly.
 @Model
 final class GoalMilestoneEntity {
+  // Ordered by detection instant for the presentation queue.
+  #Index<GoalMilestoneEntity>([\.occurredAt])
+
   @Attribute(.unique) var id: String   // deterministic: "<scope>|<rungKey>"
   var goalID: String?                  // owning goal, nil for goal-less scopes (PR/XP/streak)
   var scope: String                    // "goal:<id>" | "exercise:<slug>" | "habit:<id>" | "training.volume"
@@ -827,6 +851,9 @@ final class ChoreDefinitionEntity {
 
 @Model
 final class ChoreEventEntity {
+  // Grouped by chore for the due-date roll-up; windowed by date for history.
+  #Index<ChoreEventEntity>([\.date], [\.choreID])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -866,6 +893,9 @@ final class ChoreEventEntity {
 
 @Model
 final class GutEventEntity {
+  // Day-scoped reads (the drawer, the Next feed, the rhythm dial).
+  #Index<GutEventEntity>([\.date])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -908,6 +938,9 @@ final class GutEventEntity {
 
 @Model
 final class MoodEventEntity {
+  // Day-scoped reads — the check-in gate gets hit on every suggestions pass.
+  #Index<MoodEventEntity>([\.date])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -998,6 +1031,9 @@ final class SymptomDefinitionEntity {
 
 @Model
 final class SymptomEventEntity {
+  // Day-scoped reads, plus per-definition history.
+  #Index<SymptomEventEntity>([\.date], [\.symptomID])
+
   @Attribute(.unique) var id: String
   var occurredAt: Date = Date.distantPast
   var date: String
@@ -1107,6 +1143,9 @@ final class MedicationDefinitionEntity {
 
 @Model
 final class MedicationDoseEventEntity {
+  // Day-scoped reads, plus per-definition history.
+  #Index<MedicationDoseEventEntity>([\.date], [\.medicationID])
+
   @Attribute(.unique) var id: String
   var occurredAt: Date = Date.distantPast
   var date: String
@@ -1258,6 +1297,10 @@ final class IntakeItemEntity {
 
 @Model
 final class IntakeEventEntity {
+  // The suggestions engine sweeps 14 days of these on every Next rebuild and
+  // then groups by tracker — both columns are on that hot path.
+  #Index<IntakeEventEntity>([\.date], [\.kindID])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant. Derived from `date`/`time` via `EventTimestamp` on
   /// write; `.distantPast` only on pre-migration rows.
@@ -1363,6 +1406,9 @@ final class GroceryCategoryEntity {
 
 @Model
 final class ExerciseEntryEntity {
+  // Windowed by date (trailing week / 30-day suggestion history).
+  #Index<ExerciseEntryEntity>([\.date])
+
   @Attribute(.unique) var id: String
   /// Canonical UTC instant of the event. Derived from `date`/`time` via
   /// `EventTimestamp` on write; `.distantPast` only on pre-migration rows.
@@ -1504,6 +1550,10 @@ final class SessionTypeEntity {
 
 @Model
 final class NutritionEntryEntity {
+  // Every nutrition read is `loggedAt >= since` ordered by `loggedAt` — the
+  // 14-day suggestions sweep and the 120-day top-meals sweep both ride it.
+  #Index<NutritionEntryEntity>([\.loggedAt])
+
   @Attribute(.unique) var id: String
   var loggedAt: Date
   var updatedAt: Date
@@ -1589,6 +1639,9 @@ final class NutritionEntryEntity {
 
 @Model
 final class NutritionDailySummaryEntity {
+  // Day-keyed lookups.
+  #Index<NutritionDailySummaryEntity>([\.date])
+
   @Attribute(.unique) var id: String    // YYYY-MM-DD in user TZ at compute time
   var date: String                       // same
   var entryCount: Int
@@ -1661,6 +1714,9 @@ final class NutritionDailySummaryEntity {
 /// and every surface — including macOS, which has no HealthKit — reads it back.
 @Model
 final class ActivityDayEntity {
+  // Day-keyed lookups.
+  #Index<ActivityDayEntity>([\.date])
+
   @Attribute(.unique) var id: String   // yyyy-MM-dd in the device TZ at ingest
   var date: String                      // same string, kept for symmetry/query
   var stepCount: Int?                   // nil when HealthKit had no step data

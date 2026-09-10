@@ -31,7 +31,11 @@ struct AboutSettingsPane: View {
               .multilineTextAlignment(.center)
           }
           VStack(spacing: 2) {
-            Text("Version \(version) (\(build))")
+            // The configuration rides along deliberately: a Debug binary and
+            // a Release one feel very different, and Xcode can keep running a
+            // stale Debug build after the project is regenerated. This makes
+            // "which build am I actually holding" a one-look question.
+            Text("Version \(version) (\(build)) · \(BuildConfig.name)")
             Text(platformLabel)
           }
           .font(.caption)

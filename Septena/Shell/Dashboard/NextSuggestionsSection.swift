@@ -452,7 +452,11 @@ final class NextSuggestionsModel {
   }
 
   /// Suggestions minus the ones the user skipped today — what actually renders.
-  static func visibleSuggestions(context ctx: ModelContext, now: Date) -> [NextSuggestion] {
+  ///
+  /// `nonisolated` to match `computeAll`: both are pure reads over the handed
+  /// context plus a `UserDefaults` lookup, so the headless feed builder can run
+  /// them on a background context instead of the main actor.
+  nonisolated static func visibleSuggestions(context ctx: ModelContext, now: Date) -> [NextSuggestion] {
     let today = SeptenaDate.format(now) ?? ""
     let skips = loadSkips(date: today)
     return computeAll(context: ctx, now: now).filter { !skips.contains($0.id) }
@@ -475,9 +479,9 @@ final class NextSuggestionsModel {
 
   // MARK: Skips persistence
 
-  private static func skipKey(date: String) -> String { "septena.next.skips.\(date)" }
+  nonisolated private static func skipKey(date: String) -> String { "septena.next.skips.\(date)" }
 
-  private static func loadSkips(date: String) -> Set<String> {
+  nonisolated private static func loadSkips(date: String) -> Set<String> {
     Set(UserDefaults.standard.stringArray(forKey: skipKey(date: date)) ?? [])
   }
 

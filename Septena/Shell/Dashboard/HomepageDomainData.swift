@@ -98,6 +98,12 @@ struct HomepageDomainData: Identifiable {
   let headlineStats: [DomainStat]
   let progress: DomainProgress?
   let history: HistorySeries?
+  /// One ISO day per `history` element, in the same order. Domains whose
+  /// series can be sparse (Oura sleep when the ring wasn't worn, nutrition
+  /// days with no meals) set this so the Heatmap renderer keys cells by date
+  /// rather than back-dating from today by index. Nil = dense, one element
+  /// per day, ending today.
+  var historyDates: [String]? = nil
   let tap: DomainTapAction
   /// Render the Dense-mode sparkline as a **trailing-7-day moving
   /// average** instead of raw daily values. For domains where the
@@ -154,6 +160,7 @@ extension HomepageDomainData {
       headline: headline,
       headlineStats: headlineStats.map(\.wire),
       history: history?.wire,
+      historyDates: historyDates,
       trailingTodayPending: trailingTodayPending
     )
   }

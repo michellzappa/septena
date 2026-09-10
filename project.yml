@@ -68,9 +68,16 @@ targets:
       - target: SeptenaShare
         embed: true
         codeSign: true
-      - target: SeptenaWatch
-        embed: true
-        codeSign: true
+      # ⛔️ WATCH_EMBED_DISABLED — TEMPORARY, MUST BE RESTORED BEFORE ANY RELEASE.
+      # Uncommented = the Septena app embeds SeptenaWatch. While it's commented out the
+      # iOS scheme neither builds nor needs a watchOS runtime, which is the only
+      # way to run Septena on device when the installed watchOS simulator runtimes
+      # don't match the SDK this Xcode ships. Nothing else changes.
+      # Re-enable: delete the three '#' below, then `xcodegen generate`.
+      # An archive/upload made in this state SHIPS WITHOUT THE WATCH APP.
+      #- target: SeptenaWatch
+      #  embed: true
+      #  codeSign: true
       - sdk: FoundationModels.framework
       - target: SeptenaLiveActivitiesExtension
         embed: true
@@ -274,7 +281,6 @@ targets:
       # meal). Included by
       # file, never by folder — the rest of Shell/Dashboard and the section
       # folders reach into surfaces Septask doesn't compile.
-      - path: Septena/Shell/Dashboard/MirrorReader.swift
       # Shared reconnect cue: Septask puts the same direct recovery affordance
       # on Today that Septena shows on its dashboard.
       - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
@@ -294,9 +300,16 @@ targets:
       - target: SeptaskShare
         embed: true
         codeSign: true
-      - target: SeptaskWatch
-        embed: true
-        codeSign: true
+      # ⛔️ WATCH_EMBED_DISABLED — TEMPORARY, MUST BE RESTORED BEFORE ANY RELEASE.
+      # Uncommented = the Septask app embeds SeptaskWatch. While it's commented out the
+      # iOS scheme neither builds nor needs a watchOS runtime, which is the only
+      # way to run Septask on device when the installed watchOS simulator runtimes
+      # don't match the SDK this Xcode ships. Nothing else changes.
+      # Re-enable: delete the three '#' below, then `xcodegen generate`.
+      # An archive/upload made in this state SHIPS WITHOUT THE WATCH APP.
+      #- target: SeptaskWatch
+      #  embed: true
+      #  codeSign: true
       # MealPhotoModelAnalyzer (meal-photo macro estimation) imports
       # FoundationModels — same dependency the other three app targets carry.
       - sdk: FoundationModels.framework
@@ -469,7 +482,6 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
       # Embedded Next fold — same file set as the Septask target (lockstep).
-      - path: Septena/Shell/Dashboard/MirrorReader.swift
       - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
       - path: Septena/Shell/Dashboard/NextItemsSection.swift
       - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
@@ -901,6 +913,23 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: SeptaskMac
 
+# Run actions build **Release**, deliberately.
+#
+# Debug is already `-Osize` (see the `configs` block above), but that is not the
+# same thing as Release: Debug still carries assertions, no cross-module
+# optimization, and — because so much behavior is `#if DEBUG`-gated — a
+# materially different app. Speed work has to be measured on the build that
+# ships, so ⌘R gives you that build. Consequences worth knowing:
+#   • debug-only affordances are gone at runtime — the dashboard's ⟨ / ⟩ day
+#     time-travel strip, the Milestones preview row, the server inspector;
+#   • telemetry is LIVE in Release (`Telemetry` / `SeptaskDiagnostics` return
+#     early only under `#if DEBUG`), so dev runs post to the community worker;
+#   • step-debugging is effectively gone (it was already imprecise under -Osize).
+# Flip a scheme's `run: config:` back to `Debug` here for a debugging session.
+#
+# `test:` stays on Debug ON PURPOSE and must not be flipped: the UI-test and
+# App Store screenshot pipeline runs against `DemoSeedMode` (`-SeptenaSeed`),
+# which is compiled out of Release.
 schemes:
   Septena:
     build:
@@ -946,7 +975,7 @@ schemes:
       targets:
         SeptaskMac: all
     run:
-      config: Debug
+      config: Release
     test:
       config: Debug
       targets:
@@ -963,7 +992,7 @@ schemes:
       targets:
         SeptenaWatch: all
     run:
-      config: Debug
+      config: Release
     profile:
       config: Release
     analyze:
@@ -976,7 +1005,7 @@ schemes:
       targets:
         SeptaskWatch: all
     run:
-      config: Debug
+      config: Release
     profile:
       config: Release
     analyze:
@@ -989,7 +1018,7 @@ schemes:
       targets:
         SeptenaMac: all
     run:
-      config: Debug
+      config: Release
       storeKitConfiguration: Config/Septena.storekit
     test:
       config: Debug

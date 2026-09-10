@@ -94,7 +94,10 @@ private struct SeptaskMainWindow: View {
     SeptaskRootView()
       .overlay { LogCommitOverlay() }
       .septaskWelcomeGate()
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { _ in
+      // Unscoped posts only — see the same listener in `Septena/App/App.swift`
+      // for why a scoped life-data post can never have moved the section mirror.
+      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
+        guard note.isCloudKitBatch else { return }
         settingsStore.reloadFromMirror(context: localStore.container.mainContext)
         theme.paintFromCache()
       }

@@ -58,7 +58,7 @@ enum WatchSnapshotPublisher {
       try? await Task.sleep(for: .milliseconds(1200))
       guard !Task.isCancelled else { return }
       pending = nil
-      publish(context: context, date: date, now: now)
+      await publish(context: context, date: date, now: now)
     }
   }
 
@@ -115,15 +115,86 @@ enum WatchSnapshotPublisher {
     #endif
   }
 
-  /// Compute on the main actor (SwiftData read), then save off-main. Best-effort:
-  /// a failed write is retried by the next mutation / foreground. Prefer
-  /// `schedule` from mutation paths so rapid edits don't each pay the full cost.
+  /// Rebuild and republish the snapshot. Best-effort: a failed write is retried
+  /// by the next mutation / foreground. Prefer `schedule` from mutation paths so
+  /// rapid edits don't each pay the full cost.
+  ///
+  /// Split in two on purpose:
+  ///
+  ///   • the main actor reads only what is bound to it — the Today task rows,
+  ///     the macro / training rings, the fasting anchor, the tasks-widget
+  ///     snapshot (all `LocalCache`-backed, so `@MainActor`);
+  ///   • everything else is built on `MirrorReader`'s background context.
+  ///
+  /// The second half is the expensive one — the suggestions engine over 14 days
+  /// of nutrition and 30 of training, a 120-day meal sweep, the ritual feed, the
+  /// three capture catalogs, and the JSON encode — and it used to run on the
+  /// main actor once per logged item (debounced, but still a main-thread stall a
+  /// beat after every tap). Nothing in it writes, so a background context is
+  /// safe; it just needs its inputs handed over as value types. The background
+  /// context reads committed rows only — fine here, because every mutator saves
+  /// before it posts and `schedule` debounces a further 1.2s on top.
   @MainActor
-  static func publish(context: ModelContext, date: String, now: Date) {
+  static func publish(context: ModelContext, date: String, now: Date) async {
+    // Main-actor inputs, read once and passed across.
+    let taskRows = NextFeed.todayTasks(context: context)
+    // Today's macro totals-so-far vs targets, for the watch macro-ring
+    // complication. Nil when nutrition is untracked / no goals, so the wire
+    // stays additive.
+    let nutritionRings = NutritionRingsBuilder.buildRings(context: context, date: date)
+    // This week's training (trailing 7 days) vs targets, for the watch's
+    // training-ring complication. Present whenever a target exists (they always
+    // have built-in defaults), so it mirrors the macro rings' availability.
+    let trainingRings = buildTrainingRings(context: context, today: date)
+    // The fasting context (last-meal anchor + target), if the user tracks fasting
+    // and has a recent meal — the watch decides fed-vs-fasting itself from this
+    // and morphs the macro complication into a fasting face when due. Nil when
+    // untracked / no meal, so the wrist keeps showing macros.
+    let fasting = buildFasting(context: context)
+    // Recent meal / training rows for the watch summary pages' freshness lists.
+    // Built only when the rings rode along (same data presence), so a page that
+    // shows nothing carries no list either. Training reads `TrainingMetrics`
+    // (`@MainActor`), so it stays here with the rings.
+    let recentTraining = trainingRings != nil
+      ? buildRecentTraining(context: context, today: date) : []
+
+    let payload = await MirrorReader.shared.read { ctx in
+      buildPayload(context: ctx, date: date, now: now, tasks: taskRows,
+                   nutritionRings: nutritionRings, trainingRings: trainingRings,
+                   fasting: fasting, recentTraining: recentTraining)
+    }
+    guard let payload else { return }
+
+    // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot. Same
+    // trigger as the watch complication's reload — every checklist edit and app
+    // foreground flows through here. The kind string matches `NextWidget.kind`
+    // in the SeptenaWidgets target (separate module, so it can't be referenced
+    // directly). No-op on platforms without the widget.
+    #if os(iOS)
+    WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
+    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: context))
+    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
+    #endif
+
+    Task.detached(priority: .utility) {
+      await save(payload: payload, date: date)
+    }
+  }
+
+  /// The off-main half — see `publish`. Pure reads over `context`, which is
+  /// `MirrorReader`'s background context, never the view's.
+  nonisolated private static func buildPayload(
+    context: ModelContext, date: String, now: Date,
+    tasks: [NextTaskRow],
+    nutritionRings: NutritionRingsWire?,
+    trainingRings: TrainingRingsWire?,
+    fasting: FastingWire?,
+    recentTraining: [RecentLogWire]
+  ) -> Data? {
     // The full Next feed (suggestions + tasks/chores/habits/supplements in the
     // user's saved section order) comes from the one shared builder, so the
     // watch snapshot can never diverge from the app's Next list.
-    let items = NextFeed.flat(context: context, date: date, now: now)
+    let items = NextFeed.flat(context: context, date: date, now: now, tasks: tasks)
     // Carry this phone's current bucket cutoffs in the payload so the watch
     // applies the same morning/afternoon/evening boundaries. The watch has its
     // own separate app-group container — the phone's DayBucket.saveCutoffs()
@@ -191,19 +262,6 @@ enum WatchSnapshotPublisher {
     // (foods + macros) with one tap — frequency-then-recency ranked, capped to
     // a wrist-sized list.
     let topMeals = buildTopMeals(context: context)
-    // Today's macro totals-so-far vs targets, for the watch macro-ring
-    // complication. Nil when nutrition is untracked / no goals, so the wire
-    // stays additive.
-    let nutritionRings = NutritionRingsBuilder.buildRings(context: context, date: date)
-    // This week's training (trailing 7 days) vs targets, for the watch's
-    // training-ring complication. Present whenever a target exists (they always
-    // have built-in defaults), so it mirrors the macro rings' availability.
-    let trainingRings = buildTrainingRings(context: context, today: date)
-    // The fasting context (last-meal anchor + target), if the user tracks fasting
-    // and has a recent meal — the watch decides fed-vs-fasting itself from this
-    // and morphs the macro complication into a fasting face when due. Nil when
-    // untracked / no meal, so the wrist keeps showing macros.
-    let fasting = buildFasting(context: context)
     // The medications / symptoms / groceries capture catalogs, each gated on the
     // section being enabled so the wrist + menu is dynamic — disabling a section
     // on the phone drops its rows from the watch on the next publish.
@@ -214,12 +272,11 @@ enum WatchSnapshotPublisher {
       ? buildSymptoms(context: context) : []
     let groceries = enabledKeys.contains("groceries")
       ? buildGroceries(context: context) : []
-    // Recent meal / training rows for the watch summary pages' freshness lists.
-    // Built only when the rings rode along (same data presence), so a page that
-    // shows nothing carries no list either.
+    // Recent meal rows for the watch summary pages' freshness list. Built only
+    // when the rings rode along (same data presence), so a page that shows
+    // nothing carries no list either. (`recentTraining` is read on the main
+    // actor by `publish` — `TrainingMetrics` is `@MainActor`.)
     let recentNutrition = nutritionRings != nil ? buildRecentNutrition(context: context) : []
-    let recentTraining = trainingRings != nil
-      ? buildRecentTraining(context: context, today: date) : []
     let response = NextItemsResponse(date: date, bucket: "", items: items,
                                      morningCutoff: cutoffs.morningEnd,
                                      afternoonCutoff: cutoffs.afternoonEnd,
@@ -238,8 +295,6 @@ enum WatchSnapshotPublisher {
                                      recentNutrition: recentNutrition.isEmpty ? nil : recentNutrition,
                                      recentTraining: recentTraining.isEmpty ? nil : recentTraining,
                                      intakeToday: intakeToday.isEmpty ? nil : intakeToday)
-    guard let payload = try? JSONEncoder().encode(response) else { return }
-
     // The time-wheel/day-dial widget is DISABLED for now (its glass face can't
     // render in a widget snapshot — see `SeptenaWidgetsBundle`), so we skip
     // building + publishing its `RhythmWire` blob: no point paying the
@@ -253,21 +308,7 @@ enum WatchSnapshotPublisher {
     //   let rhythm = RhythmSnapshotBuilder.build(context: context, sections: configs,
     //                                            todayStart: todayStart, windowDays: 1)
     //   let rhythmPayload = try? JSONEncoder().encode(rhythm)
-
-    // Nudge the iOS "Next" home/lock-screen widget to re-read the snapshot. Same
-    // trigger as the watch complication's reload — every checklist edit and app
-    // foreground flows through here. The kind string matches `NextWidget.kind`
-    // in the SeptenaWidgets target (separate module, so it can't be referenced
-    // directly). No-op on platforms without the widget.
-    #if os(iOS)
-    WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
-    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: context))
-    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
-    #endif
-
-    Task.detached(priority: .utility) {
-      await save(payload: payload, date: date)
-    }
+    return try? JSONEncoder().encode(response)
   }
 
   // MARK: - Top meals (wrist quick-add)
@@ -282,8 +323,7 @@ enum WatchSnapshotPublisher {
   /// `allDistinctMeals` (the Nutrition "+" meal search): group by a normalized
   /// food signature, keep the most-recent instance as the template, exclude the
   /// macro-free water marker (hydration has its own quick-log).
-  @MainActor
-  private static func buildTopMeals(context: ModelContext) -> [MealWire] {
+  nonisolated private static func buildTopMeals(context: ModelContext) -> [MealWire] {
     let since = SeptenaDate.format(
       Calendar.current.date(byAdding: .day, value: -topMealsWindowDays, to: Date()))
     let entries = ChecklistMirror.loadNutritionEntries(context: context, since: since)
@@ -355,8 +395,7 @@ enum WatchSnapshotPublisher {
   /// The newest few logged meals (last `recentLogWindowDays`, newest first), so
   /// the watch's Macros page can list them under the rings as a freshness check.
   /// `loadNutritionEntries` already sorts newest-first by `loggedAt`.
-  @MainActor
-  private static func buildRecentNutrition(context: ModelContext) -> [RecentLogWire] {
+  nonisolated private static func buildRecentNutrition(context: ModelContext) -> [RecentLogWire] {
     let since = SeptenaDate.format(
       Calendar.current.date(byAdding: .day, value: -recentLogWindowDays, to: Date()))
     let entries = ChecklistMirror.loadNutritionEntries(context: context, since: since)
@@ -499,8 +538,7 @@ enum WatchSnapshotPublisher {
   /// The user's active medications for the wrist "mark taken" menu, in their
   /// saved order. `detail` is the strength ("500 mg") else the form, so the row
   /// can disambiguate two meds with the same name.
-  @MainActor
-  private static func buildMedications(context: ModelContext) -> [MedicationWire] {
+  nonisolated private static func buildMedications(context: ModelContext) -> [MedicationWire] {
     let rows = (try? context.fetch(FetchDescriptor<MedicationDefinitionEntity>(
       predicate: #Predicate { !$0.archived },
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
@@ -518,8 +556,7 @@ enum WatchSnapshotPublisher {
   }
 
   /// The user's active symptom catalog for the wrist severity menu, in saved order.
-  @MainActor
-  private static func buildSymptoms(context: ModelContext) -> [SymptomWire] {
+  nonisolated private static func buildSymptoms(context: ModelContext) -> [SymptomWire] {
     let rows = (try? context.fetch(FetchDescriptor<SymptomDefinitionEntity>(
       predicate: #Predicate { !$0.archived },
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []
@@ -529,8 +566,7 @@ enum WatchSnapshotPublisher {
   /// The user's in-stock grocery items for the wrist "mark low" menu, in saved
   /// order. Only items currently `low == false` — marking low is the wrist
   /// action, so an already-low item has nothing to do here.
-  @MainActor
-  private static func buildGroceries(context: ModelContext) -> [GroceryWire] {
+  nonisolated private static func buildGroceries(context: ModelContext) -> [GroceryWire] {
     let rows = (try? context.fetch(FetchDescriptor<GroceryItemEntity>(
       predicate: #Predicate { !$0.low },
       sortBy: [SortDescriptor(\.sortIndex)]))) ?? []

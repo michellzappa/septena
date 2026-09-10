@@ -128,6 +128,13 @@ final class SettingsStore {
   /// CloudKit pull and on `.septenaDataChanged` so `sections` stays in parity
   /// with `SectionEntity` rows (the tab bar, dashboard tiles, and Settings all
   /// read this cache).
+  ///
+  /// `sections` is only reassigned when the mirror actually moved. This store is
+  /// `@Observable` and the tab bar / every dashboard tile / Settings read the
+  /// array, so an unconditional assignment invalidated all of them — and the
+  /// paired `ResponseCache.save` re-encoded the same JSON to disk — on every
+  /// inbound CloudKit batch, which during a sync burst is many per second.
+  /// `SectionConfig` is `Hashable`, so the comparison is cheap and exact.
   func reloadFromMirror(context: ModelContext) {
     if let v = SettingsMirror.loadSettings(context: context) {
       serverSettings = v
@@ -135,6 +142,7 @@ final class SettingsStore {
       HealthKitBridge.shared.syncSettings = v.hkSync ?? HKSyncSettings()
     }
     let mirroredSections = SettingsMirror.loadSections(context: context)
+    guard mirroredSections != sections else { return }
     sections = mirroredSections
     if !mirroredSections.isEmpty {
       ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
