@@ -157,6 +157,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   /// on the main run loop and preserve the latest selection key.
   private var rebuildWorkItem: DispatchWorkItem?
   private var pendingPreservedKey: String?
+  /// True while `rebuild` re-applies the selection it preserved across
+  /// `reloadData()`. That reselect is a repaint, not navigation: it must not
+  /// fire `onSelect`, because the window's route handler answers every
+  /// `onSelect` with `list.focusList()` — and since the rebuild is coalesced
+  /// onto the next run-loop tick (`scheduleRebuild`), that focus move landed
+  /// right after ⌘N / the "New task" line had attached its field editor. The
+  /// editor resigned with an empty title, `commitRename` purged the draft,
+  /// and the new row vanished before a character was typed.
+  private var isRestoringSelection = false
   /// Which areas the user has folded shut, by `Node.key`. THE source of truth
   /// for the fold — `numberOfChildrenOfItem` reads it (see the long comment
   /// there for why NSOutlineView's own expansion can't be used).
@@ -480,7 +489,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     restoreExpansion()
 
     if let key, let row = row(forKey: key) {
+      isRestoringSelection = true
       outlineView.selectRowIndexes([row], byExtendingSelection: false)
+      isRestoringSelection = false
     }
   }
 
@@ -997,6 +1008,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   func outlineViewSelectionDidChange(_ notification: Notification) {
+    // A rebuild restoring the row it already had is not a navigation.
+    guard !isRestoringSelection else { return }
     guard outlineView.selectedRow >= 0,
           let node = outlineView.item(atRow: outlineView.selectedRow) as? Node else { return }
     switch node.content {
