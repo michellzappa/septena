@@ -270,6 +270,13 @@ private struct SeptaskAccountPane: View {
       } footer: {
         Text("Septask keeps your tasks in your private iCloud — nothing lives on a server of ours.")
       }
+
+      // Next to Sync because the two answer the same worry — "is my work
+      // actually stored?" — from opposite ends: Sync covers the trip to
+      // iCloud, this covers the local write that has to land first. Renders
+      // nothing when no save has failed this launch. Septask has no Data Tools
+      // pane (that lives in Septena ▸ Advanced), so this is its only home.
+      StoreHealthSettingsSection()
     }
     .formStyle(.grouped)
     .navigationTitle("Account")

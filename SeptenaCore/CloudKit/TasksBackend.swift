@@ -74,12 +74,21 @@ final class CloudKitTasksBackend {
   }
 
   /// Persists the local mutation, tells the engine, posts the notification
-  /// so views repaint. A save failure is not propagated to the caller — the UI
-  /// has already rendered the optimistic mutation — but it does stop the push:
-  /// `StoreHealth.save` rolls the context back, so the change no longer exists
-  /// locally and must not be sent to CloudKit as if it did. The posted
-  /// `TaskChange` makes the affected list reload and drop the phantom row.
-  private func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) {
+  /// so views repaint. A save failure stops the push: `StoreHealth.save` rolls
+  /// the context back, so the change no longer exists locally and must not be
+  /// sent to CloudKit as if it did. The posted `TaskChange` makes the affected
+  /// list reload and drop the phantom row.
+  ///
+  /// **Returns false when the write was rolled back**, and callers that then
+  /// DESTROY something on the strength of the write having landed must check
+  /// it. The inline-create flow is exactly that: a new row is born with an
+  /// empty title, and the fold purges it when the store still shows no title.
+  /// With the result discarded, a rolled-back title write made the row look
+  /// untitled and the purge deleted the task the user had just typed — the
+  /// "it sometimes just doesn't save" report. Most callers are plain field
+  /// writes with nothing to undo, hence `@discardableResult`.
+  @discardableResult
+  private func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) -> Bool {
     let id = entity.id
     let title = entity.title
     // Read id/title BEFORE the save: on the purge path `entity` is already
@@ -88,7 +97,7 @@ final class CloudKitTasksBackend {
     guard StoreHealth.save(context, op: op) else {
       SeptenaLog.error("[CK] \(op) id=\(id) NOT pushed — local save failed and rolled back")
       TaskChange.post(id)
-      return
+      return false
     }
     if deletion {
       engine.noteTaskDeletion(id: id)
@@ -98,6 +107,7 @@ final class CloudKitTasksBackend {
       SeptenaLog.info("[CK] \(op) id=\(id) title=\"\(title)\" → engine.noteTaskChange")
     }
     TaskChange.post(id)
+    return true
   }
 
   /// Inserts the next instance as a complete, recurring TaskEntity in one
@@ -295,15 +305,19 @@ final class CloudKitTasksBackend {
     return SeptenaTask(entity)
   }
 
-  func update(id: String, title: String?, notes: String?) {
+  /// False when the title/notes write did NOT land — either the row is gone
+  /// from the local store, or the save was rolled back. The inline-create fold
+  /// reads this before purging an apparently-untitled new row.
+  @discardableResult
+  func update(id: String, title: String?, notes: String?) -> Bool {
     guard let entity = fetch(id: id) else {
       SeptenaLog.info("[CK] update id=\(id) → MISS (no local entity)")
-      return
+      return false
     }
     if let title { entity.title = title }
     if let notes { entity.notes = notes.isEmpty ? nil : notes }
     entity.pendingSync = true
-    commitAndPush(entity, op: "update")
+    return commitAndPush(entity, op: "update")
   }
 
   /// Stamp `acknowledgedAt` so the agent-cue clears (and stays cleared on

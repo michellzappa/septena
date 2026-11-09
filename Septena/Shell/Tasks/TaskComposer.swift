@@ -295,7 +295,15 @@ struct TaskComposerCard: View {
       // why the guard compares drafts instead of latching after the first call.
       // Save first, THEN let the host decide about an untouched draft — both in
       // the one teardown event so purge can never front-run the autosave.
-      .onDisappear { persistOnce(); onVanish?() }
+      // `onVanish` is the host's licence to purge an inline-create draft that
+      // was never titled — so it fires only when there is genuinely no title
+      // to lose. A draft the user DID type into is never offered for purging,
+      // whatever the store currently shows: if its write was rolled back the
+      // store reads empty, and handing that to the host destroyed the task.
+      .onDisappear {
+        let landed = persistOnce()
+        if !draft.canSave || landed { onVanish?() }
+      }
       .onChange(of: draft.title) { oldValue, newValue in
         // A title is one line, so a line break in the field is never text —
         // it is one of two gestures, and they end differently:
@@ -761,7 +769,11 @@ struct TaskComposerCard: View {
 
   /// Writes the draft through the mutator. The scaffold's Save runs this then
   /// closes; the title-newline path runs it through `commit()`.
-  private func persist() {
+  ///
+  /// Returns false when the title write was rolled back, so `persistOnce` can
+  /// avoid recording a failed write as the last persisted state.
+  @discardableResult
+  private func persist() -> Bool {
     // Commit against the mode the draft was SEEDED from (see `seededMode`), so
     // a mid-flight subject swap flushes the outgoing edit into the right task.
     switch seededMode ?? mode {
@@ -769,15 +781,16 @@ struct TaskComposerCard: View {
       applyPendingTokens()
       draft.create(via: mutator)
       AddInfoSection.tasks.notifyTilesChanged()
+      return true
     case .edit(let task):
       if seededDeferredCreate {
         // Same create pipeline as the drawer, except the inline host already
         // inserted a push-deferred entity for layout identity. Updating its
         // title releases the first CloudKit push.
         applyPendingTokens()
-        draft.update(task, via: mutator)
+        let landed = draft.update(task, via: mutator)
         AddInfoSection.tasks.notifyTilesChanged()
-        return
+        return landed
       }
       // Ratify (acknowledge → leave the Inbox) only when this save actually
       // (re)placed the task — gave it a project/area, a date, or a Today pin
@@ -786,8 +799,9 @@ struct TaskComposerCard: View {
       // must keep an agent proposal in the Inbox. No-op for non-agent /
       // already-seen rows.
       let placed = draft.placementChanged(from: task)
-      draft.update(task, via: mutator)
+      let landed = draft.update(task, via: mutator)
       if placed { mutator.acknowledge(id: task.id) }
+      return landed
     }
   }
 
@@ -800,13 +814,21 @@ struct TaskComposerCard: View {
   /// It is deliberately NOT one-shot. See `lastPersistedDraft`: a `LazyVStack`
   /// fires `.onDisappear` on a row that merely scrolled out of view, and the
   /// user goes on typing into a view whose state is still very much alive.
-  private func persistOnce() {
-    guard !discarded else { return }
-    guard draft.canSave else { return }
-    guard draft != lastPersistedDraft else { return }
-    lastPersistedDraft = draft
-    persist()
+  @discardableResult
+  private func persistOnce() -> Bool {
+    guard !discarded else { return false }
+    guard draft.canSave else { return false }
+    guard draft != lastPersistedDraft else { return true }
+    // Mark the draft persisted only AFTER the write reports that it landed.
+    // Marking it first meant a rolled-back save was remembered as the last
+    // persisted state, so every later call short-circuited on
+    // `draft != lastPersistedDraft` and the title was never written again —
+    // the row then read as untitled and the inline-create sweep purged it.
+    // Leaving the marker unset keeps the next teardown/Save retrying.
+    let landed = persist()
+    if landed { lastPersistedDraft = draft }
     onDone()
+    return landed
   }
 
   /// Are there unsaved changes worth guarding? Create: any content entered;

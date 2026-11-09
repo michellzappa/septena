@@ -508,7 +508,12 @@ struct TaskListView: View {
       } message: {
         Text("Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.")
       }
-    let withSnackbar = content.septenaToastOverlay(store: toastStore)
+    // A rolled-back save is reported here, on the surface where a lost task is
+    // noticed. NOT the snackbar below it: that is a one-line auto-dismissing
+    // confirmation with an Undo, and a lost write is neither confirmable nor
+    // undoable — a notice the user can miss would just reproduce the original
+    // "it silently didn't save" complaint.
+    let withSnackbar = content.storeHealthAlert().septenaToastOverlay(store: toastStore)
     // Publish row actions to the menu bar via FocusedValues — macOS ONLY.
     // The "Task" CommandMenu in App.swift reads these and owns the keyboard
     // shortcuts (⌘N, ⌘T, ⌘S, ⌘⇧D, ⌘⌫, ⌘.). On iPadOS, publishing a focused
@@ -968,6 +973,17 @@ struct TaskListView: View {
     guard let stored = LocalCache.task(id: id, in: modelContext) else { return }
     let trimmed = stored.title.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.isEmpty else { return }
+    // "No title in the store" is not proof the user typed nothing. A write
+    // that `StoreHealth` rolled back leaves exactly this state, and purging on
+    // it hard-deleted typed work with no trash entry. The mutator remembers
+    // the ids whose last write did not land, so this sweep — which runs a
+    // runloop away from the composer and cannot ask the write itself — fails
+    // closed and leaves the row for the user to retype or delete.
+    guard !mutator.lastWriteFailed(id: id) else {
+      SeptenaLog.error(
+        "[Tasks] draft id=\(id) reads untitled after a failed write — keeping the row", nil)
+      return
+    }
     clearQuickAddCaptureSlot(for: id)
     mutator.purge(id: id)
     removeLocally(id: id)

@@ -182,6 +182,9 @@ final class SeptaskKitTaskListController: NSViewController {
   /// A ⌘N row whose first title is still being typed — abandoned (empty on
   /// commit) it's purged, so escaping a fresh row leaves nothing behind.
   private var pendingNewTaskId: String?
+  /// True while the rolled-back-save sheet is on screen, so a run of failures
+  /// raises one report instead of one sheet per failed write.
+  private var storeHealthSheetUp = false
   /// Pending Apple Reminders mirrored onto Today, newest read wins. Held as
   /// (reminder, view) pairs exactly like `RemindersInboxSection`: the
   /// `EKReminder` is what we delete after a successful import, the
@@ -603,6 +606,14 @@ final class SeptaskKitTaskListController: NSViewController {
       forName: .septenaTextSizeDidChange, object: nil, queue: .main
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.refreshTextSize() }
+    })
+    // A rolled-back save. This shell is pure AppKit, so it cannot use the
+    // SwiftUI `.storeHealthAlert()` the Septena surfaces carry — it listens for
+    // the notification and raises the same report as a window sheet.
+    observers.append(NotificationCenter.default.addObserver(
+      forName: StoreHealthState.failureNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.reportStoreHealthFailure() }
     })
     // View ▸ Group Today by List. This table reads the setting straight from
     // UserDefaults, so it needs telling — and a full rebuild, not a diff
@@ -2402,11 +2413,29 @@ final class SeptaskKitTaskListController: NSViewController {
       // The row was born titleless, so undo here means "un-create", not
       // "rename back to empty" — which is what the rename branch below used
       // to register for a brand-new row.
-      mutator.update(id: id, title: trimmed)
-      recordNewTaskUndo(id: id)
+      //
+      // Register the undo only when the title actually landed. A rolled-back
+      // write leaves a still-untitled row, and an "un-create" entry for it
+      // would put a purge on the undo stack for a task the user never got.
+      if mutator.update(id: id, title: trimmed) {
+        recordNewTaskUndo(id: id)
+      } else {
+        SeptenaLog.error(
+          "[SeptaskKit] title for new task id=\(id) did not land — no undo entry registered", nil)
+      }
     } else if let task = rows.compactMap(\.task).first(where: { $0.id == id }),
               !trimmed.isEmpty, trimmed != task.title {
       let previousTitle = task.title
+      // Same rule for a plain rename: the undo entry describes a write that
+      // happened, so it is registered after the write reports success. A
+      // rolled-back rename otherwise left ⌘Z claiming it could restore a
+      // title that was never replaced.
+      guard mutator.update(id: id, title: trimmed) else {
+        SeptenaLog.error("[SeptaskKit] rename of id=\(id) did not land — title unchanged", nil)
+        reload()
+        view.window?.makeFirstResponder(tableView)
+        return
+      }
       recordUndo(name: String(localized: "Rename Task", comment: "SeptaskKit: undo action"),
                 undo: { [weak self] in
                   self?.mutator.update(id: id, title: previousTitle)
@@ -2416,10 +2445,37 @@ final class SeptaskKitTaskListController: NSViewController {
                   self?.mutator.update(id: id, title: trimmed)
                   self?.reload()
                 })
-      mutator.update(id: id, title: trimmed)
     }
     reload()
     view.window?.makeFirstResponder(tableView)
+  }
+
+  // MARK: - Store health
+
+  /// Tell the user a write was rolled back. The AppKit counterpart of the
+  /// SwiftUI `.storeHealthAlert()` — same words, same once-per-failure
+  /// contract, raised as a window sheet.
+  ///
+  /// `storeHealthSheetUp` guards against stacking: a run of failures (a wedged
+  /// context fails every save the same way) would otherwise queue one sheet
+  /// per write and make the app unusable. One sheet reports the condition; the
+  /// running count lives in Settings.
+  private func reportStoreHealthFailure() {
+    guard !storeHealthSheetUp else { return }
+    guard let window = view.window else { return }
+    guard StoreHealthState.shared.unreportedFailure != nil else { return }
+    storeHealthSheetUp = true
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = StoreHealthState.alertTitle
+    alert.informativeText = StoreHealthState.alertMessage
+    alert.addButton(withTitle: String(localized: "OK", comment: "SeptaskKit: dismiss an alert"))
+    alert.beginSheetModal(for: window) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.storeHealthSheetUp = false
+        StoreHealthState.shared.acknowledge()
+      }
+    }
   }
 
   // MARK: - Creation (⌘N)
@@ -2775,13 +2831,18 @@ final class SeptaskKitTaskListController: NSViewController {
   /// silently dropped.
   private func collapseComposer(commit: Bool, animated: Bool = true) {
     guard let taskId = composingTaskId else { return }
-    if commit, let row = rows.firstIndex(where: { $0.task?.id == taskId }),
-       let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
-         as? KitComposerCell {
+    // The live cell, fetched whether or not we are the one committing: its
+    // field contents are what the USER typed, and the purge decision below
+    // needs that independently of whether the write reached the store.
+    let composerCell = rows.firstIndex(where: { $0.task?.id == taskId }).flatMap {
+      tableView.view(atColumn: 0, row: $0, makeIfNecessary: false) as? KitComposerCell
+    }
+    let typedTitle = composerCell?.pendingTitle ?? ""
+    if commit, let composerCell {
       // Mutator notifications fire sync; `reload()` no-ops while
       // `composingTaskId` is still set, so the height animation below owns
       // the visual fold instead of racing a full-list reload.
-      cell.commit()
+      composerCell.commit()
     }
     // Resign before the height fold — a live field editor would keep edit
     // chrome attached through the shrink.
@@ -2800,11 +2861,25 @@ final class SeptaskKitTaskListController: NSViewController {
       // Read the STORE, not `rows` — `SeptenaTask` is a struct, so the row
       // array still holds the pre-commit copy and a title the user just typed
       // would look empty here and get the row purged out from under them.
-      let title = LocalCache.task(id: taskId, in: context)?.title ?? ""
-      if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      let stored = LocalCache.task(id: taskId, in: context)?.title ?? ""
+      // Purge needs BOTH to be empty. The store alone is not enough evidence:
+      // `cell.commit()` routes through `StoreHealth.save`, which ROLLS BACK a
+      // failed write — so a title the user really did type can leave the store
+      // reading empty, and purging on that destroyed their task outright (no
+      // trash entry, nothing to restore). `typedTitle` is read straight off
+      // the field, so it survives a rolled-back save and keeps the row alive.
+      // A wrongly-kept blank row is one ⌘⌫ away; a wrongly-purged task is gone.
+      let nothingTyped = typedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      let nothingStored = stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      if nothingTyped, nothingStored, !mutator.lastWriteFailed(id: taskId) {
         mutator.purge(id: taskId)
         reload()
         return
+      }
+      if !nothingTyped, nothingStored {
+        SeptenaLog.error(
+          "[SeptaskKit] new task id=\(taskId) was typed but the store shows no title — keeping the row rather than purging it",
+          nil)
       }
       recordNewTaskUndo(id: taskId)
     }

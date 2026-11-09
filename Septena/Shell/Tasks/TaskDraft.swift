@@ -93,9 +93,18 @@ struct TaskDraft: Equatable {
 
   /// Apply edits to an existing task: only fire the mutations whose value
   /// actually changed (the Things-style save the composer commits on Done).
+  ///
+  /// Returns false when the title/notes write was attempted and did NOT land
+  /// (rolled-back save, or the row has gone from the store). The composer uses
+  /// it to decide whether the draft may be marked as persisted — marking a
+  /// failed write as saved is what let a typed title be dropped and the row
+  /// then purged as untitled. The placement writes below are not part of the
+  /// result: losing one of those leaves a visible, re-editable row.
   @MainActor
-  func update(_ original: SeptenaTask, via mutator: TaskMutator) {
+  @discardableResult
+  func update(_ original: SeptenaTask, via mutator: TaskMutator) -> Bool {
     let id = original.id
+    var titleWriteLanded = true
     // Compare against the original run through the SAME normalization (a draft
     // seeded from it), so every field is normalized-vs-normalized. The When /
     // Today writes used to be unconditional, which — because `storedScheduled`
@@ -109,7 +118,7 @@ struct TaskDraft: Equatable {
     // trailing whitespace read as changed on every save — an endless no-op
     // write that churned CloudKit each time the editor merely opened and closed.
     if trimmedTitle != prior.trimmedTitle || trimmedNotes != prior.trimmedNotes {
-      mutator.update(id: id, title: trimmedTitle, notes: trimmedNotes)
+      titleWriteLanded = mutator.update(id: id, title: trimmedTitle, notes: trimmedNotes)
     }
 
     if storedScheduled != prior.storedScheduled {
@@ -135,6 +144,7 @@ struct TaskDraft: Equatable {
     // is why this only bit nested projects.)
     if projectId != prior.projectId { mutator.moveToProject(id: id, project: projectId) }
     if projectId == nil, areaId != prior.areaId { mutator.moveToArea(id: id, area: areaId) }
+    return titleWriteLanded
   }
 
   /// Did this edit change a *placement* field — project, area, scheduled, due,
