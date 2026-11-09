@@ -127,12 +127,17 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
 
 ## Branch & integration discipline
 
-**A committer-cron handles commits.** A scheduled job commits green work on
-`main` automatically — agents do NOT need to `git commit` (or offer to) as part
-of finishing a task. Just leave the working tree in a green, build-verified
-state; the cron picks it up. Don't worry about "uncommitted across sessions"
-below — that's the cron's job now. (You still must never `git push`, create
-branches, or rewrite history unless explicitly asked.)
+**Commit your own work. The committer-cron is NOT running.** This file used to
+say a scheduled job commits green work on `main`, so agents need not commit. That
+stopped being true: the newest cron commit is 2026-09-14, and the host has no
+crontab entry, no LaunchAgent and no `auto-git-commit.sh`. Two months of sessions
+that trusted this paragraph left their work uncommitted. Until the cron is
+restored, **commit logically-complete, build-verified units yourself** — see
+"Don't leave work uncommitted across sessions" below, which is now your job, not
+the cron's. The same gap means `Config/Base.xcconfig` holds a stale build number
+(the cron stamped it); `scripts/stamp-version.sh` fixes it at archive time, so
+leave it alone. (You still must never `git push`, create branches, or rewrite
+history unless explicitly asked.)
 
 **Default to committing on `main`. Do NOT create branches unless the user
 explicitly asks for one.** The user never asks for branches — every stray
