@@ -457,8 +457,15 @@ public final class ClaudeGatewayProvider {
     guard !isRefreshing else { return false }
     isRefreshing = true
     defer { isRefreshing = false }
+    // Past the token lifetime, the Apple web session that minted the last
+    // token is dead too, but its cookie still sits in the shared Safari jar.
+    // idmsa answers that stale cookie with "Your session has timed out",
+    // clears it, and only the second attempt works. A clean ephemeral
+    // session skips the dead cookie; there is no live session to reuse.
+    let age = lastRefreshAt.map { Date().timeIntervalSince($0) }
+    let sessionExpired = needsReauth || (age.map { $0 >= Self.refreshInterval } ?? false)
     do {
-      let token = try await mintWebAuthToken()
+      let token = try await mintWebAuthToken(ephemeral: sessionExpired)
       try await push(ckWebAuthToken: token)
       // Keep the pushed token so we can later ask CloudKit whether it's still
       // valid (the closed-loop expiry check) — it's the exact credential the
@@ -514,9 +521,9 @@ public final class ClaudeGatewayProvider {
 
   // MARK: Internals
 
-  private func mintWebAuthToken() async throws -> String {
+  private func mintWebAuthToken(ephemeral: Bool) async throws -> String {
     let signInURL = try await fetchSignInRedirectURL()
-    let callbackURL = try await runWebAuth(startURL: signInURL)
+    let callbackURL = try await runWebAuth(startURL: signInURL, ephemeral: ephemeral)
     guard
       let token = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
         .queryItems?.first(where: { $0.name == "ckWebAuthToken" })?.value,
@@ -553,7 +560,7 @@ public final class ClaudeGatewayProvider {
   }
 
   /// Present the sign-in and capture the HTTPS callback URL.
-  private func runWebAuth(startURL: URL) async throws -> URL {
+  private func runWebAuth(startURL: URL, ephemeral: Bool) async throws -> URL {
     // One-shot resume: the session completion, start()-failure, and the
     // watchdog timeout can all race; resuming a CheckedContinuation twice
     // traps.
@@ -601,7 +608,8 @@ public final class ClaudeGatewayProvider {
       }
       webAuth.presentationContextProvider = provider
       // Reuse the system Apple session so a live session signs in quickly.
-      webAuth.prefersEphemeralWebBrowserSession = false
+      // Once that session has expired, use a clean jar (see refreshNow).
+      webAuth.prefersEphemeralWebBrowserSession = ephemeral
       self.anchorProvider = provider
       self.authSession = webAuth
       self.isPresentingWebAuth = true
