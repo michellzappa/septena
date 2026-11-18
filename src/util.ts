@@ -11,6 +11,12 @@ export function base64url(buf: Uint8Array): string {
     .replace(/=+$/g, "");
 }
 
+export function fromBase64Url(part: string): Uint8Array<ArrayBuffer> {
+  const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+
 export async function sha256Base64Url(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return base64url(new Uint8Array(digest));

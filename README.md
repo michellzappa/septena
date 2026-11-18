@@ -21,6 +21,8 @@ Scaffold. OAuth + Apple bridge wired end-to-end with KV storage; the initial tas
 
 ## Endpoints
 
+The `/v1` routes are the task backend (`src/api/`, `src/store/`), served on `api.septena.app`. Spec and migration phases: `docs/SEPTASK_BACKEND.md` in the app repo.
+
 | | |
 |---|---|
 | `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata for client discovery |
@@ -30,6 +32,12 @@ Scaffold. OAuth + Apple bridge wired end-to-end with KV storage; the initial tas
 | `POST /oauth/token` | code + PKCE → 1h access token + rotating 30d refresh token; also serves the `refresh_token` grant |
 | `POST /oauth/revoke` | RFC 7009 revocation (access or refresh token; refresh revokes the pair) |
 | `POST /mcp` | JSON-RPC MCP transport (Authorization: Bearer required) |
+| `POST /v1/auth/apple` | Task backend: Sign in with Apple identity token + raw nonce → access + refresh token |
+| `POST /v1/auth/refresh` · `/v1/auth/signout` | Rotate (single-use) or revoke a task-backend refresh token |
+| `POST /v1/sync/push` · `GET /v1/sync/pull` | Task sync: batched field patches in, changes since a `rev` out |
+| `GET /v1/sync/ws` | WebSocket nudge `{rev}` on every commit |
+| `PUT`/`GET /v1/attachments/:id` | Attachment bytes to/from R2 (25 MB per file, 2 GB per user) |
+| `DELETE /v1/account` | Delete all task data and attachment bytes for the user |
 | `GET`/`DELETE` `/mcp` | `405` — the GET stream and session-DELETE were removed in MCP `2026-07-28` |
 
 ## Protocol revisions

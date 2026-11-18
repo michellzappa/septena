@@ -25,7 +25,12 @@ fallthrough = true
 # Bind the Worker to the custom domain. Requires:
 #   • septena.app DNS on Cloudflare (done)
 #   • Zone "Active" in the Cloudflare dashboard
-routes = [{ pattern = "mcp.septena.app", custom_domain = true }]
+routes = [
+  { pattern = "mcp.septena.app", custom_domain = true },
+  # Task backend API (/v1). Same Worker so the MCP tools can reach each
+  # user's TaskStore directly in a later phase.
+  { pattern = "api.septena.app", custom_domain = true },
+]
 
 [vars]
 CK_CONTAINER = "iCloud.com.septena.cloud"
@@ -35,6 +40,8 @@ CK_CONTAINER = "iCloud.com.septena.cloud"
 CK_ENVIRONMENT = "development"
 CK_ZONE = "septena-v1"
 PUBLIC_URL = "https://mcp.septena.app"
+# Bundle ids accepted as the `aud` of a Sign in with Apple identity token.
+APPLE_AUDIENCES = "com.septena.cloud,com.septena.cloud.mac,com.septena.tasks,com.septena.tasks.mac"
 
 # Created via `wrangler kv namespace create <NAME>`; paste returned IDs here.
 [[kv_namespaces]]
@@ -49,7 +56,23 @@ id = "d89bf617d013488096dd64be9f826d7e"
 binding = "CLIENTS"
 id = "8d9200723c194a03ac3e1482f24f173d"
 
+# Task backend: one TaskStore Durable Object (SQLite) per user.
+[[durable_objects.bindings]]
+name = "TASK_STORE"
+class_name = "TaskStore"
+
+[[migrations]]
+tag = "v1-task-store"
+new_sqlite_classes = ["TaskStore"]
+
+# Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "septena-attachments"
+
 # ---- Secrets (NOT in this file — set via `wrangler secret put`) ----
 # CK_API_TOKEN    — CloudKit Dashboard → API Tokens; redirect URL must be
 #                   https://mcp.septena.app/auth/apple/callback
 # TOKEN_ENC_KEY   — 32-byte base64 (openssl rand -base64 32) for AES-GCM
+# SESSION_SIGNING_KEY — 32-byte base64 (openssl rand -base64 32); signs the
+#                   task backend's access tokens. Separate from TOKEN_ENC_KEY.

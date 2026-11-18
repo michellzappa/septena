@@ -10,6 +10,9 @@ import { appleCallback } from "./auth/appleCallback.js";
 import { ingestCkToken } from "./ingest/ckToken.js";
 import { mcpHandler } from "./mcp.js";
 import { landingHTML, SKILL_MARKDOWN } from "./landing.js";
+import { api } from "./api/routes.js";
+
+export { TaskStore } from "./store/TaskStore.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -114,6 +117,10 @@ app.on(["GET", "DELETE"], "/mcp", (c) =>
 // live token without the user re-authing every ~8h. Self-securing: the
 // pushed token is validated against CloudKit's users/current.
 app.post("/ingest/ck-token", ingestCkToken);
+
+// Task backend (phase 0 of docs/SEPTASK_BACKEND.md in the app repo). Served
+// on api.septena.app; nothing on mcp.septena.app calls it yet.
+app.route("/v1", api);
 
 // Access/refresh tokens now carry KV TTLs and self-expire; this cron is
 // belt-and-braces for what doesn't: legacy raw-keyed token records from

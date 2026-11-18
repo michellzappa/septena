@@ -4,6 +4,24 @@ Hard-won context on how Claude reads/writes a user's **private** Septena
 (CloudKit) data via the MCP gateway. Read this before changing the auth/token
 design — several "obvious" approaches are dead ends, proven empirically.
 
+## 2026-11-18 decision: tasks move to our own backend
+
+This **reverses** the "no copy of user data at rest" and "private CloudKit
+only" constraints below, **for task data only** (tasks, areas, projects,
+task attachments, task conversations). mz decided it on 2026-11-18 because
+the ~8h `ckWebAuthToken` makes Claude access fail whenever no device opened
+the app recently, and that cannot be fixed on the CloudKit path (see "The
+core wall"). Claude must work from claude.ai, mobile, Claude Code and
+unattended scheduled agents.
+
+- Task data lives in a per-user `TaskStore` Durable Object (SQLite) in this
+  Worker, attachment bytes in R2. Spec: `docs/SEPTASK_BACKEND.md` in the app
+  repo.
+- Every other Septena section stays on CloudKit and keeps the constraints
+  below.
+- Do not "restore" the no-data-at-rest rule for tasks. Do not move another
+  section to the backend without a new decision from mz.
+
 ## Goal & constraints (decided)
 
 - **Who pays / where it runs:** the user's own **Claude subscription**, via an
