@@ -871,6 +871,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case .today where todayGroupsByList:
       newRows = titleRows + signInBanner() + agenda() + rolledInBanner(pool) + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
+        + todayLoggedRows()
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract
       // — but only for CLASSIFIED work. The Inbox run still leads the page:
@@ -904,6 +905,7 @@ final class SeptaskKitTaskListController: NSViewController {
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
+        + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
     case .unscheduled:
@@ -1738,8 +1740,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `TaskListView.scopeLoggedSection` exactly (same copy, same sort —
   /// newest-completed-first).
   private func loggedFooterRows(completed: [SeptenaTask]) -> [Row] {
-    guard let scopeId, !completed.isEmpty else { return [] }
-    let expanded = loggedExpandedIds().contains(scopeId)
+    guard let key = loggedScopeKey, !completed.isEmpty else { return [] }
+    let expanded = loggedIsExpanded(key)
     var rows: [Row] = [.loggedFooter(count: completed.count, expanded: expanded)]
     if expanded {
       rows.append(contentsOf: completed.map(unchipped))
@@ -1747,8 +1749,46 @@ final class SeptaskKitTaskListController: NSViewController {
     return rows
   }
 
+  /// Today's entry in the shared expanded-set. Its MEMBERSHIP MEANS
+  /// COLLAPSED, the inverse of a project/area id: Today's footer exists only
+  /// while Settings ▸ Tasks ▸ Today ▸ Show completed tasks is on, and that
+  /// setting promises the rows are shown, so they start open. The name says
+  /// so, and can't collide with a project or area id in the same set.
+  private static let todayLoggedCollapsedKey = "today-collapsed"
+
+  /// The footer's key in the expanded-set: the project/area id, or Today's
+  /// inverted key. Nil on every other page (no footer).
+  private var loggedScopeKey: String? {
+    if filter == .today { return Self.todayLoggedCollapsedKey }
+    return scopeId
+  }
+
+  private func loggedIsExpanded(_ key: String) -> Bool {
+    let member = loggedExpandedIds().contains(key)
+    return key == Self.todayLoggedCollapsedKey ? !member : member
+  }
+
+  /// Mirrors SettingsKey.todayShowCompleted's contract: absent → on.
+  private var todayShowsCompleted: Bool {
+    UserDefaults.standard.object(forKey: SettingsKey.todayShowCompleted) == nil
+      ? true
+      : UserDefaults.standard.bool(forKey: SettingsKey.todayShowCompleted)
+  }
+
+  /// Today's logged block: what was finished (or cancelled) today, newest
+  /// first — the same set the Septena Today drawer's "Done" section shows
+  /// (`TasksDestinationView.reload`). Empty when the setting is off.
+  private func todayLoggedRows() -> [Row] {
+    guard todayShowsCompleted else { return [] }
+    let today = SeptenaDate.today
+    let done = LocalCache.tasks(in: context, filter: .logbook)
+      .filter { ($0.completedAt ?? "").hasPrefix(today) }
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    return loggedFooterRows(completed: done)
+  }
+
   func toggleLoggedExpanded() {
-    guard let scopeId else { return }
+    guard let scopeId = loggedScopeKey else { return }
     var ids = loggedExpandedIds()
     if ids.contains(scopeId) { ids.remove(scopeId) } else { ids.insert(scopeId) }
     UserDefaults.standard.set((try? JSONEncoder().encode(ids)) ?? Data(),

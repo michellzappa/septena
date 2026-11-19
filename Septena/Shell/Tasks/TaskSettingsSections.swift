@@ -75,7 +75,9 @@ struct TaskSettingsPane<Destination: Hashable>: View {
 
   private var todaySection: some View {
     Section {
-      Toggle("Show completed tasks", isOn: $todayShowCompleted)
+      // Announced for the same reason as the grouping toggle below: Septask's
+      // AppKit Today reads the key from UserDefaults and must rebuild.
+      Toggle("Show completed tasks", isOn: TaskViewOptions.announcing($todayShowCompleted))
       Toggle(isOn: $showAging) {
         rowLabel("Show aging",
                  detail: "Tint the checkbox as a task carries over day after day.")
