@@ -4,6 +4,7 @@ import {
   ENTITIES,
   ENTITY_NAMES,
   MAX_USER_ATTACHMENT_BYTES,
+  addMissingColumnsSQL,
   createTableSQL,
   decodeRow,
   encodeValue,
@@ -54,7 +55,14 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   private migrate(): void {
-    for (const name of ENTITY_NAMES) this.sql.exec(createTableSQL(ENTITIES[name]));
+    for (const name of ENTITY_NAMES) {
+      const spec = ENTITIES[name];
+      this.sql.exec(createTableSQL(spec));
+      const existing = new Set(
+        this.sql.exec<{ name: string }>(`PRAGMA table_info(${spec.table})`).toArray().map((r) => r.name),
+      );
+      for (const stmt of addMissingColumnsSQL(spec, existing)) this.sql.exec(stmt);
+    }
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS turns (

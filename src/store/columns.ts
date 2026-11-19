@@ -66,7 +66,12 @@ export const ENTITIES = {
       todaySetOn: day(),
       completedAt: stamp(),
       notes: text(NOTES_MAX),
+      // Manual order inside the task's own list (Inbox, area, project).
       position: real(),
+      // Manual order on Today, kept apart from `position` so reordering Today
+      // never reshuffles the home list (Things' model). Null until the row is
+      // first ordered on Today; readers fall back to `position`.
+      todayPosition: real(),
       recurrenceUnit: text(16),
       recurrenceInterval: int(),
       recurrenceAfterCompletion: bool(),
@@ -189,6 +194,18 @@ export function createTableSQL(spec: EntitySpec): string {
     deletedAt TEXT
   );
   CREATE INDEX IF NOT EXISTS ${spec.table}_rev ON ${spec.table}(rev);`;
+}
+
+/// Columns a table created by an older deploy is missing. Columns are only
+/// ever added (never renamed or dropped), so `ALTER TABLE ADD COLUMN` brings
+/// any older table up to date.
+export function addMissingColumnsSQL(spec: EntitySpec, existing: Set<string>): string[] {
+  return Object.entries(spec.columns)
+    .filter(([name]) => !existing.has(name))
+    .map(([name, col]) => {
+      const d = col.dflt === undefined ? "" : ` DEFAULT ${typeof col.dflt === "string" ? `'${col.dflt}'` : col.dflt}`;
+      return `ALTER TABLE ${spec.table} ADD COLUMN "${name}" ${sqlType(col.kind)}${d}`;
+    });
 }
 
 export function encodeValue(col: Column, v: unknown): string | number | null {
