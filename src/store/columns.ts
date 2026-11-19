@@ -56,6 +56,9 @@ export const SETTING_VALUES = {
   /// IANA zone of the device that last opened the app. The MCP connector
   /// reads it for "today".
   homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
+  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true, no
+  /// agent claim succeeds and the agent queue reads as empty.
+  agentsPaused: z.boolean(),
 } satisfies Record<string, z.ZodTypeAny>;
 
 export type SettingKey = keyof typeof SETTING_VALUES;
@@ -175,6 +178,17 @@ export const ENTITIES = {
       endState: text(32),
       endStateNote: text(NOTES_MAX),
       assignee: { kind: "text", zod: z.enum(["me", "local", "claude"]).nullable() },
+      // The human's stop on agent work for this task. Only an app actor may
+      // set or clear it (TaskStore.apply refuses an agent write), so an agent
+      // cannot restart itself. While set, agent writes to the task fail.
+      stoppedAt: stamp(),
+      // The agent claim (docs/TASK_FACTORY_SPEC.md §5). Server-owned: set
+      // only by TaskStore.claim / release, never by a push.
+      claimedBy: { kind: "text", zod: z.never() },
+      claimUntil: { kind: "text", zod: z.never() },
+      // Fresh claims since the human last wrote a turn. The run budget: at
+      // AGENT_RUN_BUDGET the agent must ask before it may claim again.
+      runsSinceUser: { kind: "int", zod: z.never() },
     },
     requiredOnInsert: [],
   },

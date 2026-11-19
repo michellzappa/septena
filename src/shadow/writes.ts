@@ -57,7 +57,7 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
-  | "readOrderTop" | "readSetting" | "push";
+  | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;
 };
@@ -226,6 +226,9 @@ function requireApplied(r: OpResult | undefined, id: string): void {
   if (applied(r) || r?.status === "noop") return;
   if (r?.status === "dropped" || (r?.status === "rejected" && /unknown_task|missing_required/.test(r.reason))) {
     throw new Error(`Task not found: ${id}`);
+  }
+  if (r?.status === "rejected" && r.reason === "stopped") {
+    throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septask.`);
   }
   throw new Error(`Task ${id} was not changed: ${r?.status === "rejected" ? r.reason : "no result"}`);
 }

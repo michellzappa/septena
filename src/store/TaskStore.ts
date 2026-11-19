@@ -25,7 +25,40 @@ export interface ChangeEntry {
   diff: ChangeDiff | null;
   actor: string;
   at: string;
+  /// Why the writer made this change, when it said (agent writes).
+  reason: string | null;
 }
+
+/// Why a claim was refused. Every value is a rule the agent must respect,
+/// not a transient error to retry.
+export type ClaimRefusal =
+  | "not_found" | "closed" | "terminal" | "stopped" | "paused"
+  | "your_turn" | "held" | "budget";
+
+export type ClaimResult =
+  | { ok: true; holder: string; claimUntil: string; renewed: boolean; runsSinceUser: number }
+  | { ok: false; reason: ClaimRefusal; holder?: string; claimUntil?: string };
+
+/// One thing an agent may need to react to. A pointer, never content: the
+/// agent reads the task itself, so text in a task can never arrive as an
+/// order through this feed.
+export interface AgentEvent {
+  rev: number;
+  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused";
+  taskId: string | null;
+  at: string;
+}
+
+/// Agent writers (the MCP connector) carry an `mcp:` actor. Everything else
+/// (`app:<client>`) is the human.
+export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
+
+/// Lease bounds for a claim. An agent that stops writing loses the task when
+/// the lease ends; the maximum keeps a crashed run from holding it for long.
+export const CLAIM_TTL_DEFAULT_MS = 30 * 60 * 1000;
+export const CLAIM_TTL_MAX_MS = 4 * 60 * 60 * 1000;
+/// Fresh claims allowed between two human turns on one task.
+export const AGENT_RUN_BUDGET = 5;
 
 const LOG_TEXT_MAX = 4_000;
 
@@ -72,6 +105,14 @@ function decodeTurnRow(raw: Record<string, unknown>): Record<string, unknown> {
   return row;
 }
 
+/// An open task with a conversation, as the agent queue reads it.
+export type ConvoCandidate = {
+  id: string; title: string | null; confirmedIntent: string | null;
+  assignee: string | null; endState: string | null;
+  stoppedAt: string | null; claimedBy: string | null; claimUntil: string | null;
+  lastProviderConfidence: number | null; awaitsHuman: number | null;
+};
+
 export interface PushOutcome {
   result: PushResult;
   /// Attachments this push deleted. The Worker removes their bytes from R2.
@@ -101,6 +142,7 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec<{ name: string }>("PRAGMA table_info(changes)").toArray().map((r) => r.name),
     );
     if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
+    if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
   }
 
   private migrateTables(): void {
@@ -154,14 +196,17 @@ export class TaskStore extends DurableObject<Env> {
     return rev;
   }
 
+  /// The writer's stated reason for the push in progress (push sets it).
+  private reason: string | null = null;
+
   private log(
     rev: number, entity: string, id: string, op: string, fields: string[] | null,
     clientOpId: string | null, actor: string, at: string, diff: ChangeDiff | null = null,
   ): void {
     this.sql.exec(
-      "INSERT INTO changes (rev, entity, id, op, fields, clientOpId, actor, at, diff) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO changes (rev, entity, id, op, fields, clientOpId, actor, at, diff, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       rev, entity, id, op, fields ? JSON.stringify(fields) : null, clientOpId, actor, at,
-      diff && Object.keys(diff).length ? JSON.stringify(diff) : null,
+      diff && Object.keys(diff).length ? JSON.stringify(diff) : null, this.reason,
     );
   }
 
@@ -189,11 +234,11 @@ export class TaskStore extends DurableObject<Env> {
       where.push("(id = ? OR id LIKE ?)"); args.push(id, `${id}:%`);
     }
     if (before !== null) { where.push("rev < ?"); args.push(before); }
-    const sql = `SELECT rev, entity, id, op, fields, diff, actor, at FROM changes${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY rev DESC LIMIT ?`;
-    return this.sql.exec<{ rev: number; entity: string; id: string; op: string; fields: string | null; diff: string | null; actor: string; at: string }>(sql, ...args, limit)
+    const sql = `SELECT rev, entity, id, op, fields, diff, actor, at, reason FROM changes${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY rev DESC LIMIT ?`;
+    return this.sql.exec<{ rev: number; entity: string; id: string; op: string; fields: string | null; diff: string | null; actor: string; at: string; reason: string | null }>(sql, ...args, limit)
       .toArray()
       .map((r) => ({
-        rev: r.rev, entity: r.entity, id: r.id, op: r.op, actor: r.actor, at: r.at,
+        rev: r.rev, entity: r.entity, id: r.id, op: r.op, actor: r.actor, at: r.at, reason: r.reason,
         fields: r.fields ? (JSON.parse(r.fields) as string[]) : null,
         diff: r.diff ? (JSON.parse(r.diff) as ChangeDiff) : null,
       }));
@@ -201,15 +246,21 @@ export class TaskStore extends DurableObject<Env> {
 
   // ---- push ----
 
-  push(ops: Op[], actor: string): PushOutcome {
+  push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
     const purgedAttachmentIds: string[] = [];
-    const results = this.ctx.storage.transactionSync(() => ops.map((op) => {
-      const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
-      if (seen) return JSON.parse(seen.result) as OpResult;
-      const result = this.apply(op, actor, purgedAttachmentIds);
-      this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
-      return result;
-    }));
+    this.reason = reason;
+    let results: OpResult[];
+    try {
+      results = this.ctx.storage.transactionSync(() => ops.map((op) => {
+        const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
+        if (seen) return JSON.parse(seen.result) as OpResult;
+        const result = this.apply(op, actor, purgedAttachmentIds);
+        this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
+        return result;
+      }));
+    } finally {
+      this.reason = null;
+    }
     const appliedThrough = this.meta("rev");
     if (results.some((r) => r.status === "applied")) this.broadcast(appliedThrough);
     return { result: { appliedThrough, results }, purgedAttachmentIds };
@@ -217,6 +268,10 @@ export class TaskStore extends DurableObject<Env> {
 
   private apply(op: Op, actor: string, purgedAttachmentIds: string[]): OpResult {
     const now = new Date().toISOString();
+    if (isAgentActor(actor)) {
+      const refusal = this.agentRefusal(op);
+      if (refusal) return { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
+    }
     if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
 
     const spec: EntitySpec = ENTITIES[op.entity];
@@ -283,6 +338,24 @@ export class TaskStore extends DurableObject<Env> {
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 
+  /// The rules an agent write must pass, enforced here so no connector can
+  /// skip them: the stop is the human's alone, and a stopped task takes no
+  /// agent writes at all.
+  private agentRefusal(op: Op): string | null {
+    if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
+    if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    const taskId = op.op === "appendTurn" ? op.taskId
+      : (op.entity === "task" || op.entity === "convo") ? op.id
+      : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
+      : null;
+    if (taskId && this.convoStopped(taskId)) return "stopped";
+    return null;
+  }
+
+  private convoStopped(taskId: string): boolean {
+    return this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND stoppedAt IS NOT NULL", taskId).toArray().length > 0;
+  }
+
   private liveTask(id: string): boolean {
     return this.sql.exec("SELECT 1 FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray().length > 0;
   }
@@ -333,7 +406,146 @@ export class TaskStore extends DurableObject<Env> {
       taskId, seq, ...values, rev, now,
     );
     this.log(rev, "turn", `${taskId}:${seq}`, "append", null, clientOpId, actor, now);
+    if (!isAgentActor(actor) && turn.role === "user") {
+      // The human spoke: the run budget starts over.
+      this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
+    } else if (isAgentActor(actor) && turn.role === "provider" && turn.options?.length) {
+      // The agent asked: the ball is in the human's court, so the claim ends.
+      this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    }
     return { clientOpId, status: "applied", rev, seq };
+  }
+
+  // ---- agent claims (docs/TASK_FACTORY_SPEC.md §5) ----
+
+  /// Writes server-owned convo columns as their own rev, creating the convo
+  /// row when the task has none. `onlyIfChanged` skips a write that would
+  /// change nothing, so a quiet rule never bumps the rev.
+  private writeConvoServerFields(
+    taskId: string, fields: Record<string, string | number | null>, op: string,
+    actor: string, now: string, onlyIfChanged = false,
+  ): number | null {
+    const raw = this.sql.exec("SELECT * FROM convos WHERE id = ?", taskId).toArray()[0] as Record<string, unknown> | undefined;
+    if (raw?.deletedAt) return null;
+    if (onlyIfChanged && Object.entries(fields).every(([k, v]) => (raw?.[k] ?? null) === v)) return null;
+    if (onlyIfChanged && !raw) return null;
+    const rev = this.nextRev();
+    const names = Object.keys(fields);
+    if (raw) {
+      const sets = names.map((n) => `"${n}" = ?`).concat(["rev = ?", "updatedAt = ?"]).join(", ");
+      this.sql.exec(`UPDATE convos SET ${sets} WHERE id = ?`, ...Object.values(fields), rev, now, taskId);
+    } else {
+      const cols = names.map((n) => `"${n}"`).concat(["id", "rev", "updatedAt"]).join(", ");
+      const marks = names.map(() => "?").concat(["?", "?", "?"]).join(", ");
+      this.sql.exec(`INSERT INTO convos (${cols}) VALUES (${marks})`, ...Object.values(fields), taskId, rev, now);
+    }
+    const before: Record<string, unknown> = {};
+    for (const n of names) before[n] = raw?.[n] ?? null;
+    this.log(rev, "convo", taskId, op, names, null, actor, now, this.diffFor(before, fields));
+    return rev;
+  }
+
+  /// Takes or renews the claim on a task for `holder`. The DO serializes
+  /// calls, so two agents can never both win. Refuses, with the rule that
+  /// stopped it, when agents are paused, the human stopped the task, a
+  /// question waits for the human, another holder's lease is live, or the
+  /// run budget since the last human turn is spent.
+  claim(taskId: string, holder: string, ttlMs: number, actor: string, reason: string | null): ClaimResult {
+    const result = this.ctx.storage.transactionSync((): ClaimResult => {
+      if (this.readSetting("agentsPaused") === true) return { ok: false, reason: "paused" };
+      const task = this.sql.exec<{ status: string; deletedAt: string | null }>("SELECT status, deletedAt FROM tasks WHERE id = ?", taskId).toArray()[0];
+      if (!task || task.deletedAt) return { ok: false, reason: "not_found" };
+      if (task.status !== "open") return { ok: false, reason: "closed" };
+      const convo = this.sql.exec<{
+        endState: string | null; stoppedAt: string | null; claimedBy: string | null;
+        claimUntil: string | null; runsSinceUser: number | null;
+      }>("SELECT endState, stoppedAt, claimedBy, claimUntil, runsSinceUser FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
+      if (convo?.stoppedAt) return { ok: false, reason: "stopped" };
+      if (convo?.endState && convo.endState !== "open") return { ok: false, reason: "terminal" };
+      if (this.awaitsHuman(taskId)) return { ok: false, reason: "your_turn" };
+      const nowMs = Date.now();
+      const live = !!convo?.claimedBy && !!convo.claimUntil && Date.parse(convo.claimUntil) > nowMs;
+      if (live && convo!.claimedBy !== holder) {
+        return { ok: false, reason: "held", holder: convo!.claimedBy!, claimUntil: convo!.claimUntil! };
+      }
+      const renewed = live;
+      const runs = (convo?.runsSinceUser ?? 0) + (renewed ? 0 : 1);
+      if (!renewed && runs > AGENT_RUN_BUDGET) return { ok: false, reason: "budget" };
+      const claimUntil = new Date(nowMs + Math.min(Math.max(ttlMs, 60_000), CLAIM_TTL_MAX_MS)).toISOString();
+      this.reason = reason;
+      try {
+        this.writeConvoServerFields(taskId, { claimedBy: holder, claimUntil, runsSinceUser: runs }, renewed ? "renew" : "claim", actor, new Date(nowMs).toISOString());
+      } finally {
+        this.reason = null;
+      }
+      return { ok: true, holder, claimUntil, renewed, runsSinceUser: runs };
+    });
+    if (result.ok) this.broadcast(this.meta("rev"));
+    return result;
+  }
+
+  /// Ends `holder`'s claim. A lease that already ran out, or one held by
+  /// someone else, is left as it is. Returns whether a claim was cleared.
+  release(taskId: string, holder: string, actor: string, reason: string | null): boolean {
+    const rev = this.ctx.storage.transactionSync(() => {
+      const convo = this.sql.exec<{ claimedBy: string | null }>("SELECT claimedBy FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
+      if (!convo || convo.claimedBy !== holder) return null;
+      this.reason = reason;
+      try {
+        return this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, new Date().toISOString());
+      } finally {
+        this.reason = null;
+      }
+    });
+    if (rev !== null) this.broadcast(rev);
+    return rev !== null;
+  }
+
+  /// The last turn is the agent's question and no human turn followed it.
+  private awaitsHuman(taskId: string): boolean {
+    const last = this.sql.exec<{ role: string; options: string | null }>(
+      "SELECT role, options FROM turns WHERE taskId = ? ORDER BY seq DESC LIMIT 1", taskId,
+    ).toArray()[0];
+    if (!last || last.role !== "provider" || !last.options) return false;
+    const opts = JSON.parse(last.options) as unknown;
+    return Array.isArray(opts) && opts.length > 0;
+  }
+
+  /// The newest rev: the cursor for an agent that starts listening now.
+  head(): number {
+    return this.meta("rev");
+  }
+
+  /// What changed since `since` that an agent may need to act on, oldest
+  /// first, as pointers. `nextSince` is the cursor for the next call.
+  agentEvents(since: number, limit: number): { events: AgentEvent[]; nextSince: number } {
+    const n = Math.min(Math.max(limit, 1), 500);
+    const events: AgentEvent[] = [];
+    let cursor = since;
+    // Scan in pages so a long run of agent-only writes cannot starve the feed.
+    for (let page = 0; page < 10 && events.length < n; page++) {
+      const rows = this.sql.exec<{ rev: number; entity: string; id: string; op: string; diff: string | null; actor: string; at: string }>(
+        "SELECT rev, entity, id, op, diff, actor, at FROM changes WHERE rev > ? ORDER BY rev LIMIT 500", cursor,
+      ).toArray();
+      if (!rows.length) break;
+      for (const r of rows) {
+        cursor = r.rev;
+        if (isAgentActor(r.actor)) continue;
+        const diff = r.diff ? (JSON.parse(r.diff) as ChangeDiff) : {};
+        const push = (kind: AgentEvent["kind"], taskId: string | null) => events.push({ rev: r.rev, kind, taskId, at: r.at });
+        if (r.entity === "turn" && r.op === "append") {
+          // The app also writes on-device provider turns; only the human's count.
+          const [taskId, seq] = r.id.split(":");
+          const turn = this.sql.exec<{ role: string }>("SELECT role FROM turns WHERE taskId = ? AND seq = ?", taskId, Number(seq)).toArray()[0];
+          if (turn?.role === "user") push("user_turn", taskId);
+        }
+        else if (r.entity === "convo" && diff.assignee?.[1] === "claude") push("assigned", r.id);
+        else if (r.entity === "convo" && diff.stoppedAt) push(diff.stoppedAt[1] ? "stopped" : "resumed", r.id);
+        else if (r.entity === "setting" && r.id === "agentsPaused" && diff.value) push(diff.value[1] === true ? "paused" : "unpaused", null);
+        if (events.length >= n) break;
+      }
+    }
+    return { events, nextSince: events.length >= n ? cursor : Math.max(cursor, this.meta("rev")) };
   }
 
   // ---- pull ----
@@ -423,18 +635,15 @@ export class TaskStore extends DurableObject<Env> {
   /// Open tasks that have a conversation, with what the pending-reasoning
   /// rule needs: the convo fields and the confidence of the last provider
   /// turn. The rule itself runs in the Worker (tools/taskShared.ts).
-  readConvoCandidates(): Array<{
-    id: string; title: string | null; confirmedIntent: string | null;
-    assignee: string | null; endState: string | null; lastProviderConfidence: number | null;
-  }> {
-    return this.sql.exec<{
-      id: string; title: string | null; confirmedIntent: string | null;
-      assignee: string | null; endState: string | null; lastProviderConfidence: number | null;
-    }>(`
+  readConvoCandidates(): ConvoCandidate[] {
+    return this.sql.exec<ConvoCandidate>(`
       SELECT t.id AS id, t.title AS title, c.confirmedIntent AS confirmedIntent,
              c.assignee AS assignee, c.endState AS endState,
+             c.stoppedAt AS stoppedAt, c.claimedBy AS claimedBy, c.claimUntil AS claimUntil,
              (SELECT confidence FROM turns WHERE taskId = t.id AND role = 'provider' ORDER BY seq DESC LIMIT 1)
-               AS lastProviderConfidence
+               AS lastProviderConfidence,
+             (SELECT CASE WHEN role = 'provider' AND options IS NOT NULL AND options != '[]' THEN 1 ELSE 0 END
+                FROM turns WHERE taskId = t.id ORDER BY seq DESC LIMIT 1) AS awaitsHuman
       FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
       WHERE t.deletedAt IS NULL AND t.status = 'open'
         AND (c.id IS NOT NULL OR EXISTS (SELECT 1 FROM turns WHERE taskId = t.id))
