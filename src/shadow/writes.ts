@@ -57,7 +57,7 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
-  | "readOrderTop" | "push";
+  | "readOrderTop" | "readSetting" | "push";
 export type StoreRpc = {
   [K in StoreMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>>;
 };

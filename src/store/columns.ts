@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTz } from "../tz.js";
 
 // Column specs for the task backend (docs/SEPTASK_BACKEND.md in the app repo,
 // §5). ONE table per entity, and this file is the single source of truth for
@@ -36,6 +37,29 @@ const zAttachmentPointer = z.record(z.unknown()).refine(
   (v) => JSON.stringify(v).length <= 4_000,
   "attachment pointer too large",
 );
+
+// Synced app settings (Septask), one row per key in the `settings` table:
+// `id` = the key, `value` = its JSON value (null = not set). Only these keys
+// are accepted, each with its own schema, so validation stays as strict as a
+// typed column. A new setting is a new line here: no table change. Settings
+// are never deleted (a tombstone would drop every later write, §6.4); a
+// cleared setting is `value: null`. Device-only preferences never come here.
+export const SETTING_VALUES = {
+  /// Profile name (Settings ▸ Account).
+  welcomeName: z.string().max(200),
+  /// Analytics level (`TelemetryClient.TelemetryLevel`).
+  telemetryLevel: z.enum(["none", "minimal", "balanced", "full"]),
+  /// Calendars hidden from Today / Upcoming, by `EKCalendar.title`.
+  calendarHiddenTitles: z.array(z.string().max(500)).max(500),
+  /// The day the "rolled into Today" notice was last dismissed.
+  rolledInDismissedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD"),
+  /// IANA zone of the device that last opened the app. The MCP connector
+  /// reads it for "today".
+  homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
+} satisfies Record<string, z.ZodTypeAny>;
+
+export type SettingKey = keyof typeof SETTING_VALUES;
+export const SETTING_KEYS = Object.keys(SETTING_VALUES) as SettingKey[];
 
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_USER_ATTACHMENT_BYTES = 2 * 1024 * 1024 * 1024;
@@ -151,6 +175,16 @@ export const ENTITIES = {
       endState: text(32),
       endStateNote: text(NOTES_MAX),
       assignee: { kind: "text", zod: z.enum(["me", "local", "claude"]).nullable() },
+    },
+    requiredOnInsert: [],
+  },
+  // One row per `SETTING_VALUES` key. The push schema for this entity is
+  // built from `SETTING_VALUES` (ops.ts), not from this column's `zod`, so
+  // each key keeps its own type.
+  setting: {
+    table: "settings",
+    columns: {
+      value: { kind: "json", zod: z.unknown() },
     },
     requiredOnInsert: [],
   },

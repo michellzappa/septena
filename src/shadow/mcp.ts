@@ -15,7 +15,7 @@ import {
 } from "../rpc.js";
 import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
-import { todayYMD } from "../tz.js";
+import { isValidTz, todayYMD } from "../tz.js";
 import { GLOBAL_TOOLS } from "../mcp.js";
 import {
   type ConvoTurn,
@@ -141,6 +141,7 @@ async function callTool(
 ): Promise<Response> {
   const name = params.name ?? "";
   const store = rpcStoreFor(env, grant.userId);
+  const timeZone = await effectiveTimeZone(store, grant);
   if (Object.hasOwn(zWriteArgs, name)) {
     if (!hasScope(grant, MCP_WRITE_SCOPE)) {
       // In-band, so the connector stays connected and the model can relay it.
@@ -149,7 +150,7 @@ async function callTool(
     const args = zWriteArgs[name as WriteToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
     const result = await runWriteTool(
-      { store, timeZone: grant.timeZone ?? "UTC" },
+      { store, timeZone },
       name as WriteToolName,
       args.data as Record<string, unknown>,
     );
@@ -164,7 +165,7 @@ async function callTool(
   let result: unknown;
   switch (name as ReadToolName) {
     case "tasks_list":
-      result = await listTasks(store, grant, a.view, a.limit as number | undefined);
+      result = await listTasks(store, timeZone, a.view, a.limit as number | undefined);
       break;
     case "tasks_get": {
       const r = await store.readTask(a.id as string);
@@ -239,7 +240,16 @@ function invalidArgs(id: JsonRpcRequest["id"], error: z.ZodError, era: Era): Res
   return rpcError(id, -32602, `Invalid arguments: ${error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`, era);
 }
 
-async function listTasks(store: StoreRpc, grant: McpGrant, rawView: unknown, rawLimit: number | undefined) {
+/// The user's zone for "today": the `homeTimezone` setting the app syncs
+/// (the device that last opened Septask), else the zone the app sent when it
+/// approved this pairing, else UTC.
+async function effectiveTimeZone(store: StoreRpc, grant: McpGrant): Promise<string> {
+  const synced = await store.readSetting("homeTimezone");
+  if (typeof synced === "string" && isValidTz(synced)) return synced;
+  return grant.timeZone ?? "UTC";
+}
+
+async function listTasks(store: StoreRpc, timeZone: string, rawView: unknown, rawLimit: number | undefined) {
   const view = normalizeView(rawView);
   const limit = rawLimit ?? 100;
   if (view === "completed") {
@@ -249,7 +259,7 @@ async function listTasks(store: StoreRpc, grant: McpGrant, rawView: unknown, raw
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
   // its own manual order: todayPosition, falling back to position.
   const { rows } = await store.readTasks("open", limit);
-  const today = todayYMD(grant.timeZone ?? "UTC");
+  const today = todayYMD(timeZone);
   const nowMs = Date.now();
   let matched = rows
     .map((row) => ({ row, out: taskOut(row) }))

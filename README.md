@@ -34,7 +34,7 @@ The `/v1` routes are the task backend (`src/api/`, `src/store/`), served on `api
 | `POST /mcp` | JSON-RPC MCP transport (Authorization: Bearer required) |
 | `POST /v1/auth/apple` | Task backend: Sign in with Apple identity token + raw nonce → access + refresh token |
 | `POST /v1/auth/refresh` · `/v1/auth/signout` | Rotate (single-use) or revoke a task-backend refresh token |
-| `POST /v1/sync/push` · `GET /v1/sync/pull` | Task sync: batched field patches in, changes since a `rev` out |
+| `POST /v1/sync/push` · `GET /v1/sync/pull` | Task sync: batched field patches in, changes since a `rev` out. Entities: task, area, project, attachment, convo, turn, and `setting` (Septask's synced settings, one row per key, schemas in `SETTING_VALUES` in `src/store/columns.ts`). Pull sends setting rows only with `settings=1` |
 | `GET /v1/sync/ws` | WebSocket nudge `{rev}` on every commit |
 | `PUT`/`GET /v1/attachments/:id` | Attachment bytes to/from R2 (25 MB per file, 2 GB per user) |
 | `DELETE /v1/account` | Delete all task data and attachment bytes for the user |

@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { ENTITIES, ENTITY_NAMES, pushableFields, zId, type EntityName } from "./columns.js";
+import { ENTITIES, ENTITY_NAMES, SETTING_KEYS, SETTING_VALUES, pushableFields, zId, type EntityName } from "./columns.js";
 
 // Wire shapes for POST /v1/sync/push (docs/SEPTASK_BACKEND.md §6.1).
 // Validated in the Worker before anything reaches the Durable Object.
 
 const zClientOpId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
 
-const upsertOps = ENTITY_NAMES.map((name) =>
+const upsertOps = ENTITY_NAMES.filter((name) => name !== "setting").map((name) =>
   z.object({
     clientOpId: zClientOpId,
     op: z.literal("upsert"),
@@ -16,10 +16,23 @@ const upsertOps = ENTITY_NAMES.map((name) =>
   }).strict(),
 );
 
+// A setting upsert names its key as the id and carries only `value`, typed by
+// that key's schema (columns.ts `SETTING_VALUES`). Unknown keys fail.
+const settingOps = SETTING_KEYS.map((key) =>
+  z.object({
+    clientOpId: zClientOpId,
+    op: z.literal("upsert"),
+    entity: z.literal("setting"),
+    id: z.literal(key),
+    fields: z.object({ value: SETTING_VALUES[key].nullable() }).strict(),
+  }).strict(),
+);
+
 const zDelete = z.object({
   clientOpId: zClientOpId,
   op: z.literal("delete"),
-  // Conversations are deleted with their task, never on their own.
+  // Conversations are deleted with their task, never on their own. Settings
+  // are never deleted (columns.ts).
   entity: z.enum(["task", "area", "project", "attachment"]),
   id: zId,
 }).strict();
@@ -46,7 +59,7 @@ const zAppendTurn = z.object({
   turn: zTurn,
 }).strict();
 
-const zOp = z.union([...upsertOps, zDelete, zAppendTurn] as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
+const zOp = z.union([...upsertOps, ...settingOps, zDelete, zAppendTurn] as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
 
 export const MAX_OPS_PER_PUSH = 500;
 
@@ -56,7 +69,7 @@ export const zPushBody = z.object({
 
 export type Op =
   | { clientOpId: string; op: "upsert"; entity: EntityName; id: string; fields: Record<string, unknown> }
-  | { clientOpId: string; op: "delete"; entity: Exclude<EntityName, "convo">; id: string }
+  | { clientOpId: string; op: "delete"; entity: Exclude<EntityName, "convo" | "setting">; id: string }
   | { clientOpId: string; op: "appendTurn"; taskId: string; turn: Turn };
 
 export type OpResult =

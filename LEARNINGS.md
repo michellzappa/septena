@@ -4,6 +4,36 @@ Hard-won context on how Claude reads/writes a user's **private** Septena
 (CloudKit) data via the MCP gateway. Read this before changing the auth/token
 design — several "obvious" approaches are dead ends, proven empirically.
 
+## 2026-11-19: Septask settings on the backend (`setting` entity)
+
+Septask is now CloudKit-free, so the few account-wide settings it used to
+read from the CloudKit `Settings` record sync through the task backend.
+
+- **Shape:** table `settings`, one row per key, `value` = JSON. Allowed keys
+  and their schemas live in `SETTING_VALUES` (`src/store/columns.ts`, the one
+  source of truth); `ops.ts` builds one strict upsert schema per key from it,
+  so an unknown key or a wrong type is refused at the edge. Today:
+  `welcomeName`, `telemetryLevel`, `calendarHiddenTitles`,
+  `rolledInDismissedOn`, `homeTimezone`. Adding a setting = one line there,
+  plus the app's `SeptaskSyncedSettings.keys` (keep in lockstep).
+- **Never deleted.** `delete` is not allowed for `setting`: a tombstone would
+  make every later upsert `dropped` (deleted stays deleted). Clear with
+  `value: null`.
+- **Pull is opt-in: `GET /v1/sync/pull?…&settings=1`.** App builds before
+  this change decode entities strictly and would fail a whole pull on an
+  unknown `setting` row. Without the flag the DO skips the settings table
+  (the cursor still moves past those revs). New app builds always send it and
+  re-pull once from rev 0 so settings pushed before they asked arrive.
+- **Migration:** nothing to run. `migrate()` already runs
+  `CREATE TABLE IF NOT EXISTS` for every entity in `ENTITIES` at DO start, so
+  the new table appears on the first request after deploy.
+- **The MCP connector reads `homeTimezone`** for "today" (`effectiveTimeZone`
+  in `src/shadow/mcp.ts`), falling back to the zone the app sent at pairing,
+  then UTC. One extra DO read per tool call.
+- **Order of deploy:** the gateway can deploy before or after the app. An app
+  that pushes settings to an older gateway gets the op refused, stops sending
+  settings for that launch, and tries again next launch.
+
 ## 2026-11-19: the api.septena.app connector writes
 
 `https://api.septena.app/mcp` now serves every task tool of the live

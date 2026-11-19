@@ -256,7 +256,10 @@ export class TaskStore extends DurableObject<Env> {
 
   // ---- pull ----
 
-  pull(since: number, limit: number): PullResult {
+  /// `includeSettings`: the client syncs the `setting` entity. Clients built
+  /// before it existed decode pulled entities strictly and would fail on it,
+  /// so they get no setting rows (their cursor still moves past them).
+  pull(since: number, limit: number, includeSettings = false): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -265,6 +268,7 @@ export class TaskStore extends DurableObject<Env> {
     // keeping the global first n is exact.
     const merged: Array<{ rev: number; entity: EntityName | "turn"; row: Record<string, unknown> }> = [];
     for (const name of ENTITY_NAMES) {
+      if (name === "setting" && !includeSettings) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -372,6 +376,14 @@ export class TaskStore extends DurableObject<Env> {
         FROM tasks WHERE deletedAt IS NULL
       )
     `).one().m;
+  }
+
+  /// One synced setting's value (columns.ts `SETTING_VALUES`), or null when
+  /// it was never set.
+  readSetting(key: string): Json {
+    const raw = this.sql.exec("SELECT * FROM settings WHERE id = ? AND deletedAt IS NULL", key).toArray()[0];
+    if (!raw) return null;
+    return (decodeRow(ENTITIES.setting, raw).value ?? null) as Json;
   }
 
   // ---- pairing rate limit (src/shadow/oauth.ts) ----
