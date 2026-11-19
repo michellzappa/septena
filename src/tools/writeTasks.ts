@@ -4,6 +4,9 @@ import { getEffectiveTimezone, localServerTimestamp, todayYMD } from "../tz.js";
 import { nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { listAreas } from "./listAreas.js";
 import { listProjects } from "./listProjects.js";
+import { awaitsReasoning, convoSummary, type ConvoTurn, type TaskConvo } from "./taskShared.js";
+
+export type { ConvoTurn, TaskConvo } from "./taskShared.js";
 
 // Reject writes that point a task at an area/project id with no matching
 // container. CloudKit stores the FK string verbatim, so an unknown id becomes a
@@ -552,32 +555,8 @@ export async function moveToToday(client: CloudKitClient, input: { id: string })
 // that blob. The field auto-registers in the dev CloudKit schema on the app's
 // first native write; gateway writes assume it exists (dev-only until ship).
 
-export interface ConvoTurn {
-  seq: number;
-  role: "user" | "provider";          // propose (provider) vs choose (user) are separate turns
-  step: "confirm" | "ground" | "scope" | "decide" | "work";
-  provider?: "onDevice" | "claude" | "applePCC";   // omitted = deterministic compute (no model)
-  confidence?: number;                // provider turns; the escalation trigger
-  question?: string;
-  options?: string[];
-  chosen?: string;
-  otherText?: string;
-  inReplyTo?: number;                 // user turn → the proposal turn (seq) it answers
-  note?: string;
-  ts: string;                         // ISO-8601 (matches the app's coders)
-}
-
-export interface TaskConvo {
-  confirmedIntent?: string;
-  acceptance?: string;
-  thread: ConvoTurn[];
-  subtasks: string[];
-  artifact?: { kind: string; title: string; body: string; refs?: string[] };
-  handoff?: { instruction: string; actionType: "open_url" | "compose" | "call" | "none"; payload?: string };
-  endState?: string;
-  endStateNote?: string;
-  assignee?: "me" | "local" | "claude";
-}
+// ConvoTurn / TaskConvo and the summary rules live in taskShared.ts, shared
+// with the read-only task-backend preview (src/shadow/).
 
 function decodeConvo(fields: Record<string, { value: unknown }> | null): TaskConvo {
   const raw = fields?.conversationJSON?.value;
@@ -603,10 +582,6 @@ async function writeConvo(client: CloudKitClient, id: string, convo: TaskConvo):
       record: { recordType: "Task", recordName: id, fields: { conversationJSON: { value: JSON.stringify(convo) } } },
     },
   ]);
-}
-
-function isTerminalConvo(c: TaskConvo): boolean {
-  return c.endState !== undefined && c.endState !== "open";
 }
 
 function nextSeq(c: TaskConvo): number {
@@ -703,8 +678,6 @@ export async function getTask(client: CloudKitClient, input: { id: string }) {
     throw new Error(`Task not found: ${input.id}`);
   }
   const convo = decodeConvo(fields);
-  const lastProvider = [...convo.thread].reverse().find((t) => t.role === "provider");
-  const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
   return {
     id: input.id,
     title: (fields.title?.value as string) ?? "",
@@ -717,16 +690,7 @@ export async function getTask(client: CloudKitClient, input: { id: string }) {
     completedAt: optionalString(fields.completedAt?.value),
     source: optionalString(fields.source?.value),
     notes: optionalString(fields.notesText?.value),
-    convo: {
-      confirmedIntent: convo.confirmedIntent,
-      acceptance: convo.acceptance,
-      assignee: convo.assignee,
-      endState: convo.endState,
-      turns: convo.thread.length,
-      hasArtifact: !!convo.artifact,
-      hasHandoff: !!convo.handoff,
-      pendingReasoning: !isTerminalConvo(convo) && (convo.assignee === "claude" || lowConf),
-    },
+    convo: convoSummary(convo),
   };
 }
 
@@ -850,10 +814,7 @@ export async function pendingReasoning(client: CloudKitClient, input: { limit?: 
     const raw = r.fields.conversationJSON?.value;
     if (typeof raw !== "string" || raw.length === 0) continue;
     const c = decodeConvo(r.fields);
-    if (isTerminalConvo(c)) continue;
-    const lastProvider = [...c.thread].reverse().find((t) => t.role === "provider");
-    const lowConf = lastProvider?.confidence !== undefined && lastProvider.confidence < 0.5;
-    if (c.assignee === "claude" || lowConf) {
+    if (awaitsReasoning(c)) {
       tasks.push({
         id: r.recordName,
         title: (r.fields.title?.value as string) ?? "",

@@ -237,7 +237,7 @@ function consentPage(clientName: string, redirectHost: string): string {
 </html>`;
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) =>
     ch === "&" ? "&amp;" :
     ch === "<" ? "&lt;" :

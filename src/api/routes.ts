@@ -6,6 +6,7 @@ import { MAX_ATTACHMENT_BYTES, zId } from "../store/columns.js";
 import { zPushBody, type Op } from "../store/ops.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
+import { approvePairing, zPairApproveBody } from "../shadow/oauth.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
@@ -87,6 +88,7 @@ async function requireUser(c: Ctx, next: Next) {
 api.use("/sync/*", requireUser);
 api.use("/attachments/*", requireUser);
 api.use("/account", requireUser);
+api.use("/pair/*", requireUser);
 
 api.post("/sync/push", async (c) => {
   const body = await parse(c, zPushBody);
@@ -154,6 +156,15 @@ api.get("/attachments/:id", async (c) => {
       "Cache-Control": "private, no-store",
     },
   });
+});
+
+// ---- pairing a Claude connector to this user (MCP preview, src/shadow/) ----
+
+api.post("/pair/approve", async (c) => {
+  const body = await parse(c, zPairApproveBody);
+  if (body instanceof Response) return body;
+  const res = await approvePairing(c.env, c.get("userId"), body);
+  return res.ok ? c.json({ ok: true, client: res.client }) : c.json({ error: res.error }, res.status);
 });
 
 // ---- account deletion (§10) ----

@@ -4,6 +4,38 @@ Hard-won context on how Claude reads/writes a user's **private** Septena
 (CloudKit) data via the MCP gateway. Read this before changing the auth/token
 design — several "obvious" approaches are dead ends, proven empirically.
 
+## 2026-11-19: phase 2 preview connector uses app pairing, not web sign-in
+
+The read-only test connector at `https://api.septena.app/mcp` (`src/shadow/`)
+reads the user's TaskStore. Its OAuth needs a user id, and web Sign in with
+Apple needs a Services ID (developer-portal work we chose not to do). So the
+authorize page shows a short code and the signed-in Septask Mac app approves
+it (`POST /v1/pair/approve`), like a TV device code.
+
+- **Pairing state lives in a Durable Object (`PairingStore`), one per code,
+  not KV.** The page polls the same key every few seconds; KV caches a read at
+  the edge for up to a minute, so the approval would show late. The DO also
+  makes the approve-once rule atomic.
+- **Brute force is limited per user**, in the user's own TaskStore (5 wrong
+  codes per 10 minutes). A wrong code maps to no pending pairing, so a
+  per-code counter cannot see it.
+- **The cookie, not the code, finishes the flow.** The code only binds a
+  user; polling and the redirect need the random `pendingId` in the
+  browser's HttpOnly cookie.
+- **Phishing risk is the device-code one:** someone could get a user to enter
+  the attacker's code and so read the user's tasks. The app copy says to
+  enter only a code from a browser window you opened yourself.
+- **Host split, live untouched:** `byHost` in `src/index.ts` sends api-host
+  requests to the preview handlers and every other host (mcp.septena.app,
+  localhost) to the live handlers unchanged. The JSON-RPC envelope moved to
+  `src/rpc.ts` and the pure task rules to `src/tools/taskShared.ts`; both
+  endpoints use them, so the live output did not change.
+- **Token prefixes keep kinds apart:** `sa1.`/`sr1.` app session, `sm1.`/`smr1.`
+  MCP preview, unprefixed live. KV keys for the preview are under `v2:`.
+- **"Today" needs a time zone and the DO has no Settings record.** The app
+  sends `TimeZone.current` at approve time; it rides in the grant. Travel
+  changes need a re-pair. Fallback is UTC.
+
 ## 2026-11-18 decision: tasks move to our own backend
 
 This **reverses** the "no copy of user data at rest" and "private CloudKit

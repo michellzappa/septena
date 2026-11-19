@@ -1,13 +1,15 @@
 // Worker bindings — keep in sync with wrangler.toml.
 
 import type { TaskStore } from "./store/TaskStore.js";
+import type { PairingStore } from "./shadow/PairingStore.js";
 
 export interface Env {
   // Vars (public-ish, set in wrangler.toml)
   CK_CONTAINER: string;
   CK_ENVIRONMENT: "development" | "production";
   CK_ZONE: string;
-  PUBLIC_URL: string;
+  PUBLIC_URL: string;     // live connector origin (mcp.septena.app)
+  API_PUBLIC_URL: string; // task backend origin (api.septena.app); also hosts the read-only MCP preview
   APPLE_AUDIENCES: string; // comma-separated bundle ids allowed as SIWA `aud`
 
   // Secrets (set via `wrangler secret put`)
@@ -23,4 +25,5 @@ export interface Env {
   // Task backend (docs/SEPTASK_BACKEND.md in the app repo)
   TASK_STORE: DurableObjectNamespace<TaskStore>; // one object per user
   ATTACHMENTS: R2Bucket;                         // attachment bytes, u/{userId}/att/{id}
+  PAIRING: DurableObjectNamespace<PairingStore>; // one object per pending app-pairing code (src/shadow/)
 }

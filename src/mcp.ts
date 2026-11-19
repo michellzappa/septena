@@ -1,31 +1,19 @@
 import type { Context } from "hono";
-import pkg from "../package.json";
 import type { Env } from "./env.js";
-
-// Single source of truth for the server version — the MCP `serverInfo.version`
-// must always match package.json so a deployed Worker maps to a tagged release.
-const SERVER_VERSION = pkg.version;
 import { CloudKitClient, CloudKitError } from "./cloudkit.js";
 import { getCkTokenForAccessToken, touchAccessToken, putUserSections, getUserSections } from "./storage.js";
 import { logEvent } from "./util.js";
+import { type Era, TOOLS_LIST_TTL_MS } from "./protocol.js";
 import {
-  type Era,
-  MODERN_VERSION,
-  SUPPORTED_VERSIONS,
-  DISCOVER_TTL_MS,
-  TOOLS_LIST_TTL_MS,
-  ERR_HEADER_MISMATCH,
-  ERR_UNSUPPORTED_PROTOCOL_VERSION,
-  decorateResult,
-  detectEra,
-  isSupportedVersion,
-  metaProtocolVersion,
-  negotiateLegacyVersion,
-  validateModernHeaders,
-} from "./protocol.js";
-
-/// Identity reported in `serverInfo`, on both eras.
-const SERVER_INFO = { name: "septena-mcp-gateway", version: SERVER_VERSION };
+  type JsonRpcRequest,
+  type Tool,
+  answerProtocolMethod,
+  methodNotFound,
+  readRpcRequest,
+  rpcError,
+  rpcResult,
+  unauthorized,
+} from "./rpc.js";
 
 // Throttle lastUsedAt writes: at most one KV write per token per interval.
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -144,14 +132,9 @@ import {
 //   { "jsonrpc": "2.0", "id": ..., "method": "tools/list" | "tools/call", ... }
 // We dispatch and return a JSON-RPC response.
 
-interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id: number | string | null;
-  method: string;
-  params?: Record<string, unknown>;
-}
-
-type Tool = { name: string; description: string; inputSchema: unknown };
+// The JSON-RPC envelope (request parsing, era rules, discover/initialize/ping,
+// result and error shapes) lives in src/rpc.ts, shared with the read-only
+// task-backend preview on api.septena.app.
 
 // Always exposed regardless of section configuration.
 const GLOBAL_TOOLS: Tool[] = [
@@ -567,92 +550,17 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
     c.executionCtx.waitUntil(touchAccessToken(c.env, accessToken));
   }
 
-  const req = (await c.req.json().catch(() => null)) as JsonRpcRequest | null;
-  if (!req || req.jsonrpc !== "2.0" || !req.method) {
-    return rpcError(req?.id ?? null, -32600, "Invalid Request");
-  }
-
-  // JSON-RPC notifications carry no id; per spec the server must not reply.
-  // MCP clients send notifications/initialized after the handshake — answer
-  // with a bare 202 instead of a "Method not found" error.
-  if (req.id === undefined || req.id === null || req.method.startsWith("notifications/")) {
-    return new Response(null, { status: 202 });
-  }
-
-  // --- Protocol era (see src/protocol.ts) ---------------------------------
-  // Modern (2026-07-28) requests declare their version per-request and are
-  // served statelessly; legacy clients keep the `initialize` handshake. A
-  // request never changes era mid-flight, so this is decided once, here.
-  const era: Era = detectEra(req.method, req.params, c.req.header("MCP-Protocol-Version"));
-
-  if (era === "modern") {
-    // Header/body agreement is a MUST: an intermediary may route on the
-    // header while we execute the body, so a mismatch is a security bug, not
-    // a nicety. Legacy callers never send these and are never checked.
-    const reason = validateModernHeaders(name => c.req.header(name), req.method, req.params);
-    if (reason) {
-      logEvent("header_mismatch", { method: req.method, reason });
-      return rpcError(req.id, ERR_HEADER_MISMATCH, `Header mismatch: ${reason}`, era, 400);
-    }
-
-    // Version support is now answered honestly. We used to echo whatever
-    // version string the client sent, which claimed support for revisions we
-    // do not implement; the modern reply is an explicit error naming what we
-    // actually serve so the client can retry on a mutually supported one.
-    const declared = metaProtocolVersion(req.params) ?? c.req.header("MCP-Protocol-Version");
-    if (declared !== undefined && !isSupportedVersion(declared)) {
-      return rpcError(
-        req.id,
-        ERR_UNSUPPORTED_PROTOCOL_VERSION,
-        "Unsupported protocol version",
-        era,
-        400,
-        { supported: SUPPORTED_VERSIONS, requested: declared },
-      );
-    }
-  }
+  const parsed = await readRpcRequest(c);
+  if (parsed instanceof Response) return parsed;
+  const { req, era } = parsed;
 
   const client = new CloudKitClient(c.env, ckWebAuthToken);
 
+  const protocolReply = answerProtocolMethod(req, era, { instructions: LIVE_INSTRUCTIONS });
+  if (protocolReply) return protocolReply;
+
   try {
     switch (req.method) {
-      case "server/discover":
-        // MUST be implemented by every modern server. Pure identity — no
-        // CloudKit call, no user data — so it is the same for every caller
-        // and caches publicly.
-        return rpcResult(
-          req.id,
-          {
-            supportedVersions: SUPPORTED_VERSIONS,
-            capabilities: { tools: {} },
-            instructions:
-              "Septena is a private life-tracking app. These tools read and write the " +
-              "signed-in user's own data (tasks, goals, habits, nutrition, training, and " +
-              "the other sections they have enabled). The advertised tool set reflects " +
-              "which sections that user turned on, so call tools/list before assuming a " +
-              "section is available.",
-            ttlMs: DISCOVER_TTL_MS,
-            cacheScope: "public",
-          },
-          era,
-        );
-      case "initialize": {
-        // Legacy handshake. Retained deliberately: Claude's connector has not
-        // shipped 2026-07-28 support, so removing this takes the live
-        // connector offline. Answer with a version we genuinely serve rather
-        // than echoing the client's request blindly.
-        const requested = (req.params as { protocolVersion?: unknown } | undefined)?.protocolVersion;
-        return rpcResult(req.id, {
-          protocolVersion: negotiateLegacyVersion(requested),
-          capabilities: { tools: {} },
-          serverInfo: SERVER_INFO,
-        }, era);
-      }
-      case "ping":
-        // Removed in 2026-07-28, kept for legacy clients that health-probe
-        // with it. Must be a fast empty result that never touches CloudKit,
-        // or clients judge the connector unhealthy.
-        return rpcResult(req.id, {}, era);
       case "tools/list": {
         // Source of truth for "which sections this user has enabled" is
         // the per-section `Section.isEnabled` flag the iOS app writes.
@@ -766,16 +674,7 @@ export async function mcpHandler(c: Context<{ Bindings: Env }>) {
         }
       }
       default:
-        // Modern transport pins an unknown method to HTTP 404 (with the
-        // JSON-RPC body distinguishing us from a legacy server that simply
-        // doesn't host this endpoint). Legacy clients keep the 200 they expect.
-        return rpcError(
-          req.id,
-          -32601,
-          `Method not found: ${req.method}`,
-          era,
-          era === "modern" ? 404 : 200,
-        );
+        return methodNotFound(req, era);
     }
   } catch (err) {
     if (err instanceof CloudKitError && err.isAuthExpired) {
@@ -1153,54 +1052,14 @@ const AUTH_EXPIRED_MESSAGE =
   "I'll be able to read and write your data again with no need to reconnect from " +
   "claude.ai.";
 
-/// Success envelope. Modern results additionally carry `resultType` and the
-/// server's identity in `_meta`; legacy results are byte-identical to what
-/// this gateway has always emitted. Aliased as `baseRpcResult` at the one call
-/// site that shadows it (`callTool`).
-function rpcResult(
-  id: JsonRpcRequest["id"],
-  result: Record<string, unknown>,
-  era: Era = "legacy",
-): Response {
-  return Response.json({
-    jsonrpc: "2.0",
-    id,
-    result: decorateResult(result, era, SERVER_INFO),
-  });
-}
+/// `server/discover` instructions for the live connector. Text unchanged from
+/// before the envelope moved to src/rpc.ts.
+const LIVE_INSTRUCTIONS =
+  "Septena is a private life-tracking app. These tools read and write the " +
+  "signed-in user's own data (tasks, goals, habits, nutrition, training, and " +
+  "the other sections they have enabled). The advertised tool set reflects " +
+  "which sections that user turned on, so call tools/list before assuming a " +
+  "section is available.";
+
+/// Aliased because `callTool` shadows `rpcResult` with an era-bound version.
 const baseRpcResult = rpcResult;
-
-/// Error envelope. `status` exists because the modern transport maps certain
-/// protocol errors onto HTTP status codes (400 for version/header failures,
-/// 404 for an unknown method) — that status is how a dual-era CLIENT tells a
-/// modern server from a legacy one, so it is load-bearing, not cosmetic.
-function rpcError(
-  id: JsonRpcRequest["id"],
-  code: number,
-  message: string,
-  era: Era = "legacy",
-  status = 200,
-  data?: unknown,
-): Response {
-  const error = data === undefined ? { code, message } : { code, message, data };
-  return Response.json({ jsonrpc: "2.0", id, error }, { status: era === "modern" ? status : 200 });
-}
-
-function unauthorized(reason?: string): Response {
-  // RFC 9728 / MCP 2025-06: the `resource_metadata` parameter points clients
-  // at our /.well-known/oauth-protected-resource doc, from which they learn
-  // the authorization server. Without it, Claude's MCP client cannot
-  // discover where to re-run OAuth on a 401 and falls back to "user must
-  // reconnect manually" — the daily-disconnect symptom we're fixing.
-  const resourceMetadata = "https://mcp.septena.app/.well-known/oauth-protected-resource";
-  const params = [
-    'Bearer realm="septena-mcp"',
-    'error="invalid_token"',
-    `resource_metadata="${resourceMetadata}"`,
-  ];
-  if (reason) logEvent("unauthorized", { reason });
-  return new Response("Unauthorized", {
-    status: 401,
-    headers: { "WWW-Authenticate": params.join(", ") },
-  });
-}

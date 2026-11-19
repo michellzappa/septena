@@ -1,12 +1,12 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { getEffectiveTimezone, todayYMD } from "../tz.js";
+import { matchesView, normalizeView, type TaskOut, type TaskView } from "./taskShared.js";
 
 // Ported from /Users/mz/Dev/septena-mcp/src/tools/listTasks.ts.
 // Single source of truth for tool definitions can come later once a 3rd
 // shared package exists; for now, mirror.
 
-export type TaskView =
-  | "today" | "triage" | "inbox" | "anytime" | "upcoming" | "completed";
+export type { TaskView } from "./taskShared.js";
 
 export const listTasksJsonSchema = {
   type: "object",
@@ -32,30 +32,6 @@ export interface ListTasksInput {
   limit?: number;
 }
 
-interface TaskOut {
-  id: string;
-  title: string;
-  status: string;
-  today: boolean;
-  scheduled?: string;
-  deadline?: string;
-  area?: string;
-  project?: string;
-  completedAt?: string;
-  notes?: string;
-  // Provenance + freshness cue — needed to compute the triage band (and to
-  // keep "today" excluding unratified rows). See iOS SeptenaTask.isInTriageBand.
-  source?: string;
-  acknowledgedAt?: number; // ms epoch; present once the user has engaged the row
-  createdAt?: number;      // ms epoch
-  // Row shape: "heading" = a project section divider, not a to-do. Filtered out
-  // of every view below (mirrors iOS TaskEntity.isHeading). Absent = task.
-  kind?: string;
-  // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
-  // round-trips into a write unchanged.
-  recurrence?: { unit: string; interval: number; after_completion: boolean };
-}
-
 /** Reads the three CloudKit recurrence columns back into the wire shape. */
 function recurrenceOut(
   fields: Record<string, { value: unknown } | undefined>,
@@ -69,16 +45,12 @@ function recurrenceOut(
   };
 }
 
-// Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
-const CUE_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
-
 export async function listTasks(
   client: CloudKitClient,
   input: ListTasksInput,
 ): Promise<{ tasks: TaskOut[]; total: number; truncated: boolean }> {
-  // "someday" is the retired bucket — accept it as an alias for "anytime" so
-  // existing agent calls keep working.
-  const view = ((input.view as string) === "someday" ? "anytime" : input.view) ?? "today";
+  // "someday" is the retired bucket — accepted as an alias for "anytime".
+  const view = normalizeView(input.view);
   const limit = input.limit ?? 100;
 
   // CKQuery can express EQUALS but not OR-unions or IS-NULL. iOS's
@@ -157,41 +129,6 @@ function optionalString(value: unknown): string | undefined {
 
 function optionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-/// Mirrors iOS TaskEntity.isInTriageBand — the unratified layer above Today.
-/// Agent arm: an unacknowledged MCP-authored row still inside the freshness
-/// window (reuses the agent-cue, so cue-decay = ratification-by-timeout).
-/// Human arm: a loose capture with no disposition at all (the classic Inbox).
-function inTriageBand(t: TaskOut, nowMs: number): boolean {
-  if (t.status !== "open" || t.kind === "heading") return false;
-  if (t.source === "mcp") {
-    if (t.acknowledgedAt) return false;
-    if (!t.createdAt) return false;
-    return nowMs - t.createdAt < CUE_DECAY_MS;
-  }
-  return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
-}
-
-/// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep
-/// with iOS so the two surfaces never disagree on what "Today" means.
-function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: number): boolean {
-  if (t.status !== "open" || t.kind === "heading") return false;
-  switch (view) {
-    case "today":
-      // Ratified + due — the triage band (unratified) is excluded.
-      if (inTriageBand(t, nowMs)) return false;
-      return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
-    case "triage":
-      return inTriageBand(t, nowMs);
-    case "inbox":
-      return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
-    case "upcoming":
-      if (t.today) return false;
-      return (!!t.scheduled && t.scheduled > today) || (!!t.deadline && t.deadline > today);
-    default:
-      return true;
-  }
 }
 
 function filtersForView(view: TaskView) {

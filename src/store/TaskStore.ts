@@ -26,11 +26,25 @@ const TOMBSTONE_TTL_MS = 90 * DAY_MS;
 const CLIENT_OP_TTL_MS = 30 * DAY_MS;
 const CHANGE_LOG_TTL_MS = 365 * DAY_MS;
 const MAX_PULL = 1_000;
+const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
 
 const TURN_COLUMNS = [
   "role", "step", "provider", "confidence", "question", "options",
   "chosen", "otherText", "inReplyTo", "note", "ts",
 ] as const;
+
+/// A decoded row as it crosses the RPC boundary: JSON values only.
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+export type Row = { [key: string]: Json };
+
+/// A turns row as the wire carries it: nulls dropped, options parsed. Shared
+/// by pull and the MCP preview's reads.
+function decodeTurnRow(raw: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = { ...raw };
+  for (const [k, v] of Object.entries(row)) if (v === null) delete row[k];
+  if (typeof row.options === "string") row.options = JSON.parse(row.options);
+  return row;
+}
 
 export interface PushOutcome {
   result: PushResult;
@@ -257,10 +271,7 @@ export class TaskStore extends DurableObject<Env> {
       }
     }
     for (const raw of this.sql.exec(`SELECT * FROM turns WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
-      const row: Record<string, unknown> = { ...raw };
-      for (const [k, v] of Object.entries(row)) if (v === null) delete row[k];
-      if (typeof row.options === "string") row.options = JSON.parse(row.options);
-      merged.push({ rev: raw.rev as number, entity: "turn", row });
+      merged.push({ rev: raw.rev as number, entity: "turn", row: decodeTurnRow(raw) });
     }
     merged.sort((a, b) => a.rev - b.rev);
     const page = merged.slice(0, n);
@@ -271,6 +282,97 @@ export class TaskStore extends DurableObject<Env> {
       nextSince,
       hasMore: merged.length > n,
     };
+  }
+
+  // ---- reads for the MCP preview (src/shadow/) ----
+  //
+  // SQL queries that return decoded rows (the same shape a pull carries), so
+  // a tool call never pulls the whole store. Live rows only: tombstones are
+  // never returned. Formatting into tool output happens in the Worker.
+
+  /// Open tasks (every one: the view filters need the whole open set), or
+  /// done tasks newest first, capped. Headings are never to-dos and are left
+  /// out. `total` counts every matching row, not only the returned ones.
+  readTasks(status: "open" | "done", limit: number): { rows: Row[]; total: number } {
+    const spec: EntitySpec = ENTITIES.task;
+    const where = "deletedAt IS NULL AND status = ? AND (kind IS NULL OR kind != 'heading')";
+    const total = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM tasks WHERE ${where}`, status).one().n;
+    const order = status === "done"
+      ? "ORDER BY completedAt IS NULL, completedAt DESC, rev DESC LIMIT ?"
+      : "ORDER BY scheduled IS NULL, scheduled, position IS NULL, position, rev";
+    const args: unknown[] = status === "done" ? [status, Math.min(Math.max(limit, 1), 500)] : [status];
+    const rows = this.sql.exec(`SELECT * FROM tasks WHERE ${where} ${order}`, ...args).toArray().map((r) => decodeRow(spec, r) as Row);
+    return { rows, total };
+  }
+
+  /// One live task with its conversation row and turns (oldest first).
+  readTask(id: string): { task: Row; convo: Row | null; turns: Row[] } | null {
+    const raw = this.sql.exec("SELECT * FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    if (!raw) return null;
+    const convoRaw = this.sql.exec("SELECT * FROM convos WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    const turns = this.sql.exec("SELECT * FROM turns WHERE taskId = ? ORDER BY seq", id).toArray().map((r) => decodeTurnRow(r) as Row);
+    return {
+      task: decodeRow(ENTITIES.task, raw) as Row,
+      convo: convoRaw ? (decodeRow(ENTITIES.convo, convoRaw) as Row) : null,
+      turns,
+    };
+  }
+
+  readAreas(limit: number): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM areas WHERE deletedAt IS NULL ORDER BY position IS NULL, position, title LIMIT ?",
+      Math.min(Math.max(limit, 1), 500),
+    ).toArray().map((r) => decodeRow(ENTITIES.area, r) as Row);
+  }
+
+  readProjects(status: "active" | "done" | "cancelled" | "all", limit: number): Row[] {
+    const n = Math.min(Math.max(limit, 1), 500);
+    const order = "ORDER BY position IS NULL, position, title LIMIT ?";
+    const rows = status === "all"
+      ? this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL ${order}`, n)
+      : this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL AND status = ? ${order}`, status, n);
+    return rows.toArray().map((r) => decodeRow(ENTITIES.project, r) as Row);
+  }
+
+  /// Open tasks that have a conversation, with what the pending-reasoning
+  /// rule needs: the convo fields and the confidence of the last provider
+  /// turn. The rule itself runs in the Worker (tools/taskShared.ts).
+  readConvoCandidates(): Array<{
+    id: string; title: string | null; confirmedIntent: string | null;
+    assignee: string | null; endState: string | null; lastProviderConfidence: number | null;
+  }> {
+    return this.sql.exec<{
+      id: string; title: string | null; confirmedIntent: string | null;
+      assignee: string | null; endState: string | null; lastProviderConfidence: number | null;
+    }>(`
+      SELECT t.id AS id, t.title AS title, c.confirmedIntent AS confirmedIntent,
+             c.assignee AS assignee, c.endState AS endState,
+             (SELECT confidence FROM turns WHERE taskId = t.id AND role = 'provider' ORDER BY seq DESC LIMIT 1)
+               AS lastProviderConfidence
+      FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+      WHERE t.deletedAt IS NULL AND t.status = 'open'
+        AND (c.id IS NOT NULL OR EXISTS (SELECT 1 FROM turns WHERE taskId = t.id))
+      ORDER BY t.rev
+    `).toArray();
+  }
+
+  // ---- pairing rate limit (src/shadow/oauth.ts) ----
+  //
+  // Wrong pairing codes this user entered in the current window. Kept in the
+  // user's own object so the count is exact and needs no KV.
+
+  pairFailures(): number {
+    if (Date.now() - this.meta("pairFailWindow") > PAIR_FAIL_WINDOW_MS) return 0;
+    return this.meta("pairFailCount");
+  }
+
+  notePairFailure(): number {
+    const now = Date.now();
+    const fresh = now - this.meta("pairFailWindow") > PAIR_FAIL_WINDOW_MS;
+    const count = fresh ? 1 : this.meta("pairFailCount") + 1;
+    if (fresh) this.setMeta("pairFailWindow", now);
+    this.setMeta("pairFailCount", count);
+    return count;
   }
 
   // ---- attachments ----

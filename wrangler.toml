@@ -45,6 +45,9 @@ CK_CONTAINER = "iCloud.com.septena.cloud"
 CK_ENVIRONMENT = "development"
 CK_ZONE = "septena-v1"
 PUBLIC_URL = "https://mcp.septena.app"
+# Task backend origin. Requests on this host get the read-only MCP preview
+# (/mcp) and its pairing OAuth (/oauth/*, /.well-known/*); see src/shadow/.
+API_PUBLIC_URL = "https://api.septena.app"
 # Bundle ids accepted as the `aud` of a Sign in with Apple identity token.
 APPLE_AUDIENCES = "com.septena.cloud,com.septena.cloud.mac,com.septena.tasks,com.septena.tasks.mac"
 
@@ -69,6 +72,17 @@ class_name = "TaskStore"
 [[migrations]]
 tag = "v1-task-store"
 new_sqlite_classes = ["TaskStore"]
+
+# Pending app-pairing codes for the api.septena.app MCP preview: one object per
+# code, so approve and the browser's poll see the same state at once (KV would
+# serve the poll a cached "pending" for up to a minute).
+[[durable_objects.bindings]]
+name = "PAIRING"
+class_name = "PairingStore"
+
+[[migrations]]
+tag = "v2-pairing-store"
+new_sqlite_classes = ["PairingStore"]
 
 # Attachment bytes. Create once: wrangler r2 bucket create septena-attachments
 [[r2_buckets]]

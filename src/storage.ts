@@ -434,11 +434,14 @@ export interface ClientRecord {
   createdAt: number;
 }
 
-export async function putClient(env: Env, c: ClientRecord): Promise<void> {
-  await env.CLIENTS.put(`client:${c.clientId}`, JSON.stringify(c));
+// `keyPrefix` keeps each authorization server's registrations apart: the live
+// connector uses the default `client:`, the api.septena.app preview `v2:client:`
+// (src/shadow/), so a client registered with one is unknown to the other.
+export async function putClient(env: Env, c: ClientRecord, keyPrefix = "client:"): Promise<void> {
+  await env.CLIENTS.put(`${keyPrefix}${c.clientId}`, JSON.stringify(c));
 }
 
-export async function getClient(env: Env, clientId: string): Promise<ClientRecord | null> {
-  const raw = await env.CLIENTS.get(`client:${clientId}`);
+export async function getClient(env: Env, clientId: string, keyPrefix = "client:"): Promise<ClientRecord | null> {
+  const raw = await env.CLIENTS.get(`${keyPrefix}${clientId}`);
   return raw ? (JSON.parse(raw) as ClientRecord) : null;
 }

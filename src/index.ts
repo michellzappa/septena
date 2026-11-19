@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { Env } from "./env.js";
 import { cleanupAccessTokens } from "./storage.js";
 import { register } from "./oauth/register.js";
@@ -11,10 +11,25 @@ import { ingestCkToken } from "./ingest/ckToken.js";
 import { mcpHandler } from "./mcp.js";
 import { landingHTML, SKILL_MARKDOWN } from "./landing.js";
 import { api } from "./api/routes.js";
+import * as preview from "./shadow/oauth.js";
+import { previewMcpHandler } from "./shadow/mcp.js";
 
 export { TaskStore } from "./store/TaskStore.js";
+export { PairingStore } from "./shadow/PairingStore.js";
 
 const app = new Hono<{ Bindings: Env }>();
+
+// Host split. api.septena.app serves the read-only MCP preview (src/shadow/)
+// with its own OAuth (app pairing) and discovery documents. Every other host —
+// mcp.septena.app, and localhost in `wrangler dev` — runs the live handlers
+// exactly as before: `byHost` calls the live handler unchanged whenever the
+// request is not on the api host.
+type Handler = (c: Context<{ Bindings: Env }>) => Response | Promise<Response>;
+const byHost = (onApi: Handler, live: Handler): Handler => (c) =>
+  preview.isApiHost(c) ? onApi(c) : live(c);
+/// A path that exists only on the api host; elsewhere it 404s as before.
+const apiOnly = (onApi: Handler): Handler => (c) =>
+  preview.isApiHost(c) ? onApi(c) : c.notFound();
 
 // Public landing page — introduces the gateway and embeds the skill brief.
 // Both humans (browsing) and models (fetching the URL) land here.
@@ -59,7 +74,7 @@ app.get("/.well-known/apple-app-site-association", (c) =>
 
 // OAuth 2.0 Authorization Server metadata (RFC 8414). MCP clients fetch
 // this to discover the registration/authorize/token endpoints.
-app.get("/.well-known/oauth-authorization-server", (c) => {
+function liveAuthServerMetadata(c: Context<{ Bindings: Env }>) {
   const base = c.env.PUBLIC_URL;
   return c.json({
     issuer: base,
@@ -77,7 +92,8 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
     // when present).
     authorization_response_iss_parameter_supported: true,
   });
-});
+}
+app.get("/.well-known/oauth-authorization-server", byHost(preview.authServerMetadata, liveAuthServerMetadata));
 
 // OAuth 2.0 Protected Resource Metadata (RFC 9728). Required by the MCP
 // 2025-06 auth spec: the resource server advertises which authorization
@@ -86,24 +102,27 @@ app.get("/.well-known/oauth-authorization-server", (c) => {
 // uses `authorization_servers[0]` to find the AS metadata above and
 // re-runs OAuth without bothering the user (assuming Apple's browser
 // session cookie is still alive).
-app.get("/.well-known/oauth-protected-resource", (c) => {
+function liveProtectedResourceMetadata(c: Context<{ Bindings: Env }>) {
   const base = c.env.PUBLIC_URL;
   return c.json({
     resource: base,
     authorization_servers: [base],
     bearer_methods_supported: ["header"],
   });
-});
+}
+app.get("/.well-known/oauth-protected-resource", byHost(preview.protectedResourceMetadata, liveProtectedResourceMetadata));
 
-app.post("/oauth/register", register);
-app.get("/oauth/authorize", authorize);
+app.post("/oauth/register", byHost(preview.register, register));
+app.get("/oauth/authorize", byHost(preview.authorize, authorize));
 app.post("/oauth/continue", continueAuth);
-app.post("/oauth/token", token);
-app.post("/oauth/revoke", revoke);
+app.get("/oauth/pair/continue", apiOnly(preview.pairContinue));
+app.post("/oauth/token", byHost(preview.token, token));
+app.post("/oauth/revoke", byHost(preview.revoke, revoke));
 
 app.get("/auth/apple/callback", appleCallback);
 
-app.post("/mcp", mcpHandler);
+// Live connector on mcp.septena.app; read-only task preview on api.septena.app.
+app.post("/mcp", byHost(previewMcpHandler, mcpHandler));
 
 // Revision 2026-07-28 removed the GET stream endpoint and protocol-level
 // sessions (which were torn down with DELETE). A server on this revision
@@ -118,8 +137,8 @@ app.on(["GET", "DELETE"], "/mcp", (c) =>
 // pushed token is validated against CloudKit's users/current.
 app.post("/ingest/ck-token", ingestCkToken);
 
-// Task backend (phase 0 of docs/SEPTASK_BACKEND.md in the app repo). Served
-// on api.septena.app; nothing on mcp.septena.app calls it yet.
+// Task backend (docs/SEPTASK_BACKEND.md in the app repo). Served on
+// api.septena.app; nothing on mcp.septena.app calls it yet.
 app.route("/v1", api);
 
 // Access/refresh tokens now carry KV TTLs and self-expire; this cron is
