@@ -111,18 +111,19 @@ Then in **CloudKit Dashboard → Tokens & Keys → API Tokens**, create a token 
 
 ## Production deploy
 
+`wrangler.toml` has no `[env.production]` block: its top-level config IS
+production (custom domains `mcp.septena.app` and `api.septena.app`, the live
+KV namespaces, the `TaskStore` Durable Object). Deploy with:
+
 ```sh
-# Set production secrets
-wrangler secret put CK_API_TOKEN --env production
-wrangler secret put TOKEN_ENC_KEY --env production
-
-# Create production KV namespaces, paste IDs under [env.production] in wrangler.toml
-wrangler kv namespace create STATE --env production
-wrangler kv namespace create TOKENS --env production
-wrangler kv namespace create CLIENTS --env production
-
-wrangler deploy --env production
+pnpm run deploy
 ```
+
+`--env production` would deploy a separate, unconfigured Worker. Secrets are
+set the same way, without `--env` (`wrangler secret put CK_API_TOKEN`).
+Columns added to `src/store/columns.ts` migrate themselves on the next object
+start (`addMissingColumnsSQL`); a new Durable Object class needs a
+`[[migrations]]` entry.
 
 Production CloudKit API token's URL Redirect: `https://mcp.septena.app/auth/apple/callback`.
 
@@ -150,3 +151,23 @@ Production CloudKit API token's URL Redirect: `https://mcp.septena.app/auth/appl
 - [ ] Sentry / minimal analytics; "delete my data" endpoint for App Store compliance
 
 - `GET /v1/changes?entity=&id=&before=&limit=` (bearer): change history, newest first. Each entry has rev, entity, id, op, actor, time, changed field names and `diff` {field: [before, after]} (long text clipped to 4,000 chars; a delete carries the row's last values). Kept 365 days.
+
+## Agent loop (api.septena.app only)
+
+The task connector at `api.septena.app/mcp` serves four tools the CloudKit
+connector does not have (`src/shadow/agent.ts`, app repo ADR 0008):
+
+| Tool | Does |
+|---|---|
+| `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews a lease (30 min default, 240 max). Refusals name the rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`. |
+| `tasks_release(id, agent, why)` | Ends the agent's own claim; `why` goes to the log. |
+| `tasks_agent_events(since?, limit?)` | Pointer events with a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
+
+The rules are enforced in `TaskStore`, so they hold for every caller:
+
+- A question from the agent (provider turn with options) releases its claim.
+- `convo.stoppedAt` and the `agentsPaused` setting are written by app actors
+  only. While a task is stopped, every `mcp:` write to it is refused.
+- A human turn from the app sets `runsSinceUser` to 0. The 6th fresh claim
+  without one is refused (`budget`).
