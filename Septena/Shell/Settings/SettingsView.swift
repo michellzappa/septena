@@ -390,10 +390,11 @@ struct SettingsView: View {
     // Seven intent groups. The profile card above this list is destination 0;
     // About/Advanced live under Account so utility pages don't consume root
     // slots, and the former General controls sit inside Home.
-    // Tasks leads: it is the one section every user has, and its settings
-    // used to hide two levels down under Sections ▸ Tasks.
-    [.tasks, .sections, .home, .notifications, .connectionsAI,
-     .sharingData, .privacy, .feedback]
+    // Tasks led here until Septena Life retired it (ADR 0007): the task app
+    // owns tasks, and Sections ▸ carries the one-line pointer to it.
+    let all: [SettingsDestination] = [.tasks, .sections, .home, .notifications,
+                                      .connectionsAI, .sharingData, .privacy, .feedback]
+    return all.filter { $0 != .tasks || !SectionManifest.isRetired("tasks") }
   }
 
   /// Septena's navigation value for each linked row on the shared Tasks pane.

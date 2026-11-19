@@ -208,6 +208,11 @@ enum MCPDispatch {
   // MARK: - Tool routing
 
   private static func callTool(name: String, args: MCPArgs) async throws -> Any {
+    // Septena Life retired Tasks (ADR 0007): refuse task tools even when a
+    // client calls one it was never offered.
+    if SectionManifest.isRetired("tasks") && MCPToolCatalog.isTaskTool(name) {
+      throw MCPError.rejected(SectionManifest.tasksMovedNotice)
+    }
     if !readOnlyTools.contains(name) {
       try await ensureStartedOrThrow()
     }

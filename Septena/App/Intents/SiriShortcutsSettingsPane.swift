@@ -65,7 +65,6 @@ func sectionSiriTip<I: AppIntent>(_ intent: I) -> some View {
 @MainActor @ViewBuilder
 func sectionSiriTip(forKey key: String) -> some View {
   switch key {
-  case "tasks":       sectionSiriTip(AddTaskIntent())
   case "supplements": sectionSiriTip(MarkSupplementTakenIntent())
   case "habits":      sectionSiriTip(MarkHabitDoneIntent())
   case "chores":      sectionSiriTip(CompleteChoreIntent())
@@ -97,7 +96,6 @@ struct SiriShortcutsSettingsPane: View {
       // list and the provider in sync. Every OTHER action is still Siri-
       // callable too — assign it a phrase in the Shortcuts app.
       Section {
-        DismissableSiriTip(AddTaskIntent())
         DismissableSiriTip(MarkSupplementTakenIntent())
         DismissableSiriTip(LogWaterIntent())
         DismissableSiriTip(LogMealIntent())
@@ -109,13 +107,6 @@ struct SiriShortcutsSettingsPane: View {
         Text("Ask Siri")
       } footer: {
         Text("Say one of these to log without opening the app. Asking for a section that's turned off turns it back on automatically — your data is never lost. Every other action is Siri-callable too — open the Shortcuts app to give it a phrase.")
-      }
-
-      Section {
-        Text("Add **Add Task** in Settings → Control Center to open a new to-do.")
-          .foregroundStyle(.secondary)
-      } header: {
-        Text("Control Center")
       }
       #else
       Section {

@@ -124,6 +124,8 @@ final class SeptenaServices {
   /// when a section is off — matching MCP, which simply doesn't advertise a
   /// disabled section's tools.
   func isSectionEnabled(_ key: String) -> Bool {
+    // A retired section (Septena Life: Tasks) is never writable here.
+    if SectionManifest.isRetired(key) { return false }
     if SectionManifest.byKey[key]?.activation == .always { return true }
     if SeptenaServices.alwaysAvailableSectionKeys.contains(key) { return true }
     return enabledSectionKeys().contains(key)

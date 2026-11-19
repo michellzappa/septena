@@ -492,6 +492,31 @@ public extension SectionManifest {
     ),
   ]
 
+  /// Sections this app no longer shows (ADR 0007). Septena Life drops Tasks:
+  /// the task app owns them. A retired section reads as off everywhere
+  /// (`SectionConfig.maskingRetired`) and leaves every list that offers
+  /// sections, but its `SectionEntity` row and its data stay untouched, so
+  /// nothing is deleted and nothing syncs out. Empty in the task app.
+  static var retiredKeys: Set<String> {
+    #if SEPTASK
+    return []
+    #else
+    return ["tasks"]
+    #endif
+  }
+
+  /// True when this app has retired the section (see `retiredKeys`).
+  static func isRetired(_ key: String) -> Bool { retiredKeys.contains(key) }
+
+  /// The one line that points Septena Life users to the task app where Tasks
+  /// used to be (Settings ▸ Sections, and the refusal of a task Siri action
+  /// or shortcut). Product name per
+  /// ADR 0007: the task app is "Septena".
+  static var tasksMovedNotice: String {
+    String(localized: "Tasks now live in the Septena app.",
+           comment: "Septena Life: one-line pointer to the task app where the Tasks section used to be")
+  }
+
   /// Constant-time lookup by key. Built once at type init; reads are
   /// the hot path (sidebar render, section detail header, etc.).
   static let byKey: [String: SectionManifest] = Dictionary(

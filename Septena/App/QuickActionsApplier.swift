@@ -18,7 +18,8 @@ enum QuickActionsApplier {
       .prefix(4)
 
     let items: [UIApplicationShortcutItem] = keys.compactMap { key in
-      guard let manifest = SectionManifest.byKey[key] else { return nil }
+      guard !SectionManifest.isRetired(key),
+            let manifest = SectionManifest.byKey[key] else { return nil }
       let action = ShortcutAction.openSection(key)
       return UIApplicationShortcutItem(
         type: action.rawValue,

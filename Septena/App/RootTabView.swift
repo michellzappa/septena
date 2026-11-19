@@ -58,6 +58,8 @@ struct RootTabView: View {
   // fall back to the SwiftData mirror so a post-pull enablement isn't masked
   // by a stale in-memory cache during launch.
   private var tasksEnabled: Bool {
+    // Septena Life retired Tasks (ADR 0007): no tab, whatever the row says.
+    if SectionManifest.isRetired("tasks") { return false }
     if let row = settingsStore.sections.first(where: { $0.key == "tasks" }) {
       return row.isEnabled
     }
@@ -145,7 +147,14 @@ struct RootTabView: View {
       // Deep-link tab switch (e.g. the Next widget's `septena://next`).
       .onChange(of: nav.pendingTab) { _, tab in
         guard let tab else { return }
-        tabSelection.current = tab
+        // A route to a tab that is not in the bar (Tasks, retired in Septena
+        // Life) lands nowhere: keep the current tab and drop the task path.
+        if tab == .tasks && !tasksEnabled {
+          nav.path = []
+          nav.shouldStartCreating = false
+        } else {
+          tabSelection.current = tab
+        }
         nav.pendingTab = nil
       }
       // "What's New" after an update — see the gate notes on `showWhatsNew`.

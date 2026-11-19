@@ -95,6 +95,8 @@ struct TaskChoiceQuery: EntityQuery {
 /// Mark a task done. Mirrors MCP `tasks_complete`.
 struct CompleteTaskIntent: SectionLogIntent {
   static let sectionKey = "tasks"
+  // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
+  static let isDiscoverable = false
   static let title: LocalizedStringResource = "Complete Task"
   static let description = IntentDescription("Mark a Septena task as done.")
 
@@ -117,6 +119,8 @@ struct CompleteTaskIntent: SectionLogIntent {
 /// clear any scheduled date so it surfaces now.
 struct MoveTaskToTodayIntent: SectionLogIntent {
   static let sectionKey = "tasks"
+  // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
+  static let isDiscoverable = false
   static let title: LocalizedStringResource = "Move Task to Today"
   static let description = IntentDescription("Pin a Septena task to Today.")
 
@@ -141,6 +145,8 @@ struct MoveTaskToTodayIntent: SectionLogIntent {
 /// date and take it off Today.
 struct DeferTaskIntent: SectionLogIntent {
   static let sectionKey = "tasks"
+  // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
+  static let isDiscoverable = false
   static let title: LocalizedStringResource = "Defer Task"
   static let description = IntentDescription("Schedule a Septena task for a future day and take it off Today.")
 

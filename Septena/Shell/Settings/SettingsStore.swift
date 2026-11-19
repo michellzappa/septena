@@ -88,7 +88,7 @@ final class SettingsStore {
       sections = mirroredSections
       ResponseCache.save(mirroredSections, forKey: CacheKey.sections)
     } else if let v = ResponseCache.load([SectionConfig].self, forKey: CacheKey.sections) {
-      sections = v
+      sections = v.map { $0.maskingRetired() }
     }
     if let v = ResponseCache.load(MacrosConfig.self, forKey: CacheKey.macros) { macros = v }
     if let v = ResponseCache.load([SessionTypeConfig].self, forKey: CacheKey.sessionTypes) { sessionTypes = v }
@@ -562,7 +562,10 @@ final class SettingsStore {
   /// bit). Posts one repaint after the batch.
   func applyWelcomeSelection(enabledKeys: Set<String>,
                              context: ModelContext, engine: CKEngine?) {
-    for manifest in SectionManifest.all where manifest.kind == .loggingDomain {
+    // A retired section (Septena Life: Tasks) is not offered, so its row is
+    // left as it is rather than switched off.
+    for manifest in SectionManifest.all
+    where manifest.kind == .loggingDomain && !SectionManifest.isRetired(manifest.key) {
       let shouldEnable = enabledKeys.contains(manifest.key)
       if shouldEnable {
         // hasOnboarded-setting overload: enabling implies set-up.

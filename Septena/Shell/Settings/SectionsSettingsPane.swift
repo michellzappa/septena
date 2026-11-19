@@ -38,6 +38,9 @@ struct SectionsSettingsPane: View {
             // tools, the Coach destination, section-tagged goals — but aren't
             // life domains, so they're excluded here.
             manifest.kind == .loggingDomain,
+            // A retired section (Tasks, in Septena Life) is not offered at
+            // all; `tasksPointer` below says where it went.
+            !SectionManifest.isRetired(key),
             let installed = installedByKey[key] else { return nil }
       return SectionEntry(manifest: manifest, server: installed)
     }
@@ -78,6 +81,13 @@ struct SectionsSettingsPane: View {
           Text("Off")
         } footer: {
           Text("Turned-off sections disappear from the home tab but keep all their data. Turn one back on anytime.")
+        }
+      }
+
+      if SectionManifest.isRetired("tasks") {
+        Section {
+          Text(SectionManifest.tasksMovedNotice)
+            .foregroundStyle(.secondary)
         }
       }
     }

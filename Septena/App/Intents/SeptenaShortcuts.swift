@@ -26,24 +26,8 @@ import AppIntents
 /// AppEntity/AppEnum — otherwise Siri prompts via the @Parameter dialog.
 struct SeptenaShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
-    // 1 — Tasks (highest-frequency capture)
-    AppShortcut(
-      intent: AddTaskIntent(),
-      phrases: [
-        "Add to \(.applicationName)",
-        "Add task to \(.applicationName)",
-        "Add a task to \(.applicationName)",
-        "Add a to-do to \(.applicationName)",
-        "New task in \(.applicationName)",
-        "New reminder in \(.applicationName)",
-        "Create a task in \(.applicationName)",
-        "Capture in \(.applicationName)",
-        "Remind me in \(.applicationName)",
-        "In \(.applicationName) add a task",
-      ],
-      shortTitle: "Add Task",
-      systemImageName: "checklist"
-    )
+    // Tasks (Add Task) left the list when Septena Life retired the section
+    // (ADR 0007): the task app owns tasks. Its intents refuse with a pointer.
     // 2 — Supplements
     AppShortcut(
       intent: MarkSupplementTakenIntent(),

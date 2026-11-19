@@ -80,7 +80,19 @@ enum MCPToolCatalog {
 
   // MARK: - Global tools (always exposed)
 
+  /// The globals this app serves. Septena Life retired Tasks (ADR 0007), so
+  /// it advertises no task tools; the task app serves them. `allGlobal`
+  /// keeps the full list for the drift tripwire.
   static var global: [MCPTool] {
+    guard SectionManifest.isRetired("tasks") else { return allGlobal }
+    return allGlobal.filter { !isTaskTool($0.name) }
+  }
+
+  /// True for a task, project or area tool (`tasks_*`).
+  static func isTaskTool(_ name: String) -> Bool { name.hasPrefix("tasks_") }
+
+  /// Every global tool, before any app retires a section.
+  static var allGlobal: [MCPTool] {
     tasks + [
       MCPTool(name: "tasks_list_projects",
               description: "List Septena projects available for task assignment, optionally filtered by status.",
@@ -708,6 +720,6 @@ enum MCPToolCatalog {
   /// Every tool name the local server can serve, regardless of gating — the
   /// drift tripwire a test compares against the gateway's full manifest.
   static var expectedNames: [String] {
-    global.map(\.name) + section.values.flatMap { $0 }.map(\.name)
+    allGlobal.map(\.name) + section.values.flatMap { $0 }.map(\.name)
   }
 }

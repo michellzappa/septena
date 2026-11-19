@@ -107,7 +107,10 @@ final class SpotlightIndexer {
     // Tasks is a core, always-on section, but still honors the Spotlight
     // opt-out. Opted out → empty list → reconcile prunes whatever was indexed.
     let entities: [TaskChoice]
-    if SettingsMirror.showInSpotlight("tasks", context: context) {
+    // Septena Life retired Tasks (ADR 0007): index none, which also prunes
+    // the tasks indexed before.
+    if !SectionManifest.isRetired("tasks"),
+       SettingsMirror.showInSpotlight("tasks", context: context) {
       let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
       // Recently-Deleted tasks must drop out of Spotlight (reconcile then prunes
       // any previously-indexed trashed row). Project headings aren't to-dos, so

@@ -29,18 +29,22 @@ struct ConnectedAppsSettingsSections: View {
 
   var body: some View {
     Section {
-      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.reminders)) {
-        stateRow(title: "Reminders",
-                 systemImage: "checklist",
-                 state: remindersAccessLabel,
-                 isGranted: remindersBridge.access == .granted)
-      }
+      // Reminders and Things only import tasks. Septena Life retired Tasks
+      // (ADR 0007), so it does not offer them.
+      if !SectionManifest.isRetired("tasks") {
+        NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.reminders)) {
+          stateRow(title: "Reminders",
+                   systemImage: "checklist",
+                   state: remindersAccessLabel,
+                   isGranted: remindersBridge.access == .granted)
+        }
 
-      NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.things)) {
-        stateRow(title: "Things",
-                 systemImage: "square.and.arrow.down",
-                 state: "One-time import",
-                 isGranted: true)
+        NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.things)) {
+          stateRow(title: "Things",
+                   systemImage: "square.and.arrow.down",
+                   state: "One-time import",
+                   isGranted: true)
+        }
       }
 
       NavigationLink(value: SettingsView.SettingsDestination.connectedApp(.calendar)) {

@@ -914,7 +914,7 @@ enum ImportExportService {
         for r in rows { try upsertGroceryCategory(r, ctx: ctx, engine: engine); applied += 1 }
       case "groceryItem":
         for r in rows { try upsertGroceryItem(r, ctx: ctx, engine: engine); applied += 1 }
-      case "task_attachment":
+      case "task_attachment" where !SectionManifest.isRetired("tasks"):
         for r in rows { try upsertTaskAttachment(r, ctx: ctx, engine: engine); applied += 1 }
       default:
         skipped += rows.count

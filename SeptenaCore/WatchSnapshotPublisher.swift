@@ -172,8 +172,6 @@ enum WatchSnapshotPublisher {
     // directly). No-op on platforms without the widget.
     #if os(iOS)
     WidgetCenter.shared.reloadTimelines(ofKind: "NextWidget")
-    TasksWidgetSnapshotStore.save(TasksWidgetBuilder.buildSnapshot(context: context))
-    WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget")
     #endif
 
     Task.detached(priority: .utility) {

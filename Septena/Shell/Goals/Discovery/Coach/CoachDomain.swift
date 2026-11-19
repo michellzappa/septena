@@ -67,7 +67,8 @@ enum CoachDomain: String, CaseIterable, Identifiable {
     switch self {
     case .training:       return ["training"]
     case .food:           return ["nutrition", "supplements", "hydration", "gut"]
-    case .accountability: return ["tasks", "chores", "habits"]
+    // Septena Life retired Tasks (ADR 0007): the coach reads no tasks.
+    case .accountability: return ["tasks", "chores", "habits"].filter { !SectionManifest.isRetired($0) }
     case .wholeLife:      return nil
     case .custom:         return nil   // all sections offered; user scopes via pills
     }
