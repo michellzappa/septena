@@ -1,4 +1,7 @@
 name = "septena-mcp-gateway"
+# The Centaur-Labs account. Pinned so a wrangler login with several accounts
+# cannot deploy or create resources on the wrong one.
+account_id = "50894cc73fc5188e3efb7eb9819c54e9"
 main = "src/index.ts"
 compatibility_date = "2024-12-15"
 compatibility_flags = ["nodejs_compat_v2"]
