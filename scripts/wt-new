@@ -23,6 +23,16 @@ git -C "$main" show-ref --verify --quiet "refs/heads/$branch" \
 git -C "$main" fetch origin main --quiet 2>/dev/null || true
 git -C "$main" worktree add -b "$branch" "$path" main
 
+# Gitignored signing config (development team, optional dev keys): without it
+# the Mac schemes fail to sign ("requires signing with a development
+# certificate"). Symlink, not copy, so a change in main reaches every worktree
+# and the secret never exists twice on disk. git ignores the link too.
+secrets="$main/Config/Secrets.xcconfig"
+if [ -f "$secrets" ] && [ ! -e "$path/Config/Secrets.xcconfig" ]; then
+  ln -s "$secrets" "$path/Config/Secrets.xcconfig"
+  echo "  linked Config/Secrets.xcconfig from main"
+fi
+
 echo "✓ worktree ready: $path   (branch $branch, off main)"
 echo "  start a session:   cd \"$path\" && claude"
 echo "  build (locked):    scripts/build.sh"
