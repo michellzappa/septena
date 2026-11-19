@@ -3,7 +3,7 @@ import Foundation
 
 // Regression coverage for SeptenaCore/DateParser.swift. `parseRepeatRule` and
 // absolute-date parsing are deterministic; the relative parses ("tomorrow")
-// read the wall clock, so we don't assert on their exact values here.
+// depend on the `today` passed in, so we don't assert on their exact values here.
 
 @Suite struct DateParserTests {
 
@@ -30,7 +30,7 @@ import Foundation
   }
 
   @Test func parsesISODate() {
-    let date = SeptenaDateParser.parse("2026-04-05")
+    let date = SeptenaDateParser.parse("2026-04-05", today: Date())
     #expect(date != nil)
     let c = Calendar.current.dateComponents([.year, .month, .day], from: date!)
     #expect(c.year == 2026)
@@ -39,7 +39,7 @@ import Foundation
   }
 
   @Test func returnsNilForGarbage() {
-    #expect(SeptenaDateParser.parse("not a date at all") == nil)
+    #expect(SeptenaDateParser.parse("not a date at all", today: Date()) == nil)
   }
 }
 

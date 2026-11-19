@@ -2,29 +2,102 @@ import Foundation
 
 // ─── Natural Language Date Parser ─────────────────────────────────────────────
 
+/// The ONE typed-date parser. Every surface that turns typed text into a day
+/// goes through `parse` — the Septask date popover and anything else — so
+/// "tom" can't mean tomorrow in one place and nothing in another.
+///
+/// Relative to the `today` the caller passes, never the wall clock: app
+/// callers pass DayClock's today (`DayClock.today` / `SeptenaDate.today`) so
+/// time travel and day rollover hold. This file also compiles into the watch
+/// targets and the Foundation-only test bundle, which have no DayClock — hence
+/// the parameter instead of reading DayClock here.
 struct SeptenaDateParser {
-  /// Parse a natural language date string into a Date.
-  /// Examples:
-  ///   "tomorrow", "next monday", "in 3 days", "every monday",
-  ///   "monthly on the 1st", "March 15", "2026-04-05"
-  static func parse(_ input: String) -> Date? {
-    let normalized = input.lowercased().trimmingCharacters(in: .whitespaces)
-    let calendar = Calendar.current
-    let now = Date()
-
-    if let relative = parseRelative(normalized, relativeTo: now, calendar: calendar) {
-      return relative
+  /// Parse what a person types into a day. Day precision only; returns the
+  /// start of that day.
+  ///
+  /// Accepts: today / tod / tonight, tomorrow / tom / tmr / tmrw, weekday names
+  /// and their abbreviations (the next occurrence after today; "next fri"
+  /// too), "in N days / weeks / months", "+N" (days), "+Nd" / "+Nw" / "+Nm",
+  /// month-day in either order ("dec 4", "4 dec", optional year, commas
+  /// ignored: "March 15, 2027"), ISO "yyyy-mm-dd", and "mm/dd/yyyy" (then
+  /// "dd/mm/yyyy" when the first reading is not a date). Month and weekday
+  /// names match English and the current locale.
+  static func parse(_ raw: String, today: Date, calendar: Calendar = .current) -> Date? {
+    let text = raw.lowercased()
+      .folding(options: .diacriticInsensitive, locale: .current)
+      .replacingOccurrences(of: ",", with: " ")
+      .split(separator: " ", omittingEmptySubsequences: true)
+      .joined(separator: " ")
+    guard !text.isEmpty else { return nil }
+    let start = calendar.startOfDay(for: today)
+    func add(_ value: Int, _ component: Calendar.Component) -> Date? {
+      calendar.date(byAdding: component, value: value, to: start)
     }
 
-    if let weekday = parseWeekday(normalized, relativeTo: now, calendar: calendar) {
-      return weekday
+    switch text {
+    case "today", "tod", "tdy", "now", "tonight": return start
+    case "tomorrow", "tom", "tmr", "tmrw", "tmw": return add(1, .day)
+    default: break
     }
 
-    if let interval = parseInterval(normalized, relativeTo: now) {
-      return interval
+    // "+3", "+3d", "+2w", "+1m"
+    if text.hasPrefix("+") {
+      return relative(String(text.dropFirst()).replacingOccurrences(of: " ", with: ""),
+                      add: add)
     }
 
-    return parseAbsolute(input, calendar: calendar)
+    // "in 3 days", "in 2 weeks", "in 1 month", "in 3d"
+    if text.hasPrefix("in ") {
+      return relative(String(text.dropFirst(3)).replacingOccurrences(of: " ", with: ""),
+                      add: add)
+    }
+
+    // Weekday, optionally "next ..."
+    let weekdayText = text.hasPrefix("next ") ? String(text.dropFirst(5)) : text
+    if let weekday = weekdayNumber(weekdayText, calendar: calendar) {
+      let current = calendar.component(.weekday, from: start)
+      var delta = (weekday - current + 7) % 7
+      if delta == 0 { delta = 7 }
+      return add(delta, .day)
+    }
+
+    // ISO yyyy-mm-dd
+    let iso = text.split(separator: "-")
+    if iso.count == 3, iso[0].count == 4,
+       let year = Int(iso[0]), let month = Int(iso[1]), let day = Int(iso[2]) {
+      return validDate(year: year, month: month, day: day, calendar: calendar)
+    }
+
+    // mm/dd/yyyy, then dd/mm/yyyy
+    let slash = text.split(separator: "/")
+    if slash.count == 3, slash[2].count == 4,
+       let first = Int(slash[0]), let second = Int(slash[1]), let year = Int(slash[2]) {
+      return validDate(year: year, month: first, day: second, calendar: calendar)
+        ?? validDate(year: year, month: second, day: first, calendar: calendar)
+    }
+
+    // Month-day in either order, optional year: "dec 4", "4 dec 2027".
+    let words = text.split(separator: " ").map(String.init)
+    guard words.count == 2 || words.count == 3 else { return nil }
+    var month: Int?
+    var day: Int?
+    if let m = monthNumber(words[0], calendar: calendar), let d = Int(words[1]) {
+      month = m; day = d
+    } else if let d = Int(words[0]), let m = monthNumber(words[1], calendar: calendar) {
+      month = m; day = d
+    }
+    guard let month, let day else { return nil }
+    if words.count == 3 {
+      guard let year = Int(words[2]) else { return nil }
+      return validDate(year: year, month: month, day: day, calendar: calendar)
+    }
+    // No year: the next time that day comes round, today included.
+    let thisYear = calendar.component(.year, from: start)
+    if let date = validDate(year: thisYear, month: month, day: day, calendar: calendar),
+       date >= start {
+      return date
+    }
+    return validDate(year: thisYear + 1, month: month, day: day, calendar: calendar)
   }
 
   /// Extract repeatRule from natural language.
@@ -81,82 +154,57 @@ struct SeptenaDateParser {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
-  private static func parseRelative(_ s: String, relativeTo now: Date, calendar: Calendar) -> Date? {
-    switch s {
-    case "today": return now
-    case "tomorrow": return calendar.date(byAdding: .day, value: 1, to: now)
-    case "tonight": return calendar.date(bySettingHour: 20, minute: 0, second: 0, of: now)
-    default: return nil
-    }
-  }
-
-  private static func parseWeekday(_ s: String, relativeTo now: Date, calendar: Calendar) -> Date? {
-    let dayMap: [String: Int] = [
-      "sunday": 1, "sun": 1,
-      "monday": 2, "mon": 2,
-      "tuesday": 3, "tue": 3,
-      "wednesday": 4, "wed": 4,
-      "thursday": 5, "thu": 5,
-      "friday": 6, "fri": 6,
-      "saturday": 7, "sat": 7,
-    ]
-
-    let lower = s.trimmingCharacters(in: .whitespaces)
-    for (name, weekday) in dayMap {
-      if lower == name || lower == "next \(name)" {
-        return nextDate(for: weekday, after: now, calendar: calendar)
-      }
-    }
-    return nil
-  }
-
-  private static func parseInterval(_ s: String, relativeTo now: Date) -> Date? {
-    let pattern = #"in (\d+) (day|week|month)s?"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
-          match.numberOfRanges == 3,
-          let countRange = Range(match.range(at: 1), in: s),
-          let count = Int(s[countRange]),
-          let unitRange = Range(match.range(at: 2), in: s) else { return nil }
-
-    let unit = String(s[unitRange])
-    let calendar = Calendar.current
-
+  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" → offset from today.
+  private static func relative(_ text: String, add: (Int, Calendar.Component) -> Date?) -> Date? {
+    let digits = text.prefix { $0.isNumber }
+    guard let count = Int(digits) else { return nil }
+    let unit = text.dropFirst(digits.count)
     switch unit {
-    case "day": return calendar.date(byAdding: .day, value: count, to: now)
-    case "week": return calendar.date(byAdding: .weekOfYear, value: count, to: now)
-    case "month": return calendar.date(byAdding: .month, value: count, to: now)
+    case "", "d", "day", "days": return add(count, .day)
+    case "w", "wk", "wks", "week", "weeks": return add(count * 7, .day)
+    case "m", "mo", "month", "months": return add(count, .month)
     default: return nil
     }
   }
 
-  private static func parseAbsolute(_ s: String, calendar: Calendar) -> Date? {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US")
+  private static func validDate(year: Int, month: Int, day: Int, calendar: Calendar) -> Date? {
+    let components = DateComponents(year: year, month: month, day: day)
+    guard components.isValidDate(in: calendar) else { return nil }
+    return calendar.date(from: components)
+  }
 
-    let formats = [
-      "yyyy-MM-dd",
-      "MMMM d",
-      "MMM d",
-      "MMMM d, yyyy",
-      "MM/dd/yyyy",
-      "dd/MM/yyyy",
-    ]
+  private static let englishWeekdays = ["sunday", "monday", "tuesday", "wednesday",
+                                        "thursday", "friday", "saturday"]
+  private static let englishMonths = ["january", "february", "march", "april", "may", "june",
+                                      "july", "august", "september", "october", "november",
+                                      "december"]
 
-    for format in formats {
-      formatter.dateFormat = format
-      if let date = formatter.date(from: s.trimmingCharacters(in: .whitespaces)) {
-        return date
+  /// 1 = Sunday … 7 = Saturday (Calendar's numbering). A word matches a full
+  /// name, or any prefix of at least three letters ("thu", "thurs").
+  private static func weekdayNumber(_ word: String, calendar: Calendar) -> Int? {
+    let localized = calendar.weekdaySymbols.map { fold($0) }
+    for names in [englishWeekdays, localized] {
+      if let index = names.firstIndex(where: { word.count >= 3 && $0.hasPrefix(word) }) {
+        return index + 1
       }
     }
     return nil
   }
 
-  private static func nextDate(for weekday: Int, after date: Date, calendar: Calendar) -> Date? {
-    let currentWeekday = calendar.component(.weekday, from: date)
-    var daysToAdd = weekday - currentWeekday
-    if daysToAdd <= 0 { daysToAdd += 7 }
-    return calendar.date(byAdding: .day, value: daysToAdd, to: date)
+  /// 1 = January … 12. Full name or a prefix of at least three letters.
+  private static func monthNumber(_ word: String, calendar: Calendar) -> Int? {
+    let cleaned = word.hasSuffix(".") ? String(word.dropLast()) : word
+    let localized = calendar.monthSymbols.map { fold($0) }
+    for names in [englishMonths, localized] {
+      if let index = names.firstIndex(where: { cleaned.count >= 3 && $0.hasPrefix(cleaned) }) {
+        return index + 1
+      }
+    }
+    return nil
+  }
+
+  private static func fold(_ text: String) -> String {
+    text.lowercased().folding(options: .diacriticInsensitive, locale: .current)
   }
 }
 
