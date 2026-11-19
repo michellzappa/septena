@@ -671,9 +671,21 @@ struct ProjectDetailView: View {
 
   private func deleteProject() {
     Haptics.warning()
+    // Capture before the delete; record at the gesture (CLAUDE.md: undo is
+    // recorded at the user gesture, never inside a mutator).
+    let undoSnapshot = TaskUndo.projectDeleteSnapshot(id: project.id, projects: projectsMutator,
+                                                      context: modelContext)
+    let projects = projectsMutator
+    // The process-wide mutator, not a new `@Environment(TaskMutator.self)`:
+    // this view is shared, and an environment read that one app forgot to
+    // inject crashes at launch (CLAUDE.md, Septask).
+    let tasks = SeptenaServices.shared.taskMutator
     Task {
       do {
         try await projectsMutator.delete(id: project.id)
+        if let undoSnapshot {
+          TaskUndo.recordProjectDelete(undoSnapshot, projects: projects, mutator: tasks)
+        }
         dismiss()
       } catch {
         errorMessage = error.localizedDescription

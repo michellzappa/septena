@@ -110,6 +110,47 @@ final class ProjectsMutator: ProjectsBackend {
     try await requireBackend().reorder(orderedIDs: orderedIDs)
   }
 
+  // MARK: Undo support
+
+  /// Every stored field of a project, captured before a delete so an undo can
+  /// put the row back exactly — sidebar position and sync metadata included.
+  /// Capture it at the user gesture, BEFORE `delete(id:)`; the undo is
+  /// recorded by the caller (`TaskUndo.recordProjectDelete`), never here.
+  struct DeletedProject {
+    let id: String
+    let title: String
+    let statusRaw: String
+    let area: String?
+    let created: String?
+    let completedAt: String?
+    let notes: String?
+    let context: String?
+    let githubRepo: String?
+    let attachmentJSON: String?
+    let position: Int
+    let cloudKitSystemFields: Data?
+  }
+
+  func snapshotForDelete(id: String) -> DeletedProject? {
+    let descriptor = FetchDescriptor<ProjectEntity>(predicate: #Predicate { $0.id == id })
+    guard let e = try? context.fetch(descriptor).first else { return nil }
+    return DeletedProject(id: e.id, title: e.title, statusRaw: e.statusRaw, area: e.area,
+                          created: e.created, completedAt: e.completedAt, notes: e.notes,
+                          context: e.context, githubRepo: e.githubRepo,
+                          attachmentJSON: e.attachmentJSON, position: e.position,
+                          cloudKitSystemFields: e.cloudKitSystemFields)
+  }
+
+  /// Bring a deleted project back. Uses its old id when the sync store still
+  /// allows it (always on CloudKit; on the task backend only while the delete
+  /// waits in the outbox), otherwise a fresh id. Returns the id it used, so
+  /// the caller re-files the tasks under it. Nil when not bound yet.
+  @discardableResult
+  func revive(_ snapshot: DeletedProject) -> String? {
+    guard let backend = ckBackend else { return nil }
+    return backend.revive(snapshot)
+  }
+
   /// Forensic — create a record with a specific id.
   @discardableResult
   func createWithExplicitID(id: String, title: String, area: String? = nil) async throws -> Project {
@@ -184,6 +225,24 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     context.insert(entity)
     commitAndPush(entity, op: "create(explicit-id)")
     return Project(entity)
+  }
+
+  func revive(_ s: ProjectsMutator.DeletedProject) -> String {
+    if let existing = fetch(id: s.id) { return existing.id }
+    let sameID = engine.canReviveProject(id: s.id)
+    let id = sameID ? s.id : uniqueShortcode()
+    // CloudKit: a delete that never went out leaves the record in place, so
+    // the save is an update and needs the old change tag. Otherwise the row
+    // is new to CloudKit and must carry no system fields.
+    let keepSystemFields = sameID && engine.cancelPendingProjectDeletion(id: s.id)
+    let entity = ProjectEntity(id: id, title: s.title, statusRaw: s.statusRaw, area: s.area,
+                               created: s.created, completedAt: s.completedAt, notes: s.notes,
+                               context: s.context, githubRepo: s.githubRepo,
+                               attachmentJSON: s.attachmentJSON, position: s.position,
+                               cloudKitSystemFields: keepSystemFields ? s.cloudKitSystemFields : nil)
+    context.insert(entity)
+    commitAndPush(entity, op: sameID ? "revive" : "revive(new-id)")
+    return id
   }
 
   func rename(id: String, to title: String) async throws {
