@@ -13,14 +13,10 @@ import {
   rpcResult,
   unauthorized,
 } from "../rpc.js";
-import { storeFor } from "../api/session.js";
 import { zId } from "../store/columns.js";
-import type { Row, TaskStore } from "../store/TaskStore.js";
+import type { Row } from "../store/TaskStore.js";
 import { todayYMD } from "../tz.js";
-import { listTasksJsonSchema } from "../tools/listTasks.js";
-import { listAreasJsonSchema } from "../tools/listAreas.js";
-import { listProjectsJsonSchema } from "../tools/listProjects.js";
-import { getTaskJsonSchema, pendingReasoningJsonSchema, threadGetJsonSchema } from "../tools/writeTasks.js";
+import { GLOBAL_TOOLS } from "../mcp.js";
 import {
   type ConvoTurn,
   type TaskConvo,
@@ -30,61 +26,36 @@ import {
   matchesView,
   normalizeView,
 } from "../tools/taskShared.js";
-import { MCP_SCOPE, verifyMcpAccess, type McpGrant } from "./tokens.js";
+import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
+import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 
-// Read-only MCP preview at https://api.septena.app/mcp (phase 2, "shadow", of
+// The task connector at https://api.septena.app/mcp (phase 2 of
 // docs/SEPTASK_BACKEND.md in the app repo). Same protocol layer as the live
 // connector (src/rpc.ts + src/protocol.ts, dual-era); the data source is the
 // user's TaskStore Durable Object instead of CloudKit.
 //
-// Tool names, arguments and output shapes match the live tools. The view rules
-// and the conversation summary are the same functions (tools/taskShared.ts).
-// No write tool is listed or callable here: the apps still write iCloud and
-// this store is a snapshot refreshed by re-running the import.
+// It serves every task tool the live connector has, under the same names,
+// descriptions, argument schemas and result shapes (the tool definitions are
+// the live ones, src/mcp.ts GLOBAL_TOOLS). Reads use the same view rules and
+// conversation summary (tools/taskShared.ts); writes are TaskStore pushes
+// (./writes.ts) built from the live tools' pure logic (tools/writeTasks.ts).
+//
+// Scopes: reads need `tasks:read`, writes `tasks:write`. Pairings made before
+// 2026-11-19 hold `tasks:read` only; a write tool tells those users to
+// reconnect.
 
 const INSTRUCTIONS =
-  "Septena tasks, read-only preview. These tools read the signed-in user's tasks, " +
-  "areas, projects and task conversations from the Septena task backend. The data " +
-  "is a copy the user refreshes from the Septask Mac app, so it can lag behind the " +
-  "app. Nothing here can create or change a task: use the main Septena connector " +
-  "for that.";
+  "Septena tasks. These tools read the signed-in user's tasks, areas, projects and " +
+  "task conversations in the Septena task backend, and create, change and complete " +
+  "tasks and their conversations. It is the same data the user's Septask app shows, " +
+  "and changes reach the app within seconds.";
 
 const RESOURCE_METADATA = (env: Env) => `${env.API_PUBLIC_URL}/.well-known/oauth-protected-resource`;
 
-const TOOLS: Tool[] = [
-  {
-    name: "tasks_list",
-    description:
-      "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, completed). Read-only preview from the task backend. 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'triage' is the to-sort pile shown above Today; 'today' excludes those and is in the user's Today order. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
-    inputSchema: listTasksJsonSchema,
-  },
-  {
-    name: "tasks_get",
-    description:
-      "Inspect a single task by id: title, status, area, project, scheduled, deadline, today, completedAt, source, and a compact conversation summary. Read-only preview from the task backend.",
-    inputSchema: getTaskJsonSchema,
-  },
-  {
-    name: "tasks_list_projects",
-    description: "List Septena projects, optionally filtered by status. Read-only preview from the task backend.",
-    inputSchema: listProjectsJsonSchema,
-  },
-  {
-    name: "tasks_list_areas",
-    description: "List Septena areas (top-level containers like 'home', 'envisioning'). Read-only preview from the task backend.",
-    inputSchema: listAreasJsonSchema,
-  },
-  {
-    name: "tasks_thread_get",
-    description: "Read a task's conversation (TaskConvo: confirmedIntent, acceptance, thread of turns, artifact, handoff, endState, assignee). Read-only preview from the task backend.",
-    inputSchema: threadGetJsonSchema,
-  },
-  {
-    name: "tasks_pending_reasoning",
-    description: "List tasks awaiting reasoning: marked for Claude, or whose last provider turn was low-confidence, and not yet terminal. Read-only preview from the task backend.",
-    inputSchema: pendingReasoningJsonSchema,
-  },
-];
+const RECONNECT_MESSAGE =
+  "This Septena connection can only read tasks: it was set up before Claude could change them. " +
+  "To let Claude change tasks, remove the Septena connector in Claude's settings, add " +
+  "https://api.septena.app/mcp again, and enter the new pairing code in Septask.";
 
 // Arguments are validated before anything reaches the Durable Object. Unknown
 // keys are ignored, as on the live connector.
@@ -103,7 +74,14 @@ const zArgs = {
   }),
   tasks_pending_reasoning: z.object({ limit: zLimit(500).optional() }),
 };
-type ToolName = keyof typeof zArgs;
+type ReadToolName = keyof typeof zArgs;
+
+// Every task tool of the live connector, in its order, with its definition.
+const TOOL_NAMES = new Set<string>([...Object.keys(zArgs), ...WRITE_TOOL_NAMES]);
+const TOOLS: Tool[] = GLOBAL_TOOLS.filter((t) => TOOL_NAMES.has(t.name));
+if (TOOLS.length !== TOOL_NAMES.size) {
+  throw new Error("api connector: a task tool has no live definition in src/mcp.ts");
+}
 
 export async function previewMcpHandler(c: Context<{ Bindings: Env }>) {
   const auth = c.req.header("Authorization") ?? "";
@@ -111,7 +89,7 @@ export async function previewMcpHandler(c: Context<{ Bindings: Env }>) {
   if (!m) return unauthorized("preview: missing Bearer header", RESOURCE_METADATA(c.env));
   const grant = await verifyMcpAccess(c.env, m[1]);
   if (!grant) return unauthorized("preview: access_token not found", RESOURCE_METADATA(c.env));
-  if (!grant.scope.split(" ").includes(MCP_SCOPE)) {
+  if (!hasScope(grant, MCP_READ_SCOPE)) {
     return unauthorized("preview: scope", RESOURCE_METADATA(c.env));
   }
 
@@ -162,18 +140,29 @@ async function callTool(
   era: Era,
 ): Promise<Response> {
   const name = params.name ?? "";
-  if (!(name in zArgs)) {
-    // Write tools are not part of this endpoint; same reply as any unknown tool.
-    return rpcError(id, -32602, `Unknown tool: ${params.name} (this connector is a read-only preview)`);
+  const store = rpcStoreFor(env, grant.userId);
+  if (Object.hasOwn(zWriteArgs, name)) {
+    if (!hasScope(grant, MCP_WRITE_SCOPE)) {
+      // In-band, so the connector stays connected and the model can relay it.
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
+    }
+    const args = zWriteArgs[name as WriteToolName].safeParse(params.arguments ?? {});
+    if (!args.success) return invalidArgs(id, args.error, era);
+    const result = await runWriteTool(
+      { store, timeZone: grant.timeZone ?? "UTC" },
+      name as WriteToolName,
+      args.data as Record<string, unknown>,
+    );
+    return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
-  const args = zArgs[name as ToolName].safeParse(params.arguments ?? {});
-  if (!args.success) {
-    return rpcError(id, -32602, `Invalid arguments: ${args.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+  if (!Object.hasOwn(zArgs, name)) {
+    return rpcError(id, -32602, `Unknown tool: ${params.name}`, era);
   }
-  const store = readerFor(env, grant.userId);
+  const args = zArgs[name as ReadToolName].safeParse(params.arguments ?? {});
+  if (!args.success) return invalidArgs(id, args.error, era);
   const a = args.data as Record<string, unknown>;
   let result: unknown;
-  switch (name as ToolName) {
+  switch (name as ReadToolName) {
     case "tasks_list":
       result = await listTasks(store, grant, a.view, a.limit as number | undefined);
       break;
@@ -246,13 +235,11 @@ async function callTool(
   return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
 }
 
-/// The DO's read methods as plain async calls. Typed from TaskStore's own
-/// declarations: the generated RPC stub type recurses too deep on JSON rows.
-type ReadMethod = "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates";
-type Store = { [K in ReadMethod]: (...a: Parameters<TaskStore[K]>) => Promise<ReturnType<TaskStore[K]>> };
-const readerFor = (env: Env, userId: string) => storeFor(env, userId) as unknown as Store;
+function invalidArgs(id: JsonRpcRequest["id"], error: z.ZodError, era: Era): Response {
+  return rpcError(id, -32602, `Invalid arguments: ${error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`, era);
+}
 
-async function listTasks(store: Store, grant: McpGrant, rawView: unknown, rawLimit: number | undefined) {
+async function listTasks(store: StoreRpc, grant: McpGrant, rawView: unknown, rawLimit: number | undefined) {
   const view = normalizeView(rawView);
   const limit = rawLimit ?? 100;
   if (view === "completed") {

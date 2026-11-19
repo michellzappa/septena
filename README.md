@@ -39,13 +39,13 @@ The `/v1` routes are the task backend (`src/api/`, `src/store/`), served on `api
 | `PUT`/`GET /v1/attachments/:id` | Attachment bytes to/from R2 (25 MB per file, 2 GB per user) |
 | `DELETE /v1/account` | Delete all task data and attachment bytes for the user |
 | `GET`/`DELETE` `/mcp` | `405` — the GET stream and session-DELETE were removed in MCP `2026-07-28` |
-| **api.septena.app only** | Read-only MCP preview over the task backend (phase 2 "shadow", `src/shadow/`). Same paths as above, host-switched in `src/index.ts`; mcp.septena.app is unchanged. |
-| `POST /mcp` (api host) | Read-only task tools from the user's TaskStore: `tasks_list`, `tasks_get`, `tasks_list_areas`, `tasks_list_projects`, `tasks_thread_get`, `tasks_pending_reasoning`. Bearer `sm1.` required. |
-| `GET /.well-known/oauth-authorization-server` · `/oauth-protected-resource` (api host) | Discovery with issuer `https://api.septena.app`, scope `tasks:read` |
+| **api.septena.app only** | MCP task connector over the task backend (phase 2, `src/shadow/`), read-write. Same paths as above, host-switched in `src/index.ts`; mcp.septena.app is unchanged. |
+| `POST /mcp` (api host) | Every task tool of the live connector, same names, schemas and result shapes, on the user's TaskStore. Reads (`tasks_list`, `tasks_get`, `tasks_list_areas`, `tasks_list_projects`, `tasks_thread_get`, `tasks_pending_reasoning`) need scope `tasks:read`. Writes (`tasks_create`, `tasks_update`, `tasks_complete`, `tasks_defer`, `tasks_move_to_today`, `tasks_thread_append`, `tasks_set_acceptance`, `tasks_set_endstate`, `tasks_set_assignee`, `tasks_set_artifact`, `tasks_set_handoff`) need `tasks:write` and run as one TaskStore push per call, actor `mcp:claude` (`src/shadow/writes.ts`). Bearer `sm1.` required. |
+| `GET /.well-known/oauth-authorization-server` · `/oauth-protected-resource` (api host) | Discovery with issuer `https://api.septena.app`, scopes `tasks:read`, `tasks:write` |
 | `POST /oauth/register` (api host) | DCR, same redirect policy as live, clients under KV `v2:client:` |
 | `GET /oauth/authorize` (api host) | Shows an 8-character pairing code; the page refreshes itself |
 | `GET /oauth/pair/continue` (api host) | The page's poll: once the app approves, 302 to the client with `code`, `state`, `iss` |
-| `POST /oauth/token` · `/oauth/revoke` (api host) | PKCE code → `sm1.` access (1h) + rotating `smr1.` refresh (30d); revocation |
+| `POST /oauth/token` · `/oauth/revoke` (api host) | PKCE code → `sm1.` access (1h) + rotating `smr1.` refresh (30d), scope `tasks:read tasks:write`; revocation. A pairing from before 2026-11-19 keeps `tasks:read` through refresh and must reconnect to write. |
 | `POST /v1/pair/approve` | App bearer (`sa1.`) + `{code, timeZone?}` binds the user to a pending pairing. 404 wrong code, 409 used, 429 after 5 wrong codes in 10 min |
 
 ## Protocol revisions

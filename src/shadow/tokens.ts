@@ -1,7 +1,7 @@
 import type { Env } from "../env.js";
 import { randomId, sha256Base64Url } from "../util.js";
 
-// OAuth tokens for the read-only MCP preview on api.septena.app.
+// OAuth tokens for the task connector on api.septena.app.
 //
 // Same model as the live connector (src/storage.ts) and the app sessions
 // (src/api/session.ts): a 1-hour access token, a rotating refresh token, and
@@ -10,12 +10,23 @@ import { randomId, sha256Base64Url } from "../util.js";
 //
 // Distinct prefixes keep the three token kinds apart:
 //   sa1.  / sr1.   app session (session.ts)       — never accepted here
-//   sm1.  / smr1.  MCP preview (this file)         — never accepted by /v1
+//   sm1.  / smr1.  MCP task connector (this file)         — never accepted by /v1
 //   (none)         live connector (storage.ts)     — random, no prefix
 // KV keys live under `v2:` so they never collide with the live `token:`,
 // `refresh:` and `rtfamily:` records (or the cleanup cron that scans those).
 
-export const MCP_SCOPE = "tasks:read";
+export const MCP_READ_SCOPE = "tasks:read";
+export const MCP_WRITE_SCOPE = "tasks:write";
+/// Every scope this server knows, for discovery.
+export const MCP_SCOPES = [MCP_READ_SCOPE, MCP_WRITE_SCOPE];
+/// What a new pairing grants. Grants issued before 2026-11-19 carry
+/// `tasks:read` only and keep it through refresh rotation: those connections
+/// must pair again to write.
+export const MCP_GRANT_SCOPE = MCP_SCOPES.join(" ");
+
+export function hasScope(grant: Pick<McpGrant, "scope">, scope: string): boolean {
+  return grant.scope.split(" ").includes(scope);
+}
 
 const ACCESS_PREFIX = "sm1.";
 const REFRESH_PREFIX = "smr1.";

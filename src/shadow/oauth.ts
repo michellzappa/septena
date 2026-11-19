@@ -8,10 +8,11 @@ import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
 import { escapeHtml } from "../oauth/authorize.js";
 import { storeFor } from "../api/session.js";
-import { MCP_SCOPE, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
+import { MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
 
-// OAuth 2.1 for the read-only MCP preview on api.septena.app (phase 2,
-// "shadow", of docs/SEPTASK_BACKEND.md in the app repo).
+// OAuth 2.1 for the MCP task connector on api.septena.app (phase 2,
+// "shadow", of docs/SEPTASK_BACKEND.md in the app repo; read-write since
+// 2026-11-19).
 //
 // Web Sign in with Apple is not configured, so identity comes from APP
 // PAIRING instead of a web login:
@@ -23,7 +24,7 @@ import { MCP_SCOPE, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./t
 //   4. The page's next refresh sees the approval and redirects back to Claude
 //      with an auth code (+ RFC 9207 `iss`).
 //   5. Claude trades the code (PKCE) at /oauth/token for an `sm1.` access token
-//      and a rotating `smr1.` refresh token, scope tasks:read.
+//      and a rotating `smr1.` refresh token, scope `tasks:read tasks:write`.
 //
 // Everything here runs only on the api host; mcp.septena.app keeps its own
 // handlers (src/oauth/*) unchanged. KV keys are under `v2:`.
@@ -77,7 +78,7 @@ export function authServerMetadata(c: Context<{ Bindings: Env }>) {
     token_endpoint: `${base}/oauth/token`,
     registration_endpoint: `${base}/oauth/register`,
     revocation_endpoint: `${base}/oauth/revoke`,
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: MCP_SCOPES,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
@@ -92,7 +93,7 @@ export function protectedResourceMetadata(c: Context<{ Bindings: Env }>) {
   return c.json({
     resource: base,
     authorization_servers: [base],
-    scopes_supported: [MCP_SCOPE],
+    scopes_supported: MCP_SCOPES,
     bearer_methods_supported: ["header"],
   });
 }
@@ -312,7 +313,7 @@ export async function token(c: Context<{ Bindings: Env }>) {
   const tokens = await issueMcpTokens(c.env, {
     userId: stored.userId,
     clientId,
-    scope: MCP_SCOPE,
+    scope: MCP_GRANT_SCOPE,
     timeZone: stored.timeZone,
   });
   logEvent("preview_oauth_token", { ok: true, grantType, clientId });
@@ -374,7 +375,7 @@ function pairPage(
     <h1>Connect ${escapeHtml(opts.clientName)} to your Septena tasks</h1>
     <p>Open Septask &#9656; Settings &#9656; About &#9656; Advanced &#9656; Task backend, and enter this code:</p>
     <div class="code">${escapeHtml(shown)}</div>
-    <p>This is a read-only preview. Claude can read your tasks here but cannot change them.</p>
+    <p>Claude will be able to read and change your tasks.</p>
     <p class="small">The code works for 10 minutes. This page checks for your approval every few seconds.</p>
     ${back}
   </main>

@@ -4,6 +4,43 @@ Hard-won context on how Claude reads/writes a user's **private** Septena
 (CloudKit) data via the MCP gateway. Read this before changing the auth/token
 design — several "obvious" approaches are dead ends, proven empirically.
 
+## 2026-11-19: the api.septena.app connector writes
+
+`https://api.septena.app/mcp` now serves every task tool of the live
+connector, writes included, so it can replace mcp.septena.app for tasks once
+the devices are on the backend.
+
+- **One push per tool call.** Each write builds its TaskStore ops and sends
+  them in one `push(ops, "mcp:claude")`: one transaction, one `{rev}` nudge to
+  the user's app sockets (`push` broadcasts whenever an op applied). The
+  clientOpIds are random per call, `mcp-<random>-<n>` per op. The ops pass the
+  same `zPushBody` schema as `/v1/sync/push` before they reach the store.
+- **Shared logic, not copies.** Provenance, update planning, repeat-rule
+  parsing, container errors, conversation normalizing and recurrence warnings
+  are pure functions in `src/tools/writeTasks.ts`, used by the CloudKit tools
+  and by `src/shadow/writes.ts`. The extraction was checked by running the old
+  and new CloudKit tool code against a recording mock client on about 25,000
+  generated inputs: identical requests and results.
+- **Recurrence converges with the app.** Completion uses the app's anchor
+  (`recurrenceAnchorDate`, then `scheduled`; `nextScheduledDate` gained the
+  optional `logicalScheduled` the Swift calculator has) and `occurrenceID`, so
+  Claude and the app derive the same occurrence id. `recurrencePaused`
+  suppresses the spawn, as in the app. An occurrence id that was deleted
+  before (an undo in the app) stays deleted: the push answers `dropped` and the
+  tool returns the `recurrenceWarning`.
+- **Order follows the app, not the live gateway.** A new task, a recurring
+  occurrence and a re-homed task get `position` = lowest order key − 1024
+  (`TaskOrder.topPosition`; `TaskStore.readOrderTop` reads the key the app
+  uses). A row that lands on Today gets `todayPosition` = its `position`, the
+  app's rule (`TaskBackendMapping`).
+- **Scope:** new pairings get `tasks:read tasks:write`. Refresh rotation keeps
+  the old scope, so a pre-write pairing stays read-only; its write calls return
+  an in-band `isError` result that tells the user to reconnect.
+- **Known gap, inherited:** `newTaskId` maps a random byte with `& 31` onto a
+  31-character alphabet, so index 31 yields `undefined` and the id is shorter
+  than 6 characters in about 17% of creates. Not changed here (live behavior).
+  The backend create retries on an id that already exists.
+
 ## 2026-11-19: phase 2 preview connector uses app pairing, not web sign-in
 
 The read-only test connector at `https://api.septena.app/mcp` (`src/shadow/`)

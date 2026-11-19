@@ -356,6 +356,24 @@ export class TaskStore extends DurableObject<Env> {
     `).toArray();
   }
 
+  /// The lowest order key across live tasks, or null when there is none:
+  /// the app's `TaskOrder.extremeKey(highest: false)`. A row's key is its
+  /// `position` once it has one (0 is the app's "never dragged" value),
+  /// else its `createdAt` in seconds since 2001-01-01 (the app's
+  /// `timeIntervalSinceReferenceDate`). The MCP connector subtracts the app's
+  /// gap from it to put a row at the top of its list.
+  readOrderTop(): number | null {
+    return this.sql.exec<{ m: number | null }>(`
+      SELECT MIN(k) AS m FROM (
+        SELECT CASE
+          WHEN position IS NOT NULL AND position != 0 THEN position
+          WHEN createdAt IS NOT NULL THEN (julianday(createdAt) - 2440587.5) * 86400.0 - 978307200
+        END AS k
+        FROM tasks WHERE deletedAt IS NULL
+      )
+    `).one().m;
+  }
+
   // ---- pairing rate limit (src/shadow/oauth.ts) ----
   //
   // Wrong pairing codes this user entered in the current window. Kept in the

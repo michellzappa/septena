@@ -24,11 +24,22 @@ async function validateContainer(
     kind === "area"
       ? (await listAreas(client, { limit: 500 })).areas
       : (await listProjects(client, { status: "all", limit: 500 })).projects;
-  if (valid.some((c) => c.id === id)) return;
+  const message = unknownContainerMessage(kind, id, valid);
+  if (message) throw new Error(message);
+}
+
+/// The tool error for a task pointed at an area/project id that does not
+/// exist, or null when `id` is one of `valid`. Pure: shared with the task
+/// backend connector (src/shadow/writes.ts), which reads the containers from
+/// the TaskStore instead of CloudKit.
+export function unknownContainerMessage(
+  kind: "area" | "project",
+  id: string,
+  valid: ReadonlyArray<{ id: string; title: string }>,
+): string | null {
+  if (valid.some((c) => c.id === id)) return null;
   const known = valid.map((c) => `${c.id} (${c.title})`).join(", ");
-  throw new Error(
-    `unknown ${kind} id '${id}'. Use tasks_list_${kind}s for valid ids. Known: ${known}`,
-  );
+  return `unknown ${kind} id '${id}'. Use tasks_list_${kind}s for valid ids. Known: ${known}`;
 }
 
 // Mutators for Task records. Uses CKWS records/modify with forceUpdate.
@@ -239,6 +250,116 @@ export function parseRecurrenceInput(
   return { unit, interval, afterCompletion };
 }
 
+export type RecurrenceRuleInput = { unit: string; interval: number; afterCompletion: boolean };
+
+/** The `recurrence` block a write echoes back: the same shape it accepts. */
+export function recurrenceEcho(rule: RecurrenceRuleInput) {
+  return { unit: rule.unit, interval: rule.interval, after_completion: rule.afterCompletion };
+}
+
+/**
+ * The data-source-free part of `tasks_create`: the parsed rule, provenance
+ * and the result echo. Throws on a bad rule, before anything is written.
+ * Shared by the CloudKit tool below and the task backend connector.
+ */
+export function planCreate(input: CreateTaskInput) {
+  const rule = parseRecurrenceInput(input.recurrence, input.scheduled);
+  // Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4): only an explicit
+  // `user_request` commits; anything else lands as a proposal.
+  const committed = input.origin === "user_request";
+  const placement: "committed" | "inbox_proposal" = committed ? "committed" : "inbox_proposal";
+  const deadline = input.deadline ?? input.due;
+  const echo = rule ? { recurrence: recurrenceEcho(rule) } : {};
+  return { rule, committed, placement, deadline, echo };
+}
+
+/**
+ * A `tasks_update` call as data-source-free field writes. `null` clears a
+ * field; an absent key leaves it alone. `heading: null` is set when the task
+ * moves to a new area/project. `recurrence` is the parsed rule (null clears).
+ */
+export interface TaskUpdatePlan {
+  fields: {
+    title?: string;
+    today?: boolean;
+    scheduled?: string | null;
+    deadline?: string | null;
+    area?: string | null;
+    project?: string | null;
+    heading?: null;
+    status?: "open" | "cancelled";
+    notes?: string | null;
+    recurrence?: RecurrenceRuleInput | null;
+  };
+  updated: string[];
+}
+
+/// True when validating the call's repeat rule needs the task's stored
+/// `scheduled` date: a fixed-anchor rule, with no `scheduled` in this call.
+export function updateNeedsStoredSchedule(input: UpdateTaskInput): boolean {
+  const wantsFixedAnchor =
+    input.recurrence !== undefined &&
+    input.recurrence !== null &&
+    (input.recurrence.after_completion ?? input.recurrence.afterCompletion ?? true) === false;
+  return wantsFixedAnchor && input.scheduled === undefined;
+}
+
+/**
+ * The data-source-free part of `tasks_update`. `storedScheduled` is the
+ * task's current `scheduled`, needed only when `updateNeedsStoredSchedule`.
+ * Throws on a bad repeat rule. Shared by the CloudKit tool below and the task
+ * backend connector.
+ */
+export function planUpdate(input: UpdateTaskInput, storedScheduled?: string | null): TaskUpdatePlan {
+  const f: TaskUpdatePlan["fields"] = {};
+  const updated: string[] = [];
+  if (input.title !== undefined) { f.title = input.title; updated.push("title"); }
+  if (input.today !== undefined) { f.today = input.today; updated.push("today"); }
+  if (input.scheduled !== undefined) { f.scheduled = input.scheduled ?? null; updated.push("scheduled"); }
+  const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
+  if (updDeadline !== undefined) { f.deadline = updDeadline ?? null; updated.push("deadline"); }
+  // Re-home clears BOTH the cross-field container AND any stale project section
+  // FK (`heading`) — LOCKSTEP with the app's TasksBackend.moveToArea/
+  // moveToProject (app repo docs/DRAG_AND_DROP.md §4).
+  if (input.area !== undefined) {
+    f.area = input.area ?? null;
+    if (input.area) {
+      f.project = null;
+      f.heading = null;
+    }
+    updated.push("area");
+  }
+  if (input.project !== undefined) {
+    f.project = input.project ?? null;
+    if (input.project) {
+      f.area = null;
+      f.heading = null;
+    }
+    updated.push("project");
+  }
+  if (input.status !== undefined) { f.status = input.status; updated.push("status"); }
+  if (input.notes !== undefined) { f.notes = input.notes ?? null; updated.push("notes"); }
+  // Recurrence last, so it validates against the schedule this call may have
+  // just set. Present-with-null clears; absent leaves the rule alone.
+  if (input.recurrence !== undefined) {
+    const effectiveScheduled = input.scheduled !== undefined ? input.scheduled : storedScheduled;
+    f.recurrence = parseRecurrenceInput(input.recurrence, effectiveScheduled);
+    updated.push("recurrence");
+  }
+  return { fields: f, updated };
+}
+
+/// Tool-result warnings for a recurring completion whose series could not
+/// advance. Shared wording for both connectors.
+export const recurrenceWarning = {
+  noNextDate: (id: string, unit: string) =>
+    `Task ${id} is recurring (every ${unit}) but the next date could not be calculated, ` +
+    `so no new occurrence was created. It was still marked done.`,
+  createFailed: (id: string, next: string) =>
+    `Task ${id} was marked done, but its next occurrence (due ${next}) could not be created. ` +
+    `It will reappear when the task is next opened in the Septena app.`,
+};
+
 /** CloudKit field triple for a rule (or the cleared form when null). */
 function recurrenceFields(
   rule: { unit: string; interval: number; afterCompletion: boolean } | null,
@@ -264,7 +385,8 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   await validateContainer(client, "project", input.project);
   // Validate the rule BEFORE creating anything, so a bad repeat can't leave a
   // stray non-recurring task behind.
-  const createRule = parseRecurrenceInput(input.recurrence, input.scheduled);
+  const plan = planCreate(input);
+  const createRule = plan.rule;
   const id = newTaskId();
   const fields: Record<string, { value: unknown }> = {
     title: { value: input.title },
@@ -280,10 +402,10 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
   // inbox → rendered dashed. The gateway is a consumer connection, so it
   // defaults to a proposal (secure by default); only an explicit `user_request`
   // commits.
-  const committed = input.origin === "user_request";
+  const committed = plan.committed;
   if (committed) fields.acknowledgedAt = { value: Date.now() };
   if (input.scheduled) fields.scheduled = { value: input.scheduled };
-  const createDeadline = input.deadline ?? input.due;
+  const createDeadline = plan.deadline;
   if (createDeadline) fields.deadline = { value: createDeadline };
   if (input.area) fields.area = { value: input.area };
   if (input.project) fields.project = { value: input.project };
@@ -307,16 +429,8 @@ export async function createTask(client: CloudKitClient, input: CreateTaskInput)
 
   // Signals exactly when the prod schema catches up: a non-empty list here
   // (containing source/sourceClient/createdAt) means provenance isn't sticking yet.
-  const placement = committed ? "committed" : "inbox_proposal";
-  const echo = createRule
-    ? {
-        recurrence: {
-          unit: createRule.unit,
-          interval: createRule.interval,
-          after_completion: createRule.afterCompletion,
-        },
-      }
-    : {};
+  const placement = plan.placement;
+  const echo = plan.echo;
   if (droppedFields.length > 0) {
     logEvent("task_create_dropped_fields", { id, droppedFields });
     return { id, title: input.title, placement, ...echo, droppedFields };
@@ -400,11 +514,7 @@ async function spawnNextOccurrence(
   });
   if (!next) {
     logEvent("recurrence_next_date_failed", { id: sourceID, unit, interval });
-    return {
-      recurrenceWarning:
-        `Task ${sourceID} is recurring (every ${unit}) but the next date could not be calculated, ` +
-        `so no new occurrence was created. It was still marked done.`,
-    };
+    return { recurrenceWarning: recurrenceWarning.noNextDate(sourceID, unit) };
   }
 
   const id = occurrenceID(sourceID, next);
@@ -460,70 +570,40 @@ async function spawnNextOccurrence(
     return { nextOccurrence: { id, scheduled: next } };
   } catch (err) {
     logEvent("recurrence_create_failed", { id, sourceID, error: String(err) });
-    return {
-      recurrenceWarning:
-        `Task ${sourceID} was marked done, but its next occurrence (due ${next}) could not be created. ` +
-        `It will reappear when the task is next opened in the Septena app.`,
-    };
+    return { recurrenceWarning: recurrenceWarning.createFailed(sourceID, next) };
   }
 }
 
 export async function updateTask(client: CloudKitClient, input: UpdateTaskInput) {
   await validateContainer(client, "area", input.area);
   await validateContainer(client, "project", input.project);
+  // Only pay for a read when the rule actually needs an anchor and this call
+  // didn't supply one — everything else stays a blind forceUpdate.
+  let storedScheduled: string | null | undefined;
+  if (updateNeedsStoredSchedule(input)) {
+    const existing = await lookupRecord(client, input.id);
+    storedScheduled = (existing?.scheduled?.value as string | undefined) || null;
+  }
+  const { fields: p, updated } = planUpdate(input, storedScheduled);
+  // CloudKit encoding: a cleared string field is "", a bool is 1/0. Divergence,
+  // on purpose: on a re-home the app also resets `position` so the row lands at
+  // the top of the destination; a chat move here deliberately does NOT (no
+  // read-before-write, and landing order matters far less for an agent move) —
+  // the row keeps its existing order key. The task backend connector does
+  // reset it (src/shadow/writes.ts), where the read is cheap.
+  // Plan key order is kept, so the request body is the one this tool sent
+  // before the plan was extracted.
   const fields: Record<string, { value: unknown }> = {};
-  const updated: string[] = [];
-  if (input.title !== undefined) { fields.title = { value: input.title }; updated.push("title"); }
-  if (input.today !== undefined) {
-    fields.today = { value: input.today ? 1 : 0 };
-    updated.push("today");
-  }
-  if (input.scheduled !== undefined) { fields.scheduled = { value: input.scheduled ?? "" }; updated.push("scheduled"); }
-  const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
-  if (updDeadline !== undefined) { fields.deadline = { value: updDeadline ?? "" }; updated.push("deadline"); }
-  // Re-home clears BOTH the cross-field container AND any stale project section
-  // FK (`heading`) — LOCKSTEP with the app's TasksBackend.moveToArea/
-  // moveToProject (app repo docs/DRAG_AND_DROP.md §4). Divergence, on purpose:
-  // the app also resets `position` so the row lands at the top of the
-  // destination; a chat move deliberately does NOT (no read-before-write here,
-  // and landing order matters far less for an agent move) — the row keeps its
-  // existing order key. Documented, not an oversight.
-  if (input.area !== undefined) {
-    fields.area = { value: input.area ?? "" };
-    if (input.area) {
-      fields.project = { value: "" };
-      fields.heading = { value: "" };
+  for (const key of Object.keys(p) as Array<keyof typeof p>) {
+    switch (key) {
+      case "today": fields.today = { value: p.today ? 1 : 0 }; break;
+      // notes → plaintext `notesText`; null/"" writes an empty string (clear),
+      // matching the in-app server's clear-on-empty semantics.
+      case "notes": fields.notesText = { value: p.notes ?? "" }; break;
+      case "recurrence": Object.assign(fields, recurrenceFields(p.recurrence ?? null)); break;
+      case "heading": fields.heading = { value: "" }; break;
+      default: fields[key] = { value: p[key] ?? "" };
     }
-    updated.push("area");
-  }
-  if (input.project !== undefined) {
-    fields.project = { value: input.project ?? "" };
-    if (input.project) {
-      fields.area = { value: "" };
-      fields.heading = { value: "" };
-    }
-    updated.push("project");
-  }
-  if (input.status !== undefined) { fields.status = { value: input.status }; updated.push("status"); }
-  // notes → plaintext `notesText`; null/"" writes an empty string (clear),
-  // matching the in-app server's clear-on-empty semantics.
-  if (input.notes !== undefined) { fields.notesText = { value: input.notes ?? "" }; updated.push("notes"); }
-  // Recurrence last, so it validates against the schedule this call may have
-  // just set. Present-with-null clears; absent leaves the rule alone.
-  if (input.recurrence !== undefined) {
-    let effectiveScheduled: string | null | undefined = input.scheduled;
-    const wantsFixedAnchor =
-      input.recurrence !== null &&
-      (input.recurrence.after_completion ?? input.recurrence.afterCompletion ?? true) === false;
-    // Only pay for a read when the rule actually needs an anchor and this call
-    // didn't supply one — everything else stays a blind forceUpdate.
-    if (wantsFixedAnchor && effectiveScheduled === undefined) {
-      const existing = await lookupRecord(client, input.id);
-      effectiveScheduled = (existing?.scheduled?.value as string | undefined) || null;
-    }
-    const rule = parseRecurrenceInput(input.recurrence, effectiveScheduled);
-    Object.assign(fields, recurrenceFields(rule));
-    updated.push("recurrence");
   }
 
   if (updated.length === 0) return { id: input.id, updated: [] };
@@ -582,6 +662,30 @@ async function writeConvo(client: CloudKitClient, id: string, convo: TaskConvo):
       record: { recordType: "Task", recordName: id, fields: { conversationJSON: { value: JSON.stringify(convo) } } },
     },
   ]);
+}
+
+/// A confirm-step turn carrying a `chosen` also caches confirmedIntent in the
+/// SAME write (richer `note` wins over the bare button label). Mirrors the app.
+/// Undefined when the turn sets nothing. Shared with the task backend connector.
+export function confirmedIntentFor(turn: Pick<ConvoTurn, "step" | "chosen" | "note">): string | undefined {
+  if (turn.step === "confirm" && turn.chosen) return turn.note ?? turn.chosen;
+  return undefined;
+}
+
+/// The stored artifact for a `tasks_set_artifact` call (kind defaults to
+/// "note", body to ""). Shared with the task backend connector.
+export function normalizeArtifact(a: { kind?: string; title: string; body?: string; refs?: string[] }): NonNullable<TaskConvo["artifact"]> {
+  return { kind: a.kind ?? "note", title: a.title, body: a.body ?? "", refs: a.refs };
+}
+
+/// The stored handoff for a `tasks_set_handoff` call (actionType defaults to
+/// "none"). Shared with the task backend connector.
+export function normalizeHandoff(h: {
+  instruction: string;
+  actionType?: "open_url" | "compose" | "call" | "none";
+  payload?: string;
+}): NonNullable<TaskConvo["handoff"]> {
+  return { instruction: h.instruction, actionType: h.actionType ?? "none", payload: h.payload };
 }
 
 function nextSeq(c: TaskConvo): number {
@@ -701,11 +805,8 @@ export async function threadAppend(
   const convo = await readConvo(client, input.id);
   const turn: ConvoTurn = { ...input.turn, seq: nextSeq(convo), ts: input.turn.ts ?? new Date().toISOString() };
   convo.thread.push(turn);
-  // A confirm-step turn carrying a `chosen` also caches confirmedIntent in the
-  // SAME write (richer `note` wins over the bare button label). Mirrors the app.
-  if (turn.step === "confirm" && turn.chosen) {
-    convo.confirmedIntent = turn.note ?? turn.chosen;
-  }
+  const confirmedIntent = confirmedIntentFor(turn);
+  if (confirmedIntent !== undefined) convo.confirmedIntent = confirmedIntent;
   await writeConvo(client, input.id, convo);
   return { id: input.id, seq: turn.seq };
 }
@@ -775,12 +876,7 @@ export async function setArtifact(
   input: { id: string; artifact: { kind?: string; title: string; body?: string; refs?: string[] } },
 ) {
   const convo = await readConvo(client, input.id);
-  convo.artifact = {
-    kind: input.artifact.kind ?? "note",
-    title: input.artifact.title,
-    body: input.artifact.body ?? "",
-    refs: input.artifact.refs,
-  };
+  convo.artifact = normalizeArtifact(input.artifact);
   await writeConvo(client, input.id, convo);
   return { id: input.id, artifact: input.artifact.title };
 }
@@ -790,11 +886,7 @@ export async function setHandoff(
   input: { id: string; handoff: { instruction: string; actionType?: "open_url" | "compose" | "call" | "none"; payload?: string } },
 ) {
   const convo = await readConvo(client, input.id);
-  convo.handoff = {
-    instruction: input.handoff.instruction,
-    actionType: input.handoff.actionType ?? "none",
-    payload: input.handoff.payload,
-  };
+  convo.handoff = normalizeHandoff(input.handoff);
   await writeConvo(client, input.id, convo);
   return { id: input.id, handoff: input.handoff.instruction };
 }

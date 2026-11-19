@@ -87,12 +87,17 @@ export interface RecurrenceRule {
 export function nextScheduledDate(input: {
   completedOn: string;
   scheduled?: string | null;
+  /** The series' logical slot (`recurrenceAnchorDate`) when this occurrence
+   *  was moved as a one-off exception. A fixed rule advances from it, not
+   *  from the shown date. Swift's `logicalScheduled ?? scheduled`. */
+  logicalScheduled?: string | null;
   rule: RecurrenceRule;
 }): string | null {
   const completed = parseYMD(input.completedOn);
   if (!completed) return null;
 
-  const scheduled = input.scheduled ? parseYMD(input.scheduled) : null;
+  const fixedAnchor = input.logicalScheduled ?? input.scheduled;
+  const scheduled = fixedAnchor ? parseYMD(fixedAnchor) : null;
   const anchor = input.rule.afterCompletion ? completed : (scheduled ?? completed);
   const step = Math.max(1, input.rule.interval);
 

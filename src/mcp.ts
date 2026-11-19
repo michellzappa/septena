@@ -137,7 +137,7 @@ import {
 // task-backend preview on api.septena.app.
 
 // Always exposed regardless of section configuration.
-const GLOBAL_TOOLS: Tool[] = [
+export const GLOBAL_TOOLS: Tool[] = [
   {
     name: "tasks_list",
     description:
