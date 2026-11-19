@@ -34,41 +34,47 @@ contract): `tasks-today`, `tasks-upcoming`, `tasks-project`.
 
 ### name
 
-Septask
+Septena
 
 ### subtitle
 
-Focused tasks, in your iCloud
+Tasks that think with you
 
 ### promotional_text
 
-A real task app: Inbox, Today, Upcoming, and projects, kept in your own iCloud and drivable by your own AI. The same tasks as Septena, in a focused app. Free.
+A task app that thinks with you, on iPhone, iPad, and Mac. Inbox, Today, and projects, with AI that asks before it acts. Connect Claude and work your list together.
 
 ### description
 
-Septask is a task app and nothing else. Inbox, Today, Upcoming, and Someday, with areas and projects underneath. Capture in a second, triage when you are ready, and let today be something you decide rather than a pile that lands on you. It is built to stand next to the best task apps on feel: keyboard flow on the Mac, calm density, and a fast Reminders import.
+Septena is a task app that thinks with you. It is for people who want a short list and a clear day. Capture a thought in a second, sort it when you're ready, and decide what today holds before it decides for you.
 
-TODAY IS A VERB
-Work scheduled for today does not get dumped on your plate. It lands in a review zone you triage, so you decide what today actually is before you start. Projects group related work under an area, each with its own list and a progress ring that fills as you finish.
+THE BASICS, DONE CAREFULLY
+Inbox, Today, Upcoming, and Someday, with areas, projects, and headings to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
-THE SAME TASKS AS SEPTENA
-Septask is not a lite version, and it is not a separate copy of your to-dos. It reads and writes the same task records in your own iCloud that the full Septena app does. Add a task in one and it is in the other. They are two windows onto one private dataset, so there is no lock-in and no migration. Start with just tasks today; turn on the rest of your life in Septena tomorrow and your tasks are already there.
+TODAY IS YOUR CALL
+New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
 
-PRIVATE BY ARCHITECTURE
-There is no account to create and no server to trust. Your tasks live on your device and sync only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. The code is open source, so the privacy claim is something you can audit rather than a policy you are asked to trust.
+AI THAT ASKS FIRST
+Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-BRING YOUR OWN AI
-Septask ships no AI of its own. It opens an optional door, so you can point your own AI at your tasks and let it read, add, and reorganize on your behalf. Anything an agent touches is marked, so nothing it does hides in your list. Your call, your tools, your audit trail.
+YOUR CLAUDE, IN YOUR LIST
+Connect Claude and it can read, add, and organize your tasks with you. Anything an agent writes is marked, so you can always see what it touched.
 
-Native on iPhone, iPad, and Mac, and free. Try it with a tap of demo data before you commit a single task of your own.
+COMING FROM THINGS OR REMINDERS
+Import your Things database and keep your areas and projects. Reminders show up in your Inbox. Septena never changes the original data.
+
+OPEN SOURCE
+The code is public. You can read exactly how your tasks are handled.
+
+Native on iPhone, iPad, and Mac, with your tasks in sync across all three.
 
 ### keywords
 
-task manager,to-do,todo,tasks,things,reminders,projects,inbox,today,productivity,gtd,ai,private
+task manager,to-do,todo,tasks,things,reminders,projects,inbox,today,productivity,gtd,ai,claude
 
 ### release_notes
 
-Septask's first release: a focused, private task app over the same iCloud task data as Septena. Inbox, Today, Upcoming, and Someday, with areas and projects, a Reminders import, and an optional door for your own AI. Native on iPhone, iPad, and Mac.
+The first release of Septena: Inbox, Today, Upcoming, and Someday, with areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for Claude. Native on iPhone, iPad, and Mac.
 
 ### support_url
 
@@ -76,7 +82,7 @@ https://septena.app/support
 
 ### marketing_url
 
-https://septena.app/septask
+https://septena.app
 
 ### privacy_url
 
@@ -105,41 +111,47 @@ UTILITIES
 
 ### name
 
-Septask
+Septena
 
 ### subtitle
 
-Focused tasks, in your iCloud
+Tasks that think with you
 
 ### promotional_text
 
-A real task app for the Mac: keyboard flow, calm lists, and projects, kept in your own iCloud and drivable by your own AI. The same tasks as Septena. Free.
+A task app that thinks with you, built for the Mac: keyboard first, Quick Entry from anywhere, AI that asks before it acts. Connect Claude and work your list together.
 
 ### description
 
-Septask is a task app and nothing else, now in a calm window on your Mac. Inbox, Today, Upcoming, and Someday, with areas and projects underneath. Keyboard flow, calm density, and a fast Reminders import, built to stand next to the best task apps on the Mac.
+Septena is a task app that thinks with you, built as a real Mac app for people who want a short list and a clear day. Every action has a keyboard shortcut, and Quick Entry opens from anywhere so you can capture a task without leaving what you're doing.
 
-TODAY IS A VERB
-Work scheduled for today does not get dumped on your plate. It lands in a review zone you triage, so you decide what today actually is before you start. Projects group related work under an area, each with its own list and a progress ring that fills as you finish.
+THE BASICS, DONE CAREFULLY
+Inbox, Today, Upcoming, and Someday, with areas, projects, and headings to group the work. Deadlines, repeating tasks, notes, and attachments. Your calendar events sit next to today's tasks, so you plan against the hours you actually have.
 
-THE SAME TASKS AS SEPTENA
-Septask is not a lite version, and it is not a separate copy of your to-dos. It reads and writes the same task records in your own iCloud that the full Septena app does. Add a task in one and it is in the other. They are two windows onto one private dataset, so there is no lock-in and no migration. Start with just tasks today; turn on the rest of your life in Septena tomorrow and your tasks are already there.
+TODAY IS YOUR CALL
+New and loose tasks wait in the Inbox above Today. Nothing lands on your day until you put it there. Septena also learns where you usually file things and suggests the right project, on your device.
 
-PRIVATE BY ARCHITECTURE
-There is no account to create and no server to trust. Your tasks live on your devices and sync only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. The code is open source, so the privacy claim is something you can audit rather than a policy you are asked to trust.
+AI THAT ASKS FIRST
+Some tasks need a moment of thinking before anyone can act on them. Open one and Septena asks a short question with a few answers to tap. Where it can, it drafts, compares, or looks something up. Then it hands you the one step only you can take. It runs on your device first and reaches further only when you let it.
 
-BRING YOUR OWN AI
-Septask ships no AI of its own. It opens an optional door, so you can point your own AI at your tasks and let it read, add, and reorganize on your behalf. Anything an agent touches is marked, so nothing it does hides in your list.
+YOUR CLAUDE, IN YOUR LIST
+Connect Claude and it can read, add, and organize your tasks with you. Anything an agent writes is marked, so you can always see what it touched.
 
-Syncs the same private tasks across Mac, iPhone, and iPad through your iCloud. Start on one, pick up on another, and it is free.
+COMING FROM THINGS OR REMINDERS
+Import your Things database and keep your areas and projects. Reminders show up in your Inbox. Septena never changes the original data.
+
+OPEN SOURCE
+The code is public. You can read exactly how your tasks are handled.
+
+Your tasks stay in sync across your Mac, iPhone, and iPad.
 
 ### keywords
 
-task manager,to-do,todo,tasks,things,reminders,projects,productivity,gtd,ai,private,mac
+task manager,to-do,todo,tasks,things,reminders,projects,productivity,gtd,ai,claude,mac
 
 ### release_notes
 
-Septask's first release on the Mac: a focused, private task app over the same iCloud task data as Septena. Inbox, Today, Upcoming, and Someday, with areas and projects, a Reminders import, and an optional door for your own AI.
+The first release of Septena on the Mac: keyboard-first lists, Quick Entry from anywhere, areas and projects, Things and Reminders import, AI that asks before it acts, and a connector for Claude.
 
 ### support_url
 
@@ -147,7 +159,7 @@ https://septena.app/support
 
 ### marketing_url
 
-https://septena.app/septask
+https://septena.app
 
 ### privacy_url
 

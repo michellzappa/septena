@@ -101,7 +101,9 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 |---|---|
 | [DesignSpec.md](DesignSpec.md) | canonical |
 | [PAGE_CHROME_SPEC.md](PAGE_CHROME_SPEC.md), [DRAWER_MODES_SPEC.md](DRAWER_MODES_SPEC.md), [GLASS_DOTS_SPEC.md](GLASS_DOTS_SPEC.md), [WAKING_DAY_WHEEL.md](WAKING_DAY_WHEEL.md) | mixed: see each status line |
-| [SETTINGS_REORG_PROPOSAL.md](SETTINGS_REORG_PROPOSAL.md), [FRONT_DOOR_IDENTITY.md](FRONT_DOOR_IDENTITY.md) | proposal / roadmap |
+| [SETTINGS_FLATTEN_SPEC.md](SETTINGS_FLATTEN_SPEC.md) | building (task app settings) |
+| [SETTINGS_REORG_PROPOSAL.md](SETTINGS_REORG_PROPOSAL.md) | life app; mostly built |
+| [FRONT_DOOR_IDENTITY.md](FRONT_DOOR_IDENTITY.md) | roadmap |
 | [LOCALIZATION_PLAN.md](LOCALIZATION_PLAN.md) | pt-BR pilot done |
 
 ### Septena sections (life OS)
@@ -126,7 +128,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 ### Product and identity
 
-[MESSAGING.md](MESSAGING.md), [MAKER_IDENTITY.md](MAKER_IDENTITY.md),
+[MESSAGING.md](MESSAGING.md) (moved to the Septena Starlings workspace), [MAKER_IDENTITY.md](MAKER_IDENTITY.md),
 [APPSTORE.md](APPSTORE.md), [feedback.md](feedback.md),
 [BACKLOG.md](BACKLOG.md) (being replaced by GitHub issues: move open items
 there when you touch them).
