@@ -35,9 +35,11 @@ Set up 2026-11-19 so planned work keeps moving without mz.
   that origin changed are also dirty here, do not pull, stash or reset: other
   sessions' uncommitted work lives there. Report it first and work only on
   docs-only issues that touch none of those files.
-- **Push:** not allowed until mz approves a push policy for the factory
-  (decision pending, 2026-11-19). Commit locally and list unpushed commits in
-  the report.
+- **Push:** allowed (mz, 2026-11-19). After the run's commits, `git fetch`,
+  merge `origin/main` (never rebase shared history, never force), and
+  `git push origin main`. A merge conflict you cannot resolve with certainty
+  → leave it unpushed and report it first. The repo is public and open source
+  (MIT): everything pushed is public.
 - **Product names (ADR 0007):** the task app is **Septena**; the life OS is
   **Septena Life**, on the back burner (fixes only). "Septask" is a working
   name in code and docs and never appears in user-facing text.
