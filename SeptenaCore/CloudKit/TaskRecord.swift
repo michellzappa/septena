@@ -14,10 +14,8 @@ private func optionalTaskString(_ value: CKRecordValue?) -> String? {
 // or retyped. This file is the single seam for that mapping; over-
 // provisioned fields are listed below with the rationale for each.
 
-enum TaskCloudKitSchema {
-  /// CKRecord type. Capitalized by CloudKit convention.
-static let recordType = "Task"
-
+// The record type lives in TaskRecordNames.swift (shared with Septask).
+extension TaskCloudKitSchema {
   // MARK: - Field names
 
 enum Field {

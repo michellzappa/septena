@@ -1,7 +1,8 @@
 # Septask backend — spec
 
 **Status (2026-11-19):** live at `api.septena.app` (Cloudflare account
-Centaur-Labs). **Septask is backend-only and CloudKit-free** (§9 phase 4):
+Centaur-Labs). **Phase 4 done: Septask is backend-only and CloudKit-free**
+(§9):
 tasks, areas, projects, attachments, conversations, turns and Septask's
 synced settings all sync through it. Septena still uses CloudKit for its own
 data and freezes the CloudKit task types on a device where Septask runs.
@@ -311,6 +312,21 @@ reconcile already sends every local row the backend does not hold. There is
 no way back to iCloud from Septask any more. The CloudKit task records stay as
 a frozen backup. Septena still compiles the CloudKit task path for its own
 records; the files above remain in Septena until Septena drops tasks.
+
+**Phase 4 done (2026-11-19, #42).** No CloudKit task record mapping compiles
+into either Septask target. `CloudKit/TaskRecord.swift`, `AreaRecord.swift`,
+`ProjectRecord.swift`, `TaskAttachmentRecord.swift` (CKRecord encode/decode)
+and `CloudKit/Migration.swift` (the CloudKit `TasksMigrator` and its
+snapshots) are excluded from `Septask` and `SeptaskMac`. Their shared halves
+moved to their own files, which both apps compile: `TaskRecordNames.swift`
+(record type and record-name scheme, plain strings, used by
+`TaskStoreMode`'s freeze and the sync engine's ledger),
+`TaskAttachments.swift` (`TaskAttachmentEntity`, `TaskAttachmentFiles`,
+`TaskAttachmentStore`) and `LaunchMigrators.swift` (`EventTimestamp` and the
+launch migrators). `CKEngine` still compiles in Septask because the mutators
+take it; it never starts there. `TaskStoreMode` and the frozen-record-types
+logic stay for Septena, which reads the device-wide mode so it never writes
+tasks through CloudKit.
 
 ## 10. Privacy and security
 

@@ -242,15 +242,23 @@ targets:
           - ClaudeReconnectNudge.swift
           # Phase 4 (docs/SEPTASK_BACKEND.md §9): Septask is CloudKit-free.
           # The cutover tools (copy to backend, move back to iCloud), the
-          # CloudKit schema seeder, the record registry (CloudKit apply path)
-          # and the CloudKit watch snapshot stay out. CKEngine and
-          # CloudKit/Migration.swift still compile: mutators take the engine
-          # (it never starts), and Migration.swift also holds shared helpers
-          # (EventTimestamp, the launch migrators).
+          # CloudKit schema seeder, the record registry (CloudKit apply path),
+          # the CloudKit watch snapshot, the CloudKit task migrator and the
+          # task/area/project/attachment CKRecord mappings stay out (#42).
+          # Their shared halves compile from their own files:
+          # TaskRecordNames.swift (record identity), TaskAttachments.swift
+          # (model + store), LaunchMigrators.swift (EventTimestamp, launch
+          # migrators). CKEngine still compiles: mutators take the engine
+          # (it never starts).
           - TaskBackend/TaskBackendImporter.swift
           - TaskBackend/TaskStoreRollback.swift
           - CloudKit/CloudKitRecordRegistry.swift
           - CloudKit/SchemaSeedRegistrar.swift
+          - CloudKit/Migration.swift
+          - CloudKit/TaskRecord.swift
+          - CloudKit/AreaRecord.swift
+          - CloudKit/ProjectRecord.swift
+          - CloudKit/TaskAttachmentRecord.swift
           - TasksWatchSnapshotPublisher.swift
       # P1 (docs/SEPTASK.md): the real task UI, by source inclusion — the same
       # files the full app compiles, never copies. TasksDestinationView is the
@@ -468,6 +476,11 @@ targets:
           - TaskBackend/TaskStoreRollback.swift
           - CloudKit/CloudKitRecordRegistry.swift
           - CloudKit/SchemaSeedRegistrar.swift
+          - CloudKit/Migration.swift
+          - CloudKit/TaskRecord.swift
+          - CloudKit/AreaRecord.swift
+          - CloudKit/ProjectRecord.swift
+          - CloudKit/TaskAttachmentRecord.swift
           - TasksWatchSnapshotPublisher.swift
       - path: Septena/Shell/Tasks
         excludes:

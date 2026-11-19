@@ -14,13 +14,8 @@ private func optionalAreaString(_ value: CKRecordValue?) -> String? {
 // rationale — once a schema is promoted to Production, fields can be added
 // but not renamed or retyped, so we reserve a few slots up front.
 
-enum AreaCloudKitSchema {
-  static let recordType = "Area"
-  static func recordName(for id: String) -> String { "area:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    recordName.hasPrefix("area:") ? String(recordName.dropFirst(5)) : recordName
-  }
-
+// Record type and record-name scheme: TaskRecordNames.swift (shared).
+extension AreaCloudKitSchema {
   enum Field {
     static let title = "title"
     static let context = "context"

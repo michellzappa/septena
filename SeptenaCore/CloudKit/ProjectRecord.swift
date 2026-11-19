@@ -10,13 +10,8 @@ private func optionalProjectString(_ value: CKRecordValue?) -> String? {
 // ProjectRecord — ProjectEntity ↔ CKRecord mapping. See [TaskRecord.swift]
 // for the schema-rigidity background and field-reservation pattern.
 
-enum ProjectCloudKitSchema {
-  static let recordType = "Project"
-  static func recordName(for id: String) -> String { "project:\(id)" }
-  static func entityID(from recordName: String) -> String {
-    recordName.hasPrefix("project:") ? String(recordName.dropFirst(8)) : recordName
-  }
-
+// Record type and record-name scheme: TaskRecordNames.swift (shared).
+extension ProjectCloudKitSchema {
   enum Field {
     static let title = "title"
     static let status = "status"
