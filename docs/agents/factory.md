@@ -45,9 +45,17 @@ Set up 2026-11-19 so planned work keeps moving without mz.
   name in code and docs and never appears in user-facing text.
 - **Budget:** stop starting new issues after 5 implemented or 2 hours. Finish
   what is in flight.
-- **Do not touch** the backend migration (`track:backend`, milestone M1) or
-  `../septena-mcp-gateway` unless an issue there carries `ready-for-agent`.
-  Another session owns that track.
+- **Backend track (M1).** Only issues labeled `ready-for-agent`. Skip one when
+  another session committed to its area in the last 24 h (each issue says how
+  to check). `(mz)` issues are mz's steps: never do them, only prepare what
+  they ask for.
+- **Gateway repo** (`../septena-mcp-gateway`, origin on a local volume, no
+  GitHub remote): commit there and push to its origin. Gate with
+  `npm run typecheck`. One Worker serves both `api.septena.app` and the LIVE
+  connector `mcp.septena.app`, so `wrangler deploy` unattended only when the
+  change cannot alter any `mcp.septena.app` response (host-dispatched `api`
+  routes only). Anything else: leave it undeployed and say so first in the
+  report. Never switch mz's connector to the backend (that is M1.9).
 
 ## 1. Load state
 

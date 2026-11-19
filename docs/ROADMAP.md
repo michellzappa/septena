@@ -25,8 +25,15 @@ parallel unless an arrow says otherwise.
 
 ### M1 — Backend cutover
 
-Runs separately (another session owns it). Exit: all task data on
-`api.septena.app`, apps and MCP on the backend, privacy copy updated.
+Split into M1.1–M1.10 (issues on GitHub, 2026-11-19). Phase 0 deployed,
+phase 1 importer and phase 2 preview connector written.
+
+- M1.1 (mz) first import · M1.2 (mz) shadow week
+- M1.3 rollback writer · M1.4 TaskSyncClient → M1.5 route writes ·
+  M1.6 live nudge · M1.7 Sign in with Apple at launch · M1.8 gateway on the DO
+- M1.9 (mz) cutover → M1.10 cleanup
+
+Exit: all task data on `api.septena.app`, apps and MCP on the backend.
 
 ### Launch — Septena on iPhone, iPad and Mac
 
