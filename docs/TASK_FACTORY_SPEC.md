@@ -1,6 +1,6 @@
 # Task factory — spec
 
-**Status:** accepted, not started. Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
+**Status:** accepted. F0 claims, stop and pause built 2026-11-19 (§5, ADR 0008); Agent smart list and runner not started. Written and accepted 2026-11-19. Open questions keep their defaults until mz overrules them.
 **Decisions:** [ADR 0002](adr/0002-own-backend-replaces-icloud.md),
 [ADR 0005](adr/0005-tasks-as-factory-intake.md).
 **Builds on:** the task conversation loop (`docs/TASK_CONVERSATIONS_PLAN.md`,
@@ -89,21 +89,41 @@ The runner is a process that drains the queue.
 
 ## 5. Claims
 
-New fields in the task conversation (`task_convo` row on the backend):
+**Built 2026-11-19 (backend + api.septena.app connector). Rules: ADR 0008.**
 
-- `claimedBy` — runner id (`runner:mz-mini`, `routine:<id>`, `mcp:<client>`).
-- `claimUntil` — lease end. Default 30 minutes, renewed while working.
+Fields on the `convos` row:
 
-New MCP tools, in both servers:
+- `claimedBy` — `<agent>@<pairing>`, e.g. `runner:mz-mini@a1b2c3d4`.
+  Server-owned: a push cannot set it.
+- `claimUntil` — lease end. Default 30 minutes, at most 4 hours, renewed by
+  claiming again as the same agent.
+- `runsSinceUser` — fresh claims since the last human turn. Server-owned.
+- `stoppedAt` — the human's stop. App actors only.
+
+MCP tools, on the api.septena.app connector only (ADR 0008):
 
 | Tool | Effect |
 |---|---|
-| `tasks_claim(id, ttlMinutes)` | Sets the claim if none is live. Fails if another actor holds it. The DO serializes, so two runners cannot both win. |
-| `tasks_release(id)` | Clears the claim. |
+| `tasks_claim(id, agent, ttlMinutes?, why?)` | Takes or renews the claim. Refuses with a rule: `paused`, `stopped`, `your_turn`, `held`, `budget`, `terminal`, `closed`, `not_found`. The DO serializes, so two agents cannot both win. |
+| `tasks_release(id, agent, why)` | Clears the agent's own claim. `why` goes to the activity log. |
+| `tasks_agent_events(since?, limit?)` | Pointer events since a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
+| `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
 
-An expired claim is free again. A turn written by a non-holder while a claim
-is live is accepted (mz can always write), but the runner re-reads the thread
-before its next write.
+Rules the store enforces:
+
+- An expired claim is free again.
+- A provider turn with options (a question) releases the claim.
+- A human turn sets `runsSinceUser` to 0. The 6th fresh claim without one is
+  refused (`budget`): the agent must ask.
+- While `stoppedAt` is set, every agent write to the task is refused.
+- While `agentsPaused` is true, every claim is refused and
+  `tasks_pending_reasoning` returns no tasks.
+- A turn written by a non-holder while a claim is live is accepted (mz can
+  always write), but the runner re-reads the thread before its next write.
+
+`tasks_pending_reasoning` now leaves out stopped tasks and tasks whose
+question waits for the human, and gives each task its `stage` (`queued` or
+`working`, with the holder).
 
 ## 6. Work profiles
 
@@ -224,6 +244,8 @@ links (issue, PR, commit).
   scope (backend spec §8), and GitHub access only through the repo links of
   its profile.
 - **Kill switch:** one setting, "Pause all agents", stops claims at once.
+  Built: synced setting `agentsPaused`, toggle in Septask ▸ Settings ▸
+  Connections & AI. Per task: **Stop** / **Resume** in the conversation.
 
 ## 11. Phases
 

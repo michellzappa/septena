@@ -13,6 +13,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0005](0005-tasks-as-factory-intake.md) | Tasks are factory intake; agents ask in the app | accepted |
 | [0006](0006-tasks-fade-by-default.md) | Tasks fade by default; the list asks why a task is stuck | accepted |
 | [0007](0007-septena-is-the-task-app.md) | Septena is the task app; the life OS becomes Septena Life | accepted |
+| [0008](0008-agent-loop-rules-live-in-the-store.md) | Agent loop rules live in the store; the human holds the stop | accepted |
 
 ## Template
 
