@@ -27,11 +27,15 @@ async function appleKeys(forceRefresh: boolean): Promise<AppleJwk[]> {
   return body.keys;
 }
 
-function decodePart<T>(part: string): T {
-  return JSON.parse(new TextDecoder().decode(fromBase64Url(part))) as T;
-}
-
 export class AppleIdentityError extends Error {}
+
+function decodePart<T>(part: string): T {
+  try {
+    return JSON.parse(new TextDecoder().decode(fromBase64Url(part))) as T;
+  } catch {
+    throw new AppleIdentityError("malformed token");
+  }
+}
 
 export async function verifyAppleIdentityToken(
   token: string,
@@ -56,10 +60,16 @@ export async function verifyAppleIdentityToken(
     false,
     ["verify"],
   );
+  let sig: Uint8Array<ArrayBuffer>;
+  try {
+    sig = fromBase64Url(s);
+  } catch {
+    throw new AppleIdentityError("malformed token");
+  }
   const ok = await crypto.subtle.verify(
     "RSASSA-PKCS1-v1_5",
     key,
-    fromBase64Url(s),
+    sig,
     new TextEncoder().encode(`${h}.${p}`),
   );
   if (!ok) throw new AppleIdentityError("bad signature");

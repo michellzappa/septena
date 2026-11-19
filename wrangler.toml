@@ -6,6 +6,18 @@ main = "src/index.ts"
 compatibility_date = "2024-12-15"
 compatibility_flags = ["nodejs_compat_v2"]
 
+# Bind the Worker to the custom domains. Keep this above the first [table]:
+# below a table header TOML makes it a key of that table and wrangler
+# ignores it. Requires:
+#   • septena.app DNS on Cloudflare (done)
+#   • Zone "Active" in the Cloudflare dashboard
+routes = [
+  { pattern = "mcp.septena.app", custom_domain = true },
+  # Task backend API (/v1). Same Worker so the MCP tools can reach each
+  # user's TaskStore directly in a later phase.
+  { pattern = "api.septena.app", custom_domain = true },
+]
+
 # Retain structured logs (the logEvent JSON lines) so a lapse can be
 # investigated after the fact instead of only during a live `wrangler tail`.
 # Query in the dashboard (Workers → Observability) or via the API.
@@ -24,16 +36,6 @@ crons = ["0 3 * * *"]
 type = "Text"
 globs = ["**/*.md"]
 fallthrough = true
-
-# Bind the Worker to the custom domain. Requires:
-#   • septena.app DNS on Cloudflare (done)
-#   • Zone "Active" in the Cloudflare dashboard
-routes = [
-  { pattern = "mcp.septena.app", custom_domain = true },
-  # Task backend API (/v1). Same Worker so the MCP tools can reach each
-  # user's TaskStore directly in a later phase.
-  { pattern = "api.septena.app", custom_domain = true },
-]
 
 [vars]
 CK_CONTAINER = "iCloud.com.septena.cloud"
