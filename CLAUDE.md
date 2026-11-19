@@ -543,6 +543,13 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   never one without the others, or the two surfaces silently diverge. The
   gateway's `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so
   keep in-app section skill briefs in sync with the gateway's tools.
+  **One sanctioned exception: the agent loop** (`tasks_claim`,
+  `tasks_release`, `tasks_agent_events`, `tasks_activity`) lives ONLY on the
+  task backend connector (`api.septena.app/mcp`, `src/shadow/agent.ts`). A claim
+  needs the Durable Object's single writer, and its rules (leases, the
+  human-only stop, pause, run budget) are enforced in `TaskStore`, not in tool
+  code. Do not port these tools to the CloudKit gateway or the in-app server.
+  See ADR 0008.
 - **Both MCP servers are DUAL-ERA and must stay that way.** MCP revision
   `2026-07-28` made the protocol stateless (no `initialize`, no
   `Mcp-Session-Id`, no GET stream; version + client identity ride in
