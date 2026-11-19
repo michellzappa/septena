@@ -38,8 +38,19 @@ final class CKEngine {
   /// Exposed read-only so DEBUG diagnostics can query userRecordID — both
   /// devices must report the same one or they're hitting different
   /// private databases entirely.
-  let container: CKContainer
-  private let database: CKDatabase
+  ///
+  /// Created on first use, not in `init`: Septask builds this object (the
+  /// mutators take it) but has no iCloud entitlement, and `CKContainer`
+  /// raises an exception for a container the app is not entitled to. Septask
+  /// never starts the engine, so it never reaches this.
+  var container: CKContainer {
+    if let containerCache { return containerCache }
+    let created = CKContainer(identifier: SeptenaCloudKit.containerIdentifier)
+    containerCache = created
+    return created
+  }
+  @ObservationIgnored private var containerCache: CKContainer?
+  private var database: CKDatabase { container.privateCloudDatabase }
 
   /// Set on `start()`. Nil until Phase 1 wires the boot call in App.swift.
   private var engine: CKSyncEngine?
@@ -108,8 +119,9 @@ var accountStatus: CKAccountStatus = .couldNotDetermine
   private var lastSendFailureSummary: String?
 
 init() {
-    self.container = CKContainer(identifier: SeptenaCloudKit.containerIdentifier)
-    self.database = container.privateCloudDatabase
+    #if !SEPTASK
+    // Septask is CloudKit-free: no container, no account query (see
+    // `container`).
     // The CKAccountChanged notification fires on an arbitrary thread, so
     // bounce back to MainActor before touching `self`.
     NotificationCenter.default.addObserver(
@@ -118,11 +130,15 @@ init() {
       Task { @MainActor in await self?.refreshAccountStatus() }
     }
     Task { await refreshAccountStatus() }
+    #endif
   }
 
   /// Re-query the container for the user's iCloud status. Cheap; safe
   /// to call on every foreground transition.
   func refreshAccountStatus() async {
+    #if SEPTASK
+    return
+    #else
     do {
       let status = try await container.accountStatus()
       if status != accountStatus {
@@ -142,6 +158,7 @@ init() {
       logger.error("accountStatus query failed: \(error.localizedDescription, privacy: .public)")
       accountStatus = .couldNotDetermine
     }
+    #endif
   }
 
   /// Boots the sync engine. Idempotent — safe to call repeatedly. No-op
@@ -149,6 +166,12 @@ init() {
   /// account status; we don't want to pay that cost until we're ready
   /// to actually sync).
 func start() {
+    #if SEPTASK
+    // Septask is CloudKit-free (docs/SEPTASK_BACKEND.md §9, phase 4): no
+    // engine, no zone fetch, no push registration.
+    SeptenaLog.info("[CKEngine] start skipped: Septask does not use CloudKit")
+    return
+    #else
     guard engine == nil else { return }
     // No persisted engine state means nothing has ever synced on this device,
     // so the fetch below pulls the whole account rather than a delta.
@@ -183,6 +206,7 @@ func start() {
     Task { [weak self] in
       try? await self?.engine?.fetchChanges()
     }
+    #endif
   }
 
   private func registerForRemoteNotifications() {
@@ -211,16 +235,16 @@ func start() {
 
   /// Tells the engine "this task changed locally"; the engine batches and
   /// uploads on the next drain. Safe before `start()` — calls are dropped.
-func noteTaskChange(id: String) { noteChange(recordName: id, kind: "task") }
-func noteTaskDeletion(id: String) { noteDeletion(recordName: id, kind: "task") }
+func noteTaskChange(id: String) { if routeToTaskBackend(.task, id) { return }; noteChange(recordName: id, kind: "task") }
+func noteTaskDeletion(id: String) { if routeToTaskBackend(.task, id) { return }; noteDeletion(recordName: id, kind: "task") }
 
   // Area / Project pendants. CK doesn't distinguish by record type at the
   // engine layer — a pending save is a pending save — but logging the
   // kind helps when reading [CKEngine] traces post-mortem.
-func noteAreaChange(id: String) { noteChange(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
-func noteAreaDeletion(id: String) { noteDeletion(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
-func noteProjectChange(id: String) { noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
-func noteProjectDeletion(id: String) { noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
+func noteAreaChange(id: String) { if routeToTaskBackend(.area, id) { return }; noteChange(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
+func noteAreaDeletion(id: String) { if routeToTaskBackend(.area, id) { return }; noteDeletion(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
+func noteProjectChange(id: String) { if routeToTaskBackend(.project, id) { return }; noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
+func noteProjectDeletion(id: String) { if routeToTaskBackend(.project, id) { return }; noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 func noteSettingsChange() { noteChange(recordName: SettingsCloudKitSchema.singletonID, kind: "settings") }
 func noteSectionChange(id: String) { noteChange(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
 func noteSectionDeletion(id: String) { noteDeletion(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
@@ -288,8 +312,8 @@ func noteCoachVoiceChange(id: String) { noteChange(recordName: CoachVoiceCloudKi
 func noteCoachVoiceDeletion(id: String) { noteDeletion(recordName: CoachVoiceCloudKitSchema.recordName(for: id), kind: "coachVoice") }
 func noteCoachMessageChange(id: String) { noteChange(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
 func noteCoachMessageDeletion(id: String) { noteDeletion(recordName: CoachMessageCloudKitSchema.recordName(for: id), kind: "coachMessage") }
-func noteTaskAttachmentChange(id: String) { noteChange(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
-func noteTaskAttachmentDeletion(id: String) { noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
+func noteTaskAttachmentChange(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteChange(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
+func noteTaskAttachmentDeletion(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {
@@ -335,6 +359,46 @@ func noteTaskAttachmentDeletion(id: String) { noteDeletion(recordName: TaskAttac
     }
     engine.state.add(pendingRecordZoneChanges: changes)
   }
+
+  // MARK: - Task-store cutover (docs/SEPTASK_BACKEND.md §7, §9 phase 3)
+  //
+  // In `TaskStoreMode.backend` the four task record types (Task, Area,
+  // Project, TaskAttachment) FREEZE here: a local change is routed to the
+  // backend sync instead of queued for CloudKit, a queued CloudKit change for
+  // them is never sent, and an incoming CloudKit record of those types is
+  // ignored, so a device still on CloudKit cannot overwrite backend state.
+  // Every other record type syncs as before.
+
+  /// True while `TaskStoreRollback` sends the local rows back: the send-side
+  /// freeze is lifted for that send only. Incoming records stay frozen until
+  /// the rollback flips the mode.
+  var taskRollbackSending = false
+
+  private var blocksTaskSends: Bool { TaskStoreMode.current == .backend && !taskRollbackSending }
+  private var blocksTaskApplies: Bool { TaskStoreMode.current == .backend }
+
+  /// The swap point. In backend mode, hands the change to `TaskSyncEngine`
+  /// (Septask) or drops it (Septena, which never syncs tasks to the backend;
+  /// Septask's reconcile picks the row up from the shared store) and returns
+  /// true. In CloudKit mode returns false and the caller queues as before.
+  private func routeToTaskBackend(_ entity: BackendEntity, _ id: String) -> Bool {
+    guard TaskStoreMode.current == .backend else { return false }
+    TaskSyncEngine.shared.captureLocalChange(entity, id: id)
+    return true
+  }
+
+  /// Whether a task row never reached the store it syncs with, so a delete
+  /// or purge of it can stay local. CloudKit: no system fields. Backend: the
+  /// sync shadow does not know it.
+  func taskNeverSynced(id: String, systemFields: Data?) -> Bool {
+    if TaskStoreMode.current == .backend { return !TaskSyncEngine.shared.backendKnowsTask(id) }
+    return systemFields == nil
+  }
+
+  /// Rollback only: queue saves / deletes for task-type records past the
+  /// routing above.
+  func queueTaskRollbackSaves(recordNames: [String]) { noteChanges(recordNames: recordNames) }
+  func queueTaskRollbackDeletions(recordNames: [String]) { noteDeletions(recordNames: recordNames) }
 
   /// Count of writes the engine has accepted but not yet sent to CloudKit.
   /// Non-zero before sendChanges drains; useful in diagnostics to see if a
@@ -587,7 +651,10 @@ func handleEvent(
       let callbacks = await MainActor.run {
         (self.applyFetchedRecord, self.applyDeletedRecord, self.applyDidFinishBatch)
       }
+      let frozen = blocksTaskApplies ? TaskStoreMode.backendOwnedRecordTypes : []
+      var ignored = 0
       for mod in changes.modifications {
+        if frozen.contains(mod.record.recordType) { ignored += 1; continue }
         await callbacks.0?(mod.record)
       }
       for del in changes.deletions {
@@ -595,7 +662,11 @@ func handleEvent(
           SeptenaLog.info("[CKEngine] fetched.delete IGNORED (reset) id=\(del.recordID.recordName)")
           continue
         }
+        if frozen.contains(String(del.recordType)) { ignored += 1; continue }
         await callbacks.1?(del.recordID, del.recordType)
+      }
+      if ignored > 0 {
+        SeptenaLog.info("[CKEngine] fetched: ignored \(ignored) task-type changes (task store is the backend)")
       }
       // Inbound remote changes — the UI hasn't seen these; repaint.
       await callbacks.2?(true)
@@ -633,7 +704,14 @@ func handleEvent(
       }
       // Apply fresh server versions of oplock-conflicting records so the
       // next CKSyncEngine retry sends the correct etag instead of looping.
+      // Not for task types while the backend owns them: the CloudKit version
+      // would overwrite the row the rollback is copying back.
+      let frozenTypes = blocksTaskApplies ? TaskStoreMode.backendOwnedRecordTypes : []
       for fresh in freshServerRecords {
+        if frozenTypes.contains(fresh.recordType) {
+          SeptenaLog.error("[CKEngine] oplock on \(fresh.recordID.recordName) NOT resolved (task store is the backend)")
+          continue
+        }
         await applyRecord?(fresh)
       }
       await MainActor.run {
@@ -687,8 +765,27 @@ func nextRecordZoneChangeBatch(
     _ context: CKSyncEngine.SendChangesContext,
     syncEngine: CKSyncEngine
   ) async -> CKSyncEngine.RecordZoneChangeBatch? {
-    let pending = syncEngine.state.pendingRecordZoneChanges
+    var pending = syncEngine.state.pendingRecordZoneChanges
       .filter { context.options.scope.contains($0) }
+    // Send-side freeze: a task-type change queued past the routing (another
+    // process on the shared store, or one queued before the switch) is
+    // removed, never sent.
+    let blocksSends = await MainActor.run { self.blocksTaskSends }
+    if blocksSends {
+      let frozen = pending.filter { change in
+        switch change {
+        case .saveRecord(let id), .deleteRecord(let id):
+          return TaskStoreMode.isBackendOwnedRecordName(id.recordName)
+        @unknown default:
+          return false
+        }
+      }
+      if !frozen.isEmpty {
+        syncEngine.state.remove(pendingRecordZoneChanges: frozen)
+        pending.removeAll { frozen.contains($0) }
+        SeptenaLog.info("[CKEngine] removed \(frozen.count) queued task-type changes (task store is the backend)")
+      }
+    }
     guard !pending.isEmpty else { return nil }
     // Pre-resolve every record on the registry's background ModelActor before
     // handing the batch builder a pure dictionary-lookup closure.

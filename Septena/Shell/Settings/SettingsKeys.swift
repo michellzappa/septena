@@ -51,6 +51,15 @@ enum SettingsKey {
   /// notes). On update, any release newer than this triggers the sheet once;
   /// dismissing it advances the marker to the latest version.
   static let lastSeenChangelogVersion = "septena.changelog.lastSeenVersion"
+  /// Where tasks, areas, projects, attachments and conversations sync on this
+  /// device: `cloudkit` (absent) or `backend` (api.septena.app). Stored in the
+  /// shared app-group defaults (`SeptenaAppGroup.defaults`), not `.standard`:
+  /// Septena and Septask share one SwiftData store, so Septena must see the
+  /// value to freeze the CloudKit task types. Only Septask writes it: it
+  /// writes `backend` at every launch (`TaskStoreMode.markDeviceBackend`),
+  /// since Septask is backend-only. Septask itself never reads it. See
+  /// `TaskStoreMode`.
+  static let taskStoreMode = "septena.taskStore.mode"
   /// Device-local dev override: forces the welcome to present even on an
   /// established account, surviving relaunch, so the first-run flow can be
   /// re-tested without wiping the app. Set by Settings ▸ About ▸ Advanced

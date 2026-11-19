@@ -1,9 +1,10 @@
 # Septask backend — spec
 
-**Status:** phase 0 code written 2026-11-18 in `../septena-mcp-gateway`
-(`src/store/`, `src/api/`, mounted at `/v1`). Deployed 2026-11-19 to
-`api.septena.app` (Cloudflare account Centaur-Labs). No app or MCP tool uses it
-yet.
+**Status (2026-11-19):** live at `api.septena.app` (Cloudflare account
+Centaur-Labs). **Septask is backend-only and CloudKit-free** (§9 phase 4):
+tasks, areas, projects, attachments, conversations, turns and Septask's
+synced settings all sync through it. Septena still uses CloudKit for its own
+data and freezes the CloudKit task types on a device where Septask runs.
 **Owner of decisions:** mz. All open questions answered 2026-11-18 (§12).
 
 ## 1. Decisions already made (2026-11-18)
@@ -135,6 +136,23 @@ chosen, otherText, inReplyTo, note, ts, plus the per-task fields of
 artifact, acceptance, endstate) in a `task_convo` row. Exact split follows
 `SeptenaCore/TaskConvo.swift` at build time.
 
+**settings** (added 2026-11-19): id (the setting key), value (JSON), rev,
+updatedAt, deletedAt. One row per key of `SETTING_VALUES` in the gateway's
+`src/store/columns.ts`; each key has its own Zod schema, and unknown keys are
+refused. Today: `welcomeName`, `telemetryLevel`, `calendarHiddenTitles`,
+`rolledInDismissedOn`, `homeTimezone`. Settings are never deleted (a
+tombstone would drop every later write, §6.4); `value: null` clears one.
+Why key/value rows and not one row of columns: conflicts stay per key (two
+devices changing two settings both win), and a new setting is one schema line
+with no table change. A pull carries setting rows only when the client asks
+with `settings=1`, because builds before 2026-11-19 decode entities strictly.
+The app keeps these values in a blob in Septask's own defaults, NOT in the
+shared `SettingsEntity` row, which Septena still syncs through CloudKit
+(`SeptenaCore/TaskBackend/TaskSyncSettings.swift`). First run: the blob is
+seeded from that row, and a seeded value is pushed only for a key the first
+pull did not bring, so a value another device pushed wins. Device-only
+preferences stay in local defaults.
+
 **changes:** rev, entity, id, op (`upsert` / `delete` / `dropped`), fields (JSON of the
 changed field names), clientOpId, actor (`app:<device>` / `mcp:<client>`),
 at. This is the sync log and the audit log.
@@ -223,6 +241,15 @@ the pulled server state overwrites local fields that have no pending op.
   app write.
 - **Cutover flag:** a `taskStore` setting with values `cloudkit` / `backend`.
   Both paths exist in the code until the cleanup phase.
+- **Status (2026-11-19): Septask is CloudKit-free.** Septask never starts
+  `CKEngine` (no zone fetch, no push registration, no `CKContainer`), has no
+  iCloud or push entitlement, and has no iCloud/backend switch. In Septask
+  `TaskStoreMode.current` is always `backend`; Septask writes `backend` into
+  the shared `septena.taskStore.mode` key at every launch so Septena keeps its
+  freeze. Signed out, Septask edits the local store and queues every change
+  in the outbox; the welcome, Today and Settings ▸ Account ask for Sign in
+  with Apple. The `.tasks` section color is no longer read in Septask (it
+  uses the platform accent).
 
 ## 8. MCP gateway
 
@@ -240,6 +267,18 @@ the pulled server state overwrites local fields that have no pending op.
 - **Dual-era protocol stays** (legacy `initialize` plus stateless
   `2026-07-28`). This spec does not change the protocol layer.
 - `ClaudeGatewayProvider` and the reconnect cue retire after cutover.
+- **Status (2026-11-19): phase 2 built, not deployed.** A read-only test
+  connector serves `https://api.septena.app/mcp` from the same Worker
+  (`src/shadow/` in the gateway). Its OAuth uses **app pairing** instead of
+  web Sign in with Apple (no Services ID needed): the authorize page shows an
+  8-character code, and Septask ▸ Settings ▸ About ▸ Advanced ▸ Task backend ▸
+  "Connect Claude (preview)" approves it through `POST /v1/pair/approve` with
+  the app's own session. Today is ordered by `todayPosition`, then
+  `position`. mcp.septena.app is unchanged. **Read-write since 2026-11-19
+  (built, not deployed):** it serves every task tool of the live connector,
+  writes included, as TaskStore pushes with actor `mcp:claude`. New pairings
+  get `tasks:read tasks:write`; an older read-only pairing must reconnect to
+  write.
 
 ## 9. Migration
 
@@ -253,9 +292,25 @@ Each phase ends in a working app. Rollback is the cutover flag.
 | 3. Cutover | mz flips `taskStore = backend` on every device. A final import runs first. CloudKit task records freeze (no writes, no deletes). The live connector switches to the DO. | A day of normal use on all devices with no divergence. |
 | 4. Cleanup | Remove the CloudKit task path and the token flow from the code. CloudKit task records stay as a frozen backup. | Build green on all schemes. |
 
+**Status (2026-11-19):** phases 0 and 1 are live (2,035 rows imported).
+Phase 2 is built and awaits deploy: the read-only connector at
+`api.septena.app/mcp`, authorized by pairing a code with the Septask Mac app
+(§8).
+
 **Rollback after phase 3:** a one-shot "Copy tasks back to iCloud" writer
 must exist **before** cutover, because rows created on the backend after
 cutover are not in CloudKit.
+
+**Phase 4 status (2026-11-19), Septask:** done for Septask. The rollback
+("Move tasks back to iCloud", `TaskStoreRollback`) and the import ("Copy tasks
+to backend", `TaskBackendImporter`, with its CloudKit-pending checks) are
+removed from Septask's compile, as are `CloudKitRecordRegistry`,
+`SchemaSeedRegistrar` and the CloudKit watch snapshot publisher (project.yml
+excludes). No re-upload action replaces the import: the sync engine's
+reconcile already sends every local row the backend does not hold. There is
+no way back to iCloud from Septask any more. The CloudKit task records stay as
+a frozen backup. Septena still compiles the CloudKit task path for its own
+records; the files above remain in Septena until Septena drops tasks.
 
 ## 10. Privacy and security
 
@@ -294,3 +349,5 @@ cutover are not in CloudKit.
 | Manual order (2026-11-19) | Today has its own order (`todayPosition`), separate from the home list's `position`, as in Things. The backend column is live; the apps adopt it at cutover. |
 | Things-grade pass | Separate work. Needs mz's list of pains. Not part of this spec. |
 | Linked projects (2026-11-19) | GitHub Issues and Starlings tasks as project sources, run server-side after cutover. Spec: `docs/LINKED_PROJECTS_SPEC.md`. |
+| Septask and CloudKit (2026-11-19) | Septask is CloudKit-free: no engine, no entitlement, no iCloud switch. Settings it syncs move to the backend `setting` entity. Rollback to iCloud is removed. |
+| Task-related settings (2026-11-19) | Answers §3's open question. Task view preferences (`todayGroupByList` and the like) are device-local defaults and stay local. The account-wide settings Septask used (name, usage-data level, hidden calendars, rolled-in dismissal, home time zone) synced through the CloudKit `Settings` record; for Septask they now sync as backend `setting` rows (§5.2). |

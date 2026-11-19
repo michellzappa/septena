@@ -35,6 +35,12 @@ enum SeptaskKitTheme {
     .monospacedDigitSystemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .regular)
   }
 
+  /// Theme.septenaMetaStrong — the title line of an inline notice
+  /// (`KitNoticeCell`), one weight step above `meta`.
+  static var metaStrong: NSFont {
+    .systemFont(ofSize: SeptenaTypeScale.size(.footnote), weight: .semibold)
+  }
+
   /// Project section headings — semibold at SwiftUI's
   /// `sectionGroupHeaderTitleStyle()` rung (`Theme.groupHeaderFontSize`).
   /// READ FROM THE TOKEN, never hardcoded: this said `17` while the token is
@@ -83,16 +89,16 @@ enum SeptaskKitTheme {
   static let todayTenure = NSColor(Theme.todayTenure)
   /// Theme.overdueRed — late deadlines, platform red.
   static let overdueRed: NSColor = .systemRed
+  /// Theme.noticeWarning — the glyph of a warning notice (`KitNoticeCell`).
+  static let noticeWarning = NSColor(Theme.noticeWarning)
+  /// Light wash over the card surface for a warning notice's fill.
+  static let noticeWarningWash = NSColor(Theme.noticeWarning).withAlphaComponent(0.12)
   /// Theme.inkPrimary.
   static let inkPrimary: NSColor = .labelColor
   /// Theme.inkSecondary.
   static let inkSecondary: NSColor = .secondaryLabelColor
   /// Theme.iconMuted — receding glyphs/meta (Reminders' non-tinted metadata).
   static let iconMuted: NSColor = .tertiaryLabelColor
-  /// Color.claudeAccent — the ONE place Claude's own color appears in the
-  /// shell (the reconnect row). A brand color, not a semantic one, so it
-  /// bridges the shared token rather than naming a system color.
-  static let claudeAccent = NSColor(Color.claudeAccent)
 
   // Surfaces. These Theme tokens are hand-built Colors (not straight system
   // semantics), so they bridge rather than name an NSColor — one source of
@@ -132,9 +138,9 @@ enum SeptaskKitTheme {
   static func listSelectionFill(emphasized: Bool) -> NSColor {
     NSColor(name: nil) { appearance in
       let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      // The accent where the keyboard is, gray elsewhere: the standard Mac
+      // focus cue (Finder, Mail). Decided 2026-11-19.
       if emphasized {
-        // Wash opacity calibrated so the accent reads clearly on white cards
-        // (light) and dark surfaces without needing white text.
         let alpha: CGFloat = isDark ? 0.34 : 0.22
         return systemAccentColor.withAlphaComponent(alpha)
       }
@@ -175,6 +181,33 @@ enum SeptaskKitLayout {
   /// measured from the bar rather than from the window edge — `verticalInset`
   /// stays the bottom-of-list breathing room, which has no bar under it.
   static let titleBarGap: CGFloat = 20
+
+  // MARK: Leading glyph column
+  //
+  // One vertical axis for every leading mark in the list: a task's checkbox,
+  // a group header's sun / tray / emoji / project ring, and the page title's
+  // glyph all share the SAME horizontal CENTER. Header glyphs are centered on
+  // that axis (not left-aligned to the column edge), so a glyph wider than the
+  // checkbox grows to the left of the text column — a negative leading margin
+  // by derivation, never by a hand-tuned offset. All values are measured from
+  // the width-dependent content inset (`inset(for:)`).
+
+  /// Content inset → a row's leading control (checkbox, event dot, ring).
+  static let rowLeadingPad: CGFloat = 6
+
+  /// Content inset → the CENTER of a row's checkbox. Every leading glyph
+  /// centers here. `KitCheckboxView` draws its box centered in its tap area.
+  static var leadingGlyphCenterX: CGFloat { rowLeadingPad + KitCheckboxView.tapSize / 2 }
+
+  /// Content inset → a group header's title. Unchanged by the glyph axis
+  /// (the old icon-column arithmetic: 4 + 22 + 6), so header titles do not
+  /// move when their glyphs re-center.
+  static let headerTitleLeading: CGFloat = 32
+
+  /// Content inset → the page title's dropdown button. The borderless
+  /// `NSButton` carries its own content inset, so its frame sits left of
+  /// `headerTitleLeading` to keep its text where it read before (4 + 18 + 6).
+  static let screenTitleLeading: CGFloat = 28
 
   /// The left/right margin for a row or header at the given container width.
   static func inset(for width: CGFloat) -> CGFloat {

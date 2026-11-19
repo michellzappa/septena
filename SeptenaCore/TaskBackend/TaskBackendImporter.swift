@@ -90,6 +90,33 @@ final class TaskBackendImporter {
     }
   }
 
+  /// The import as the cutover's last step (`TaskSyncEngine.switchToBackend`):
+  /// the same run as `run()`, but a refusal or a network failure throws, so
+  /// the switch does not flip the mode on an import that did not finish. Rows
+  /// left out or different are still reported in `issues` and do not throw.
+  func runForSwitch() async throws -> String {
+    guard phase != .running else { throw TaskStoreSwitchError.busy }
+    phase = .running
+    issues = []
+    resultLine = nil
+    defer {
+      phase = .finished
+      progress = ""
+      signedIn = TaskBackendClient.hasSession
+    }
+    do {
+      let line = try await runImport()
+      resultLine = line
+      return line
+    } catch let stop as Refusal {
+      resultLine = stop.message
+      throw TaskStoreSwitchError.importRefused(stop.message)
+    } catch let error as TaskBackendError {
+      resultLine = "Stopped. " + (error.errorDescription ?? "Unknown error.")
+      throw error
+    }
+  }
+
   private struct Refusal: Error { let message: String }
 
   /// Everything read from the mirror, mapped and validated.

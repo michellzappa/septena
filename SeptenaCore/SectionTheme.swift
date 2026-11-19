@@ -125,8 +125,16 @@ final class SectionTheme {
 
   /// Resolve any section's accent — falls back to `inkSecondary` for
   /// sections we don't know about (or before the first refresh completes).
+  ///
+  /// Septask has no sections: every key resolves to the platform accent
+  /// (Septask sets no global accent color, so this is the system accent, the
+  /// user's own on macOS). It never reads the Tasks section color.
   func color(for sectionKey: String) -> Color {
-    accentByKey[sectionKey] ?? Color(red: 0.541, green: 0.514, blue: 0.471)
+    #if SEPTASK
+    return Color.accentColor
+    #else
+    return accentByKey[sectionKey] ?? Color(red: 0.541, green: 0.514, blue: 0.471)
+    #endif
   }
 
   /// Resolve the authored accent token for a section — for wire payloads.
@@ -158,6 +166,11 @@ final class SectionTheme {
   static let cacheKey = "theme.sections"
 
   func refresh() async {
+    #if SEPTASK
+    // No sections to paint and none to seed (the seed writes section rows
+    // Septena syncs through CloudKit).
+    return
+    #else
     if let sections = loadSectionsForPaint(), !sections.isEmpty {
       applySections(sections)
       ResponseCache.save(sections, forKey: Self.cacheKey)
@@ -174,6 +187,7 @@ final class SectionTheme {
     SettingsMirror.replaceSections(sections,
                                    context: LocalStore.shared.container.mainContext,
                                    engine: SeptenaServices.shared.ckEngine)
+    #endif
   }
 
   private func loadSectionsForPaint() -> [SectionConfig]? {

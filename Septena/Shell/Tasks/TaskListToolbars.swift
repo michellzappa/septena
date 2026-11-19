@@ -111,26 +111,6 @@ struct TaskListToolbarChrome: ViewModifier {
   }
 }
 
-/// Septask's reconnect affordance intentionally composes after the standalone
-/// page chrome so the trailing controls retain their established face/plus order.
-struct TaskListClaudeReconnectToolbar: ViewModifier {
-  let shows: Bool
-
-  func body(content: Content) -> some View {
-    #if SEPTASK && os(iOS)
-    content.toolbar {
-      if shows {
-        ToolbarItem(placement: .topBarTrailing) {
-          ClaudeReconnectCue(.pill)
-        }
-      }
-    }
-    #else
-    content
-    #endif
-  }
-}
-
 /// Standalone TaskListView (its own tab pane) gets the unified page chrome:
 /// the constant gear (→ Settings) plus a contextual "+" (new task) that merges
 /// with the sidebar's "···" on iPad regular. Embedded uses (Project/Area detail

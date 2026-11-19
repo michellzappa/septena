@@ -22,13 +22,11 @@ private extension Int {
 // suppressed and replaced with a custom chevron on the row's trailing edge,
 // left of the count badge.
 
-/// Where the sidebar points the detail pane. Next is NOT a `TaskFilter` —
-/// it's the chores / habits / supplements / suggestions feed (see
-/// `SeptaskNextPage`), so it lives beside the smart-list filters rather than
-/// inside them.
+/// Where the sidebar points the detail pane. Every destination is a task
+/// list. (Septask's Next page was removed on 2026-11-19: it showed life-OS
+/// content, not tasks.)
 enum KitSidebarDestination: Equatable {
   case filter(TaskFilter, title: String)
-  case next
 
   /// The AppKit shell's smart-list destinations, in order — read from the SAME
   /// `TaskDestinations.sidebarRoutes` the SwiftUI sidebar and `TaskNavMenu`
@@ -45,9 +43,9 @@ enum KitSidebarDestination: Equatable {
   /// live record) and return nil here.
   init?(route: Route) {
     switch route {
-    case .next:            self = .next
     case .filter(let f):   self = .filter(f, title: route.title)
-    case .area, .project:  return nil
+    // Septask has no Next destination; Septena's `Route.next` maps to nothing.
+    case .next, .area, .project:  return nil
     }
   }
 
@@ -55,14 +53,12 @@ enum KitSidebarDestination: Equatable {
   /// on every surface at once.
   var symbol: String {
     switch self {
-    case .next:             return Route.next.icon
     case .filter(let f, _): return Route.filter(f).icon
     }
   }
 
   var title: String {
     switch self {
-    case .next:                 return Route.next.title
     case .filter(_, let title): return title
     }
   }
@@ -71,7 +67,6 @@ enum KitSidebarDestination: Equatable {
   /// SwiftUI page titles and dropdowns speak.
   var route: Route {
     switch self {
-    case .next: return .next
     case .filter(let filter, _):
       switch filter {
       case .area(let id):    return .area(id: id)
@@ -85,12 +80,14 @@ enum KitSidebarDestination: Equatable {
   /// `select(_:)` lookup both speak.
   var key: String { Self.key(for: route) }
 
-  /// The same key straight off a `Route`, for callers that only have one (the
-  /// Next page's title dropdown). A `Route` carries no title for an area or
+  /// The same key straight off a `Route`, for callers that only have one. A
+  /// `Route` carries no title for an area or
   /// project, and none is needed: the lookup is by key, and the row that gets
   /// selected re-emits its own real title.
   static func key(for route: Route) -> String {
     switch route {
+    // No sidebar row has this key, so a lookup by it (e.g. a restored
+    // "next" from before Next was removed) finds nothing and falls back.
     case .next:            return "next"
     case .filter(let f):   return "filter:\(f.navigationKey)"
     case .area(let id):    return "area:\(id)"
@@ -106,8 +103,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   final class Node {
     enum Content {
       case filter(TaskFilter, title: String, symbol: String)
-      /// Standalone Next feed — not a task filter (see `KitSidebarDestination`).
-      case next
       case area(Area)
       /// `progress` drives the completion ring, matching `ProjectProgressIcon`.
       case project(Project, progress: Double)
@@ -126,7 +121,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     var key: String {
       switch content {
       case .filter(let filter, _, _): return "filter:\(filter.navigationKey)"
-      case .next: return "next"
       case .area(let area): return "area:\(area.id)"
       case .project(let project, _): return "project:\(project.id)"
       }
@@ -335,8 +329,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     selectRow(key: destination.key)
   }
 
-  /// Same jump, named by a shared `Route` — what the Next page's title
-  /// dropdown hands back.
+  /// Same jump, named by a shared `Route`.
   func select(_ route: Route) {
     selectRow(key: KitSidebarDestination.key(for: route))
   }
@@ -420,7 +413,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                               counts: [TaskFilter: Int],
                               today: Int, doneToday: Int) -> Int? {
     switch destination {
-    case .next: return KitNextCount.open().nilIfZero
     case .filter(let filter, _):
       switch filter {
       case .today:   return today.nilIfZero
@@ -502,8 +494,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // captures live in the triage band on top of Today (the same structure
     // the SwiftUI sidebar settled on, docs/TRIAGE_BAND_SPEC.md). The band's
     // size rides on Today's count so nothing about it is hidden.
-    // Next sits beside Today (not at the foot of the Today list) — the same
-    // first-class destination iOS now uses as a tab / sidebar row.
     // Set + order come from `KitSidebarDestination.smartLists`, which reads
     // `TaskDestinations.sidebarRoutes` — the same list the title dropdown
     // builds from, so the two can't drift. Only the counts are sidebar work.
@@ -630,8 +620,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       case .unscheduled: return .anytime
       default: return nil   // Inbox is where captures start, not a filing target; Logbook is an archive.
       }
-    case .next:
-      return nil   // Rituals feed, not a task filing target.
     case .area(let area):
       return .area(area.id)
     case .project(let project, _):
@@ -763,7 +751,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       let pbItem = NSPasteboardItem()
       pbItem.setString(node.key, forType: .septaskStructureItem)
       return pbItem
-    case .filter, .next:
+    case .filter:
       return nil
     }
   }
@@ -812,7 +800,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.setDropItem(parent, dropChildIndex: index)
       return .move
 
-    case .filter, .next:
+    case .filter:
       return []
     }
   }
@@ -855,7 +843,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       moveProject(project, toArea: targetArea, at: localIndex, snapshot: snapshot)
       return true
 
-    case .filter, .next:
+    case .filter:
       return false
     }
   }
@@ -968,11 +956,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
         ? SeptaskKitTheme.todayAccent
         : SeptaskKitTheme.inkSecondary
       cell.imageView?.image = KitGlyph.colored(symbol: symbol, color: tint)
-    case .next:
-      cell.textField?.font = SeptaskKitTheme.sidebarTitle
-      cell.textField?.stringValue = String(localized: "Next", comment: "Smart list title")
-      cell.imageView?.image = KitGlyph.colored(symbol: "arrow.right",
-                                              color: SeptaskKitTheme.inkSecondary)
     case .area(let area):
       // Areas share the same semibold navigation weight as smart lists and
       // projects; structure is carried by indentation and the disclosure
@@ -1208,8 +1191,6 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     switch node.content {
     case .filter(let filter, let title, _):
       onSelect?(.filter(filter, title: title))
-    case .next:
-      onSelect?(.next)
     case .area(let area):
       onSelect?(.filter(.area(area.id), title: area.title))
     case .project(let project, _):
@@ -1251,7 +1232,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       menu.addItem(.separator())
       menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(deleteSelected)))
-    case .filter(_, _, _), .next, .none:
+    case .filter(_, _, _), .none:
       menu.addItem(item(String(localized: "New Area…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(newArea)))
       menu.addItem(item(String(localized: "New Project…", comment: "SeptaskKit: sidebar context menu"),
@@ -1609,7 +1590,6 @@ private final class KitSidebarOutlineView: NSOutlineView {
 extension KitSidebarDestination {
   var nodeContent: SeptaskKitSidebarController.Node.Content {
     switch self {
-    case .next:                     return .next
     case .filter(let f, let title): return .filter(f, title: title, symbol: symbol)
     }
   }

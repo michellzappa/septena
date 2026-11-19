@@ -13,14 +13,26 @@ import UIKit
 // so this pane is where the user learns whether it works here and why not.
 // Availability is a live system property (model downloads finish, the user
 // flips the toggle), so it's re-sampled on appear and on scene activation.
-struct ClaudeAISettingsPane: View {
+//
+// `extra` appends sections to the same Form, so each app's "Connections & AI"
+// root row is ONE page (AI + Claude + connected apps) instead of a hub of links
+// (docs/SETTINGS_FLATTEN_SPEC.md). The Form, sheet and lifecycle modifiers stay
+// here, on a container that always exists.
+struct ClaudeAISettingsPane<Extra: View>: View {
+  private let extra: () -> Extra
+
+  init(@ViewBuilder extra: @escaping () -> Extra) {
+    self.extra = extra
+  }
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
   @AppStorage(AIModelTag.visibilityKey) private var showModelTags = true
   @AppStorage(PCCConfig.routingEnabledKey) private var pccRouting = false
   @AppStorage(PCCConfig.reasoningKey) private var pccReasoning = PCCConfig.Reasoning.balanced.rawValue
   @State private var showExplainer = false
   @State private var aiStatus: OnDeviceAI.Status = .unknown
+  #if !SEPTASK
   @State private var claudeProvider = ClaudeGatewayProvider.shared
+  #endif
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openURL) private var openURL
 
@@ -64,12 +76,15 @@ struct ClaudeAISettingsPane: View {
 
       connectionsSection
       skillsSection
+      extra()
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showExplainer) { AIExplainerView() }
     .onAppear {
       aiStatus = OnDeviceAI.status
+      #if !SEPTASK
       claudeProvider.reloadSharedState()
+      #endif
     }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { aiStatus = OnDeviceAI.status }
@@ -80,6 +95,14 @@ struct ClaudeAISettingsPane: View {
 
   private var connectionsSection: some View {
     Section {
+      #if SEPTASK
+      // Septask has no hosted-gateway connection (mcp.septena.app). Claude
+      // pairs with the task backend (api.septena.app/mcp), so this row opens
+      // that pane instead of a second pairing UI.
+      NavigationLink(value: SeptaskSettingsView.Destination.taskBackend) {
+        claudeRowLabel
+      }
+      #else
       NavigationLink {
         ClaudeGatewayDetail()
           .navigationTitle("Claude")
@@ -88,22 +111,14 @@ struct ClaudeAISettingsPane: View {
           #endif
       } label: {
         HStack {
-          Label {
-            Text("Claude")
-          } icon: {
-            Image("ClaudeMark")
-              .renderingMode(.template)
-              .resizable()
-              .scaledToFit()
-              .frame(width: 20, height: 20)
-          }
-          .foregroundStyle(.primary)
+          claudeRowLabel
           Spacer()
           Text(claudeProvider.connectionDisplayState.label)
             .font(.subheadline)
             .foregroundStyle(claudeConnectionStatusColor(claudeProvider.connectionDisplayState))
         }
       }
+      #endif
 
       // Septask compiles no SettingsView destination graph — link the pane
       // directly (macOS only; the pane type itself is macOS-gated, and the
@@ -124,12 +139,31 @@ struct ClaudeAISettingsPane: View {
     } header: {
       Text("Connections")
     } footer: {
+      #if SEPTASK
       #if os(macOS)
+      Text("Claude reads your tasks through the task backend. Choose Claude above to pair it. The MCP Server lets Claude Code on this Mac connect directly.")
+      #else
+      Text("Claude reads your tasks through the task backend. Choose Claude above to pair it.")
+      #endif
+      #elseif os(macOS)
       Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. The MCP Server lets Claude Code on this Mac connect directly, with no gateway hop.")
       #else
       Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app. MCP Server is shown here for discoverability, but hosting it requires the Mac app.")
       #endif
     }
+  }
+
+  private var claudeRowLabel: some View {
+    Label {
+      Text("Claude")
+    } icon: {
+      Image("ClaudeMark")
+        .renderingMode(.template)
+        .resizable()
+        .scaledToFit()
+        .frame(width: 20, height: 20)
+    }
+    .foregroundStyle(.primary)
   }
 
   // Septena's pane renders every section's brief via the SettingsView
@@ -276,4 +310,8 @@ struct ClaudeAISettingsPane: View {
     if let url = URL(string: "x-apple.systempreferences:") { openURL(url) }
     #endif
   }
+}
+
+extension ClaudeAISettingsPane where Extra == EmptyView {
+  init() { self.init(extra: { EmptyView() }) }
 }

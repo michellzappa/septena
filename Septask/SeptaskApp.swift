@@ -94,13 +94,9 @@ private struct SeptaskMainWindow: View {
     SeptaskRootView()
       .overlay { LogCommitOverlay() }
       .septaskWelcomeGate()
-      // Unscoped posts only — see the same listener in `Septena/App/App.swift`
-      // for why a scoped life-data post can never have moved the section mirror.
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)) { note in
-        guard note.isCloudKitBatch else { return }
-        settingsStore.reloadFromMirror(context: localStore.container.mainContext)
-        theme.paintFromCache()
-      }
+      // No CloudKit batch listener: Septask's settings arrive with the task
+      // backend pull, and `SettingsStore` reloads itself on
+      // `.septaskSettingsPulled`. Septask has no section colors to repaint.
       .onChange(of: navigation.pendingShortcut) { _, action in
         guard let action else { return }
         switch action {
@@ -143,14 +139,9 @@ private struct SeptaskMainWindow: View {
         // Shared with the macOS AppKit root — see `SeptaskLaunch`. Idempotent,
         // so it's harmless when that root already ran it.
         await SeptaskLaunch.run(settings: settingsStore)
-        // Publish the watch snapshot as soon as the runtime is up — don't wait
-        // for a foreground bounce; the watch shows "error fetching record" until
-        // this record exists in CloudKit.
-        #if os(iOS)
-        TasksWatchSnapshotPublisher.schedule(
-          context: localStore.container.mainContext,
-          date: dayClock.today)
-        #endif
+        // No watch snapshot: it was a CloudKit record, and Septask is
+        // CloudKit-free (docs/SEPTASK_BACKEND.md §9). The Septask watch needs
+        // a new transport before its embed is restored (project.yml).
         #if DEBUG
         if DemoSeedMode.isOn {
           DemoSeed.populate(context: localStore.container.mainContext, today: dayClock.today)
@@ -160,17 +151,17 @@ private struct SeptaskMainWindow: View {
         #endif
       }
       .onChange(of: scenePhase) { _, phase in
+        if phase == .background {
+          // Close the backend live socket and try once more to drain the
+          // task outbox.
+          TaskSyncEngine.shared.enterBackground()
+        }
         if phase == .active {
           #if os(iOS)
           SeptaskAppDelegate.navigation = navigation
           #endif
           Task { @MainActor in
             await SeptaskLaunch.activate()
-            #if os(iOS)
-            TasksWatchSnapshotPublisher.schedule(
-              context: localStore.container.mainContext,
-              date: dayClock.today)
-            #endif
           }
         }
       }

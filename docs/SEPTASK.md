@@ -11,6 +11,45 @@ Web project links (P5) follow the native-sharing work per
 **macOS is moving to AppKit** for the task surfaces — see "AppKit shell on
 macOS" below before touching `SeptaskMac`.
 
+## CloudKit-free (2026-11-19)
+
+**Septask uses no CloudKit at all.** Everything it shows comes from the task
+backend (`api.septena.app`, docs/SEPTASK_BACKEND.md). This supersedes §5
+"Data Model And Parallel Running" and the CloudKit parts of §6 below, which
+stay as history.
+
+- **Sync:** tasks, areas, projects, attachments, conversations, turns and the
+  synced settings go through `TaskSyncEngine`. `TaskStoreMode.current` is
+  always `.backend` in Septask. `CKEngine` still compiles (the mutators take
+  it), but in Septask its `start()` is a no-op, it creates no `CKContainer`,
+  queries no account status, fetches no zone and registers for no push.
+- **Septena on the same device:** Septask writes `backend` into the shared
+  `septena.taskStore.mode` key at every launch, so Septena keeps freezing the
+  CloudKit task types (it reads that key, unchanged).
+- **Signed out:** Septask works on the local store and queues every edit in
+  the sync outbox. It asks for Sign in with Apple on the welcome, at the top
+  of Today (SwiftUI `SeptaskSignInNotice` on `TaskListNotice`, AppKit `KitNoticeCell`) and
+  in Settings ▸ Account. One flow: `Septask/SeptaskSignIn.swift`.
+- **Settings:** the account-wide ones (name, usage-data level, hidden
+  calendars, rolled-in dismissal, home time zone) sync as the backend's
+  `setting` entity. In Septask, `SettingsMirror.loadSettings` / `upsert` read
+  and write a blob in Septask's own defaults, never the shared
+  `SettingsEntity` row (Septena still syncs that through CloudKit). Supporter
+  status no longer syncs into Septask.
+- **Colors:** Septask has no section colors. `SectionTheme.color(for:)`
+  returns the platform accent in Septask; the Tasks section color is
+  Septena's only.
+- **Entitlements:** iCloud containers, CloudKit, the container environment
+  and `aps-environment` are gone from both Septask entitlements files. App
+  group (iOS) and Sign in with Apple stay. No `UIBackgroundModes`.
+- **Not compiled in Septask:** `TaskBackendImporter`, `TaskStoreRollback`,
+  `CloudKitRecordRegistry`, `SchemaSeedRegistrar`,
+  `TasksWatchSnapshotPublisher` (project.yml excludes).
+- **Watch:** the Septask watch read a CloudKit snapshot record the phone
+  published. That publisher is off, so the watch needs a new transport
+  (WatchConnectivity or the backend) before `WATCH_EMBED_DISABLED` in
+  project.yml is undone.
+
 ## AppKit shell on macOS (2026-08-06)
 
 **Decision: SeptaskMac's task surfaces are being ported to AppKit.** SwiftUI's
@@ -48,7 +87,6 @@ first-run welcome gate, which the AppKit shell does NOT show.
 - `SeptaskKitQuickEntry.swift` — global ⌃Space capture panel.
 - `SeptaskKitDatePopover.swift` — ⌘S / ⌘⇧D date popovers.
 - `SeptaskKitSettings.swift` — hosts the SwiftUI settings view.
-- `SeptaskKitNext.swift` — hosts the SwiftUI Next page (sidebar destination).
 
 **What's still missing** versus the SwiftUI surface is tracked as a prioritized
 checklist in `docs/SEPTASK_APPKIT_PARITY.md` — read that before picking up
@@ -269,7 +307,7 @@ zero task files copied:
   `IPadChromeModel` (read by SeptenaPage's nav-depth reporter) did exactly
   that. Septask's composition root must inject: NavigationState,
   SectionTheme, TaskMutator, AreasMutator, ProjectsMutator, ChecklistMutator
-  (the Next fold's trio rows read it), CKEngine, DayClock, LogCommitCenter,
+  (the removed Next page's trio rows read it; still injected), CKEngine, DayClock, LogCommitCenter,
   IPadChromeModel, and the model container. When new surfaces land, re-audit
   environment reads before shipping.
 
@@ -295,10 +333,10 @@ binds in `start()`), not structural (no UIKit/shell types in the runtime).
 - **Two known upward seams in SeptenaCore.** `NextFeed.swift` references
   `NextSuggestionsModel` (defined in `Shell/Dashboard`) — originally both it
   and its one core dependent `WatchSnapshotPublisher.swift` were excluded from
-  the Septask target. Since the Next page landed (see "Next page" below),
-  the Septask targets compile `NextFeed.swift` plus the Next model/row files,
-  so only `WatchSnapshotPublisher.swift` stays excluded, with the `#if
-  !SEPTASK` gate at its single call site.
+  the Septask target. The Next page (2026-08-13) un-excluded `NextFeed.swift`;
+  its removal (2026-11-19, see "Next page" below) excluded it again, so both
+  `NextFeed.swift` and `WatchSnapshotPublisher.swift` stay out, with the `#if
+  !SEPTASK` gate at the publisher's single call site.
 - **Separate sync state comes free.** `CKEngineState.json` lives in each
   app's own Application Support (not the App Group), so the "separate
   mirrors" non-negotiable is structurally satisfied.
@@ -380,11 +418,9 @@ long as bundle IDs and display names are explicit.
   not data or external clients.
 - **Task-only user surface.** Septask v1 has no Week, Goals, Health,
   training, nutrition, section picker, full section registry, or life-OS
-  dashboard. (Amended 2026-07-11 / 2026-08-13: the Next feed — suggestions +
-  the chores / habits / supplements trio — is a first-class page, matching
-  the AppKit sidebar destination; see "Next page" below. Forward-glance
-  only, not a section surface, and no Done Today timeline; the rest of the
-  rule holds.)
+  dashboard. (Amended 2026-07-11 / 2026-08-13 to add a Next page; amended
+  again 2026-11-19: the Next page was removed, so the rule holds without
+  exception. See "Next page" below.)
 - **Complexity is the kill condition.** If task-only runtime extraction requires
   invasive surgery through sync and services, stop and reassess before building
   a broad parallel app shell.
@@ -502,6 +538,9 @@ Do not solve seam failures by copying task files into `Septask/`.
 
 ## 5. Data Model And Parallel Running
 
+> **Superseded 2026-11-19:** Septask is CloudKit-free; see "CloudKit-free"
+> at the top. Kept as history.
+
 Both apps should be able to run at once on the same device.
 
 Correct shape:
@@ -610,6 +649,9 @@ Settings split rule:
   domains, or dashboards.
 
 ### Accent
+
+> **Superseded 2026-11-19:** Septask uses the platform accent and reads no
+> section color. The text below is history.
 
 The task accent is shared.
 
@@ -791,9 +833,34 @@ shared supporting folder so both apps improve together.
 - Target definitions: `project.yml`
 
 
-## Next page (2026-08-13)
+## Next page (2026-08-13, removed 2026-11-19)
 
-Septask hosts the Next feed — suggestions plus the chores / habits /
+**Removed 2026-11-19.** Septask is becoming a standalone task app: Septena
+(the life-OS app) drops tasks, and Septask may be renamed. The Next page
+showed Septena's suggestions plus the chores / habits / supplements trio,
+which is life-OS content, not tasks. Today covers "what's next" for tasks.
+What changed:
+
+- Deleted `Septask/SeptaskNext.swift` and `Septask/SeptaskKitNext.swift`.
+- AppKit: `KitSidebarDestination.next`, the sidebar row and badge, the
+  window's Next controller / `showingNext` / inspector collapse, and the
+  Go ▸ Next menu item are gone. A saved last destination of `"next"` matches
+  no sidebar row, so the window falls back to Today.
+- SwiftUI (iPhone / iPad / classic Mac window): `TaskDestinations.sidebarRoutes`
+  no longer inserts `.next` under `SEPTASK`; the iPad sidebar badge is gone;
+  `ContentView` maps a stray `.next` route to the Today list in Septask.
+  `SeptaskRootView` dropped the mood check-in and new-meal sheets.
+- project.yml (both Septask targets, lockstep): removed the two
+  `Shell/Dashboard` Next files and the Mood / Nutrition files, and excluded
+  `SeptenaCore/NextFeed.swift` again.
+- Not changed: `SeptenaServices.start()` still binds `checklistMutator`,
+  `intakeMutator` and `nutritionMutator` in both profiles. Moving them under
+  the life-OS gate is a separate decision. Septena's own Next is untouched.
+  SeptaskWatch never showed Next (tasks only).
+
+The history below describes the page as it was.
+
+Septask hosted the Next feed — suggestions plus the chores / habits /
 supplements trio — as a **first-class page**, not a fold under Today.
 iPhone: a tab between Today and Upcoming (`SeptaskRootView`). iPad: a
 sidebar row after Today (`TaskDestinations.sidebarRoutes` → `ContentView`

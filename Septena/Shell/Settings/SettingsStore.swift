@@ -39,7 +39,28 @@ final class SettingsStore {
   /// catalog order and causes a half-second reorder flash).
   init() {
     paintFromCache()
+    #if SEPTASK
+    // Septask's settings arrive with the task-backend pull, not a CloudKit
+    // batch: reload, then copy the synced values into the device-local
+    // mirrors the views read. Inbound only (`engine: nil` pushes nothing).
+    settingsPulledObserver = NotificationCenter.default.addObserver(
+      forName: .septaskSettingsPulled, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        guard let self else { return }
+        let context = LocalStore.shared.container.mainContext
+        self.reloadFromMirror(context: context)
+        self.reconcileWelcomeName(context: context, engine: nil)
+        self.reconcileTelemetryLevel(context: context, engine: nil)
+        self.reconcileHiddenCalendars(context: context, engine: nil)
+      }
+    }
+    #endif
   }
+
+  #if SEPTASK
+  @ObservationIgnored private var settingsPulledObserver: NSObjectProtocol?
+  #endif
 
   private enum CacheKey {
     static let serverSettings = "settings.serverSettings"

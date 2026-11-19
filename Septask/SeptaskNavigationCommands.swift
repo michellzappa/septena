@@ -213,14 +213,6 @@ struct SeptaskCommandMenus: Commands {
       Button("Today") { go(.today) }
         .keyboardShortcut("1", modifiers: .command)
         .disabled(!canNavigate)
-      #if os(macOS)
-      // Next is not a TaskFilter, so it has no `actions.go` arm; it is an
-      // AppKit-shell destination (the sidebar row beside Today).
-      if actions == nil {
-        Button("Next") { SeptaskKitCommands.goNext() }
-          .disabled(!SeptaskKitCommands.canNavigate)
-      }
-      #endif
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
         .disabled(!canNavigate)
@@ -303,8 +295,12 @@ struct SeptaskCommandMenus: Commands {
           #endif
         }
       }
-      // ⌃⌘S — the platform's standard sidebar toggle.
+      #if os(macOS)
+      // ⌃⌘S — the platform's standard sidebar toggle. macOS only: on iOS the
+      // system already owns ⌃⌘S (its own Show Sidebar command), and UIKit
+      // aborts the app at launch on a duplicate menu shortcut (2026-11-19).
       .keyboardShortcut("s", modifiers: [.control, .command])
+      #endif
       .disabled(!canNavigate)
 
       #if os(macOS)

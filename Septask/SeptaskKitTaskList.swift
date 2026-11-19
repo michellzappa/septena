@@ -72,23 +72,6 @@ final class SeptaskKitTaskListController: NSViewController {
     case symbol(String)
   }
 
-  /// What the Claude reconnect row says right now. The four states are
-  /// `ClaudeReconnectCue`'s, one for one: the calm auth checkpoint, a genuine
-  /// failure, the re-mint in flight, and the brief "you're back" flash that
-  /// closes the loop instead of letting the row vanish silently.
-  enum ReconnectCueState: Equatable {
-    case idle, failed, refreshing, reconnected
-
-    var key: String {
-      switch self {
-      case .idle: return "idle"
-      case .failed: return "failed"
-      case .refreshing: return "refreshing"
-      case .reconnected: return "reconnected"
-      }
-    }
-  }
-
   /// A calendar event flattened to a value — the row diff compares rows, and
   /// EKEvent is a live reference whose identity says nothing about content.
   struct Event: Equatable {
@@ -128,10 +111,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// work that arrived on its own because a date the user set earlier has
     /// now come round.
     case rolledInBanner(count: Int)
-    /// "Reconnect" — the Claude gateway token lapsed and only the user can
-    /// re-mint it. Today only, the slot `ClaudeReconnectCue(.card)` takes in
-    /// the SwiftUI shell.
-    case reconnectCue(state: ReconnectCueState)
+    /// "Not signed in" — Today's ask for the task-backend sign-in (Septask is
+    /// backend-only; signed out, edits wait in the outbox).
+    case signInBanner
 
     var key: String {
       switch self {
@@ -145,9 +127,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .rolledInBanner: return "rolled-in-banner"
-      // The state rides the key so a change (idle → refreshing → reconnected)
-      // reads as a row REPLACEMENT in the diff, and the cell re-configures.
-      case .reconnectCue(let state): return "reconnect-cue:" + state.key
+      case .signInBanner: return "sign-in-banner"
       case .importAllReminders: return "import-all-reminders"
       }
     }
@@ -165,11 +145,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .header, .screenTitle, .loggedFooter, .addSection: return false
       // A notice, not an item: it sits on the page like a header, NOT on a
       // card. A statement about your list must not look like a row of it.
-      case .rolledInBanner: return false
-      // A control, not a notice: it draws on a card because it is something
-      // you press, the same reason SwiftUI's cue is a glass card and the
-      // rolled-in notice above is bare page.
-      case .reconnectCue: return true
+      case .rolledInBanner, .signInBanner: return false
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
@@ -375,30 +351,38 @@ final class SeptaskKitTaskListController: NSViewController {
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
 
-  /// "No Tasks" is a lie while CloudKit is still pulling an existing account
-  /// down for the first time — the list is empty because the data hasn't
-  /// arrived, not because there is none. Swap in the sync copy until the
-  /// bootstrap fetch completes.
+  /// "No Tasks" is a lie while the first pull from the task backend is still
+  /// running, or while this device is not signed in — the list is empty
+  /// because the data hasn't arrived, not because there is none.
   private func refreshEmptyLabel() {
-    let engine = SeptenaServices.shared.ckEngine
-    emptyLabel.stringValue = engine.isBootstrapping
-      ? engine.bootstrapStatusText
-      : String(localized: "No Tasks", comment: "SeptaskKit: empty list")
+    let sync = TaskSyncEngine.shared
+    if !sync.signedIn {
+      emptyLabel.stringValue = String(localized: "Sign in to see your tasks",
+                                      comment: "SeptaskKit: empty list while signed out of the task backend")
+    } else if sync.isSyncing && sync.lastPull == nil {
+      emptyLabel.stringValue = String(localized: "Syncing…",
+                                      comment: "SeptaskKit: empty list during the first task-backend pull")
+    } else {
+      emptyLabel.stringValue = String(localized: "No Tasks", comment: "SeptaskKit: empty list")
+    }
   }
 
-  /// `CKEngine` is `@Observable`, which drives SwiftUI automatically but does
-  /// nothing for an NSViewController. Re-arm a one-shot observation after each
-  /// change so the count keeps ticking and the label settles back to "No Tasks"
-  /// when the bootstrap ends.
+  /// `TaskSyncEngine` is `@Observable`, which drives SwiftUI automatically but
+  /// does nothing for an NSViewController. Re-arm a one-shot observation after
+  /// each change: the empty label follows the sync state, and a sign-in or
+  /// sign-out reloads the list (Today's sign-in notice comes and goes).
   private func observeBootstrapState() {
+    let wasSignedIn = TaskSyncEngine.shared.signedIn
     withObservationTracking {
-      let engine = SeptenaServices.shared.ckEngine
-      _ = engine.isBootstrapping
-      _ = engine.bootstrapFetchedCount
+      let sync = TaskSyncEngine.shared
+      _ = sync.signedIn
+      _ = sync.isSyncing
+      _ = sync.lastPull
     } onChange: { [weak self] in
       Task { @MainActor [weak self] in
         guard let self else { return }
         self.refreshEmptyLabel()
+        if TaskSyncEngine.shared.signedIn != wasSignedIn { self.reload() }
         self.observeBootstrapState()
       }
     }
@@ -616,9 +600,6 @@ final class SeptaskKitTaskListController: NSViewController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.syncWindowTitle() }
     })
-    // The Claude reconnect row. `@Observable` state, not a notification —
-    // see `trackClaudeGatewayState`.
-    trackClaudeGatewayState()
   }
 
   /// Keep the first card clear of the title bar. The bar's height is the
@@ -888,7 +869,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = titleRows + signInBanner() + agenda() + rolledInBanner(pool) + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
     case .today:
       // Flat Today: due-first ordering, per the setting's documented contract
@@ -919,7 +900,7 @@ final class SeptaskKitTaskListController: NSViewController {
                               comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
-      newRows = reconnectCue() + titleRows + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = titleRows + signInBanner() + agenda() + rolledInBanner(pool) + triageBand()
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
@@ -1210,7 +1191,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// as the SwiftUI Today renders it.
   // MARK: - Rolled-into-Today banner
   //
-  // The counterpart of `TaskListView.newTodosBanner`. NOTE this is a BANNER,
+  // The counterpart of `TaskListView.newTodosBanner` (both draw through the
+  // shared notice component: `KitNoticeCell` / `TaskListNotice`). NOTE this is a BANNER,
   // not a bucket: there is no separate "review" section, and an earlier
   // version of the parity doc was wrong about that. The rows it counts are
   // already on Today; the notice just says how many of them arrived on their
@@ -1219,71 +1201,6 @@ final class SeptaskKitTaskListController: NSViewController {
   // Dismissal persists today's date, so it stays gone for the rest of the day
   // and returns tomorrow — the SAME UserDefaults key SwiftUI uses, so
   // dismissing in one shell dismisses in the other.
-
-  // MARK: - Claude reconnect cue
-  //
-  // The AppKit twin of `ClaudeReconnectCue(.card)`, which Septask's SwiftUI
-  // shell puts at the top of Today (`TaskListView.taskListHeader`). Same
-  // gate, same copy, same tap: the app never auto-presents the Apple sign-in,
-  // so a lapsed token needs a row the user can press. Without it the fast
-  // shell had no in-app recovery at all — the connection just stopped working.
-  //
-  // Today only, like SwiftUI: it is the landing surface, and a reconnect
-  // prompt on every project page would be a nag.
-
-  /// True during the brief post-reconnect flash. Held here rather than read
-  /// off the provider because it is a UI beat, not gateway state — the same
-  /// role `justReconnected` plays in the SwiftUI cue.
-  private var justReconnectedClaude = false
-
-  private func reconnectCue() -> [Row] {
-    let provider = ClaudeGatewayProvider.shared
-    guard provider.isEnabled, provider.needsReauth || justReconnectedClaude
-    else { return [] }
-    if justReconnectedClaude { return [.reconnectCue(state: .reconnected)] }
-    if provider.isRefreshing { return [.reconnectCue(state: .refreshing)] }
-    // A real failure from the current interactive attempt (network etc.).
-    // `lastError` is diagnostic text and must not turn an expected expired
-    // token into a permanent warning after state reconciliation.
-    return [.reconnectCue(state: provider.lastRefreshFailed ? .failed : .idle)]
-  }
-
-  private func reconnectClaude() {
-    let provider = ClaudeGatewayProvider.shared
-    guard !justReconnectedClaude, !provider.isRefreshing else { return }
-    Task { @MainActor in
-      guard await provider.refreshNow() else { return }
-      justReconnectedClaude = true
-      reload()
-      try? await Task.sleep(for: .seconds(1.6))
-      justReconnectedClaude = false
-      reload()
-    }
-  }
-
-  /// Follow the provider's observable state. `ClaudeGatewayProvider` is
-  /// `@Observable`, and it only posts `.septenaClaudeGatewayChanged` on
-  /// connect / disconnect / successful refresh — the flip to `needsReauth`
-  /// that MAKES this row appear posts nothing. So track the properties
-  /// themselves; `withObservationTracking` fires once per change, hence the
-  /// re-arm on every callback.
-  private func trackClaudeGatewayState() {
-    withObservationTracking {
-      let provider = ClaudeGatewayProvider.shared
-      _ = provider.isEnabled
-      _ = provider.needsReauth
-      _ = provider.isRefreshing
-      _ = provider.lastError
-      _ = provider.lastRefreshFailed
-    } onChange: { [weak self] in
-      Task { @MainActor in
-        guard let self else { return }
-        self.trackClaudeGatewayState()
-        // The cue only renders on Today; nothing else in the list moves.
-        if self.filter == .today { self.reload() }
-      }
-    }
-  }
 
   private func rolledInBanner(_ pool: [SeptenaTask]) -> [Row] {
     let today = SeptenaDate.today
@@ -1302,6 +1219,53 @@ final class SeptaskKitTaskListController: NSViewController {
     }.count
     guard count > 0 else { return [] }
     return [.rolledInBanner(count: count)]
+  }
+
+  /// Today's sign-in notice: present while this device has no backend
+  /// session (`observeBootstrapState` reloads when that changes).
+  private func signInBanner() -> [Row] {
+    TaskSyncEngine.shared.signedIn ? [] : [.signInBanner]
+  }
+
+  // MARK: - Inline notices (one component: `KitNoticeCell`)
+
+  private func noticeCell(_ notice: KitNotice) -> KitNoticeCell {
+    let identifier = NSUserInterfaceItemIdentifier("noticeCell")
+    let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNoticeCell
+      ?? KitNoticeCell(identifier: identifier)
+    cell.configure(notice)
+    return cell
+  }
+
+  static func rolledInNotice(count: Int) -> KitNotice {
+    KitNotice(
+      kind: .info,
+      symbol: "arrow.down.circle",
+      title: count == 1
+        ? String(localized: "1 task rolled into Today",
+                 comment: "SeptaskKit: start-of-day rolled-in notice, singular")
+        : String(localized: "\(count) tasks rolled into Today",
+                 comment: "SeptaskKit: start-of-day rolled-in notice, plural"),
+      detail: nil,
+      primaryTitle: nil,
+      dismissible: true)
+  }
+
+  /// Opens the same Sign in with Apple flow as Settings
+  /// (`SeptaskAppKitSignIn`). A standard bordered button, not Apple's
+  /// `ASAuthorizationAppleIDButton`: at a compact row height that control
+  /// drew as a bare black bar with only the logo.
+  static var signInNotice: KitNotice {
+    KitNotice(
+      kind: .actionNeeded,
+      symbol: "person.crop.circle.badge.exclamationmark",
+      title: String(localized: "Not signed in",
+                    comment: "SeptaskKit: Today notice title when the task backend has no session"),
+      detail: String(localized: "Your changes stay on this Mac until you sign in.",
+                     comment: "SeptaskKit: Today notice detail when the task backend has no session"),
+      primaryTitle: String(localized: "Sign in…",
+                           comment: "SeptaskKit: Today notice button that starts Sign in with Apple"),
+      dismissible: false)
   }
 
   private func dismissRolledInBanner() {
@@ -1534,18 +1498,28 @@ final class SeptaskKitTaskListController: NSViewController {
       + band.map(chipped)
   }
 
-  /// The "New task" line, or nothing while a create is in flight — then the
-  /// row being typed into reads as the slot itself rather than sitting under a
-  /// duplicate prompt. `pendingNewTaskId` clears on commit (and on an
-  /// abandoned empty row, which is purged), and the reload that follows puts a
-  /// fresh line back.
+  /// The "New task" line, or nothing while an INBOX create is in flight —
+  /// then the row being typed into sits exactly where the line was and reads
+  /// as the slot itself rather than sitting under a duplicate prompt.
+  /// `pendingNewTaskId` clears on commit (and on an abandoned empty row, which
+  /// is purged), and the reload that follows puts a fresh line back.
+  ///
+  /// Only a pending row that lands in the Inbox run (no area, no project)
+  /// takes the line's place. A ⌘N or header "+" inside an area / project
+  /// group on Today opens its row in THAT group, far from the Inbox card, so
+  /// hiding the line there made it vanish and reappear for nothing. Read the
+  /// store, not `rows`: this runs while `rows` is being rebuilt.
   ///
   /// Emitted by the CALLER, not by `triageBand`, because Today's Inbox run is
   /// the triage band PLUS the loose rows that `groupedByList` emits before its
   /// first group header — the same `allInbox` split SwiftUI's `triageSection`
   /// makes. Appending it to the band alone parked it above those loose rows.
   private var newTaskLine: [Row] {
-    pendingNewTaskId == nil ? [Row.newTask] : []
+    guard let pendingNewTaskId,
+          let pending = LocalCache.task(id: pendingNewTaskId, in: context),
+          pending.area == nil, pending.project == nil
+    else { return [Row.newTask] }
+    return []
   }
 
   /// An MCP-authored row can satisfy both the triage band and Today (the band
@@ -3959,10 +3933,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // header sits on the page like every other group header.
     case .reminder: return SeptaskKitTheme.rowHeight
     case .importAllReminders: return SeptaskKitTheme.rowHeight
-    // Meta-height notice on the page, not a full card row.
-    case .rolledInBanner: return SeptenaTypeScale.size(.footnote) + 22
-    // A pressable card row, so it stands at row height like the rest.
-    case .reconnectCue: return SeptaskKitTheme.rowHeight
+    // Inline notices: one component, its height follows its content.
+    case .rolledInBanner(let count): return KitNoticeCell.height(for: Self.rolledInNotice(count: count))
+    case .signInBanner: return KitNoticeCell.height(for: Self.signInNotice)
     }
   }
 
@@ -4542,22 +4515,16 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.importAllReminders() }
       return cell
 
-    case .rolledInBanner(let count):
-      let identifier = NSUserInterfaceItemIdentifier("rolledInBannerCell")
-      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
-        as? KitRolledInBannerCell
-        ?? KitRolledInBannerCell(identifier: identifier)
-      cell.configure(count: count)
-      cell.onDismiss = { [weak self] in self?.dismissRolledInBanner() }
+    case .signInBanner:
+      let cell = noticeCell(Self.signInNotice)
+      cell.onPrimary = { SeptaskAppKitSignIn.shared.start() }
+      cell.onDismiss = nil
       return cell
 
-    case .reconnectCue(let state):
-      let identifier = NSUserInterfaceItemIdentifier("reconnectCueCell")
-      let cell = tableView.makeView(withIdentifier: identifier, owner: nil)
-        as? KitReconnectCueCell
-        ?? KitReconnectCueCell(identifier: identifier)
-      cell.configure(state: state)
-      cell.onTap = { [weak self] in self?.reconnectClaude() }
+    case .rolledInBanner(let count):
+      let cell = noticeCell(Self.rolledInNotice(count: count))
+      cell.onPrimary = nil
+      cell.onDismiss = { [weak self] in self?.dismissRolledInBanner() }
       return cell
 
     case .reminder(let item, let importing):
@@ -4794,7 +4761,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     setAccessibilityElement(true)
     setAccessibilityRole(.group)
     leadingConstraint = checkbox.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = trailing.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
@@ -4830,7 +4797,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   /// background (`KitCardRowView.cardPath`) draws to.
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     super.layout()
   }
@@ -4904,7 +4871,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // where the tenure fade below carries the cue instead. Elsewhere (moved
     // in via a scheduled/deadline date counts too, not just the pinned flag —
     // `isOnToday`, not the raw `today` field) it shows solid.
-    checkbox.isToday = task.isOnToday && filter != .today
+    // Recently Deleted rows are out of every list, Today included: no gold
+    // Today badge there.
+    checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil
     // The remaining cue vocabulary, matching `TaskCheckboxModel`: gold tenure
     // dial for days carried on Today, corner dot for unread agent context on a
     // committed row (proposals are excluded — they already read as dashed),
@@ -5174,15 +5143,17 @@ final class KitProjectTargetCell: NSTableCellView {
     textField = title
     setAccessibilityElement(true)
     leadingConstraint = progress.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = chevron.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       progress.centerYAnchor.constraint(equalTo: centerYAnchor),
-      progress.widthAnchor.constraint(equalToConstant: 20),
-      progress.heightAnchor.constraint(equalToConstant: 20),
+      // The checkbox's tap column, so the ring's center and the title's
+      // leading edge match a task row's (`SeptaskKitLayout.leadingGlyphCenterX`).
+      progress.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
+      progress.heightAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       title.leadingAnchor.constraint(equalTo: progress.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
       chevron.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 6),
@@ -5198,7 +5169,7 @@ final class KitProjectTargetCell: NSTableCellView {
 
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     hitPin.update(width: bounds.width)
     super.layout()
@@ -5274,13 +5245,15 @@ final class KitEventCell: NSTableCellView {
     addSubview(time)
     textField = title
     leadingConstraint = dot.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
+      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = time.trailingAnchor.constraint(
       equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
       dot.centerYAnchor.constraint(equalTo: centerYAnchor),
-      dot.widthAnchor.constraint(equalToConstant: 20),
+      // The checkbox's tap column — the dot "where the checkbox would be"
+      // shares its center, and the title starts where a task title does.
+      dot.widthAnchor.constraint(equalToConstant: KitCheckboxView.tapSize),
       title.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
       time.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 8),
@@ -5294,7 +5267,7 @@ final class KitEventCell: NSTableCellView {
   /// Same centered-column margin as `SeptaskKitTaskCell` — see its `layout()`.
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
+    leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
     super.layout()
   }
@@ -5325,7 +5298,11 @@ final class KitScreenTitleCell: NSTableCellView {
   /// "use standard components, never get creative" rule in CLAUDE.md, arrived
   /// at the hard way.
   private let button = NSButton()
+  /// Glyph CENTER on the checkbox axis (`SeptaskKitLayout.leadingGlyphCenterX`).
   private var leadingConstraint: NSLayoutConstraint!
+  /// Title button leading, pinned to the content inset — independent of the
+  /// glyph, so re-centering the glyph never moves the title.
+  private var buttonLeadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   /// Builds the dropdown fresh on every click — see the call site's comment
   /// on why this isn't built once and cached. Optional-returning to match
@@ -5365,19 +5342,21 @@ final class KitScreenTitleCell: NSTableCellView {
     addSubview(icon)
     addSubview(emoji)
     addSubview(button)
-    leadingConstraint = icon.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
+    leadingConstraint = icon.centerXAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
+    buttonLeadingConstraint = button.leadingAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.screenTitleLeading)
     trailingConstraint = button.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     NSLayoutConstraint.activate([
       leadingConstraint,
+      buttonLeadingConstraint,
       icon.centerYAnchor.constraint(equalTo: button.centerYAnchor),
       icon.widthAnchor.constraint(equalToConstant: 18),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
-      // -2 keeps the glyph's optical left edge where the label's used to sit:
-      // a borderless NSButton still carries a small internal content inset.
-      button.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
       button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
       trailingConstraint,
     ])
@@ -5408,7 +5387,8 @@ final class KitScreenTitleCell: NSTableCellView {
   /// Same width-dependent centered-column margin as every other row.
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 4
+    leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
+    buttonLeadingConstraint.constant = inset + SeptaskKitLayout.screenTitleLeading
     trailingConstraint.constant = -(inset + 8)
     super.layout()
   }
@@ -5787,279 +5767,6 @@ final class KitAddSectionCell: NSTableCellView {
   @objc private func fire() { onTap?() }
 }
 
-// MARK: - Rolled-into-Today banner cell
-
-/// "N tasks rolled into Today", with a Dismiss button.
-///
-/// A NOTICE, and it must not look like an item. It used to wear the same
-/// fill, radius and margin as a task card, which made a statement ABOUT your
-/// list read as a row OF it — the only action on it is "go away", so looking
-/// actionable was a lie. It now sits on the page background at meta size,
-/// like a group header does, at roughly half the height it had.
-///
-/// Still deliberately NOT a filled colour band with a filled button: per
-/// `TaskListView.newTodosBanner`, that is Things' treatment and a saturated
-/// slab is the loudest thing on a screen whose language is quiet cards. The
-/// gold is spent in exactly one place — the glyph.
-@MainActor
-final class KitRolledInBannerCell: NSTableCellView {
-  private let glyph = NSImageView()
-  private let label = NSTextField(labelWithString: "")
-  private let dismiss = NSButton()
-  private var leadingConstraint: NSLayoutConstraint!
-  private var trailingConstraint: NSLayoutConstraint!
-  var onDismiss: (() -> Void)?
-
-  init(identifier: NSUserInterfaceItemIdentifier) {
-    super.init(frame: .zero)
-    self.identifier = identifier
-
-    glyph.translatesAutoresizingMaskIntoConstraints = false
-    // Outline, not `.fill`: a filled disc reads as a status dot demanding
-    // attention. The outline states the fact and stops.
-    glyph.image = NSImage(systemSymbolName: "arrow.down.circle",
-                          accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.footnote) + 1,
-                                     weight: .regular))
-    // NEUTRAL, not gold. Gold is already spoken for on this screen: it is the
-    // Today tenure dial inside checkboxes, where it carries data (days
-    // carried). Spending it again on a dismissible notice made the least
-    // important thing the only coloured thing, and made one colour mean two
-    // unrelated things. A notice should be the quietest thing on screen.
-    glyph.contentTintColor = SeptaskKitTheme.iconMuted
-    glyph.setContentHuggingPriority(.required, for: .horizontal)
-    glyph.kitA11yIgnore()
-
-    label.translatesAutoresizingMaskIntoConstraints = false
-    label.font = SeptaskKitTheme.meta
-    label.textColor = SeptaskKitTheme.inkSecondary
-    label.lineBreakMode = .byTruncatingTail
-    label.kitA11yIgnore()
-
-    dismiss.translatesAutoresizingMaskIntoConstraints = false
-    dismiss.isBordered = false
-    dismiss.setButtonType(.momentaryChange)
-    dismiss.refusesFirstResponder = true
-    dismiss.target = self
-    dismiss.action = #selector(fireDismiss)
-    dismiss.setContentHuggingPriority(.required, for: .horizontal)
-    let dismissTitle = String(localized: "Dismiss",
-                              comment: "SeptaskKit: dismiss the rolled-into-Today notice")
-    // Same font and ink as the message itself. Semibold made the way OUT
-    // louder than the thing being said, which is backwards for a notice you
-    // can ignore.
-    dismiss.attributedTitle = NSAttributedString(
-      string: dismissTitle,
-      attributes: [
-        .font: SeptaskKitTheme.meta,
-        .foregroundColor: SeptaskKitTheme.inkSecondary,
-      ])
-    dismiss.setAccessibilityLabel(dismissTitle)
-
-    addSubview(glyph)
-    addSubview(label)
-    addSubview(dismiss)
-    textField = label
-
-    leadingConstraint = glyph.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
-    trailingConstraint = dismiss.trailingAnchor.constraint(
-      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
-    NSLayoutConstraint.activate([
-      leadingConstraint,
-      glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
-      label.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 6),
-      label.centerYAnchor.constraint(equalTo: glyph.centerYAnchor),
-      dismiss.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 8),
-      trailingConstraint,
-      dismiss.centerYAnchor.constraint(equalTo: glyph.centerYAnchor),
-    ])
-  }
-
-  required init?(coder: NSCoder) { fatalError("KitRolledInBannerCell is code-only") }
-
-  override func layout() {
-    let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
-    trailingConstraint.constant = -(inset + 8)
-    super.layout()
-  }
-
-  func configure(count: Int) {
-    label.stringValue = count == 1
-      ? String(localized: "1 task rolled into Today",
-               comment: "SeptaskKit: start-of-day rolled-in notice, singular")
-      : String(localized: "\(count) tasks rolled into Today",
-               comment: "SeptaskKit: start-of-day rolled-in notice, plural")
-    kitA11yElement(role: .staticText, label: label.stringValue, value: nil, help: nil)
-    window?.invalidateCursorRects(for: self)
-  }
-
-  override func resetCursorRects() {
-    addCursorRect(dismiss.frame, cursor: .pointingHand)
-  }
-
-  @objc private func fireDismiss() { onDismiss?() }
-}
-
-// MARK: - Claude reconnect cue cell
-
-/// "Reconnect" — the row that re-mints the Claude gateway token. The AppKit
-/// twin of `ClaudeReconnectCue(.card)`: same glyph vocabulary, same copy,
-/// same one-press action.
-///
-/// The default framing is a SECURITY CHECKPOINT, not a fault. The token lapses
-/// by design, so the resting glyph is the device's biometry mark ("verify it's
-/// you"), and the orange warning triangle appears only when a reconnect
-/// genuinely failed. The whole row is the button, like `KitReminderCell` —
-/// a `.plain`-style label with dead trailing space is the row-dead-zone bug.
-@MainActor
-final class KitReconnectCueCell: NSTableCellView {
-  /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
-  private var hitPin: KitContentColumnPin!
-  private let glyph = NSImageView()
-  private let title = NSTextField(labelWithString: "")
-  private let subtitle = NSTextField(labelWithString: "")
-  private let spinner = NSProgressIndicator()
-  private let hit = NSButton()
-  private var leadingConstraint: NSLayoutConstraint!
-  private var trailingConstraint: NSLayoutConstraint!
-  var onTap: (() -> Void)?
-
-  init(identifier: NSUserInterfaceItemIdentifier) {
-    super.init(frame: .zero)
-    self.identifier = identifier
-
-    glyph.translatesAutoresizingMaskIntoConstraints = false
-    glyph.setContentHuggingPriority(.required, for: .horizontal)
-    glyph.kitA11yIgnore()
-
-    title.translatesAutoresizingMaskIntoConstraints = false
-    title.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline), weight: .semibold)
-    title.setContentHuggingPriority(.required, for: .horizontal)
-    title.setContentCompressionResistancePriority(.required, for: .horizontal)
-    title.kitA11yIgnore()
-
-    subtitle.translatesAutoresizingMaskIntoConstraints = false
-    subtitle.font = .systemFont(ofSize: SeptenaTypeScale.size(.subheadline))
-    subtitle.textColor = SeptaskKitTheme.iconMuted
-    subtitle.lineBreakMode = .byTruncatingTail
-    subtitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-    subtitle.kitA11yIgnore()
-
-    spinner.translatesAutoresizingMaskIntoConstraints = false
-    spinner.style = .spinning
-    spinner.controlSize = .small
-    spinner.isDisplayedWhenStopped = false
-    spinner.kitA11yIgnore()
-
-    hit.translatesAutoresizingMaskIntoConstraints = false
-    hit.isBordered = false
-    hit.isTransparent = true
-    hit.title = ""
-    hit.setButtonType(.momentaryChange)
-    hit.refusesFirstResponder = true
-    hit.target = self
-    hit.action = #selector(fire)
-    hit.kitA11yIgnore()
-
-    addSubview(glyph)
-    addSubview(title)
-    addSubview(subtitle)
-    addSubview(spinner)
-    // Last, so it layers above the content and takes every click in the row.
-    addSubview(hit)
-    textField = title
-
-    leadingConstraint = glyph.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 6)
-    trailingConstraint = spinner.trailingAnchor.constraint(
-      equalTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
-    hitPin = KitContentColumnPin(hit, in: self)
-    NSLayoutConstraint.activate([
-      leadingConstraint,
-      glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
-      glyph.widthAnchor.constraint(equalToConstant: 20),
-      title.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 7),
-      title.centerYAnchor.constraint(equalTo: centerYAnchor),
-      subtitle.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 8),
-      subtitle.centerYAnchor.constraint(equalTo: centerYAnchor),
-      spinner.leadingAnchor.constraint(greaterThanOrEqualTo: subtitle.trailingAnchor,
-                                       constant: 8),
-      trailingConstraint,
-      spinner.centerYAnchor.constraint(equalTo: centerYAnchor),
-      hit.topAnchor.constraint(equalTo: topAnchor),
-      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ] + hitPin.constraints)
-  }
-
-  required init?(coder: NSCoder) { fatalError("KitReconnectCueCell is code-only") }
-
-  override func layout() {
-    let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 6
-    trailingConstraint.constant = -(inset + 8)
-    hitPin.update(width: bounds.width)
-    super.layout()
-  }
-
-  func configure(state: SeptaskKitTaskListController.ReconnectCueState) {
-    let reconnected = state == .reconnected
-    title.stringValue = reconnected
-      ? String(localized: "Reconnected", comment: "Claude gateway reconnect cue")
-      : String(localized: "Reconnect", comment: "Claude gateway reconnect cue")
-    title.textColor = reconnected ? .systemGreen : SeptaskKitTheme.claudeAccent
-
-    switch state {
-    case .reconnected:
-      // A green lock, not a check: the connection is SECURE again, echoing the
-      // biometry language of the resting state.
-      glyph.image = Self.symbol("lock.fill")
-      glyph.contentTintColor = .systemGreen
-      subtitle.stringValue = ""
-    case .failed:
-      glyph.image = Self.symbol("exclamationmark.triangle.fill")
-      glyph.contentTintColor = .systemOrange
-      subtitle.stringValue = String(localized: "Couldn’t reconnect — tap to retry",
-                                    comment: "Claude gateway reconnect cue")
-    case .idle, .refreshing:
-      // Biometry mark (Face/Touch/Optic ID): a lapsed token is an auth
-      // checkpoint, not a problem to alarm about.
-      glyph.image = Self.symbol(BiometrySymbol.systemName)
-      glyph.contentTintColor = SeptaskKitTheme.claudeAccent
-      subtitle.stringValue = String(localized: "Verify it’s you to reconnect",
-                                    comment: "Claude gateway reconnect cue")
-    }
-
-    if state == .refreshing { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
-    // Pressing again mid-flight or during the flash would do nothing — say so
-    // in the cursor and the hit target rather than swallowing the click.
-    hit.isEnabled = state != .refreshing && !reconnected
-    kitA11yButton(label: reconnected
-      ? String(localized: "Reconnected", comment: "Claude gateway reconnect cue")
-      : String(localized: "Reconnect Claude", comment: "Claude gateway reconnect cue"))
-    window?.invalidateCursorRects(for: self)
-  }
-
-  private static func symbol(_ name: String) -> NSImage? {
-    NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-      .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.subheadline),
-                                     weight: .regular))
-  }
-
-  override func accessibilityPerformPress() -> Bool {
-    onTap?()
-    return true
-  }
-
-  override func resetCursorRects() {
-    guard hit.isEnabled else { return }
-    addCursorRect(hit.frame, cursor: .pointingHand)
-  }
-
-  @objc private func fire() { onTap?() }
-}
-
 // MARK: - Reminders inbox cells
 
 /// "Import all N from Reminders" — a quiet action line at the foot of the
@@ -6334,7 +6041,10 @@ final class KitGroupHeaderCell: NSTableCellView {
   private let emoji = NSTextField(labelWithString: "")
   private let title = NSTextField(labelWithString: "")
   private let count = NSTextField(labelWithString: "")
+  /// Glyph CENTER on the checkbox axis (`SeptaskKitLayout.leadingGlyphCenterX`).
   private var leadingConstraint: NSLayoutConstraint!
+  /// Title leading, pinned to the content inset — independent of the glyph.
+  private var titleLeadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   /// Set only for area/project headers (see `configure`) — clicking drills
   /// into that list, the same destination its sidebar row goes to. Whether a
@@ -6383,13 +6093,15 @@ final class KitGroupHeaderCell: NSTableCellView {
                 weight: .semibold)
   }
   /// The icon COLUMN width — same as a task row's checkbox column
-  /// (`Theme.checkboxTap` = 22 on macOS) — so header glyphs and row
-  /// checkboxes sit at one X. NOT the glyph's own size: SwiftUI sizes each
+  /// (`Theme.checkboxTap` = 22 on macOS). Its CENTER is pinned to the
+  /// checkbox axis (`SeptaskKitLayout.leadingGlyphCenterX`), so header glyphs
+  /// and row checkboxes share one center X; a wider glyph grows equally both
+  /// ways, i.e. left of the text column. NOT the glyph's own size: SwiftUI sizes each
   /// icon KIND differently within this column (`TaskListView.groupHeaderBody`
   /// — `AreaIcon(diameter: 21)`, `ProjectProgressIcon(diameter: 14)`, a
   /// system symbol at `.scaledFont(size: 16)`), so `configure` matches those
   /// per case rather than forcing one shared diameter.
-  private static let iconColumnWidth: CGFloat = 22
+  private static let iconColumnWidth: CGFloat = KitCheckboxView.tapSize
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -6448,8 +6160,12 @@ final class KitGroupHeaderCell: NSTableCellView {
     title.kitA11yIgnore()
     count.kitA11yIgnore()
     setAccessibilityElement(true)
-    leadingConstraint = icon.leadingAnchor.constraint(
-      equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + 4)
+    leadingConstraint = icon.centerXAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.leadingGlyphCenterX)
+    titleLeadingConstraint = title.leadingAnchor.constraint(
+      equalTo: leadingAnchor,
+      constant: KitCardRowView.horizontalInset + SeptaskKitLayout.headerTitleLeading)
     trailingConstraint = count.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
     plusTrailingConstraint = plus.trailingAnchor.constraint(
@@ -6460,7 +6176,7 @@ final class KitGroupHeaderCell: NSTableCellView {
       icon.widthAnchor.constraint(equalToConstant: Self.iconColumnWidth),
       emoji.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
       emoji.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
-      title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
+      titleLeadingConstraint,
       // Bottom-aligned: the header's air belongs above it, separating cards.
       // -5 (was -4) — 1pt more breathing room below the title before the
       // list underneath starts.
@@ -6487,7 +6203,8 @@ final class KitGroupHeaderCell: NSTableCellView {
   /// edges line up with the cards below it.
   override func layout() {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
-    leadingConstraint.constant = inset + 4
+    leadingConstraint.constant = inset + SeptaskKitLayout.leadingGlyphCenterX
+    titleLeadingConstraint.constant = inset + SeptaskKitLayout.headerTitleLeading
     trailingConstraint.constant = -(inset + 8)
     plusTrailingConstraint.constant = -(inset + 6)
     super.layout()

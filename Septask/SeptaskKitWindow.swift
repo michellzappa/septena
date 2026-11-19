@@ -35,15 +35,13 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     current = controller
     controller.window?.makeKeyAndOrderFront(nil)
     // After the window is on screen, so `makeFirstResponder` sticks: keyboard
-    // focus starts on the DETAIL pane (the task list, or Next when that is the
-    // restored destination), not the sidebar.
+    // focus starts on the DETAIL pane (the task list), not the sidebar.
     controller.focusDetail()
   }
 
   /// The pieces the menu bar drives. Held so `SeptaskKitCommands` can route a
   /// menu selection to the shell when its window is the one in front.
   private var list: SeptaskKitTaskListController?
-  private var next: SeptaskKitNextController?
   private var detail: KitDetailPaneController?
   private var inspector: SeptaskKitInspectorController?
   private var sidebar: SeptaskKitSidebarController?
@@ -53,15 +51,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   /// destination (every structure rebuild re-selects its row) never commits
   /// an open edit or moves focus.
   private var currentDestinationKey: String?
-  /// Next has no task selection: row commands are off while it shows.
-  private var showingNext = false
   /// Split-view resize observer (sidebar-hidden mirror). Process-lived like
   /// the window, but removed on close all the same.
   private var layoutObserver: NSObjectProtocol?
 
   private init() {
     let list = SeptaskKitTaskListController()
-    let next = SeptaskKitNextController()
     let detail = KitDetailPaneController()
     let sidebar = SeptaskKitSidebarController()
     let inspector = SeptaskKitInspectorController()
@@ -88,8 +83,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     listItem.minimumThickness = 380
     split.addSplitViewItem(listItem)
     // Native inspector pane — collapsed until ⌥⌘I, and it commits any pending
-    // note when it closes so nothing typed is lost on collapse. Hidden while
-    // Next is showing (no task selection to inspect).
+    // note when it closes so nothing typed is lost on collapse.
     let inspectorItem = NSSplitViewItem(inspectorWithViewController: inspector)
     inspectorItem.minimumThickness = 260
     inspectorItem.maximumThickness = 380
@@ -115,10 +109,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
     list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
-    // The Next page's title dropdown is the same affordance on a SwiftUI page,
-    // so it lands in the same place — a `Route`, because that's the vocabulary
-    // `TaskNavMenu` speaks.
-    next.onNavigate = { [weak sidebar] route in sidebar?.select(route) }
 
     let window = KitShellWindow(contentViewController: split)
     window.title = String(localized: "Septask (AppKit)",
@@ -156,7 +146,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     syncAccessory.view = syncHost
     syncAccessory.layoutAttribute = .trailing
     window.addTitlebarAccessoryViewController(syncAccessory)
-    // The title names the DESTINATION ("Today", "Next", a project) — the same
+    // The title names the DESTINATION ("Today", a project) — the same
     // string the SwiftUI shell puts in its page header. Hiding it left nothing
     // to name the window: the list ran straight to the top edge and the drag
     // strip read as a row of tasks. `SeptaskKitTaskListController` reveals and
@@ -170,7 +160,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     super.init(window: window)
     window.delegate = self
     self.list = list
-    self.next = next
     self.detail = detail
     self.sidebar = sidebar
     self.splitController = split
@@ -199,7 +188,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       self?.show(destination)
     }
     // Return / Tab / a mouse click in the sidebar hand the keyboard to
-    // whatever the detail pane shows — the list, or the Next page.
+    // the task list in the detail pane.
     sidebar.onFocusList = { [weak self] in self?.focusDetail() }
     list.onToggleInspector = { [weak self] in
       self?.setInspector(visible: inspectorItem.isCollapsed, focusTitle: true)
@@ -222,6 +211,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // (start() memoizes), load-bearing if this window somehow opens first.
     Task { await SeptenaServices.shared.start() }
     // Restore the list that was showing last time; Today when it is gone.
+    // That fallback also covers a saved "next" from before Septask's Next
+    // page was removed (2026-11-19): no row has that key any more.
     if let key = UserDefaults.standard.string(forKey: SeptaskKitStateKey.lastDestination),
        sidebar.select(key: key) {
       // Selected — `onSelect` already showed it.
@@ -230,8 +221,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     }
   }
 
-  /// Sidebar → detail. Task filters keep the NSTableView list; Next swaps in
-  /// the hosted SwiftUI feed. Inspector collapses off Next (nothing to show).
+  /// Sidebar → detail. Every destination is a task list in the NSTableView.
   private func show(_ destination: KitSidebarDestination) {
     let changed = destination.key != currentDestinationKey
     // Was the keyboard in the detail pane (or nowhere)? Then it follows the
@@ -256,38 +246,20 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .filter(let filter, let title):
       guard let list, let detail else { return }
       // The title is set HERE, not inside `list.show`, which returns early
-      // when the destination is already current — coming back to Today from
-      // Next hits exactly that early return, and a title set behind it would
-      // stay reading "Next".
+      // when the destination is already current.
       window?.title = title
       detail.display(list)
       list.show(filter)
       // Ahead of the first scroll event, so a fresh page starts in the right
-      // state (and coming back from Next, where the title is always shown).
+      // state.
       list.syncWindowTitle()
-      showingNext = false
-    case .next:
-      guard let next, let detail else { return }
-      showingNext = true
-      setInspector(visible: false)
-      window?.title = Route.next.title
-      detail.display(next)
-      // Same handoff as a task page: the page's own big title owns the top of
-      // the window until it scrolls away. Next is a hosted SwiftUI page, so it
-      // reports its own scroll position rather than being read off a clip view
-      // — but the shell applies the identical rule, ahead of the first report.
-      next.syncWindowTitle()
     }
     if changed, detailHadFocus { focusDetail() }
   }
 
-  /// Give the keyboard to the detail pane — the task list, or the Next page.
+  /// Give the keyboard to the detail pane — the task list.
   func focusDetail() {
-    if showingNext {
-      next?.focusPage()
-    } else {
-      list?.focusList()
-    }
+    list?.focusList()
   }
 
   /// Save every open editor in the window: the list's open row (composer or
@@ -299,12 +271,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   /// One place that opens and closes the inspector, so every path — ⌥⌘I, the
-  /// menu item, Escape inside the pane, switching to Next — commits pending
+  /// menu item, Escape inside the pane — commits pending
   /// edits, hands focus back to the list, and leaves the menu title truthful.
   private func setInspector(visible: Bool, focusTitle: Bool = false) {
     guard let inspectorItem else { return }
-    // Next has no task to inspect; the pane stays shut there.
-    if visible, showingNext { return }
     if !visible {
       inspector?.flushPendingEdits()
     }
@@ -339,10 +309,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func focusWindow() { window?.makeKeyAndOrderFront(nil) }
 
   func go(to filter: TaskFilter) { sidebar?.select(filter) }
-  // Spelled out: `select` is overloaded for TaskFilter / KitSidebarDestination
-  // / Route, and both KitSidebarDestination and Route have a `next`, so the
-  // leading-dot form is ambiguous.
-  func goNext() { sidebar?.select(KitSidebarDestination.next) }
   func newTask() { list?.createTask() }
   func newProject() { sidebar?.newProject() }
   func newArea() { sidebar?.newArea() }
@@ -355,7 +321,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
 
   /// Whether a Task-menu row command has a target. The menu acts on the pane
   /// that holds the keyboard: on the sidebar only Rename and Delete exist
-  /// (for an area or project), on the Next page nothing does, and otherwise
+  /// (for an area or project), and otherwise
   /// the list's selection decides.
   /// The caret is in a text view or field editor anywhere in the window. The
   /// list's own key handling already passes text keys through; this keeps the
@@ -363,7 +329,6 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var editingText: NSTextView? { window?.firstResponder as? NSTextView }
 
   func canRun(_ command: RowCommand) -> Bool {
-    if showingNext { return false }
     if editingText != nil { return false }
     if let sidebar, sidebar.hasKeyboardFocus {
       switch command {
@@ -468,9 +433,9 @@ enum SeptaskKitStateKey {
   static let sidebarHidden = "septaskKitSidebarHidden"
 }
 
-/// Swaps the middle split pane between the task list and the Next host without
-/// rebuilding the `NSSplitViewController` — both children stay alive so
-/// returning to a list keeps selection / scroll position.
+/// Hosts the middle split pane's child (the task list) with manual
+/// containment. It swapped between the list and the Next page until Septask's
+/// Next was removed (2026-11-19); kept as the seam for any future second pane.
 @MainActor
 private final class KitDetailPaneController: NSViewController {
   private weak var current: NSViewController?
@@ -553,12 +518,6 @@ enum SeptaskKitCommands {
     guard let controller = SeptaskKitWindowController.existing else { return }
     controller.focusWindow()
     controller.go(to: filter)
-  }
-  /// Go ▸ Next — same fronting rule as `go(_:)`.
-  static func goNext() {
-    guard let controller = SeptaskKitWindowController.existing else { return }
-    controller.focusWindow()
-    controller.goNext()
   }
   static func newTask() { shell?.newTask() }
   static func newProject() { shell?.newProject() }

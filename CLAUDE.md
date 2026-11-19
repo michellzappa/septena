@@ -487,9 +487,11 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   so controls, toggles, menus and native selection use the system accent (the
   user's System Settings accent on macOS, blue on iOS). It used to be adaptive
   ink (black in light, white in dark); code written for that era may still
-  assume ink. Selection fills are an accent WASH with normal ink text
-  (`Theme.listSelectionFill`, `SeptaskKitTheme.listSelectionFill`), never a
-  solid bar with white text. Selected chips use a **wash plus matching ink**
+  assume ink. Selection fills are an accent WASH with normal
+  ink text in the focused pane and gray elsewhere (decided 2026-11-19: the
+  task app has no arbitrary section colors, so the accent can mean
+  "selected") (`Theme.listSelectionFill`, `SeptaskKitTheme.listSelectionFill`),
+  never a solid bar with white text. Selected chips use a **wash plus matching ink**
   (`SelectableChip` / `SelectableChipStyle`), contrast-safe for any tint in both
   appearances. Related trap: `Color.accentColor` only means "the section color"
   *inside* a `SectionDrawer` — a view pushed from a settings pane gets the
@@ -518,11 +520,12 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   or move it. **Septena is leaving iCloud** (ADR 0002): new specs design for
   the own backend only.
 - **This repo is PUBLIC — keep only app-relevant docs here. Strategy lives in the
-  private site repo.** Competitive strategy, positioning, and the **book**
-  (manifesto / go-to-market) do NOT belong in this repo. They live in the
-  **private** `../septena-site` repo under `docs/` — the book thesis is
-  `septena-site/docs/THE_INSTRUMENT_MANIFESTO.md`. When the work is
-  strategy/positioning/book copy, edit it *there*, not here. App engineering docs
+  Septena Starlings workspace** (`septena.starlings.work`, Docs `/strategy` and
+  `/brand`, connector "Starlings: Septena"). Competitive strategy, positioning,
+  messaging, the supporter model, the feature catalog and the **book**
+  (`/strategy/the-instrument-manifesto`) do NOT belong in this repo. When the
+  work is strategy/positioning/book copy, edit it *there*, not here. The copies
+  in `../septena-site/docs/` are older; the workspace wins. App engineering docs
   (schema, design spec, plans, specs) stay public in this `docs/`;
   `docs/MAKER_IDENTITY.md` stays here too because it sources in-app maker copy.
 - Match surrounding code: comment density, naming, idiom.

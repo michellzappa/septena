@@ -402,7 +402,10 @@ struct TaskCheckboxModel {
     let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
     tint = accent
     isDone = task.status == .done
-    isToday = task.isOnToday && showsTodayIndicator
+    // A row in Recently Deleted is out of every list, Today included, so it
+    // never shows the gold Today badge or the Today aging.
+    let isDeleted = task.deletedAt != nil
+    isToday = task.isOnToday && showsTodayIndicator && !isDeleted
     dashed = TaskRowFlags.languageV2 && isProposal
     // Accent corner dot for a committed task carrying unread agent context.
     // Proposals are excluded (they already read as dashed).
@@ -414,7 +417,7 @@ struct TaskCheckboxModel {
     // Aging shows only where the Today badge is suppressed, which is the
     // Today list itself (`showsTodayIndicator == filter != .today`). Inside an
     // area or project it would grade a list the row isn't judged in.
-    tenureFill = TaskRowFlags.agingEnabled && !showsTodayIndicator ? task.todayTenureFill() : nil
+    tenureFill = TaskRowFlags.agingEnabled && !showsTodayIndicator && !isDeleted ? task.todayTenureFill() : nil
   }
 }
 

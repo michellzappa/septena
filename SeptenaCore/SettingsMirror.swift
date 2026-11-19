@@ -38,6 +38,13 @@ enum SettingsMirror {
   // genuinely need main — they push through CKEngine — so the enum stays
   // `@MainActor` and only this read opts out).
   nonisolated static func loadSettings(context: ModelContext) -> AppSettings? {
+    #if SEPTASK
+    // Septask syncs no CloudKit record: its settings are the synced-settings
+    // blob (TaskSyncSettings.swift), never the shared `SettingsEntity` row
+    // Septena syncs through CloudKit.
+    guard let data = UserDefaults.standard.data(forKey: SeptaskSyncedSettings.storeKey) else { return nil }
+    return settingsCache.value(forPayload: data)
+    #else
     let singletonID = SettingsCloudKitSchema.singletonID
     var descriptor = FetchDescriptor<SettingsEntity>(
       predicate: #Predicate { $0.id == singletonID }
@@ -45,6 +52,18 @@ enum SettingsMirror {
     descriptor.fetchLimit = 1   // it's a singleton by definition
     guard let entity = try? context.fetch(descriptor).first else { return nil }
     return settingsCache.value(forPayload: entity.payloadData)
+    #endif
+  }
+
+  /// The settings CloudKit last synced to this device (the shared
+  /// `SettingsEntity` row), in either app. Septask reads it once, to seed
+  /// its synced-settings blob (`SeptaskSyncedSettings.seedIfNeeded`).
+  static func loadCloudKitSettingsRow(context: ModelContext) -> AppSettings? {
+    let singletonID = SettingsCloudKitSchema.singletonID
+    var descriptor = FetchDescriptor<SettingsEntity>(predicate: #Predicate { $0.id == singletonID })
+    descriptor.fetchLimit = 1
+    guard let entity = try? context.fetch(descriptor).first else { return nil }
+    return try? decoder.decode(AppSettings.self, from: entity.payloadData)
   }
 
   /// Memoized decode of the settings singleton, keyed by the payload bytes.
@@ -340,6 +359,15 @@ enum SettingsMirror {
   static func upsert(settings: AppSettings,
                      context: ModelContext,
                      engine: CKEngine? = nil) {
+    #if SEPTASK
+    // Septask: write the synced-settings blob and queue the changed keys for
+    // the task backend. `engine` is unused (Septask never starts CloudKit).
+    let data = SeptaskSyncedSettings.encode(settings)
+    guard UserDefaults.standard.data(forKey: SeptaskSyncedSettings.storeKey) != data else { return }
+    UserDefaults.standard.set(data, forKey: SeptaskSyncedSettings.storeKey)
+    TaskSyncEngine.shared.captureSettings()
+    return
+    #else
     guard let data = try? encoder.encode(settings) else { return }
     let singletonID = SettingsCloudKitSchema.singletonID
     let descriptor = FetchDescriptor<SettingsEntity>(
@@ -357,6 +385,7 @@ enum SettingsMirror {
     } catch {
       SeptenaLog.error("SettingsMirror.upsert settings", error)
     }
+    #endif
   }
 
   /// Upsert-only. Section rows are never deleted by this code path —

@@ -48,6 +48,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SectionTheme.self) private var theme
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations = true
   #endif
 
   var body: some View {
@@ -229,6 +230,18 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       Text("Appearance")
     } footer: {
       Text("The accent is shared with Septena. Changing it here recolors Tasks there too.")
+    }
+
+    // Text size and completion motion sit here, inline, instead of on a
+    // separate Home page (docs/SETTINGS_FLATTEN_SPEC.md).
+    TextSizeSliderSection()
+
+    Section {
+      Toggle(isOn: $completionAnimations) {
+        Label("Completion animations", systemImage: "party.popper")
+      }
+    } footer: {
+      Text("The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
     }
     #else
     Section {

@@ -25,9 +25,10 @@ struct TaskNavMenu<Trigger: View>: View {
   @Environment(\.modelContext) private var modelContext
 
   /// The destination to draw the checkmark on. Defaults to whatever `nav` is
-  /// showing. A host that doesn't drive `nav` names its destination directly —
-  /// the AppKit shell's Next pane owns a per-pane `NavigationState` stub that
-  /// nothing observes, so `nav.path` there is always empty.
+  /// showing. A host that doesn't drive `nav` names its destination directly
+  /// (an AppKit-hosted page whose `NavigationState` stub nothing observes, so
+  /// `nav.path` there is always empty). No caller does today: Septask's Next
+  /// page, the one such host, was removed on 2026-11-19.
   var current: Route? = nil
   /// Where a pick goes. Defaults to `nav.go(to:)` — the SwiftUI shells' whole
   /// navigation model. The AppKit shell passes a closure that steers its own

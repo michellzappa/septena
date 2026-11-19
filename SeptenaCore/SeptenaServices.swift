@@ -153,9 +153,11 @@ final class SeptenaServices {
       // nutrition, mood, intake) stays in sync without each mutator opting in.
       // Compile-gated: Septask ships a task-only watch snapshot publisher;
       // the full-app Next snapshot publisher stays out of the Septask target.
-      #if SEPTASK
-      TasksWatchSnapshotPublisher.install(context: context)
-      #else
+      // Septask publishes no watch snapshot: its snapshot was a CloudKit
+      // record, and Septask is CloudKit-free (docs/SEPTASK_BACKEND.md §9,
+      // phase 4). The Septask watch needs a new transport before its embed
+      // is restored.
+      #if !SEPTASK
       WatchSnapshotPublisher.install(context: context)
       #endif
 
@@ -165,6 +167,14 @@ final class SeptenaServices {
       PerfTrace.spanSync("start.backfillSectionOnboarding") {
         SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
       }
+      #if SEPTASK
+      // CloudKit-free: no record registry, no engine start, no zone fetch,
+      // no push registration. Mutators still call `ckEngine.note…`; the task
+      // kinds route to `TaskSyncEngine` (TaskStoreMode is always `backend`
+      // here) and every other kind is dropped by the unstarted engine.
+      TaskStoreMode.markDeviceBackend()
+      SeptaskSyncedSettings.seedIfNeeded(from: SettingsMirror.loadCloudKitSettingsRow(context: context))
+      #else
       let recordRegistry = CloudKitRecordRegistry(modelContainer: LocalStore.shared.container)
       ckEngine.recordProvider = { recordID in
         await recordRegistry.record(for: recordID)
@@ -203,6 +213,7 @@ final class SeptenaServices {
           await self.areasMutator.repairDeletedAreaReferences()
         }
       }
+      #endif
       taskMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
@@ -211,12 +222,12 @@ final class SeptenaServices {
       // Lets area deletion detach its projects and tasks (never delete them).
       areasMutator.taskMutator = taskMutator
       areasMutator.projectsMutator = projectsMutator
-      // The Next feed's write set binds in BOTH profiles: Septask hosts the
-      // full Next feed as its own page (SeptaskNextPage), so the trio
-      // toggles (checklist), inline intake nudges, and the fast-break new-meal
-      // suggestion (nutrition) must reach CloudKit from the tasks-only shell
-      // too. (Mood needs no engine binding; gut isn't written by the page —
-      // the Done Today log that read/edited it was cut, so gut stays full-only.)
+      // These three bind in BOTH profiles. They were the write set of
+      // Septask's Next page (trio toggles, intake nudges, the fast-break
+      // new-meal suggestion). Septask removed Next on 2026-11-19, so no
+      // Septask UI writes them now; they stay bound so any remaining shared
+      // write path (e.g. the in-app MCP dispatch) still reaches CloudKit.
+      // Moving them under the life-OS gate below is a separate decision.
       checklistMutator.bind(ckEngine: ckEngine)
       intakeMutator.bind(ckEngine: ckEngine)
       nutritionMutator.bind(ckEngine: ckEngine)
@@ -243,6 +254,7 @@ final class SeptenaServices {
       }
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
+        #if !SEPTASK
         // Start the engine (it kicks off its own background fetch) but do
         // NOT await a server round-trip here. start() gates the first frame
         // AND every background-launched App Intent, and the local mirror is
@@ -264,6 +276,10 @@ final class SeptenaServices {
         // uploads that re-locked the UI on every launch until drained. One-shot
         // and idempotent: a no-op once the queue is clean.
         ckEngine.dropPendingReadwiseQuoteChanges()
+        #endif
+        // Septask: tasks, areas, projects, attachments, conversations and
+        // settings sync with api.septena.app. No-op in Septena.
+        TaskSyncEngine.shared.start()
       }
       // Fixed-schedule repeats are a promise about DATES, so the series has
       // to advance when the date does — not only when someone ticks a box.
@@ -294,11 +310,19 @@ final class SeptenaServices {
   func absorbRemoteChanges() async {
     guard !DemoSeedMode.isOn else { return }
     let context = LocalStore.shared.container.mainContext
+    #if !SEPTASK
     try? await ckEngine.fetchChanges()
+    #endif
+    // Backend task store (Septask): the launch repairs below (catch-up,
+    // purge) want the backend's rows in hand. No-op in Septena.
+    await TaskSyncEngine.shared.syncNow()
     // Seed any manifest keys still missing AFTER the pull. A genuinely fresh
     // account (no section rows and no other account signals) seeds OFF for the
     // welcome picker; reinstalls and new devices seed from manifest defaults
     // so we never clobber synced enablement with pre-sync placeholders.
+    // Section rows are Septena's (synced through its CloudKit). Septask has
+    // no sections, and a row it seeded here would never reach CloudKit.
+    #if !SEPTASK
     PerfTrace.spanSync("absorb.seedSections") {
       let sectionCount =
         (try? context.fetchCount(FetchDescriptor<SectionEntity>())) ?? 0
@@ -309,6 +333,7 @@ final class SeptenaServices {
         NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
       }
     }
+    #endif
     // Heal dangling project references now that the initial fetch has
     // landed (so we never stub a project that's merely mid-sync).
     await reconcileProjectGraph(context: context)

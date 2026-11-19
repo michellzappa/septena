@@ -503,7 +503,7 @@ final class CloudKitTasksBackend {
       dissolveHeadingMembers(headingID: id)
     }
     entity.deletedAt = ckServerTimestamp()
-    if entity.cloudKitSystemFields == nil, !engine.hasPendingTaskSave(id: id) {
+    if engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields), !engine.hasPendingTaskSave(id: id) {
       guard StoreHealth.save(context, op: "delete(soft, local-only)") else {
         SeptenaLog.error("[CK] delete(soft, local-only) id=\(id) — local save failed and rolled back")
         TaskChange.post(id)
@@ -532,7 +532,7 @@ final class CloudKitTasksBackend {
   func purge(id: String) {
     guard let entity = fetch(id: id) else { return }
     purgeAttachments(taskID: id)
-    let neverPushed = entity.cloudKitSystemFields == nil
+    let neverPushed = engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields)
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
     if neverPushed {

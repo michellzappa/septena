@@ -92,9 +92,9 @@ struct ContentView: View {
     case .filter(let f):  TaskListView(filter: f)
     case .next:
       #if SEPTASK
-      // Same standalone Next page the AppKit sidebar hosts — iPad's SwiftUI
-      // split lands here; iPhone uses the Next tab instead (SeptaskRootView).
-      SeptaskNextPage()
+      // Septask has no Next page (removed 2026-11-19). Nothing routes here;
+      // a stray `.next` lands on Today rather than an empty pane.
+      TaskListView(filter: .today)
       #else
       NextView()
       #endif

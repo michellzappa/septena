@@ -35,7 +35,11 @@ actor TaskBackendClient {
 
   static let baseURL = URL(string: "https://api.septena.app")!
   /// Sent as `X-Septena-Client`; the server logs writes as `app:<this>`.
+  #if os(macOS)
   static let clientName = "septask-mac"
+  #else
+  static let clientName = "septask-ios"
+  #endif
   private static let refreshAccount = "com.septena.taskBackend.refreshToken"
 
   private let session: URLSession
@@ -144,7 +148,10 @@ actor TaskBackendClient {
   }
 
   func pull(since: Int, limit: Int = 1_000) async throws -> BackendPullResponse {
-    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)", method: "GET", body: nil)
+    // `settings=1`: this client syncs the `setting` entity. Without it the
+    // server leaves setting rows out (older builds decode entities strictly).
+    let (data, status) = try await authed(path: "/v1/sync/pull?since=\(since)&limit=\(limit)&settings=1",
+                                          method: "GET", body: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
     return try decode(BackendPullResponse.self, from: data, what: "pull")
   }
@@ -158,6 +165,50 @@ actor TaskBackendClient {
     let (body, status) = try await authed(path: "/v1/attachments/\(encodedID)", method: "PUT", body: data,
                                           contentType: contentType)
     guard status == 200 else { throw Self.httpError(status, body) }
+  }
+
+  /// Downloads an attachment's bytes (`GET /v1/attachments/:id`) and writes
+  /// them atomically to `destination`. Returns the byte count.
+  @discardableResult
+  func downloadAttachment(id: String, to destination: URL) async throws -> Int {
+    let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    let (data, status) = try await authed(path: "/v1/attachments/\(encodedID)", method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    do { try data.write(to: destination, options: .atomic) } catch {
+      throw TaskBackendError.badResponse("file not writable")
+    }
+    return data.count
+  }
+
+  /// The upgrade request for the live-nudge socket (`GET /v1/sync/ws`), with
+  /// a fresh bearer token. The caller opens the socket; it carries `{ rev }`
+  /// nudges only (docs/SEPTASK_BACKEND.md §6.3).
+  func webSocketRequest() async throws -> URLRequest {
+    let token = try await validAccessToken(forceRefresh: false)
+    guard let https = URL(string: "/v1/sync/ws", relativeTo: Self.baseURL)?.absoluteURL,
+          var parts = URLComponents(url: https, resolvingAgainstBaseURL: false) else {
+      throw TaskBackendError.badResponse("bad path")
+    }
+    parts.scheme = "wss"
+    guard let url = parts.url else { throw TaskBackendError.badResponse("bad path") }
+    var request = URLRequest(url: url)
+    request.setValue(Self.clientName, forHTTPHeaderField: "X-Septena-Client")
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    return request
+  }
+
+  // MARK: - Claude connector pairing (MCP preview)
+
+  /// Approves the pairing code that the api.septena.app connector page shows,
+  /// so that Claude connector reads this user's tasks (read-only preview,
+  /// docs/SEPTASK_BACKEND.md §8). Sends the device time zone, which decides
+  /// what "today" means for the connector. Returns the client name.
+  func approvePairing(code: String) async throws -> String {
+    struct Approval: Decodable { let client: String }
+    let body = try JSONEncoder().encode(["code": code, "timeZone": TimeZone.current.identifier])
+    let (data, status) = try await authed(path: "/v1/pair/approve", method: "POST", body: body)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(Approval.self, from: data, what: "pairing").client
   }
 
   // MARK: - HTTP

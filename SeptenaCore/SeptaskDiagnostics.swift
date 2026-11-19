@@ -258,12 +258,22 @@ public final class SeptaskDiagnosticsCoordinator {
                 architecture: architecture
             ),
             features: .init(
-                claudeConnected: ClaudeGatewayProvider.shared.isEnabled,
+                claudeConnected: Self.claudeConnected,
                 calendarAccess: calendarAccessGranted,
                 remindersAccess: remindersAccessGranted,
                 remindersAutoImport: RemindersBridge.shared.autoImport
             )
         )
+    }
+
+    /// Septask has no hosted-gateway connection: Claude pairs with the task
+    /// backend, and that pairing lives server-side, so the app reports false.
+    private static var claudeConnected: Bool {
+        #if SEPTASK
+        false
+        #else
+        ClaudeGatewayProvider.shared.isEnabled
+        #endif
     }
 
     private var appVersion: String {

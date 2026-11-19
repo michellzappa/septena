@@ -74,8 +74,7 @@ extension Route {
 @MainActor
 enum TaskDestinations {
   /// Smart lists, in display order. Next is intentionally absent here — on
-  /// Septena it's a top-level tab; on Septask `sidebarRoutes` inserts it
-  /// after Today (matching the AppKit shell).
+  /// Septena it's a top-level tab; Septask has no Next (removed 2026-11-19).
   static let smartListRoutes: [Route] = [
     .filter(.today),
     .filter(.upcoming),
@@ -84,18 +83,10 @@ enum TaskDestinations {
     .filter(.logbook),
   ]
 
-  /// Sidebar / title-dropdown destinations. Septask puts Next beside Today
-  /// (iPhone tab + iPad sidebar, same order as AppKit). Septena keeps Next
-  /// out of the Tasks sidebar.
-  static var sidebarRoutes: [Route] {
-    #if SEPTASK
-    var routes = smartListRoutes
-    routes.insert(.next, at: 1)
-    return routes
-    #else
-    return smartListRoutes
-    #endif
-  }
+  /// Sidebar / title-dropdown destinations. Neither app puts Next in the
+  /// Tasks sidebar: Septena keeps it as a top-level tab, and Septask dropped
+  /// Next on 2026-11-19 (life-OS content, not tasks; Today covers it).
+  static var sidebarRoutes: [Route] { smartListRoutes }
 
   static func orderedAreas(_ loaded: [Area]) -> [Area] {
     TaskStructureOrder.orderedAreas(loaded)

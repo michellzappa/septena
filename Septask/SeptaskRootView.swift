@@ -8,9 +8,8 @@ import SwiftUI
 /// tab). Quick-add is NOT a tab: every list already carries a nav-bar `+`
 /// (`pageChrome`) and ⌘N, so capture lives there, not in the bar.
 ///
-/// Next is NOT a tab. It stays a sidebar destination (AppKit shell, iPad
-/// split), so on iPhone it pushes inside the Tasks stack — the `.next` route
-/// below selects Tasks, not a tab of its own.
+/// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
+/// not tasks; Today covers "what's next" for tasks).
 enum SeptaskTab: Hashable {
   case tasks, today, upcoming, search
 }
@@ -67,35 +66,22 @@ struct SeptaskRootView: View {
       // shell root and publish `\.usesPushNavigation` to every surface.
       .resolvesAdaptiveNavigation()
       // The app-global modals, one `.sheet(item:)` like RootTabView — the
-      // subset with a Septask surface. The Next page's suggestions add two:
-      // the mood check-in and the nutrition new-meal sheet. Training stays
-      // out (its destination is the live-session surface Septask doesn't
-      // compile — the feed filters that suggestion). Anything else ever set
-      // shows empty rather than crashing.
+      // subset with a Septask surface. The mood check-in and new-meal sheets
+      // left with the Next page (2026-11-19). Anything else ever set shows
+      // empty rather than crashing.
       .sheet(item: $nav.presentedModal) { modal in
         switch modal {
         case .quickFind:
           withEnvironment(QuickFindView())
             .septenaModalSheet(detents: [.medium, .large],
                                macWidth: 560, macHeight: 420)
-        case .addInfo(let section):
+        case .addInfo:
           // Septask's quick capture IS the task composer — no multi-section
-          // palette here (the tasks-only twin of AddInfoSheet). The one
-          // exception: the Next page's fast-break suggestion targets
-          // nutrition, which opens the new-meal sheet directly.
-          if section == .nutrition {
-            withEnvironment(NewNutritionEntrySheet())
-              .septenaModalSheet(macWidth: 560, macHeight: 600)
-          } else {
-            withEnvironment(SeptaskQuickAdd())
-              .septenaModalSheet(detents: [.medium, .large],
-                                 macWidth: 560, macHeight: 520)
-          }
-        case .moodCheckin:
-          // The Next page's mood suggestion — same check-in page as
-          // Septena's tab root (RootTabView.modalSheet).
-          withEnvironment(AddMoodPage(anchorTime: dayClock.now, date: dayClock.today))
-            .septenaModalSheet(macWidth: 560, macHeight: 600)
+          // palette here (the tasks-only twin of AddInfoSheet), whatever
+          // section the request names.
+          withEnvironment(SeptaskQuickAdd())
+            .septenaModalSheet(detents: [.medium, .large],
+                               macWidth: 560, macHeight: 520)
         case .keyboardShortcuts:
           withEnvironment(KeyboardShortcutsView())
             .septenaModalSheet(detents: [.medium, .large],
@@ -167,10 +153,8 @@ struct SeptaskRootView: View {
   /// the per-list nav-bar `+` / ⌘N.
   private var systemTabView: some View {
     TabView(selection: $selection) {
-      // ContentView self-tints to `theme.accent` (ink), so the Tasks tab's
-      // chrome/content stays black; the reset on Today/Upcoming does the same
-      // for the tabs that don't host ContentView. Only the bar's SELECTED item
-      // picks up the Tasks color, from the `.tint` on the TabView below.
+      // Septask has no section colors: the bar, the tabs and their content
+      // all take the platform accent (no `.tint` on the TabView).
       Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
         ContentView()
       }
@@ -190,7 +174,6 @@ struct SeptaskRootView: View {
       }
     }
     .tabBarMinimizeBehavior(.onScrollDown)
-    .tint(theme.color(for: "tasks"))
   }
   #endif
 }

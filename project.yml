@@ -232,6 +232,26 @@ targets:
           # Septask ships no widgets; the full-app Next snapshot publisher stays
           # out — `TasksWatchSnapshotPublisher` compiles instead for the watch.
           - WatchSnapshotPublisher.swift
+          # Septask has no Next feed (removed 2026-11-19). NextFeed reads the
+          # suggestions model, which Septask no longer compiles.
+          - NextFeed.swift
+          # The old hosted-gateway Claude connection (mcp.septena.app, ~8h
+          # CloudKit web-auth token + reconnect reminder) is Septena-only.
+          # Septask pairs Claude through the task backend (api.septena.app/mcp).
+          - ClaudeGatewayProvider.swift
+          - ClaudeReconnectNudge.swift
+          # Phase 4 (docs/SEPTASK_BACKEND.md §9): Septask is CloudKit-free.
+          # The cutover tools (copy to backend, move back to iCloud), the
+          # CloudKit schema seeder, the record registry (CloudKit apply path)
+          # and the CloudKit watch snapshot stay out. CKEngine and
+          # CloudKit/Migration.swift still compile: mutators take the engine
+          # (it never starts), and Migration.swift also holds shared helpers
+          # (EventTimestamp, the launch migrators).
+          - TaskBackend/TaskBackendImporter.swift
+          - TaskBackend/TaskStoreRollback.swift
+          - CloudKit/CloudKitRecordRegistry.swift
+          - CloudKit/SchemaSeedRegistrar.swift
+          - TasksWatchSnapshotPublisher.swift
       # P1 (docs/SEPTASK.md): the real task UI, by source inclusion — the same
       # files the full app compiles, never copies. TasksDestinationView is the
       # full-app drawer adapter and stays out. Cross-domain spots inside these
@@ -248,6 +268,8 @@ targets:
           # Dashboard tile card — reaches into homepage domain types; unused
           # by any task surface.
           - ModuleTile.swift
+          # Biometry glyph — only the old Claude reconnect cue used it.
+          - BiometrySymbol.swift
       - path: Septena/App/ContentView.swift
       - path: Septena/App/NavigationState.swift
       - path: Septena/App/ShortcutAction.swift
@@ -256,11 +278,11 @@ targets:
       - path: Septena/Shell/Settings/SettingsKeys.swift
       # Supporter-finish constants used by LogCommit's celebration variant.
       - path: Septena/Shell/Settings/SeptenaPlus.swift
-      # P3: the AI/Claude pane + gateway detail (SettingsView deep links
-      # inside are #if !SEPTASK-gated), the macOS local MCP pane, and the
-      # hex→Color helper the shared palette picker rides.
+      # P3: the AI/Claude pane (SettingsView deep links and the hosted
+      # gateway row inside are #if !SEPTASK-gated; Septask's Claude row opens
+      # the task backend pane), the macOS local MCP pane, and the hex→Color
+      # helper the shared palette picker rides.
       - path: Septena/Shell/Settings/AISettingsPane.swift
-      - path: Septena/Shell/Settings/ClaudeGatewayDetail.swift
       - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
@@ -280,26 +302,13 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
-      # The Next page (SeptaskNextPage): the Next feed's
-      # models + rows, plus the suggestion destinations (mood check-in, new
-      # meal). Included by
-      # file, never by folder — the rest of Shell/Dashboard and the section
-      # folders reach into surfaces Septask doesn't compile.
-      # Shared reconnect cue: Septask puts the same direct recovery affordance
-      # on Today that Septena shows on its dashboard.
-      - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
-      - path: Septena/Shell/Dashboard/NextItemsSection.swift
-      - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
-      - path: Septena/Sections/Mood/MoodCatalog.swift
-      - path: Septena/Sections/Mood/MoodCommitAnimation.swift
-      - path: Septena/Sections/Mood/AddMoodPage.swift
-      - path: Septena/Sections/Nutrition/EditNutritionEntrySheet.swift
-      - path: Septena/Sections/Nutrition/NewNutritionEntrySheet.swift
-      - path: Septena/Sections/Nutrition/NutritionCommit.swift
-      - path: Septena/Sections/Nutrition/MealCameraPicker.swift
-      - path: Septena/Sections/Nutrition/MealPhotoAnalyzer.swift
-      - path: Septena/Sections/Nutrition/MealPhotoModelAnalyzer.swift
-      - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
+      # Shell/Dashboard files are included by file, never by folder — the
+      # rest of Shell/Dashboard reaches into surfaces Septask doesn't compile.
+      # The Next feed's files (NextItemsSection, NextSuggestionsSection, and
+      # the mood / nutrition suggestion destinations) left with Septask's
+      # Next page on 2026-11-19 (life-OS content, not tasks). The last one,
+      # ClaudeReconnectCue, left with the hosted-gateway connection, so
+      # Septask now compiles no Shell/Dashboard file.
     dependencies:
       - target: SeptaskShare
         embed: true
@@ -330,7 +339,6 @@ targets:
           - es
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
-        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
         UILaunchScreen: {}
         # Scene lifecycle so Home Screen Quick Actions land: the cold-launch
         # item rides UIScene.ConnectionOptions, delivered to SeptaskSceneDelegate
@@ -351,8 +359,8 @@ targets:
           - UIApplicationShortcutItemType: com.septena.app.today
             UIApplicationShortcutItemTitle: Today
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeDate
-        UIBackgroundModes:
-          - remote-notification
+        # No UIBackgroundModes: Septask registers for no push (CloudKit-free,
+        # and the backend's silent push is not built yet).
         # The compiled task UI includes the Reminders inbox and the Today
         # calendar strip (EventKit) — access requests crash without these.
         NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
@@ -452,6 +460,15 @@ targets:
         excludes:
           - "**/.DS_Store"
           - WatchSnapshotPublisher.swift
+          - NextFeed.swift
+          - ClaudeGatewayProvider.swift
+          - ClaudeReconnectNudge.swift
+          # Phase 4: CloudKit-free, same list as the iOS target.
+          - TaskBackend/TaskBackendImporter.swift
+          - TaskBackend/TaskStoreRollback.swift
+          - CloudKit/CloudKitRecordRegistry.swift
+          - CloudKit/SchemaSeedRegistrar.swift
+          - TasksWatchSnapshotPublisher.swift
       - path: Septena/Shell/Tasks
         excludes:
           - TasksDestinationView.swift
@@ -460,6 +477,7 @@ targets:
         excludes:
           - IntensityGlyph.swift
           - ModuleTile.swift
+          - BiometrySymbol.swift
       - path: Septena/App/ContentView.swift
       - path: Septena/App/NavigationState.swift
       - path: Septena/App/ShortcutAction.swift
@@ -468,7 +486,6 @@ targets:
       - path: Septena/Shell/Settings/SettingsKeys.swift
       - path: Septena/Shell/Settings/SeptenaPlus.swift
       - path: Septena/Shell/Settings/AISettingsPane.swift
-      - path: Septena/Shell/Settings/ClaudeGatewayDetail.swift
       - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
@@ -486,20 +503,6 @@ targets:
       - path: Septena/Shell/Intelligence/OnDeviceReasoningProvider.swift
       - path: Septena/Shell/Intelligence/OnDeviceAI.swift
       - path: Septena/Shell/Intelligence/Components/FlowLayout.swift
-      # Embedded Next fold — same file set as the Septask target (lockstep).
-      - path: Septena/Shell/Dashboard/ClaudeReconnectCue.swift
-      - path: Septena/Shell/Dashboard/NextItemsSection.swift
-      - path: Septena/Shell/Dashboard/NextSuggestionsSection.swift
-      - path: Septena/Sections/Mood/MoodCatalog.swift
-      - path: Septena/Sections/Mood/MoodCommitAnimation.swift
-      - path: Septena/Sections/Mood/AddMoodPage.swift
-      - path: Septena/Sections/Nutrition/EditNutritionEntrySheet.swift
-      - path: Septena/Sections/Nutrition/NewNutritionEntrySheet.swift
-      - path: Septena/Sections/Nutrition/NutritionCommit.swift
-      - path: Septena/Sections/Nutrition/MealCameraPicker.swift
-      - path: Septena/Sections/Nutrition/MealPhotoAnalyzer.swift
-      - path: Septena/Sections/Nutrition/MealPhotoModelAnalyzer.swift
-      - path: Septena/Sections/Nutrition/MealPhotoDraft.swift
       # Standalone icns generated from the same disc geometry + Septena's
       # icns alpha mask (identical corner rounding) — see the SeptenaMac
       # comment for why a pre-built icns and not the asset catalog.
@@ -521,7 +524,6 @@ targets:
           - es
           - pt-BR
         ITSAppUsesNonExemptEncryption: false
-        CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
         CFBundleIconFile: AppIcon
         SUFeedURL: https://updates.centaur-labs.io/appcast.xml
         SUPublicEDKey: $(SPARKLE_PUBLIC_ED_KEY)

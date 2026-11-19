@@ -76,12 +76,20 @@ struct TaskAttachmentsPanel: View {
     return "doc"
   }
 
+  /// The file is local, or (backend task store) fetched on first open.
   private func open(_ attachment: TaskAttachmentEntity) {
-    guard let url = TaskAttachmentFiles.url(for: attachment) else { return }
-    #if os(macOS)
-    NSWorkspace.shared.open(url)
-    #else
-    UIApplication.shared.open(url)
-    #endif
+    Task { @MainActor in
+      do {
+        guard let url = try await store.localFile(for: attachment) else { return }
+        errorMessage = nil
+        #if os(macOS)
+        NSWorkspace.shared.open(url)
+        #else
+        await UIApplication.shared.open(url)
+        #endif
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+    }
   }
 }

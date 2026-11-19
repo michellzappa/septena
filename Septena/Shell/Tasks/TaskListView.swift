@@ -605,14 +605,6 @@ struct TaskListView: View {
     #endif
   }
 
-  private var showsClaudeReconnectToolbar: Bool {
-    #if SEPTASK && os(iOS)
-    !embedded
-    #else
-    false
-    #endif
-  }
-
   private var taskList: some View {
     taskListContent
     // Deep task-list rhythm runs denser than the drawer's: task rows read
@@ -632,8 +624,6 @@ struct TaskListView: View {
                                        recentlyDeleted: filter == .recentlyDeleted,
                                        showsViewOptions: filter == .today,
                                        onNew: { openContextualQuickAdd() }))
-    // Applied after standalone chrome so Septask retains its face/plus order.
-    .modifier(TaskListClaudeReconnectToolbar(shows: showsClaudeReconnectToolbar))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
     // is owned by `SelectableScrollList`; the `+` toolbar button and ⌘N still
     // open the composer via `shouldStartCreating` → `openContextualQuickAdd()`.)
@@ -1324,20 +1314,14 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var taskListHeader: some View {
+    titleRow
     #if SEPTASK
-    #if os(macOS)
-    // Septena shows the expanded reconnect card at the top of its macOS
-    // dashboard. Septask's equivalent landing surface is Today, so use the
-    // exact same cue there (not on every project/detail page).
-    if filter == .today {
-      ClaudeReconnectCue(.card)
-        .padding(.horizontal, TaskCardMetrics.margin)
-        .padding(.top, 10)
-        .plainListChrome()
+    // Backend-only: signed out, Today asks for the sign-in (draws nothing
+    // once signed in).
+    if filter == .today && !TaskSyncEngine.shared.signedIn {
+      SeptaskSignInNotice().plainListChrome()
     }
     #endif
-    #endif
-    titleRow
     todayCalendarRow
     newTodosBannerRow
     remindersRow
@@ -1445,26 +1429,36 @@ struct TaskListView: View {
   /// canvas.
   private var listCanvasFill: Color { Theme.groupedBackground }
 
-  @ViewBuilder
-  private var taskListRows: some View {
+  /// Type-erased per branch on purpose. Spelled out, this switch's result
+  /// type nests every row builder's full generic type, and resolving that
+  /// type at runtime recursed deep enough to overflow the main thread's
+  /// stack at launch on iPhone (EXC_BAD_ACCESS in swift_getTypeByMangledName,
+  /// 2026-11-19). `AnyView` at this one seam caps the depth; the rows inside
+  /// keep their concrete types.
+  private var taskListRows: AnyView {
     switch filter {
     case .today:
-      triageSection
       if todayGroupByList {
-        groupedOpenItems
-      } else {
-        ungroupedOpenItems
+        return AnyView(Group {
+          AnyView(triageSection)
+          AnyView(groupedOpenItems)
+        })
       }
+      // `Group`, not a stack: the rows stay direct children of the lazy
+      // stack (AnyView forwards the view list), so laziness and per-row
+      // identity hold. No lifecycle modifiers hang off this Group.
+      return AnyView(Group {
+        AnyView(triageSection)
+        AnyView(ungroupedOpenItems)
+      })
     case .unscheduled:
-      groupedOpenItems
+      return AnyView(groupedOpenItems)
     case .upcoming:
-      groupedUpcomingItems
-    case .recentlyDeleted:
-      visibleRows
+      return AnyView(groupedUpcomingItems)
     case .project:
-      projectGroupedRows
+      return AnyView(projectGroupedRows)
     default:
-      visibleRows
+      return AnyView(visibleRows)
     }
   }
 
@@ -3872,55 +3866,20 @@ struct TaskListView: View {
   /// Start-of-day notice for tasks that rolled into Today on their own — a
   /// plan made on an earlier day whose date has now arrived. Dismissing
   /// persists today's date so it stays gone for the rest of the day and
-  /// returns tomorrow.
-  ///
-  /// Deliberately NOT a filled color band with a filled button: that is
-  /// Things' treatment of the same idea, and a saturated yellow slab is the
-  /// loudest thing on a screen whose own language is quiet cards and
-  /// typographic group headers. This reads as one more card in the stack
-  /// (`Theme.cardSurface` on the card grid's own metrics) and spends its gold
-  /// in exactly one place — the glyph. Gold is the app's temporal accent
-  /// (`Theme.todayAccent`, the same swatch as the Today sun), so the cue still
-  /// says "time moved" without shouting. Per DesignSpec §4 there are no raw
-  /// `Color` literals here; the old banner used `Color.yellow` twice.
-  @ViewBuilder
+  /// returns tomorrow. Drawn by the shared `TaskListNotice`, like every other
+  /// inline notice on the task lists.
   private func newTodosBanner(count: Int) -> some View {
-    HStack(spacing: Theme.iconTextGap) {
-      Image(systemName: "arrow.down.circle.fill")
-        .font(.septenaMeta)
-        .foregroundStyle(Theme.todayAccent)
-        .accessibilityHidden(true)
-      Text(count == 1
-           ? "1 task rolled into Today"
-           : "\(count) tasks rolled into Today")
-        .font(.septenaMeta)
-        .foregroundStyle(Theme.inkSecondary)
-        .lineLimit(1)
-      Spacer(minLength: Theme.iconTextGap)
-      Button {
-        Haptics.tick()
+    TaskListNotice(
+      kind: .info,
+      symbol: "arrow.down.circle",
+      title: Text(count == 1
+                  ? "1 task rolled into Today"
+                  : "\(count) tasks rolled into Today"),
+      onDismiss: {
         SettingsMirror.dismissRolledIn(on: clock.today, context: modelContext,
                                        engine: SeptenaServices.shared.ckEngine)
         motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
-      } label: {
-        Text("Dismiss")
-          .font(.septenaMetaStrong)
-          .foregroundStyle(Theme.inkSecondary)
-          .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .inlineHover(capsule: true)
-    }
-    .padding(.horizontal, TaskCardMetrics.contentInset)
-    .padding(.vertical, 10)
-    .background(
-      RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
-        .fill(Theme.cardSurface)
-    )
-    // Same margin as the task cards below, so the notice sits in the card
-    // column rather than floating on its own inset.
-    .padding(.horizontal, TaskCardMetrics.margin)
-    .padding(.bottom, TaskCardMetrics.groupGap)
+      })
     .transition(.opacity.combined(with: .move(edge: .top)))
   }
 

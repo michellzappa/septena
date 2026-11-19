@@ -44,7 +44,6 @@ private struct SeptaskWelcomeGate: ViewModifier {
 /// sheet (`SeptaskKitWelcome`) because the SwiftUI window it used to ride no
 /// longer opens at launch. One welcome, two presenters — never a second copy.
 struct SeptaskWelcomeView: View {
-  @Environment(SectionTheme.self) private var theme
   @AppStorage(SeptaskWelcome.completedKey) private var completed = false
 
   /// Called after `completed` flips, so an AppKit host can end its sheet.
@@ -63,15 +62,15 @@ struct SeptaskWelcomeView: View {
         VStack(spacing: 28) {
           hero
           VStack(spacing: 20) {
-            feature(icon: "lock",
-                    title: "Private by design",
-                    detail: "Your tasks live in your iCloud, synced by CloudKit. No accounts, no servers of ours, readable by no one else.")
-            feature(icon: "arrow.triangle.2.circlepath",
-                    title: "One dataset, two apps",
-                    detail: "Runs side by side with Septena over the same tasks, areas, and projects — edits in one appear in the other.")
+            feature(icon: "tray",
+                    title: "Your day, your call",
+                    detail: "New tasks wait in the Inbox. Nothing lands on Today until you put it there.")
             feature(icon: "brain.head.profile",
-                    title: "AI on your terms",
-                    detail: "Connect your own Claude or use Apple's on-device intelligence. You set how far AI may reach — including not at all.")
+                    title: "AI that asks first",
+                    detail: "Stuck on a task? Septena asks a quick question and suggests the next step. Keep it on your device, or connect Claude to work your list together.")
+            feature(icon: "lock",
+                    title: "Yours to keep",
+                    detail: "No ads, and we never sell your data. The code is open source, so you can read how your tasks are handled.")
           }
           .padding(.horizontal, 8)
         }
@@ -87,11 +86,11 @@ struct SeptaskWelcomeView: View {
     VStack(spacing: 14) {
       Image(systemName: "checkmark.circle.fill")
         .font(.system(size: 56))
-        .foregroundStyle(theme.color(for: "tasks"))
-      Text("Welcome to Septask")
+        .foregroundStyle(Color.accentColor)
+      Text("Welcome to Septena")
         .font(.largeTitle.weight(.bold))
         .multilineTextAlignment(.center)
-      Text("A focused, private task manager — calm lists, careful keyboarding, and an AI that answers to you.")
+      Text("A task app that thinks with you, and asks before it acts.")
         .font(.body)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
@@ -102,7 +101,7 @@ struct SeptaskWelcomeView: View {
     HStack(alignment: .top, spacing: 14) {
       Image(systemName: icon)
         .font(.title3)
-        .foregroundStyle(theme.color(for: "tasks"))
+        .foregroundStyle(Color.accentColor)
         .frame(width: 32)
       VStack(alignment: .leading, spacing: 2) {
         Text(title).font(.headline)
@@ -115,6 +114,7 @@ struct SeptaskWelcomeView: View {
   private var bottomBar: some View {
     VStack(spacing: 0) {
       Divider()
+      signInRow
       Button {
         completed = true
         onComplete?()
@@ -125,8 +125,26 @@ struct SeptaskWelcomeView: View {
           .padding(.vertical, 6)
       }
       .buttonStyle(.borderedProminent)
-      .tint(AdaptiveColor.fillForWhiteInk(theme.color(for: "tasks")))
+      .tint(AdaptiveColor.fillForWhiteInk(Color.accentColor))
       .padding(20)
+    }
+  }
+
+  /// Septask syncs through its own server, so the welcome asks for the one
+  /// sign-in it needs. Skipping is allowed: tasks stay on this device and
+  /// Today keeps asking (`SeptaskSignInNotice`).
+  @ViewBuilder
+  private var signInRow: some View {
+    if !TaskSyncEngine.shared.signedIn {
+      VStack(spacing: 8) {
+        Text("Sign in with Apple to sync your tasks across your devices.")
+          .font(.subheadline)
+          .foregroundStyle(.secondary)
+          .multilineTextAlignment(.center)
+        SeptaskSignInButton()
+      }
+      .padding(.horizontal, 20)
+      .padding(.top, 20)
     }
   }
 }

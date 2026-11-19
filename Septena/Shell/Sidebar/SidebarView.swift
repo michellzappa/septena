@@ -34,11 +34,6 @@ struct SidebarRootView: View {
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
-  #if SEPTASK
-  /// Open Next items (suggestions + trio) — iPad sidebar badge, same cut as
-  /// AppKit's `KitNextCount`.
-  @State private var nextOpenCount: Int = 0
-  #endif
 
   // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
   // Move Up/Down renumbers via areas/projects mutators; the legacy device-local
@@ -83,10 +78,6 @@ struct SidebarRootView: View {
     _projectProgress = State(initialValue: agg.projectProgress)
     _projectOpenCount = State(initialValue: agg.projectOpenCount)
     _areaOpenCount = State(initialValue: agg.areaOpenCount)
-    #if SEPTASK
-    _nextOpenCount = State(initialValue: SeptaskNextFeed.openCount(
-      today: SeptenaDate.today, now: Date()))
-    #endif
   }
   /// Fraction of each project's tasks that are done (0...1). Drives the
   /// circular progress icon in SidebarProjectRow.
@@ -568,9 +559,6 @@ struct SidebarRootView: View {
     case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
     case .filter(.unscheduled): return counts?.unscheduledCount
     case .filter(.logbook):     return doneTodayCount > 0 ? doneTodayCount : nil
-    #if SEPTASK
-    case .next:                 return nextOpenCount > 0 ? nextOpenCount : nil
-    #endif
     default:                    return nil
     }
   }
@@ -1023,10 +1011,6 @@ struct SidebarRootView: View {
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
     let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
-    #if SEPTASK
-    // Reads the Next response cache, not the store — safe either way.
-    nextOpenCount = SeptaskNextFeed.openCount(today: clock.today, now: clock.now)
-    #endif
     guard !StoreHealth.readsFailed(since: token) else {
       SeptenaLog.error("[Sidebar] load aborted — a store read failed; keeping the last good counts")
       return
@@ -1227,14 +1211,6 @@ private struct SidebarBehaviorModifier: ViewModifier {
         .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
         reload()
       }
-      #if SEPTASK
-      // Next's badge is chores / habits / suggestions, which post data-changed
-      // (not tasks-changed). Same debounce so a ritual burst is one reload.
-      .onReceive(NotificationCenter.default.publisher(for: .septenaDataChanged)
-        .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-        reload()
-      }
-      #endif
   }
 }
 

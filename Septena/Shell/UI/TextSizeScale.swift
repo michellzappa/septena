@@ -170,47 +170,9 @@ extension View {
 // and Septask's own settings shell present the same pane.
 
 struct TextSizeSettingsPane: View {
-  @AppStorage(SettingsKey.textSizeStep) private var step: Int = 0
-
-  private var sliderBinding: Binding<Double> {
-    Binding(
-      get: { Double(TextSizeStep.resolve(step).rawValue) },
-      set: { step = Int($0.rounded()) }
-    )
-  }
-
   var body: some View {
     Form {
-      Section {
-        Slider(
-          value: sliderBinding,
-          in: -2...2,
-          step: 1
-        ) {
-          Text("Text Size")
-        } minimumValueLabel: {
-          Image(systemName: "textformat.size.smaller")
-            .foregroundStyle(.secondary)
-        } maximumValueLabel: {
-          Image(systemName: "textformat.size.larger")
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityValue(TextSizeStep.resolve(step).label)
-
-        HStack {
-          Spacer()
-          Text(TextSizeStep.resolve(step).label)
-            .font(.septenaLabel)
-            .foregroundStyle(.secondary)
-          Spacer()
-        }
-      } footer: {
-        #if os(macOS)
-        Text("Adjusts text size everywhere in the app. This is a per-device preference — it doesn’t change your other Septena devices.")
-        #else
-        Text("Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size.")
-        #endif
-      }
+      TextSizeSliderSection()
 
       Section {
         VStack(alignment: .leading, spacing: 6) {
@@ -227,5 +189,51 @@ struct TextSizeSettingsPane: View {
     }
     .formStyle(.grouped)
     .navigationTitle("Text Size")
+  }
+}
+
+/// The text-size dial as one Form section, so a settings page can hold it
+/// inline instead of pushing `TextSizeSettingsPane`.
+struct TextSizeSliderSection: View {
+  @AppStorage(SettingsKey.textSizeStep) private var step: Int = 0
+
+  private var sliderBinding: Binding<Double> {
+    Binding(
+      get: { Double(TextSizeStep.resolve(step).rawValue) },
+      set: { step = Int($0.rounded()) }
+    )
+  }
+
+  var body: some View {
+    Section {
+      Slider(
+        value: sliderBinding,
+        in: -2...2,
+        step: 1
+      ) {
+        Text("Text Size")
+      } minimumValueLabel: {
+        Image(systemName: "textformat.size.smaller")
+          .foregroundStyle(.secondary)
+      } maximumValueLabel: {
+        Image(systemName: "textformat.size.larger")
+          .foregroundStyle(.secondary)
+      }
+      .accessibilityValue(TextSizeStep.resolve(step).label)
+
+      HStack {
+        Spacer()
+        Text(TextSizeStep.resolve(step).label)
+          .font(.septenaLabel)
+          .foregroundStyle(.secondary)
+        Spacer()
+      }
+    } footer: {
+      #if os(macOS)
+      Text("Adjusts text size everywhere in the app. This is a per-device preference — it doesn’t change your other Septena devices.")
+      #else
+      Text("Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size.")
+      #endif
+    }
   }
 }

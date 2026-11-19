@@ -481,7 +481,7 @@ enum KitGlyph {
 
   /// `ColoredGlyph` — filled colored rounded square with a white SF Symbol.
   static func colored(symbol: String, color: NSColor, size: CGFloat = 17) -> NSImage? {
-    let key = cacheKey("c:\(symbol):\(color.description):\(size)")
+    let key = "c:\(symbol):\(color.description):\(size)"
     if let hit = cache[key] { return hit }
     // The symbol is tinted white by its own palette configuration — compositing
     // a white fill over it afterwards would flood the whole glyph rect instead.
@@ -513,7 +513,7 @@ enum KitGlyph {
     let clamped = value.isFinite ? max(0, min(1, value)) : 0
     // Quantized so scrolling a long sidebar reuses cache entries.
     let step = (clamped * 20).rounded() / 20
-    let key = cacheKey("p:\(step):\(tint.description):\(diameter)")
+    let key = "p:\(step):\(tint.description):\(diameter)"
     if let hit = cache[key] { return hit }
 
     let lineWidth = diameter * (2.5 / 14)
@@ -544,7 +544,7 @@ enum KitGlyph {
   /// a checkable or progress ring. `diameter` scales the whole image (dot
   /// inset stays proportional) — the group header passes a bigger one.
   static func areaDot(diameter: CGFloat = 16) -> NSImage {
-    let key = cacheKey("dot:\(diameter)")
+    let key = "dot:\(diameter)"
     if let hit = cache[key] { return hit }
     let inset = diameter * (5.0 / 16)
     let image = draw(size: NSSize(width: diameter, height: diameter)) { rect in
@@ -555,22 +555,22 @@ enum KitGlyph {
     return image
   }
 
-  /// These are bitmaps with semantic colors baked in, so light and dark need
-  /// separate entries — a dynamic NSColor describes itself identically in
-  /// both, which would otherwise serve a dark-mode ring in light mode.
-  private static func cacheKey(_ base: String) -> String {
-    base + "|" + NSApp.effectiveAppearance.name.rawValue
-  }
-
-  private static func draw(size: NSSize, _ body: (NSRect) -> Void) -> NSImage {
-    let image = NSImage(size: size)
-    // Resolve semantic colors against the appearance the key was built for.
-    NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
-      image.lockFocus()
-      body(NSRect(origin: .zero, size: size))
-      image.unlockFocus()
+  /// Draws lazily, at display time, in the drawing view's effective appearance
+  /// — the AppKit-documented way to build a custom image from dynamic
+  /// `NSColor`s. AppKit re-invokes the handler when the hosting view's
+  /// appearance changes, so a ring already on screen re-colors live.
+  ///
+  /// It used to `lockFocus` a bitmap under `NSApp.effectiveAppearance` and key
+  /// the cache by that appearance name. That baked the colors at the moment of
+  /// `configure`: the list reconfigures its cells on every data change, so it
+  /// picked up the right ink soon after a switch, but the sidebar sets its row
+  /// images only on a structure reload — its project rings kept the
+  /// light-mode `secondaryLabelColor` (near-black) on the dark sidebar.
+  private static func draw(size: NSSize, _ body: @escaping (NSRect) -> Void) -> NSImage {
+    NSImage(size: size, flipped: false) { rect in
+      body(rect)
+      return true
     }
-    return image
   }
 }
 
@@ -925,49 +925,91 @@ final class KitSidebarRowView: NSTableRowView {
   /// cover that band, or a selected area reads as if the blank space above
   /// it were selected too. 0 for every other row (the common case). Set
   /// alongside this row view in `outlineView(_:rowViewForItem:)`.
-  var extraTopMargin: CGFloat = 0
+  var extraTopMargin: CGFloat = 0 {
+    didSet { if oldValue != extraTopMargin { needsLayout = true } }
+  }
+
+  /// The pill is a layer-backed subview at the bottom of the row view, not a
+  /// drawing pass. With the outline's `selectionHighlightStyle` at `.none`
+  /// (AppKit's own source-list selection flashed ink on the row being left
+  /// and covered the area margin), a source-list row view runs neither
+  /// `drawSelection` nor `drawBackground`, so drawn pills never showed. A
+  /// subview always renders, under the cell.
+  private let pill: NSView = {
+    let view = NSView()
+    view.wantsLayer = true
+    view.layer?.cornerRadius = 6
+    view.layer?.cornerCurve = .continuous
+    view.isHidden = true
+    return view
+  }()
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    addSubview(pill, positioned: .below, relativeTo: nil)
+  }
+
+  required init?(coder: NSCoder) {
+    super.init(coder: coder)
+    addSubview(pill, positioned: .below, relativeTo: nil)
+  }
 
   /// See `KitCardRowView.viewDidMoveToWindow`.
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
     septaskObserveKeyWindow()
-    needsDisplay = true
+    refreshPill()
   }
 
-  /// The outline's `selectionHighlightStyle` is `.none` (AppKit's own
-  /// source-list selection flashed ink on the row being left and covered the
-  /// area margin), so selection is painted here from `isSelected`. These
-  /// overrides repaint when it or the focus emphasis changes.
   override var isSelected: Bool {
     get { super.isSelected }
-    set { super.isSelected = newValue; needsDisplay = true }
+    set { super.isSelected = newValue; refreshPill() }
   }
   override var isEmphasized: Bool {
     get { super.isEmphasized }
-    set { super.isEmphasized = newValue; needsDisplay = true }
+    set { super.isEmphasized = newValue; refreshPill() }
+  }
+  /// A task dragged ONTO this row (file into this list) gets the SAME pill as
+  /// selection: one emphasis language on the sidebar, not the system's
+  /// drop-target fill. The between-rows insertion line for reordering is
+  /// separate and untouched.
+  override var isTargetForDropOperation: Bool {
+    get { super.isTargetForDropOperation }
+    set { super.isTargetForDropOperation = newValue; refreshPill() }
+  }
+  /// Focus changes reach rows through `needsDisplay`
+  /// (`septaskRefreshSelectionEmphasis`, the key-window observer), so the
+  /// pill's emphasis follows that same signal.
+  override var needsDisplay: Bool {
+    didSet { if needsDisplay { refreshPill() } }
+  }
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    refreshPill()
   }
 
-  /// Painted in `draw(_:)`, not `drawBackground`: a source-list row view
-  /// skips its background pass, which is why the pill vanished once AppKit's
-  /// own selection was turned off. Row-view drawing sits under the cells.
-  override func draw(_ dirtyRect: NSRect) {
-    super.draw(dirtyRect)
-    guard isSelected else { return }
-    SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
+  override func layout() {
+    super.layout()
+    pill.frame = pillRect
   }
 
-  /// No-op: selection is painted in `drawBackground`.
+  private func refreshPill() {
+    let show = isSelected || isTargetForDropOperation
+    pill.isHidden = !show
+    guard show else { return }
+    let emphasized = isTargetForDropOperation || septaskSelectionIsActive
+    var color = SeptaskKitTheme.listSelectionFill(emphasized: emphasized).cgColor
+    effectiveAppearance.performAsCurrentDrawingAppearance {
+      color = SeptaskKitTheme.listSelectionFill(emphasized: emphasized).cgColor
+    }
+    pill.layer?.backgroundColor = color
+    pill.frame = pillRect
+  }
+
+  /// No-op: the pill subview shows selection.
   override func drawSelection(in dirtyRect: NSRect) {}
-
-  /// A task dragged ONTO this row (file into this list) gets the SAME pill
-  /// as selection — one emphasis language on the sidebar, not the system's
-  /// drop-target fill. The between-rows insertion line for reordering is a
-  /// separate drawing and is untouched (`.sourceList` style stays).
-  override func drawDraggingDestinationFeedback(in dirtyRect: NSRect) {
-    SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
-  }
+  /// No-op: the pill subview shows the drop target.
+  override func drawDraggingDestinationFeedback(in dirtyRect: NSRect) {}
 
   /// The one pill rect both drawings use. It covers only the row's CONTENT
   /// band — `bounds` minus `extraTopMargin` — sitting at the BOTTOM of

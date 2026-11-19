@@ -1,0 +1,228 @@
+import AuthenticationServices
+import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
+
+// Sign in with Apple for the task backend, in one place. Septask is
+// backend-only (docs/SEPTASK_BACKEND.md §9, phase 4): signed out, it keeps
+// working on the local store and queues every edit in the sync outbox, and it
+// asks to sign in on the welcome, on Today, and in Settings ▸ Account. All
+// three ask through the pieces below, so the flow exists once.
+
+/// The flow itself: a nonce for Apple, then the identity token to the backend.
+@MainActor
+enum SeptaskSignIn {
+  /// Fills Apple's request. Returns the raw nonce, which the backend needs.
+  static func prepare(_ request: ASAuthorizationAppleIDRequest) -> String {
+    let nonce = TaskBackendClient.makeNonce()
+    request.requestedScopes = []
+    request.nonce = nonce.hashed
+    return nonce.raw
+  }
+
+  /// Hands Apple's result to the backend. Returns an error line, or nil when
+  /// it worked or the user cancelled.
+  static func finish(_ result: Result<ASAuthorization, Error>, rawNonce: String?) async -> String? {
+    switch result {
+    case .failure(let error):
+      if (error as? ASAuthorizationError)?.code == .canceled { return nil }
+      return error.localizedDescription
+    case .success(let auth):
+      guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
+            let data = credential.identityToken,
+            let token = String(data: data, encoding: .utf8),
+            let rawNonce else {
+        return String(localized: "Couldn't read the Apple sign-in.",
+                      comment: "Septask sign-in: Apple returned no identity token")
+      }
+      do {
+        try await TaskSyncEngine.shared.signIn(identityToken: token, rawNonce: rawNonce)
+        return nil
+      } catch {
+        return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+      }
+    }
+  }
+}
+
+// MARK: - SwiftUI
+
+/// The Apple button, with progress and the error line under it. `compact`
+/// is the size for an inline notice (`SeptaskSignInNotice`); the full size
+/// is for the welcome and Settings.
+struct SeptaskSignInButton: View {
+  var compact = false
+  @Environment(\.colorScheme) private var colorScheme
+  @State private var rawNonce: String?
+  @State private var working = false
+  @State private var error: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      if working {
+        ProgressView().controlSize(.small)
+      } else {
+        SignInWithAppleButton(.signIn) { request in
+          rawNonce = SeptaskSignIn.prepare(request)
+        } onCompletion: { result in
+          working = true
+          Task { @MainActor in
+            error = await SeptaskSignIn.finish(result, rawNonce: rawNonce)
+            rawNonce = nil
+            working = false
+          }
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        // Apple's minimum for the "Sign in with Apple" label is 140 x 30.
+        .frame(width: compact ? 180 : nil, height: compact ? 32 : 36)
+        .frame(maxWidth: 320)
+      }
+      if let error {
+        Text(error).font(.caption).foregroundStyle(.red)
+      }
+    }
+  }
+}
+
+/// Settings ▸ Account and the task backend pane: who is signed in, the sync
+/// state, and sign-in or sign-out.
+struct SeptaskSyncAccountSection: View {
+  private var sync: TaskSyncEngine { .shared }
+
+  var body: some View {
+    Section {
+      if sync.signedIn {
+        LabeledContent("Sync") {
+          Text(statusLine).foregroundStyle(.secondary)
+        }
+        if let error = sync.lastError {
+          Text(error).font(.caption).foregroundStyle(.red)
+        }
+        Button(role: .destructive) {
+          Task { await sync.signOut() }
+        } label: {
+          Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+        }
+      } else {
+        Text(signedOutLine).foregroundStyle(.secondary)
+        SeptaskSignInButton()
+      }
+    } header: {
+      Text("Sync")
+    } footer: {
+      Text("Your tasks sync through Septena's own server at api.septena.app. Sign in with Apple once on each device.")
+    }
+  }
+
+  private var signedOutLine: String {
+    sync.pendingOps > 0
+      ? String(localized: "Not signed in. \(sync.pendingOps) changes are waiting on this device and sync when you sign in.",
+               comment: "Septask sync: signed out with queued edits")
+      : String(localized: "Not signed in. Your tasks stay on this device until you sign in.",
+               comment: "Septask sync: signed out, nothing queued")
+  }
+
+  private var statusLine: String {
+    var parts: [String] = []
+    parts.append(sync.isSyncing ? "Syncing" : (sync.wsConnected ? "Live" : "Waiting for connection"))
+    if sync.pendingOps > 0 { parts.append("\(sync.pendingOps) to send") }
+    if let last = sync.lastPull {
+      parts.append("updated \(last.formatted(.relative(presentation: .named)))")
+    }
+    return parts.joined(separator: ", ")
+  }
+}
+
+/// Today's sign-in notice on the SwiftUI task list, drawn by the shared
+/// `TaskListNotice` with Apple's button as its action. Draws nothing once
+/// signed in. The AppKit Today draws the same notice through `KitNoticeCell`.
+struct SeptaskSignInNotice: View {
+  private var sync: TaskSyncEngine { .shared }
+
+  var body: some View {
+    if !sync.signedIn {
+      TaskListNotice(
+        kind: .actionNeeded,
+        symbol: "person.crop.circle.badge.exclamationmark",
+        title: Text("Not signed in"),
+        detail: Text(detail)
+      ) {
+        SeptaskSignInButton(compact: true)
+      }
+    }
+  }
+
+  private var detail: String {
+    #if os(macOS)
+    String(localized: "Your changes stay on this Mac until you sign in.",
+           comment: "Septask: Today notice detail when the task backend has no session")
+    #else
+    UIDevice.current.userInterfaceIdiom == .pad
+      ? String(localized: "Your changes stay on this iPad until you sign in.",
+               comment: "Septask: Today notice detail when the task backend has no session, iPad")
+      : String(localized: "Your changes stay on this iPhone until you sign in.",
+               comment: "Septask: Today notice detail when the task backend has no session, iPhone")
+    #endif
+  }
+}
+
+// MARK: - AppKit (the macOS shell's Today list)
+
+#if os(macOS)
+/// Runs the Apple sheet for an AppKit button. One shared instance: the
+/// controller holds its delegate weakly.
+@MainActor
+final class SeptaskAppKitSignIn: NSObject, ASAuthorizationControllerDelegate,
+  ASAuthorizationControllerPresentationContextProviding {
+  static let shared = SeptaskAppKitSignIn()
+
+  private var rawNonce: String?
+  private var controller: ASAuthorizationController?
+
+  func start() {
+    guard controller == nil else { return }
+    let request = ASAuthorizationAppleIDProvider().createRequest()
+    rawNonce = SeptaskSignIn.prepare(request)
+    let controller = ASAuthorizationController(authorizationRequests: [request])
+    controller.delegate = self
+    controller.presentationContextProvider = self
+    self.controller = controller
+    controller.performRequests()
+  }
+
+  nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    MainActor.assumeIsolated {
+      NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first ?? NSWindow()
+    }
+  }
+
+  nonisolated func authorizationController(controller: ASAuthorizationController,
+                                           didCompleteWithAuthorization authorization: ASAuthorization) {
+    MainActor.assumeIsolated { finish(.success(authorization)) }
+  }
+
+  nonisolated func authorizationController(controller: ASAuthorizationController,
+                                           didCompleteWithError error: Error) {
+    MainActor.assumeIsolated { finish(.failure(error)) }
+  }
+
+  private func finish(_ result: Result<ASAuthorization, Error>) {
+    let nonce = rawNonce
+    rawNonce = nil
+    controller = nil
+    Task { @MainActor in
+      if let error = await SeptaskSignIn.finish(result, rawNonce: nonce) {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Sign in didn't finish",
+                                   comment: "Septask sign-in: failure alert title")
+        alert.informativeText = error
+        alert.runModal()
+      }
+    }
+  }
+}
+
+#endif

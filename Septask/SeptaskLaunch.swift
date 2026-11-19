@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 // The process's launch sequence, in one place because two roots now perform
 // it: the SwiftUI window's `.task` (iOS, and the macOS classic window) and the
@@ -15,12 +16,8 @@ enum SeptaskLaunch {
 
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-    ClaudeReconnectNudge.shared.start()
+    SeptaskLegacyClaudeCleanup.runOnce()
     SeptaskDiagnosticsCoordinator.shared.start()
-    Task { @MainActor in
-      await ClaudeGatewayProvider.shared.refreshIfNeeded()
-      ClaudeReconnectNudge.shared.reconcile()
-    }
     BadgeManager.shared.start(context: localStore.container.mainContext)
     Task {
       await services.absorbRemoteChanges()
@@ -29,7 +26,10 @@ enum SeptaskLaunch {
       settings.reconcileWelcomeName(context: context, engine: services.ckEngine)
       settings.reconcileTelemetryLevel(context: context, engine: services.ckEngine)
       settings.reconcileHiddenCalendars(context: context, engine: services.ckEngine)
-      settings.reconcileSupporter(context: context, engine: services.ckEngine)
+      // No `reconcileSupporter`: the supporter flag came from Septena through
+      // CloudKit, and Septask no longer reads CloudKit. `engine` above is
+      // only the "push allowed" signal; in Septask the push goes to the task
+      // backend (SettingsMirror.upsert), and the engine never starts.
     }
   }
 
@@ -39,22 +39,65 @@ enum SeptaskLaunch {
     let services = SeptenaServices.shared
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-    ClaudeReconnectNudge.shared.activate()
     SeptaskDiagnosticsCoordinator.shared.start()
-    try? await services.ckEngine.fetchChanges()
+    // Task backend: reconcile, push, pull, reopen the live socket.
+    TaskSyncEngine.shared.activate()
     // Opened after midnight (or after a few days away): a backgrounded app
     // does not reliably receive `NSCalendarDayChanged`, so the foreground is
     // the reliable place to advance fixed-schedule repeats. Idempotent —
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
-    await ClaudeGatewayProvider.shared.refreshIfNeeded()
-    ClaudeReconnectNudge.shared.reconcile()
+  }
+}
+
+/// One-time removal of the old hosted-gateway Claude connection
+/// (mcp.septena.app, a CloudKit web-auth token re-minted every ~8h with an
+/// Apple sign-in). Septask no longer compiles `ClaudeGatewayProvider` or
+/// `ClaudeReconnectNudge`: Claude now connects to the task backend
+/// (`https://api.septena.app/mcp`), paired in Settings ▸ About ▸ Advanced ▸
+/// Task backend. This clears only what Septask itself wrote. The shared App
+/// Group keys (`septena.claudeGateway.enabled` / `.lastRefreshAt` /
+/// `.nudgeOwner` in `group.com.septena.cloud`) stay: Septena still reads them.
+@MainActor
+enum SeptaskLegacyClaudeCleanup {
+  private static let doneKey = "septask.legacyClaudeGatewayCleanup.v1"
+  /// `ClaudeReconnectNudge.notificationID` — literal, the type is not compiled here.
+  private static let nudgeNotificationID = "septena.claude.connectionNudge"
+  /// `ClaudeGatewayProvider.tokenKeychainAccount`.
+  private static let tokenKeychainAccount = "septena.claudeGateway.ckToken"
+  /// Bundle-local defaults the old provider and its Settings toggle wrote.
+  private static let localDefaultsKeys = [
+    "septena.notify.toggle.claude.connection",
+    "septena.claudeGateway.enabled",
+    "septena.claudeGateway.lastRefreshAt",
+    "septena.claudeGateway.measure.cycleRefreshAt",
+    "septena.claudeGateway.measure.lastValidAge",
+    "septena.claudeGateway.measure.finalizedCycle",
+    "septena.claudeGateway.measure.samples",
+  ]
+
+  static func runOnce() {
+    let defaults = UserDefaults.standard
+    guard !defaults.bool(forKey: doneKey) else { return }
+    // Each app has its own notification queue, so this never touches the
+    // reminder Septena schedules.
+    let center = UNUserNotificationCenter.current()
+    center.removePendingNotificationRequests(withIdentifiers: [nudgeNotificationID])
+    center.removeDeliveredNotifications(withIdentifiers: [nudgeNotificationID])
+    #if os(iOS)
+    // iOS: the item sits in Septask's own keychain access group (no
+    // keychain-access-groups entitlement), so Septena's copy is out of reach.
+    // macOS: not deleted. The unsandboxed Mac apps share the login keychain
+    // and both used this account name, so a delete could remove Septena's.
+    KeychainStore.delete(account: tokenKeychainAccount)
+    #endif
+    for key in localDefaultsKeys { defaults.removeObject(forKey: key) }
+    defaults.set(true, forKey: doneKey)
   }
 }
 
 #if os(macOS)
 import AppKit
-import UserNotifications
 
 /// The observable objects the AppKit shell owns, since it has no SwiftUI
 /// scene to hold them.
@@ -77,14 +120,8 @@ enum SeptaskMacRuntime {
 /// here rather than in a SwiftUI scene's `.task` — the SwiftUI window is
 /// suppressed at launch and only opens on request.
 @MainActor
-final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate,
-                                   UNUserNotificationCenterDelegate {
+final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
-    // Route the Claude reconnect nudge's tap here. The Mac schedules the same
-    // reminder the phone does (`ClaudeReconnectNudge`, started by
-    // `SeptaskLaunch.run` below); without a delegate the tap would foreground
-    // the app without re-minting.
-    UNUserNotificationCenter.current().delegate = self
     // Global Quick Entry hotkey, ⌃⌥Space (Carbon RegisterEventHotKey: no
     // Accessibility permission, no event tap). ⌃Space is the system input
     // source switch and Moom's binding, so it is not used.
@@ -103,35 +140,6 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate,
     if SeptaskUpdater.isConfigured { _ = SeptaskUpdater.shared }
     #endif
     Task { @MainActor in await SeptaskLaunch.run(settings: SeptaskMacRuntime.settings) }
-  }
-
-  /// Show the banner even while Septask is frontmost — the nudge still matters
-  /// if you aren't looking at Settings.
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    willPresent notification: UNNotification,
-    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-  ) {
-    completionHandler([.banner, .sound])
-  }
-
-  /// macOS twin of `SeptaskAppDelegate`'s iOS handler. Claude is the only
-  /// nudge Septask schedules, and a plain tap re-mints too.
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    didReceive response: UNNotificationResponse,
-    withCompletionHandler completionHandler: @escaping () -> Void
-  ) {
-    let actionID = response.actionIdentifier
-    let userInfo = response.notification.request.content.userInfo
-    Task { @MainActor in
-      await SeptenaServices.shared.start()
-      if actionID == NotificationActionID.claudeReconnect || userInfo["claudeReconnect"] != nil {
-        await ClaudeGatewayProvider.shared.refreshIfNeeded(force: true)
-        ClaudeReconnectNudge.shared.reconcile()
-      }
-      completionHandler()
-    }
   }
 
   /// Clicking the Dock icon with every window closed reopens the shell — the

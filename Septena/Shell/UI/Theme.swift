@@ -225,8 +225,9 @@ enum Theme {
   #endif
 
   /// Selection color: the user's accent (System Settings on macOS; iOS has
-  /// no user accent, so the system blue). Selection is the one place the app
-  /// shows it. Everything else keeps the ink accent and section colors.
+  /// no user accent, so the system blue). Sections don't carry arbitrary
+  /// colors in the task app, so the accent is free to mean "selected"
+  /// (decided 2026-11-19).
   static var selectionAccent: Color {
     #if os(macOS)
     return Color(nsColor: systemAccentNSColor)
@@ -279,6 +280,10 @@ enum Theme {
   /// date text. The previous orange read as "warning, but soft"; red is the
   /// platform convention for "this is late".
   static let overdueRed = Color.red
+  /// Warning notices (`TaskListNotice` / `KitNoticeCell`): the glyph, and a
+  /// light wash of it over the card surface. System orange, the platform's
+  /// "something needs a look" color.
+  static let noticeWarning = Color.orange
 
   // MARK: - Filter accents
 

@@ -1,128 +1,123 @@
-#if os(macOS)
-import AuthenticationServices
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
-/// Settings ▸ About ▸ Advanced ▸ Task backend (preview). Mac only. Phase 1 of
-/// docs/SEPTASK_BACKEND.md §9: sign in to api.septena.app with Apple and copy
-/// every task, area, project, conversation and attachment there. The logic
-/// lives in `TaskBackendImporter` (SeptenaCore); this view only drives it.
+/// Settings ▸ About ▸ Advanced ▸ Task backend, on Mac and iOS. Septask is
+/// backend-only (docs/SEPTASK_BACKEND.md §9, phase 4): there is no iCloud
+/// switch and no copy or move-back action any more. This pane shows the
+/// sign-in and sync state (the same section as Settings ▸ Account), what
+/// the backend refused, and pairs a Claude connector.
+///
+/// Why no "Copy tasks to backend": it read the CloudKit mirror and needed a
+/// running CloudKit engine. The sync engine already sends every local row
+/// the backend does not hold (its reconcile diffs each row against what the
+/// backend last confirmed), so a re-upload action would add nothing.
 struct SeptaskBackendSettingsPane: View {
-  @Environment(\.colorScheme) private var colorScheme
-  private var importer: TaskBackendImporter { .shared }
-  /// The raw nonce of the Sign in with Apple request in flight. Apple gets
-  /// its hash; the backend gets this value.
-  @State private var rawNonce: String?
-  @State private var signingIn = false
-  @State private var signInError: String?
+  private var sync: TaskSyncEngine { .shared }
+  /// Claude connector pairing.
+  @State private var pairCode = ""
+  @State private var pairing = false
+  @State private var pairResult: (text: String, failed: Bool)?
+  @State private var copiedURL = false
+  private static let connectorURL = "https://api.septena.app/mcp"
 
   var body: some View {
     Form {
-      Section {
-        if importer.signedIn {
-          Label("Signed in", systemImage: "checkmark.seal")
-            .foregroundStyle(.secondary)
-          Button(role: .destructive) {
-            Task { await importer.signOut() }
-          } label: {
-            Label("Sign out of backend", systemImage: "rectangle.portrait.and.arrow.right")
-          }
-          .disabled(importer.phase == .running)
-        } else if signingIn {
-          HStack {
-            ProgressView().controlSize(.small)
-            Text("Signing in…").foregroundStyle(.secondary)
-          }
-        } else {
-          SignInWithAppleButton(.signIn) { request in
-            let nonce = TaskBackendClient.makeNonce()
-            rawNonce = nonce.raw
-            request.requestedScopes = []
-            request.nonce = nonce.hashed
-          } onCompletion: { result in
-            handleSignIn(result)
-          }
-          .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-          .frame(height: 32)
-        }
-        if let signInError {
-          Text(signInError).font(.caption).foregroundStyle(.red)
-        }
-      } header: {
-        Text("Account")
-      } footer: {
-        Text("Sign in with Apple to reach the task backend at api.septena.app. The sign-in stays on this Mac.")
-      }
-
-      Section {
-        Button {
-          Task { await importer.run() }
-        } label: {
-          Label("Copy tasks to backend", systemImage: "arrow.up.doc")
-        }
-        .disabled(!importer.signedIn || importer.phase == .running)
-
-        if importer.phase == .running {
-          HStack {
-            ProgressView().controlSize(.small)
-            Text(importer.progress).foregroundStyle(.secondary)
-          }
-        } else if let line = importer.resultLine {
-          Text(line)
-        }
-      } header: {
-        Text("Copy")
-      } footer: {
-        Text("Copies every task, area, project, conversation and attachment on this Mac to the backend, then reads it back to check. Your iCloud data does not change. Running it again updates the copy.")
-      }
-
-      if !importer.issues.isEmpty {
-        Section {
-          ForEach(importer.issues.prefix(20), id: \.key) { issue in
-            VStack(alignment: .leading, spacing: 2) {
-              Text("\(issue.entity.rawValue) \(issue.id)")
-                .font(.caption.monospaced())
-              Text(issue.reason)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-          if importer.issues.count > 20 {
-            Text("\(importer.issues.count - 20) more not shown.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        } header: {
-          Text("Details")
-        }
-      }
+      SeptaskSyncAccountSection()
+      claudeSection
+      if !sync.issues.isEmpty { issuesSection }
     }
     .formStyle(.grouped)
+    .navigationTitle("Task backend")
   }
 
-  private func handleSignIn(_ result: Result<ASAuthorization, Error>) {
-    switch result {
-    case .failure(let error):
-      if (error as? ASAuthorizationError)?.code == .canceled { return }
-      signInError = error.localizedDescription
-    case .success(let auth):
-      guard let credential = auth.credential as? ASAuthorizationAppleIDCredential,
-            let tokenData = credential.identityToken,
-            let token = String(data: tokenData, encoding: .utf8),
-            let nonce = rawNonce else {
-        signInError = "Couldn't read the Apple identity token."
-        return
-      }
-      signingIn = true
-      signInError = nil
-      Task { @MainActor in
-        defer { signingIn = false; rawNonce = nil }
-        do {
-          try await importer.signIn(identityToken: token, rawNonce: nonce)
-        } catch {
-          signInError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+  private var claudeSection: some View {
+    Section {
+      LabeledContent("Connector URL") {
+        HStack {
+          Text(Self.connectorURL)
+            .font(.callout.monospaced())
+            .textSelection(.enabled)
+          Button(copiedURL ? "Copied" : "Copy", action: copyURL)
         }
+      }
+      HStack {
+        TextField("Code from the browser page", text: $pairCode)
+          .font(.body.monospaced())
+          .onSubmit(approvePairing)
+        Button("Approve", action: approvePairing)
+          .disabled(!sync.signedIn || pairing
+                    || pairCode.trimmingCharacters(in: .whitespaces).isEmpty)
+      }
+      if pairing {
+        HStack {
+          ProgressView().controlSize(.small)
+          Text("Approving…").foregroundStyle(.secondary)
+        }
+      } else if let pairResult {
+        Text(pairResult.text)
+          .font(.caption)
+          .foregroundStyle(pairResult.failed ? .red : .secondary)
+      }
+    } header: {
+      Text("Connect Claude")
+    } footer: {
+      Text("Add this URL to Claude as a custom connector. When Claude shows a code, enter it here. Claude can then read and change your tasks. Only enter a code from a browser window you opened yourself.")
+    }
+  }
+
+  private var issuesSection: some View {
+    Section {
+      ForEach(sync.issues.suffix(20).reversed(), id: \.key) { issue in
+        VStack(alignment: .leading, spacing: 2) {
+          Text("\(issue.entity.rawValue) \(issue.id)")
+            .font(.caption.monospaced())
+          Text(issue.reason)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      Button("Clear") { sync.clearIssues() }
+    } header: {
+      Text("Not synced")
+    } footer: {
+      Text("Changes the backend refused, newest first. The backend kept its own version of each.")
+    }
+  }
+
+  private func copyURL() {
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(Self.connectorURL, forType: .string)
+    #else
+    UIPasteboard.general.string = Self.connectorURL
+    #endif
+    copiedURL = true
+  }
+
+  private func approvePairing() {
+    let code = pairCode.trimmingCharacters(in: .whitespaces)
+    guard sync.signedIn, !pairing, !code.isEmpty else { return }
+    pairing = true
+    pairResult = nil
+    Task { @MainActor in
+      defer { pairing = false }
+      do {
+        _ = try await TaskBackendClient.shared.approvePairing(code: code)
+        pairCode = ""
+        pairResult = ("Approved. Finish in your browser.", false)
+      } catch TaskBackendError.http(_, let code) where code == "invalid_code" {
+        pairResult = ("That code is wrong or has expired.", true)
+      } catch TaskBackendError.http(_, let code) where code == "code_used" {
+        pairResult = ("That code was already used.", true)
+      } catch TaskBackendError.http(_, let code) where code == "too_many_attempts" {
+        pairResult = ("Too many wrong codes. Try again in 10 minutes.", true)
+      } catch {
+        pairResult = ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription, true)
       }
     }
   }
 }
-#endif

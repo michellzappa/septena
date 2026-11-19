@@ -1,6 +1,5 @@
 #if os(iOS)
 import UIKit
-import UserNotifications
 
 // Home Screen Quick Action delivery for Septask.
 //
@@ -26,7 +25,7 @@ import UserNotifications
 // `UIResponder` property, so an `NSObject` delegate cannot override it (the
 // compiler says "does not override any property from its superclass") and the
 // app delegate would not sit in the responder chain the lookup walks.
-final class SeptaskAppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class SeptaskAppDelegate: UIResponder, UIApplicationDelegate {
   /// Captured at cold launch before `NavigationState` exists; drained by
   /// `SeptaskApp.task`.
   private static var pending: ShortcutAction?
@@ -49,49 +48,6 @@ final class SeptaskAppDelegate: UIResponder, UIApplicationDelegate, UNUserNotifi
       Task { @MainActor in nav.pendingShortcut = action }
     } else {
       pending = action
-    }
-  }
-
-  /// Septask owns the same Claude reconnect notification path as Septena.
-  /// Registering the delegate at launch lets both the action button and a
-  /// plain notification tap re-mint the hosted gateway token in this app.
-  func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions:
-      [UIApplication.LaunchOptionsKey: Any]? = nil
-  ) -> Bool {
-    UNUserNotificationCenter.current().delegate = self
-    Task { @MainActor in ClaudeReconnectNudge.shared.start() }
-    return true
-  }
-
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    willPresent notification: UNNotification,
-    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-  ) {
-    completionHandler([.banner, .sound])
-  }
-
-  func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    didReceive response: UNNotificationResponse,
-    withCompletionHandler completionHandler: @escaping () -> Void
-  ) {
-    let actionID = response.actionIdentifier
-    let userInfo = response.notification.request.content.userInfo
-    guard actionID == NotificationActionID.claudeReconnect || userInfo["claudeReconnect"] != nil else {
-      completionHandler()
-      return
-    }
-    Task { @MainActor in
-      // A notification can cold-launch us before the SwiftUI scene has bound
-      // the task stack. Start is idempotent, and refresh is deliberately an
-      // explicit user action here so the Apple sign-in sheet may appear.
-      await SeptenaServices.shared.start()
-      await ClaudeGatewayProvider.shared.refreshIfNeeded(force: true)
-      ClaudeReconnectNudge.shared.reconcile()
-      completionHandler()
     }
   }
 
