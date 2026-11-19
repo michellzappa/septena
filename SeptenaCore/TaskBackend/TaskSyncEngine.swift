@@ -982,6 +982,56 @@ final class TaskSyncEngine {
     signedIn = TaskBackendClient.hasSession
   }
 
+  /// Deletes the account on the backend, then wipes this device's task data:
+  /// the outbox, the shadows, and every local task, area, project and
+  /// attachment row (with the attachment files). The engine stops first so
+  /// that no push in flight writes rows back after the server emptied the
+  /// store. On failure nothing local changes and the engine starts again.
+  func deleteAccount() async throws {
+    stop()
+    // A run that started before `stop()` finishes its current request.
+    var waited = 0
+    while isSyncing, waited < 100 {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      waited += 1
+    }
+    do {
+      try await client.deleteAccount()
+    } catch {
+      start()
+      throw error
+    }
+    wipeLocalTaskData()
+    signedIn = TaskBackendClient.hasSession
+    SeptenaLog.info("[TaskSync] account deleted; local task data wiped")
+  }
+
+  /// Object-by-object deletes through the context, never `delete(model:)`:
+  /// a batch delete leaves objects the context already holds registered,
+  /// and the next read of one of them traps (see `TaskSyncStore`).
+  private func wipeLocalTaskData() {
+    let context = main
+    for a in (try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] {
+      if let url = TaskAttachmentFiles.url(for: a) { try? FileManager.default.removeItem(at: url) }
+      context.delete(a)
+    }
+    for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
+    for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
+    for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
+    _ = StoreHealth.save(context, op: "taskSync.deleteAccount")
+    store()?.deleteEverything()
+    since = 0
+    settingsReady = false
+    lastPull = nil
+    lastError = nil
+    issues = []
+    refreshPendingCount()
+    // The undo closures point at rows that no longer exist.
+    TaskUndo.removeAll()
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
+  }
+
   // MARK: - Settings (TaskSyncSettings.swift)
 
   var settingsReady: Bool {

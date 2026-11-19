@@ -291,6 +291,8 @@ private struct SeptaskAccountPane: View {
       // nothing when no save has failed this launch. Septask has no Data Tools
       // pane (that lives in Septena ▸ Advanced), so this is its only home.
       StoreHealthSettingsSection()
+
+      SeptaskDeleteAccountSection()
     }
     .formStyle(.grouped)
     .navigationTitle("Account")

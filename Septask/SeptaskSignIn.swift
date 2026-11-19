@@ -136,6 +136,109 @@ struct SeptaskSyncAccountSection: View {
   }
 }
 
+// MARK: - Delete account
+
+/// Settings ▸ Account: the in-app account deletion the App Store requires.
+/// Draws nothing while signed out (there is no account on this device to
+/// delete). The confirmation is a plain window sheet that lists what goes;
+/// Cancel is the default button, so Return never deletes.
+struct SeptaskDeleteAccountSection: View {
+  private var sync: TaskSyncEngine { .shared }
+  @State private var confirming = false
+
+  var body: some View {
+    if sync.signedIn {
+      Section {
+        Button(role: .destructive) {
+          confirming = true
+        } label: {
+          Label("Delete account", systemImage: "trash")
+        }
+        // On the button, not the Section: a Section's modifiers fan out to
+        // its rows.
+        .sheet(isPresented: $confirming) {
+          SeptaskDeleteAccountSheet()
+        }
+      } footer: {
+        Text("Deletes your account and all your tasks on the Septena server.")
+      }
+    }
+  }
+}
+
+private struct SeptaskDeleteAccountSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  @AppStorage(SeptaskWelcome.completedKey) private var welcomeCompleted = false
+  @State private var working = false
+  @State private var error: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Delete your account?")
+        .font(.title2.weight(.semibold))
+      Text("This deletes the following from the Septena server:")
+      VStack(alignment: .leading, spacing: 6) {
+        Label("Your tasks, areas and projects", systemImage: "checklist")
+        Label("Your attachments", systemImage: "paperclip")
+        Label("Your conversations with Claude", systemImage: "bubble.left.and.text.bubble.right")
+        Label("Your synced settings", systemImage: "gearshape")
+      }
+      .padding(.leading, 4)
+      Text("It also removes your tasks from this device and signs you out. You can't undo this.")
+      if let error {
+        Text(error).font(.callout).foregroundStyle(.red)
+      }
+      #if os(iOS)
+      Spacer(minLength: 0)
+      #endif
+      HStack {
+        if working { ProgressView().controlSize(.small) }
+        Spacer()
+        Button("Cancel") { dismiss() }
+          .keyboardShortcut(.defaultAction)
+          .disabled(working)
+        Button("Delete account", role: .destructive) { delete() }
+          .disabled(working)
+      }
+    }
+    .padding(24)
+    #if os(macOS)
+    .frame(width: 420)
+    #else
+    .presentationDetents([.medium])
+    #endif
+    .interactiveDismissDisabled(working)
+  }
+
+  private func delete() {
+    working = true
+    error = nil
+    Task { @MainActor in
+      do {
+        try await TaskSyncEngine.shared.deleteAccount()
+        dismiss()
+        showWelcome()
+      } catch {
+        let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        self.error = String(localized: "Couldn't delete your account. Nothing was deleted. \(detail)",
+                            comment: "Delete account sheet: the server call failed")
+        working = false
+      }
+    }
+  }
+
+  /// Back to the first run. iOS: the welcome gate watches the same key.
+  /// Mac: the AppKit shell hosts the welcome itself.
+  private func showWelcome() {
+    welcomeCompleted = false
+    #if os(macOS)
+    if let shell = SeptaskKitWindowController.existing?.window {
+      SeptaskKitWelcome.presentIfNeeded(over: shell)
+    }
+    #endif
+  }
+}
+
 /// Today's sign-in notice on the SwiftUI task list, drawn by the shared
 /// `TaskListNotice` with Apple's button as its action. Draws nothing once
 /// signed in. The AppKit Today draws the same notice through `KitNoticeCell`.
