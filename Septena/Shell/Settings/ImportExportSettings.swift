@@ -56,6 +56,10 @@ struct ImportExportSettingsPane: View {
         trainingImportSection
         formatSection
       case .dataTools:
+        // First: it reports a write the user has already lost, so it outranks
+        // the repair and prompt tools they came here to run. Renders nothing
+        // when no save has failed this launch.
+        StoreHealthSettingsSection()
         repairSection
         schemaPromptsSection
       }

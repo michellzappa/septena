@@ -103,10 +103,19 @@ struct TaskDraft: Equatable {
   /// schedule change, project / area as one move. `groupsByEvent` folds them
   /// into one ⌘Z step. Pass nil for saves that are not a user edit of an
   /// existing task (the inline-create placeholder's first title).
+  ///
+  /// Returns false when the title/notes write was attempted and did NOT land
+  /// (rolled-back save, or the row has gone from the store). The composer uses
+  /// it to decide whether the draft may be marked as persisted — marking a
+  /// failed write as saved is what let a typed title be dropped and the row
+  /// then purged as untitled. The placement writes below are not part of the
+  /// result: losing one of those leaves a visible, re-editable row.
   @MainActor
+  @discardableResult
   func update(_ original: SeptenaTask, via mutator: TaskMutator,
-              undoContext: ModelContext? = nil) {
+              undoContext: ModelContext? = nil) -> Bool {
     let id = original.id
+    var titleWriteLanded = true
     // Compare against the original run through the SAME normalization (a draft
     // seeded from it), so every field is normalized-vs-normalized. The When /
     // Today writes used to be unconditional, which — because `storedScheduled`
@@ -126,10 +135,12 @@ struct TaskDraft: Equatable {
     let titleChanged = trimmedTitle != prior.trimmedTitle
     let notesChanged = trimmedNotes != prior.trimmedNotes
     if titleChanged || notesChanged {
-      mutator.update(id: id,
-                     title: titleChanged ? trimmedTitle : nil,
-                     notes: notesChanged ? trimmedNotes : nil)
-      if undoContext != nil {
+      titleWriteLanded = mutator.update(id: id,
+                                        title: titleChanged ? trimmedTitle : nil,
+                                        notes: notesChanged ? trimmedNotes : nil)
+      // The undo entry describes a write that happened: skip it when the
+      // write did not land.
+      if undoContext != nil, titleWriteLanded {
         TaskUndo.recordEdit(id: id,
                             beforeTitle: original.title,
                             afterTitle: titleChanged ? trimmedTitle : original.title,
@@ -174,7 +185,7 @@ struct TaskDraft: Equatable {
     if projectId != prior.projectId { mutator.moveToProject(id: id, project: projectId) }
     if projectId == nil, areaId != prior.areaId { mutator.moveToArea(id: id, area: areaId) }
 
-    guard let undoContext else { return }
+    guard let undoContext else { return titleWriteLanded }
     if scheduleChanged {
       TaskUndo.recordScheduleChange(
         name: String(localized: "Change Schedule", comment: "Undo action name"),
@@ -183,6 +194,7 @@ struct TaskDraft: Equatable {
     if filingChanged {
       TaskUndo.recordMove(before: [filingBefore], context: undoContext, mutator: mutator)
     }
+    return titleWriteLanded
   }
 
   /// Did this edit change a *placement* field — project, area, scheduled, due,

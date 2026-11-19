@@ -153,6 +153,10 @@ struct WelcomeView: View {
                      moreSections)
       }
       .formStyle(.grouped)
+      // Same centered 640 pt column as the home tabs, so the form doesn't run
+      // edge to edge on iPad or the open iPhone Duo (951 pt wide).
+      .septenaTabScrollInsets(top: 0)
+      .resolvesAdaptiveNavigation()
       #if os(iOS)
       .navigationBarTitleDisplayMode(.inline)
       #endif
@@ -260,7 +264,9 @@ struct WelcomeView: View {
       .controlSize(.large)
       .disabled(selected.isEmpty)
     }
+    .frame(maxWidth: WideContentMetrics.maxReadableWidth)
     .padding()
+    .frame(maxWidth: .infinity)
     .background(.bar)
   }
 

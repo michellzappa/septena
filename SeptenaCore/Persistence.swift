@@ -3854,6 +3854,7 @@ enum StoreHealth {
   private static func noteSaveFailure(_ summary: String) {
     saveFailures += 1
     lastFailureSummary = summary
+    StoreHealthState.shared.noteSaveFailure(summary)
   }
 
   /// The parts of an `NSError` that actually name the problem. A SwiftData save

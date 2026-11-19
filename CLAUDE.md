@@ -127,12 +127,17 @@ Full guide: `docs/VERSIONING.md`. The rules that bite:
 
 ## Branch & integration discipline
 
-**A committer-cron handles commits.** A scheduled job commits green work on
-`main` automatically — agents do NOT need to `git commit` (or offer to) as part
-of finishing a task. Just leave the working tree in a green, build-verified
-state; the cron picks it up. Don't worry about "uncommitted across sessions"
-below — that's the cron's job now. (You still must never `git push`, create
-branches, or rewrite history unless explicitly asked.)
+**Commit your own work. The committer-cron is NOT running.** This file used to
+say a scheduled job commits green work on `main`, so agents need not commit. That
+stopped being true: the newest cron commit is 2026-09-14, and the host has no
+crontab entry, no LaunchAgent and no `auto-git-commit.sh`. Two months of sessions
+that trusted this paragraph left their work uncommitted. Until the cron is
+restored, **commit logically-complete, build-verified units yourself** — see
+"Don't leave work uncommitted across sessions" below, which is now your job, not
+the cron's. The same gap means `Config/Base.xcconfig` holds a stale build number
+(the cron stamped it); `scripts/stamp-version.sh` fixes it at archive time, so
+leave it alone. (You still must never `git push`, create branches, or rewrite
+history unless explicitly asked.)
 
 **Default to committing on `main`. Do NOT create branches unless the user
 explicitly asks for one.** The user never asks for branches — every stray
@@ -364,6 +369,49 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   row, and native-`List` surfaces (sidebar) rename via an alert/the composer.
   Inline-edit-in-row is fine on iOS (no split-view focus war) and fine for a
   *non-selectable* dedicated row (the quick-add line).
+- **A rolled-back save looks exactly like "the user typed nothing" — never
+  purge on that evidence alone.** `StoreHealth.save` rolls the context back
+  when a save fails, so the write is discarded and the row keeps its old
+  value. For an inline-create draft that old value is the empty title it was
+  born with (`mutator.create(title: "", deferPush: true)` — the row exists,
+  with an id, before the user types). The fold then read the store, saw no
+  title, and called `mutator.purge` — a hard delete, no trash entry. The task
+  the user had just typed was destroyed, and nothing said so. This is the
+  "saving inbox items is flaky" report.
+  **The rules, all four purge paths:**
+  1. Mutator writes report their result. `TaskMutator.update`,
+     `TasksBackend.update` and `commitAndPush` return `Bool`
+     (`@discardableResult`, so plain field writes keep their shape). Any caller
+     that DESTROYS a row on the strength of a write must check it.
+  2. Purge needs evidence the user typed nothing, not just an empty store.
+     On macOS read `KitComposerCell.pendingTitle` — the field contents survive
+     a rolled-back save. On iOS gate the host's `onVanish` on `draft.canSave`.
+  3. A path that cannot ask the write (the iOS filter-change sweep runs a
+     runloop later) consults `mutator.lastWriteFailed(id:)` and fails CLOSED.
+  4. Register an undo entry only after the write lands. An undo for a
+     rolled-back rename claims it can restore a title that was never replaced.
+  A wrongly-kept blank row costs one ⌘⌫. A wrongly-purged task is gone. Bias
+  every ambiguous case toward keeping the row.
+  No `scan` rule: the defect is the ABSENCE of a guard near a `purge` call, and
+  a line regex cannot see that. Most of the seven `.purge(id:)` call sites are
+  a legitimate user-initiated Delete Permanently, so a rule that flagged them
+  all would just collect `septena-lint:allow` comments. This note is the
+  guardrail, same as the `Group` lifecycle trap above.
+  **A rolled-back save now reports itself.** `StoreHealth.noteSaveFailure`
+  mirrors into `StoreHealthState.shared` (`@Observable`), which drives two
+  surfaces in `Septena/Shell/UI/StoreHealthNotice.swift`: `.storeHealthAlert()`
+  at the moment of loss, and `StoreHealthSettingsSection` for the running count
+  (Septena ▸ Advanced ▸ Data Tools; Septask ▸ Settings ▸ Account). Both render
+  nothing while the count is zero. It is an alert, NOT the `SeptenaToastStore`
+  snackbar — that is a one-line auto-dismissing confirmation with an Undo, and
+  a lost write is neither confirmable nor undoable, so a notice the user can
+  miss would just reproduce the original complaint. Septask's Mac shell is pure
+  AppKit with no SwiftUI view to hang a modifier on, so it observes
+  `StoreHealthState.failureNotification` and raises the same words as an
+  `NSAlert` sheet, guarded against stacking (a wedged context fails every save
+  the same way).
+  Related, still open: `deferPush` means a new row is local-only until the
+  first title write, so a crash in that window leaves a titleless task.
 
 ## Where truth lives (priority order)
 

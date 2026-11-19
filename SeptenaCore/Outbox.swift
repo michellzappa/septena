@@ -123,6 +123,7 @@ final class TaskMutator {
       SeptenaLog.error("[TaskMutator] purge called before CK bound — dropping", nil)
       return
     }
+    failedWriteIDs.remove(id)
     cloudBackend.purge(id: id)
   }
 
@@ -336,13 +337,48 @@ final class TaskMutator {
     return copy
   }
 
-  func update(id: String, title: String? = nil, notes: String? = nil) {
+  /// False when the write did not land (CK not bound yet, the row is gone, or
+  /// the save was rolled back). Every caller that would DESTROY the row on the
+  /// strength of this write must check the result — see `lastWriteFailed(id:)`
+  /// for the paths that can only consult it later.
+  @discardableResult
+  func update(id: String, title: String? = nil, notes: String? = nil) -> Bool {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] update called before CK bound — dropping", nil)
-      return
+      noteWriteFailed(id)
+      return false
     }
-    cloudBackend.update(id: id, title: title, notes: notes)
+    let ok = cloudBackend.update(id: id, title: title, notes: notes)
+    if ok { failedWriteIDs.remove(id) } else { noteWriteFailed(id) }
+    return ok
   }
+
+  // MARK: - Failed-write memory
+
+  /// Ids whose most recent title/notes write was rolled back or dropped.
+  ///
+  /// The inline-create flow purges a new row that still shows no title, and it
+  /// cannot always ask the write for its result: the iOS list sweeps abandoned
+  /// drafts on a filter change, one runloop removed from the composer that
+  /// wrote them. Without this memory a rolled-back title write made the row
+  /// read as never-titled and the sweep hard-deleted work the user had typed.
+  /// A blank row the user can retype beats a task destroyed with no trash
+  /// entry, so every purge path fails CLOSED on a remembered failure.
+  private var failedWriteIDs: Set<String> = []
+
+  private func noteWriteFailed(_ id: String) {
+    failedWriteIDs.insert(id)
+    SeptenaLog.error("[TaskMutator] write for id=\(id) did not land — purge paths will spare this row", nil)
+  }
+
+  /// True when the last title/notes write for `id` did not land. Purge paths
+  /// consult this before destroying an apparently-untitled row.
+  func lastWriteFailed(id: String) -> Bool { failedWriteIDs.contains(id) }
+
+  /// Drop the failure memory for `id` — called when the row is legitimately
+  /// destroyed or has since been written successfully, so the set cannot grow
+  /// for the life of the process.
+  func clearWriteFailure(id: String) { failedWriteIDs.remove(id) }
 
   /// Clear the agent-created freshness cue on engagement. Idempotent and
   /// cheap — the backend no-ops for non-agent or already-seen rows.
