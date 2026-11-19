@@ -90,6 +90,8 @@ final class TaskSyncEngine {
   /// True once a pull that asked for settings finished. Until then a local
   /// setting is not sent, so a value another device already pushed wins.
   static let settingsReadyKey = "septena.taskSync.settingsReady"
+  /// Backend user id of the last sign-in, compared on the next sign-in.
+  static let lastUserKey = "septena.taskSync.lastUserID"
   private static let issueCap = 200
 
   private init() {}
@@ -965,21 +967,55 @@ final class TaskSyncEngine {
 
   // MARK: - Account
 
-  /// Sign in with Apple → a backend session, then sync at once (the outbox
-  /// queued while signed out drains now).
+  /// Sign in with Apple → a backend session, then sync at once.
+  ///
+  /// Same backend user as the last sign-in on this device: the outbox
+  /// queued while signed out drains now. A different user: the outbox,
+  /// the shadows and every local task, area, project and attachment row
+  /// belong to the other account, so they are wiped and the new account
+  /// pulls from rev 0. The engine pauses across the sign-in, so no run
+  /// pushes the old outbox with the new session before that check.
   func signIn(identityToken: String, rawNonce: String) async throws {
-    try await client.signIn(identityToken: identityToken, rawNonce: rawNonce)
+    let wasRunning = await pauseSync()
+    defer { if wasRunning { start() } }
+    let userID = try await client.signIn(identityToken: identityToken, rawNonce: rawNonce)
+    // No stored id (the first sign-in on this device, or a session from a
+    // build before this check): keep the local data, as before.
+    if let last = lastUserID, last != userID {
+      wipeLocalTaskData()
+      SeptenaLog.info("[TaskSync] signed in as another account; local task data wiped")
+    }
+    lastUserID = userID
     signedIn = TaskBackendClient.hasSession
     lastError = nil
-    activate()
   }
 
   /// Ends the session on this device. Local tasks and the outbox stay: edits
-  /// made while signed out are sent after the next sign-in.
+  /// made while signed out are sent after the next sign-in, when the same
+  /// account signs in again (`signIn` wipes them for another account).
   func signOut() async {
     disconnectSocket()
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
+  }
+
+  /// Backend user id of the last sign-in on this device.
+  private var lastUserID: String? {
+    get { UserDefaults.standard.string(forKey: Self.lastUserKey) }
+    set { UserDefaults.standard.set(newValue, forKey: Self.lastUserKey) }
+  }
+
+  /// Stops the engine and waits (up to 10 s) for a run that started before
+  /// the stop to finish its current request. Returns whether it was running.
+  private func pauseSync() async -> Bool {
+    let wasRunning = isRunning
+    stop()
+    var waited = 0
+    while isSyncing, waited < 100 {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      waited += 1
+    }
+    return wasRunning
   }
 
   /// Deletes the account on the backend, then wipes this device's task data:
@@ -988,13 +1024,7 @@ final class TaskSyncEngine {
   /// that no push in flight writes rows back after the server emptied the
   /// store. On failure nothing local changes and the engine starts again.
   func deleteAccount() async throws {
-    stop()
-    // A run that started before `stop()` finishes its current request.
-    var waited = 0
-    while isSyncing, waited < 100 {
-      try? await Task.sleep(nanoseconds: 100_000_000)
-      waited += 1
-    }
+    _ = await pauseSync()
     do {
       try await client.deleteAccount()
     } catch {
@@ -1002,6 +1032,7 @@ final class TaskSyncEngine {
       throw error
     }
     wipeLocalTaskData()
+    lastUserID = nil
     signedIn = TaskBackendClient.hasSession
     SeptenaLog.info("[TaskSync] account deleted; local task data wiped")
   }
@@ -1018,7 +1049,7 @@ final class TaskSyncEngine {
     for t in (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? [] { context.delete(t) }
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
-    _ = StoreHealth.save(context, op: "taskSync.deleteAccount")
+    _ = StoreHealth.save(context, op: "taskSync.wipe")
     store()?.deleteEverything()
     since = 0
     settingsReady = false
