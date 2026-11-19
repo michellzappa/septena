@@ -670,7 +670,7 @@ private final class KitDateBoard: NSView {
   /// The task's current value for this attribute, if any.
   private var initialDate: Date?
   /// Typed date entry on the week page: printable keys collect here, Return
-  /// parses and applies (`KitDateEntry`), Esc clears, ⌫ deletes. Arrows keep
+  /// parses and applies (`SeptenaDateParser`), Esc clears, ⌫ deletes. Arrows keep
   /// walking the strip.
   private var typed = ""
   private let typedLabel = NSTextField(labelWithString: "")
@@ -1060,7 +1060,7 @@ private final class KitDateBoard: NSView {
 
   private var typedDate: Date? {
     guard let today = KitDayFormat.todayDate() else { return nil }
-    return KitDateEntry.parse(typed, today: today)
+    return SeptenaDateParser.parse(typed, today: today)
   }
 
   /// The line above the strip: a hint while nothing is typed, then the typed
@@ -1076,142 +1076,6 @@ private final class KitDateBoard: NSView {
     let meaning = typedDate.map { Self.setFormatter.string(from: $0) }
       ?? String(localized: "Not a date", comment: "SeptaskKit: date popover typed-entry no match")
     typedLabel.stringValue = "\(typed)  →  \(meaning)"
-  }
-}
-
-// MARK: - Typed date entry
-
-/// Parses what a person types into the date popover. Relative to the app's
-/// TODAY (`KitDayFormat.todayDate()`, which honors DayClock time travel),
-/// never the wall clock. Day precision only; returns the start of the day.
-///
-/// Accepts: today / tod, tomorrow / tom / tmr / tmrw, weekday names and their
-/// abbreviations (the next occurrence after today; "next fri" too), "in N
-/// days / weeks / months", "+N" (days), "+Nd" / "+Nw" / "+Nm", month-day in
-/// either order ("dec 4", "4 dec", optional year), and ISO "yyyy-mm-dd".
-/// Month and weekday names match English and the current locale.
-enum KitDateEntry {
-  static func parse(_ raw: String, today: Date, calendar: Calendar = .current) -> Date? {
-    let text = raw.lowercased()
-      .folding(options: .diacriticInsensitive, locale: .current)
-      .replacingOccurrences(of: ",", with: " ")
-      .split(separator: " ", omittingEmptySubsequences: true)
-      .joined(separator: " ")
-    guard !text.isEmpty else { return nil }
-    let start = calendar.startOfDay(for: today)
-    func add(_ value: Int, _ component: Calendar.Component) -> Date? {
-      calendar.date(byAdding: component, value: value, to: start)
-    }
-
-    switch text {
-    case "today", "tod", "tdy", "now": return start
-    case "tomorrow", "tom", "tmr", "tmrw", "tmw": return add(1, .day)
-    default: break
-    }
-
-    // "+3", "+3d", "+2w", "+1m"
-    if text.hasPrefix("+") {
-      return relative(String(text.dropFirst()).replacingOccurrences(of: " ", with: ""),
-                      add: add)
-    }
-
-    // "in 3 days", "in 2 weeks", "in 1 month", "in 3d"
-    if text.hasPrefix("in ") {
-      return relative(String(text.dropFirst(3)).replacingOccurrences(of: " ", with: ""),
-                      add: add)
-    }
-
-    // Weekday, optionally "next ..."
-    let weekdayText = text.hasPrefix("next ") ? String(text.dropFirst(5)) : text
-    if let weekday = weekdayNumber(weekdayText, calendar: calendar) {
-      let current = calendar.component(.weekday, from: start)
-      var delta = (weekday - current + 7) % 7
-      if delta == 0 { delta = 7 }
-      return add(delta, .day)
-    }
-
-    // ISO yyyy-mm-dd
-    let iso = text.split(separator: "-")
-    if iso.count == 3, iso[0].count == 4,
-       let year = Int(iso[0]), let month = Int(iso[1]), let day = Int(iso[2]) {
-      return validDate(year: year, month: month, day: day, calendar: calendar)
-    }
-
-    // Month-day in either order, optional year: "dec 4", "4 dec 2027".
-    let words = text.split(separator: " ").map(String.init)
-    guard words.count == 2 || words.count == 3 else { return nil }
-    var month: Int?
-    var day: Int?
-    if let m = monthNumber(words[0], calendar: calendar), let d = Int(words[1]) {
-      month = m; day = d
-    } else if let d = Int(words[0]), let m = monthNumber(words[1], calendar: calendar) {
-      month = m; day = d
-    }
-    guard let month, let day else { return nil }
-    if words.count == 3 {
-      guard let year = Int(words[2]) else { return nil }
-      return validDate(year: year, month: month, day: day, calendar: calendar)
-    }
-    // No year: the next time that day comes round, today included.
-    let thisYear = calendar.component(.year, from: start)
-    if let date = validDate(year: thisYear, month: month, day: day, calendar: calendar),
-       date >= start {
-      return date
-    }
-    return validDate(year: thisYear + 1, month: month, day: day, calendar: calendar)
-  }
-
-  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" → offset from today.
-  private static func relative(_ text: String, add: (Int, Calendar.Component) -> Date?) -> Date? {
-    let digits = text.prefix { $0.isNumber }
-    guard let count = Int(digits) else { return nil }
-    let unit = text.dropFirst(digits.count)
-    switch unit {
-    case "", "d", "day", "days": return add(count, .day)
-    case "w", "wk", "wks", "week", "weeks": return add(count * 7, .day)
-    case "m", "mo", "month", "months": return add(count, .month)
-    default: return nil
-    }
-  }
-
-  private static func validDate(year: Int, month: Int, day: Int, calendar: Calendar) -> Date? {
-    let components = DateComponents(year: year, month: month, day: day)
-    guard components.isValidDate(in: calendar) else { return nil }
-    return calendar.date(from: components)
-  }
-
-  private static let englishWeekdays = ["sunday", "monday", "tuesday", "wednesday",
-                                        "thursday", "friday", "saturday"]
-  private static let englishMonths = ["january", "february", "march", "april", "may", "june",
-                                      "july", "august", "september", "october", "november",
-                                      "december"]
-
-  /// 1 = Sunday … 7 = Saturday (Calendar's numbering). A word matches a full
-  /// name, or any prefix of at least three letters ("thu", "thurs").
-  private static func weekdayNumber(_ word: String, calendar: Calendar) -> Int? {
-    let localized = calendar.weekdaySymbols.map { fold($0) }
-    for names in [englishWeekdays, localized] {
-      if let index = names.firstIndex(where: { word.count >= 3 && $0.hasPrefix(word) }) {
-        return index + 1
-      }
-    }
-    return nil
-  }
-
-  /// 1 = January … 12. Full name or a prefix of at least three letters.
-  private static func monthNumber(_ word: String, calendar: Calendar) -> Int? {
-    let cleaned = word.hasSuffix(".") ? String(word.dropLast()) : word
-    let localized = calendar.monthSymbols.map { fold($0) }
-    for names in [englishMonths, localized] {
-      if let index = names.firstIndex(where: { cleaned.count >= 3 && $0.hasPrefix(cleaned) }) {
-        return index + 1
-      }
-    }
-    return nil
-  }
-
-  private static func fold(_ text: String) -> String {
-    text.lowercased().folding(options: .diacriticInsensitive, locale: .current)
   }
 }
 

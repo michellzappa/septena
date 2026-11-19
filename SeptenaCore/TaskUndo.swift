@@ -275,7 +275,9 @@ enum TaskUndo {
   struct FilingSnapshot {
     let id: String
     let area: String?
-    let project: String?
+    /// `var` so a project-delete undo can re-file under a revived project's
+    /// new id (`recordProjectDelete`).
+    var project: String?
     let heading: String?
     let today: Bool
     let position: Double
@@ -343,5 +345,56 @@ enum TaskUndo {
     record(name: String(localized: "Move Task", comment: "Undo action name"),
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })
+  }
+
+  // MARK: - Project delete
+
+  /// What a project delete takes away: the project row, its section headings
+  /// (which go to Recently Deleted) and the filing of every task in it (the
+  /// cascade clears their project and heading). Capture BEFORE the delete.
+  struct ProjectDeleteSnapshot {
+    let project: ProjectsMutator.DeletedProject
+    let headings: [FilingSnapshot]
+    let members: [FilingSnapshot]
+  }
+
+  static func projectDeleteSnapshot(id: String,
+                                    projects: ProjectsMutator,
+                                    context: ModelContext) -> ProjectDeleteSnapshot? {
+    guard let project = projects.snapshotForDelete(id: id) else { return nil }
+    return ProjectDeleteSnapshot(
+      project: project,
+      headings: LocalCache.headings(inProject: id, in: context).map(FilingSnapshot.init),
+      members: LocalCache.allTasks(in: context)
+        .filter { $0.project == id }
+        .map(FilingSnapshot.init))
+  }
+
+  /// Undo for a project delete: revive the project (same id when the sync
+  /// store allows it, else a new one — `ProjectsMutator.revive`), bring its
+  /// headings back from Recently Deleted, then re-file every task exactly as
+  /// it stood: heading, Today and position included. Redo deletes again
+  /// through the same cascade. Call AFTER starting the delete.
+  static func recordProjectDelete(_ snapshot: ProjectDeleteSnapshot,
+                                  projects: ProjectsMutator,
+                                  mutator: TaskMutator) {
+    var currentID = snapshot.project.id
+    record(name: String(localized: "Delete Project", comment: "Undo action name"),
+           undo: {
+             guard let id = projects.revive(snapshot.project) else { return }
+             currentID = id
+             for heading in snapshot.headings { mutator.restore(id: heading.id) }
+             // Headings first, so a member's `heading` points at a live row.
+             let filings = (snapshot.headings + snapshot.members).map { filing -> FilingSnapshot in
+               var refiled = filing
+               refiled.project = id
+               return refiled
+             }
+             restore(filings, using: mutator)
+           },
+           redo: {
+             let id = currentID
+             Task { @MainActor in try? await projects.delete(id: id) }
+           })
   }
 }

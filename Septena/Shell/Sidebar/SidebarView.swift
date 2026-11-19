@@ -217,9 +217,18 @@ struct SidebarRootView: View {
     if case .project(let id) = nav.path.last, id == project.id {
       nav.path = [.filter(.today)]
     }
+    // Capture before the delete; record at the gesture (CLAUDE.md: undo is
+    // recorded at the user gesture, never inside a mutator).
+    let undoSnapshot = TaskUndo.projectDeleteSnapshot(id: project.id, projects: projectsMutator,
+                                                      context: modelContext)
+    let projects = projectsMutator
+    let tasks = taskMutator
     Task {
       do {
         try await projectsMutator.delete(id: project.id)
+        if let undoSnapshot {
+          TaskUndo.recordProjectDelete(undoSnapshot, projects: projects, mutator: tasks)
+        }
         await load()
       } catch {
         errorMessage = error.localizedDescription

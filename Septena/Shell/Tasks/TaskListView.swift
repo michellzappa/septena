@@ -695,16 +695,21 @@ struct TaskListView: View {
     // batch — including pushes from other devices and the foreground
     // bootstrap fetch. Without this, the list only refreshes when the
     // view re-appears (i.e. you have to navigate away and back).
-    // Debounced: a single mutation can fan out several `.septenaTasksChanged`
-    // posts (local save + CK batch + Spotlight). Coalesce like the sidebar.
+    // Coalesced: a single mutation can fan out several `.septenaTasksChanged`
+    // posts (local save + sync batch + Spotlight). The coalescing lives in
+    // `load()`'s generation counter (@State), NOT in a Combine `.debounce`
+    // here: `onReceive` resubscribes whenever the body re-evaluates, and a
+    // resubscription silently drops a debounced event still waiting out its
+    // window. On an iOS foreground the body re-evaluates right after the
+    // pull's post (scene phase, and every sync run writes the observed
+    // `TaskSyncEngine.signedIn`), so the pulled change never reached the
+    // list until a restart.
     .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)
-      .filter { taskChangeMayAffectCurrentList($0) }
-      .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-      reloadOrDeferWhileEditing()
+      .filter { taskChangeMayAffectCurrentList($0) }) { _ in
+      reloadOrDeferWhileEditing(coalescing: true)
     }
-    .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)
-      .debounce(for: .seconds(0.3), scheduler: RunLoop.main)) { _ in
-      reloadOrDeferWhileEditing()
+    .onReceive(NotificationCenter.default.publisher(for: .septenaStructureChanged)) { _ in
+      reloadOrDeferWhileEditing(coalescing: true)
     }
     // The moment an inline editor / quick-add / composer folds, catch up on any
     // background refresh we held back so the list never reshuffles under a
@@ -3683,10 +3688,18 @@ struct TaskListView: View {
   /// `LazyVStack` and steals first-responder mid-keystroke. Deferred reloads
   /// coalesce into a single `load()` when the editor folds (see
   /// `flushDeferredReloadIfNeeded`).
-  private func reloadOrDeferWhileEditing() {
+  ///
+  /// `coalescing` waits the longer notification window (`notificationCoalesce`)
+  /// so a burst of sync posts costs one rebuild.
+  private func reloadOrDeferWhileEditing(coalescing: Bool = false) {
     guard !listInputActive else { pendingReloadWhileEditing = true; return }
-    Task { await load() }
+    Task { await load(delay: coalescing ? Self.notificationCoalesce : Self.loadCoalesce) }
   }
+
+  /// One run-loop beat for a user action; the old Combine debounce window for
+  /// sync / structure notifications.
+  private static let loadCoalesce: UInt64 = 75_000_000
+  private static let notificationCoalesce: UInt64 = 300_000_000
 
   /// Run a reload that was held back while an editor was open. Fired on the
   /// `listInputActive` falling edge so the list catches up to any background
@@ -3697,14 +3710,14 @@ struct TaskListView: View {
     Task { await load() }
   }
 
-  private func load() async {
+  private func load(delay: UInt64 = loadCoalesce) async {
     loadGeneration &+= 1
     let generation = loadGeneration
     // Completion, filing, drag, and a CK batch frequently land together. The
     // cache already paints optimistically, so wait a single run-loop beat and
     // discard every superseded rebuild instead of scanning the task history N
     // times on the main actor.
-    try? await Task.sleep(nanoseconds: 75_000_000)
+    try? await Task.sleep(nanoseconds: delay)
     guard !Task.isCancelled, generation == loadGeneration else { return }
     performLoad()
   }

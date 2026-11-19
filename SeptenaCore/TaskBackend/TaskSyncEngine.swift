@@ -254,6 +254,23 @@ final class TaskSyncEngine {
     #endif
   }
 
+  /// True when a deleted project can come back under its own id: the backend
+  /// never had it, or its delete still waits in the outbox (held for
+  /// `deleteGrace`). False once the delete reached the backend, which never
+  /// revives a deleted row — undo then has to mint a new id.
+  func canReviveProject(_ id: String) -> Bool {
+    #if SEPTASK
+    guard let store = store() else { return true }
+    guard let shadow = store.shadow("project:\(id)"), shadow.gone else { return true }
+    guard let last = store.lastRowOp(entity: BackendEntity.project.rawValue, rowID: id) else {
+      return false
+    }
+    return last.kind == TaskSyncOpKind.delete && !last.sent
+    #else
+    return true
+    #endif
+  }
+
   /// True when the backend has (or will get, from the outbox) this task, so
   /// a delete must be sent rather than kept local. Septena never opens the
   /// store and answers true: its notes are dropped by the freeze anyway.
@@ -456,6 +473,11 @@ final class TaskSyncEngine {
   }
 
   /// Areas, projects, attachments: no soft delete; a missing row is a delete.
+  ///
+  /// A project delete is HELD for `deleteGrace`, like a task's: ⌘Z on a
+  /// project delete re-creates the row under the same id
+  /// (`ProjectsMutator.revive`), and the backend never revives a deleted row,
+  /// so the delete must still be in the outbox for undo to cancel it.
   private func captureSimple(_ entity: BackendEntity, _ id: String,
                              plan: Result<BackendRowPlan, TaskBackendIssue>?,
                              store: TaskSyncStore, lookup: (String) -> TaskSyncShadow?) {
@@ -463,7 +485,7 @@ final class TaskSyncEngine {
     let shadow = lookup(key)
     guard let plan else {
       if let shadow, !shadow.gone {
-        queueDeleteIfNeeded(entity, id, store: store)
+        queueDeleteIfNeeded(entity, id, hold: entity == .project, store: store)
         shadow.gone = true
         store.saveSoon()
       }
@@ -476,6 +498,20 @@ final class TaskSyncEngine {
     }
     clearBlocked(entity, id)
     let old = shadow.map { TaskSyncJSON.decode($0.fields) } ?? [:]
+
+    // Re-created inside the grace period (undo): the backend never saw the
+    // delete. Drop it and send only what differs from the last synced row.
+    if entity == .project, shadow?.gone == true,
+       let last = store.lastRowOp(entity: entity.rawValue, rowID: id),
+       last.kind == TaskSyncOpKind.delete, !last.sent {
+      store.remove(last)
+      shadow?.gone = false
+      var patch: [String: BackendJSON] = [:]
+      for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
+      if !patch.isEmpty { enqueueUpsert(entity, id, patch, store: store) }
+      writeShadow(shadow, key, old: old, new: mapped, store: store)
+      return
+    }
 
     if shadow == nil || shadow?.gone == true {
       // New here, or deleted on the backend (the upsert is then dropped and

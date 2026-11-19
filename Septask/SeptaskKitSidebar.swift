@@ -1441,36 +1441,20 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   /// The project delete also detaches its tasks (the mutator's cascade), so
-  /// undo rebuilds the project under its old id, then re-files exactly the
-  /// tasks that were in it — headings and positions included.
+  /// undo rebuilds the project — every field, sidebar position included —
+  /// brings its headings back, and re-files exactly the tasks that were in
+  /// it. One shared inverse (`TaskUndo.recordProjectDelete`) for every
+  /// surface that deletes a project.
   private func deleteProject(_ project: Project) {
     let mutator = projectsMutator
-    let taskMutator = SeptenaServices.shared.taskMutator
-    let snapshot = StructureCache.snapshot(in: context)
-    let order = projectOrder(inArea: project.area, snapshot: snapshot)
-    let filed = LocalCache.allTasks(in: context)
-      .filter { $0.project == project.id }
-      .map(TaskUndo.FilingSnapshot.init)
+    let snapshot = TaskUndo.projectDeleteSnapshot(id: project.id, projects: mutator,
+                                                  context: context)
     bounceToTodayIfShowing(key: "project:\(project.id)")
     Task { try? await mutator.delete(id: project.id) }
-    recordStructure(
-      name: String(localized: "Delete Project", comment: "SeptaskKit: undo action"),
-      undo: {
-        Task {
-          _ = try? await mutator.createWithExplicitID(id: project.id, title: project.title,
-                                                      area: project.area)
-          if let notes = project.notes { try? await mutator.setNotes(id: project.id, notes: notes) }
-          if project.status != .active {
-            try? await mutator.setStatus(id: project.id, status: project.status)
-          }
-          if project.attachment != nil {
-            try? await mutator.setAttachment(id: project.id, attachment: project.attachment)
-          }
-          try? await mutator.reorder(orderedIDs: order)
-          TaskUndo.restore(filed, using: taskMutator)
-        }
-      },
-      redo: { Task { try? await mutator.delete(id: project.id) } })
+    if let snapshot {
+      TaskUndo.recordProjectDelete(snapshot, projects: mutator,
+                                   mutator: SeptenaServices.shared.taskMutator)
+    }
   }
 
   /// Context menu ▸ Move to Area — the keyboard-and-pointer twin of dragging

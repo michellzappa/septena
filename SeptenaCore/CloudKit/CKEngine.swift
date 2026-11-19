@@ -245,6 +245,29 @@ func noteAreaChange(id: String) { if routeToTaskBackend(.area, id) { return }; n
 func noteAreaDeletion(id: String) { if routeToTaskBackend(.area, id) { return }; noteDeletion(recordName: AreaCloudKitSchema.recordName(for: id), kind: "area") }
 func noteProjectChange(id: String) { if routeToTaskBackend(.project, id) { return }; noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 func noteProjectDeletion(id: String) { if routeToTaskBackend(.project, id) { return }; noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
+
+  /// Whether a deleted project can come back under its own id (undo). CloudKit
+  /// accepts a save under a deleted record name; the task backend never
+  /// revives a deleted row, so there it holds only while the delete still
+  /// waits in the outbox (`TaskSyncEngine.canReviveProject`).
+  func canReviveProject(id: String) -> Bool {
+    if TaskStoreMode.current == .backend { return TaskSyncEngine.shared.canReviveProject(id) }
+    return true
+  }
+
+  /// CloudKit only: take back a project delete that has not gone out yet, so
+  /// the revived row's save is an ordinary update of the record CloudKit still
+  /// has. Returns true when one was pending (the caller then keeps the row's
+  /// old system fields). The backend cancels its own held delete on capture.
+  func cancelPendingProjectDeletion(id: String) -> Bool {
+    guard TaskStoreMode.current != .backend, let engine else { return false }
+    let recordID = CKRecord.ID(recordName: ProjectCloudKitSchema.recordName(for: id),
+                               zoneID: SeptenaCloudKit.zoneID)
+    let delete = CKSyncEngine.PendingRecordZoneChange.deleteRecord(recordID)
+    guard engine.state.pendingRecordZoneChanges.contains(delete) else { return false }
+    engine.state.remove(pendingRecordZoneChanges: [delete])
+    return true
+  }
 func noteSettingsChange() { noteChange(recordName: SettingsCloudKitSchema.singletonID, kind: "settings") }
 func noteSectionChange(id: String) { noteChange(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
 func noteSectionDeletion(id: String) { noteDeletion(recordName: SectionCloudKitSchema.recordName(for: id), kind: "section") }
