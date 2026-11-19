@@ -125,7 +125,8 @@ struct TabSwitcher: View {
   @Namespace private var bubble
 
   private var tasksEnabled: Bool {
-    settingsStore.sections.first { $0.key == "tasks" }?.isEnabled ?? true
+    if SectionManifest.isRetired("tasks") { return false }
+    return settingsStore.sections.first { $0.key == "tasks" }?.isEnabled ?? true
   }
 
   private var tabs: [(tab: SeptenaTab, title: String)] {

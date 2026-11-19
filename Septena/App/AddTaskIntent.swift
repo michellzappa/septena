@@ -11,6 +11,8 @@ import AppIntents
 
 struct AddTaskIntent: SectionLogIntent {
   static let sectionKey = "tasks"
+  // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
+  static let isDiscoverable = false
   static let title: LocalizedStringResource = "Add Task"
   static let description = IntentDescription("Add a new to-do to Septena.")
 

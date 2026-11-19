@@ -41,6 +41,16 @@ public struct SectionConfig: Codable, Hashable {
     self.hasOnboarded = hasOnboarded
   }
 
+  /// This config as the app shows it: a section the app retired
+  /// (`SectionManifest.retiredKeys`) reads as off. A read-side mask only; the
+  /// stored `SectionEntity` keeps its own value.
+  public func maskingRetired() -> SectionConfig {
+    guard isEnabled, SectionManifest.isRetired(key) else { return self }
+    return SectionConfig(key: key, label: label, color: color, isEnabled: false,
+                         showInToday: showInToday, showInSpotlight: showInSpotlight,
+                         hasOnboarded: hasOnboarded)
+  }
+
   // Custom decode so older ResponseCache blobs (pre-isEnabled /
   // pre-showInToday / pre-showInSpotlight / pre-hasOnboarded) decode cleanly
   // with sensible defaults.

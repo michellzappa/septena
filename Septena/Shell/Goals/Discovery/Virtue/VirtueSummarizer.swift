@@ -256,7 +256,9 @@ enum VirtueSummarizer {
     }
 
     // ── Tasks → Justice (duty to others) + Courage/Wisdom ───────────
-    let completed = fetchCompletedTasks(fromStr, toStr, context)
+    // Septena Life retired Tasks (ADR 0007): no task signals.
+    let completed = SectionManifest.isRetired("tasks")
+      ? [] : fetchCompletedTasks(fromStr, toStr, context)
     if !completed.isEmpty {
       let otherDirected = completed.filter(isOtherDirected).count
       let financial = completed.filter { isFinancial($0.title) }.count
@@ -299,7 +301,7 @@ enum VirtueSummarizer {
     }
 
     let allSupported = ["intake", "habits", "nutrition", "supplements",
-                        "gut", "training", "tasks", "chores"]
+                        "gut", "training", "tasks", "chores"].filter { !SectionManifest.isRetired($0) }
     let missing = allSupported.filter { !sections.contains($0) }
 
     return VirtueWeekSummary(

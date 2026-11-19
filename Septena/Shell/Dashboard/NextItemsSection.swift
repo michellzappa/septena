@@ -852,6 +852,8 @@ final class NextDoneModel {
 
   @MainActor
   private static func collectTasks(date: String, now: Date) async -> [DoneEvent] {
+    // Septena Life retired Tasks (ADR 0007): no completed tasks in the log.
+    guard !SectionManifest.isRetired("tasks") else { return [] }
     let ctx = LocalStore.shared.container.mainContext
     let resp = await TaskReads.list(view: "logbook", days: 1,
                                     today: date, now: now, context: ctx)

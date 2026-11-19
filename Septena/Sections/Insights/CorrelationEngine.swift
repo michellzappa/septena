@@ -196,7 +196,7 @@ struct CorrelationEngine {
     // empty set (fresh account before the mirror hydrates) means "all."
     let activeSections: Set<String> = {
       let rows = (try? context.fetch(FetchDescriptor<SectionEntity>())) ?? []
-      return Set(rows.filter { $0.isEnabled }.map { $0.id })
+      return Set(rows.filter { $0.isEnabled && !SectionManifest.isRetired($0.id) }.map { $0.id })
     }()
 
     // Pull plugin-declared daily features from active sections (GitHub today;

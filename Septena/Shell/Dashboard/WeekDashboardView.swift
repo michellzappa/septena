@@ -1309,12 +1309,9 @@ struct WeekDashboardView: View {
       ? DashboardTileBuilder.buildMacroSnapshot(ctx: tileContext, theme: theme)
       : nil
     let macrosChanged = MacroWidgetSnapshotStore.saveIfChanged(macroSnapshot)
-    let tasksChanged = TasksWidgetSnapshotStore.saveIfChanged(
-      TasksWidgetBuilder.buildSnapshot(context: tileContext.modelContext)
-    )
+    // No tasks widget snapshot: Septena Life no longer shows tasks (ADR 0007).
     if tilesChanged { WidgetCenter.shared.reloadTimelines(ofKind: "SectionTileWidget") }
     if macrosChanged { WidgetCenter.shared.reloadTimelines(ofKind: "MacrosWidget") }
-    if tasksChanged { WidgetCenter.shared.reloadTimelines(ofKind: "TasksTodayWidget") }
   }
   #endif
 

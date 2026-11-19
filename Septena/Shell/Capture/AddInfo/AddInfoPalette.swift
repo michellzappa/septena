@@ -38,7 +38,7 @@ enum AddInfoPalette {
     }
     if mirroredFallback.isEmpty {
       return SectionManifest.all
-        .filter(\.supportsDashboard)
+        .filter { $0.supportsDashboard && !SectionManifest.isRetired($0.key) }
         .compactMap { HomepageDomain(rawValue: $0.key) }
     }
     var seen = Set<HomepageDomain>()

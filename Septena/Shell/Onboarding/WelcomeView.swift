@@ -118,12 +118,13 @@ struct WelcomeView: View {
   // dead tile. They're introduced later via the dashboard discovery card.
   private var coreSections: [SectionManifest] {
     SectionManifest.all.filter {
-      $0.kind == .loggingDomain && $0.onboarding == .core
+      $0.kind == .loggingDomain && $0.onboarding == .core && !SectionManifest.isRetired($0.key)
     }
   }
   private var moreSections: [SectionManifest] {
     SectionManifest.all.filter {
       $0.kind == .loggingDomain && $0.activation == .optional && $0.onboarding == .optional
+        && !SectionManifest.isRetired($0.key)
     }
   }
 

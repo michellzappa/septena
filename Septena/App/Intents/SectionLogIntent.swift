@@ -45,10 +45,23 @@ extension SectionLogIntent {
   /// are locked on and always pass.
   @MainActor
   func requireSection() async throws {
+    // Septena Life retired Tasks (ADR 0007): say where tasks went instead of
+    // offering to turn the section on.
+    if SectionManifest.isRetired(Self.sectionKey) {
+      throw SectionRetiredError()
+    }
     await SeptenaServices.shared.start()
     guard SeptenaServices.shared.isSectionEnabled(Self.sectionKey) else {
       throw SectionDisabledError(label: manifest.defaultLabel)
     }
+  }
+}
+
+/// Thrown by `requireSection()` when an intent targets a section this app
+/// retired (Septena Life: Tasks). Carries the one-line pointer to the task app.
+struct SectionRetiredError: Error, CustomLocalizedStringResourceConvertible {
+  var localizedStringResource: LocalizedStringResource {
+    "\(SectionManifest.tasksMovedNotice)"
   }
 }
 

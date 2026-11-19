@@ -47,9 +47,10 @@ enum CoachContextBuilder {
 
   /// All section keys a coach can summarize. `CoachDomain.wholeLife`
   /// (sectionKeys == nil) sees this whole list; other presets pick a slice.
+  /// A section this app retired (Septena Life: Tasks) is left out.
   static let supportedKeys = ["training", "nutrition", "hydration", "supplements",
                               "sleep", "body", "mood", "gut", "tasks", "chores",
-                              "habits", "intake"]
+                              "habits", "intake"].filter { !SectionManifest.isRetired($0) }
 
   /// A compact facts block for the preset + window, safe to paste into a
   /// prompt. `excluding` drops sections the user toggled off — the model

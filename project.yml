@@ -65,9 +65,12 @@ targets:
         excludes:
           - "**/.DS_Store"
     dependencies:
-      - target: SeptenaShare
-        embed: true
-        codeSign: true
+      # SeptenaShare (share text or a link into Tasks) is not embedded:
+      # Septena Life retired Tasks (ADR 0007, issue #61). The target stays
+      # defined; restore these three lines to embed it again.
+      #- target: SeptenaShare
+      #  embed: true
+      #  codeSign: true
       # ⛔️ WATCH_EMBED_DISABLED — TEMPORARY, MUST BE RESTORED BEFORE ANY RELEASE.
       # Uncommented = the Septena app embeds SeptenaWatch. While it's commented out the
       # iOS scheme neither builds nor needs a watchOS runtime, which is the only

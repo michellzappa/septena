@@ -1211,7 +1211,6 @@
 		BCF563DB7153EF121B930068 /* PhotosBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019FD83A1963232155425024 /* PhotosBridge.swift */; };
 		BCF6D92C2BE184989D98EA0F /* SymptomsDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC63DAB721CC130BA2A96843 /* SymptomsDestinationView.swift */; };
 		BD3F171ECA451BC6A72F660C /* TaskNavMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567240B663C68644B7223D98 /* TaskNavMenu.swift */; };
-		BD536D809478A85B60BB516A /* SeptenaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0EC1DA8956AB72A184A6844 /* SeptenaShare.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BD6E080D2682C87ACB9190DD /* AddInfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35D898846EB8A48B77811E /* AddInfoSheet.swift */; };
 		BD8D840AF166C2001860803F /* DiscoveryMiniApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C480659283E01C4B16C910C /* DiscoveryMiniApp.swift */; };
 		BD91368937B7553C9000819A /* TaskStructureOrder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4FD8156022B5BC0FAA1DDC2 /* TaskStructureOrder.swift */; };
@@ -1663,13 +1662,6 @@
 			remoteGlobalIDString = C4055CC2A1451D2304DA1AD5;
 			remoteInfo = SeptenaWatchComplication;
 		};
-		C85DA884AB90691C06310B4C /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 6F1CD6291C23F60453DBC13A;
-			remoteInfo = SeptenaShare;
-		};
 		D926F1AAF82BED48D099CF50 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3A81108521AE358318C77A50 /* Project object */;
@@ -1714,7 +1706,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				BD536D809478A85B60BB516A /* SeptenaShare.appex in Embed Foundation Extensions */,
 				8AF84843863B8AD9242182B7 /* SeptenaLiveActivitiesExtension.appex in Embed Foundation Extensions */,
 				020427845BE68FA93286A4B3 /* SeptenaWidgets.appex in Embed Foundation Extensions */,
 			);
@@ -3860,7 +3851,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				BEE5E9F2230F4EE86E937082 /* PBXTargetDependency */,
 				B3BC9423C06E32CBA24D7D43 /* PBXTargetDependency */,
 				C32F56637886EB4AC1118510 /* PBXTargetDependency */,
 			);
@@ -5816,11 +5806,6 @@
 			isa = PBXTargetDependency;
 			target = FA39C23110542023235A82C8 /* SeptenaLiveActivitiesExtension */;
 			targetProxy = DA083821C527A4F9B58FDD02 /* PBXContainerItemProxy */;
-		};
-		BEE5E9F2230F4EE86E937082 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 6F1CD6291C23F60453DBC13A /* SeptenaShare */;
-			targetProxy = C85DA884AB90691C06310B4C /* PBXContainerItemProxy */;
 		};
 		C32F56637886EB4AC1118510 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

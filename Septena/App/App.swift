@@ -142,7 +142,10 @@ struct SeptenaApp: App {
           if phase == .active {
             Task { @MainActor in
               await services.start()
-              SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+              // No share-sheet captures: Septena Life retired Tasks (ADR 0007).
+              if !SectionManifest.isRetired("tasks") {
+                SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+              }
               // Opened after midnight (or after a few days away): a
               // backgrounded app does not reliably receive
               // `NSCalendarDayChanged`, so the foreground is the reliable
@@ -239,7 +242,9 @@ struct SeptenaApp: App {
           // the first frame paints from the SwiftData mirror without
           // waiting on any network round-trip.
           await PerfTrace.span("app.servicesStart") { await services.start() }
-          SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+          if !SectionManifest.isRetired("tasks") {
+            SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+          }
           #if DEBUG
           // Catch section identity↔behavior drift in dev: every manifest row
           // must have a plugin and vice versa (the join is a runtime string).
@@ -451,64 +456,19 @@ struct SeptenaApp: App {
     .defaultPosition(.center)
     .defaultLaunchBehavior(.presented)
     #endif
-    // ⌘1-4 switch the four top-level tabs (Week / Next / Tasks / Goals) via
-    // `nav.pendingTab`, which RootTabView observes. ⌥⌘1-5 jump to the Tasks
-    // smart lists; each first hops to the Tasks tab so the filter is visible
-    // no matter which tab you're on, then sets nav.path to the route.
+    // ⌘1-3 switch the top-level tabs (Week / Next / Goals) via
+    // `nav.pendingTab`, which RootTabView observes. Septena Life has no Tasks
+    // tab, smart-list jumps, Task menu, task view options or New To-Do
+    // (ADR 0007: the task app owns tasks); Goals moved from ⌘4 to ⌘3.
     .commands {
       CommandMenu("Go") {
         Button("Today") { navigation.pendingTab = .week }
           .keyboardShortcut("1", modifiers: .command)
         Button("Next")  { navigation.pendingTab = .next }
           .keyboardShortcut("2", modifiers: .command)
-        Button("Tasks") { navigation.pendingTab = .tasks }
-          .keyboardShortcut("3", modifiers: .command)
         Button("Goals") { navigation.pendingTab = .goals }
-          .keyboardShortcut("4", modifiers: .command)
-
-        Divider()
-
-        Button("Today")    { navigation.pendingTab = .tasks; navigation.path = [.filter(.today)] }
-          .keyboardShortcut("1", modifiers: [.command, .option])
-        Button("Upcoming") { navigation.pendingTab = .tasks; navigation.path = [.filter(.upcoming)] }
-          .keyboardShortcut("2", modifiers: [.command, .option])
-        Button("Repeating") { navigation.pendingTab = .tasks; navigation.path = [.filter(.repeating)] }
-        Button("Anytime")  { navigation.pendingTab = .tasks; navigation.path = [.filter(.unscheduled)] }
-          .keyboardShortcut("3", modifiers: [.command, .option])
-
-        Divider()
-
-        // Quick Find — the jump-to-anything palette. Lives in Go (the app's
-        // navigation menu) rather than a bespoke top-level "Find" menu, the
-        // way Xcode's "Open Quickly…" sits under File.
-        Button("Quick Find…") { navigation.showQuickFind = true }
-          .keyboardShortcut("f", modifiers: [.command, .shift])
-      }
-      // Row-level actions, fed by `TaskListView`'s `focusedSceneValue`.
-      // Items disable themselves when no task list is focused, which also
-      // gates the shortcut so ⌘T can't fire from an unrelated screen.
-      CommandMenu("Task") {
-        // New Project / New Area lead the Task menu (macOS has no toolbar
-        // "···" — see SeptenaPage); they flip one-shots the sidebar consumes
-        // to open its create sheets.
-        Button("New Project") { navigation.shouldCreateProject = true }
-        Button("New Area") { navigation.shouldCreateArea = true }
-        Divider()
-        TaskCommandsMenu()
-      }
-      // ⌘/ toggles the sidebar. Lives in the standard View > Sidebar group
-      // so macOS shows it alongside the built-in column-visibility items.
-      CommandGroup(after: .sidebar) {
-        Button(navigation.sidebarVisibility == .detailOnly
-               ? "Show Sidebar" : "Hide Sidebar") {
-          navigation.sidebarVisibility =
-            navigation.sidebarVisibility == .detailOnly ? .all : .detailOnly
-        }
-        .keyboardShortcut("/", modifiers: .command)
-
-        // Task list view options, same rows Septask's View menu carries.
-        Divider()
-        TaskViewOptions()
+          .keyboardShortcut("3", modifiers: .command)
+        // No Quick Find: it searches tasks, projects and areas only.
       }
       // ⌘, opens the Settings sheet — standard macOS Preferences shortcut.
       // Replaces the system app-settings menu item so it routes to ours
@@ -518,20 +478,15 @@ struct SeptenaApp: App {
           .keyboardShortcut(",", modifiers: .command)
       }
       // ⌘I opens Add Info — the unified quick-add palette ("I" for Info). It
-      // sits in File alongside New To-Do rather than a bespoke "Add" menu.
-      // Moved off ⌘K so ⌘K cleanly completes the selected task (the Task
-      // menu's Mark as Complete) — File's ⌘K used to shadow it. Quick Find
-      // (⌘⇧F) lives in the Go menu above.
+      // sits in File rather than a bespoke "Add" menu. Quick Find (⌘⇧F)
+      // is gone with Tasks.
       CommandGroup(after: .newItem) {
         Button("Add Info…") { navigation.presentAddInfo() }
           .keyboardShortcut("i", modifiers: .command)
       }
-      // Override the default ⌘N "New Window" with "New To-Do". When a task
-      // list is focused, `NewTaskCommand` routes to the in-list inline
-      // creator so the new row inherits the list's project/area context;
-      // otherwise it falls back to the menu-bar Quick Add path (jump to
-      // Inbox + draft a row), the same flow as the iOS Quick Action.
-      CommandGroup(replacing: .newItem) { NewTaskCommand() }
+      // ⌘N was "New To-Do" until Septena Life retired Tasks (ADR 0007). The
+      // group stays replaced (empty) so ⌘N does not open a second window.
+      CommandGroup(replacing: .newItem) {}
       // ⌘? opens the keyboard-shortcuts cheat-sheet. Sits in the Help menu —
       // the standard macOS home for it — and surfaces in the iPad ⌘-HUD too.
       CommandGroup(after: .help) {
@@ -658,6 +613,8 @@ struct SeptenaApp: App {
   /// open task list refreshes without manual reload.
   @MainActor
   private func runRemindersAutoImport() async {
+    // Reminders import creates tasks; Septena Life retired Tasks (ADR 0007).
+    guard !SectionManifest.isRetired("tasks") else { return }
     let bridge = RemindersBridge.shared
     let before = bridge.recentImports.count
     // Belt-and-suspenders: scene `.task` has already awaited this, but

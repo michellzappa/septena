@@ -110,6 +110,10 @@ enum SettingsMirror {
         }
       }
       .map(SectionConfig.init)
+      // A section this app retired (Septena Life: Tasks) reads as off here,
+      // the one read path every surface goes through. The row itself is not
+      // written, so other apps and devices keep their value.
+      .map { $0.maskingRetired() }
   }
 
   /// Insert a SectionEntity for a manifest key if it isn't already in

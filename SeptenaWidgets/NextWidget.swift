@@ -84,11 +84,12 @@ struct NextWidget: Widget {
 @main
 struct SeptenaWidgetsBundle: WidgetBundle {
   var body: some Widget {
-    AddTaskControl()
+    // AddTaskControl() and TasksTodayWidget() are off: Septena Life no longer
+    // shows tasks (ADR 0007, the task app owns them). Their code still
+    // compiles; the app no longer publishes the tasks widget snapshot.
     NextWidget()
     SectionTileWidget()
     MacrosWidget()
-    TasksTodayWidget()
     // RhythmWidget() — the time-wheel/day-dial widget is DISABLED for now: the
     // hero's Liquid Glass face can't render in a static widget snapshot, and a
     // flat-faced fallback doesn't carry the look. All of its code is kept and
