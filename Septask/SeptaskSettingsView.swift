@@ -7,14 +7,15 @@ import SwiftData
 /// apart with a disc tile. The task app keeps its own focused sub-options,
 /// but the first level is deliberately identical so moving between the two
 /// apps feels natural. Shell-only composition: behavior lives in shared files
-/// (`TaskSettingsSections`, `ClaudeAISettingsPane`, `ThingsImportView`,
+/// (`TaskSettingsPane`, `ClaudeAISettingsPane`, `ThingsImportView`,
 /// `SettingsMirror`, `SettingsStore`, `SettingsChrome`, `ProfileAvatar`);
 /// only app-local surfaces (the About pages, task privacy copy) are here.
 struct SeptaskSettingsView: View {
   enum Destination: Hashable {
     case account
-    // Same root destinations, in the same order, as `SettingsView`.
-    case sections
+    // Same root destinations, in the same order, as `SettingsView`, minus
+    // Sections: Septask has one domain, and its settings are the Tasks pane.
+    case tasks
     case home
     case notifications
     case connectionsAI
@@ -23,11 +24,11 @@ struct SeptaskSettingsView: View {
     case feedback
     case about
     // Focused task-app sub-pages. These are intentionally not root entries.
-    case tasks
     case claudeAI
     case calendar
     case reminders
     case thingsImport
+    case taskBackend   // macOS: copy tasks to the task backend (preview)
   }
 
   @Environment(\.dismiss) private var dismiss
@@ -36,7 +37,7 @@ struct SeptaskSettingsView: View {
   @State private var path: [Destination] = []
   /// Detail selection for the macOS split view (a sidebar+detail Settings
   /// window, matching `SettingsView`). Unused on iOS, which pushes via `path`.
-  @State private var selection: Destination? = .sections
+  @State private var selection: Destination? = .tasks
 
   var body: some View {
     #if os(macOS)
@@ -53,7 +54,7 @@ struct SeptaskSettingsView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 220, max: 220)
     } detail: {
       NavigationStack {
-        pane(selection ?? .sections)
+        pane(selection ?? .tasks)
           .navigationDestination(for: Destination.self) { pane($0) }
       }
     }
@@ -69,6 +70,13 @@ struct SeptaskSettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(for: Destination.self) { pane($0) }
+        // A sheet needs a visible way out besides the drag (VoiceOver,
+        // keyboard, iPad form sheets that don't show the grabber).
+        .toolbar {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("Done") { dismiss() }
+          }
+        }
     }
     .presentationDragIndicator(.visible)
     #endif
@@ -114,13 +122,20 @@ struct SeptaskSettingsView: View {
     }
   }
 
-  /// Septena's root Settings order. Keep this list parallel with
-  /// `SettingsView.staticDestinations` so colors, labels, and muscle memory
-  /// remain aligned between the focused and full apps.
+  /// Septena's root Settings order without Sections. Keep this list
+  /// parallel with `SettingsView.staticDestinations` so labels and muscle
+  /// memory stay aligned between the focused and full apps.
   private var rootDestinations: [Destination] {
-    [.sections, .home, .notifications, .connectionsAI,
+    [.tasks, .home, .notifications, .connectionsAI,
      .sharingData, .privacy, .feedback]
   }
+
+  /// Septena's full root order, with `nil` where Septena shows Sections, so
+  /// each row takes the same palette color it has in Septena.
+  private static let septenaPaletteOrder: [Destination?] = [
+    .tasks, nil, .home, .notifications, .connectionsAI,
+    .sharingData, .privacy, .feedback,
+  ]
 
   /// One list row, as either a selectable tag (macOS split view) or a
   /// value-based push link (iOS stack).
@@ -128,7 +143,11 @@ struct SeptaskSettingsView: View {
   private func entry<L: View>(_ dest: Destination, selectable: Bool,
                               @ViewBuilder label: () -> L) -> some View {
     if selectable {
+      #if os(macOS)
+      label().settingsSidebarRow(dest, selection: selection)
+      #else
       label().tag(dest)
+      #endif
     } else {
       NavigationLink(value: dest) { label() }
     }
@@ -160,7 +179,6 @@ struct SeptaskSettingsView: View {
   private func title(for destination: Destination) -> String {
     switch destination {
     case .account:       return "Account"
-    case .sections:      return "Sections"
     case .home:          return "Home"
     case .notifications: return "Notifications"
     case .connectionsAI: return "Connections & AI"
@@ -173,13 +191,13 @@ struct SeptaskSettingsView: View {
     case .calendar:      return "Calendar"
     case .reminders:     return "Reminders"
     case .thingsImport:  return "Import from Things"
+    case .taskBackend:   return "Task backend (preview)"
     }
   }
 
   private func icon(for destination: Destination) -> String {
     switch destination {
     case .account:       return "person.crop.circle"
-    case .sections:      return "square.grid.2x2"
     case .home:          return "house"
     case .notifications: return "bell.badge"
     case .connectionsAI: return "brain.head.profile"
@@ -192,19 +210,31 @@ struct SeptaskSettingsView: View {
     case .calendar:      return "calendar"
     case .reminders:     return "checklist"
     case .thingsImport:  return "square.and.arrow.down"
+    case .taskBackend:   return "arrow.up.doc"
     }
   }
 
   private func tint(for destination: Destination) -> Color {
-    guard let index = rootDestinations.firstIndex(of: destination) else { return .gray }
+    guard let index = Self.septenaPaletteOrder.firstIndex(of: destination) else { return .gray }
     return SettingsAccentPalette.colors[index % SettingsAccentPalette.colors.count]
+  }
+
+  /// Septask's navigation value for each linked row on the shared Tasks
+  /// pane. `.section` is Septena-only (Septask shows the accent inline).
+  private static func taskSettingsDestination(_ link: TaskSettingsLink) -> Destination {
+    switch link {
+    case .section:   return .tasks
+    case .reminders: return .reminders
+    case .calendar:  return .calendar
+    case .things:    return .thingsImport
+    case .claudeAI:  return .claudeAI
+    }
   }
 
   @ViewBuilder
   private func pane(_ destination: Destination) -> some View {
     switch destination {
     case .account:       SeptaskAccountPane()
-    case .sections:      SeptaskSectionsPane()
     case .home:          SeptaskHomePane()
     case .notifications: SeptaskNotificationsPane()
     case .connectionsAI: SeptaskConnectionsAISettingsPane()
@@ -212,11 +242,18 @@ struct SeptaskSettingsView: View {
     case .privacy:       SeptaskPrivacyPane()
     case .feedback:      SeptaskFeedbackPane()
     case .about:         SeptaskAboutPane()
-    case .tasks:         SeptaskTaskSettingsPane()
+    case .tasks:         TaskSettingsPane(destination: Self.taskSettingsDestination)
+                           .navigationTitle(title(for: destination))
     case .claudeAI:      ClaudeAISettingsPane().navigationTitle(title(for: destination))
     case .calendar:      CalendarDetail().navigationTitle(title(for: destination))
     case .reminders:     RemindersInboxDetail().navigationTitle(title(for: destination))
     case .thingsImport:  ThingsImportView().navigationTitle(title(for: destination))
+    case .taskBackend:
+      #if os(macOS)
+      SeptaskBackendSettingsPane()
+      #else
+      EmptyView()
+      #endif
     }
   }
 }
@@ -286,87 +323,6 @@ private struct SeptaskAccountPane: View {
   }
 }
 
-// MARK: - Sections
-
-/// Septena's Sections root condensed to Septask's one always-on domain. This
-/// preserves the same route (Settings → Sections → Tasks) without implying
-/// that the focused app can add, remove, or configure life domains.
-private struct SeptaskSectionsPane: View {
-  @Environment(SectionTheme.self) private var theme
-
-  var body: some View {
-    Form {
-      Section {
-        NavigationLink(value: SeptaskSettingsView.Destination.tasks) {
-          HStack(spacing: 12) {
-            ColoredGlyph(icon: "checklist", color: theme.color(for: "tasks"),
-                         size: glyphSize, glyphRatio: glyphRatio)
-            VStack(alignment: .leading, spacing: 2) {
-              Text("Tasks")
-              Text("Inbox, Today, areas, and projects")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-      } footer: {
-        Text("Tasks is always on in Septask. Set its color and behavior here; shared task settings carry over to Septena.")
-      }
-    }
-    .formStyle(.grouped)
-    .navigationTitle("Sections")
-  }
-
-  private var glyphSize: CGFloat {
-    #if os(macOS)
-    20
-    #else
-    29
-    #endif
-  }
-
-  private var glyphRatio: CGFloat {
-    #if os(macOS)
-    0.48
-    #else
-    0.38
-    #endif
-  }
-}
-
-// MARK: - Tasks
-
-/// The single section detail in the focused app. Septena exposes these same
-/// controls at Settings → Sections → Tasks; the route stays parallel even
-/// though Septask has no other sections to list.
-private struct SeptaskTaskSettingsPane: View {
-  @Environment(\.modelContext) private var modelContext
-  @Environment(CKEngine.self) private var ckEngine
-  @Environment(SectionTheme.self) private var theme
-
-  var body: some View {
-    Form {
-      Section {
-        HStack {
-          Text("Accent")
-          Spacer()
-          PaletteSwatchButton(selectedHex: theme.token(for: "tasks")) { hex in
-            SettingsMirror.setSectionColor("tasks", hex: hex,
-                                           context: modelContext, engine: ckEngine)
-            theme.setColor(hex, for: "tasks")
-          }
-        }
-      } footer: {
-        Text("The accent is shared with Septena — changing it here recolors Tasks there too.")
-      }
-
-      TaskSettingsSections()
-    }
-    .formStyle(.grouped)
-    .navigationTitle("Tasks")
-  }
-}
-
 // MARK: - Home
 
 /// Septask's Home counterpart: presentation preferences for its focused task
@@ -401,25 +357,26 @@ private struct SeptaskHomePane: View {
 
 // MARK: - Notifications
 
-/// Septask's notification surface: the overdue badge (driven by the shared
-/// BadgeManager this app starts at launch) and the Claude reconnect nudge
+/// Septask's notification surface: a pointer to the overdue badge (a task
+/// setting on the shared Tasks pane) and the Claude reconnect nudge
 /// (armed from ClaudeGatewayProvider in core). Septena's per-section nudge
 /// scheduler is SectionRegistry-driven and doesn't run here; task deadline
 /// reminders are the planned addition.
 private struct SeptaskNotificationsPane: View {
-  // Shared with Septena through the App Group — see `BadgeManager`.
-  @AppStorage(SettingsKey.badgeShowOverdue, store: SeptenaAppGroup.defaults)
-  private var taskBadge: Bool = false
   @AppStorage(ClaudeGatewayProvider.connectionNudgeKey) private var claudeNudge: Bool = true
 
   var body: some View {
     Form {
+      // The overdue badge is a task setting; it lives on the Tasks pane.
+      // This is only a pointer, not a second toggle.
       Section {
-        Toggle("Show overdue indicator on app icon", isOn: $taskBadge)
+        NavigationLink(value: SeptaskSettingsView.Destination.tasks) {
+          Label("Overdue badge", systemImage: "app.badge")
+        }
       } header: {
         Text("Badge")
       } footer: {
-        Text("Marks the app icon while any task is overdue — the same count as Today's overdue pill. On Mac it's a dock dot; per-device, so each device opts in on its own.")
+        Text("Set the app icon badge for overdue tasks in Tasks settings.")
       }
 
       Section {
@@ -764,6 +721,16 @@ private struct SeptaskAboutPane: View {
         #endif
         Button("Show Welcome Again") { welcomeCompleted = false }
       }
+
+      #if os(macOS)
+      Section {
+        NavigationLink(value: SeptaskSettingsView.Destination.taskBackend) {
+          Label("Task backend (preview)", systemImage: "arrow.up.doc")
+        }
+      } header: {
+        Text("Advanced")
+      }
+      #endif
     }
     .formStyle(.grouped)
     .navigationTitle("About")

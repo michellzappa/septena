@@ -343,6 +343,18 @@ func noteTaskAttachmentDeletion(id: String) { noteDeletion(recordName: TaskAttac
     engine?.state.pendingRecordZoneChanges.count ?? 0
   }
 
+  /// True when a save for this task is queued and not yet confirmed. Lets the
+  /// task backend tell a deferred draft (never queued, nothing to send) from a
+  /// fresh row whose first upload is still pending (which must carry later
+  /// edits such as a soft delete).
+  func hasPendingTaskSave(id: String) -> Bool {
+    guard let engine else { return false }
+    return engine.state.pendingRecordZoneChanges.contains { change in
+      if case .saveRecord(let recordID) = change { return recordID.recordName == id }
+      return false
+    }
+  }
+
   /// Drop any queued uploads/deletes for Readwise-imported quotes. Those rows are
   /// now device-local (re-imported per device from the user's own token), so they
   /// never belong in CloudKit — and this clears a backlog a pre-change build may
@@ -373,6 +385,25 @@ func noteTaskAttachmentDeletion(id: String) { noteDeletion(recordName: TaskAttac
   /// Usually 0 in steady state.
   var pendingDatabaseChangesCount: Int {
     engine?.state.pendingDatabaseChanges.count ?? 0
+  }
+
+  /// True once `start()` has created the sync engine.
+  var isStarted: Bool { engine != nil }
+
+  /// Read-only. How many queued saves or deletes target one of these record
+  /// names. The task-backend import refuses to start while any task, area,
+  /// project or attachment change is still unsent, because the local mirror
+  /// would then hold edits CloudKit has not confirmed.
+  func pendingChangeCount(recordNames: Set<String>) -> Int {
+    guard let engine else { return 0 }
+    return engine.state.pendingRecordZoneChanges.reduce(0) { count, change in
+      switch change {
+      case .saveRecord(let id), .deleteRecord(let id):
+        return recordNames.contains(id.recordName) ? count + 1 : count
+      @unknown default:
+        return count
+      }
+    }
   }
 
   /// Force-flush all pending record-zone changes to CloudKit. Awaits
@@ -542,8 +573,10 @@ func handleEvent(
       persistStateSerialization(update.stateSerialization)
 
     case .accountChange(let change):
-      // Phase 1: react to sign-in / sign-out / switched-account. On
-      // signOut we wipe the local mirror; on signIn we re-upload.
+      // Log only. Nothing here wipes the local mirror on sign-out or
+      // re-uploads it on sign-in: the SwiftData rows stay as they are, so a
+      // switched iCloud account keeps the previous account's local rows on
+      // this device. A wipe is deliberately not implemented (data-loss risk).
       logger.info("CKEngine accountChange: \(String(describing: change), privacy: .public)")
 
     case .fetchedRecordZoneChanges(let changes):
