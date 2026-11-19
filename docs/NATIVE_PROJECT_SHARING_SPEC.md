@@ -1,5 +1,10 @@
 # Native CloudKit Project Sharing Spec
 
+> **Superseded by `docs/PROJECT_SHARING_SPEC.md`** (2026-11-19). Septena
+> leaves iCloud ([ADR 0002](adr/0002-own-backend-replaces-icloud.md)), so the
+> CloudKit share design below does not apply. Its product decisions (§12) carry
+> over where the new spec marks them *(carried)*.
+
 **Status:** planning / migration spec. Not started. Core design decisions
 **locked 2026-07-03** (§5, §6, §12 below). Sequenced AFTER Septask P2
 (docs/SEPTASK.md "P0 Findings"): Phase 0's dev spike may start any time, but

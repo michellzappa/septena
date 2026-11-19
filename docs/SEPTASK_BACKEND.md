@@ -1,0 +1,296 @@
+# Septask backend — spec
+
+**Status:** phase 0 code written 2026-11-18 in `../septena-mcp-gateway`
+(`src/store/`, `src/api/`, mounted at `/v1`). Deployed 2026-11-19 to
+`api.septena.app` (Cloudflare account Centaur-Labs). No app or MCP tool uses it
+yet.
+**Owner of decisions:** mz. All open questions answered 2026-11-18 (§12).
+
+## 1. Decisions already made (2026-11-18)
+
+| Question | Decision |
+|---|---|
+| Where task data lives | Own backend. Cloudflare is the source of truth. SwiftData stays as the local cache. |
+| Who Septask is for | mz first. Keep an App Store release possible. |
+| Septena (life OS) | Stays. Septena and Septask share one task core. |
+| Claude surfaces that must work | Claude.ai / mobile connector, Claude Code / Desktop, scheduled agents while every device sleeps. |
+
+**2026-11-19: Septask becomes a fully separate product** and will probably
+be renamed. Backend features (Sign in with Apple, the import, sync) land in
+Septask first. **Septena drops tasks** (decided 2026-11-19): the task app
+owns them, and Septena's Tasks section is removed after the cutover. The
+import runs from Septask (Settings ▸ About ▸ Advanced). Open: the new name.
+
+Earlier default chosen by the agent (overrule if wrong): **tasks move to the backend
+for BOTH apps.** Septena's other sections (checklists, intake, body, goals,
+wearables, settings) stay on CloudKit. One task store, not two.
+
+## 2. Why
+
+The hosted MCP gateway reads the private CloudKit DB with a
+`ckWebAuthToken`. A private-scope token comes only from the idmsa web
+sign-in, lives about 8 hours, and Apple gives no server-side refresh
+(`SeptenaCore/ClaudeGatewayProvider.swift`). The app renews it only in the
+foreground. So Claude loses access whenever no device opened the app in the
+last ~8 hours. That is structural; no client fix removes it.
+
+A backend we own removes the token problem: the gateway and the apps talk to
+the same server with credentials we control and can refresh.
+
+## 3. Scope
+
+**Moves to the backend:**
+
+- `Task` — including heading rows (`kind == "heading"`) and recurrence fields.
+- `Area`, `Project`.
+- `TaskAttachment` — metadata in the DB, bytes in R2.
+- Task conversation turns (today `TaskEntity.conversationJSON`) — becomes its
+  own append-only table (§5.3).
+
+**Stays on CloudKit:** every other record type in `docs/CloudKitSchema.md`.
+
+**Unknown, verify before build:**
+
+- Whether any non-task record references a task, area or project id (goals,
+  sections, settings). If yes, that reference crosses stores and needs a rule.
+- Whether task-related settings (`SettingsKey.todayGroupByList` and others)
+  sync through the CloudKit `Settings` record or stay in local defaults.
+- The current state of `../septena-mcp-gateway` — the repo is not checked out
+  on this machine, so this spec did not read its code.
+
+## 4. Architecture
+
+```
+iOS / Mac / Watch apps                 Claude (web, mobile, Code, agents)
+  SwiftData cache + op queue                    │
+          │  HTTPS + WebSocket                  │ MCP (OAuth)
+          ▼                                     ▼
+   Worker  api.septena.app  (Hono)  ◄────── Worker  mcp.septena.app (gateway)
+          │                                     │
+          └──────────► Durable Object per user ◄┘
+                        SQLite: tasks, areas, projects,
+                        attachments, turns, change log
+                        R2: attachment bytes
+```
+
+- **One Durable Object per user.** The DO is the authorization boundary and
+  the single writer. Its SQLite holds all task data and the change log. Every
+  write is serialized by the DO, so the server order is total and simple.
+- **The gateway calls the DO directly** (service binding / DO stub). No
+  CloudKit Web Services, no `ckWebAuthToken`, no foreground renewal.
+- **R2** holds attachment bytes, keyed `u/{userId}/att/{attachmentId}`.
+  Uploads and downloads go through the Worker (`PUT`/`GET
+  /v1/attachments/:id`), not signed URLs: no S3 credentials to manage, and
+  the 25 MB limit is under the Worker's request-body cap. The client pushes
+  the attachment row first, then uploads bytes whose length must equal its
+  `byteCount`.
+- **Stack:** Workers + Hono + Durable Objects (SQLite) + R2, Zod at every
+  boundary. Matches the gateway, which is already a Worker.
+
+## 5. Data model
+
+### 5.1 Rules for every row
+
+- `id` — the existing id, unchanged. Task ids stay bare; area/project ids stay
+  the shortids from `docs/IDENTIFIERS.md`. No id rewrite during migration.
+- `rev` — server sequence number of the last change to this row. Assigned by
+  the DO. Monotonic per user.
+- `updatedAt` — server time of the last change.
+- `deletedAt` — tombstone. Rows are soft-deleted so a pull can carry the
+  deletion. Tombstones are purged after 90 days.
+- Field names are the real names, not CloudKit reserved slots:
+  `Area.reservedString1` → `emoji`, `Area.reservedString2` /
+  `Project.reservedString1` → `attachment` (JSON `AreaAttachment`),
+  `reservedInt1` → `position`. Legacy encrypted `notes` is dropped; only
+  `notesText` migrates, as `notes`.
+- Dates keep their current shapes (`YYYY-MM-DD` strings for `created`,
+  `scheduled`, `deadline`, `todaySetOn`; the existing `completedAt` string).
+  Changing them is a separate decision, not part of the move.
+
+### 5.2 Tables
+
+**tasks:** id, title, status, kind, heading, area, project, created,
+scheduled, deadline, today, todaySetOn, completedAt, notes, position,
+todayPosition, recurrenceUnit, recurrenceInterval, recurrenceAfterCompletion,
+recurrencePaused, recurrenceSeriesID, recurrenceAnchorDate, source,
+sourceClient, acknowledgedAt, createdAt, rev, updatedAt, deletedAt.
+
+`position` is the manual order inside the task's own list (Inbox, area,
+project). `todayPosition` is the manual order on Today, kept apart so
+reordering Today never reshuffles the home list, as in Things. It is null
+until the row is first ordered on Today; readers fall back to `position`.
+
+**areas:** id, title, context, emoji, attachment, position, rev, updatedAt,
+deletedAt.
+
+**projects:** id, title, status, area, created, completedAt, notes, context,
+githubRepo, attachment, position, rev, updatedAt, deletedAt.
+
+**attachments:** id, taskId, filename, contentType, byteCount, position,
+createdAt, r2Key, rev, updatedAt, deletedAt.
+
+**turns:** taskId, seq, role, step, provider, confidence, question, options,
+chosen, otherText, inReplyTo, note, ts, plus the per-task fields of
+`ConvoTurn`'s parent struct that are not turns (status, assignee, handoff,
+artifact, acceptance, endstate) in a `task_convo` row. Exact split follows
+`SeptenaCore/TaskConvo.swift` at build time.
+
+**changes:** rev, entity, id, op (`upsert` / `delete` / `dropped`), fields (JSON of the
+changed field names), clientOpId, actor (`app:<device>` / `mcp:<client>`),
+at. This is the sync log and the audit log.
+
+**client_ops:** clientOpId, rev, at — dedupe for retried pushes. Purged after
+30 days.
+
+### 5.3 Conversation turns are append-only rows
+
+Today the whole conversation is one JSON string on the task. If Claude
+appends a turn while a device appends a turn, last writer wins and one turn is
+lost. On the backend, a turn is a row; `seq` is assigned by the DO. Two
+appends never overwrite each other.
+
+## 6. Sync protocol
+
+### 6.1 Push
+
+`POST /v1/sync/push` with a batch of ops:
+
+- `{ clientOpId, entity, id, op: "upsert", fields: { … only changed fields … } }`
+- `{ clientOpId, entity, id, op: "delete" }`
+- `{ clientOpId, op: "appendTurn", taskId, turn }`
+
+The DO applies the batch in order inside one transaction, assigns `rev`s,
+writes `changes`, and returns `{ appliedThrough: rev, results: [...] }`. A
+`clientOpId` already in `client_ops` returns the stored result and does not
+apply again. So a retry after a lost response is safe.
+
+### 6.2 Pull
+
+`GET /v1/sync/pull?since=<rev>&limit=<n>` returns the current state of every
+row changed after `since`, plus tombstones, plus `nextSince` and `hasMore`.
+The client stores `nextSince` only after it saved the batch to SwiftData.
+
+### 6.3 Live nudge
+
+- **Foreground:** the app holds a WebSocket to the DO (hibernation API). On
+  any commit, the DO sends `{ rev }`. The client pulls. The socket carries no
+  data, only the nudge.
+- **Background:** the DO sends a silent APNs push on commit (coalesced). Like
+  today's CloudKit rule, push is a hint, not a guarantee: **foreground pull on
+  launch and on activate stays the reliable path.**
+- **Watch and widgets:** unchanged. They read the snapshots the phone and Mac
+  already publish (`TasksWatchSnapshotPublisher`, `TasksWidgetSnapshotStore`).
+
+### 6.4 Conflict rule
+
+**Field-level last-writer-wins by server arrival order.** A push carries only
+changed fields, so concurrent edits to different fields of one task both
+survive. Concurrent edits to the same field: the later arrival at the DO
+wins. Turns never conflict (§5.3). **A deleted row stays deleted:** an update
+that arrives after the delete is dropped, and the DO writes it to `changes`
+with op `dropped` so the edit is still on record.
+
+Recurrence: the next occurrence keeps its deterministic id (computed from the
+series and the completion stamp, as `TasksBackend.complete` / `uncomplete`
+do today). Two devices that both spawn it produce one row, because the upsert
+is idempotent on id.
+
+### 6.5 Offline
+
+The client queues ops in SwiftData (a persisted op queue — the job
+`CKSyncEngine` does today). Local writes apply to SwiftData at once, as now.
+The queue drains on reconnect, in order. After a push, the client pulls, and
+the pulled server state overwrites local fields that have no pending op.
+
+## 7. Client changes
+
+- **The swap point is the three backends.** Only
+  `SeptenaCore/CloudKit/TasksBackend.swift`, `AreasBackend.swift` and
+  `ProjectsBackend.swift` call `CKEngine.note…Change` for tasks, areas and
+  projects. A new `TaskSyncClient` replaces those calls. Mutators keep their
+  public API. Views do not change.
+- **CKEngine stops owning task kinds** after cutover. It keeps every other
+  record type. The task/area/project/attachment record types stay in the
+  CloudKit schema (Prod deploy is additive-only) but receive no writes.
+- **Undo** stays as is (`SeptenaCore/TaskUndo.swift`): recorded at the user
+  gesture, never in the mutator or the sync apply path.
+- **Sign-in:** Sign in with Apple, once per install. The Worker returns a
+  long-lived refresh token (Keychain, shared through the app group so
+  extensions can read it) and a short access token. **Septena asks for Sign
+  in with Apple at first launch**, for every user, same as Septask.
+- **In-app MCP server** (`SeptenaCore/MCP/`) keeps working: it reads the
+  local cache and writes through the mutators, so its writes sync like any
+  app write.
+- **Cutover flag:** a `taskStore` setting with values `cloudkit` / `backend`.
+  Both paths exist in the code until the cleanup phase.
+
+## 8. MCP gateway
+
+- Tools keep their names and shapes (`tasks_list`, `tasks_create`,
+  `tasks_update`, `tasks_thread_append`, …). The gateway changes its data
+  source from CloudKit Web Services to the user's DO. Tool changes still land
+  in both MCP servers in the same change (`CLAUDE.md`, "Two MCP servers").
+- **Auth:** OAuth 2.1 on the gateway, with Sign in with Apple as the identity.
+  The OAuth subject maps to the same user id as the app's sign-in, so the
+  gateway resolves the same DO. Refresh tokens rotate server-side; no device
+  needs to be awake.
+- **Scheduled agents:** use the same connector. If an agent runtime cannot do
+  OAuth, a per-user API token with a `tasks` scope, created in Settings, is
+  the fallback.
+- **Dual-era protocol stays** (legacy `initialize` plus stateless
+  `2026-07-28`). This spec does not change the protocol layer.
+- `ClaudeGatewayProvider` and the reconnect cue retire after cutover.
+
+## 9. Migration
+
+Each phase ends in a working app. Rollback is the cutover flag.
+
+| Phase | What happens | Exit check |
+|---|---|---|
+| 0. Backend | Worker, DO, R2, auth, push/pull. No app uses it. | Push/pull round trip from a test client. |
+| 1. Import | A one-shot "Copy tasks to backend" action in the Mac app reads the local SwiftData mirror and pushes everything, ids unchanged. Attachments upload to R2. | Count and per-row hash match between SwiftData and the DO. |
+| 2. Shadow | The gateway reads the DO for `tasks_list` / `tasks_get` in a test connector. The apps still write CloudKit. Import re-runs to refresh. | Claude answers match the app for a few days of real use. |
+| 3. Cutover | mz flips `taskStore = backend` on every device. A final import runs first. CloudKit task records freeze (no writes, no deletes). The live connector switches to the DO. | A day of normal use on all devices with no divergence. |
+| 4. Cleanup | Remove the CloudKit task path and the token flow from the code. CloudKit task records stay as a frozen backup. | Build green on all schemes. |
+
+**Rollback after phase 3:** a one-shot "Copy tasks back to iCloud" writer
+must exist **before** cutover, because rows created on the backend after
+cutover are not in CloudKit.
+
+## 10. Privacy and security
+
+- **The privacy story changes.** Task data leaves the user's iCloud and lives
+  on Cloudflare, encrypted at rest by Cloudflare, not end-to-end. Claude needs
+  plaintext, so end-to-end encryption is not possible for this data. App
+  Store privacy labels and the site's privacy text must change before any
+  public release.
+- Per-user DO isolation is the authorization boundary. No query crosses users.
+- Zod validation on every request body. Unknown fields are rejected. Fail
+  closed.
+- Secrets live in wrangler secrets only (Apple keys, token signing key).
+- Account deletion deletes the DO storage and the R2 prefix.
+- Attachment limits: **25 MB per file, 2 GB per user.** The Worker checks
+  both before it mints an upload URL, and the app checks the file size before
+  upload so the user sees the error at once.
+
+## 11. Repo split (after cutover)
+
+- A new `septask` repo holds the Septask app targets and the backend Worker.
+- The shared task core (models, mutators, `TaskSyncClient`, task UI under
+  `Shell/Tasks`) becomes an SPM package that both repos consume.
+- Septena pins a version of that package. Shared-code changes then need a
+  version bump in Septena; this replaces today's "build all four schemes"
+  rule.
+- The split happens after cutover so that the migration happens in one repo.
+
+## 12. Decisions on the open questions (2026-11-18)
+
+| Question | Decision |
+|---|---|
+| Domain | Stay on `septena.app`: keep `mcp.septena.app`, add `api.septena.app`. The live connector does not change. |
+| Sign-in in Septena | Septena asks for Sign in with Apple at first launch, for every user. |
+| Attachment limits | 25 MB per file, 2 GB per user (§10). |
+| Delete vs. late update | A deleted task stays deleted; the late edit is dropped and logged (§6.4). |
+| Manual order (2026-11-19) | Today has its own order (`todayPosition`), separate from the home list's `position`, as in Things. The backend column is live; the apps adopt it at cutover. |
+| Things-grade pass | Separate work. Needs mz's list of pains. Not part of this spec. |
+| Linked projects (2026-11-19) | GitHub Issues and Starlings tasks as project sources, run server-side after cutover. Spec: `docs/LINKED_PROJECTS_SPEC.md`. |

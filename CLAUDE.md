@@ -434,15 +434,18 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   `SelectableChip` for a chip / segment / filter. **An inset highlight on an
   ordinary list row is the "selection floating on top of the row" bug** — inset
   is only for palettes.
-- **The app accent is adaptive INK, not a hue — black in light, WHITE in dark.**
-  So `.background(Color.accentColor).foregroundStyle(.white)` is white-on-white
-  in dark mode and the control vanishes. This shipped twice (the training
-  effort-rung picker and the task week-strip day picker). Selected chips use a
-  **wash plus matching ink** (`SelectableChip` / `SelectableChipStyle`), which is
-  contrast-safe for any tint in both appearances. Related trap: `Color.accentColor`
-  only means "the section color" *inside* a `SectionDrawer` — a view pushed from a
-  settings pane inherits the monochrome ink instead, so it must read
-  `theme.color(for: "<key>")` explicitly.
+- **The app accent is the PLATFORM accent (decided 2026-11-19: "feel as native
+  as possible").** No target sets `ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME`,
+  so controls, toggles, menus and native selection use the system accent (the
+  user's System Settings accent on macOS, blue on iOS). It used to be adaptive
+  ink (black in light, white in dark); code written for that era may still
+  assume ink. Selection fills are an accent WASH with normal ink text
+  (`Theme.listSelectionFill`, `SeptaskKitTheme.listSelectionFill`), never a
+  solid bar with white text. Selected chips use a **wash plus matching ink**
+  (`SelectableChip` / `SelectableChipStyle`), contrast-safe for any tint in both
+  appearances. Related trap: `Color.accentColor` only means "the section color"
+  *inside* a `SectionDrawer` — a view pushed from a settings pane gets the
+  platform accent instead, so it must read `theme.color(for: "<key>")` explicitly.
 - **Motion is gated centrally — never bare `withAnimation` / `.animation(_:value:)`.**
   Use `a11yAnimate(_:) { … }` (drop-in for `withAnimation`, no environment
   needed), `A11yMotion.run` (when `@Environment(\.a11yMotion)` is already in
@@ -459,6 +462,13 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   spec, design note, feature write-up — goes in `docs/`, never the repo root. Root
   is reserved for the canonical set only: `README.md`, `CLAUDE.md`, `SECURITY.md`,
   `LICENSE`, `NOTICE`, `project.yml`. Reference docs by their `docs/…` path.
+- **Planning: start at `docs/README.md`.** It indexes every doc with a status
+  and sets the rules: decisions as ADRs in `docs/adr/`, features as specs,
+  order in `docs/ROADMAP.md`, work as GitHub issues + milestones on
+  `michellzappa/septena`. Write an ADR before a spec that rests on a
+  hard-to-reverse decision. Mark a superseded doc with a header; never delete
+  or move it. **Septena is leaving iCloud** (ADR 0002): new specs design for
+  the own backend only.
 - **This repo is PUBLIC — keep only app-relevant docs here. Strategy lives in the
   private site repo.** Competitive strategy, positioning, and the **book**
   (manifesto / go-to-market) do NOT belong in this repo. They live in the

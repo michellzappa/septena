@@ -1,5 +1,12 @@
 # Septask Android — bridge app plan
 
+> **Superseded on architecture** (2026-11-19). This plan assumes CloudKit
+> stays the store and Android reaches it through the gateway. Septena leaves
+> iCloud ([ADR 0002](adr/0002-own-backend-replaces-icloud.md)): Android becomes
+> an ordinary client of `api.septena.app`, and Android-only users become
+> possible. The UI parity notes may still help. Rewrite before building
+> (`docs/ROADMAP.md`, "Later").
+
 **Status:** Proposal / unstarted. Companion to `docs/SEPTASK.md` (the Apple
 Septask plan, P0–P4 landed). This doc covers (a) the backend work that makes
 any non-Apple client possible, and (b) a native Android app with maximum
