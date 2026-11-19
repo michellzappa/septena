@@ -51,7 +51,9 @@ The tool list is **dynamic**: on `tools/list` the gateway reads the user's `Sett
 ## Specific guidance
 
 ### Tasks
-- Views: `today`, `inbox`, `upcoming`, `anytime`, `completed`. `anytime` is the single home for open, dateless tasks (it absorbed the former `someday` bucket). **`anytime` is NOT "all tasks"** — it excludes inbox-only items.
+- Views: `today`, `inbox`, `upcoming`, `anytime`, `completed`. `today` is the whole Today page: the **Inbox** section first, then the filed tasks due today. `inbox` is that Inbox section alone. `anytime` is the single home for open, dateless tasks (it absorbed the former `someday` bucket).
+- **One Inbox.** The app shows a single Inbox at the top of Today. It holds unfiled tasks (no area, no project) and your proposals the user has not accepted. Never describe these as two piles ("triage" vs "unorganized"). `triage` is a retired view name and returns the Inbox.
+- Row flags: `inbox: true` = the row sits in the Inbox. `daysOnToday: N` = the row has carried over on Today undone for N days; the app darkens its checkbox one seventh per day. Mention rows at 7+ as stuck when you summarize Today.
 - `tasks_list` returns `{tasks, total, truncated}` — **`truncated: true` means more rows exist beyond `limit`**, so don't conclude a task is missing/deleted from a capped page; raise `limit` or use `tasks_get`.
 - **`tasks_get(id)`** — one call for "where is this task, what's its state?": title, status, area, project, scheduled, deadline, today, completedAt, source, notes, plus a compact convo summary. Works regardless of view or status; use this instead of scanning lists to locate a known id.
 - **`notes`** — the task's free-text body. Readable on `tasks_get`/`tasks_list` and writable on `tasks_create`/`tasks_update` (pass `notes`; on update, `null`/`""` clears it). This is the plain note field, distinct from the structured `TaskConvo` (artifact/handoff/thread) below.
@@ -101,7 +103,7 @@ or as a *proposal*:
   fields you set (table below), with no triage step.
 - **`origin: "agent_suggestion"` (or omitted)** — you surfaced it yourself,
   proactively (from email, a transcript, your own initiative). It lands as a
-  **proposal** in the user's **triage** pile — the "to sort" band on top of Today
+  **proposal** in the user's **Inbox** — the section on top of Today
   — awaiting their tap. The gateway defaults to this (secure by default), so if
   you don't set `origin`, you are proposing.
 
@@ -122,17 +124,17 @@ ages in after ~7 days unacknowledged). A **committed** task routes immediately:
 `area` and `project` tag a task for filtering but don't route it on their own.
 
 **Footgun**: a *proposal* is NOT in `today` even when you set `today: true` — it's
-in `triage`, awaiting the user's tap. For proposals, never claim "added to
-today"; say you've **proposed** it ("Proposed for today — accept it in your To
-sort band"). A **committed** (`user_request`) task you may report as added.
+in the Inbox, awaiting the user's tap. For proposals, never claim "added to
+today"; say you've **proposed** it ("Proposed for today — accept it in your
+Inbox"). A **committed** (`user_request`) task you may report as added.
 
 **Verification habit**: check `placement` in the create result, or
-`tasks_list(view: "triage")` for proposals.
+`tasks_list(view: "inbox")` for proposals.
 
 ```
 # "Add X to today" — proposes X for today; user taps to accept
 tasks_create(title: "X", today: true)
-  → "Proposed for today — accept it in your To sort band."
+  → "Proposed for today — accept it in your Inbox."
 
 # "Schedule X for tomorrow"
 tasks_create(title: "X", scheduled: "<tomorrow>")
@@ -143,13 +145,13 @@ tasks_create(title: "Write newsletter",
              scheduled: "<the next Monday, YYYY-MM-DD>",
              recurrence: {unit: "week", interval: 1, after_completion: false})
 ```
-  → "Queued to sort, proposed for tomorrow."
+  → "Proposed for tomorrow — accept it in your Inbox."
 
-# "What haven't I sorted yet?"
-tasks_list(view: "triage")
+# "What haven't I sorted yet?" / "What's in my inbox?"
+tasks_list(view: "inbox")
 
 # "Show me unscheduled tasks"
-tasks_list(view: "inbox")
+tasks_list(view: "anytime")
 ```
 
 ### Habits, supplements, chores

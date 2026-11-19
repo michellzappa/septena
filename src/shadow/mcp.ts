@@ -21,8 +21,10 @@ import {
   type ConvoTurn,
   type TaskConvo,
   type TaskOut,
+  annotate,
   awaitsReasoning,
   convoSummary,
+  inboxFirst,
   matchesView,
   normalizeView,
 } from "../tools/taskShared.js";
@@ -62,7 +64,8 @@ const RECONNECT_MESSAGE =
 const zLimit = (max: number) => z.number().int().min(1).max(max);
 const zArgs = {
   tasks_list: z.object({
-    view: z.enum(["today", "triage", "inbox", "anytime", "upcoming", "completed", "someday"]).optional(),
+    // "triage" and "someday" are retired names, kept as aliases (normalizeView).
+    view: z.enum(["today", "inbox", "anytime", "upcoming", "completed", "triage", "someday"]).optional(),
     limit: zLimit(500).optional(),
   }),
   tasks_get: z.object({ id: zId }),
@@ -170,11 +173,12 @@ async function callTool(
     case "tasks_get": {
       const r = await store.readTask(a.id as string);
       if (!r || r.task.kind === "heading") throw new Error(`Task not found: ${a.id}`);
-      const t = taskOut(r.task);
+      const t = annotate(taskOut(r.task), todayYMD(timeZone), Date.now());
       result = {
         id: t.id, title: t.title, status: t.status, today: t.today,
         scheduled: t.scheduled, deadline: t.deadline, area: t.area, project: t.project,
         completedAt: t.completedAt, source: t.source, notes: t.notes,
+        inbox: t.inbox, daysOnToday: t.daysOnToday,
         convo: convoSummary(convoOut(r.convo, r.turns)),
       };
       break;
@@ -254,7 +258,7 @@ async function listTasks(store: StoreRpc, timeZone: string, rawView: unknown, ra
   const limit = rawLimit ?? 100;
   if (view === "completed") {
     const { rows, total } = await store.readTasks("done", limit);
-    return { tasks: rows.map(taskOut), total, truncated: total > rows.length };
+    return { tasks: rows.map(taskOut).map(stripDays), total, truncated: total > rows.length };
   }
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
   // its own manual order: todayPosition, falling back to position.
@@ -264,15 +268,19 @@ async function listTasks(store: StoreRpc, timeZone: string, rawView: unknown, ra
   let matched = rows
     .map((row) => ({ row, out: taskOut(row) }))
     .filter(({ out }) => matchesView(out, view, today, nowMs));
+  let tasks = matched.map((m) => m.out);
   if (view === "today") {
     const key = (r: Row) =>
       num(r.todayPosition) ?? num(r.position) ?? Number.POSITIVE_INFINITY;
-    matched = matched
-      .map((m, i) => ({ ...m, i }))
-      .sort((x, y) => key(x.row) - key(y.row) || x.i - y.i);
+    tasks = inboxFirst(
+      matched
+        .map((m, i) => ({ ...m, i }))
+        .sort((x, y) => key(x.row) - key(y.row) || x.i - y.i)
+        .map((m) => m.out),
+      today, nowMs);
   }
   return {
-    tasks: matched.slice(0, limit).map((m) => m.out),
+    tasks: tasks.slice(0, limit).map((t) => stripDays(annotate(t, today, nowMs))),
     total: matched.length,
     truncated: matched.length > limit,
   };
@@ -293,6 +301,8 @@ function taskOut(r: Row): TaskOut {
     project: str(r.project),
     completedAt: str(r.completedAt),
     notes: str(r.notes),
+    created: str(r.created),
+    todaySetOn: str(r.todaySetOn),
     source: str(r.source),
     acknowledgedAt: ms(r.acknowledgedAt),
     createdAt: ms(r.createdAt),
@@ -330,6 +340,12 @@ function turnOut(r: Row): ConvoTurn {
     if (r[k] !== undefined && r[k] !== null) t[k] = r[k];
   }
   return t as unknown as ConvoTurn;
+}
+
+/// `created` / `todaySetOn` feed `daysOnToday` and are not part of the
+/// `tasks_list` result shape.
+function stripDays({ created: _c, todaySetOn: _t, ...t }: TaskOut): TaskOut {
+  return t;
 }
 
 function str(v: unknown): string | undefined {

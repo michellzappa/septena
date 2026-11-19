@@ -5,7 +5,7 @@
 // disagree on what "Today" or "pending reasoning" means.
 
 export type TaskView =
-  | "today" | "triage" | "inbox" | "anytime" | "upcoming" | "completed";
+  | "today" | "inbox" | "anytime" | "upcoming" | "completed";
 
 export interface TaskOut {
   id: string;
@@ -18,8 +18,12 @@ export interface TaskOut {
   project?: string;
   completedAt?: string;
   notes?: string;
-  // Provenance + freshness cue — needed to compute the triage band (and to
-  // keep "today" excluding unratified rows). See iOS SeptenaTask.isInTriageBand.
+  // Day stamps (YYYY-MM-DD) that date a task's arrival on Today — the inputs
+  // of `daysOnToday`. `todaySetOn` = when the explicit `today` pin was set.
+  created?: string;
+  todaySetOn?: string;
+  // Provenance + freshness cue — needed to compute the triage band, the
+  // unratified part of the Inbox. See iOS SeptenaTask.isInTriageBand.
   source?: string;
   acknowledgedAt?: number; // ms epoch; present once the user has engaged the row
   createdAt?: number;      // ms epoch
@@ -29,12 +33,22 @@ export interface TaskOut {
   // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
   // round-trips into a write unchanged.
   recurrence?: { unit: string; interval: number; after_completion: boolean };
+  // Derived on output by `annotate` (absent = false / 0):
+  // `inbox` = the row sits in Today's Inbox section in the app.
+  // `daysOnToday` = days the row has carried over on Today undone; the app
+  // darkens the checkbox one seventh per day (SeptenaCore todayTenureFill).
+  inbox?: true;
+  daysOnToday?: number;
 }
 
-/// "someday" is the retired bucket — accepted as an alias for "anytime" so
-/// existing agent calls keep working. Default view is "today".
+/// Retired view names stay accepted so existing agent calls keep working:
+/// "someday" → "anytime"; "triage" → "inbox" (the app shows one Inbox, never
+/// a separate triage pile). Default view is "today".
 export function normalizeView(view: unknown): TaskView {
-  return ((view as string) === "someday" ? "anytime" : (view as TaskView | undefined)) ?? "today";
+  const v = view as string | undefined;
+  if (v === "someday") return "anytime";
+  if (v === "triage") return "inbox";
+  return (v as TaskView | undefined) ?? "today";
 }
 
 // Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
@@ -54,19 +68,74 @@ export function inTriageBand(t: TaskOut, nowMs: number): boolean {
   return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
 }
 
+/// Mirrors SeptenaCore SeptenaTask.isOnToday: a `today` pin, or a scheduled /
+/// deadline date that has arrived.
+export function isOnToday(t: TaskOut, today: string): boolean {
+  if (t.status !== "open" || t.kind === "heading") return false;
+  return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
+}
+
+/// Today's Inbox section in the app (Septask SeptaskKitTaskList: the triage
+/// band, then the Today rows with no area and no project). One bucket: the
+/// user never sees "unratified" and "unfiled" as two states.
+export function inInbox(t: TaskOut, today: string, nowMs: number): boolean {
+  if (inTriageBand(t, nowMs)) return true;
+  return isOnToday(t, today) && !t.area && !t.project;
+}
+
+/// Mirrors SeptenaCore SeptenaTask.daysOnToday: whole days since the task
+/// landed on Today (earliest of the pin stamp and any arrived scheduled /
+/// deadline date, floored at `created`). 0 for a fresh agent proposal (it
+/// carries its own cue) and for a legacy pin with no `todaySetOn`.
+export function daysOnToday(t: TaskOut, today: string, nowMs: number): number {
+  if (!isOnToday(t, today) || showsAgentCue(t, nowMs)) return 0;
+  const landed: string[] = [];
+  if (t.today && t.todaySetOn) landed.push(t.todaySetOn);
+  if (t.scheduled && t.scheduled <= today) landed.push(t.scheduled);
+  if (t.deadline && t.deadline <= today) landed.push(t.deadline);
+  if (landed.length === 0) return 0;
+  let earliest = landed.sort()[0].slice(0, 10);
+  if (t.created && t.created.slice(0, 10) > earliest) earliest = t.created.slice(0, 10);
+  const from = Date.parse(`${earliest}T00:00:00Z`);
+  const to = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.max(0, Math.round((to - from) / 86_400_000));
+}
+
+/// Mirrors SeptenaTask.showsAgentCue: an unacknowledged MCP-authored row
+/// inside the decay window.
+function showsAgentCue(t: TaskOut, nowMs: number): boolean {
+  if (t.source !== "mcp" || t.acknowledgedAt || !t.createdAt) return false;
+  return nowMs - t.createdAt < CUE_DECAY_MS;
+}
+
+/// Adds the derived `inbox` and `daysOnToday` fields to an output row.
+export function annotate(t: TaskOut, today: string, nowMs: number): TaskOut {
+  const out = { ...t };
+  if (inInbox(t, today, nowMs)) out.inbox = true;
+  const days = daysOnToday(t, today, nowMs);
+  if (days > 0) out.daysOnToday = days;
+  return out;
+}
+
+/// Today in the app's order: the Inbox section first (triage band, then the
+/// loose Today rows), then the filed rows. Stable within each part.
+export function inboxFirst(tasks: TaskOut[], today: string, nowMs: number): TaskOut[] {
+  const rank = (t: TaskOut) => (inTriageBand(t, nowMs) ? 0 : inInbox(t, today, nowMs) ? 1 : 2);
+  return tasks.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map((x) => x.t);
+}
+
 /// Mirrors Persistence.swift LocalCache.tasks(filter:). Keep in lockstep
 /// with iOS so the two surfaces never disagree on what "Today" means.
 export function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: number): boolean {
   if (t.status !== "open" || t.kind === "heading") return false;
   switch (view) {
     case "today":
-      // Ratified + due — the triage band (unratified) is excluded.
-      if (inTriageBand(t, nowMs)) return false;
-      return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
-    case "triage":
-      return inTriageBand(t, nowMs);
+      // The whole Today page, as the app draws it: the Inbox section (which
+      // includes the unratified band) plus every row due today.
+      return inTriageBand(t, nowMs) || isOnToday(t, today);
     case "inbox":
-      return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
+      return inInbox(t, today, nowMs);
     case "upcoming":
       if (t.today) return false;
       return (!!t.scheduled && t.scheduled > today) || (!!t.deadline && t.deadline > today);

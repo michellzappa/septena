@@ -141,7 +141,7 @@ export const GLOBAL_TOOLS: Tool[] = [
   {
     name: "tasks_list",
     description:
-      "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, completed). 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'triage' is the to-sort pile shown above Today — unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes those. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+      "List Septena tasks for a given view (today, inbox, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. The user sees ONE Inbox; never describe it as two piles. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
     inputSchema: listTasksJsonSchema,
   },
   {

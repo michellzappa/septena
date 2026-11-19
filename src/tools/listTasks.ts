@@ -1,6 +1,6 @@
 import type { CloudKitClient } from "../cloudkit.js";
 import { getEffectiveTimezone, todayYMD } from "../tz.js";
-import { matchesView, normalizeView, type TaskOut, type TaskView } from "./taskShared.js";
+import { annotate, inboxFirst, matchesView, normalizeView, type TaskOut, type TaskView } from "./taskShared.js";
 
 // Ported from /Users/mz/Dev/septena-mcp/src/tools/listTasks.ts.
 // Single source of truth for tool definitions can come later once a 3rd
@@ -13,10 +13,10 @@ export const listTasksJsonSchema = {
   properties: {
     view: {
       type: "string",
-      enum: ["today", "triage", "inbox", "anytime", "upcoming", "completed"],
+      enum: ["today", "inbox", "anytime", "upcoming", "completed"],
       default: "today",
       description:
-        "Which task list to read. 'today' = ratified + due. 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'triage' = the to-sort pile shown above Today: unratified rows the user hasn't placed (your unacknowledged proposals + their loose captures); 'today' excludes these.",
+        "Which task list to read. 'today' = the whole Today page as the app shows it: the Inbox section first, then every task due today. 'inbox' = only the Inbox section: tasks the user has not filed yet (no area or project) and your proposals they have not accepted. 'anytime' is the single home for open, dateless tasks. Rows carry `inbox: true` when they sit in the Inbox, and `daysOnToday: N` when they have carried over on Today undone for N days (the app darkens their checkbox; 7+ is long overdue for a decision).",
     },
     limit: {
       type: "integer",
@@ -60,7 +60,7 @@ export async function listTasks(
   // task population and filter client-side using iOS's rules (see
   // Persistence.swift LocalCache.tasks(filter:)).
   const needsClientFilter =
-    view === "today" || view === "triage" || view === "inbox" || view === "upcoming";
+    view === "today" || view === "inbox" || view === "upcoming";
   // These views are filtered client-side (today/inbox/upcoming aren't
   // expressible as one CK query), and the matching tasks often have NO
   // `scheduled` value (inbox items, today-flagged) so they sort unpredictably.
@@ -87,6 +87,8 @@ export async function listTasks(
     project: optionalString(r.fields.project?.value),
     completedAt: optionalString(r.fields.completedAt?.value),
     notes: optionalString(r.fields.notesText?.value),
+    created: optionalString(r.fields.created?.value),
+    todaySetOn: optionalString(r.fields.todaySetOn?.value),
     source: optionalString(r.fields.source?.value),
     acknowledgedAt: optionalNumber(r.fields.acknowledgedAt?.value),
     createdAt: optionalNumber(r.fields.createdAt?.value),
@@ -108,11 +110,12 @@ export async function listTasks(
   // count returned (≥ when truncated, exact when not).
   let truncated: boolean;
   let total: number;
+  const tz = await getEffectiveTimezone(client);
+  const todayStr = todayYMD(tz);
+  const nowMs = Date.now();
   if (needsClientFilter) {
-    const tz = await getEffectiveTimezone(client);
-    const todayStr = todayYMD(tz);
-    const nowMs = Date.now();
-    const matched = tasks.filter((t) => matchesView(t, view, todayStr, nowMs));
+    let matched = tasks.filter((t) => matchesView(t, view, todayStr, nowMs));
+    if (view === "today") matched = inboxFirst(matched, todayStr, nowMs);
     total = matched.length;
     truncated = matched.length > limit;
     tasks = matched.slice(0, limit);
@@ -120,6 +123,11 @@ export async function listTasks(
     truncated = !!res.continuationMarker;
     total = tasks.length;
   }
+  // `created` / `todaySetOn` only feed `daysOnToday`; not part of the result.
+  tasks = tasks.map((t) => {
+    const { created: _c, todaySetOn: _t, ...out } = annotate(t, todayStr, nowMs);
+    return out;
+  });
   return { tasks, total, truncated };
 }
 
