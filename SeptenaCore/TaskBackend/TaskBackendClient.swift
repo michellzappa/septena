@@ -95,6 +95,21 @@ actor TaskBackendClient {
     accessExpiry = .distantPast
   }
 
+  /// Deletes the account on the backend (`DELETE /v1/account`): the server
+  /// empties the user's task store (tasks, areas, projects, conversations,
+  /// settings) and their attachment files (docs/SEPTASK_BACKEND.md §10).
+  /// Then drops the local session. Throws, and keeps the session, when the
+  /// server did not confirm.
+  func deleteAccount() async throws {
+    let (data, status) = try await authed(path: "/v1/account", method: "DELETE", body: nil)
+    guard status == 204 || status == 200 else { throw Self.httpError(status, data) }
+    // No sign-out call: the server's store is empty, so the refresh token
+    // fails its next rotation anyway.
+    KeychainStore.delete(account: Self.refreshAccount)
+    accessToken = nil
+    accessExpiry = .distantPast
+  }
+
   private func adopt(_ s: BackendSession) {
     // Store the rotated refresh token first: the old one is already spent.
     KeychainStore.store(s.refreshToken, account: Self.refreshAccount, synchronizable: false)
