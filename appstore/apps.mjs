@@ -12,10 +12,10 @@
 //   SEPTENA_APP=septask node metadata.mjs   # Septask
 //   npm run all           /  npm run all:septask
 //
-// Bundle ids are verified against project.yml (Septask = com.septena.tasks,
-// mac = com.septena.tasks.mac — NOT com.septask.*). Each app is its own pair of
-// App Store Connect apps (iOS + a separate macOS record), so shipping is four
-// `fastlane deliver` runs total. Device `active` flags gate rendering/validation
+// Bundle ids are verified against project.yml (Septask = com.septena.tasks on
+// iOS AND macOS — NOT com.septask.*). Since 2026-11-19 each app is ONE App
+// Store Connect record with an iOS and a macOS platform (ADR 0007), so each
+// app ships with two `fastlane deliver` runs (--platform ios / osx). Device `active` flags gate rendering/validation
 // per app: a class stays inactive until its real captures exist, so `npm run
 // all` never ships a placeholder (the same discipline Septena's mac/watch use).
 
@@ -29,7 +29,7 @@ export const APPS = {
     screenshotsMacDir: "screenshots-mac",
     metadataDir: "metadata",
     metadataMacDir: "metadata-mac",
-    bundleIds: { ios: "com.septena.cloud", mac: "com.septena.cloud.mac" },
+    bundleIds: { ios: "com.septena.cloud", mac: "com.septena.cloud" },
     devices: {
       iphone69: { active: true },
       ipad13: { active: true },
@@ -52,7 +52,7 @@ export const APPS = {
     screenshotsMacDir: "screenshots-septask-mac",
     metadataDir: "metadata-septask",
     metadataMacDir: "metadata-septask-mac",
-    bundleIds: { ios: "com.septena.tasks", mac: "com.septena.tasks.mac" },
+    bundleIds: { ios: "com.septena.tasks", mac: "com.septena.tasks" },
     devices: {
       // Flip each on once its raw shots land so validate.mjs's parity guard
       // never lets a placeholder ship. iphone69 captured 2026-07-03

@@ -96,10 +96,10 @@ UTILITIES
 
 ---
 
-## Platform: macOS (com.septena.tasks.mac)
+## Platform: macOS (com.septena.tasks)
 
 > Separate App Store Connect app (own bundle id) → its own `deliver` run:
-> `fastlane deliver --app_identifier com.septena.tasks.mac --platform osx
+> `fastlane deliver --app_identifier com.septena.tasks --platform osx
 > --metadata_path appstore/metadata-septask-mac --screenshots_path appstore/screenshots-septask-mac`.
 > Mac screenshots must be 16:10 (the render pipeline outputs 2880×1800).
 
@@ -184,7 +184,7 @@ npm run viz:septask                                 # 3. open the viz to review
 # 4. upload — Septask is two separate ASC apps (see fastlane/Deliverfile):
 fastlane deliver --app_identifier com.septena.tasks --platform ios \
   --metadata_path appstore/metadata-septask --screenshots_path appstore/screenshots-septask
-fastlane deliver --app_identifier com.septena.tasks.mac --platform osx \
+fastlane deliver --app_identifier com.septena.tasks --platform osx \
   --metadata_path appstore/metadata-septask-mac --screenshots_path appstore/screenshots-septask-mac
 ```
 

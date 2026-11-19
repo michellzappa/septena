@@ -1,0 +1,162 @@
+# Sync subscription — spec
+
+**Status:** proposed 2026-11-19. Defaults marked *(default)* stand until mz
+overrules them in §11.
+**Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md),
+[ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+**Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
+existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
+`SeptenaPlus.swift`, `Config/Septena.storekit`).
+**Prices:** set in App Store Connect. The reasoning lives in the private site
+repo (`septena-site/docs/PRODUCT_DIRECTION.md`), not here.
+
+## 1. Goal
+
+Septena (the task app) is free and complete on one device. One subscription
+pays for everything the server does: sync, agents that work while your
+devices sleep, links to other tools, and sharing. The rule is simple enough to
+say in one line: **the device is free, the server is paid.**
+
+## 2. What exists and what is missing
+
+**Exists:**
+
+- `SupportStore`: StoreKit 2 store for a tip jar. Products
+  `com.septena.cloud.support.{annual,monthly,lifetime}`, local config
+  `Config/Septena.storekit`. The App Store Connect products were never
+  created, so the ids are still free to drop.
+- `SeptenaPlus`: tip-jar copy, tiers and a cosmetic "Supporter" finish. Its
+  header rule says no feature may sit behind `plusUnlocked`. ADR 0007 ends
+  that rule for the server features in §3.
+- Backend auth: Sign in with Apple once per install; the Worker issues a
+  refresh token and an access token; one Durable Object per user
+  (`docs/SEPTASK_BACKEND.md` §4, §7).
+- The in-app MCP server on macOS (`SeptenaCore/MCP/`), which runs on the
+  device and needs no server.
+
+**Missing:**
+
+| Gap | Section |
+|---|---|
+| A rule for what is free and what is paid | §3 |
+| Subscription products on the task app's record | §4 |
+| A link between a purchase and a backend user | §5 |
+| A server-side entitlement that every paid path checks | §6 |
+| App behavior with and without the entitlement | §7 |
+| A plan for the tip jar | §8 |
+| Purchases outside the App Store | §9 |
+
+## 3. Free and paid
+
+| Free (on the device, no account) | Paid (needs the server) |
+|---|---|
+| Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Sync between devices, including the watch through the server |
+| Watch app paired to the phone *(default: the watch syncs through the phone, free)* | The hosted Claude connector (`mcp.septena.app`) |
+| The local MCP server on the Mac (Claude Code / Desktop on the same Mac) | Agents that run while every device sleeps (roadmap M2: scheduled runner, push questions) |
+| Import and export (plain JSON) | Linked projects: GitHub, Starlings, Linear (ADR 0003) |
+| | Shared projects with other people (ADR 0004) |
+| | Capture feeds (Gmail) and attachment storage in R2 |
+
+Rules:
+
+- A free user never needs an account. The app works from first launch with
+  no sign-in.
+- Nothing free today becomes paid later without a new ADR.
+- The cost line matches the price line: every paid feature costs us server
+  time or storage; no free feature does.
+
+## 4. Products
+
+- New subscription group on the `com.septena.tasks` record, one level:
+  - `com.septena.tasks.sync.monthly`
+  - `com.septena.tasks.sync.annual`
+- *(default)* A free trial as a StoreKit introductory offer on both products.
+- *(default)* No lifetime product. A lifetime sale pays once for a server
+  that costs money every month.
+- *(default)* Family Sharing off at launch (it needs per-member backend
+  accounts; revisit after sharing ships).
+- One subscription covers Septena Life too, when Septena Life moves to the
+  backend.
+
+## 5. Purchase and account link
+
+1. The user taps a paid feature or "Turn on sync". The app asks for Sign in
+   with Apple first if the install has no backend account.
+2. The app buys with `Product.purchase(options: [.appAccountToken(userId)])`,
+   where `userId` is the backend user UUID. This ties the transaction to the
+   account, not to the device.
+3. The app sends the signed transaction (JWS) to `POST /v1/entitlement/apple`.
+4. The Worker verifies the JWS with Apple's root certificates (App Store
+   Server Library or an equal check in the Worker), checks that
+   `appAccountToken` equals the caller's user id, and stores the result.
+5. "Restore purchases" repeats step 3 for every item in
+   `Transaction.currentEntitlements`.
+
+## 6. Server entitlement
+
+- The user's Durable Object stores one row: `source` (`apple` / `stripe` /
+  `grant`), `productId`, `expiresAt`, `originalTransactionId`, `status`.
+- App Store Server Notifications V2 go to `POST /v1/webhooks/apple`. The
+  Worker verifies each signed payload and updates the row (renewal, expiry,
+  refund, grace period, billing retry).
+- Every paid path checks the row in one place: a Hono middleware on `/v1`
+  sync routes, and the same check in the gateway before it reaches the DO.
+- **Fail closed** on a missing or invalid row, with one exception: grace
+  period and billing retry count as active (Apple's own rule).
+- A `grant` row (no expiry or a set expiry) covers mz, testers, and press.
+
+## 7. App behavior
+
+- **Active:** sync runs, the connector works, agents run.
+- **Never subscribed:** the app is the full free app. Paid features show one
+  quiet entry point each, never a modal on launch.
+- **Lapsed:** sync stops; local data stays on every device and stays fully
+  editable. The server keeps the data *(default: 12 months)*, then mails a
+  warning before it deletes. Re-subscribing resumes sync with the server
+  copy as the base and pushes local edits on top (the normal op queue).
+- The app never deletes local data because a subscription ended.
+- Agents and links stop at expiry. Open agent claims return to the user.
+
+## 8. The tip jar
+
+*(default)* Remove the tip jar from the task app. One way to pay, not two.
+Keep the cosmetic supporter finish only if a subscriber gets it. The
+`com.septena.cloud.support.*` products were never created in App Store
+Connect, so nothing breaks. Septena Life may keep the tip jar until it moves
+to the backend.
+
+## 9. Other platforms
+
+- Web and Android buy through Stripe (web checkout) and Google Play billing.
+  Each writes the same entitlement row with its own `source`.
+- One account, one entitlement, any store. A user who pays on iPhone gets
+  sync on the web client.
+- Apple rules: the iOS app does not link to the web checkout unless the
+  storefront allows it.
+
+## 10. Phases
+
+| Phase | Work | Exit |
+|---|---|---|
+| P0 | Entitlement row, Apple JWS verify, webhook, `grant` rows, middleware on `/v1` and the gateway. mz has a `grant`. | A user without a row gets 402 on sync; mz syncs. |
+| P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, paywall sheet, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
+| P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
+| P3 | Stripe for the web client. | A web purchase turns on sync on iPhone. |
+
+P0 can start after roadmap M1 phase 0 (backend auth exists). P1 must ship
+before any public release that uses the backend.
+
+## 11. Open questions for mz
+
+| Question | Default |
+|---|---|
+| Monthly and annual price | Decided 2026-11-19: €5 / €40 (reasoning in the private site repo) |
+| Trial length | Decided 2026-11-19: 14 days |
+| Does the watch need the subscription? | No, it syncs through the paired phone |
+| Is the hosted Claude connector paid? | Yes, it runs on our server |
+| Lifetime product | None |
+| Family Sharing | Off at launch |
+| How long the server keeps a lapsed user's data | 12 months, with a warning mail first |
+| Tip jar in the task app | Removed |
+| Early TestFlight access as a subscriber perk | Yes |
+| Does the code stay open source? | Yes; the paid product is the hosted service |

@@ -6154,7 +6154,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
 				PRODUCT_NAME = Septask;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG SEPTASK";
@@ -6208,7 +6208,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				PRODUCT_NAME = Septena;
 				SDKROOT = macosx;
 			};
@@ -6263,7 +6263,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.cloud;
 				PRODUCT_NAME = Septena;
 				SDKROOT = macosx;
 			};
@@ -6319,7 +6319,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.septena.tasks;
 				PRODUCT_NAME = Septask;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SEPTASK;

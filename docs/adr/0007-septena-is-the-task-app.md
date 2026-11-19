@@ -13,12 +13,12 @@
   supplement logging) to sell on its own.
 - ADR 0002 moves both apps off iCloud to the own backend. A server-owned task
   store makes sync a service we run per user, and it costs money per user.
-- Each app already has its own App Store record and bundle IDs:
+- Each app has its own bundle IDs, registered on the team (CENTAUR LABS OU):
   - life OS: `com.septena.cloud` (+ `.mac`, `.watchkitapp`, widgets, live
     activities, share)
   - task app: `com.septena.tasks` (+ `.mac`, `.watchkitapp`, `.share`)
-- The App Store name "Septena" sits on the `com.septena.cloud` record today.
-  App Store names are unique across the store. A US search on 2026-11-19
+- Neither app had an App Store Connect record. App Store names are unique
+  across the store. A US search on 2026-11-19
   found no app called "Septena" (other than ours) and none called "Septena
   Life". Plain "LifeOS" is taken by about 30 apps.
 
@@ -26,16 +26,27 @@
 
 The task app takes the name **Septena** and is the primary product. The life
 OS becomes **Septena Life**, a secondary product. Both keep their current App
-Store records and bundle IDs; only the display names change. "Septask" stays a
+Store bundle IDs. "Septask" stays a
 working name in code and docs and never ships to users. Septena sells on
 several platforms with a small subscription for sync. Septena Life moves to
 the own backend too, after the task app; that move is not planned yet.
 
 ## Consequences
 
-- mz renames the records by hand in App Store Connect, in one sitting:
-  first `com.septena.cloud` → "Septena Life" (this frees the name), then
-  `com.septena.tasks` → "Septena". Each rename needs an editable version.
+- Done 2026-11-19: two iOS App Store Connect records, primary language
+  English (U.S.), full user access:
+  - "Septena", `com.septena.tasks`, SKU `septena-tasks-ios`, Apple ID
+    6836809027
+  - "Septena Life", `com.septena.cloud`, SKU `septena-life-ios`, Apple ID
+    6836809299
+- Each record has an iOS and a macOS platform (universal purchase, one
+  subscription on both). The Mac targets moved from `com.septena.cloud.mac` /
+  `com.septena.tasks.mac` to the iOS bundle IDs on 2026-11-19. On a Mac that
+  ran the old ID, the app starts with empty UserDefaults and keychain items
+  and asks again for privacy permissions (Reminders). The SwiftData store
+  lives at `~/Library/Septena/`, which does not depend on the bundle ID, so
+  it carries over. The gateway still accepts the old `.mac` audiences for
+  installs that have not updated.
 - Bundle IDs, the CloudKit container and the app groups do not change. Users
   never see them.
 - New user-facing strings, domains and ids must not say "Septask".

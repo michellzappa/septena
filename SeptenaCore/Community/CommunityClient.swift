@@ -211,8 +211,8 @@ public actor CommunityClient {
   private let session: URLSession
 
   // Must be the app's real container, NOT `CKContainer.default()`: `.default()`
-  // resolves to `iCloud.<main-bundle-id>`, which on the Mac app
-  // (`com.septena.cloud.mac`) is a container the app isn't entitled to — so
+  // resolves to `iCloud.<main-bundle-id>`, which on the Mac app (until
+  // 2026-11-19 `com.septena.cloud.mac`) was a container the app isn't entitled to — so
   // accountStatus never reports `.available` and community surfaces wrongly show
   // "sign in to iCloud" for a signed-in user. The rest of the app keys on this
   // explicit identifier (see CKEngine). Resolved in-body because a public init's

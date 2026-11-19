@@ -17,6 +17,7 @@ is one issue there. Update this file when the order changes. Rules:
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Other clients (web, Android) | spec to rewrite on the backend | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
+| Launch — Septena name and paid sync | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007 | `track:launch` |
 
 ## Milestones
 
@@ -51,6 +52,28 @@ through `api.septena.app`.
 
 **Septena Life** (the life OS) is on the back burner: fixes only, no new
 features, no backend move planned.
+
+### Launch track (runs next to M1–M2)
+
+GitHub milestone: "Launch Septena (iPhone, iPad, Mac)", label `track:launch`.
+
+- #32 done: App Store records "Septena" (`com.septena.tasks`) and
+  "Septena Life" (`com.septena.cloud`) exist (ADR 0007).
+- #45 (mz) create the two sync products in App Store Connect
+- #44 P0 entitlement on the backend (needs M1 phase 0 auth)
+- #46 P1 StoreKit purchase, paywall, lapsed state; tip jar out of the task app
+  (needs #44, #39)
+- #47 P2 free mode works with no account and no network
+- #31 / #48 rename pass: user-facing "Septask" → "Septena", life OS →
+  "Septena Life", in the apps, the MCP skill text and the App Store copy.
+  Code identifiers stay.
+- #50 site rewrite around the task app and a pricing page (private site repo)
+- #49 (mz) trademark search for "Septena" (classes 9 and 42)
+- #3 privacy copy for the iCloud exit
+- #43 P3 Stripe for the web client waits for the web client (Later)
+
+Exit: a sandbox purchase turns on sync, the stores and the site say
+"Septena", and the trademark search is clear.
 
 ### M2 — Agent intake v0
 

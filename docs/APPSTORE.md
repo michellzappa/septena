@@ -102,10 +102,10 @@ PRODUCTIVITY
 
 ---
 
-## Platform: macOS (com.septena.cloud.mac)
+## Platform: macOS (com.septena.cloud)
 
 > Separate App Store Connect app (own bundle id) → its own `deliver` run:
-> `fastlane deliver --app_identifier com.septena.cloud.mac --platform osx
+> `fastlane deliver --app_identifier com.septena.cloud --platform osx
 > --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac`.
 > Mac screenshots must be 16:10 (the render pipeline outputs 2880×1800).
 
@@ -200,7 +200,7 @@ cd appstore && npm install            #    first time only (Playwright)
 npm run all                           # 2. metadata + render composites + validate
 npm run viz                           # 3. open the App Store viz to verify
 fastlane deliver                      # 4. upload iOS metadata + screenshots (no binary)
-fastlane deliver --app_identifier com.septena.cloud.mac --platform osx \
+fastlane deliver --app_identifier com.septena.cloud --platform osx \
   --metadata_path appstore/metadata-mac --screenshots_path appstore/screenshots-mac
 ```
 

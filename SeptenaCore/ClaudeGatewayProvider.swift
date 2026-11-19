@@ -393,7 +393,7 @@ public final class ClaudeGatewayProvider {
   // catches them dead. Samples feed `calibratedValidFloor()` below so
   // `refreshInterval` / `probeAfter` self-tune upward as real data
   // accumulates — no hand-editing needed. To eyeball the raw samples:
-  //   defaults read com.septena.cloud.mac septena.claudeGateway.measure.samples
+  //   defaults read com.septena.cloud septena.claudeGateway.measure.samples
   private static let measureCycleKey = "septena.claudeGateway.measure.cycleRefreshAt"
   private static let measureValidKey = "septena.claudeGateway.measure.lastValidAge"
   private static let measureFinalizedKey = "septena.claudeGateway.measure.finalizedCycle"

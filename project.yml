@@ -200,7 +200,9 @@ targets:
         # the shipped app is just "Septena" — without this the built bundle is
         # SeptenaMac.app, which is what kept "renaming" the app.
         PRODUCT_NAME: Septena
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud.mac
+        # Same bundle ID as iOS: one App Store record per product, one purchase
+        # on both platforms (ADR 0007). Was com.septena.cloud.mac until 2026-11-19.
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.cloud
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Septena/SeptenaMac.entitlements
         # No global accent: controls, toggles, selection and menus use the
@@ -538,7 +540,9 @@ targets:
         # Target name disambiguates from the iOS target; the shipped bundle
         # is Septask.app (same pattern as SeptenaMac → Septena.app).
         PRODUCT_NAME: Septask
-        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks.mac
+        # Same bundle ID as iOS: one App Store record per product, one purchase
+        # on both platforms (ADR 0007). Was com.septena.tasks.mac until 2026-11-19.
+        PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks
         # No global accent: controls, toggles, selection and menus use the
         # platform accent (the user's System Settings accent on macOS).
         GENERATE_INFOPLIST_FILE: NO
