@@ -13,6 +13,32 @@ import {
 } from "./columns.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 
+/// Per changed field: [before, after]. `null` means absent / cleared.
+export type ChangeDiff = Record<string, [unknown, unknown]>;
+
+export interface ChangeEntry {
+  rev: number;
+  entity: string;
+  id: string;
+  op: string;
+  fields: string[] | null;
+  diff: ChangeDiff | null;
+  actor: string;
+  at: string;
+}
+
+const LOG_TEXT_MAX = 4_000;
+
+/// Long text (notes, artifacts) is cut in the log; the row itself keeps it.
+function clipForLog(v: unknown): unknown {
+  if (typeof v === "string" && v.length > LOG_TEXT_MAX) return `${v.slice(0, LOG_TEXT_MAX)}…`;
+  if (v !== null && typeof v === "object") {
+    const s = JSON.stringify(v);
+    if (s.length > LOG_TEXT_MAX) return `${s.slice(0, LOG_TEXT_MAX)}…`;
+  }
+  return v;
+}
+
 // TaskStore — one Durable Object per user, the single writer for that user's
 // task data (docs/SEPTASK_BACKEND.md in the app repo, §4–§6).
 //
@@ -69,6 +95,15 @@ export class TaskStore extends DurableObject<Env> {
   }
 
   private migrate(): void {
+    this.migrateTables();
+    // The change log gained per-field before/after values after it shipped.
+    const changeCols = new Set(
+      this.sql.exec<{ name: string }>("PRAGMA table_info(changes)").toArray().map((r) => r.name),
+    );
+    if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
+  }
+
+  private migrateTables(): void {
     for (const name of ENTITY_NAMES) {
       const spec = ENTITIES[name];
       this.sql.exec(createTableSQL(spec));
@@ -92,6 +127,7 @@ export class TaskStore extends DurableObject<Env> {
         rev INTEGER PRIMARY KEY, entity TEXT NOT NULL, id TEXT NOT NULL,
         op TEXT NOT NULL, fields TEXT, clientOpId TEXT, actor TEXT NOT NULL, at TEXT NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS changes_row ON changes(entity, id, rev);
       CREATE TABLE IF NOT EXISTS client_ops (
         clientOpId TEXT PRIMARY KEY, result TEXT NOT NULL, at INTEGER NOT NULL
       );
@@ -118,11 +154,49 @@ export class TaskStore extends DurableObject<Env> {
     return rev;
   }
 
-  private log(rev: number, entity: string, id: string, op: string, fields: string[] | null, clientOpId: string | null, actor: string, at: string): void {
+  private log(
+    rev: number, entity: string, id: string, op: string, fields: string[] | null,
+    clientOpId: string | null, actor: string, at: string, diff: ChangeDiff | null = null,
+  ): void {
     this.sql.exec(
-      "INSERT INTO changes (rev, entity, id, op, fields, clientOpId, actor, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO changes (rev, entity, id, op, fields, clientOpId, actor, at, diff) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       rev, entity, id, op, fields ? JSON.stringify(fields) : null, clientOpId, actor, at,
+      diff && Object.keys(diff).length ? JSON.stringify(diff) : null,
     );
+  }
+
+  /// Before/after per field for the change log. `before` is the decoded row
+  /// (or null for an insert), `after` the pushed values. Only fields whose
+  /// value actually changed are kept; long text is cut to keep the log small.
+  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>): ChangeDiff {
+    const out: ChangeDiff = {};
+    for (const [name, next] of Object.entries(after)) {
+      const prev = before ? (before[name] ?? null) : null;
+      if (JSON.stringify(prev) === JSON.stringify(next ?? null)) continue;
+      out[name] = [clipForLog(prev), clipForLog(next ?? null)];
+    }
+    return out;
+  }
+
+  /// History of one row (newest first), or of the whole store when `id` is
+  /// omitted. Paged by rev: pass the smallest rev seen as `before`.
+  history(entity: string | null, id: string | null, before: number | null, limit: number): ChangeEntry[] {
+    const where: string[] = [];
+    const args: (string | number)[] = [];
+    if (entity) { where.push("entity = ?"); args.push(entity); }
+    if (id) {
+      // Turns are logged as `taskId:seq`; a task's history includes them.
+      where.push("(id = ? OR id LIKE ?)"); args.push(id, `${id}:%`);
+    }
+    if (before !== null) { where.push("rev < ?"); args.push(before); }
+    const sql = `SELECT rev, entity, id, op, fields, diff, actor, at FROM changes${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY rev DESC LIMIT ?`;
+    return this.sql.exec<{ rev: number; entity: string; id: string; op: string; fields: string | null; diff: string | null; actor: string; at: string }>(sql, ...args, limit)
+      .toArray()
+      .map((r) => ({
+        rev: r.rev, entity: r.entity, id: r.id, op: r.op, actor: r.actor, at: r.at,
+        fields: r.fields ? (JSON.parse(r.fields) as string[]) : null,
+        diff: r.diff ? (JSON.parse(r.diff) as ChangeDiff) : null,
+      }));
   }
 
   // ---- push ----
@@ -152,7 +226,14 @@ export class TaskStore extends DurableObject<Env> {
       if (!row || row.deletedAt) return { clientOpId: op.clientOpId, status: "noop" };
       const rev = this.nextRev();
       this.sql.exec(`UPDATE ${spec.table} SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?`, now, rev, now, op.id);
-      this.log(rev, op.entity, op.id, "delete", null, op.clientOpId, actor, now);
+      // The deleted row's last values, so the log can show (and a later
+      // tool can restore) what was removed.
+      const gone = decodeRow(spec, row as Record<string, unknown>);
+      const snapshot: ChangeDiff = {};
+      for (const name of Object.keys(spec.columns)) {
+        if (gone[name] !== null && gone[name] !== undefined && gone[name] !== false) snapshot[name] = [clipForLog(gone[name]), null];
+      }
+      this.log(rev, op.entity, op.id, "delete", null, op.clientOpId, actor, now, snapshot);
       if (op.entity === "attachment") purgedAttachmentIds.push(op.id);
       if (op.entity === "task") {
         this.tombstoneConvo(op.id, now);
@@ -164,7 +245,7 @@ export class TaskStore extends DurableObject<Env> {
     const names = Object.keys(op.fields);
     if (row?.deletedAt) {
       const rev = this.nextRev();
-      this.log(rev, op.entity, op.id, "dropped", names, op.clientOpId, actor, now);
+      this.log(rev, op.entity, op.id, "dropped", names, op.clientOpId, actor, now, this.diffFor(null, op.fields));
       return { clientOpId: op.clientOpId, status: "dropped", rev, reason: "deleted" };
     }
     if (names.length === 0) return { clientOpId: op.clientOpId, status: "noop" };
@@ -197,7 +278,8 @@ export class TaskStore extends DurableObject<Env> {
       const values = names.map((n) => encodeValue(spec.columns[n], op.fields[n]));
       this.sql.exec(`UPDATE ${spec.table} SET ${sets} WHERE id = ?`, ...values, rev, now, op.id);
     }
-    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now);
+    const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
+    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
     return { clientOpId: op.clientOpId, status: "applied", rev };
   }
 

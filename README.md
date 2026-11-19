@@ -148,3 +148,5 @@ Production CloudKit API token's URL Redirect: `https://mcp.septena.app/auth/appl
 - [ ] Additional domains: chores, nutrition, training, groceries, intake, symptoms, medications
 - [ ] Streamable HTTP transport with SSE for server-initiated messages
 - [ ] Sentry / minimal analytics; "delete my data" endpoint for App Store compliance
+
+- `GET /v1/changes?entity=&id=&before=&limit=` (bearer): change history, newest first. Each entry has rev, entity, id, op, actor, time, changed field names and `diff` {field: [before, after]} (long text clipped to 4,000 chars; a delete carries the row's last values). Kept 365 days.

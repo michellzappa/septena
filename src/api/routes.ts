@@ -88,6 +88,7 @@ async function requireUser(c: Ctx, next: Next) {
 api.use("/sync/*", requireUser);
 api.use("/attachments/*", requireUser);
 api.use("/account", requireUser);
+api.use("/changes", requireUser);
 api.use("/pair/*", requireUser);
 
 api.post("/sync/push", async (c) => {
@@ -115,6 +116,22 @@ api.get("/sync/pull", async (c) => {
 api.get("/sync/ws", async (c) => {
   if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected_websocket" }, 426);
   return storeFor(c.env, c.get("userId")).fetch(c.req.raw);
+});
+
+// ---- change history (who changed what, with before/after values) ----
+
+api.get("/changes", async (c) => {
+  const q = z.object({
+    entity: z.enum(["task", "area", "project", "attachment", "convo", "setting", "turn"]).optional(),
+    id: zId.optional(),
+    before: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(500).default(100),
+  }).safeParse(c.req.query());
+  if (!q.success) return c.json({ error: "invalid_request" }, 400);
+  const changes = await storeFor(c.env, c.get("userId")).history(
+    q.data.entity ?? null, q.data.id ?? null, q.data.before ?? null, q.data.limit,
+  );
+  return c.json({ changes });
 });
 
 // ---- attachments (bytes proxied through the Worker; §10 limits) ----
