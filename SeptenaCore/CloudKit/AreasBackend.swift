@@ -51,6 +51,10 @@ protocol AreasBackend: AnyObject {
 final class AreasMutator: AreasBackend {
   private let context: ModelContext
   private var ckBackend: CloudKitAreasBackend?
+  /// Set once at startup so `delete` can detach the area's tasks and projects
+  /// through their own write boundaries. Weak: neither points back here.
+  weak var taskMutator: TaskMutator?
+  weak var projectsMutator: ProjectsMutator?
 
   init(context: ModelContext) {
     self.context = context
@@ -85,11 +89,56 @@ final class AreasMutator: AreasBackend {
   func setAttachment(id: String, attachment: AreaAttachment?) async throws {
     try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
+  /// Delete an area. Its projects and tasks are DETACHED first (area → nil),
+  /// never deleted: the confirm dialog promises that, and a dangling area id
+  /// hid the tasks from every list. Open loose tasks then land in the Inbox,
+  /// tasks in a project stay with the project.
   func delete(id: String) async throws {
-    try await requireBackend().delete(id: id)
+    let backend = try requireBackend()
+    DeletedAreaLedger.record(id)
+    await detachReferences(toArea: id)
+    try await backend.delete(id: id)
   }
   func reorder(orderedIDs: [String]) async throws {
     try await requireBackend().reorder(orderedIDs: orderedIDs)
+  }
+
+  /// Clear the area link on every project and task that points at `areaID`,
+  /// through the projects / task mutators (local write + CloudKit push + the
+  /// usual notifications). Soft-deleted tasks are included, so a restore
+  /// from Recently Deleted cannot bring back a dangling id.
+  func detachReferences(toArea areaID: String) async {
+    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.area == areaID }
+    ))) ?? []
+    for project in projects.map(\.id) {
+      try? await projectsMutator?.setArea(id: project, area: nil)
+    }
+    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.area == areaID }
+    ))) ?? []
+    for task in tasks.map(\.id) {
+      taskMutator?.moveToArea(id: task, area: nil)
+    }
+    if !projects.isEmpty || !tasks.isEmpty {
+      SeptenaLog.info("[CK] area \(areaID) detached \(projects.count) project(s), \(tasks.count) task(s)")
+    }
+  }
+
+  /// Repair for an area deleted on ANOTHER device (or by the MCP gateway):
+  /// the CloudKit apply removes the area row but leaves the tasks and
+  /// projects that point at it. Detach those for every area id the ledger
+  /// knows was deleted. Only ledger ids, never "any unknown id": an area that
+  /// is merely not fetched yet must not lose its tasks. Skips an id whose
+  /// area exists again (forensic re-create). Idempotent; cheap when clean.
+  func repairDeletedAreaReferences() async {
+    for areaID in DeletedAreaLedger.ids() {
+      let exists = ((try? context.fetchCount(FetchDescriptor<AreaEntity>(
+        predicate: #Predicate { $0.id == areaID }
+      ))) ?? 0) > 0
+      guard !exists else { continue }
+      await detachReferences(toArea: areaID)
+    }
   }
 
   /// Forensic — create a record with a specific id.
@@ -222,5 +271,30 @@ final class CloudKitAreasBackend: AreasBackend {
     for id in changed { engine.noteAreaChange(id: id) }
     SeptenaLog.info("[CK] area reorder → \(changed.count) repositioned")
     NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
+  }
+}
+
+// MARK: - Deleted-area ledger
+
+/// Area ids this device knows were deleted — locally, or by a CloudKit
+/// deletion applied from another device. `AreasMutator.repairDeletedAreaReferences`
+/// detaches tasks and projects that still point at one of these. A plain
+/// device-local list in `UserDefaults`; capped so it cannot grow without end.
+/// Thread-safe (`UserDefaults` is), so the CloudKit apply path can record ids
+/// off the main actor.
+enum DeletedAreaLedger {
+  private static let key = "septena.deletedAreaIDs"
+  private static let cap = 200
+
+  static func record(_ id: String) {
+    var list = ids()
+    guard !list.contains(id) else { return }
+    list.append(id)
+    if list.count > cap { list.removeFirst(list.count - cap) }
+    UserDefaults.standard.set(list, forKey: key)
+  }
+
+  static func ids() -> [String] {
+    UserDefaults.standard.stringArray(forKey: key) ?? []
   }
 }

@@ -303,10 +303,8 @@ struct SeptenaApp: App {
             await PerfTrace.span("app.absorbRemoteChanges") {
               await services.absorbRemoteChanges()
             }
-            // 30-day auto-purge for Recently Deleted tasks (docs/RECENTLY_DELETED_SPEC.md).
-            // Runs after the CloudKit pull so remote-synced deletions are included.
-            let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-            taskMutator.purgeExpired(before: thirtyDaysAgo)
+            // The 30-day Recently Deleted purge runs inside
+            // `absorbRemoteChanges()` so Septask runs it too.
             await theme.refresh()
             await settingsStore.refresh(today: dayClock.today)
             // Bridge the welcome name between the CloudKit-synced settings

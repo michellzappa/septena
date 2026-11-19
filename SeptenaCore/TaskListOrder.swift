@@ -15,19 +15,34 @@ import Foundation
 ///
 /// `areas` and `projects` come in already in sidebar order (`StructureCache`).
 enum TaskListOrder {
+  ///
+  /// A dangling reference (an area or project id with no row — deleted on
+  /// another device, or not synced yet) counts as nil, so the row lands with
+  /// the loose work instead of dropping out of the list. Same for a project
+  /// whose area is gone: it sorts with the area-less projects.
   static func byList(_ pool: [SeptenaTask], areas: [Area], projects: [Project]) -> [SeptenaTask] {
-    let byProject = Dictionary(grouping: pool.filter { $0.project != nil },
-                               by: { $0.project! })
-    let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
-                            by: { $0.area! })
-    var result = pool.filter { $0.project == nil && $0.area == nil }
+    let areaIDs = Set(areas.map(\.id))
+    let projectIDs = Set(projects.map(\.id))
+    func knownProject(_ t: SeptenaTask) -> String? {
+      guard let p = t.project, projectIDs.contains(p) else { return nil }
+      return p
+    }
+    func knownArea(_ t: SeptenaTask) -> String? {
+      guard let a = t.area, areaIDs.contains(a) else { return nil }
+      return a
+    }
+    let byProject = Dictionary(grouping: pool.filter { knownProject($0) != nil },
+                               by: { knownProject($0)! })
+    let byArea = Dictionary(grouping: pool.filter { knownProject($0) == nil && knownArea($0) != nil },
+                            by: { knownArea($0)! })
+    var result = pool.filter { knownProject($0) == nil && knownArea($0) == nil }
     for area in areas {
       result.append(contentsOf: byArea[area.id] ?? [])
       for project in projects where project.area == area.id {
         result.append(contentsOf: byProject[project.id] ?? [])
       }
     }
-    for project in projects where project.area == nil {
+    for project in projects where project.area.map({ !areaIDs.contains($0) }) ?? true {
       result.append(contentsOf: byProject[project.id] ?? [])
     }
     return result

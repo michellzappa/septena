@@ -77,14 +77,34 @@ final class ProjectsMutator: ProjectsBackend {
     // promises) instead of being left with a dangling id. A dangling id would
     // otherwise be re-stubbed by `SeptenaServices.reconcileProjectGraph()` on
     // the next launch — making the deletion reappear.
+    //
+    // The project's heading rows go to Recently Deleted (soft delete, which
+    // also dissolves their members' `heading`), and lose the project link too
+    // so a trashed heading cannot make the reconcile re-stub the project.
+    // Member tasks lose the project link AND any stale `heading`. Done and
+    // cancelled members need no special case: they end up unfiled but stay
+    // in the Logbook — Inbox membership (`isInTriageBand`) requires `.open`.
+    let backend = try requireBackend()
     let descriptor = FetchDescriptor<TaskEntity>(
       predicate: #Predicate { $0.project == id }
     )
     let referencing = (try? context.fetch(descriptor)) ?? []
-    for task in referencing {
-      taskMutator?.moveToProject(id: task.id, project: nil)
+    let headingIDs = referencing.filter(\.isHeading).map(\.id)
+    let memberIDs = referencing.filter { !$0.isHeading }.map(\.id)
+    for headingID in headingIDs {
+      taskMutator?.delete(id: headingID)
+      taskMutator?.moveToProject(id: headingID, project: nil)
     }
-    try await requireBackend().delete(id: id)
+    for taskID in memberIDs {
+      taskMutator?.moveToProject(id: taskID, project: nil)
+      // Re-read after the move: dissolving a heading above may already have
+      // cleared it.
+      let stillHeaded = ((try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.id == taskID && $0.heading != nil }
+      ))) ?? []).isEmpty == false
+      if stillHeaded { taskMutator?.setHeading(id: taskID, heading: nil) }
+    }
+    try await backend.delete(id: id)
   }
   func reorder(orderedIDs: [String]) async throws {
     try await requireBackend().reorder(orderedIDs: orderedIDs)

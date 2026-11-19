@@ -19,6 +19,17 @@ private let ckTimestampFormatter: DateFormatter = {
 }()
 private func ckServerTimestamp() -> String { ckTimestampFormatter.string(from: Date()) }
 
+/// Parse a `deletedAt` / `completedAt` stamp. Current writers use
+/// `ckTimestampFormatter` (no zone); older rows and gateway writes may carry a
+/// full ISO-8601 stamp, so that is the fallback.
+private func parseTaskTimestamp(_ stamp: String) -> Date? {
+  if let date = ckTimestampFormatter.date(from: stamp) { return date }
+  let iso = ISO8601DateFormatter()
+  if let date = iso.date(from: stamp) { return date }
+  iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+  return iso.date(from: stamp)
+}
+
 /// Completion stamp on the app's clock rather than the system's. `complete`
 /// computes the next occurrence from `DayClock.appToday`, and `uncomplete`
 /// recomputes that occurrence's id from this stamp — if the two disagreed
@@ -47,6 +58,11 @@ private var currentAppClientLabel: String {
 final class CloudKitTasksBackend {
   private let engine: CKEngine
   private let context: ModelContext
+  /// The `position` each recurring occurrence got when this process spawned
+  /// it, keyed by occurrence id. `retractSpawnedOccurrence` reads it to tell a
+  /// pristine occurrence from one the user dragged. In memory only: after a
+  /// relaunch the position check is skipped and the other checks decide.
+  private var spawnedPositions: [String: Double] = [:]
 
   init(engine: CKEngine, context: ModelContext) {
     self.engine = engine
@@ -149,6 +165,7 @@ final class CloudKitTasksBackend {
       heading: entity.heading
     )
     context.insert(next)
+    spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")
     return true
   }
@@ -393,6 +410,10 @@ final class CloudKitTasksBackend {
                                               logicalScheduled: source.recurrenceAnchorDate) else { return }
     let spawnedID = Recurrence.occurrenceID(sourceTaskID: source.id, scheduled: scheduled)
     guard let spawned = fetch(id: spawnedID) else { return }
+    // Every field `createRecurringOccurrence` set must still hold its spawned
+    // value. A Today pin, a deadline, a move, a section or a drag is the user
+    // working with the row, so the row is theirs and stays.
+    let positionUntouched = spawnedPositions[spawnedID].map { $0 == spawned.position } ?? true
     let untouched = spawned.status == .open
       && spawned.completedAt == nil
       && spawned.deletedAt == nil
@@ -401,21 +422,50 @@ final class CloudKitTasksBackend {
       && spawned.scheduled == scheduled
       && spawned.title == source.title
       && spawned.notes == source.notes
+      && !spawned.today
+      && spawned.deadline == nil
+      && spawned.area == source.area
+      && spawned.project == source.project
+      && spawned.heading == source.heading
+      && positionUntouched
     guard untouched else {
       SeptenaLog.info("[CK] uncomplete id=\(source.id) — occurrence \(spawnedID) was touched, keeping it")
       return
     }
+    spawnedPositions[spawnedID] = nil
     purge(id: spawnedID)
   }
 
   func cancel(id: String) {
     guard let entity = fetch(id: id) else { return }
+    // Cancelling one instance of a repeat is "skip this one", not "end the
+    // series", so an OPEN source spawns its next occurrence exactly like
+    // `complete` does (same deterministic id, so a later complete or catch-up
+    // no-ops). A row that is already done or cancelled spawned its successor
+    // when it closed; it only changes status here.
+    let wasOpen = entity.status == .open
+    let recurrence = wasOpen ? entity.recurrence : nil
+    let nextDate = (recurrence == nil || entity.recurrencePaused) ? nil : recurrence?.nextDate(
+      completedOn: DayClock.appToday,
+      scheduled: entity.scheduled,
+      logicalScheduled: entity.recurrenceAnchorDate
+    )
     entity.statusRaw = TaskStatus.cancelled.rawValue
-    entity.completedAt = ckServerTimestamp()
+    // The app's clock, same as `complete`: un-cancel goes through `uncomplete`,
+    // which recomputes the spawned occurrence id from this stamp. A closed row
+    // keeps its original stamp so that recomputation still finds its successor.
+    if wasOpen || entity.completedAt == nil {
+      entity.completedAt = ckCompletionTimestamp()
+    }
     // Same as `complete`: the status guard hides a cancelled task everywhere, so
     // clearing the pin would only lose placement on a future un-cancel.
     entity.pendingSync = true
     commitAndPush(entity, op: "cancel")
+    if let recurrence, let nextDate {
+      createRecurringOccurrence(from: entity, recurrence: recurrence, scheduled: nextDate)
+    } else if recurrence != nil, !entity.recurrencePaused {
+      SeptenaLog.error("[CK] cancel id=\(id) could not calculate next recurrence", nil)
+    }
   }
 
   /// Soft-delete: move the task to Recently Deleted (Apple Reminders model,
@@ -424,8 +474,13 @@ final class CloudKitTasksBackend {
   /// (every read path filters `deletedAt != nil`), and it stays recoverable via
   /// `restore` until `purge` (30-day auto-purge or "Delete Permanently") removes
   /// it for good. This replaces the old hard-delete, which destroyed the record
-  /// with no confirmation and no undo. A draft that never reached CloudKit has
-  /// no server record to keep, so it's purged outright.
+  /// with no confirmation and no undo.
+  ///
+  /// ALWAYS a soft delete, also for a row that never reached CloudKit: a
+  /// hard purge here left `restore` (undo, Recently Deleted) nothing to bring
+  /// back. A surface that wants a blank draft gone for good calls `purge`.
+  /// A row with no server record and no queued save stays local: there is
+  /// nothing on the server to mark, and `restore` queues it as a normal create.
   func delete(id: String) {
     guard let entity = fetch(id: id) else { return }
     // Deleting a heading dissolves it: members are re-parented to the un-headed
@@ -433,18 +488,27 @@ final class CloudKitTasksBackend {
     if entity.isHeading {
       dissolveHeadingMembers(headingID: id)
     }
-    if entity.cloudKitSystemFields == nil {
-      purge(id: id)   // never pushed — nothing to keep
+    entity.deletedAt = ckServerTimestamp()
+    if entity.cloudKitSystemFields == nil, !engine.hasPendingTaskSave(id: id) {
+      guard StoreHealth.save(context, op: "delete(soft, local-only)") else {
+        SeptenaLog.error("[CK] delete(soft, local-only) id=\(id) — local save failed and rolled back")
+        TaskChange.post(id)
+        return
+      }
+      SeptenaLog.info("[CK] delete(soft, local-only) id=\(id) — never pushed, engine untouched")
+      TaskChange.post(id)
       return
     }
-    entity.deletedAt = ckServerTimestamp()
     commitAndPush(entity, op: "delete(soft)")
   }
 
   /// Bring a task back from Recently Deleted: clear the marker, push the update.
+  /// A row that `delete` kept local-only has no server record yet, so this
+  /// push reaches CloudKit as an ordinary create.
   func restore(id: String) {
     guard let entity = fetch(id: id) else { return }
     entity.deletedAt = nil
+    entity.pendingSync = true
     commitAndPush(entity, op: "restore")
   }
 
@@ -479,14 +543,20 @@ final class CloudKitTasksBackend {
   /// 30-day auto-purge: permanently delete all Recently Deleted tasks whose
   /// `deletedAt` timestamp is older than `cutoff` (docs/RECENTLY_DELETED_SPEC.md).
   func purgeExpired(before cutoff: Date) {
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
-    let fmt = ISO8601DateFormatter()
-    var purged = 0
-    for e in rows {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.deletedAt != nil }
+    ))) ?? []
+    // Collect ids first: `purge` deletes models, so the loop must not read a
+    // row after an earlier purge in the same pass touched the context.
+    let expired = rows.compactMap { e -> String? in
       guard let stamp = e.deletedAt,
-            let date = fmt.date(from: stamp),
-            date < cutoff else { continue }
-      purge(id: e.id)
+            let date = parseTaskTimestamp(stamp),
+            date < cutoff else { return nil }
+      return e.id
+    }
+    var purged = 0
+    for id in expired {
+      purge(id: id)
       purged += 1
     }
     if purged > 0 {

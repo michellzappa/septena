@@ -173,6 +173,12 @@ final class SeptenaServices {
         await recordRegistry.apply(record)
       }
       ckEngine.applyDeletedRecord = { recordID, recordType in
+        // Remember a remotely deleted area so its tasks / projects get
+        // detached after the batch (`repairDeletedAreaReferences`) instead of
+        // vanishing from every list behind a dangling area id.
+        if recordType == AreaCloudKitSchema.recordType {
+          DeletedAreaLedger.record(AreaCloudKitSchema.entityID(from: recordID.recordName))
+        }
         await recordRegistry.delete(recordID: recordID, recordType: recordType)
       }
       ckEngine.applyDidFinishBatch = { notify in
@@ -191,12 +197,20 @@ final class SeptenaServices {
             NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
           }
         }
+        // A remote area deletion (structure) or a late task carrying a
+        // deleted area id (tasks) leaves dangling references; detach them.
+        if changes.touchedStructure || changes.touchedTasks {
+          await self.areasMutator.repairDeletedAreaReferences()
+        }
       }
       taskMutator.bind(ckEngine: ckEngine)
       areasMutator.bind(ckEngine: ckEngine)
       projectsMutator.bind(ckEngine: ckEngine)
       // Lets project deletion cascade-clear the link on referencing tasks.
       projectsMutator.taskMutator = taskMutator
+      // Lets area deletion detach its projects and tasks (never delete them).
+      areasMutator.taskMutator = taskMutator
+      areasMutator.projectsMutator = projectsMutator
       // The Next feed's write set binds in BOTH profiles: Septask hosts the
       // full Next feed as its own page (SeptaskNextPage), so the trio
       // toggles (checklist), inline intake nudges, and the fast-break new-meal
@@ -261,7 +275,10 @@ final class SeptenaServices {
       dayRolloverObserver = NotificationCenter.default.addObserver(
         forName: .NSCalendarDayChanged, object: nil, queue: .main
       ) { _ in
-        Task { @MainActor in SeptenaServices.shared.taskMutator.catchUpFixedSchedules() }
+        Task { @MainActor in
+          SeptenaServices.shared.taskMutator.catchUpFixedSchedules()
+          SeptenaServices.shared.purgeExpiredTasksIfDue()
+        }
       }
     }
     startTask = task
@@ -295,6 +312,8 @@ final class SeptenaServices {
     // Heal dangling project references now that the initial fetch has
     // landed (so we never stub a project that's merely mid-sync).
     await reconcileProjectGraph(context: context)
+    // Detach tasks / projects still pointing at an area deleted elsewhere.
+    await areasMutator.repairDeletedAreaReferences()
     // Life-domain repairs run only in the full profile: a tasks-only process
     // (Septask) leaves gut/medication/event history untouched — those
     // migrators write through mutators that are unbound there, and the full
@@ -317,6 +336,9 @@ final class SeptenaServices {
     // occurrences another device already created are in the mirror by now, so
     // the deterministic-id guard sees them and this adds only what is missing.
     taskMutator.catchUpFixedSchedules()
+    // 30-day auto-purge of Recently Deleted (docs/RECENTLY_DELETED_SPEC.md).
+    // Here so BOTH apps run it, after the pull so synced deletions count.
+    purgeExpiredTasksIfDue()
     if !RuntimeProfile.current.isTasksOnly {
       // Fold any retired `bedtime` medication bucket into `evening`.
       medicationsMutator.migrateBedtimeBuckets()
@@ -324,6 +346,21 @@ final class SeptenaServices {
     // Publish this device's timezone so the gateway resolves the user's real
     // zone instead of defaulting to UTC — task tools need it too.
     SettingsMirror.publishDeviceTimezone(context: context, engine: ckEngine)
+  }
+
+  /// The real calendar day the Recently Deleted purge last ran in this process.
+  private var lastExpiredPurgeDay: String?
+
+  /// Permanently remove tasks soft-deleted more than 30 days ago. Runs at most
+  /// once per calendar day per process: from `absorbRemoteChanges` at launch
+  /// and from the day-rollover observer. Wall-clock time on purpose — the
+  /// retention window is a real 30 days, so time travel must not purge.
+  func purgeExpiredTasksIfDue() {
+    let day = SeptenaDate.format(Date()) ?? ""
+    guard lastExpiredPurgeDay != day else { return }
+    lastExpiredPurgeDay = day
+    let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    taskMutator.purgeExpired(before: cutoff)
   }
 
   /// Heals the project graph surfaced by the launch crosswalk. Tasks imported
