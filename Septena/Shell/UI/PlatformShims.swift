@@ -124,14 +124,14 @@ extension View {
     #endif
   }
 
-  /// Neutral-gray native `List(selection:)` row highlight on macOS and iPad.
+  /// Native `List(selection:)` row highlight on macOS and iPad, in the user accent.
   /// The app root tints with the section accent; without an explicit override
   /// here the selection capsule reads as meaningless blue. iPhone compact keeps
   /// the system default (edit-mode circles only).
   @ViewBuilder
   func septenaNeutralListSelection() -> some View {
     #if os(macOS)
-    self.tint(Theme.selectionNeutral)
+    self.tint(Theme.selectionAccent)
     #elseif os(iOS)
     self.modifier(NeutralListSelectionOnPad())
     #else
@@ -271,12 +271,12 @@ struct SidebarMacRowBackground: View {
 #endif
 
 #if os(iOS)
-/// Applies `Theme.selectionNeutral` to selectable lists on iPad (regular width).
+/// Applies `Theme.selectionAccent` to selectable lists on iPad (regular width).
 private struct NeutralListSelectionOnPad: ViewModifier {
   @Environment(\.horizontalSizeClass) private var hSize
   func body(content: Content) -> some View {
     if hSize == .regular {
-      content.tint(Theme.selectionNeutral)
+      content.tint(Theme.selectionAccent)
     } else {
       content
     }

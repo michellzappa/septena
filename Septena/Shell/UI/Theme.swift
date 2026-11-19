@@ -203,18 +203,55 @@ enum Theme {
     #endif
   }()
 
-  /// Neutral fill behind a selected task-list row. `List(selection:)` ignores
-  /// `.tint` for its highlight on iPad — we paint this via `listRowBackground`
-  /// instead so the capsule stays gray, not accent blue.
-  static let listSelectionFill: Color = {
+  #if os(macOS)
+  /// The user's System Settings accent color, bypassing the app's
+  /// AccentColor asset (adaptive ink, black in light mode). `AppleAccentColor`
+  /// is the documented preference key; nil means Blue, the system default.
+  /// Do NOT use `NSColor.controlAccentColor`: with a Global Accent Color Name
+  /// set it returns the asset ink, and reading it can also break SwiftUI's
+  /// accent resolution (FB13688723).
+  static var systemAccentNSColor: NSColor {
+    switch UserDefaults.standard.object(forKey: "AppleAccentColor") as? Int {
+    case -1: return .systemGray      // Graphite
+    case 0:  return .systemRed
+    case 1:  return .systemOrange
+    case 2:  return .systemYellow
+    case 3:  return .systemGreen
+    case 4:  return .systemPurple
+    case 5:  return .systemPink
+    default: return .systemBlue      // nil / unknown → Blue
+    }
+  }
+  #endif
+
+  /// Selection color: the user's accent (System Settings on macOS; iOS has
+  /// no user accent, so the system blue). Selection is the one place the app
+  /// shows it. Everything else keeps the ink accent and section colors.
+  static var selectionAccent: Color {
     #if os(macOS)
-    return Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
-    #elseif canImport(UIKit)
-    return Color(uiColor: .tertiarySystemFill)
+    return Color(nsColor: systemAccentNSColor)
     #else
-    return Color.secondary.opacity(0.18)
+    return Color(uiColor: .systemBlue)
     #endif
-  }()
+  }
+
+  /// Fill behind a selected row: a wash of `selectionAccent`, light enough
+  /// that the row keeps its normal ink (the wash-plus-ink rule `SelectableChip`
+  /// uses), never a solid accent bar with white text. Painted via
+  /// `listRowBackground` because `List(selection:)` ignores `.tint` on iPad.
+  static var listSelectionFill: Color {
+    #if os(macOS)
+    let accent = systemAccentNSColor
+    return Color(nsColor: NSColor(name: nil) { appearance in
+      let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+      return accent.withAlphaComponent(isDark ? 0.34 : 0.22)
+    })
+    #else
+    return Color(uiColor: UIColor { traits in
+      UIColor.systemBlue.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.34 : 0.2)
+    })
+    #endif
+  }
 
   /// Opacity of the primary-color wash painted under a pointer / Apple Pencil
   /// hover. Shared by task-card rows, grouped-list cells, and macOS tiles.
@@ -250,6 +287,12 @@ enum Theme {
   /// icon almost disappears). Same swatch in both modes — dark mode reads
   /// it as a warm gold, light mode as a saturated amber.
   static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
+
+  /// Today tenure dial — the checkbox interior that darkens with each day a
+  /// task is carried on Today. Neutral gray, not gold: aging is a quiet "this
+  /// has been sitting here" cue, and gold stays reserved for the moment a
+  /// task is promoted to Today.
+  static let todayTenure    = Color.gray
 
   /// Next widget's signature tint — the app's violet accent (#7c3aed, the same
   /// swatch Insights uses). Pairs with `todayAccent`'s gold so the two

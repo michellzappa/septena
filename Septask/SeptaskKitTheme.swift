@@ -79,6 +79,8 @@ enum SeptaskKitTheme {
   static let checkboxCheck: NSColor = .textBackgroundColor
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
+  /// Theme.todayTenure — the neutral gray the tenure dial darkens toward.
+  static let todayTenure = NSColor(Theme.todayTenure)
   /// Theme.overdueRed — late deadlines, platform red.
   static let overdueRed: NSColor = .systemRed
   /// Theme.inkPrimary.
@@ -147,18 +149,7 @@ enum SeptaskKitTheme {
   /// `NSColor.controlAccentColor` here — with a Global Accent Color Name set
   /// it returns the asset ink, and reading it can also break SwiftUI's
   /// accent resolution (FB13688723).
-  private static var systemAccentColor: NSColor {
-    switch UserDefaults.standard.object(forKey: "AppleAccentColor") as? Int {
-    case -1: return .systemGray      // Graphite
-    case 0:  return .systemRed
-    case 1:  return .systemOrange
-    case 2:  return .systemYellow
-    case 3:  return .systemGreen
-    case 4:  return .systemPurple
-    case 5:  return .systemPink
-    default: return .systemBlue      // nil / unknown → Blue
-    }
-  }
+  private static var systemAccentColor: NSColor { Theme.systemAccentNSColor }
 }
 
 /// Content column geometry — Things-style: rows don't stretch edge-to-edge on

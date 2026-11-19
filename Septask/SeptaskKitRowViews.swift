@@ -31,7 +31,7 @@ final class KitCheckboxView: NSButton {
   var isDone = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var isDashed = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var isToday = false { didSet { needsDisplay = true; refreshAccessibility() } }
-  /// Today tenure dial (0…1) — gold interior deepening one seventh per carried
+  /// Today tenure dial (0…1) — gray interior deepening one seventh per carried
   /// day (`SeptenaTask.todayTenureFill`). nil = no dial.
   var tenureFill: Double? = nil { didSet { needsDisplay = true; refreshAccessibility() } }
   /// Unread agent context on a committed task — the haloed corner dot.
@@ -42,7 +42,7 @@ final class KitCheckboxView: NSButton {
 
   /// Matches `TaskCheckbox.tenureMaxOpacity`: never fully opaque, so an aged
   /// Today task can't read as a solid/done box.
-  private static let tenureMaxOpacity: CGFloat = 0.7
+  private static let tenureMaxOpacity: CGFloat = 0.5
 
   override var intrinsicContentSize: NSSize {
     NSSize(width: Self.tapSize, height: Self.tapSize)
@@ -161,11 +161,11 @@ final class KitCheckboxView: NSButton {
       return
     }
 
-    // Tenure dial sits BEHIND the outline: the interior tints gold and
-    // deepens with days carried on Today, while the box keeps its pure form.
+    // Tenure dial sits BEHIND the outline: the interior grays and deepens
+    // with days carried on Today, while the box keeps its pure form.
     if let tenureFill, tenureFill > 0 {
       let strength = CGFloat(min(1, max(0, tenureFill))) * Self.tenureMaxOpacity
-      SeptaskKitTheme.todayAccent.withAlphaComponent(strength).setFill()
+      SeptaskKitTheme.todayTenure.withAlphaComponent(strength).setFill()
       NSBezierPath(roundedRect: box, xRadius: Self.corner, yRadius: Self.corner).fill()
     }
 
@@ -181,11 +181,11 @@ final class KitCheckboxView: NSButton {
     } else if let tenureFill, tenureFill > 0 {
       // Matches TaskCheckbox exactly: when the pinned badge ISN'T shown (the
       // Today screen suppresses it — redundant there), the outline itself
-      // fades gray→gold in lockstep with the tenure fill instead of jumping
-      // straight to solid gold, so there's no step-change on day 1.
+      // darkens in lockstep with the tenure fill instead of jumping to a
+      // new color, so there's no step-change on day 1.
       let strength = CGFloat(min(1, max(0, tenureFill))) * Self.tenureMaxOpacity
       SeptaskKitTheme.checkboxStroke.blended(withFraction: strength,
-                                             of: SeptaskKitTheme.todayAccent)?.setStroke()
+                                             of: SeptaskKitTheme.todayTenure)?.setStroke()
         ?? SeptaskKitTheme.checkboxStroke.setStroke()
     } else {
       SeptaskKitTheme.checkboxStroke.setStroke()
@@ -728,11 +728,11 @@ extension NSTableView {
 /// gray page behind, rounded only at the ends of a run of rows. Selection
 /// draws inside the card so the highlight can't overhang it.
 ///
-/// Contiguous multi-selection is its OWN rounding run, independent of the
-/// card group: square where selected rows meet, rounded at the ends of the
-/// selection. Using the card-group flags for selection (the old path) left
-/// every selected row fully rounded — the scalloped "kissing circles" look
-/// at each selected-row junction.
+/// Selection follows the card's shape, not the selection run: a row in the
+/// middle of a card selects as a plain rectangle, the first row rounds only
+/// its top, the last only its bottom, a lone row both. So a selection never
+/// rounds a corner the card itself doesn't have, and neighbouring selected
+/// rows always meet square.
 @MainActor
 final class KitCardRowView: NSTableRowView {
   /// Seed value other cells use for their leading/trailing constraint
@@ -840,7 +840,7 @@ final class KitCardRowView: NSTableRowView {
     // cannot overhang as a second rectangle. Composer owns the surface.
     if isSelected && !isComposing && !isEditingTitle {
       SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
-      slicePath(roundTop: !joinsSelectedAbove, roundBottom: !joinsSelectedBelow).fill()
+      slicePath(roundTop: isFirstInGroup, roundBottom: isLastInGroup).fill()
     }
     // Promote wash — SwiftUI's `playPromoteWash()`, same gold at the same
     // 0.22 peak, fading to nothing. It is NOT a second selection language:
@@ -934,28 +934,60 @@ final class KitSidebarRowView: NSTableRowView {
     needsDisplay = true
   }
 
-  override func drawSelection(in dirtyRect: NSRect) {
-    guard selectionHighlightStyle != .none else { return }
-    // The pill covers only the row's CONTENT band — `bounds` minus
-    // `extraTopMargin` — sitting at the BOTTOM of `bounds`, matching
-    // `SidebarCell`'s own bottom-anchored content (see its
-    // `contentBottomInset` comment). For a plain row (`extraTopMargin == 0`)
-    // this is just `bounds` itself, same as before.
+  /// The outline's `selectionHighlightStyle` is `.none` (AppKit's own
+  /// source-list selection flashed ink on the row being left and covered the
+  /// area margin), so selection is painted here from `isSelected`. These
+  /// overrides repaint when it or the focus emphasis changes.
+  override var isSelected: Bool {
+    get { super.isSelected }
+    set { super.isSelected = newValue; needsDisplay = true }
+  }
+  override var isEmphasized: Bool {
+    get { super.isEmphasized }
+    set { super.isEmphasized = newValue; needsDisplay = true }
+  }
+
+  /// Painted in `draw(_:)`, not `drawBackground`: a source-list row view
+  /// skips its background pass, which is why the pill vanished once AppKit's
+  /// own selection was turned off. Row-view drawing sits under the cells.
+  override func draw(_ dirtyRect: NSRect) {
+    super.draw(dirtyRect)
+    guard isSelected else { return }
+    SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
+  }
+
+  /// No-op: selection is painted in `drawBackground`.
+  override func drawSelection(in dirtyRect: NSRect) {}
+
+  /// A task dragged ONTO this row (file into this list) gets the SAME pill
+  /// as selection — one emphasis language on the sidebar, not the system's
+  /// drop-target fill. The between-rows insertion line for reordering is a
+  /// separate drawing and is untouched (`.sourceList` style stays).
+  override func drawDraggingDestinationFeedback(in dirtyRect: NSRect) {
+    SeptaskKitTheme.listSelectionFill(emphasized: true).setFill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
+  }
+
+  /// The one pill rect both drawings use. It covers only the row's CONTENT
+  /// band — `bounds` minus `extraTopMargin` — sitting at the BOTTOM of
+  /// `bounds`, matching `SidebarCell`'s own bottom-anchored content (see its
+  /// `contentBottomInset` comment). For a plain row (`extraTopMargin == 0`)
+  /// this is just `bounds`, inset.
+  private var pillRect: NSRect {
     let contentHeight = bounds.height - extraTopMargin
-    // Vertical inset bumped from 3 down to 1 — was reading a bit thin
-    // against the row; this puts ~20% more selected pixels above/below.
-    let verticalInset: CGFloat = 1
+    // No vertical inset: neighbouring pills (selection, drop target) meet,
+    // so a drag across the sidebar never crosses a dead gap.
+    let verticalInset: CGFloat = 0
     // NSTableRowView is FLIPPED (minY is the row's visual TOP, not its
     // bottom) — the margin band is the first `extraTopMargin` points from
     // `minY`, so skipping it means starting the pill AFTER that, not at
     // `minY` itself. Getting this backwards is what put the pill floating
     // in the margin with the row's text sitting below it, outside the pill.
-    let rect = NSRect(x: bounds.minX + 8,
-                      y: bounds.minY + extraTopMargin + verticalInset,
-                      width: bounds.width - 16,
-                      height: contentHeight - verticalInset * 2)
-    SeptaskKitTheme.listSelectionFill(emphasized: septaskSelectionIsActive).setFill()
-    NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+    return NSRect(x: bounds.minX + 8,
+                  y: bounds.minY + extraTopMargin + verticalInset,
+                  width: bounds.width - 16,
+                  height: contentHeight - verticalInset * 2)
   }
 
   override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }

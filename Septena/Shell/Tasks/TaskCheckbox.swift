@@ -151,7 +151,7 @@ struct TaskCheckbox: View {
   #endif
   /// Tenure fill never reaches full opacity — a hair of translucency keeps an
   /// aged Today task from reading as a solid/"done" box.
-  private static let tenureMaxOpacity: Double = 0.7
+  private static let tenureMaxOpacity: Double = 0.5
 
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
   /// and fill to `Theme.todayAccent`.
@@ -191,16 +191,16 @@ struct TaskCheckbox: View {
   private var checkboxButton: some View {
     Button(action: onToggle) {
       ZStack {
-        // Today tenure fill — the box's interior tints gold, deepening with
+        // Today tenure fill — the box's interior grays, deepening with
         // days-on-Today (see `tenureFill`): transparent on the arrival day, a
         // seventh more each carried day, capped just shy of opaque so an aged
         // task never reads as a solid/done box. Shape never changes — only the
-        // fill's opacity (and, in language v2, the open outline warms in sync).
+        // fill's opacity (and, in language v2, the open outline darkens in sync).
         // Sits behind the open stroke; hidden once done.
         if TaskRowFlags.languageV2, !isDone, let tenureFill {
           let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
           RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .fill(Theme.todayAccent.opacity(strength * Self.tenureMaxOpacity))
+            .fill(Theme.todayTenure.opacity(strength * Self.tenureMaxOpacity))
             .frame(width: Self.boxSize, height: Self.boxSize)
             .a11yAnimation(Theme.Motion.quick, value: strength)
         }
@@ -228,13 +228,13 @@ struct TaskCheckbox: View {
           .a11yAnimation(Theme.Motion.quick, value: isDone)
           .a11yAnimation(Theme.Motion.quick, value: isToday)
 
-        // Language v2 aging: fade the outline from gray → yellow in lockstep
+        // Language v2 aging: darken the outline in lockstep
         // with the Today tenure fill, so we don't have a step change when
         // `tenureFill` becomes non-nil.
         if TaskRowFlags.languageV2, !isDone, !isToday, let tenureFill {
           let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
           RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .strokeBorder(Theme.todayAccent.opacity(strength * Self.tenureMaxOpacity),
+            .strokeBorder(Theme.todayTenure.opacity(strength * Self.tenureMaxOpacity),
                           lineWidth: Self.boxStroke)
             .frame(width: Self.boxSize, height: Self.boxSize)
             .opacity(isDone ? 0 : 1)
@@ -274,9 +274,21 @@ struct TaskCheckbox: View {
         }
       }
       .frame(width: Theme.checkboxTap, height: Theme.checkboxTap)
+      #if os(iOS)
+      // 44pt touch target (the HIG minimum) around the 28pt column, without
+      // changing the drawn size or the row layout: the hit shape reaches past
+      // the frame by 8pt on every side.
+      .contentShape(Rectangle().inset(by: -(44 - Theme.checkboxTap) / 2))
+      #else
       .contentShape(Rectangle())
+      #endif
     }
     .buttonStyle(.plain)
+    // VoiceOver: a toggle named "Task" whose value says done or not, from the
+    // shared task vocabulary (`TaskA11y`), instead of an unlabeled button.
+    .accessibilityLabel(TaskA11y.checkboxLabel())
+    .accessibilityValue(TaskA11y.checkboxValue(isDone: isDone))
+    .accessibilityAddTraits(.isToggle)
   }
 
   var body: some View {

@@ -411,7 +411,10 @@ struct TaskCheckboxModel {
       if task.conversation.hasStarted, deriveConvo(task.conversation).badge != nil { return accent }
       return nil
     }()
-    tenureFill = TaskRowFlags.agingEnabled ? task.todayTenureFill() : nil
+    // Aging shows only where the Today badge is suppressed, which is the
+    // Today list itself (`showsTodayIndicator == filter != .today`). Inside an
+    // area or project it would grade a list the row isn't judged in.
+    tenureFill = TaskRowFlags.agingEnabled && !showsTodayIndicator ? task.todayTenureFill() : nil
   }
 }
 
@@ -900,19 +903,36 @@ struct TaskDateBoard: View {
     }
     .buttonStyle(.plain)
     .popover(isPresented: $showingCalendar) {
-      DatePicker("", selection: $calendarDate, displayedComponents: [.date])
-        .datePickerStyle(.graphical)
-        .labelsHidden()
-        .tint(theme.accent)
-        .padding(8)
-        .frame(minWidth: 300, idealWidth: 320, minHeight: 320)
-        .presentationDetents([.medium])
-        .presentationCompactAdaptation(.sheet)
-        .onChange(of: calendarDate) {
-          showingCalendar = false
-          onPick(cal.startOfDay(for: calendarDate))
-        }
+      VStack(spacing: 8) {
+        DatePicker("", selection: $calendarDate, displayedComponents: [.date])
+          .datePickerStyle(.graphical)
+          .labelsHidden()
+          .tint(theme.accent)
+          // Commit only when the user picks a DAY. Paging the month or using
+          // the month/year wheel also rewrites the bound date (same day number,
+          // other month), and committing that closed the calendar mid-browse.
+          .onChange(of: calendarDate) { old, new in
+            guard cal.component(.day, from: old) != cal.component(.day, from: new)
+            else { return }
+            commitCalendarDate()
+          }
+        // The one case the day compare can't see: after browsing to another
+        // month, picking the SAME day number changes nothing. This commits
+        // whatever is shown.
+        Button("Set Date") { commitCalendarDate() }
+          .buttonStyle(.borderless)
+          .tint(theme.accent)
+      }
+      .padding(8)
+      .frame(minWidth: 300, idealWidth: 320, minHeight: 360)
+      .presentationDetents([.medium])
+      .presentationCompactAdaptation(.sheet)
     }
+  }
+
+  private func commitCalendarDate() {
+    showingCalendar = false
+    onPick(cal.startOfDay(for: calendarDate))
   }
 }
 
