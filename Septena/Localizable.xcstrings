@@ -8683,6 +8683,7 @@
 
     },
     "Version %@ (%@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8694,6 +8695,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Versão %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Version %@ (%@) · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@) · %3$@"
           }
         }
       }
