@@ -25,6 +25,11 @@ import AppKit
 struct TaskMarkdownNotesEditor: View {
   @Binding var text: String
   @FocusState.Binding var focus: TaskEditFocus?
+  /// iOS: shows a keyboard accessory bar with Done, which runs this. SwiftUI's
+  /// `.keyboard` toolbar does not reach this UIKit text view, so the bar is
+  /// the text view's own `inputAccessoryView`. Nil shows no bar. Ignored on
+  /// macOS (no on-screen keyboard).
+  var onDone: (() -> Void)? = nil
   @State private var contentHeight: CGFloat = 28
 
   private let minHeight: CGFloat = 28
@@ -59,7 +64,8 @@ struct TaskMarkdownNotesEditor: View {
         ),
         contentHeight: $contentHeight,
         fontSize: bodyFontSize,
-        maxHeight: maxHeight
+        maxHeight: maxHeight,
+        onDone: onDone
       )
       .frame(height: visibleHeight)
 
@@ -81,6 +87,7 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
   @Binding var contentHeight: CGFloat
   let fontSize: CGFloat
   let maxHeight: CGFloat
+  var onDone: (() -> Void)? = nil
 
   func makeUIView(context: Context) -> UITextView {
     let view = UITextView()
@@ -95,6 +102,21 @@ private struct PlatformMarkdownNotesTextView: UIViewRepresentable {
     view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     view.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
     view.attributedText = MarkdownNotesStyle.attributed(text, fontSize: fontSize)
+    if onDone != nil {
+      // A standard accessory toolbar: flexible space, then Done. The action
+      // reads the coordinator's CURRENT parent, so it always runs the latest
+      // closure SwiftUI handed us, never the one captured at creation.
+      let coordinator = context.coordinator
+      let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+      bar.items = [
+        UIBarButtonItem(systemItem: .flexibleSpace),
+        UIBarButtonItem(systemItem: .done, primaryAction: UIAction { _ in
+          coordinator.parent.onDone?()
+        })
+      ]
+      bar.sizeToFit()
+      view.inputAccessoryView = bar
+    }
     return view
   }
 
@@ -194,6 +216,7 @@ private struct PlatformMarkdownNotesTextView: NSViewRepresentable {
   @Binding var contentHeight: CGFloat
   let fontSize: CGFloat
   let maxHeight: CGFloat
+  var onDone: (() -> Void)? = nil
 
   func makeNSView(context: Context) -> NSScrollView {
     let scrollView = NSScrollView()

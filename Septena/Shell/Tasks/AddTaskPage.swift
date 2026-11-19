@@ -21,10 +21,26 @@ struct AddTaskPage: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.dismiss) private var dismiss
   @Bindable var router: AddInfoRouter
+  /// True when this page is the whole quick-add (Septask's sheet): it then
+  /// owns its own focused title field and Cancel / Add toolbar. False under
+  /// Septena's `AddInfoSheet`, which feeds `router.query` from its `.searchable`
+  /// bar and owns the chrome.
+  var hostsTitleField: Bool = false
+  /// File every capture to the Inbox instead of deriving a list from the
+  /// current route (Septask's quick add is a pure Inbox capture).
+  var forcesInbox: Bool = false
   @State private var todays: [SeptenaTask] = []
   @State private var working = false
+  @FocusState private var titleFocused: Bool
+
+  init(router: AddInfoRouter, hostsTitleField: Bool = false, forcesInbox: Bool = false) {
+    self._router = Bindable(router)
+    self.hostsTitleField = hostsTitleField
+    self.forcesInbox = forcesInbox
+  }
 
   private var bucket: TaskBucket {
+    if forcesInbox { return .inbox }
     guard let last = nav.path.last else { return .inbox }
     switch last {
     case .filter(let f):
@@ -70,6 +86,16 @@ struct AddTaskPage: View {
   var body: some View {
     let tint = AddInfoSection.tasks.accent(theme: theme)
     List {
+      if hostsTitleField {
+        Section {
+          // Return adds. One line: a capture is a title, details come later.
+          TextField("New Task", text: $router.query)
+            .focused($titleFocused)
+            .submitLabel(.done)
+            .onSubmit { if !trimmed.isEmpty { commit(title: trimmed) } }
+        }
+      }
+
       Section {
         HStack(spacing: 6) {
           Text("Adding to").foregroundStyle(.secondary)
@@ -79,7 +105,7 @@ struct AddTaskPage: View {
         .font(.footnote)
       }
 
-      if !trimmed.isEmpty {
+      if !hostsTitleField, !trimmed.isEmpty {
         Section {
           Button { commit(title: trimmed) } label: {
             AddInfoRow(
@@ -98,15 +124,30 @@ struct AddTaskPage: View {
       if !filtered.isEmpty {
         Section("Today") {
           ForEach(filtered) { task in
-            Button { pull(task) } label: {
+            if task.isOnToday {
+              // Already on Today: shown so you don't add a duplicate. Not a
+              // button. A plain tap here used to COMPLETE the task, an action
+              // nothing on the row announced.
               AddInfoRow(
                 title: task.title,
-                subtitle: task.area ?? "Today",
-                systemImage: task.isOnToday ? "circle.inset.filled" : "circle",
+                subtitle: "Already on Today",
+                systemImage: "circle.inset.filled",
                 tint: tint
               )
+            } else {
+              // Due or rolled in but not pinned: the one action is to pin it,
+              // and the row says so.
+              Button { pullToToday(task) } label: {
+                AddInfoRow(
+                  title: task.title,
+                  subtitle: "Move to Today",
+                  systemImage: "circle",
+                  tint: tint
+                )
+                .contentShape(Rectangle())
+              }
+              .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
           }
         }
       }
@@ -115,6 +156,23 @@ struct AddTaskPage: View {
     #if os(iOS)
     .listStyle(.insetGrouped)
     #endif
+    .toolbar {
+      if hostsTitleField {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Add") { commit(title: trimmed) }
+            .disabled(trimmed.isEmpty || working)
+        }
+      }
+    }
+    .onAppear {
+      guard hostsTitleField else { return }
+      // Focus after the sheet settles: an immediate focus is dropped before
+      // the field joins the responder chain, so the keyboard would not rise.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { titleFocused = true }
+    }
   }
 
   private func matches(_ s: String) -> Bool {
@@ -122,21 +180,27 @@ struct AddTaskPage: View {
   }
 
   private func commit(title: String) {
-    guard !working else { return }
+    guard !working, !title.isEmpty else { return }
+    working = true
     var draft = TaskDraft(filter: taskFilter)
     draft.title = title
-    draft.create(via: mutator)
+    let created = draft.create(via: mutator)
+    let saved = draft
+    TaskUndo.recordCreate(
+      name: String(localized: "New Task", comment: "Undo action name"),
+      ids: [created.id], mutator: mutator,
+      rebuild: { [mutator] in [saved.create(via: mutator).id] })
     AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()
     dismiss()
   }
 
-  private func pull(_ task: SeptenaTask) {
-    if task.isOnToday {
-      mutator.complete(id: task.id)
-    } else {
-      mutator.moveToToday(id: task.id)
-    }
+  private func pullToToday(_ task: SeptenaTask) {
+    let before = TaskUndo.ScheduleSnapshot(task)
+    mutator.moveToToday(id: task.id)
+    TaskUndo.recordScheduleChange(
+      name: String(localized: "Move to Today", comment: "Undo action name"),
+      before: [before], context: modelContext, mutator: mutator)
     AddInfoSection.tasks.notifyTilesChanged()
     Haptics.tick()
     dismiss()

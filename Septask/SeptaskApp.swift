@@ -179,7 +179,7 @@ private struct SeptaskMainWindow: View {
   private var navigationActions: SeptaskNavigationActions {
     SeptaskNavigationActions(
       go: { filter in navigation.go(to: .filter(filter)) },
-      newTask: { navigation.shouldStartCreating = true },
+      newTask: { navigation.requestNewTask() },
       newProject: { navigation.shouldCreateProject = true },
       newArea: { navigation.shouldCreateArea = true },
       toggleSidebar: {

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import EventKit  // optional calendar agenda woven into Today / Upcoming
 import UniformTypeIdentifiers
+import CloudKit  // CKAccountStatus for the signed-out empty state
 #if canImport(AppKit)
 import AppKit  // NSEvent.modifierFlags for ⌘/⇧-click selection
 #endif
@@ -22,6 +23,7 @@ struct TaskListView: View {
   @Environment(\.modelContext) private var modelContext
   @Environment(\.a11yMotion) private var motion
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.scenePhase) private var scenePhase
   /// App-root celebration layer — only used by the day-cleared `.arc`
   /// (see `TaskCelebration`). Optional: hosts outside the root env keep
   /// the haptic and skip the visual.
@@ -291,6 +293,13 @@ struct TaskListView: View {
   /// activation so the first click sequence only saves/folds the open editor.
   @State private var suppressActivationAfterSelectionCloseId: String?
 
+  /// True between this list's `onAppear` and `onDisappear`. Several task lists
+  /// stay mounted at once (Septask's iPhone tabs, a list under a pushed one), so
+  /// the app-global one-shots (`nav.shouldStartCreating`,
+  /// `nav.pendingTaskReveal`) are consumed only by the list on screen. A hidden
+  /// list used to eat them.
+  @State private var isOnScreen = false
+
   /// Whether the Inbox section (on the Today view) is folded. Expanded by
   /// default; the header shows the count either way.
   @State private var inboxCollapsed = false
@@ -520,7 +529,7 @@ struct TaskListView: View {
     // gestures and the `+` button are unaffected. macOS keeps the full menu.
     #if os(macOS)
     return withSnackbar.focusedSceneValue(\.taskActions, TaskActions(
-      newTask: { nav.shouldStartCreating = true },
+      newTask: { openContextualQuickAdd() },
       toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
       openWhen: selection.isEmpty ? nil : openWhenForSelected,
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
@@ -567,7 +576,7 @@ struct TaskListView: View {
   /// focused scene value from a split-view detail SIGKILLs iPad — see above).
   private var iPadRowCommandActions: TaskActions {
     TaskActions(
-      newTask: { nav.shouldStartCreating = true },
+      newTask: { openContextualQuickAdd() },
       toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
       openWhen: selection.isEmpty ? nil : openWhenForSelected,
       openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
@@ -608,14 +617,16 @@ struct TaskListView: View {
     // keyboard nav now all live inside `SelectableScrollList`.)
     .environment(\.rowVInset, Theme.rowVPaddingTight)
     .scrollDismissesKeyboard(.interactively)
-    .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar))
+    .modifier(TaskListToolbarChrome(showsEmbeddedNewTask: showsEmbeddedNewTaskToolbar,
+                                    onNew: { openContextualQuickAdd() }))
     // Unified chrome (docs/PAGE_CHROME_SPEC.md): standalone task lists get the
     // constant gear (→ Settings) and a contextual "+" (new task). On iPad
     // regular the "+" merges with the sidebar's "···" in the tab bar; on iPhone
     // a pushed list shows gear + "+" in its own nav bar.
     .modifier(TaskListStandaloneChrome(embedded: embedded,
                                        recentlyDeleted: filter == .recentlyDeleted,
-                                       showsViewOptions: filter == .today))
+                                       showsViewOptions: filter == .today,
+                                       onNew: { openContextualQuickAdd() }))
     // Applied after standalone chrome so Septask retains its face/plus order.
     .modifier(TaskListClaudeReconnectToolbar(shows: showsClaudeReconnectToolbar))
     // (Keyboard navigation — ↑↓ traversal, Return/Esc, focus reclaim —
@@ -682,6 +693,7 @@ struct TaskListView: View {
       // never fires and `model.calendarEvents` would otherwise stay empty until the
       // load lands — a visible layout jump.
       refreshCalendarEvents()
+      Self.sweepAbandonedDraftsOnce(using: mutator, in: modelContext)
       Task { await load() }
     }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
@@ -769,7 +781,9 @@ struct TaskListView: View {
     .onChange(of: nav.shouldStartCreating) { _, _ in
       consumeStartCreatingRequest()
     }
-    .onAppear(perform: consumeStartCreatingRequest)
+    .onAppear(perform: didAppearOnScreen)
+    .onDisappear { isOnScreen = false }
+    .onChange(of: scenePhase) { _, phase in handleScenePhase(phase) }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
     // tap / (i) button). The app's standard adaptive edit drawer (sheet on
     // iPhone, inspector on iPad/macOS). Commits through `TaskDraft` so the
@@ -814,7 +828,10 @@ struct TaskListView: View {
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
     guard filter != .recentlyDeleted, filter != .repeating else { return }
-    guard !closeActiveEditIfNeeded() else { return }
+    // One press: fold (and so save) whatever editor is open, then start the
+    // new task. This used to stop after the fold, so "+" while editing took
+    // two presses.
+    closeActiveEditIfNeeded()
     guard allowsInlineCreate else {
       a11yAnimate(.snappy(duration: 0.25)) {
         expandedEditId = nil
@@ -853,12 +870,10 @@ struct TaskListView: View {
   /// on Upcoming). Re-tapping while a capture is already open scrolls back to it.
   private func openContextualQuickAdd() {
     guard filter != .recentlyDeleted else { return }
-    guard !closeActiveEditIfNeeded() else { return }
-    if quickAddDraftId != nil {
-      scrollToTargetID = Self.quickAddScrollID
-      scrollToTargetTick += 1
-      return
-    }
+    // One press: save + fold the open editor (a capture line included: its
+    // typed title lives in the editor, not the store, so only its own teardown
+    // can save it) and start the new task. `startCreate` does the fold. A blank
+    // open line is dropped by that teardown and replaced by the new one.
     if filter == .today && inboxCollapsed {
       a11yAnimate(.easeInOut(duration: 0.2)) { inboxCollapsed = false }
     }
@@ -869,12 +884,53 @@ struct TaskListView: View {
     }
   }
 
+  /// Pull to refresh: the foreground CloudKit fetch, then a mirror re-read.
+  private func refreshFromCloud() async {
+    try? await ckEngine.fetchChanges()
+    await load()
+  }
+
+  /// First frame on screen: claim the app-global one-shots meant for the
+  /// visible list (see `isOnScreen`).
+  private func didAppearOnScreen() {
+    isOnScreen = true
+    consumeStartCreatingRequest()
+    consumePendingTaskReveal()
+  }
+
+  /// Backgrounding is where an empty inline-create placeholder gets stranded
+  /// (the app is killed before the editor folds). Fold an open draft now so its
+  /// own teardown saves typed text or drops the blank row, and drop any other
+  /// blank draft. `sweepAbandonedDraftsOnce` catches what a kill still leaves.
+  private func handleScenePhase(_ phase: ScenePhase) {
+    guard phase == .background else { return }
+    // The open draft is left to its editor's teardown: its typed title is in
+    // the editor, not the store yet, so purging it here would lose it.
+    let open = expandedEditId
+    if let open, draftEditIds.contains(open) { collapseEdit() }
+    for id in draftEditIds where id != open { purgeDraftIfEmpty(id: id) }
+    draftEditIds = draftEditIds.filter { $0 == open }
+  }
+
+  /// Open the next new task after Return saved one, in the slot the saved one
+  /// was captured in (a Today area / project section, else the list default).
+  private func continueCreating(in target: QuickAddGroupTarget?) {
+    switch target {
+    case .area(let id)?:    startCreate(areaId: id)
+    case .project(let id)?: startCreate(projectId: id)
+    case .inbox?, nil:      openContextualQuickAdd()
+    }
+  }
+
   /// Consume the app-global create request from both first appearance and
   /// subsequent command deliveries. Keeping this imperative work outside the
   /// already-large SwiftUI modifier expression also gives every target the
   /// same small, compiler-friendly entry point.
   private func consumeStartCreatingRequest() {
-    guard nav.shouldStartCreating else { return }
+    // Only the list on screen answers. A hidden list (another tab, or the list
+    // under a pushed one) used to consume the flag and open a draft nobody saw.
+    // An unanswered request expires on its own (`NavigationState.requestNewTask`).
+    guard isOnScreen, nav.shouldStartCreating else { return }
     nav.shouldStartCreating = false
     openContextualQuickAdd()
   }
@@ -899,7 +955,11 @@ struct TaskListView: View {
   /// `List`) precisely because the container can host an inline-editable
   /// `TextField` on macOS without the List focus/selection corruption.
   private func beginEdit(_ task: SeptenaTask) {
-    guard !closeActiveEditIfNeeded(except: task.id) else { return }
+    // Opening a row while another is open folds (and so saves) the other and
+    // opens this one in the SAME tap. This used to stop after the fold, which
+    // (with select-first on iPad) made switching rows cost three taps.
+    if let open = expandedEditId, open != task.id { collapseEdit() }
+    if composerIsOpen { closeComposer() }
     // Open INSTANTLY — no animated transaction. An animated open cross-faded the
     // closed `Text` row and the editor `TextField` row (both carry
     // `.transition(.opacity)`): the dim mid-fade was the "flash", and the spring
@@ -926,8 +986,14 @@ struct TaskListView: View {
     // swap doesn't cross-fade (the "flash" on blur) or animate the baseline
     // delta (the drop). See `beginEdit`.
     expandedEditId = nil
-    if let closingId, selection.isEmpty || selection == [closingId] {
-      selection = [closingId]
+    if usesSelectionModel {
+      if let closingId, selection.isEmpty || selection == [closingId] {
+        selection = [closingId]
+      }
+    } else if let closingId {
+      // iPhone has no selection model: a row left selected after its editor
+      // folds kept the grey selection fill with nothing to show for it.
+      selection.remove(closingId)
     }
     // Dropping an untouched inline-create draft is owned by the editor's
     // `onVanish` (fired right after its autosave on teardown) — never a timed
@@ -973,6 +1039,30 @@ struct TaskListView: View {
     removeLocally(id: id)
     selection.remove(id)
     Task { await load() }
+  }
+
+  @MainActor private static var didSweepAbandonedDrafts = false
+
+  /// Once per launch: drop inline-create placeholders a previous run left
+  /// behind (the app was killed with a blank "New task" line open). Such a row
+  /// has an empty title and was never pushed to CloudKit (no system fields), so
+  /// it exists on this device only and nothing else references it. `purge`, not
+  /// `delete`: a blank draft is not user data and must not land in Recently
+  /// Deleted. Headings are skipped (they are never blank drafts).
+  @MainActor
+  static func sweepAbandonedDraftsOnce(using mutator: TaskMutator, in context: ModelContext) {
+    guard !didSweepAbandonedDrafts else { return }
+    didSweepAbandonedDrafts = true
+    let blank = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.title == "" && $0.deletedAt == nil }
+    ))) ?? []
+    let ids = blank
+      .filter { $0.cloudKitSystemFields == nil && !$0.isHeading }
+      .map(\.id)
+    for id in ids { mutator.purge(id: id) }
+    if !ids.isEmpty {
+      SeptenaLog.info("[TaskList] swept \(ids.count) abandoned blank draft(s)")
+    }
   }
 
   /// The in-flight capture draft, if any — rendered in the quick-add slot.
@@ -1040,6 +1130,8 @@ struct TaskListView: View {
       inputActive: listInputActive,
       selectable: usesSelectionModel,
       onActivate: activateRow,
+      // While an editor is open, one tap on another row moves it there (iPad).
+      activatesOnTap: expandedEditId != nil,
       onClear: { closeEditOrClearSelection() },
       onMoveShortcut: openMoveForSelected,
       scrollToTick: scrollToTargetTick,
@@ -1068,13 +1160,24 @@ struct TaskListView: View {
         suppressActivationAfterSelectionCloseId = nil
       }
       if let id = expandedEditId, !sel.contains(id) {
+        // macOS only: a double-click arrives as "select" then "activate", and
+        // the select already folded the editor; swallow the paired activate.
+        // iPad has no such pair, and suppressing there cost an extra tap.
+        #if os(macOS)
         suppressActivationAfterSelectionCloseId = sel.count == 1 ? sel.first : nil
+        #endif
         collapseEdit()
       }
     }
+    #if os(iOS)
+    // Pull to refresh runs the same CloudKit fetch the app runs on foreground,
+    // then re-reads the mirror. (`load()` itself must never fetch: it runs
+    // inside the sync delegate's change notification — see `performLoad`.)
+    .refreshable { await refreshFromCloud() }
+    #endif
     #if os(macOS)
     // Esc when the list itself holds focus just clears the selection. An open
-    // inline editor owns Esc itself (the composer's own cancel contract), so
+    // inline editor owns Esc itself (the composer saves and closes), so
     // this only fires when no editor is up.
     .onExitCommand { clearSelection() }
     #endif
@@ -1164,8 +1267,7 @@ struct TaskListView: View {
       return
     }
     if id == Self.quickAddScrollID {
-      if closeActiveEditIfNeeded() { return }
-      startCreate()
+      startCreate()  // folds any open editor first, same press
       return
     }
     guard selection.count <= 1 else { return }
@@ -1434,7 +1536,18 @@ struct TaskListView: View {
     // user, so say that instead of "Nothing here yet" — and say it even where
     // there IS an inline capture affordance, since the emptiness is what
     // misleads, not the missing button.
-    if showsEmptyTaskList && ckEngine.isBootstrapping {
+    if showsEmptyTaskList && iCloudSignedOut {
+      // No iCloud account: the first sync can never start, so "Getting your
+      // data" would spin forever. Say what is actually missing.
+      ContentUnavailableView {
+        Label("Sign in to iCloud", systemImage: "icloud.slash")
+      } description: {
+        Text("Your tasks sync through iCloud. Sign in from the Settings app to see them here.")
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.top, 40)
+      .plainListChrome()
+    } else if showsEmptyTaskList && ckEngine.isBootstrapping {
       ContentUnavailableView {
         Label("Getting your data", systemImage: "icloud.and.arrow.down")
       } description: {
@@ -1447,6 +1560,12 @@ struct TaskListView: View {
     } else {
       settledEmptyStateRow
     }
+  }
+
+  /// No usable iCloud account on this device (signed out, or blocked by a
+  /// restriction). `CKEngine` keeps `accountStatus` current.
+  private var iCloudSignedOut: Bool {
+    ckEngine.accountStatus == .noAccount || ckEngine.accountStatus == .restricted
   }
 
   @ViewBuilder
@@ -1474,7 +1593,7 @@ struct TaskListView: View {
           description: Text(
             showsQuickAddAtTop
               ? "Type above to add your first task."
-              : "Tap + or double-click below to add a task."
+              : Self.emptyListAddHint
           )
         )
         .frame(maxWidth: .infinity)
@@ -1482,6 +1601,15 @@ struct TaskListView: View {
         .plainListChrome()
       }
     }
+  }
+
+  /// "Double-click" only exists with a pointer; on iOS the + is the way in.
+  private static var emptyListAddHint: LocalizedStringKey {
+    #if os(macOS)
+    "Click + or double-click below to add a task."
+    #else
+    "Tap + to add a task."
+    #endif
   }
 
   private var visibleRows: some View {
@@ -1544,8 +1672,12 @@ struct TaskListView: View {
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
     guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
+    // Snapshot every row the drop can rewrite (a renumber touches the whole
+    // sequence), so shake / ⌘Z puts the old order back.
+    let undoBefore = TaskUndo.positions(of: remaining.map(\.id) + ids, in: modelContext)
     applyManualOrder(ids: ids, into: remaining,
                      at: before ? targetIdx : targetIdx + 1)
+    TaskUndo.recordReorder(before: undoBefore, context: modelContext, mutator: mutator)
     Haptics.tick()
     Task { await load() }
     return true
@@ -1699,12 +1831,18 @@ struct TaskListView: View {
       // Reorder headings among themselves.
       let remaining = projectHeadingList.filter { !dragged.contains($0.id) }
       guard let ti = remaining.firstIndex(where: { $0.id == targetHeading.id }) else { return false }
+      let undoBefore = TaskUndo.positions(of: remaining.map(\.id) + ids, in: modelContext)
       applyManualOrder(ids: ids, into: remaining, at: before ? ti : ti + 1)
+      TaskUndo.recordReorder(before: undoBefore, context: modelContext, mutator: mutator)
     } else {
       // Tasks dropped onto the label → file under this heading, above its first member.
       let members = visibleItems.filter { $0.heading == targetHeading.id && !dragged.contains($0.id) }
+      // Heading + position ride in the filing snapshot, so one undo puts the
+      // rows back where they were filed.
+      let undoBefore = filingSnapshots(ids)
       for id in ids { mutator.setHeading(id: id, heading: targetHeading.id) }
       applyManualOrder(ids: ids, into: members, at: 0)
+      TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     }
     Haptics.tick()
     Task { await load() }
@@ -2164,6 +2302,8 @@ struct TaskListView: View {
     motion.run(Theme.Motion.settle) { flipStatus(id: id, to: .cancelled) }
     model.noteCompleted(id, done: true)
     mutator.cancel(id: id)
+    // Shake / ⌘Z reopens it, same inverse the Mac shell uses.
+    TaskUndo.recordCancel(ids: [id], mutator: mutator)
   }
 
   private func applyDelete(_ id: String) {
@@ -2178,11 +2318,14 @@ struct TaskListView: View {
     // Show undo snackbar (not in the Recently Deleted view — there the
     // gesture is always intentional and Restore is a first-class action).
     guard filter != .recentlyDeleted else { return }
-    // The toast routes through the SAME stack rather than calling `restore`
-    // itself, so tapping Undo and pressing ⌘Z cannot disagree, and the toast
-    // consumes the stack entry instead of leaving a stale one behind it.
+    // The toast undoes THIS delete only. While the delete is still the newest
+    // entry it goes through the shared stack (so the toast and ⌘Z agree and no
+    // stale entry is left); once anything newer landed, a plain
+    // `TaskUndo.undo()` would take back that newer action instead, so the
+    // ticket restores the row directly.
+    let ticket = TaskUndoTicket()
     showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
-      TaskUndo.undo()
+      ticket.undo { mutator.restore(id: id) }
       Task { await load() }
     }
   }
@@ -2193,17 +2336,11 @@ struct TaskListView: View {
     toastStore.show(message, undo: undo)
   }
 
-  private struct MoveSnapshot {
-    let id: String
-    let prevArea: String?
-    let prevProject: String?
-    let wasInTriage: Bool
-  }
-
-  private func applyMoveCore(id: String, areaId: String?, projectId: String?) -> MoveSnapshot? {
-    guard let task = currentTask(id: id) else { return nil }
-    let prevArea = task.area
-    let prevProject = task.project
+  /// Re-home one task. Returns false when the row is gone. Undo is recorded by
+  /// the caller around the whole batch (`applyMove`), from store snapshots.
+  @discardableResult
+  private func applyMoveCore(id: String, areaId: String?, projectId: String?) -> Bool {
+    guard let task = currentTask(id: id) else { return false }
     let wasInTriage = task.isInTriageBand
     let chosenKind: SuggestionEngine.Suggestion.Kind? =
       projectId != nil ? .project : (areaId != nil ? .area : nil)
@@ -2219,20 +2356,13 @@ struct TaskListView: View {
     }
     mutator.acknowledge(id: id)
     if filter == .today, wasInTriage { promoteFlash.flash(id) }
-    return MoveSnapshot(id: id, prevArea: prevArea, prevProject: prevProject, wasInTriage: wasInTriage)
+    return true
   }
 
-  private func undoMove(_ snapshots: [MoveSnapshot]) {
-    for snap in snapshots {
-      if let prevProject = snap.prevProject {
-        mutator.moveToProject(id: snap.id, project: prevProject)
-      } else {
-        mutator.moveToArea(id: snap.id, area: snap.prevArea)
-        mutator.moveToProject(id: snap.id, project: nil)
-      }
-      if snap.wasInTriage { mutator.moveToToday(id: snap.id, today: false) }
-    }
-    Task { await load() }
+  /// Filing state as stored right now, for `TaskUndo.recordMove`.
+  private func filingSnapshots(_ ids: [String]) -> [TaskUndo.FilingSnapshot] {
+    ids.compactMap { LocalCache.task(id: $0, in: modelContext) }
+      .map(TaskUndo.FilingSnapshot.init)
   }
 
   private func destinationName(areaId: String?, projectId: String?) -> String {
@@ -2242,24 +2372,31 @@ struct TaskListView: View {
   }
 
   private func applyMove(id: String, areaId: String?, projectId: String?) {
-    Haptics.tick()
-    guard let snap = applyMoveCore(id: id, areaId: areaId, projectId: projectId) else { return }
-    Task { await load() }
-    let destName = destinationName(areaId: areaId, projectId: projectId)
-    showToast("Moved to \(destName)") { undoMove([snap]) }
+    applyMove([id], areaId: areaId, projectId: projectId)
   }
 
+  /// Every move from this list (context menu, Move sheet, Today-group drop)
+  /// lands on the shared undo stack, and the toast's Undo goes through the
+  /// same entry, so the toast, shake and ⌘Z all reverse the same thing.
   private func applyMove(_ ids: [String], areaId: String?, projectId: String?) {
     guard !ids.isEmpty else { return }
     Haptics.tick()
-    let snaps = ids.compactMap { applyMoveCore(id: $0, areaId: areaId, projectId: projectId) }
-    guard !snaps.isEmpty else { return }
+    let before = filingSnapshots(ids)
+    let moved = ids.filter { applyMoveCore(id: $0, areaId: areaId, projectId: projectId) }
+    guard !moved.isEmpty else { return }
+    let movedSet = Set(moved)
+    let undoBefore = before.filter { movedSet.contains($0.id) }
+    TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
+    let ticket = TaskUndoTicket()
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
-    let message = snaps.count == 1
+    let message = moved.count == 1
       ? "Moved to \(destName)"
-      : "Moved \(snaps.count) tasks to \(destName)"
-    showToast(message) { undoMove(snaps) }
+      : "Moved \(moved.count) tasks to \(destName)"
+    showToast(message) {
+      ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
+      Task { await load() }
+    }
   }
 
   private func applyMoveToSelection(_ ids: [String], areaId: String?, projectId: String?) {
@@ -2350,7 +2487,11 @@ struct TaskListView: View {
   /// scroll), on a neutral highlighted card. Folding it (Return, opening another
   /// row, leaving the list) autosaves via the card's `.onDisappear`.
   private func expandedEditorRow(_ task: SeptenaTask) -> some View {
-    TaskComposerCard(
+    // The capture slot this draft was opened in, read now (at render), because
+    // saving it clears `quickAddGroupTarget` before the chain can reuse it.
+    let captureTarget = quickAddGroupTarget
+    let isDraft = draftEditIds.contains(task.id)
+    return TaskComposerCard(
       mode: .edit(task),
       areas: areas,
       projects: projects,
@@ -2388,7 +2529,10 @@ struct TaskListView: View {
         guard draftEditIds.contains(task.id) else { return }
         draftEditIds.remove(task.id)
         purgeDraftIfEmpty(id: task.id)
-      }
+      },
+      // Return on a titled NEW task: it is already saved; open the next new
+      // task in the same slot (Things-style capture chain).
+      onSubmitNew: isDraft ? { continueCreating(in: captureTarget) } : nil
     )
     .frame(maxWidth: .infinity, alignment: .leading)
     // No own card or screen margin: the surrounding `TaskCardChrome` slice paints
@@ -2398,9 +2542,8 @@ struct TaskListView: View {
     // `rowVInset` as closed rows).
     .id(task.id)
     .transition(.opacity)
-    // `TaskComposerCard` owns Escape so it can discard an unsaved draft (with a
-    // confirmation when needed) before this row folds. The selection remains on
-    // the closed row after that shared cancel path.
+    // `TaskComposerCard` owns Escape: it saves and folds the row, the same as
+    // tapping away. The selection remains on the closed row afterwards.
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
@@ -2777,8 +2920,7 @@ struct TaskListView: View {
                                suggestion: SuggestionEngine.Suggestion) {
     Haptics.tick()
     // Capture the prior filing BEFORE the move so Undo can put it back.
-    let prevArea = task.area
-    let prevProject = task.project
+    let undoBefore = filingSnapshots([task.id])
     let wasInTriage = task.isInTriageBand
     recordImplicitRejectionIfMismatch(task: task,
                                       chosenKind: suggestion.kind,
@@ -2793,16 +2935,13 @@ struct TaskListView: View {
     // Filing is engagement — clears the agent cue so the row leaves the Inbox.
     mutator.acknowledge(id: task.id)
     if filter == .today, wasInTriage { promoteFlash.flash(task.id) }
+    // Same shared-stack undo as every other move (toast, shake and ⌘Z agree).
+    TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
+    let ticket = TaskUndoTicket()
     Task { await load() }
 
     showToast("Moved to \(suggestion.title)") {
-      if let prevProject {
-        mutator.moveToProject(id: task.id, project: prevProject)
-      } else {
-        mutator.moveToArea(id: task.id, area: prevArea)
-        mutator.moveToProject(id: task.id, project: nil)
-      }
-      if wasInTriage { mutator.moveToToday(id: task.id, today: false) }
+      ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       Task { await load() }
     }
   }
@@ -3634,7 +3773,10 @@ struct TaskListView: View {
   /// Other still-mounted tab panes must leave the one-shot alone for the active
   /// destination to consume.
   private func consumePendingTaskReveal() {
-    guard let reveal = nav.pendingTaskReveal,
+    // On-screen only: Septask's iPhone tabs keep a second list for the same
+    // route mounted (a hidden copy must leave the reveal to the visible one).
+    guard isOnScreen,
+          let reveal = nav.pendingTaskReveal,
           reveal.routeID == navigationRouteID else { return }
 
     if currentTask(id: reveal.taskID) != nil {

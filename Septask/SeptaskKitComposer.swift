@@ -22,15 +22,17 @@ import AppKit
 // full Repeat editor), so the composer and the ⌘S / ⌘⇧D / ⌘⇧M / Repeat paths
 // can't drift into two different pickers.
 //
-// Edits autosave on collapse, matching the SwiftUI inline host's contract.
+// Edits autosave on collapse, matching the SwiftUI inline host's contract —
+// the list's ONE edit contract: Esc, Return, ⌘↩, click-away, a list change
+// and window close all save and close; ⌘Z undoes the save.
 // Keyboard, one meaning per key: Return in the title enters and leaves it.
 // ⌘↩ (or Esc) commits and folds from ANYWHERE in the open row — title,
 // notes, or a pill — which is the platform's "finish this"; the table catches
 // it (`SeptaskKitTableView.onCommitEditing`) so one handler covers every
 // caret position. Going DEEPER is a separate gesture, never ⌘↩: ↓ on the
-// title's last line drops the caret into notes (↑/↓ then stay inside notes),
-// Tab walks title → notes → pills (Shift-Tab back), and ⌥↩ on a closed row
-// opens straight into notes.
+// title's last line drops the caret into notes, ↑ on the first notes line
+// goes back to the end of the title, Tab walks title → notes → pills
+// (Shift-Tab back), and ⌥↩ on a closed row opens straight into notes.
 @MainActor
 final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
@@ -98,6 +100,15 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// stack (`TaskUndo`) — and a ⌘Z after the row folded would "undo" keystrokes
   /// into a field that is no longer on screen. Reset on every `configure`.
   private let textUndo = UndoManager()
+  /// What the store held after the last commit from this cell (or at
+  /// `configure`). `commit()` reports only a difference from it, so it is
+  /// idempotent: a command that saves typed text first, and the collapse that
+  /// follows, never write the same edit twice.
+  private var committedTitle = ""
+  private var committedNotes: String?
+  /// A deferred commit-and-collapse is queued. A second Return / Esc before
+  /// it runs must not queue another.
+  private var isClosing = false
 
   // MARK: - Height
 
@@ -340,6 +351,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// first opened for a task; never on a mid-edit refresh (see `refreshPills`).
   func configure(with task: SeptenaTask, listName: String?) {
     textUndo.removeAllActions()
+    isClosing = false
+    committedTitle = task.title
+    committedNotes = Self.normalizedNotes(task.notes)
     titleView.textStorage?.setAttributedString(
       NSAttributedString(string: task.title, attributes: Self.titleAttributes))
     titleView.typingAttributes = Self.titleAttributes
@@ -494,6 +508,20 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.setSelectedRange(NSRange(location: end, length: 0))
   }
 
+  /// Whether the caret sits on the first visual line of a wrapped text view —
+  /// ↑ there leaves notes for the title; ↑ on a later line is a line move.
+  private func caretOnFirstLine(of view: NSTextView) -> Bool {
+    guard let manager = view.layoutManager, let container = view.textContainer else { return true }
+    manager.ensureLayout(for: container)
+    let glyphCount = manager.numberOfGlyphs
+    let length = (view.string as NSString).length
+    guard glyphCount > 0, length > 0 else { return true }
+    let caret = min(view.selectedRange().location, length - 1)
+    let glyph = min(manager.glyphIndexForCharacter(at: caret), glyphCount - 1)
+    let line = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+    return line.minY <= manager.usedRect(for: container).minY + 1
+  }
+
   /// Whether the caret sits on the last visual line of a wrapped text view —
   /// ↓ there leaves the field; ↓ on an earlier line is a normal line move.
   private func caretOnLastLine(of view: NSTextView) -> Bool {
@@ -560,13 +588,33 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// Current field contents, for the controller's autosave.
   var pendingTitle: String { titleView.string }
-  var pendingNotes: String? {
-    let text = notesView.string.trimmingCharacters(in: .whitespacesAndNewlines)
-    return text.isEmpty ? nil : text
+  var pendingNotes: String? { Self.normalizedNotes(notesView.string) }
+
+  /// Notes as they are SAVED and COMPARED — both sides go through this, so an
+  /// untouched row never looks edited. Only TRAILING whitespace goes: leading
+  /// indentation and interior blank lines are markdown structure (a nested
+  /// list, a code block) and stay. Empty is nil.
+  static func normalizedNotes(_ notes: String?) -> String? {
+    guard let notes else { return nil }
+    var end = notes.endIndex
+    while end > notes.startIndex {
+      let previous = notes.index(before: end)
+      guard notes[previous].isWhitespace else { break }
+      end = previous
+    }
+    let trimmed = String(notes[..<end])
+    return trimmed.isEmpty ? nil : trimmed
   }
 
+  /// Report the typed title / notes when they differ from the last commit.
+  /// Safe to call any number of times.
   func commit() {
-    onCommit?(pendingTitle, pendingNotes)
+    let title = pendingTitle
+    let notes = pendingNotes
+    guard title != committedTitle || notes != committedNotes else { return }
+    committedTitle = title
+    committedNotes = notes
+    onCommit?(title, notes)
   }
 
   // MARK: - Keyboard
@@ -585,6 +633,12 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     case #selector(NSResponder.moveDown(_:))
       where textView === titleView && caretOnLastLine(of: titleView):
       focusNotes()
+      return true
+    // …and ↑ on the FIRST line of notes climbs back to the end of the title,
+    // so the two fields read as one document in both directions.
+    case #selector(NSResponder.moveUp(_:))
+      where textView === notesView && caretOnFirstLine(of: notesView):
+      focusTitle()
       return true
     // Autosaves like the SwiftUI inline host — Esc folds the row, it doesn't
     // discard what was typed. One press from either field (notes used to hop
@@ -625,6 +679,10 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// returned and the text system has finished its own resign-first-responder
   /// sequence, so the reentrant `makeFirstResponder` lands on a clean stack.
   private func deferCommitAndCollapse() {
+    // One close per open: a double Return / Esc used to queue two commits
+    // and two collapses, and the second could land on a different row.
+    guard !isClosing else { return }
+    isClosing = true
     DispatchQueue.main.async { [weak self] in
       self?.commit()
       self?.onCollapse?()

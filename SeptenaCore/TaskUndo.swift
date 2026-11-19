@@ -243,29 +243,92 @@ enum TaskUndo {
            redo: { mutator.update(id: id, title: after) })
   }
 
-  /// Move between area / project / heading. Captured as a triple because the
-  /// three fields are one filing decision — restoring them separately would
-  /// leave a row in a half-moved state on the way through.
+  /// Title and notes edited together (the composer saves both at once). Only
+  /// the fields that changed are replayed, so undo never writes back a field
+  /// another device edited in the meantime.
+  static func recordEdit(id: String,
+                         beforeTitle: String, afterTitle: String,
+                         beforeNotes: String?, afterNotes: String?,
+                         mutator: TaskMutator) {
+    let titleChanged = beforeTitle != afterTitle
+    let notesChanged = (beforeNotes ?? "") != (afterNotes ?? "")
+    guard titleChanged || notesChanged else { return }
+    if titleChanged && !notesChanged {
+      recordRename(id: id, before: beforeTitle, after: afterTitle, mutator: mutator)
+      return
+    }
+    func apply(title: String, notes: String?) {
+      mutator.update(id: id,
+                     title: titleChanged ? title : nil,
+                     notes: notesChanged ? (notes ?? "") : nil)
+    }
+    record(name: String(localized: "Edit Task", comment: "Undo action name"),
+           undo: { apply(title: beforeTitle, notes: beforeNotes) },
+           redo: { apply(title: afterTitle, notes: afterNotes) })
+  }
+
+  /// Move between area / project / heading. Captured together because the
+  /// fields are one filing decision — restoring them separately would leave a
+  /// row in a half-moved state on the way through. Today and the manual
+  /// position ride along: filing out of the Inbox can pin a row to Today, and
+  /// re-homing resets its position, so undo has to put both back too.
   struct FilingSnapshot {
     let id: String
     let area: String?
     let project: String?
     let heading: String?
+    let today: Bool
+    let position: Double
 
     init(_ task: SeptenaTask) {
       id = task.id
       area = task.area
       project = task.project
       heading = task.heading
+      today = task.today
+      position = task.position
     }
   }
 
+  /// Order is load-bearing: re-homing resets `position` and filing can set
+  /// Today, so both are written after the filing fields.
   static func restore(_ snapshots: [FilingSnapshot], using mutator: TaskMutator) {
     for snapshot in snapshots {
       mutator.moveToArea(id: snapshot.id, area: snapshot.area)
       mutator.moveToProject(id: snapshot.id, project: snapshot.project)
       mutator.setHeading(id: snapshot.id, heading: snapshot.heading)
+      mutator.moveToToday(id: snapshot.id, today: snapshot.today)
+      mutator.reorder(id: snapshot.id, toPosition: snapshot.position)
     }
+  }
+
+  /// Snapshot of manual positions, keyed by task id. Capture it before a
+  /// reorder (drag or keyboard) and pass it to `recordReorder` after.
+  static func positions(of ids: some Sequence<String>,
+                        in context: ModelContext) -> [String: Double] {
+    let wanted = Set(ids)
+    var result: [String: Double] = [:]
+    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
+      result[task.id] = task.position
+    }
+    return result
+  }
+
+  /// Undo for a manual reorder. `before` holds the positions of every row the
+  /// reorder may have touched (a renumber rewrites neighbours too); the redo
+  /// side is re-read from the store.
+  static func recordReorder(before: [String: Double],
+                            context: ModelContext,
+                            mutator: TaskMutator) {
+    guard !before.isEmpty else { return }
+    let after = positions(of: before.keys, in: context)
+    guard after != before else { return }
+    func apply(_ map: [String: Double]) {
+      for (id, position) in map { mutator.reorder(id: id, toPosition: position) }
+    }
+    record(name: String(localized: "Reorder Tasks", comment: "Undo action name"),
+           undo: { apply(before) },
+           redo: { apply(after) })
   }
 
   static func recordMove(before: [FilingSnapshot],

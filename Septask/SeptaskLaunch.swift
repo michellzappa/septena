@@ -85,11 +85,10 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate,
     // `SeptaskLaunch.run` below); without a delegate the tap would foreground
     // the app without re-minting.
     UNUserNotificationCenter.current().delegate = self
-    // Global ⌃Space hotkey disabled for now — it contends with Moom's own
-    // ⌃Space binding system-wide (mz uses that combo for Moom). Quick Entry
-    // is still reachable via the Window ▸ Quick Entry menu item, just without
-    // a keyboard shortcut. Re-enable with SeptaskKitQuickEntry.installHotKey()
-    // once a non-conflicting key is picked.
+    // Global Quick Entry hotkey, ⌃⌥Space (Carbon RegisterEventHotKey: no
+    // Accessibility permission, no event tap). ⌃Space is the system input
+    // source switch and Moom's binding, so it is not used.
+    SeptaskKitQuickEntry.installHotKey()
     SeptaskKitWindowController.show()
     // First run: the AppKit shell is the default window on macOS, so a fresh
     // install would otherwise land in an empty task list with no introduction
@@ -150,6 +149,12 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate,
       }
     }
     return true
+  }
+
+  /// ⌘Q must not lose an open edit: the shell's text editors commit on blur,
+  /// and quitting blurs nothing. Save them explicitly before the process ends.
+  func applicationWillTerminate(_ notification: Notification) {
+    SeptaskKitWindowController.existing?.commitAllEdits()
   }
 
   func applicationDidBecomeActive(_ notification: Notification) {

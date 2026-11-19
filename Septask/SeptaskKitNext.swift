@@ -72,6 +72,14 @@ final class SeptaskKitNextController: NSViewController {
     ])
   }
 
+  /// Give the page the keyboard, so it is not left with no first responder
+  /// after the task table leaves the window. The hosting view hands focus on
+  /// to the page's focusable SwiftUI content.
+  func focusPage() {
+    guard let hostView = host?.view else { return }
+    view.window?.makeFirstResponder(hostView)
+  }
+
   /// Hide the window title while this page's own big title is on screen, show
   /// it once that title has scrolled away — the identical rule (and identical
   /// name) as `SeptaskKitTaskListController.syncWindowTitle`, so the top of

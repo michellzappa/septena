@@ -318,8 +318,10 @@ struct MovePickerSheet: View {
       .navigationTitle(bulkCount > 1 ? "Move \(bulkCount) Tasks" : "Move")
       .septenaInlineTitle()
       .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { dismiss() }
+        // Picking a row is the commit; the only other choice is to leave
+        // without moving, so the toolbar offers Cancel, not a no-op Done.
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
         }
       }
     }

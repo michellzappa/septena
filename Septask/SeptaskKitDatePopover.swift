@@ -667,6 +667,13 @@ private final class KitDateBoard: NSView {
   /// moving through months, so paging the calendar can't schedule anything.
   private var calendarDate = Date()
   private var showingCalendar: Bool { calendarPage?.superview != nil }
+  /// The task's current value for this attribute, if any.
+  private var initialDate: Date?
+  /// Typed date entry on the week page: printable keys collect here, Return
+  /// parses and applies (`KitDateEntry`), Esc clears, ⌫ deletes. Arrows keep
+  /// walking the strip.
+  private var typed = ""
+  private let typedLabel = NSTextField(labelWithString: "")
 
   /// Panel padding. The highlight is INSET from the popover edge (the
   /// palette shape in `SelectionLanguage`, not the full-bleed list-row one),
@@ -725,6 +732,7 @@ private final class KitDateBoard: NSView {
   private func buildBoardPage(initial: Date?) {
     // The app's today (DayClock/SeptenaDate), never the wall clock.
     let today = KitDayFormat.todayDate() ?? Date()
+    initialDate = initial
 
     let strip = NSStackView()
     strip.orientation = .horizontal
@@ -737,6 +745,10 @@ private final class KitDateBoard: NSView {
         self?.pick(date)
       }
       cell.fillDay(date, isToday: offset == 0)
+      // The task's current value wears the neutral current-value ground.
+      if let initial, Calendar.current.isDate(date, inSameDayAs: initial) {
+        cell.isCurrentValue = true
+      }
       cell.widthAnchor.constraint(equalToConstant: Self.dayWidth).isActive = true
       strip.addArrangedSubview(cell)
       dayCells.append(cell)
@@ -745,9 +757,25 @@ private final class KitDateBoard: NSView {
     let calendarCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
       self?.showCalendar()
     }
+    // A current value past the strip is named on this row, so the popover
+    // always shows what the task has now.
+    let beyondStrip = initial.map { value in
+      !Self.dayOffsets.contains { offset in
+        KitDayFormat.day(offset: offset).map {
+          Calendar.current.isDate($0, inSameDayAs: value)
+        } ?? false
+      }
+    } ?? false
+    var calendarTitle = String(localized: "Pick another date",
+                               comment: "SeptaskKit: date popover calendar row")
+    if beyondStrip, let initial {
+      calendarTitle = String(format: String(localized: "Pick another date (%@)",
+                                            comment: "SeptaskKit: date popover calendar row with current value"),
+                             Self.setFormatter.string(from: initial))
+    }
     calendarCell.fillRow(symbol: "calendar", tint: SeptaskKitTheme.inkSecondary,
-                         title: String(localized: "Pick another date",
-                                       comment: "SeptaskKit: date popover calendar row"))
+                         title: calendarTitle)
+    calendarCell.isCurrentValue = beyondStrip
 
     let clearCell = KitDateCell(radius: 8, height: Self.rowHeight) { [weak self] in
       self?.onPick(nil, false)
@@ -760,11 +788,17 @@ private final class KitDateBoard: NSView {
     let bottomSeparator = NSBox()
     bottomSeparator.boxType = .separator
 
-    let stack = NSStackView(views: [strip, topSeparator, calendarCell,
+    typedLabel.font = SeptaskKitTheme.meta
+    typedLabel.textColor = SeptaskKitTheme.iconMuted
+    typedLabel.lineBreakMode = .byTruncatingTail
+    updateTypedLabel()
+
+    let stack = NSStackView(views: [typedLabel, strip, topSeparator, calendarCell,
                                     bottomSeparator, clearCell])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 6
+    stack.setCustomSpacing(8, after: typedLabel)
     stack.setCustomSpacing(8, after: strip)
     stack.setCustomSpacing(4, after: topSeparator)
     stack.setCustomSpacing(8, after: calendarCell)
@@ -772,7 +806,8 @@ private final class KitDateBoard: NSView {
 
     // The strip sets the width; the single-cell rows match it so every
     // highlight spans the same column.
-    for view in [calendarCell, clearCell, topSeparator, bottomSeparator] as [NSView] {
+    for view in [typedLabel, calendarCell, clearCell, topSeparator,
+                 bottomSeparator] as [NSView] {
       view.widthAnchor.constraint(equalTo: strip.widthAnchor).isActive = true
     }
 
@@ -788,6 +823,9 @@ private final class KitDateBoard: NSView {
       guard let date = KitDayFormat.day(offset: offset) else { return false }
       return Calendar.current.isDate(date, inSameDayAs: initial)
     }) {
+      focusIndex = index
+    } else if beyondStrip, let index = cells.firstIndex(where: { $0 === calendarCell }) {
+      // Past the strip: start on "Pick another date", which opens on it.
       focusIndex = index
     }
     boardPage = stack
@@ -819,7 +857,9 @@ private final class KitDateBoard: NSView {
   /// rather than opening a second popover, which would dismiss this transient
   /// one on the spot.
   private func showCalendar() {
-    calendarDate = currentFocusDate() ?? KitDayFormat.todayDate() ?? Date()
+    // The focused day; else the task's own value (it may be months out);
+    // else today.
+    calendarDate = currentFocusDate() ?? initialDate ?? KitDayFormat.todayDate() ?? Date()
     show(page: calendarPage ?? buildCalendarPage())
     calendar.dateValue = calendarDate
     refreshSetCell()
@@ -936,6 +976,7 @@ private final class KitDateBoard: NSView {
   // MARK: Keys
 
   override func keyDown(with event: NSEvent) {
+    if !showingCalendar, handleTyping(event) { return }
     // Same four keys, same axis, on both pages: on the week they move focus
     // through time, on the calendar they move the date through time.
     if showingCalendar {
@@ -960,9 +1001,217 @@ private final class KitDateBoard: NSView {
   }
 
   /// Escape drills back out of the calendar before it closes the popover, so
-  /// one key never skips a level.
+  /// one key never skips a level — and clears a typed date before that.
   override func cancelOperation(_ sender: Any?) {
-    if showingCalendar { showBoard() } else { onCancel() }
+    if showingCalendar {
+      showBoard()
+    } else if !typed.isEmpty {
+      typed = ""
+      updateTypedLabel()
+    } else {
+      onCancel()
+    }
+  }
+
+  // MARK: Typed entry
+
+  /// Week page only. Returns true when the key belonged to the typed date.
+  /// Arrows never do; Space and Return only while something is typed.
+  private func handleTyping(_ event: NSEvent) -> Bool {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    guard flags.isDisjoint(with: [.command, .control, .option]) else { return false }
+    switch event.keyCode {
+    case 51, 117:                                // ⌫ / ⌦
+      guard !typed.isEmpty else { return false }
+      typed.removeLast()
+      updateTypedLabel()
+      return true
+    case 36, 76:                                 // Return / Enter
+      guard !typed.isEmpty else { return false }
+      if let date = typedDate {
+        pick(date)
+      } else {
+        NSSound.beep()
+      }
+      return true
+    case 53:                                     // Escape
+      guard !typed.isEmpty else { return false }
+      typed = ""
+      updateTypedLabel()
+      return true
+    case 49:                                     // Space
+      guard !typed.isEmpty else { return false }
+      typed.append(" ")
+      updateTypedLabel()
+      return true
+    case 123, 124, 125, 126, 48:                 // arrows, Tab
+      return false
+    default:
+      guard let characters = event.characters, !characters.isEmpty,
+            characters.unicodeScalars.allSatisfy({ scalar in
+              CharacterSet.alphanumerics.contains(scalar) || "+-/.,".unicodeScalars.contains(scalar)
+            })
+      else { return false }
+      typed.append(characters)
+      updateTypedLabel()
+      return true
+    }
+  }
+
+  private var typedDate: Date? {
+    guard let today = KitDayFormat.todayDate() else { return nil }
+    return KitDateEntry.parse(typed, today: today)
+  }
+
+  /// The line above the strip: a hint while nothing is typed, then the typed
+  /// text and the date it means.
+  private func updateTypedLabel() {
+    if typed.isEmpty {
+      typedLabel.textColor = SeptaskKitTheme.iconMuted
+      typedLabel.stringValue = String(localized: "Type a date: tomorrow, fri, +3, dec 4",
+                                      comment: "SeptaskKit: date popover typed-entry hint")
+      return
+    }
+    typedLabel.textColor = SeptaskKitTheme.inkPrimary
+    let meaning = typedDate.map { Self.setFormatter.string(from: $0) }
+      ?? String(localized: "Not a date", comment: "SeptaskKit: date popover typed-entry no match")
+    typedLabel.stringValue = "\(typed)  →  \(meaning)"
+  }
+}
+
+// MARK: - Typed date entry
+
+/// Parses what a person types into the date popover. Relative to the app's
+/// TODAY (`KitDayFormat.todayDate()`, which honors DayClock time travel),
+/// never the wall clock. Day precision only; returns the start of the day.
+///
+/// Accepts: today / tod, tomorrow / tom / tmr / tmrw, weekday names and their
+/// abbreviations (the next occurrence after today; "next fri" too), "in N
+/// days / weeks / months", "+N" (days), "+Nd" / "+Nw" / "+Nm", month-day in
+/// either order ("dec 4", "4 dec", optional year), and ISO "yyyy-mm-dd".
+/// Month and weekday names match English and the current locale.
+enum KitDateEntry {
+  static func parse(_ raw: String, today: Date, calendar: Calendar = .current) -> Date? {
+    let text = raw.lowercased()
+      .folding(options: .diacriticInsensitive, locale: .current)
+      .replacingOccurrences(of: ",", with: " ")
+      .split(separator: " ", omittingEmptySubsequences: true)
+      .joined(separator: " ")
+    guard !text.isEmpty else { return nil }
+    let start = calendar.startOfDay(for: today)
+    func add(_ value: Int, _ component: Calendar.Component) -> Date? {
+      calendar.date(byAdding: component, value: value, to: start)
+    }
+
+    switch text {
+    case "today", "tod", "tdy", "now": return start
+    case "tomorrow", "tom", "tmr", "tmrw", "tmw": return add(1, .day)
+    default: break
+    }
+
+    // "+3", "+3d", "+2w", "+1m"
+    if text.hasPrefix("+") {
+      return relative(String(text.dropFirst()).replacingOccurrences(of: " ", with: ""),
+                      add: add)
+    }
+
+    // "in 3 days", "in 2 weeks", "in 1 month", "in 3d"
+    if text.hasPrefix("in ") {
+      return relative(String(text.dropFirst(3)).replacingOccurrences(of: " ", with: ""),
+                      add: add)
+    }
+
+    // Weekday, optionally "next ..."
+    let weekdayText = text.hasPrefix("next ") ? String(text.dropFirst(5)) : text
+    if let weekday = weekdayNumber(weekdayText, calendar: calendar) {
+      let current = calendar.component(.weekday, from: start)
+      var delta = (weekday - current + 7) % 7
+      if delta == 0 { delta = 7 }
+      return add(delta, .day)
+    }
+
+    // ISO yyyy-mm-dd
+    let iso = text.split(separator: "-")
+    if iso.count == 3, iso[0].count == 4,
+       let year = Int(iso[0]), let month = Int(iso[1]), let day = Int(iso[2]) {
+      return validDate(year: year, month: month, day: day, calendar: calendar)
+    }
+
+    // Month-day in either order, optional year: "dec 4", "4 dec 2027".
+    let words = text.split(separator: " ").map(String.init)
+    guard words.count == 2 || words.count == 3 else { return nil }
+    var month: Int?
+    var day: Int?
+    if let m = monthNumber(words[0], calendar: calendar), let d = Int(words[1]) {
+      month = m; day = d
+    } else if let d = Int(words[0]), let m = monthNumber(words[1], calendar: calendar) {
+      month = m; day = d
+    }
+    guard let month, let day else { return nil }
+    if words.count == 3 {
+      guard let year = Int(words[2]) else { return nil }
+      return validDate(year: year, month: month, day: day, calendar: calendar)
+    }
+    // No year: the next time that day comes round, today included.
+    let thisYear = calendar.component(.year, from: start)
+    if let date = validDate(year: thisYear, month: month, day: day, calendar: calendar),
+       date >= start {
+      return date
+    }
+    return validDate(year: thisYear + 1, month: month, day: day, calendar: calendar)
+  }
+
+  /// "3", "3d", "3days", "2w", "2weeks", "1m", "1month" → offset from today.
+  private static func relative(_ text: String, add: (Int, Calendar.Component) -> Date?) -> Date? {
+    let digits = text.prefix { $0.isNumber }
+    guard let count = Int(digits) else { return nil }
+    let unit = text.dropFirst(digits.count)
+    switch unit {
+    case "", "d", "day", "days": return add(count, .day)
+    case "w", "wk", "wks", "week", "weeks": return add(count * 7, .day)
+    case "m", "mo", "month", "months": return add(count, .month)
+    default: return nil
+    }
+  }
+
+  private static func validDate(year: Int, month: Int, day: Int, calendar: Calendar) -> Date? {
+    let components = DateComponents(year: year, month: month, day: day)
+    guard components.isValidDate(in: calendar) else { return nil }
+    return calendar.date(from: components)
+  }
+
+  private static let englishWeekdays = ["sunday", "monday", "tuesday", "wednesday",
+                                        "thursday", "friday", "saturday"]
+  private static let englishMonths = ["january", "february", "march", "april", "may", "june",
+                                      "july", "august", "september", "october", "november",
+                                      "december"]
+
+  /// 1 = Sunday … 7 = Saturday (Calendar's numbering). A word matches a full
+  /// name, or any prefix of at least three letters ("thu", "thurs").
+  private static func weekdayNumber(_ word: String, calendar: Calendar) -> Int? {
+    let localized = calendar.weekdaySymbols.map { fold($0) }
+    for names in [englishWeekdays, localized] {
+      if let index = names.firstIndex(where: { word.count >= 3 && $0.hasPrefix(word) }) {
+        return index + 1
+      }
+    }
+    return nil
+  }
+
+  /// 1 = January … 12. Full name or a prefix of at least three letters.
+  private static func monthNumber(_ word: String, calendar: Calendar) -> Int? {
+    let cleaned = word.hasSuffix(".") ? String(word.dropLast()) : word
+    let localized = calendar.monthSymbols.map { fold($0) }
+    for names in [englishMonths, localized] {
+      if let index = names.firstIndex(where: { cleaned.count >= 3 && $0.hasPrefix(cleaned) }) {
+        return index + 1
+      }
+    }
+    return nil
+  }
+
+  private static func fold(_ text: String) -> String {
+    text.lowercased().folding(options: .diacriticInsensitive, locale: .current)
   }
 }
 

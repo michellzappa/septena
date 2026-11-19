@@ -195,6 +195,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
+  /// The shape `StructureCache.snapshot(in:)` returns.
+  private typealias StructureSnapshot = (areas: [Area], projects: [Project])
+
   /// Mirrors `SettingsKey.septaskSidebarCounts`'s contract: absent → on.
   private var showsCounts: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
@@ -236,6 +239,13 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.rowSizeStyle = .custom
     outlineView.floatsGroupRows = false
     outlineView.autoresizesOutlineColumn = false
+    // AppKit's own source-list selection is off: it flashed the accent ink
+    // (black) on the row being left at mouse-down and filled the area rows'
+    // top margin. `KitSidebarRowView` paints the only selection, in
+    // `drawBackground`, the same way the task list's card rows do.
+    outlineView.selectionHighlightStyle = .none
+    // Rows abut: a drop target is a solid run with no dead gap between rows.
+    outlineView.intercellSpacing = NSSize(width: 0, height: 0)
     // No indentation column, no built-in triangle: every row starts at the
     // same left edge (Things-style), and the custom chevron in SidebarCell
     // is the only expand affordance.
@@ -249,6 +259,11 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // "row targeted by a context menu" highlight the row view can't suppress.
     outlineView.onRightClick = { [weak self] event in self?.presentContextMenu(for: event) }
     outlineView.onTab = { [weak self] in self?.onFocusList?() }
+    // A CLICK on a row hands the keyboard to the detail pane (the row's list
+    // is what the person wants to work in). Arrow keys do NOT — they walk the
+    // sidebar, and focus stays here until Return or Tab.
+    outlineView.onRowClick = { [weak self] in self?.onFocusList?() }
+    outlineView.onReturn = { [weak self] in self?.handleReturn() }
 
     let scroll = NSScrollView()
     scroll.documentView = outlineView
@@ -317,6 +332,15 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     selectRow(key: KitSidebarDestination.key(for: route))
   }
 
+  /// Select a destination by its stable key — how the shell restores the
+  /// last list at launch. Returns false when no such row exists (the area or
+  /// project was deleted, the trash was emptied), so the caller can fall back.
+  @discardableResult
+  func select(key: String) -> Bool {
+    selectRow(key: key)
+    return selectedKey() == key
+  }
+
   private func selectRow(key: String) {
     // A project inside a FOLDED area has no row at all (its parent reports
     // zero children), so unfold just THAT area — not every one of them. A
@@ -347,6 +371,37 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     view.window?.makeFirstResponder(outlineView)
   }
 
+  /// The sidebar holds the keyboard (or is renaming one of its rows) — the
+  /// shell then routes Task ▸ Rename / Delete here instead of to the list.
+  var hasKeyboardFocus: Bool {
+    view.window?.firstResponder === outlineView || isRenaming
+  }
+
+  /// The selected row is an area or a project — the only rows that can be
+  /// renamed or deleted.
+  var selectionIsStructure: Bool {
+    switch selectedNode?.content {
+    case .area, .project: return true
+    default: return false
+    }
+  }
+
+  /// Task ▸ Rename (⌘R) with the sidebar focused.
+  func renameSelectedItem() { renameSelected() }
+
+  /// Task ▸ Delete (⌘⌫) with the sidebar focused. Always confirms.
+  func deleteSelectedItem() { deleteSelected() }
+
+  /// Return on a row: rename an area or project (the Finder idiom); on a
+  /// smart list it hands the keyboard to the list, like a click.
+  private func handleReturn() {
+    if selectionIsStructure {
+      renameSelected()
+    } else {
+      onFocusList?()
+    }
+  }
+
   // MARK: - Tree
 
   /// The trailing badge for one smart list. Counts are computed from the one
@@ -374,6 +429,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       rebuildWorkItem = nil
       pendingPreservedKey = nil
     }
+    // `reloadData()` would destroy a live rename field mid-word (a CloudKit
+    // batch or any task edit lands here). Defer until the rename ends — the
+    // same rule the task list applies to its own title editor.
+    if isRenaming {
+      rebuildDeferredForRename = true
+      return
+    }
+    rebuildDeferredForRename = false
     let snapshot = StructureCache.snapshot(in: context)
 
     // Counts come from one live-task pass. The filter semantics below mirror
@@ -484,6 +547,16 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }
   }
 
+  /// True while an area/project rename field is live in this outline.
+  private var isRenaming: Bool {
+    guard let editor = view.window?.firstResponder as? NSTextView,
+          let field = editor.delegate as? NSTextField else { return false }
+    return field.isDescendant(of: outlineView)
+  }
+
+  /// Set when a rebuild was skipped because a rename was live.
+  private var rebuildDeferredForRename = false
+
   private func selectedKey() -> String? {
     guard outlineView.selectedRow >= 0,
           let node = outlineView.item(atRow: outlineView.selectedRow) as? Node else { return nil }
@@ -559,12 +632,32 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                    proposedItem item: Any?, proposedChildIndex index: Int)
     -> NSDragOperation {
     if !KitDrag.ids(from: info).isEmpty {
-      guard let node = item as? Node, dropAction(for: node) != nil else { return [] }
-      // Always target the row itself, never a gap between rows.
+      // Target the row under the pointer, not AppKit's proposal: between two
+      // rows it proposes the PARENT with a child index, which lit up the area
+      // while the pointer sat on its project. Rows abut (no intercell gap),
+      // so every point resolves to one row, except an area's top margin band,
+      // which is the divider and targets nothing.
+      guard let node = taskDropNode(at: info.draggingLocation),
+            dropAction(for: node) != nil else { return [] }
       outlineView.setDropItem(node, dropChildIndex: NSOutlineViewDropOnItemIndex)
       return .move
     }
     return validateStructureReorder(info, proposedItem: item, proposedChildIndex: index)
+  }
+
+  /// The row a task drop at `windowPoint` lands on, or nil inside the top
+  /// margin band of a top-level area/project row (the section divider).
+  private func taskDropNode(at windowPoint: NSPoint) -> Node? {
+    let point = outlineView.convert(windowPoint, from: nil)
+    let row = outlineView.row(at: point)
+    guard row >= 0, let node = outlineView.item(atRow: row) as? Node else { return nil }
+    if topLevelAreaOrProjectKeys.contains(node.key) {
+      // NSOutlineView is flipped: the margin is the first 16pt from minY,
+      // the same +16 `heightOfRowByItem` adds.
+      let rect = outlineView.rect(ofRow: row)
+      if point.y < rect.minY + 16 { return nil }
+    }
+    return node
   }
 
   func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo,
@@ -599,6 +692,9 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       case .project(let projectId):
         mutator.moveToList(id: id, area: nil, project: projectId)
       }
+      // A drop is a disposition, like filing from the list: it clears the
+      // agent cue, so a proposal leaves the Inbox once the user has placed it.
+      mutator.acknowledge(id: id)
     }
     switch action {
     case .today:
@@ -621,11 +717,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   // `reorder(orderedIDs:)` API and the SAME move-before-target math
   // (`SidebarView.reorderArea`/`reorderProject`) the SwiftUI sidebar's own
   // drag-and-drop already uses — areas reorder among themselves (a flat id
-  // list), projects reorder among SAME-PARENT siblings only (loose projects
-  // together, or together within one area). Cross-parent drops would be a
-  // REPARENT, not a reorder, and are rejected — filing a project into a
-  // different area happens via "New Project in ⟨Area⟩" or a task drop, not
-  // by dragging the project row itself.
+  // list). A project dropped among another parent's projects (another area,
+  // or the loose zone at the root before the first area), or ON an area row,
+  // is RE-PARENTED with `ProjectsMutator.setArea` — the same move the context
+  // menu's "Move to Area" makes. Every structure gesture records undo.
 
   /// The `roots` index range areas occupy (always the tail of `organize`,
   /// after any loose projects). Empty range at `roots.count` if there are
@@ -670,10 +765,19 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   private func validateStructureReorder(_ info: NSDraggingInfo, proposedItem item: Any?,
                                         proposedChildIndex index: Int) -> NSDragOperation {
-    // Only between-row drops reorder; dropping ON a row is the task-filing
-    // gesture (handled above) or meaningless for a structure item.
-    guard index != NSOutlineViewDropOnItemIndex, let dragged = draggedStructureNode(from: info)
-    else { return [] }
+    guard let dragged = draggedStructureNode(from: info) else { return [] }
+
+    // Dropping a PROJECT ON an area row re-parents it into that area (it
+    // lands at the end of the area's projects). Any other drop-on-row is
+    // meaningless for a structure item.
+    if index == NSOutlineViewDropOnItemIndex {
+      guard case .project(let project, _) = dragged.content,
+            let target = item as? Node, case .area(let area) = target.content,
+            area.id != project.area
+      else { return [] }
+      outlineView.setDropItem(target, dropChildIndex: NSOutlineViewDropOnItemIndex)
+      return .move
+    }
 
     switch dragged.content {
     case .area:
@@ -683,22 +787,19 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       outlineView.setDropItem(nil, dropChildIndex: index)
       return .move
 
-    case .project(let project, _):
-      if project.area == nil {
-        // Loose project → root, within the loose-project prefix only (before
-        // the area block begins).
-        guard item == nil, index >= organizeStartIndex, index <= areaNodeRange.lowerBound
+    case .project:
+      // A project may land among the loose projects at the root (the "no
+      // area" zone, before the first area) or among ANY area's projects. The
+      // same parent is a reorder; a different one is a re-parent.
+      if item == nil {
+        guard index >= organizeStartIndex, index <= areaNodeRange.lowerBound
         else { return [] }
         outlineView.setDropItem(nil, dropChildIndex: index)
         return .move
-      } else {
-        // Project nested under an area → only back into that SAME area.
-        guard let parent = item as? Node, case .area(let area) = parent.content,
-              area.id == project.area
-        else { return [] }
-        outlineView.setDropItem(parent, dropChildIndex: index)
-        return .move
       }
+      guard let parent = item as? Node, case .area = parent.content else { return [] }
+      outlineView.setDropItem(parent, dropChildIndex: index)
+      return .move
 
     case .filter, .next:
       return []
@@ -712,31 +813,96 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
     switch dragged.content {
     case .area(let area):
-      var ids = snapshot.areas.map(\.id)
+      let before = snapshot.areas.map(\.id)
+      var ids = before
       guard let from = ids.firstIndex(of: area.id) else { return false }
       ids.remove(at: from)
       let to = min(max(0, index - areaNodeRange.lowerBound), ids.count)
       ids.insert(area.id, at: to)
-      Task { try? await areasMutator.reorder(orderedIDs: ids) }
+      guard ids != before else { return true }
+      reorderAreas(ids)
+      recordStructure(name: String(localized: "Reorder Areas", comment: "SeptaskKit: undo action"),
+                      undo: { [weak self] in self?.reorderAreas(before) },
+                      redo: { [weak self] in self?.reorderAreas(ids) })
       return true
 
     case .project(let project, _):
-      var siblings = snapshot.projects
-        .filter { $0.area == project.area && $0.status == .active }
-        .map(\.id)
-      guard let from = siblings.firstIndex(of: project.id) else { return false }
-      siblings.remove(at: from)
-      // Root-relative for a loose project (needs the same offset validate
-      // used); already parent-relative for a project nested under an area.
-      let localIndex = project.area == nil ? index - organizeStartIndex : index
-      let to = min(max(0, localIndex), siblings.count)
-      siblings.insert(project.id, at: to)
-      Task { try? await projectsMutator.reorder(orderedIDs: siblings) }
+      // Where it lands: the root's loose-project zone (no area), or an area.
+      let targetArea: String?
+      let localIndex: Int?
+      if index == NSOutlineViewDropOnItemIndex {
+        guard let target = item as? Node, case .area(let area) = target.content else { return false }
+        targetArea = area.id
+        localIndex = nil   // end of the area's projects
+      } else if let parent = item as? Node, case .area(let area) = parent.content {
+        targetArea = area.id
+        localIndex = index
+      } else {
+        targetArea = nil
+        localIndex = index - organizeStartIndex
+      }
+      moveProject(project, toArea: targetArea, at: localIndex, snapshot: snapshot)
       return true
 
     case .filter, .next:
       return false
     }
+  }
+
+  /// Active sibling ids of one parent group (an area, or nil for loose), in
+  /// sidebar order — the list `ProjectsMutator.reorder(orderedIDs:)` takes.
+  private func projectOrder(inArea area: String?, snapshot: StructureSnapshot) -> [String] {
+    snapshot.projects
+      .filter { $0.area == area && $0.status == .active && $0.deletedAt == nil }
+      .map(\.id)
+  }
+
+  /// Reorder within a parent, or re-parent into another area (or out to the
+  /// loose zone) at `localIndex` (nil = end). One undo step either way: undo
+  /// puts the project back in its old parent AND restores both groups' order.
+  private func moveProject(_ project: Project, toArea targetArea: String?, at localIndex: Int?,
+                           snapshot: StructureSnapshot) {
+    let oldArea = project.area
+    let oldOrder = projectOrder(inArea: oldArea, snapshot: snapshot)
+    let targetBefore = projectOrder(inArea: targetArea, snapshot: snapshot)
+    var targetAfter = targetBefore.filter { $0 != project.id }
+    let to = min(max(0, localIndex ?? targetAfter.count), targetAfter.count)
+    targetAfter.insert(project.id, at: to)
+
+    let reparent = oldArea != targetArea
+    guard reparent || targetAfter != targetBefore else { return }
+    let oldAfter = oldOrder.filter { $0 != project.id }
+
+    let apply: @MainActor (_ area: String?, _ orders: [[String]]) -> Void = { [weak self] area, orders in
+      guard let self else { return }
+      let mutator = self.projectsMutator
+      Task {
+        if reparent { try? await mutator.setArea(id: project.id, area: area) }
+        for order in orders { try? await mutator.reorder(orderedIDs: order) }
+      }
+    }
+    let forward: [[String]] = reparent ? [oldAfter, targetAfter] : [targetAfter]
+    let backward: [[String]] = reparent ? [targetBefore, oldOrder] : [oldOrder]
+    apply(targetArea, forward)
+    recordStructure(
+      name: reparent
+        ? String(localized: "Move Project", comment: "SeptaskKit: undo action")
+        : String(localized: "Reorder Projects", comment: "SeptaskKit: undo action"),
+      undo: { apply(oldArea, backward) },
+      redo: { apply(targetArea, forward) })
+  }
+
+  private func reorderAreas(_ ids: [String]) {
+    let mutator = areasMutator
+    Task { try? await mutator.reorder(orderedIDs: ids) }
+  }
+
+  /// Area / project changes go on the ONE shared undo stack (`TaskUndo`), so
+  /// ⌘Z after a sidebar gesture means the same thing it means in the list.
+  private func recordStructure(name: String,
+                               undo: @escaping @MainActor () -> Void,
+                               redo: @escaping @MainActor () -> Void) {
+    TaskUndo.record(name: name, undo: undo, redo: redo)
   }
 
   // MARK: - NSOutlineViewDelegate
@@ -749,6 +915,8 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // pill either clips into the margin band (too big) or leaves a sliver of
     // unselected content band showing (too small).
     row.extraTopMargin = (item as? Node).map { topLevelAreaOrProjectKeys.contains($0.key) ? 16 : 0 } ?? 0
+    row.selectionHighlightStyle = .none
+    row.needsDisplay = true
     return row
   }
 
@@ -891,11 +1059,19 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     /// The label turns into a field for the duration of the edit and turns
     /// back after, so nothing about the row's layout moves.
     private var renameCommit: ((String) -> Void)?
+    /// Fires once when the rename ends, however it ended. `true` = the
+    /// keyboard should go back to the outline view (Return, Tab, Esc); false
+    /// = the user clicked elsewhere, so focus already moved on.
+    private var renameEnded: ((Bool) -> Void)?
+    private var renameActive = false
     private var titleBeforeRename = ""
 
-    func beginRename(onCommit: @escaping (String) -> Void) {
+    func beginRename(onCommit: @escaping (String) -> Void,
+                     onEnd: @escaping (_ returnFocus: Bool) -> Void) {
       guard let text = textField else { return }
       renameCommit = onCommit
+      renameEnded = onEnd
+      renameActive = true
       titleBeforeRename = text.stringValue
       text.isEditable = true
       text.isSelectable = true
@@ -907,31 +1083,48 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       text.currentEditor()?.selectAll(nil)
     }
 
-    private func endRename(commit: Bool) {
-      guard let text = textField else { return }
+    private func endRename(commit: Bool, returnFocus: Bool) {
+      guard renameActive, let text = textField else { return }
+      renameActive = false
+      if !commit {
+        // Drop the field editor's text before the field turns back into a
+        // label, so the typed-and-abandoned name never lands in it.
+        text.abortEditing()
+      }
       let value = text.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
       let handler = renameCommit
+      let ended = renameEnded
       renameCommit = nil
+      renameEnded = nil
       text.isEditable = false
       text.isSelectable = false
       text.drawsBackground = false
       text.focusRingType = .none
       text.delegate = nil
       // An empty name is a cancel, not a rename to "" — same rule Finder uses.
-      guard commit, !value.isEmpty, value != titleBeforeRename else {
+      if commit, !value.isEmpty, value != titleBeforeRename {
+        text.stringValue = value
+        handler?(value)
+      } else {
         text.stringValue = titleBeforeRename
-        return
       }
-      handler?(value)
+      ended?(returnFocus)
     }
 
-    func controlTextDidEndEditing(_ obj: Notification) { endRename(commit: true) }
+    func controlTextDidEndEditing(_ obj: Notification) {
+      // Return / Tab end the edit from the keyboard: the keyboard goes back
+      // to the outline. A click elsewhere already moved focus on purpose.
+      let movement = obj.userInfo?["NSTextMovement"] as? Int
+      let keyboard = movement == NSTextMovement.return.rawValue
+        || movement == NSTextMovement.tab.rawValue
+        || movement == NSTextMovement.backtab.rawValue
+      endRename(commit: true, returnFocus: keyboard)
+    }
 
     func control(_ control: NSControl, textView: NSTextView,
                  doCommandBy commandSelector: Selector) -> Bool {
       guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
-      endRename(commit: false)
-      window?.makeFirstResponder(nil)
+      endRename(commit: false, returnFocus: true)
       return true
     }
 
@@ -1041,9 +1234,10 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     case .project(let project, _):
       menu.addItem(item(String(localized: "Rename Project…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(renameSelected)))
+      menu.addItem(moveToAreaItem(for: project))
+      menu.addItem(.separator())
       menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(deleteSelected)))
-      _ = project
     case .filter(_, _, _), .next, .none:
       menu.addItem(item(String(localized: "New Area…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(newArea)))
@@ -1051,6 +1245,30 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                         #selector(newProjectLoose)))
     }
     menu.popUp(positioning: nil, at: point, in: outlineView)
+  }
+
+  /// "Move to Area ▸" — No Area, then every area; the current parent is
+  /// checked and inert.
+  private func moveToAreaItem(for project: Project) -> NSMenuItem {
+    let parent = NSMenuItem(title: String(localized: "Move to Area",
+                                          comment: "SeptaskKit: sidebar context menu"),
+                            action: nil, keyEquivalent: "")
+    let submenu = NSMenu()
+    let none = item(String(localized: "No Area", comment: "SeptaskKit: sidebar context menu"),
+                    #selector(moveSelectedProject(_:)))
+    none.representedObject = NSNull()
+    none.state = project.area == nil ? .on : .off
+    submenu.addItem(none)
+    let areas = StructureCache.snapshot(in: context).areas
+    if !areas.isEmpty { submenu.addItem(.separator()) }
+    for area in areas {
+      let entry = item(area.title, #selector(moveSelectedProject(_:)))
+      entry.representedObject = area.id
+      entry.state = project.area == area.id ? .on : .off
+      submenu.addItem(entry)
+    }
+    parent.submenu = submenu
+    return parent
   }
 
   private func item(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -1072,9 +1290,33 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
             let area = try? await self.areasMutator.create(
               title: String(localized: "New Area", comment: "SeptaskKit: structure CRUD"))
       else { return }
+      self.recordAreaCreate(area)
       self.rebuild(preserving: "area:\(area.id)")
       self.beginRename(key: "area:\(area.id)")
     }
+  }
+
+  /// Undo for a new area deletes it; redo re-creates it under the SAME id,
+  /// so anything later filed into it (and later undo steps) still resolve.
+  private func recordAreaCreate(_ area: Area) {
+    let mutator = areasMutator
+    recordStructure(
+      name: String(localized: "New Area", comment: "SeptaskKit: undo action"),
+      undo: { Task { try? await mutator.delete(id: area.id) } },
+      redo: { Task { _ = try? await mutator.createWithExplicitID(id: area.id, title: area.title) } })
+  }
+
+  private func recordProjectCreate(_ project: Project) {
+    let mutator = projectsMutator
+    recordStructure(
+      name: String(localized: "New Project", comment: "SeptaskKit: undo action"),
+      undo: { Task { try? await mutator.delete(id: project.id) } },
+      redo: {
+        Task {
+          _ = try? await mutator.createWithExplicitID(id: project.id, title: project.title,
+                                                      area: project.area)
+        }
+      })
   }
 
   @objc private func newProjectLoose() { newProject(inArea: nil) }
@@ -1093,6 +1335,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
               title: String(localized: "New Project", comment: "SeptaskKit: structure CRUD"),
               area: areaId)
       else { return }
+      self.recordProjectCreate(project)
       self.rebuild(preserving: "project:\(project.id)")
       self.beginRename(key: "project:\(project.id)")
     }
@@ -1114,17 +1357,36 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     outlineView.selectRowIndexes([row], byExtendingSelection: false)
     outlineView.scrollRowToVisible(row)
 
+    // After Return / Esc the keyboard comes back to the outline; any rebuild
+    // the live field held off runs now that it is gone.
+    let onEnd: (Bool) -> Void = { [weak self] returnFocus in
+      guard let self else { return }
+      if returnFocus { self.view.window?.makeFirstResponder(self.outlineView) }
+      DispatchQueue.main.async { [weak self] in
+        guard let self, self.rebuildDeferredForRename, !self.isRenaming else { return }
+        self.rebuild(preserving: self.selectedKey())
+      }
+    }
+
     switch node.content {
     case .area(let area):
-      cell.beginRename { [weak self] title in
-        guard let self else { return }
-        Task { try? await self.areasMutator.rename(id: area.id, to: title) }
-      }
+      let mutator = areasMutator
+      cell.beginRename(onCommit: { [weak self] title in
+        Task { try? await mutator.rename(id: area.id, to: title) }
+        self?.recordStructure(
+          name: String(localized: "Rename Area", comment: "SeptaskKit: undo action"),
+          undo: { Task { try? await mutator.rename(id: area.id, to: area.title) } },
+          redo: { Task { try? await mutator.rename(id: area.id, to: title) } })
+      }, onEnd: onEnd)
     case .project(let project, _):
-      cell.beginRename { [weak self] title in
-        guard let self else { return }
-        Task { try? await self.projectsMutator.rename(id: project.id, to: title) }
-      }
+      let mutator = projectsMutator
+      cell.beginRename(onCommit: { [weak self] title in
+        Task { try? await mutator.rename(id: project.id, to: title) }
+        self?.recordStructure(
+          name: String(localized: "Rename Project", comment: "SeptaskKit: undo action"),
+          undo: { Task { try? await mutator.rename(id: project.id, to: project.title) } },
+          redo: { Task { try? await mutator.rename(id: project.id, to: title) } })
+      }, onEnd: onEnd)
     default:
       break
     }
@@ -1132,31 +1394,99 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
 
   @objc private func deleteSelected() {
     // Copy matches the SwiftUI sidebar's confirmation exactly (SidebarView) —
-    // one deletion story between the two shells.
+    // one deletion story between the two shells. A window SHEET, not an
+    // app-modal alert, with Cancel as the Return default.
     switch selectedNode?.content {
     case .area(let area):
-      guard KitPrompt.confirmDestructive(
+      KitPrompt.confirmDestructive(
         title: String(localized: "Delete \(area.title)?",
                       comment: "SeptaskKit: delete area confirm"),
         message: String(localized: "Projects in this area will be detached but not deleted.",
-                        comment: "Delete area confirmation body")
-      )
-      else { return }
-      Task { try? await areasMutator.delete(id: area.id) }
-      bounceToTodayIfShowing(key: "area:\(area.id)")
+                        comment: "Delete area confirmation body"),
+        in: view.window
+      ) { [weak self] in
+        self?.deleteArea(area)
+      }
     case .project(let project, _):
-      guard KitPrompt.confirmDestructive(
+      KitPrompt.confirmDestructive(
         title: String(localized: "Delete \(project.title)?",
                       comment: "SeptaskKit: delete project confirm"),
         message: String(localized: "Tasks in this project will be moved to the inbox.",
-                        comment: "Delete project confirmation body")
-      )
-      else { return }
-      Task { try? await projectsMutator.delete(id: project.id) }
-      bounceToTodayIfShowing(key: "project:\(project.id)")
+                        comment: "Delete project confirmation body"),
+        in: view.window
+      ) { [weak self] in
+        self?.deleteProject(project)
+      }
     default:
       break
     }
+  }
+
+  /// Delete is a hard delete in the store, so undo REBUILDS the area under
+  /// its old id with its old fields and position. Projects and tasks keep
+  /// pointing at that id, so they rejoin it as soon as it exists again.
+  private func deleteArea(_ area: Area) {
+    let mutator = areasMutator
+    let order = StructureCache.snapshot(in: context).areas.map(\.id)
+    bounceToTodayIfShowing(key: "area:\(area.id)")
+    Task { try? await mutator.delete(id: area.id) }
+    recordStructure(
+      name: String(localized: "Delete Area", comment: "SeptaskKit: undo action"),
+      undo: {
+        Task {
+          _ = try? await mutator.createWithExplicitID(id: area.id, title: area.title,
+                                                      context: area.context)
+          if area.emoji != nil { try? await mutator.setEmoji(id: area.id, emoji: area.emoji) }
+          if area.attachment != nil {
+            try? await mutator.setAttachment(id: area.id, attachment: area.attachment)
+          }
+          try? await mutator.reorder(orderedIDs: order)
+        }
+      },
+      redo: { Task { try? await mutator.delete(id: area.id) } })
+  }
+
+  /// The project delete also detaches its tasks (the mutator's cascade), so
+  /// undo rebuilds the project under its old id, then re-files exactly the
+  /// tasks that were in it — headings and positions included.
+  private func deleteProject(_ project: Project) {
+    let mutator = projectsMutator
+    let taskMutator = SeptenaServices.shared.taskMutator
+    let snapshot = StructureCache.snapshot(in: context)
+    let order = projectOrder(inArea: project.area, snapshot: snapshot)
+    let filed = LocalCache.allTasks(in: context)
+      .filter { $0.project == project.id }
+      .map(TaskUndo.FilingSnapshot.init)
+    bounceToTodayIfShowing(key: "project:\(project.id)")
+    Task { try? await mutator.delete(id: project.id) }
+    recordStructure(
+      name: String(localized: "Delete Project", comment: "SeptaskKit: undo action"),
+      undo: {
+        Task {
+          _ = try? await mutator.createWithExplicitID(id: project.id, title: project.title,
+                                                      area: project.area)
+          if let notes = project.notes { try? await mutator.setNotes(id: project.id, notes: notes) }
+          if project.status != .active {
+            try? await mutator.setStatus(id: project.id, status: project.status)
+          }
+          if project.attachment != nil {
+            try? await mutator.setAttachment(id: project.id, attachment: project.attachment)
+          }
+          try? await mutator.reorder(orderedIDs: order)
+          TaskUndo.restore(filed, using: taskMutator)
+        }
+      },
+      redo: { Task { try? await mutator.delete(id: project.id) } })
+  }
+
+  /// Context menu ▸ Move to Area — the keyboard-and-pointer twin of dragging
+  /// a project onto an area row. `representedObject` is the area id, or
+  /// `NSNull` for "No Area".
+  @objc private func moveSelectedProject(_ sender: NSMenuItem) {
+    guard case .project(let project, _) = selectedNode?.content else { return }
+    let target = sender.representedObject as? String
+    guard target != project.area else { return }
+    moveProject(project, toArea: target, at: nil, snapshot: StructureCache.snapshot(in: context))
   }
 
   /// If the item being deleted is the one currently on screen, don't leave
@@ -1211,9 +1541,22 @@ private final class KitSidebarOutlineView: NSOutlineView {
   /// Tab / Shift-Tab — two-pane keyboard nav, list ⇄ sidebar (mirrors
   /// `SeptaskKitTableView.onFocusSidebar`).
   var onTab: (() -> Void)?
+  /// A left click landed on a row (after AppKit's own tracking — selection
+  /// and any drag — has finished).
+  var onRowClick: (() -> Void)?
+  /// Return / Enter with no modifiers.
+  var onReturn: (() -> Void)?
 
   override func rightMouseDown(with event: NSEvent) {
     onRightClick?(event)
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    super.mouseDown(with: event)
+    let point = convert(event.locationInWindow, from: nil)
+    if row(at: point) >= 0, event.modifierFlags.isDisjoint(with: [.command, .shift]) {
+      onRowClick?()
+    }
   }
 
   /// Selection emphasis is computed per draw (`septaskSelectionIsActive`), so
@@ -1235,6 +1578,12 @@ private final class KitSidebarOutlineView: NSOutlineView {
   override func keyDown(with event: NSEvent) {
     if event.keyCode == 48 {  // Tab / Shift-Tab — only two stops in the loop.
       onTab?()
+      return
+    }
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if event.keyCode == 36 || event.keyCode == 76,
+       flags.isDisjoint(with: [.command, .shift, .option, .control]) {
+      onReturn?()
       return
     }
     super.keyDown(with: event)

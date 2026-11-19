@@ -35,8 +35,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     current = controller
     controller.window?.makeKeyAndOrderFront(nil)
     // After the window is on screen, so `makeFirstResponder` sticks: keyboard
-    // focus starts on the TASK LIST, not the sidebar.
-    controller.list?.focusList()
+    // focus starts on the DETAIL pane (the task list, or Next when that is the
+    // restored destination), not the sidebar.
+    controller.focusDetail()
   }
 
   /// The pieces the menu bar drives. Held so `SeptaskKitCommands` can route a
@@ -48,6 +49,15 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   private var sidebar: SeptaskKitSidebarController?
   private var splitController: NSSplitViewController?
   private var inspectorItem: NSSplitViewItem?
+  /// Key of the destination on screen, so a sidebar re-emit of the SAME
+  /// destination (every structure rebuild re-selects its row) never commits
+  /// an open edit or moves focus.
+  private var currentDestinationKey: String?
+  /// Next has no task selection: row commands are off while it shows.
+  private var showingNext = false
+  /// Split-view resize observer (sidebar-hidden mirror). Process-lived like
+  /// the window, but removed on close all the same.
+  private var layoutObserver: NSObjectProtocol?
 
   private init() {
     let list = SeptaskKitTaskListController()
@@ -56,9 +66,9 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SeptaskKitSidebarController()
     let inspector = SeptaskKitInspectorController()
     // Tab / Shift-Tab crosses between the two panes — the only two stops in
-    // this window's keyboard-nav loop. (`sidebar.onSelect` itself is wired
-    // below, after `super.init`, since `show(_:)` captures `self`.)
-    sidebar.onFocusList = { [weak list] in list?.focusList() }
+    // this window's keyboard-nav loop. (`sidebar.onSelect` and
+    // `sidebar.onFocusList` are wired below, after `super.init`, since they
+    // capture `self`.)
     list.onFocusSidebar = { [weak sidebar] in sidebar?.focusSidebar() }
     detail.display(list)
 
@@ -83,21 +93,25 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     let inspectorItem = NSSplitViewItem(inspectorWithViewController: inspector)
     inspectorItem.minimumThickness = 260
     inspectorItem.maximumThickness = 380
-    inspectorItem.isCollapsed = true
-    // The pane always builds collapsed, so the menu's mirror starts false.
-    UserDefaults.standard.set(false, forKey: SettingsKey.septaskInspectorVisible)
+    // Restored: the pane opens the way it was left. The same key is the
+    // menu's Show/Hide Info mirror, so the two agree from the first frame.
+    inspectorItem.isCollapsed = !UserDefaults.standard.bool(
+      forKey: SettingsKey.septaskInspectorVisible)
     split.addSplitViewItem(inspectorItem)
     split.splitView.autosaveName = "SeptaskKitSplit"
-
-    // Quick Find steers the sidebar, which drives the detail — so a jump
-    // always leaves the two in agreement — then selects the row it found.
-    let quickFind = SeptaskKitQuickFind { [weak sidebar, weak list] destination in
-      sidebar?.select(destination.filter)
-      if let taskId = destination.taskId {
-        list?.select(taskId: taskId)
+    // Keep the View menu's Show/Hide Sidebar title truthful however the pane
+    // collapsed (menu, ⌃⌘S, or dragging the divider shut).
+    layoutObserver = NotificationCenter.default.addObserver(
+      forName: NSSplitView.didResizeSubviewsNotification, object: split.splitView, queue: .main
+    ) { [weak sidebarItem] _ in
+      MainActor.assumeIsolated {
+        guard let sidebarItem else { return }
+        let hidden = sidebarItem.isCollapsed
+        if UserDefaults.standard.bool(forKey: SeptaskKitStateKey.sidebarHidden) != hidden {
+          UserDefaults.standard.set(hidden, forKey: SeptaskKitStateKey.sidebarHidden)
+        }
       }
     }
-    list.onQuickFind = { [weak quickFind] in quickFind?.show() }
     // Same path Quick Find uses: steer the sidebar, which drives the list —
     // so a group-header click always leaves the two in agreement.
     list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
@@ -106,7 +120,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     // `TaskNavMenu` speaks.
     next.onNavigate = { [weak sidebar] route in sidebar?.select(route) }
 
-    let window = NSWindow(contentViewController: split)
+    let window = KitShellWindow(contentViewController: split)
     window.title = String(localized: "Septask (AppKit)",
                           comment: "SeptaskKit: window title")
     // Full-size content view, so the list scrolls UNDER the title bar and the
@@ -162,35 +176,82 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     self.splitController = split
     self.inspector = inspector
     self.inspectorItem = inspectorItem
-    self.quickFind = quickFind
     self.toggleInspector = { [weak list] in list?.onToggleInspector?() }
 
     // Wired after super.init — capturing `self` in the closures below would
     // be "used before super.init".
+
+    // Quick Find steers the sidebar, which drives the detail — so a jump
+    // always leaves the two in agreement — then selects the row it found.
+    let quickFind = SeptaskKitQuickFind { [weak self] destination in
+      guard let self else { return }
+      self.sidebar?.select(destination.filter)
+      if let taskId = destination.taskId {
+        self.list?.select(taskId: taskId)
+      } else {
+        self.focusDetail()
+      }
+    }
+    self.quickFind = quickFind
+    list.onQuickFind = { [weak quickFind] in quickFind?.show() }
+
     sidebar.onSelect = { [weak self] destination in
       self?.show(destination)
     }
+    // Return / Tab / a mouse click in the sidebar hand the keyboard to
+    // whatever the detail pane shows — the list, or the Next page.
+    sidebar.onFocusList = { [weak self] in self?.focusDetail() }
     list.onToggleInspector = { [weak self] in
-      self?.setInspector(visible: inspectorItem.isCollapsed)
+      self?.setInspector(visible: inspectorItem.isCollapsed, focusTitle: true)
     }
     // Escape inside the pane closes it — the inspector owns no chrome of its
     // own, so the shell that added the split item does the closing.
     inspector.onRequestClose = { [weak self] in
       self?.setInspector(visible: false)
     }
-    // ⌘↩ in the pane's title/notes commits and returns the keyboard to the
-    // list — the pane stays open, following the selection as before.
+    // ⌘↩ / Esc / Return in the pane's title or notes commits and returns the
+    // keyboard to the list — the pane stays open, following the selection.
     inspector.onRequestFocusList = { [weak list] in list?.focusList() }
+    // ⌘↩ is caught at the WINDOW, ahead of every view's key equivalents, so
+    // the task table can never swallow it while the inspector holds focus.
+    window.onCommandReturn = { [weak inspector] in
+      inspector?.handleCommandReturn() ?? false
+    }
 
     // The SwiftUI root normally starts the runtime; harmless if already up
     // (start() memoizes), load-bearing if this window somehow opens first.
     Task { await SeptenaServices.shared.start() }
-    sidebar.selectDefault()
+    // Restore the list that was showing last time; Today when it is gone.
+    if let key = UserDefaults.standard.string(forKey: SeptaskKitStateKey.lastDestination),
+       sidebar.select(key: key) {
+      // Selected — `onSelect` already showed it.
+    } else {
+      sidebar.selectDefault()
+    }
   }
 
   /// Sidebar → detail. Task filters keep the NSTableView list; Next swaps in
   /// the hosted SwiftUI feed. Inspector collapses off Next (nothing to show).
   private func show(_ destination: KitSidebarDestination) {
+    let changed = destination.key != currentDestinationKey
+    // Was the keyboard in the detail pane (or nowhere)? Then it follows the
+    // destination. Arrowing through the sidebar keeps it in the sidebar, and a
+    // structure rebuild (same destination) never moves it.
+    let detailHadFocus: Bool = {
+      guard let responder = window?.firstResponder else { return true }
+      if responder === window { return true }
+      guard let view = responder as? NSView, let detailView = detail?.view else { return false }
+      return view.isDescendant(of: detailView)
+    }()
+    if changed {
+      // Leaving a list saves whatever row is open in it (composer or
+      // rename), and whatever the inspector holds — navigation never drops
+      // typed text.
+      list?.commitOpenEdits()
+      inspector?.flushPendingEdits()
+      currentDestinationKey = destination.key
+      UserDefaults.standard.set(destination.key, forKey: SeptaskKitStateKey.lastDestination)
+    }
     switch destination {
     case .filter(let filter, let title):
       guard let list, let detail else { return }
@@ -204,9 +265,10 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       // Ahead of the first scroll event, so a fresh page starts in the right
       // state (and coming back from Next, where the title is always shown).
       list.syncWindowTitle()
-      list.focusList()
+      showingNext = false
     case .next:
       guard let next, let detail else { return }
+      showingNext = true
       setInspector(visible: false)
       window?.title = Route.next.title
       detail.display(next)
@@ -216,13 +278,33 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       // — but the shell applies the identical rule, ahead of the first report.
       next.syncWindowTitle()
     }
+    if changed, detailHadFocus { focusDetail() }
+  }
+
+  /// Give the keyboard to the detail pane — the task list, or the Next page.
+  func focusDetail() {
+    if showingNext {
+      next?.focusPage()
+    } else {
+      list?.focusList()
+    }
+  }
+
+  /// Save every open editor in the window: the list's open row (composer or
+  /// rename) and the inspector's fields. Called on window close and on quit,
+  /// where no blur happens to commit them.
+  func commitAllEdits() {
+    inspector?.flushPendingEdits()
+    list?.commitOpenEdits()
   }
 
   /// One place that opens and closes the inspector, so every path — ⌥⌘I, the
   /// menu item, Escape inside the pane, switching to Next — commits pending
   /// edits, hands focus back to the list, and leaves the menu title truthful.
-  private func setInspector(visible: Bool) {
+  private func setInspector(visible: Bool, focusTitle: Bool = false) {
     guard let inspectorItem else { return }
+    // Next has no task to inspect; the pane stays shut there.
+    if visible, showingNext { return }
     if !visible {
       inspector?.flushPendingEdits()
     }
@@ -234,6 +316,12 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
        let responder = window?.firstResponder as? NSView,
        responder.isDescendant(of: inspectorItem.viewController.view) {
       list?.focusList()
+    }
+    // Opening from the keyboard (⌥⌘I / Show Info) is a request to edit:
+    // the title takes the keyboard. Next run-loop turn, once the pane is
+    // un-collapsed and its fields can become first responder.
+    if visible, focusTitle {
+      DispatchQueue.main.async { [weak self] in self?.inspector?.focusTitle() }
     }
   }
 
@@ -260,13 +348,49 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   func newArea() { sidebar?.newArea() }
   func showQuickFind() { quickFind?.show() }
   func showInspector() { toggleInspector?() }
-  func toggleSidebar() { splitController?.toggleSidebar(nil) }
+  func toggleSidebar() {
+    splitController?.toggleSidebar(nil)
+  }
   func toggleSidebarCounts() { sidebar?.toggleShowsCounts() }
 
-  var canActOnSelection: Bool { list?.hasActionableSelection ?? false }
+  /// Whether a Task-menu row command has a target. The menu acts on the pane
+  /// that holds the keyboard: on the sidebar only Rename and Delete exist
+  /// (for an area or project), on the Next page nothing does, and otherwise
+  /// the list's selection decides.
+  /// The caret is in a text view or field editor anywhere in the window. The
+  /// list's own key handling already passes text keys through; this keeps the
+  /// Task menu's copies of the same shortcuts from firing behind the caret.
+  private var editingText: NSTextView? { window?.firstResponder as? NSTextView }
+
+  func canRun(_ command: RowCommand) -> Bool {
+    if showingNext { return false }
+    if editingText != nil { return false }
+    if let sidebar, sidebar.hasKeyboardFocus {
+      switch command {
+      case .rename, .delete: return sidebar.selectionIsStructure
+      default: return false
+      }
+    }
+    return list?.hasActionableSelection ?? false
+  }
 
   func rowCommand(_ command: RowCommand) {
-    guard let list else { return }
+    // A menu key equivalent wins over the text view's own key bindings, so a
+    // stale enabled Delete item would swallow ⌘⌫ while typing. Give the text
+    // its standard meaning (delete to the start of the line) instead.
+    if let text = editingText {
+      if command == .delete { text.deleteToBeginningOfLine(nil) }
+      return
+    }
+    guard canRun(command), let list else { return }
+    if let sidebar, sidebar.hasKeyboardFocus {
+      switch command {
+      case .rename: sidebar.renameSelectedItem()
+      case .delete: sidebar.deleteSelectedItem()
+      default: break
+      }
+      return
+    }
     switch command {
     case .toggleComplete: list.toggleCompleteSelection()
     case .cancel: list.cancelSelection()
@@ -292,8 +416,56 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   required init?(coder: NSCoder) { fatalError("SeptaskKitWindowController is code-only") }
 
   func windowWillClose(_ notification: Notification) {
+    // ⌘W blurs nothing, so nothing commits on its own: save first.
+    commitAllEdits()
+    if let layoutObserver { NotificationCenter.default.removeObserver(layoutObserver) }
+    layoutObserver = nil
     Self.current = nil
   }
+
+  /// The window's undo manager is the ONE shared task stack, whatever pane
+  /// holds focus — ⌘Z must not depend on whether the sidebar, the list or
+  /// the inspector was clicked last. Text editors that want local typing
+  /// undo supply their own manager ahead of this one (the composer's and the
+  /// inspector's `textUndo`).
+  func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+    TaskUndo.manager
+  }
+}
+
+/// The shell's window. Exists for one hook: ⌘↩ is routed to the inspector
+/// BEFORE the view hierarchy's key equivalents run. `NSWindow` walks its views
+/// in order, and the task table (earlier in the split than the inspector)
+/// answers ⌘↩ for its own composer — so a key equivalent on the inspector's
+/// own view could be shadowed. The window asks first; when the inspector does
+/// not hold the keyboard it declines and the normal path runs.
+@MainActor
+final class KitShellWindow: NSWindow {
+  var onCommandReturn: (() -> Bool)?
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    let isReturn = event.keyCode == 36 || event.keyCode == 76
+    if isReturn, flags.contains(.command),
+       flags.isDisjoint(with: [.shift, .option, .control]),
+       onCommandReturn?() == true {
+      return true
+    }
+    return super.performKeyEquivalent(with: event)
+  }
+}
+
+
+
+/// Stable UserDefaults keys for the AppKit shell's own window state. Local to
+/// the shell (the SwiftUI shell restores through its scene storage). Top-level
+/// and non-isolated so the SwiftUI menu's `@AppStorage` can name them.
+enum SeptaskKitStateKey {
+  /// `KitSidebarDestination.key` of the last list shown — restored at launch.
+  static let lastDestination = "septaskKitLastDestination"
+  /// Mirror of the sidebar split item's collapsed state, so View ▸
+  /// Show/Hide Sidebar can name the action it will take.
+  static let sidebarHidden = "septaskKitSidebarHidden"
 }
 
 /// Swaps the middle split pane between the task list and the Next host without
@@ -370,7 +542,9 @@ enum SeptaskKitCommands {
   /// A shell exists, frontmost or not. Used by commands that stay available
   /// from an auxiliary window (Settings, opened over the shell).
   static var shellExists: Bool { SeptaskKitWindowController.existing != nil }
-  static var canActOnSelection: Bool { shell?.canActOnSelection ?? false }
+  static func canRun(_ command: SeptaskKitWindowController.RowCommand) -> Bool {
+    shell?.canRun(command) ?? false
+  }
 
   /// Fronts the shell before navigating: the command can now arrive while a
   /// panel or the Settings window holds key, and changing the list behind a
@@ -379,6 +553,12 @@ enum SeptaskKitCommands {
     guard let controller = SeptaskKitWindowController.existing else { return }
     controller.focusWindow()
     controller.go(to: filter)
+  }
+  /// Go ▸ Next — same fronting rule as `go(_:)`.
+  static func goNext() {
+    guard let controller = SeptaskKitWindowController.existing else { return }
+    controller.focusWindow()
+    controller.goNext()
   }
   static func newTask() { shell?.newTask() }
   static func newProject() { shell?.newProject() }

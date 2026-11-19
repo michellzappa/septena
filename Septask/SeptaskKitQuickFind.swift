@@ -25,12 +25,16 @@ final class SeptaskKitQuickFind {
     case task(SeptenaTask, subtitle: String)
     case project(Project)
     case area(Area)
+    /// A smart list — offered when the query is empty, so the panel doubles
+    /// as a jump-to-list.
+    case list(TaskFilter, title: String, symbol: String)
 
     var title: String {
       switch self {
       case .task(let task, _): return task.title
       case .project(let project): return project.title
       case .area(let area): return area.title
+      case .list(_, let title, _): return title
       }
     }
 
@@ -39,6 +43,7 @@ final class SeptaskKitQuickFind {
       case .task(_, let subtitle): return subtitle
       case .project: return String(localized: "Project", comment: "SeptaskKit: quick find kind")
       case .area: return String(localized: "Area", comment: "SeptaskKit: quick find kind")
+      case .list: return String(localized: "List", comment: "SeptaskKit: quick find kind")
       }
     }
 
@@ -47,6 +52,7 @@ final class SeptaskKitQuickFind {
       case .task: return "circle"
       case .project: return "number"
       case .area: return "folder"
+      case .list(_, _, let symbol): return symbol
       }
     }
   }
@@ -86,13 +92,33 @@ final class SeptaskKitQuickFind {
 
   // MARK: - Search
 
-  private func reloadHits() {
-    let query = surface.query.lowercased()
-    let snapshot = StructureCache.snapshot(in: context)
+  /// Case- and accent-blind containment, so "cafe" finds "Café".
+  private static func matches(_ text: String, _ query: String) -> Bool {
+    text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+  }
 
-    // Empty query lists the structure — the panel doubles as a jump-to-list.
+  /// The smart lists an empty query offers. Inbox has no list of its own —
+  /// it is the triage band on top of Today — so it lands on Today.
+  private static var emptyQueryLists: [Hit] {
+    [
+      .list(.today, title: Route.filter(.today).title, symbol: Route.filter(.today).icon),
+      .list(.today, title: TaskFilter.triage.title, symbol: Route.filter(.triage).icon),
+      .list(.upcoming, title: Route.filter(.upcoming).title,
+            symbol: Route.filter(.upcoming).icon),
+      .list(.logbook, title: Route.filter(.logbook).title,
+            symbol: Route.filter(.logbook).icon),
+    ]
+  }
+
+  private func reloadHits() {
+    let query = surface.query.trimmingCharacters(in: .whitespaces)
+    let snapshot = StructureCache.snapshot(in: context)
+    let liveProjects = snapshot.projects.filter { $0.deletedAt == nil }
+
+    // Empty query lists the lists, then the structure — the panel doubles as
+    // a jump-to-list.
     guard !query.isEmpty else {
-      hits = snapshot.areas.map(Hit.area) + snapshot.projects.map(Hit.project)
+      hits = Self.emptyQueryLists + snapshot.areas.map(Hit.area) + liveProjects.map(Hit.project)
       surface.reload()
       surface.select(0)
       return
@@ -103,22 +129,38 @@ final class SeptaskKitQuickFind {
     let areaTitles = Dictionary(snapshot.areas.map { ($0.id, $0.title) },
                                 uniquingKeysWith: { a, _ in a })
 
-    var found: [Hit] = []
-    found += snapshot.areas.filter { $0.title.lowercased().contains(query) }.map(Hit.area)
-    found += snapshot.projects.filter { $0.title.lowercased().contains(query) }.map(Hit.project)
-    for task in LocalCache.allTasks(in: context)
-    where !task.isHeading && task.title.lowercased().contains(query) {
+    func taskHit(_ task: SeptenaTask) -> Hit {
       let home = task.project.flatMap { projectTitles[$0] }
         ?? task.area.flatMap { areaTitles[$0] }
-        ?? (task.today
+        ?? (task.isOnToday || task.isInTriageBand
             ? String(localized: "Today", comment: "Smart list title")
             : String(localized: "Anytime", comment: "Smart list title"))
       let state = task.status == .open
         ? home
         : String(localized: "\(home) · Completed",
                  comment: "SeptaskKit: quick find completed task subtitle")
-      found.append(.task(task, subtitle: state))
+      return .task(task, subtitle: state)
     }
+
+    var found: [Hit] = []
+    found += snapshot.areas.filter { Self.matches($0.title, query) }.map(Hit.area)
+    found += liveProjects.filter { Self.matches($0.title, query) }.map(Hit.project)
+    // Title matches first, then tasks that match only in their notes. Open
+    // tasks rank ahead of completed ones inside each band.
+    var titleHits: [SeptenaTask] = []
+    var notesHits: [SeptenaTask] = []
+    for task in LocalCache.allTasks(in: context) where !task.isHeading {
+      if Self.matches(task.title, query) {
+        titleHits.append(task)
+      } else if let notes = task.notes, Self.matches(notes, query) {
+        notesHits.append(task)
+      }
+    }
+    let openFirst: (SeptenaTask, SeptenaTask) -> Bool = { a, b in
+      (a.status == .open ? 0 : 1) < (b.status == .open ? 0 : 1)
+    }
+    found += titleHits.sorted(by: openFirst).map(taskHit)
+    found += notesHits.sorted(by: openFirst).map(taskHit)
 
     hits = Array(found.prefix(60))
     surface.reload()
@@ -135,26 +177,25 @@ final class SeptaskKitQuickFind {
       onChoose(Destination(filter: .project(project.id), taskId: nil))
     case .area(let area):
       onChoose(Destination(filter: .area(area.id), taskId: nil))
+    case .list(let filter, _, _):
+      onChoose(Destination(filter: filter, taskId: nil))
     case .task(let task, _):
-      // Show the list that actually contains the task, so the row it selects
-      // is visible rather than filtered out.
-      let filter: TaskFilter = if let project = task.project {
-        .project(project)
-      } else if let area = task.area {
-        .area(area)
-      } else if task.status != .open {
-        .logbook
-      } else if task.today {
-        .today
-      } else if task.isInTriageBand {
-        .today          // the triage band renders on top of Today
-      } else if task.scheduled != nil || task.deadline != nil {
-        .upcoming
-      } else {
-        .unscheduled
-      }
-      onChoose(Destination(filter: filter, taskId: task.id))
+      onChoose(Destination(filter: Self.listShowing(task), taskId: task.id))
     }
+  }
+
+  /// The list the task is actually VISIBLE in, so the row the jump selects
+  /// exists. Completed and cancelled rows live in the Logbook (a project or
+  /// area page folds them away); open rows show on their project / area
+  /// page, else Today (the triage band rides on top of it), else Upcoming,
+  /// else Anytime.
+  private static func listShowing(_ task: SeptenaTask) -> TaskFilter {
+    if task.status != .open { return .logbook }
+    if let project = task.project { return .project(project) }
+    if let area = task.area { return .area(area) }
+    if task.isOnToday || task.isInTriageBand { return .today }
+    if task.scheduled != nil || task.deadline != nil { return .upcoming }
+    return .unscheduled
   }
 
   private func cell(for row: Int) -> NSView? {

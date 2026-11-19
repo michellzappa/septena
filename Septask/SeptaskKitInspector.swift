@@ -45,20 +45,23 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   private var task: SeptenaTask?
   /// What was loaded into the fields, so a commit can tell "the user changed
-  /// this" from "this is what the store already says".
+  /// this" from "this is what the store already says". `loadedNotes` is held
+  /// in its SAVED form (`Self.savedNotes`), so a field that differs only by a
+  /// trailing newline never reads as an edit.
   private var loadedTitle = ""
   private var loadedNotes = ""
+  /// Typing undo stays LOCAL to the pane while a field is being edited, like
+  /// the composer's: ⌘Z mid-word undoes the word, not the last task command.
+  /// Cleared after every commit, so a later ⌘Z never replays keystrokes into
+  /// a field showing a different task. Outside a field the window's manager
+  /// (the shared `TaskUndo` stack) answers.
+  private let textUndo = UndoManager()
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
   private var context: ModelContext { LocalStore.shared.container.mainContext }
 
   override func loadView() {
-    let root = KitInspectorRootView()
-    root.onCommandReturn = { [weak self] in
-      guard let self else { return }
-      flushPendingEdits()
-      onRequestFocusList?()
-    }
+    let root = NSView()
 
     titleField.font = .systemFont(ofSize: SeptenaTypeScale.size(.headline), weight: .semibold)
     titleField.isBordered = false
@@ -69,6 +72,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     titleField.translatesAutoresizingMaskIntoConstraints = false
 
     let notesScroll = NSScrollView()
+    notesScroll.borderType = .noBorder
     notesScroll.hasVerticalScroller = true
     notesScroll.drawsBackground = false
     notesScroll.translatesAutoresizingMaskIntoConstraints = false
@@ -147,15 +151,47 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // (Distinct from task rows, which carry no tooltips by design.)
     closeButton.toolTip = closeLabel
 
-    root.addSubview(form)
+    // The form scrolls: a long conversation (or a short window) used to push
+    // the lower controls off the bottom with no way to reach them. The
+    // document view is flipped so the form hangs from the top, and it is at
+    // least as tall as the visible area so short content does not float.
+    let formScroll = NSScrollView()
+    formScroll.translatesAutoresizingMaskIntoConstraints = false
+    formScroll.hasVerticalScroller = true
+    formScroll.autohidesScrollers = true
+    formScroll.drawsBackground = false
+    formScroll.borderType = .noBorder
+    let document = KitFlippedView()
+    document.translatesAutoresizingMaskIntoConstraints = false
+    document.addSubview(form)
+    formScroll.documentView = document
+    self.formScroll = formScroll
+
+    root.addSubview(formScroll)
     root.addSubview(placeholder)
     // Last, so it layers above the form's title field.
     root.addSubview(closeButton)
+    let clip = formScroll.contentView
     NSLayoutConstraint.activate([
-      form.topAnchor.constraint(equalTo: root.topAnchor),
-      form.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-      form.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-      form.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+      formScroll.topAnchor.constraint(equalTo: root.topAnchor),
+      formScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+      formScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+      formScroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+      document.topAnchor.constraint(equalTo: clip.topAnchor),
+      document.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+      document.widthAnchor.constraint(equalTo: clip.widthAnchor),
+      document.heightAnchor.constraint(greaterThanOrEqualTo: clip.heightAnchor),
+      form.topAnchor.constraint(equalTo: document.topAnchor),
+      form.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+      form.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+      form.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor),
+      // Low priority: the document is exactly as tall as the form unless the
+      // visible area is taller (the `>=` above wins then).
+      {
+        let hug = document.bottomAnchor.constraint(equalTo: form.bottomAnchor)
+        hug.priority = .defaultLow
+        return hug
+      }(),
       // -52, not the -28 the notes field uses: the title shares its band with
       // the close button and must not run under it.
       titleField.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -52),
@@ -170,28 +206,78 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       placeholder.centerYAnchor.constraint(equalTo: root.centerYAnchor),
     ])
     view = root
+
+    // Explicit keyboard order through the pane: title → notes → the date
+    // controls → back to the title. (The buttons join the loop only with
+    // Full Keyboard Access on — AppKit skips them otherwise.)
+    titleField.nextKeyView = notesView
+    notesView.nextKeyView = whenButton
+    whenButton.nextKeyView = deadlineButton
+    deadlineButton.nextKeyView = repeatButton
+    repeatButton.nextKeyView = titleField
     show(nil)
   }
+
+  private var formScroll: NSScrollView?
+
+  /// ⌥⌘I / Show Info opened the pane from the keyboard: the title takes it,
+  /// caret at the end. No-op with nothing selected.
+  func focusTitle() {
+    guard task != nil, !form.isHidden, let window = view.window else { return }
+    window.makeFirstResponder(titleField)
+    if let editor = titleField.currentEditor() {
+      editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+    }
+  }
+
+  /// ⌘↩ while the keyboard is in the pane: save and hand the keyboard back
+  /// to the list. The shell's window calls this AHEAD of the view hierarchy's
+  /// key equivalents (`KitShellWindow`). Returns false — and does nothing —
+  /// when the keyboard is elsewhere, so the list's own ⌘↩ still works.
+  func handleCommandReturn() -> Bool {
+    guard let responder = view.window?.firstResponder as? NSView,
+          responder.isDescendant(of: view) else { return false }
+    // Deferred a tick: the commit's synchronous mutator notification can call
+    // `makeFirstResponder` back into the list while this key event is still
+    // on the stack — same hazard `KitComposerCell.deferCommitAndCollapse`
+    // documents.
+    DispatchQueue.main.async { [weak self] in self?.commitAndReturnToList() }
+    return true
+  }
+
+  /// Save both fields and give the keyboard back to the list (the pane stays
+  /// open). The exit for Esc / Return in the title, Esc in notes, and ⌘↩.
+  private func commitAndReturnToList() {
+    flushPendingEdits()
+    onRequestFocusList?()
+  }
+
+  /// The pane's undo manager: the local typing stack while a text field here
+  /// is being edited, the shared task stack otherwise. Reached through the
+  /// responder chain from the title's field editor and the notes view (which
+  /// also asks its delegate, `undoManager(for:)`, below).
+  override var undoManager: UndoManager? {
+    isEditing ? textUndo : TaskUndo.manager
+  }
+
+  func undoManager(for view: NSTextView) -> UndoManager? { textUndo }
 
   // MARK: - Selection
 
   /// Load a task (or clear). Any in-flight edit for the previous task commits
   /// first, so switching rows can't silently drop what was typed.
   ///
-  /// Re-showing the SAME task (e.g. `refresh()` after a background sync)
-  /// does NOT touch `titleField`/`notesView` — only the read-only fields
-  /// (dates, list, repeat) resync. This is load-bearing, not cosmetic: this
-  /// method used to overwrite the title field unconditionally, so a refresh
-  /// landing between typing and committing silently reverted whatever the
-  /// user had typed back to the stored value — and since that reset BOTH the
-  /// field and `loadedTitle` together, the next commit's "did it change"
-  /// check then saw no difference and never wrote the edit. `refresh()`'s
-  /// `isEditing` guard was supposed to prevent this, but a field/store
-  /// mismatch shouldn't be possible in the first place — belt and braces.
+  /// Re-showing the SAME task (e.g. `refresh()` after a sync or an undo)
+  /// reloads the title / notes only into a field that is not being typed in
+  /// and only when the store differs from what was loaded
+  /// (`reloadTextIfIdle`). A live edit is never overwritten — the old
+  /// unconditional reload reverted typing mid-word and then lost the edit,
+  /// because `loadedTitle` was reset along with the field.
   func show(_ next: SeptenaTask?) {
     guard next?.id != task?.id else {
       task = next
       if let next {
+        reloadTextIfIdle(next)
         refreshReadOnlyFields(next)
         refreshConversation(next)
       }
@@ -213,15 +299,50 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // became the selected row (even with this pane collapsed). Same
     // contract as SwiftUI `TaskComposer`. Disposition paths below ack.
 
-    loadedTitle = next.title
-    loadedNotes = next.notes ?? ""
-    titleField.stringValue = loadedTitle
-    let fontSize = SeptaskKitTheme.notesFontSize
-    notesView.textStorage?.setAttributedString(
-      MarkdownNotesStyle.attributed(loadedNotes, fontSize: fontSize))
-    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+    textUndo.removeAllActions()
+    loadTitle(next.title)
+    loadNotes(next.notes ?? "")
     refreshReadOnlyFields(next)
     refreshConversation(next)
+    formScroll?.contentView.scroll(to: .zero)
+  }
+
+  private func loadTitle(_ title: String) {
+    loadedTitle = title
+    titleField.stringValue = title
+  }
+
+  private func loadNotes(_ notes: String) {
+    loadedNotes = Self.savedNotes(notes)
+    let fontSize = SeptaskKitTheme.notesFontSize
+    notesView.textStorage?.setAttributedString(
+      MarkdownNotesStyle.attributed(notes, fontSize: fontSize))
+    notesView.typingAttributes = MarkdownNotesStyle.baseAttributes(fontSize: fontSize)
+  }
+
+  /// Same task, newer store values (an undo, a sync, an edit from the list's
+  /// composer): put them in the fields — but only into a field that is NOT
+  /// being typed in, and only when the store actually differs from what the
+  /// field was loaded with. Without this the pane kept showing the stale text,
+  /// and its next blur wrote that stale text back over the newer value.
+  private func reloadTextIfIdle(_ fresh: SeptenaTask) {
+    if !isEditingTitle, fresh.title != loadedTitle {
+      loadTitle(fresh.title)
+    }
+    if !isEditingNotes, Self.savedNotes(fresh.notes ?? "") != loadedNotes {
+      loadNotes(fresh.notes ?? "")
+    }
+  }
+
+  /// Notes as they are stored: trailing whitespace and newlines dropped,
+  /// leading indentation and every internal line kept (Markdown lists and
+  /// code depend on them). Empty clears the stored notes.
+  static func savedNotes(_ text: String) -> String {
+    var trimmed = Substring(text)
+    while let last = trimmed.last, last.isWhitespace || last.isNewline {
+      trimmed = trimmed.dropLast()
+    }
+    return String(trimmed)
   }
 
   /// The dates/list/repeat controls — safe to resync on every re-show,
@@ -271,16 +392,28 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// protection for in-progress title/notes edits; `isEditing` here just
   /// avoids pointless work while actively typing.
   func refresh() {
-    guard let id = task?.id, !isEditing else { return }
+    // No blanket "is editing" bail-out any more: each text field guards
+    // itself (`reloadTextIfIdle`), the conversation keeps a live reply
+    // (`KitConversationView.configure`), and the read-only controls always
+    // resync.
+    guard let id = task?.id else { return }
     // The inspector needs one row, not a complete live-task snapshot. This is
     // called after every AppKit store refresh, so a point read matters here.
     let fresh = LocalCache.task(id: id, in: context)
     show(fresh)
   }
 
-  private var isEditing: Bool {
+  private var isEditingTitle: Bool {
+    (view.window?.firstResponder as? NSTextView)?.delegate === titleField
+  }
+
+  private var isEditingNotes: Bool {
     view.window?.firstResponder === notesView
-      || (view.window?.firstResponder as? NSTextView)?.delegate === titleField
+  }
+
+  /// Any text entry in the pane, the conversation's reply field included.
+  private var isEditing: Bool {
+    isEditingTitle || isEditingNotes || conversationView.isEditingReply
   }
 
   private func listDescription(for task: SeptenaTask) -> String {
@@ -304,6 +437,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// writes when a value actually differs from what was loaded.
   func flushPendingEdits() {
     guard let current = task else { return }
+    let beforeTitle = loadedTitle
+    let beforeNotes = loadedNotes
     var titlePatch: String?
     let title = titleField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     if !title.isEmpty, title != loadedTitle {
@@ -311,18 +446,26 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       loadedTitle = title
     }
 
-    let notes = notesView.string
+    let notes = Self.savedNotes(notesView.string)
     let notesChanged = notes != loadedNotes
     if notesChanged {
       loadedNotes = notes
     }
 
     guard titlePatch != nil || notesChanged else { return }
+    // Keystrokes are now part of a saved value; the task-level undo below
+    // is how this edit comes back.
+    textUndo.removeAllActions()
     // Blur can commit title and notes together. One backend update means one
     // SwiftData save and one task-change notification instead of up to three
     // refresh cascades. An empty string deliberately clears stored notes.
     mutator.update(id: current.id, title: titlePatch,
                    notes: notesChanged ? notes : nil)
+    // On the ONE shared stack, the same entry the list's composer records.
+    TaskUndo.recordEdit(id: current.id,
+                        beforeTitle: beforeTitle, afterTitle: loadedTitle,
+                        beforeNotes: beforeNotes, afterNotes: loadedNotes,
+                        mutator: mutator)
   }
 
   func controlTextDidBeginEditing(_ obj: Notification) {
@@ -344,10 +487,26 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   func textDidEndEditing(_ notification: Notification) { flushPendingEdits() }
 
   /// The standard "back out of this pane" responder method. It reaches the
-  /// controller whenever focus is inside the inspector and no field editor
-  /// claimed Escape first — a live title edit still cancels itself on the
-  /// first Escape (platform behavior), and the second one closes the pane.
+  /// controller when focus is inside the inspector but NOT in a text field
+  /// (those answer Escape themselves — save and back to the list).
   override func cancelOperation(_ sender: Any?) { onRequestClose?() }
+
+  /// The title's keys. Escape and Return both SAVE and hand the keyboard back
+  /// to the list — Escape never discards, and never opens NSTextView's
+  /// completion list (its default answer to Escape in a field editor).
+  func control(_ control: NSControl, textView: NSTextView,
+               doCommandBy commandSelector: Selector) -> Bool {
+    guard control === titleField else { return false }
+    switch commandSelector {
+    case #selector(NSResponder.cancelOperation(_:)),
+         #selector(NSResponder.insertNewline(_:)),
+         #selector(NSResponder.complete(_:)):
+      DispatchQueue.main.async { [weak self] in self?.commitAndReturnToList() }
+      return true
+    default:
+      return false
+    }
+  }
 
   @objc private func closePane() {
     // Commit first: the pane can be closed mid-edit, and the field's own
@@ -356,13 +515,26 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     onRequestClose?()
   }
 
-  /// NSTextView answers Escape with autocomplete, which would swallow it, so
-  /// the notes view routes Escape to the same close as everything else.
+  /// Notes keys. NSTextView answers Escape with completion, which would
+  /// swallow it: here Escape saves and returns to the list, like the title.
+  /// Notes is prose, so Return inserts a line; Tab moves on through the
+  /// pane's key-view loop (⌥Tab, `insertTabIgnoringFieldEditor`, still types
+  /// a tab character).
   func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-    guard textView === notesView,
-          commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
-    onRequestClose?()
-    return true
+    guard textView === notesView else { return false }
+    switch commandSelector {
+    case #selector(NSResponder.cancelOperation(_:)), #selector(NSResponder.complete(_:)):
+      DispatchQueue.main.async { [weak self] in self?.commitAndReturnToList() }
+      return true
+    case #selector(NSResponder.insertTab(_:)):
+      view.window?.selectNextKeyView(textView)
+      return true
+    case #selector(NSResponder.insertBacktab(_:)):
+      view.window?.selectPreviousKeyView(textView)
+      return true
+    default:
+      return false
+    }
   }
 
   // MARK: - Dates
@@ -434,30 +606,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   }
 }
 
-/// The inspector's root view — exists only to catch ⌘↩ for the pane. ⌘↩ has
-/// no standard text binding, so neither the notes view nor the title's field
-/// editor would ever see it as a command; a key equivalent on the root is
-/// the one hook that covers both fields. Fires only while the keyboard is
-/// inside the pane, so the list's own ⌘↩ (composer notes) keeps winning when
-/// focus is out there.
+/// Document view for the inspector's scrolling form: flipped, so the form
+/// hangs from the top of the pane instead of the bottom.
 @MainActor
-final class KitInspectorRootView: NSView {
-  var onCommandReturn: (() -> Void)?
-
-  override func performKeyEquivalent(with event: NSEvent) -> Bool {
-    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-    let isReturn = event.keyCode == 36 || event.keyCode == 76
-    if isReturn, flags.contains(.command),
-       flags.isDisjoint(with: [.shift, .option, .control]),
-       let responder = window?.firstResponder as? NSView, responder.isDescendant(of: self) {
-      // Deferred a tick: the commit's sync mutator notification can call
-      // `makeFirstResponder` back into the list while this key event is still
-      // on the stack — same hazard `KitComposerCell.deferCommitAndCollapse`
-      // documents.
-      DispatchQueue.main.async { [weak self] in self?.onCommandReturn?() }
-      return true
-    }
-    return super.performKeyEquivalent(with: event)
-  }
+private final class KitFlippedView: NSView {
+  override var isFlipped: Bool { true }
 }
 #endif

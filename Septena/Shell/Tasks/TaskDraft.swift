@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import Foundation
 
 // The editable shape of a task, shared by every create/edit surface (the
@@ -26,10 +27,13 @@ struct TaskDraft: Equatable {
   /// Seed defaults from the list you're composing in: Today pins today,
   /// Upcoming schedules tomorrow, a Project / Area files it there, everything
   /// else lands in the Inbox.
+  @MainActor
   init(filter: TaskFilter) {
     switch filter {
     case .today:           onToday = true
-    case .upcoming:        scheduled = Calendar.current.date(byAdding: .day, value: 1, to: .now)
+    // `DayClock.appNow`, not `.now`: a debug time-travel offset must move
+    // the "tomorrow" default too, like every other day read.
+    case .upcoming:        scheduled = Calendar.current.date(byAdding: .day, value: 1, to: DayClock.appNow)
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
     case .triage, .unscheduled, .repeating, .logbook, .recentlyDeleted: break
@@ -93,8 +97,15 @@ struct TaskDraft: Equatable {
 
   /// Apply edits to an existing task: only fire the mutations whose value
   /// actually changed (the Things-style save the composer commits on Done).
+  ///
+  /// With `undoContext`, the save also lands on the shared `TaskUndo` stack:
+  /// title/notes as one edit, the When / Deadline / Repeat fields as one
+  /// schedule change, project / area as one move. `groupsByEvent` folds them
+  /// into one ⌘Z step. Pass nil for saves that are not a user edit of an
+  /// existing task (the inline-create placeholder's first title).
   @MainActor
-  func update(_ original: SeptenaTask, via mutator: TaskMutator) {
+  func update(_ original: SeptenaTask, via mutator: TaskMutator,
+              undoContext: ModelContext? = nil) {
     let id = original.id
     // Compare against the original run through the SAME normalization (a draft
     // seeded from it), so every field is normalized-vs-normalized. The When /
@@ -108,9 +119,36 @@ struct TaskDraft: Equatable {
     // stored value meant a task whose title or notes carried stray leading /
     // trailing whitespace read as changed on every save — an endless no-op
     // write that churned CloudKit each time the editor merely opened and closed.
-    if trimmedTitle != prior.trimmedTitle || trimmedNotes != prior.trimmedNotes {
-      mutator.update(id: id, title: trimmedTitle, notes: trimmedNotes)
+    //
+    // Title and notes are written independently: the draft was seeded when the
+    // editor opened, so writing the UNCHANGED field too would overwrite an edit
+    // another device made to it in the meantime.
+    let titleChanged = trimmedTitle != prior.trimmedTitle
+    let notesChanged = trimmedNotes != prior.trimmedNotes
+    if titleChanged || notesChanged {
+      mutator.update(id: id,
+                     title: titleChanged ? trimmedTitle : nil,
+                     notes: notesChanged ? trimmedNotes : nil)
+      if undoContext != nil {
+        TaskUndo.recordEdit(id: id,
+                            beforeTitle: original.title,
+                            afterTitle: titleChanged ? trimmedTitle : original.title,
+                            beforeNotes: original.notes,
+                            afterNotes: notesChanged ? trimmedNotes : original.notes,
+                            mutator: mutator)
+      }
     }
+
+    // Snapshots for undo, taken from the task as it stood when the editor
+    // opened (the same baseline the change detection above uses).
+    let scheduleBefore = TaskUndo.ScheduleSnapshot(original)
+    let filingBefore = TaskUndo.FilingSnapshot(original)
+    let scheduleChanged = storedScheduled != prior.storedScheduled
+      || pinToday != prior.pinToday
+      || deadline != prior.deadline
+      || recurrence != prior.recurrence
+    let filingChanged = projectId != prior.projectId
+      || (projectId == nil && areaId != prior.areaId)
 
     if storedScheduled != prior.storedScheduled {
       mutator.schedule(id: id, date: storedScheduled)
@@ -135,6 +173,16 @@ struct TaskDraft: Equatable {
     // is why this only bit nested projects.)
     if projectId != prior.projectId { mutator.moveToProject(id: id, project: projectId) }
     if projectId == nil, areaId != prior.areaId { mutator.moveToArea(id: id, area: areaId) }
+
+    guard let undoContext else { return }
+    if scheduleChanged {
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change Schedule", comment: "Undo action name"),
+        before: [scheduleBefore], context: undoContext, mutator: mutator)
+    }
+    if filingChanged {
+      TaskUndo.recordMove(before: [filingBefore], context: undoContext, mutator: mutator)
+    }
   }
 
   /// Did this edit change a *placement* field — project, area, scheduled, due,

@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Window-scoped commands published by the active Septask scene. App services
 /// stay shared, but route selection, presentation, and sidebar visibility must
@@ -36,40 +39,55 @@ private struct SeptaskKitRowCommands: View {
     // `TaskRowCommands` in the SwiftUI shell. Copy is deliberately absent:
     // it lives in the standard Edit menu, which reaches the task list through
     // the responder chain — a second ⌘C here would fight it for the binding.
+    // Each item is enabled on its own: the shell routes these to the pane
+    // that holds the keyboard, and on the sidebar only Rename and Delete have
+    // a target (an area or project) — see `SeptaskKitWindowController.canRun`.
     Group {
       Button("Rename") { SeptaskKitCommands.row(.rename) }
         .keyboardShortcut("r", modifiers: .command)
+        .disabled(!SeptaskKitCommands.canRun(.rename))
       Button("Duplicate") { SeptaskKitCommands.row(.duplicate) }
         .keyboardShortcut("d", modifiers: .command)
+        .disabled(!SeptaskKitCommands.canRun(.duplicate))
       Divider()
       Menu("Complete") {
         Button("Mark as Complete") { SeptaskKitCommands.row(.toggleComplete) }
           .keyboardShortcut(TaskRowShortcuts.markComplete)
+          .disabled(!SeptaskKitCommands.canRun(.toggleComplete))
         Button("Cancel Task") { SeptaskKitCommands.row(.cancel) }
           .keyboardShortcut(TaskRowShortcuts.cancel)
+          .disabled(!SeptaskKitCommands.canRun(.cancel))
         Divider()
         Button("Delete") { SeptaskKitCommands.row(.delete) }
           .keyboardShortcut(.delete, modifiers: .command)
+          .disabled(!SeptaskKitCommands.canRun(.delete))
       }
       Button("Toggle Today") { SeptaskKitCommands.row(.toggleToday) }
         .keyboardShortcut("t", modifiers: .command)
+        .disabled(!SeptaskKitCommands.canRun(.toggleToday))
       Button("When…") { SeptaskKitCommands.row(.when) }
         .keyboardShortcut("s", modifiers: .command)
+        .disabled(!SeptaskKitCommands.canRun(.when))
       Button("Deadline…") { SeptaskKitCommands.row(.deadline) }
         .keyboardShortcut("d", modifiers: [.command, .shift])
+        .disabled(!SeptaskKitCommands.canRun(.deadline))
       Button("Move…") { SeptaskKitCommands.row(.move) }
         .keyboardShortcut("m", modifiers: [.command, .shift])
+        .disabled(!SeptaskKitCommands.canRun(.move))
       // Bare ⌘M is intentionally reclaimed by the focused task list. Keep
       // this alias hidden so Window ▸ Minimize cannot win the event.
       Button("Move…") { SeptaskKitCommands.row(.move) }
         .keyboardShortcut("m", modifiers: .command)
+        .disabled(!SeptaskKitCommands.canRun(.move))
         .hidden()
       Button("Clear Schedule") { SeptaskKitCommands.row(.clearSchedule) }
         .keyboardShortcut(".", modifiers: [.command, .shift])
+        .disabled(!SeptaskKitCommands.canRun(.clearSchedule))
       Button("Repeat…") { SeptaskKitCommands.row(.repeatEditor) }
+        .disabled(!SeptaskKitCommands.canRun(.repeatEditor))
       Button("Create Next Copy") { SeptaskKitCommands.row(.createNextCopy) }
+        .disabled(!SeptaskKitCommands.canRun(.createNextCopy))
     }
-    .disabled(!SeptaskKitCommands.canActOnSelection)
   }
 }
 
@@ -109,6 +127,9 @@ struct SeptaskCommandMenus: Commands {
   /// read because a `Commands` body has to re-evaluate when it flips — a
   /// permanent "Show Info" on an open pane is what made the toggle unfindable.
   @AppStorage(SettingsKey.septaskInspectorVisible) private var inspectorVisible = false
+  /// Mirror of the AppKit shell's sidebar collapse, for the same reason.
+  @AppStorage(SeptaskKitStateKey.sidebarHidden)
+  private var kitSidebarHidden = false
 
   private var sidebarCountsHidden: Bool {
     UserDefaults.standard.object(forKey: SettingsKey.septaskSidebarCounts) == nil
@@ -117,11 +138,24 @@ struct SeptaskCommandMenus: Commands {
   }
   #endif
 
+  /// Settings opens its own window on macOS and needs no shell behind it,
+  /// so it is ALWAYS available there — closing the last shell window must
+  /// not grey out ⌘,.
   private var canOpenSettings: Bool {
     #if os(macOS)
-    return actions != nil || SeptaskKitCommands.shellExists
+    return true
     #else
     return actions != nil
+    #endif
+  }
+
+  /// Show/Hide Sidebar names the action it will take, in either shell.
+  private var sidebarIsHidden: Bool {
+    if let actions { return actions.sidebarVisibility == .detailOnly }
+    #if os(macOS)
+    return kitSidebarHidden
+    #else
+    return false
     #endif
   }
 
@@ -179,6 +213,14 @@ struct SeptaskCommandMenus: Commands {
       Button("Today") { go(.today) }
         .keyboardShortcut("1", modifiers: .command)
         .disabled(!canNavigate)
+      #if os(macOS)
+      // Next is not a TaskFilter, so it has no `actions.go` arm; it is an
+      // AppKit-shell destination (the sidebar row beside Today).
+      if actions == nil {
+        Button("Next") { SeptaskKitCommands.goNext() }
+          .disabled(!SeptaskKitCommands.canNavigate)
+      }
+      #endif
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
         .disabled(!canNavigate)
@@ -201,16 +243,17 @@ struct SeptaskCommandMenus: Commands {
       Divider()
 
       // The AppKit shell is the default window on macOS; this reopens it if
-      // it was closed. The SwiftUI window stays available for the surfaces the
-      // shell doesn't cover yet.
+      // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘1–4 are the
+      // lists, and the Dock icon reopens the window too.
       Button("Septask Window") { SeptaskKitWindowController.show() }
-        .keyboardShortcut("0", modifiers: .command)
       ClassicWindowCommand()
 
-      // The global ⌃Space hotkey is disabled for now (conflicts with Moom —
-      // see SeptaskLaunch.swift), so this is click-only until a
-      // non-conflicting key is picked; no keyboard shortcut shown here.
+      // Shows the global hotkey `SeptaskKitQuickEntry.installHotKey()`
+      // registers (⌃⌥Space), so the combination is discoverable here.
+      // Not a task-row binding: it carries two modifiers and opens the
+      // capture panel, so it cannot reach a row checkbox.
       Button("Quick Entry") { SeptaskKitQuickEntry.show() }
+        .keyboardShortcut(.space, modifiers: [.control, .option]) // septena-lint:allow task-space-binding — global ⌃⌥Space capture hotkey, not a row key
       #endif
     }
 
@@ -251,7 +294,7 @@ struct SeptaskCommandMenus: Commands {
     }
 
     CommandGroup(after: .sidebar) {
-      Button(actions?.sidebarVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar") {
+      Button(sidebarIsHidden ? "Show Sidebar" : "Hide Sidebar") {
         if let actions {
           actions.toggleSidebar()
         } else {
@@ -260,7 +303,8 @@ struct SeptaskCommandMenus: Commands {
           #endif
         }
       }
-      .keyboardShortcut("/", modifiers: .command)
+      // ⌃⌘S — the platform's standard sidebar toggle.
+      .keyboardShortcut("s", modifiers: [.control, .command])
       .disabled(!canNavigate)
 
       #if os(macOS)
@@ -328,10 +372,24 @@ struct SeptaskCommandMenus: Commands {
     CommandGroup(replacing: .newItem) { NewTaskCommand() }
     #endif
 
+    #if os(macOS)
+    CommandGroup(replacing: .undoRedo) { SeptaskUndoRedoCommands() }
+    #endif
+
     CommandGroup(after: .newItem) {
+      #if os(macOS)
+      // SwiftUI-window only: the AppKit shell has no Quick Add sheet (Quick
+      // Entry covers capture), and a permanently disabled item is worse
+      // than none.
+      if actions != nil {
+        Button("Quick Add…") { actions?.showQuickAdd() }
+          .keyboardShortcut("i", modifiers: .command)
+      }
+      #else
       Button("Quick Add…") { actions?.showQuickAdd() }
         .keyboardShortcut("i", modifiers: .command)
         .disabled(actions == nil)
+      #endif
     }
 
     CommandGroup(replacing: .appSettings) {
@@ -343,9 +401,17 @@ struct SeptaskCommandMenus: Commands {
     }
 
     CommandGroup(after: .help) {
+      #if os(macOS)
+      // SwiftUI-window only, for the same reason as Quick Add above.
+      if actions != nil {
+        Button("Keyboard Shortcuts") { actions?.showKeyboardShortcuts() }
+          .keyboardShortcut("/", modifiers: [.command, .shift])
+      }
+      #else
       Button("Keyboard Shortcuts") { actions?.showKeyboardShortcuts() }
         .keyboardShortcut("/", modifiers: [.command, .shift])
         .disabled(actions == nil)
+      #endif
     }
 
     #if os(macOS)
@@ -362,3 +428,44 @@ struct SeptaskCommandMenus: Commands {
     #endif
   }
 }
+
+#if os(macOS)
+/// Edit ▸ Undo / Redo. SwiftUI's built-in items follow the SwiftUI scene's
+/// undo manager, so they stay greyed over the AppKit task window even when
+/// `TaskUndo` has steps. These replace them with one rule for both windows:
+/// while the caret is in a text field, the text's own typing undo answers
+/// (sent through the responder chain, so the composer's and the inspector's
+/// local stacks win); everywhere else the shared task stack does.
+private struct SeptaskUndoRedoCommands: View {
+  @State private var undoName = TaskUndo.undoActionName
+  @State private var redoName = TaskUndo.manager.redoActionName
+
+  var body: some View {
+    Group {
+      Button(undoName.isEmpty ? "Undo" : "Undo \(undoName)") { perform(undo: true) }
+        .keyboardShortcut("z", modifiers: .command)
+      Button(redoName.isEmpty ? "Redo" : "Redo \(redoName)") { perform(undo: false) }
+        .keyboardShortcut("z", modifiers: [.command, .shift])
+    }
+    .onReceive(NotificationCenter.default.publisher(for: TaskUndo.changed)) { _ in
+      undoName = TaskUndo.undoActionName
+      redoName = TaskUndo.manager.redoActionName
+    }
+  }
+
+  private func perform(undo: Bool) {
+    let selector = undo ? Selector(("undo:")) : Selector(("redo:"))
+    if NSApp.keyWindow?.firstResponder is NSText {
+      NSApp.sendAction(selector, to: nil, from: nil)
+      return
+    }
+    if undo, TaskUndo.canUndo {
+      TaskUndo.undo()
+    } else if !undo, TaskUndo.canRedo {
+      TaskUndo.redo()
+    } else {
+      NSSound.beep()
+    }
+  }
+}
+#endif

@@ -39,16 +39,49 @@ struct GroupHeaderLabel: View {
   }
 }
 
+/// Scoping for the app-global "start a new task" one-shot.
+///
+/// `NavigationState.shouldStartCreating` is a single flag that the on-screen
+/// task list consumes. Two failure modes came from treating it as a plain
+/// bool: a hidden list consumed it, and when NO list was on screen it lingered
+/// and fired on whichever list appeared minutes later. TaskListView now only
+/// consumes while on screen; this makes an unanswered request expire. The
+/// window covers "navigate, then create" (the sidebar's New To-Do switches to
+/// Today and then sets the flag): the new list appears well inside it.
+@MainActor
+enum TaskCreateRequest {
+  fileprivate static var generation = 0
+  static let lifetime: Duration = .seconds(1.5)
+}
+
+extension NavigationState {
+  /// Ask the on-screen task list to start a new task. Use this instead of
+  /// setting `shouldStartCreating` directly. A "+" that belongs to one list
+  /// should call that list's own action instead (see `TaskListNewTaskButton`).
+  func requestNewTask() {
+    shouldStartCreating = true
+    TaskCreateRequest.generation &+= 1
+    let generation = TaskCreateRequest.generation
+    Task { @MainActor [weak self] in
+      try? await Task.sleep(for: TaskCreateRequest.lifetime)
+      guard let self, TaskCreateRequest.generation == generation else { return }
+      self.shouldStartCreating = false
+    }
+  }
+}
+
 /// Prominent "+" for creating a task — shared between the local nav toolbar
 /// (iPhone / macOS) and the iPad TabView trailing slot.
 struct TaskListNewTaskButton: View {
   @Environment(NavigationState.self) private var nav
   @Environment(SectionTheme.self) private var theme
+  /// The list this "+" belongs to. Nil falls back to the app-global request.
+  var action: (() -> Void)? = nil
 
   var body: some View {
     Button {
       SeptenaLog.info("[Create] + button tapped")
-      nav.shouldStartCreating = true
+      if let action { action() } else { nav.requestNewTask() }
     } label: {
       Image(systemName: "plus")
     }
@@ -63,12 +96,15 @@ struct TaskListNewTaskButton: View {
 /// type-checkable; it never owns task draft or persistence behavior.
 struct TaskListToolbarChrome: ViewModifier {
   let showsEmbeddedNewTask: Bool
+  /// The owning list's own create action, so its "+" can't be answered by a
+  /// different (hidden) list.
+  var onNew: (() -> Void)? = nil
 
   func body(content: Content) -> some View {
     content.toolbar {
       if showsEmbeddedNewTask {
         ToolbarItem(placement: .primaryAction) {
-          TaskListNewTaskButton()
+          TaskListNewTaskButton(action: onNew)
         }
       }
     }
@@ -110,6 +146,12 @@ struct TaskListStandaloneChrome: ViewModifier {
   /// appears on every list to hold one inapplicable row is worse than none.
   /// iPad regular is served by the sidebar's "···" instead (see below).
   let showsViewOptions: Bool
+  /// The owning list's own create action (see `TaskListToolbarChrome.onNew`).
+  var onNew: (() -> Void)? = nil
+
+  private func newTask() {
+    if let onNew { onNew() } else { nav.requestNewTask() }
+  }
 
   func body(content: Content) -> some View {
     #if os(iOS)
@@ -126,7 +168,7 @@ struct TaskListStandaloneChrome: ViewModifier {
         id: "tasks",
         title: "Tasks",
         localActions: { showsViewOptions ? AnyView(TaskViewOptions()) : nil },
-        add: recentlyDeleted ? nil : .action { nav.shouldStartCreating = true }
+        add: recentlyDeleted ? nil : .action { newTask() }
       )
     }
     #else
@@ -137,7 +179,7 @@ struct TaskListStandaloneChrome: ViewModifier {
       content.pageChrome(
         id: "tasks",
         title: "Tasks",
-        add: recentlyDeleted ? nil : .action { nav.shouldStartCreating = true }
+        add: recentlyDeleted ? nil : .action { newTask() }
       )
     }
     #endif

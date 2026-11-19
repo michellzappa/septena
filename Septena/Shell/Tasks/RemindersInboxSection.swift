@@ -37,7 +37,11 @@ struct RemindersInboxSection: View {
   @State private var bulkImporting = false
 
   var body: some View {
-    Group {
+    // A VStack, not a Group: a modifier on a Group attaches to each child, so
+    // when every branch renders nothing (no pending reminders) the `.task` and
+    // `.onReceive` below never ran, and the section could never load (see
+    // CLAUDE.md, "Never hang .task / .onAppear / .onReceive off a Group").
+    VStack(alignment: .leading, spacing: 0) {
       switch bridge.access {
       case .granted:
         if sourceList == nil {

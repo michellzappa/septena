@@ -100,6 +100,10 @@ struct TaskComposerCard: View {
   /// — but only once the save has definitely had its chance, so a just-typed
   /// title can never be purged out from under the (animation-delayed) autosave.
   var onVanish: (() -> Void)? = nil
+  /// Inline create only: Return on a titled NEW task saves it and asks the host
+  /// to open the next new task below (the Things capture chain). Nil means
+  /// Return saves and closes, the edit-mode behavior.
+  var onSubmitNew: (() -> Void)? = nil
 
   @Environment(TaskMutator.self) private var mutator
   @Environment(\.modelContext) private var modelContext
@@ -146,9 +150,14 @@ struct TaskComposerCard: View {
   /// `select` for that pill (keyboard Space/Return on a focused pill). The bar
   /// resets it to nil after acting.
   @State private var pendingPillActivate: TaskAttributeBar.Attribute?
-  /// Escape follows the platform contract: cancel is non-destructive until a
-  /// dirty draft has been explicitly confirmed for discard.
-  @State private var showingKeyboardDiscardConfirmation = false
+  /// Escape saves and closes, exactly like tapping away (product decision:
+  /// every way out of the editor keeps the work; undo takes it back). One
+  /// keystroke can arrive through several handlers, so this latch makes the
+  /// close run once per editing session.
+  @State private var keyboardCloseInFlight = false
+  /// The inline-create placeholder records ONE create on the undo stack, at its
+  /// first save. Later saves in the same session are still authoring.
+  @State private var recordedCreateUndo = false
   /// The draft exactly as it was at the last successful write. `persistOnce`
   /// skips when the current draft still equals it, which makes saving
   /// idempotent WITHOUT being one-shot.
@@ -179,7 +188,8 @@ struct TaskComposerCard: View {
        heroMatchNS: Namespace.ID? = nil, heroMatchIsSource: Bool = true,
        showsTodayIndicator: Bool = true,
        onDone: @escaping () -> Void,
-       onVanish: (() -> Void)? = nil) {
+       onVanish: (() -> Void)? = nil,
+       onSubmitNew: (() -> Void)? = nil) {
     self.mode = mode
     self.areas = areas
     self.projects = projects
@@ -195,6 +205,7 @@ struct TaskComposerCard: View {
     self.showsTodayIndicator = showsTodayIndicator
     self.onDone = onDone
     self.onVanish = onVanish
+    self.onSubmitNew = onSubmitNew
     #if os(iOS)
     // Seed the iPhone sheet height before first presentation so editing opens
     // directly at half height instead of flashing full then snapping down.
@@ -233,24 +244,19 @@ struct TaskComposerCard: View {
   /// same close path `AdaptiveEditScaffold` uses, so terminal actions match.
   private func close() { (onClose ?? adaptiveClose ?? { dismiss() })() }
 
-  private func requestKeyboardCancel() {
-    // One Escape keystroke can reach this from several handlers at once: the
-    // container's key press, the title field's own copy (a TextField would
-    // otherwise swallow it), and AppKit's exit command on macOS. So this has to
-    // be idempotent — once a cancel is in flight, the duplicates are no-ops.
-    // Previously the second call re-read `isDirty` after the first had already
-    // discarded and closed, which made the outcome depend on handler ordering.
-    guard !showingKeyboardDiscardConfirmation, !discarded else { return }
-    if isDirty {
-      showingKeyboardDiscardConfirmation = true
-    } else {
-      discard()
-      close()
-    }
-  }
-
-  private func discardAndClose() {
-    discard()
+  /// Escape, and the keyboard toolbar's Done: save and close. Tapping away and
+  /// scrolling away already save, so Escape must not be the one exit that asks
+  /// "Discard?". An empty new task just closes (the host drops the blank
+  /// placeholder). Undo takes a save back.
+  ///
+  /// One Escape keystroke can reach this from several handlers at once: the
+  /// container's key press, the title field's own copy (a TextField would
+  /// otherwise swallow it), and AppKit's exit command on macOS. The latch makes
+  /// the duplicates no-ops, so a drawer can never be dismissed twice.
+  private func saveAndCloseFromKeyboard() {
+    guard !keyboardCloseInFlight, !discarded else { return }
+    keyboardCloseInFlight = true
+    persistOnce()
     close()
   }
 
@@ -265,21 +271,13 @@ struct TaskComposerCard: View {
         persistOnce()
         seed()
       }
-      // A task editor is a normal form: Escape cancels rather than silently
-      // saving. On macOS the field editor consumes Escape, so carry both the
-      // AppKit exit command and SwiftUI key press forms.
-      .septenaOnEscape(requestKeyboardCancel)
-      .onKeyPress(.escape) { requestKeyboardCancel(); return .handled }
-      .confirmationDialog(
-        isEditing ? "Discard changes?" : "Discard new task?",
-        isPresented: $showingKeyboardDiscardConfirmation,
-        titleVisibility: .visible
-      ) {
-        Button("Discard", role: .destructive) { discardAndClose() }
-        Button("Keep Editing", role: .cancel) {}
-      } message: {
-        Text("Your unsaved changes will be lost.")
-      }
+      // Escape saves and closes, like every other way out of the editor (undo
+      // takes it back). On macOS the field editor consumes Escape, so carry
+      // both the AppKit exit command and SwiftUI key press forms. (In the
+      // drawer, the scaffold's Cancel button also binds Escape and keeps its
+      // own discard contract; that chrome lives in SectionDrawer.swift.)
+      .septenaOnEscape(saveAndCloseFromKeyboard)
+      .onKeyPress(.escape) { saveAndCloseFromKeyboard(); return .handled }
       // Safety net: persist on any teardown the buttons didn't already handle
       // (app backgrounded, the inspector toggled shut by the system, a parent
       // removed, or — inline — the row folded). Idempotent via
@@ -316,6 +314,8 @@ struct TaskComposerCard: View {
           draft.title = TaskTitleText.withoutLineBreaks(newValue)
             .trimmingCharacters(in: .whitespacesAndNewlines)
           if draft.canSave { commit(); return }
+          // Return on an empty NEW task ends the capture chain.
+          if isCreating { close(); return }
         } else {
           draft.title = TaskTitleText.singleLine(newValue)
         }
@@ -330,6 +330,19 @@ struct TaskComposerCard: View {
       // No scaffold, no inner ScrollView — the bare form expands inside the
       // task row and the LIST scrolls. Autosaves on fold (see `.onDisappear`).
       formBody
+        #if os(iOS)
+        // The only way to put the keyboard away without leaving the row was
+        // to tap elsewhere. Done saves and closes, the same as Escape. (The
+        // notes field is a UIKit text view, which SwiftUI's keyboard toolbar
+        // does not reach, so it carries its own Done — see `notesField`.)
+        .toolbar {
+          ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Done") { saveAndCloseFromKeyboard() }
+              .fontWeight(.semibold)
+          }
+        }
+        #endif
     case .drawer:
       drawerBody
     }
@@ -511,16 +524,18 @@ struct TaskComposerCard: View {
       .focused($focus, equals: .title)
       // macOS: a vertical-axis field fires onSubmit on plain Return (the iOS
       // newline-as-save trick never triggers there) — commit here instead.
-      .onSubmit { if draft.canSave { commit() } }
+      .onSubmit {
+        if draft.canSave { commit() } else if isCreating { close() }
+      }
       // The field would otherwise swallow Tab, so carry the same focus-cycling
       // handler here too.
       .onKeyPress(keys: [.tab]) { press in
         moveFocus(forward: !press.modifiers.contains(.shift)); return .handled
       }
       // macOS only: the field editor consumes Escape before the container's
-      // handler sees it. `requestKeyboardCancel` is idempotent, so the overlap
+      // handler sees it. `saveAndCloseFromKeyboard` is idempotent, so the overlap
       // with the container binding is harmless.
-      .septenaOnEscape(requestKeyboardCancel)
+      .septenaOnEscape(saveAndCloseFromKeyboard)
   }
 
   /// How far to drop the inline edit-mode title so its glyphs land on the closed
@@ -543,7 +558,10 @@ struct TaskComposerCard: View {
   /// prose), so — unlike the title — there's no Return-to-save; Tab still
   /// cycles focus.
   private var notesField: some View {
-    TaskMarkdownNotesEditor(text: $draft.notes, focus: $focus)
+    TaskMarkdownNotesEditor(
+      text: $draft.notes, focus: $focus,
+      onDone: presentation == .inline ? { saveAndCloseFromKeyboard() } : nil
+    )
       // A little extra right margin so wrapped prose doesn't run to the card edge.
       .padding(.trailing, 12)
       .onKeyPress(keys: [.tab]) { press in
@@ -691,6 +709,8 @@ struct TaskComposerCard: View {
     // A new subject starts with nothing written and nothing discarded.
     lastPersistedDraft = nil
     discarded = false
+    keyboardCloseInFlight = false
+    recordedCreateUndo = false
     switch mode {
     case .create(let filter):
       draft = TaskDraft(filter: filter)
@@ -733,9 +753,21 @@ struct TaskComposerCard: View {
           projects: projects, areas: areas
         )
       }
+      //
+      // On iOS, opening an EXISTING task never raises the keyboard (inline or
+      // inspector): you're reviewing it, and a tap on a field edits. Only a
+      // new inline task (the deferred-create placeholder) focuses its title.
+      // macOS has no on-screen keyboard to fight, so it keeps the "open with
+      // Return, type at once" focus.
+      #if os(macOS)
       if useInspector || presentation == .inline {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
       }
+      #else
+      if deferredCreate {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focusTitle() }
+      }
+      #endif
     }
   }
 
@@ -767,7 +799,8 @@ struct TaskComposerCard: View {
     switch seededMode ?? mode {
     case .create:
       applyPendingTokens()
-      draft.create(via: mutator)
+      let created = draft.create(via: mutator)
+      recordCreateUndo(id: created.id)
       AddInfoSection.tasks.notifyTilesChanged()
     case .edit(let task):
       if seededDeferredCreate {
@@ -776,6 +809,10 @@ struct TaskComposerCard: View {
         // title releases the first CloudKit push.
         applyPendingTokens()
         draft.update(task, via: mutator)
+        if !recordedCreateUndo {
+          recordedCreateUndo = true
+          recordCreateUndo(id: task.id)
+        }
         AddInfoSection.tasks.notifyTilesChanged()
         return
       }
@@ -786,9 +823,19 @@ struct TaskComposerCard: View {
       // must keep an agent proposal in the Inbox. No-op for non-agent /
       // already-seen rows.
       let placed = draft.placementChanged(from: task)
-      draft.update(task, via: mutator)
+      draft.update(task, via: mutator, undoContext: modelContext)
       if placed { mutator.acknowledge(id: task.id) }
     }
+  }
+
+  /// A new task lands on the shared undo stack as a create: undo purges it,
+  /// redo re-creates it from the draft as saved.
+  private func recordCreateUndo(id: String) {
+    let saved = draft
+    TaskUndo.recordCreate(
+      name: String(localized: "New Task", comment: "Undo action name"),
+      ids: [id], mutator: mutator,
+      rebuild: { [mutator] in [saved.create(via: mutator).id] })
   }
 
   /// The single funnel for every save path (explicit Save button,
@@ -834,7 +881,13 @@ struct TaskComposerCard: View {
     guard draft.canSave else { return }
     Haptics.tick()
     persistOnce()
-    close()
+    // A new inline task chains: the host saves this one (done above) and
+    // opens the next new task below. Edits, and the drawer, just close.
+    if isCreating, presentation == .inline, let onSubmitNew {
+      onSubmitNew()
+    } else {
+      close()
+    }
   }
 
   // MARK: - Keyboard focus traversal

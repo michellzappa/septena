@@ -7,16 +7,15 @@ import Carbon.HIToolbox
 // it captures into the app at large, so it has no row to anchor to and wears
 // the shared `KitSurfacePanel` chrome. Return files the capture to the Inbox (the
 // triage band — the app's one home for loose captures); ⌘Return sends it
-// straight to Today; Esc or clicking away dismisses. Writes go through
-// TaskMutator like every other surface.
+// straight to Today. Esc discards the draft and dismisses; clicking away only
+// hides the panel and KEEPS the draft, so a half-typed capture is still there
+// on the next show. Writes go through TaskMutator like every other surface.
 //
-// The global hotkey uses the Carbon RegisterEventHotKey API — the sanctioned,
-// sandbox-safe mechanism every quick-entry app uses (no event monitors, no
-// accessibility permission) — but installHotKey() is currently NOT called
-// (see SeptaskLaunch.swift): ⌃Space also contends with Moom's own binding,
-// so the global shortcut is disabled for now and Quick Entry is reachable
-// only via the Window ▸ Quick Entry menu item. Pick a non-conflicting
-// key/modifier before re-enabling.
+// The global hotkey is ⌃⌥Space, through the Carbon RegisterEventHotKey API —
+// the sanctioned, sandbox-safe mechanism every quick-entry app uses (no event
+// monitors, no Accessibility permission). Not ⌃Space: that is the system's
+// input-source switch, and Moom also binds it. Installed at launch by
+// `SeptaskMacAppDelegate`; Go ▸ Quick Entry shows the same combination.
 @MainActor
 final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegate {
 
@@ -28,7 +27,12 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   // MARK: - Hotkey
 
-  /// Idempotent; called once from the app root's launch task.
+  /// The global combination — keep `SeptaskCommandMenus`' Go ▸ Quick Entry
+  /// item showing the same keys.
+  private static let hotKeyCode = UInt32(kVK_Space)
+  private static let hotKeyModifiers = UInt32(controlKey | optionKey)
+
+  /// Idempotent; called once from the app delegate at launch.
   static func installHotKey() {
     guard hotKeyRef == nil else { return }
     var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
@@ -38,8 +42,14 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
       return noErr
     }, 1, &eventType, nil, nil)
     let hotKeyID = EventHotKeyID(signature: OSType(0x5350_5145) /* "SPQE" */, id: 1)
-    RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey), hotKeyID,
-                        GetApplicationEventTarget(), 0, &hotKeyRef)
+    let status = RegisterEventHotKey(hotKeyCode, hotKeyModifiers, hotKeyID,
+                                     GetApplicationEventTarget(), 0, &hotKeyRef)
+    if status != noErr {
+      // Another app (or a system shortcut) already owns the combination. The
+      // menu item still opens the panel.
+      hotKeyRef = nil
+      SeptenaLog.info("[QuickEntry] global hotkey not registered (\(status))")
+    }
   }
 
   // MARK: - Panel
@@ -48,7 +58,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
 
   private func present() {
     let panel = ensurePanel()
-    field.stringValue = ""
+    // The draft is NOT cleared here: clicking away keeps it (see
+    // `windowDidResignKey`). Only a save or an explicit Esc empties it.
     if let screen = NSScreen.main {
       let frame = screen.visibleFrame
       let size = panel.frame.size
@@ -59,6 +70,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     }
     panel.makeKeyAndOrderFront(nil)
     panel.makeFirstResponder(field)
+    field.currentEditor()?.selectedRange = NSRange(location: field.stringValue.utf16.count,
+                                                   length: 0)
   }
 
   private func dismiss() {
@@ -114,6 +127,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     let title = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     dismiss()
     guard !title.isEmpty else { return }
+    // Saved: the draft is spent.
+    field.stringValue = ""
     Task { @MainActor in
       // The panel can fire before the runtime is warm (start() memoizes).
       await SeptenaServices.shared.start()
@@ -140,6 +155,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
       save(today: command)
       return true
     case #selector(NSResponder.cancelOperation(_:)):
+      // Explicit Esc is the one gesture that throws the draft away.
+      field.stringValue = ""
       dismiss()
       return true
     default:
@@ -147,7 +164,8 @@ final class SeptaskKitQuickEntry: NSObject, NSTextFieldDelegate, NSWindowDelegat
     }
   }
 
-  /// Clicking anywhere else dismisses, like every transient panel.
+  /// Clicking anywhere else hides the panel, like every transient panel, but
+  /// keeps the draft for the next show.
   func windowDidResignKey(_ notification: Notification) {
     dismiss()
   }

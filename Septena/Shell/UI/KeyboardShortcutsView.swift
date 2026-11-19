@@ -58,6 +58,7 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
       KeyboardShortcut2(keys: ["return"], label: "Open / edit"),
       KeyboardShortcut2(keys: ["esc"], label: "Clear selection"),
+      KeyboardShortcut2(keys: ["esc"], label: "Save and close the open task"),
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
     ]
     #if SEPTASK

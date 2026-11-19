@@ -135,12 +135,23 @@ struct SeptaskRootView: View {
     // on the Tasks tab. A route landing while a filter tab is frontmost
     // must move selection — the tab-bar twin of RootTabView's pendingTab
     // forwarding.
+    //
+    // Today and Upcoming ARE tabs, so a route to either switches to that tab
+    // and is then dropped from the shared path. Leaving it there also pushed a
+    // second copy of the list inside the Tasks tab: back on Tasks you landed in
+    // a duplicate Today instead of the Tasks home, and that hidden copy could
+    // consume a search reveal meant for the tab you were looking at.
     .onChange(of: nav.path) { _, path in
       guard hSize == .compact, let last = path.last else { return }
       switch last {
-      case .filter(.today):    selection = .today
-      case .filter(.upcoming): selection = .upcoming
-      default:                 selection = .tasks
+      case .filter(.today):
+        selection = .today
+        nav.path = []
+      case .filter(.upcoming):
+        selection = .upcoming
+        nav.path = []
+      default:
+        selection = .tasks
       }
     }
     #else
@@ -186,10 +197,22 @@ struct SeptaskRootView: View {
 
 /// Quick-add sheet: a fresh router per presentation so the draft never
 /// leaks between opens. Sizing comes from the host's `septenaModalSheet`.
+///
+/// The SAME `AddTaskPage` Septena's quick-add palette shows, in its
+/// self-hosted mode: Septena feeds the page's query from `AddInfoSheet`'s
+/// search bar, which Septask doesn't compile, so here the page draws its own
+/// focused title field plus Cancel / Add, and files to the Inbox. (Presenting
+/// the page bare used to leave the sheet with no text field at all.)
 private struct SeptaskQuickAdd: View {
   @State private var router = AddInfoRouter()
 
   var body: some View {
-    AddTaskPage(router: router)
+    NavigationStack {
+      AddTaskPage(router: router, hostsTitleField: true, forcesInbox: true)
+        .navigationTitle("New Task")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
   }
 }

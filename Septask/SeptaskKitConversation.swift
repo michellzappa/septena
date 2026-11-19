@@ -60,8 +60,9 @@ final class KitConversationView: NSView {
   /// so the host can hide the whole section rather than leave an empty header.
   @discardableResult
   func configure(taskID: String, convo: TaskConvo) -> Bool {
+    let sameTask = self.taskID == taskID
     // A different task must not inherit the previous one's half-typed reply.
-    if self.taskID != taskID {
+    if !sameTask {
       showOther = false
       otherField.stringValue = ""
     }
@@ -72,8 +73,19 @@ final class KitConversationView: NSView {
       return false
     }
     isHidden = false
+    // A refresh of the SAME task while the reply field is being typed in
+    // must not rebuild: `rebuild()` pulls the field out of the view tree,
+    // which ends the edit and drops the keyboard mid-sentence. The new turns
+    // land on the next refresh after the reply is sent or abandoned.
+    if sameTask, isEditingReply { return true }
     rebuild()
     return true
+  }
+
+  /// The free-text reply field holds the keyboard.
+  var isEditingReply: Bool {
+    guard let editor = window?.firstResponder as? NSTextView else { return false }
+    return editor.delegate === otherField
   }
 
   // MARK: - Building

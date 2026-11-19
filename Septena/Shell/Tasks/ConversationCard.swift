@@ -28,7 +28,10 @@ struct ConversationCard: View {
   }
 
   var body: some View {
-    Group {
+    // A VStack, not a Group: with no conversation yet the Group had no child,
+    // so `.onAppear` / `.onReceive` never ran and a thread that started later
+    // never showed (CLAUDE.md Group-modifier trap).
+    VStack(alignment: .leading, spacing: 0) {
       if convo.hasStarted {
         VStack(alignment: .leading, spacing: 12) {
           // Resolved turns sit above as a compact history; the current open

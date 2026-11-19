@@ -47,6 +47,11 @@ struct SelectableRowActions {
   /// Whether rows should wire click-selection at all (false on iPhone compact,
   /// which has no multi-select chrome — there a tap just activates).
   var selectable: Bool = true
+  /// iOS: a plain tap on an UNselected row activates it directly instead of
+  /// selecting first. The host sets this while an inline editor is open, so one
+  /// tap on another row moves the editor there. Ignored on macOS, where a
+  /// click must keep meaning "select" (double-click opens).
+  var activatesOnTap: Bool = false
 }
 
 private struct SelectableRowActionsKey: EnvironmentKey {
@@ -177,20 +182,48 @@ private struct SelectableRowGestures: ViewModifier {
         actions.click(id, currentEventModifiers())
       }
     #else
-    content.onTapGesture {
-      // Regular-width iPad uses the same selection-first model as Mac: first
-      // tap selects, second tap opens. Compact iPhone passes `selectable: false`
-      // and keeps its direct tap-to-open behavior.
-      guard actions.selectable else { actions.activate(id); return }
-      if isSelected {
-        actions.activate(id)
-      } else {
-        actions.click(id, [])
-      }
-    }
+    content.modifier(TouchOrPointerTap(id: id, isSelected: isSelected, actions: actions))
     #endif
   }
 }
+
+#if os(iOS)
+/// iPad tap model. Select-first (first tap selects, second opens) is a pointer
+/// and keyboard idiom; on glass it reads as "my tap was ignored". So:
+///   • touch tap → opens the row (like iPhone),
+///   • trackpad / mouse click → selects first, as on the Mac,
+///   • any tap while an editor is open (`activatesOnTap`) → opens that row.
+///
+/// SwiftUI's tap gesture does not say which device produced it. The standard
+/// signal that a pointer is present is hover: `onContinuousHover` reports
+/// `.active` only for a trackpad, mouse or hovering Pencil, never for a finger.
+/// A row that is hovered at tap time was clicked with a pointer.
+private struct TouchOrPointerTap: ViewModifier {
+  let id: String
+  let isSelected: Bool
+  let actions: SelectableRowActions
+  @State private var pointerOver = false
+
+  func body(content: Content) -> some View {
+    content
+      .onContinuousHover { phase in
+        switch phase {
+        case .active: pointerOver = true
+        case .ended:  pointerOver = false
+        }
+      }
+      .onTapGesture {
+        // Compact iPhone passes `selectable: false`: a tap always opens.
+        guard actions.selectable else { actions.activate(id); return }
+        if isSelected || actions.activatesOnTap || !pointerOver {
+          actions.activate(id)
+        } else {
+          actions.click(id, [])
+        }
+      }
+  }
+}
+#endif
 
 // MARK: - Container
 
@@ -216,6 +249,9 @@ struct SelectableScrollList<Content: View>: View {
   var selectable: Bool = true
   /// Return / double-click / single-tap(iOS) on a row.
   var onActivate: (String) -> Void = { _ in }
+  /// iOS: a plain tap on an unselected row activates it (see
+  /// `SelectableRowActions.activatesOnTap`).
+  var activatesOnTap: Bool = false
   /// Esc with a selection, or a click on the empty paper behind the rows.
   var onClear: () -> Void = {}
   /// ⌘M / ⌘⇧M — task-surface alias for the Move command. This is optional so
@@ -313,7 +349,8 @@ struct SelectableScrollList<Content: View>: View {
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,
-        selectable: selectable
+        selectable: selectable,
+        activatesOnTap: activatesOnTap
       ))
       // Focusable for native key delivery; the blue focus ring is suppressed —
       // the selection capsule is indicator enough (same call the List makes).

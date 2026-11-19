@@ -232,9 +232,6 @@ struct TaskRowActions: ViewModifier {
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
     Haptics.tick()
-    let prevArea = task.area
-    let prevProject = task.project
-    let wasInTriage = task.isInTriageBand
     let undoBefore = LocalCache.allTasks(in: modelContext)
       .filter { $0.id == id }
       .map(TaskUndo.FilingSnapshot.init)
@@ -246,22 +243,17 @@ struct TaskRowActions: ViewModifier {
     }
     mutator.acknowledge(id: id)
     // The toast's own Undo button stays — it's the discoverable affordance on
-    // iOS. This is the same reversal on the shared stack, so ⌘Z / shake reach
-    // it too once the toast has gone.
+    // iOS. It reverses through the SAME stack entry (via the ticket), so the
+    // toast and ⌘Z / shake can never disagree or both fire.
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
+    let ticket = TaskUndoTicket()
     onChange?()
     let destName =
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
       ?? "No Project"
     toastStore?.show("Moved to \(destName)") {
-      if let prevProject {
-        mutator.moveToProject(id: id, project: prevProject)
-      } else {
-        mutator.moveToArea(id: id, area: prevArea)
-        mutator.moveToProject(id: id, project: nil)
-      }
-      if wasInTriage { mutator.moveToToday(id: id, today: false) }
+      ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()
     }
   }
@@ -271,9 +263,11 @@ struct TaskRowActions: ViewModifier {
     let title = task.title
     mutator.delete(id: task.id)
     TaskUndo.recordDelete(ids: [task.id], mutator: mutator)
+    let ticket = TaskUndoTicket()
     onChange?()
+    let id = task.id
     toastStore?.show(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
-      mutator.restore(id: task.id)
+      ticket.undo { mutator.restore(id: id) }
       onChange?()
     }
   }
@@ -293,5 +287,51 @@ extension View {
     modifier(TaskRowActions(task: task, filter: filter, areas: areas,
                             projects: projects, mutator: mutator,
                             onOpenDetail: onOpenDetail, onChange: onChange))
+  }
+}
+
+// MARK: - Toast undo
+
+/// Lets an undo toast reverse ITS OWN action, never whatever happens to be on
+/// top of the shared stack.
+///
+/// A toast used to call `TaskUndo.undo()`, which undoes the NEWEST entry. If
+/// anything was recorded after the toast's action (another completion, a
+/// rename), tapping the toast's Undo took back that newer action and left the
+/// toast's own one in place.
+///
+/// Create the ticket right AFTER recording the action. While nothing newer has
+/// touched the stack, `undo` goes through `TaskUndo.undo()` so the toast and
+/// shake / ⌘Z stay one stack. Once anything newer registers (or an undo / redo
+/// runs), `undo` runs `fallback` instead: a direct reversal through the
+/// mutators.
+@MainActor
+final class TaskUndoTicket {
+  private let actionName: String
+  private var isNewest = true
+  nonisolated(unsafe) private var observer: NSObjectProtocol?
+
+  init() {
+    actionName = TaskUndo.undoActionName
+    // Registered after the caller's `record`, whose own `changed` post has
+    // already gone out, so only LATER stack changes reach this.
+    observer = NotificationCenter.default.addObserver(
+      forName: TaskUndo.changed, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.isNewest = false }
+    }
+  }
+
+  deinit {
+    if let observer { NotificationCenter.default.removeObserver(observer) }
+  }
+
+  func undo(fallback: () -> Void) {
+    if isNewest, TaskUndo.canUndo, TaskUndo.undoActionName == actionName {
+      TaskUndo.undo()
+    } else {
+      fallback()
+    }
+    isNewest = false
   }
 }

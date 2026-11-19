@@ -179,6 +179,20 @@ struct TaskCommandsMenu: View {
     // task list is focused. Edit is ⌘R — a MODIFIER menu shortcut, the only
     // reliable keyboard path on macOS. Each item disables itself (so its key
     // falls through to any focused text field) when its handler is nil.
+    #if os(iOS)
+    // iPad: the task list can't publish `\.taskActions` (a focused scene value
+    // from the split-view detail SIGKILLs iPad, see TaskListView), so every
+    // row item here was permanently disabled, and the hold-⌘ HUD listed each
+    // command twice: a dead copy from this menu and the working copy from the
+    // list's own shortcut buttons. Show only what has a live handler here (the
+    // Next checklist's ⌘K); the list's buttons supply the rest, once.
+    ForEach(TaskRowCommands.all) { command in
+      if let action = handler(for: command) {
+        Button(command.title) { action() }
+          .keyboardShortcut(command.shortcut)
+      }
+    }
+    #else
     ForEach(TaskRowCommands.all) { command in
       if command.separatorBefore { Divider() }
       let action = handler(for: command)
@@ -195,6 +209,7 @@ struct TaskCommandsMenu: View {
           .disabled(action == nil)
       }
     }
+    #endif
   }
 }
 

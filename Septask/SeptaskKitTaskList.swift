@@ -40,10 +40,16 @@ enum KitDrag {
 //   ↑/↓, ⇧-arrows, type-select, Home/End — native NSTableView
 //   ⌘K — toggle complete          ⌘T — toggle Today
 //   ⌘N — new task in this list    ⌘, — settings
-//   ⌘R — bare rename via the field editor (Esc cancels)
-//   Return, double-click — inline composer on the title (Return / Esc fold it)
-//   ⌘↩ — notes: opens the composer straight into notes; from inside notes it
-//        commits and folds. ↓ on the title's last line drops into notes.
+//   ⌘R — bare rename via the field editor
+//   Return, double-click — inline composer on the title
+//   ⌥↩ — opens the composer straight into notes
+//   ⌘↩ — commits and folds the open row from anywhere in it. ↓ on the
+//        title's last line drops into notes, ↑ on the first notes line goes
+//        back up to the title.
+//   ONE edit contract for the composer AND the bare field editor: Esc,
+//   Return, ⌘↩, click-away, a list change and window close all SAVE and
+//   close. ⌘Z undoes the save (`TaskUndo`). Nothing discards typed text.
+//   ⌘↑ / ⌘↓ — move the selected task(s) one slot (manual-order lists only)
 //   ⌘⌫ — delete (soft; lands in Recently Deleted)
 //   ⌥⌘M — file into the suggested list (the "→ Suggested" capsule's pick)
 //   Space — deliberately unbound (the "Space completes the task" trap);
@@ -226,8 +232,20 @@ final class SeptaskKitTaskListController: NSViewController {
       if oldValue != dropAboveRow { refreshDropIndicator() }
     }
   }
-  /// Completed rows are lingering on screen; refreshes wait (see `beginSettle`).
+  /// Completed rows are lingering on screen (see `beginSettle`). Reloads still
+  /// run meanwhile; they keep `settlingIDs` pinned on screen (`pinned`).
   private var isSettling = false
+  /// The rows lingering in the settle window — restyled done/cancelled, held
+  /// on screen by `reload` until the settle ends.
+  private var settlingIDs: Set<String> = []
+  /// A drag is over (or was started from) this table. Reloads wait for the
+  /// drop, so the row indexes `validateDrop` showed are still the ones
+  /// `acceptDrop` resolves — a sync batch landing mid-drag would otherwise
+  /// shift them under the pointer.
+  private var isDragActive = false
+  /// A reload was held back by `isApplyingMove` / `isDragActive`; run it when
+  /// the gate clears (`flushHeldReload`).
+  private var heldReload = false
   private var settleWorkItem: DispatchWorkItem?
   /// Notifications are synchronous, but a single user gesture can emit several
   /// of them (move-to-area, date changes, batch completion). Keep the payload
@@ -299,95 +317,34 @@ final class SeptaskKitTaskListController: NSViewController {
   private var kitUndoManager: UndoManager { TaskUndo.manager }
   override var undoManager: UndoManager? { kitUndoManager }
 
-  /// Registers `undoAction` as the inverse of a mutation just made; performing
-  /// it (⌘Z) re-registers `redoAction` as ITS OWN inverse, which is what gives
-  /// ⌘⇧Z (redo) for free — the standard `UndoManager` symmetric-registration
-  /// idiom. Covers every value-level mutator the shell offers:
-  /// complete/uncomplete, delete/restore, rename, move,
-  /// create/duplicate/paste, and the scheduling fields (When, Deadline,
-  /// Today, repeat) via `ScheduleSnapshot`.
-  private func recordUndo(name: String, undo undoAction: @escaping () -> Void,
-                          redo redoAction: @escaping () -> Void) {
-    kitUndoManager.setActionName(name)
-    kitUndoManager.registerUndo(withTarget: self) { target in
-      undoAction()
-      target.recordUndo(name: name, undo: redoAction, redo: undoAction)
-    }
-  }
-  /// The scheduling fields the date / Today / repeat commands touch, captured
-  /// before a change so undo can put them back. There is no second write path:
-  /// `restore` replays the SAME mutators the forward commands use.
-  private struct ScheduleSnapshot {
-    let id: String
-    let scheduled: Date?
-    let today: Bool
-    let deadline: Date?
-    let recurrence: Recurrence?
-    let recurrencePaused: Bool
+  /// Thin wrappers over the SHARED `TaskUndo` helpers. Every inverse below
+  /// captures the mutator, never this controller: an undo closure that held
+  /// the controller weakly went inert once the window closed, so ⌘Z from the
+  /// SwiftUI window (or after reopening this one) silently did nothing. The
+  /// list refreshes itself from the mutators' change notifications, so no
+  /// closure needs to reach back here to reload.
+  private func recordUndo(name: String,
+                          undo undoAction: @escaping @MainActor () -> Void,
+                          redo redoAction: @escaping @MainActor () -> Void) {
+    TaskUndo.record(name: name, undo: undoAction, redo: redoAction)
   }
 
-  private func scheduleSnapshot(_ task: SeptenaTask) -> ScheduleSnapshot {
-    ScheduleSnapshot(id: task.id,
-                     scheduled: KitDayFormat.date(fromWire: task.scheduled),
-                     today: task.today,
-                     deadline: KitDayFormat.date(fromWire: task.deadline),
-                     recurrence: task.recurrence,
-                     recurrencePaused: task.recurrencePaused)
-  }
-
-  /// Put the captured fields back. Order is load-bearing: `schedule` and
-  /// `setDeadline` both carry their own Today side effects (a deadline that
-  /// has landed can drop a row off Today), so the explicit Today flag is
-  /// written LAST and wins. `moveToToday(id:today:)` rather than
-  /// `removeFromToday` — the latter also clears any already-landed scheduled
-  /// or deadline date, which would undo more than the command did.
-  /// One fidelity limit: `todaySetOn` re-stamps to the current day, so undo
-  /// restores Today membership but not the row's original tenure age.
-  private func restoreSchedules(_ snapshots: [ScheduleSnapshot]) {
-    for snapshot in snapshots {
-      mutator.schedule(id: snapshot.id, date: snapshot.scheduled)
-      mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
-      mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
-      if snapshot.recurrence != nil {
-        mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
-      }
-      mutator.moveToToday(id: snapshot.id, today: snapshot.today)
-    }
-    reload()
+  private func scheduleSnapshot(_ task: SeptenaTask) -> TaskUndo.ScheduleSnapshot {
+    TaskUndo.ScheduleSnapshot(task)
   }
 
   /// Register undo for a change to the scheduling fields. Call it AFTER the
-  /// change: `before` is captured by the caller beforehand, and the redo side
-  /// is re-read from the store rather than predicted, because `schedule` /
-  /// `setDeadline` / `removeFromToday` each carry their own Today side
-  /// effects and modelling those here would be a second copy of that logic.
-  private func recordScheduleUndo(name: String, before: [ScheduleSnapshot]) {
-    guard !before.isEmpty else { return }
-    let wanted = Set(before.map(\.id))
-    let after = LocalCache.allTasks(in: context)
-      .filter { wanted.contains($0.id) }
-      .map(scheduleSnapshot)
-    guard !after.isEmpty else { return }
-    recordUndo(name: name,
-               undo: { [weak self] in self?.restoreSchedules(before) },
-               redo: { [weak self] in self?.restoreSchedules(after) })
+  /// change, with `before` captured beforehand (`TaskUndo.recordScheduleChange`).
+  private func recordScheduleUndo(name: String, before: [TaskUndo.ScheduleSnapshot]) {
+    TaskUndo.recordScheduleChange(name: name, before: before,
+                                  context: context, mutator: mutator)
   }
 
-  /// Undo for freshly created tasks. Redo has to RE-create rather than
-  /// restore: `purge` is a real delete, so there is no row left to bring
-  /// back. Re-creating mints NEW ids, hence the box both closures read.
+  /// Undo for freshly created tasks (`TaskUndo.recordCreate`). `rebuild` must
+  /// not capture the controller — pass it values and the mutator.
   private func recordCreateUndo(name: String, ids: [String],
-                                rebuild: @escaping () -> [String]) {
-    var current = ids
-    recordUndo(name: name,
-               undo: { [weak self] in
-                 for id in current { self?.mutator.purge(id: id) }
-                 self?.reload()
-               },
-               redo: { [weak self] in
-                 current = rebuild()
-                 self?.reload()
-               })
+                                rebuild: @escaping @MainActor () -> [String]) {
+    TaskUndo.recordCreate(name: name, ids: ids, mutator: mutator, rebuild: rebuild)
   }
 
   /// Undo for a ⌘N row that has just been given a real title. The undoable
@@ -398,17 +355,18 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let task = LocalCache.task(id: id, in: context)
     else { return }
     let title = task.title
+    let notes = task.notes
     let area = task.area
     let project = task.project
     let scheduled = KitDayFormat.date(fromWire: task.scheduled)
     let today = task.today
+    let mutator = self.mutator
     recordCreateUndo(name: String(localized: "New Task", comment: "SeptaskKit: undo action"),
                      ids: [id],
-                     rebuild: { [weak self] in
-                       guard let self else { return [] }
-                       return [self.mutator.create(title: title, area: area, project: project,
-                                                   scheduled: scheduled, today: today,
-                                                   atBottom: false).id]
+                     rebuild: {
+                       [mutator.create(title: title, area: area, project: project,
+                                       scheduled: scheduled, today: today, notes: notes,
+                                       atBottom: false).id]
                      })
   }
 
@@ -494,6 +452,8 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
+    tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
+    tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
     // Edit ▸ Copy targets the first responder, so implementing `copy(_:)` on
     // the table is what makes the STANDARD menu item work — better than a
     // second ⌘C item in the Task menu fighting it for the binding.
@@ -520,6 +480,10 @@ final class SeptaskKitTaskListController: NSViewController {
         }
         return
       }
+      // Only a TASK row has a task menu. A header, an event, the "New task"
+      // line or a reminder used to get the full menu, with every command
+      // aimed at whatever happened to be selected elsewhere.
+      guard self.rows.indices.contains(row), self.rows[row].task != nil else { return }
       if !tableView.selectedRowIndexes.contains(row) {
         tableView.selectRowIndexes([row], byExtendingSelection: false)
       }
@@ -535,7 +499,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
     tableView.registerForDraggedTypes([.septaskTask])
     tableView.setDraggingSourceOperationMask(.move, forLocal: true)
-    tableView.onDragEnded = { [weak self] in self?.dropAboveRow = nil }
+    tableView.onDragEnded = { [weak self] in self?.endDragHold() }
 
     scrollView.documentView = tableView
     scrollView.hasVerticalScroller = true
@@ -599,6 +563,22 @@ final class SeptaskKitTaskListController: NSViewController {
         self.reload()
       }
     })
+    // Midnight. Today / Upcoming / day headers are all computed against the
+    // current day, so a window left open overnight must re-read when the day
+    // flips — `NSCalendarDayChanged` is the same signal `DayClock` and
+    // `SeptenaServices` (fixed-repeat catch-up) use; wake covers a Mac that
+    // slept through it. Coalesced like every other refresh, so the catch-up's
+    // own task notifications land in the same repaint.
+    observers.append(NotificationCenter.default.addObserver(
+      forName: .NSCalendarDayChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.reloadIfDayChanged(force: true) }
+    })
+    observers.append(NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.reloadIfDayChanged(force: false) }
+    })
     observers.append(NotificationCenter.default.addObserver(
       forName: .septenaTextSizeDidChange, object: nil, queue: .main
     ) { [weak self] _ in
@@ -652,7 +632,21 @@ final class SeptaskKitTaskListController: NSViewController {
 
   deinit {
     reloadWorkItem?.cancel()
-    for observer in observers { NotificationCenter.default.removeObserver(observer) }
+    for observer in observers {
+      NotificationCenter.default.removeObserver(observer)
+      NSWorkspace.shared.notificationCenter.removeObserver(observer)
+    }
+  }
+
+  /// The day the rows on screen were computed for (see `reloadIfDayChanged`).
+  private var renderedDay = SeptenaDate.today
+
+  /// Re-read when the calendar day has moved since the last paint.
+  private func reloadIfDayChanged(force: Bool) {
+    let today = SeptenaDate.today
+    guard force || today != renderedDay else { return }
+    renderedDay = today
+    scheduleReload(locallyChanged: [])
   }
 
   /// True once `show` has run at least once — see the guard below.
@@ -671,6 +665,9 @@ final class SeptaskKitTaskListController: NSViewController {
   func show(_ filter: TaskFilter) {
     if hasShownOnce, filter == self.filter { return }
     hasShownOnce = true
+    // The window commits before it navigates; this is the backstop, so a
+    // composer can never ride along (pinned) into a different list.
+    commitOpenEdits()
     cancelSettle()
     self.filter = filter
     reload(animated: false)
@@ -714,6 +711,45 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// True while any text view in this window holds the caret. The menu-bar
+  /// fallback that routes Task-menu commands here should disable row
+  /// commands then: the table already leaves those keys to the text, but a
+  /// menu item with the same key equivalent would still fire.
+  var isEditingText: Bool { view.window?.firstResponder is NSText }
+
+  /// Save and close whatever edit is open in this list — the inline composer
+  /// and the bare field editor (⌘R rename, the Inbox "New task" line, a
+  /// header "+"). Synchronous: when it returns, the typed text is in the
+  /// store and the row is closed. Safe to call when nothing is open.
+  ///
+  /// The window calls it on sidebar navigation, the Next page, window close
+  /// and app quit — the "list change and window close SAVE" half of the one
+  /// edit contract. ⌘N, delete and `show(_:)` call it too.
+  func commitOpenEdits() {
+    commitFieldEditorNow()
+    if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
+  }
+
+  /// Commit a live field-editor edit synchronously. The cell's own end-edit
+  /// path defers its commit one tick (first-responder reentrancy, see
+  /// `viewFor:`'s `onRename`); a caller about to create a row or leave the
+  /// list can't wait for that tick, so the text is taken out of the editor
+  /// FIRST and committed outside any responder transition.
+  private func commitFieldEditorNow() {
+    guard let id = editingTaskId,
+          let row = rows.firstIndex(where: { $0.task?.id == id }),
+          let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
+            as? SeptaskKitTaskCell,
+          let text = cell.takeEditForCommit()
+    else {
+      // An editor this list doesn't track by id: end it the standard way.
+      // It still commits (Esc no longer reverts), one tick later.
+      if isTitleEditorActive { view.window?.makeFirstResponder(tableView) }
+      return
+    }
+    commitRename(id: id, title: text)
+  }
+
   /// Native AppKit cells do not observe `FontScale` the way SwiftUI font
   /// tokens do. Reload the visible table cells and invalidate row heights so
   /// View ▸ Text Size takes effect immediately in the main shell.
@@ -743,11 +779,15 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Select and reveal a row by task id — how a jump (Quick Find) lands on
   /// the thing it was asked to find. No-op when the task isn't in this list.
-  func select(taskId: String) {
-    guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else { return }
+  /// Returns false when the task isn't in this list, so the caller (Quick
+  /// Find) can fall back.
+  @discardableResult
+  func select(taskId: String) -> Bool {
+    guard let row = rows.firstIndex(where: { $0.task?.id == taskId }) else { return false }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
     tableView.scrollRowToVisible(row)
     view.window?.makeFirstResponder(tableView)
+    return true
   }
 
   // MARK: - Data
@@ -784,9 +824,9 @@ final class SeptaskKitTaskListController: NSViewController {
     DispatchQueue.main.async(execute: work)
   }
 
-  /// Take pending notification metadata for an immediate reload. If the
-  /// caller is currently editing/settling/composing, `reload()` returns before
-  /// this is called, leaving the metadata queued for the next real repaint.
+  /// Take pending notification metadata for an immediate reload. If a move
+  /// batch or a drag holds reloads back, `reload()` returns before this is
+  /// called, leaving the metadata queued for the next real repaint.
   private func takePendingReloadIDs() -> Set<String> {
     reloadWorkItem?.cancel()
     reloadWorkItem = nil
@@ -799,12 +839,20 @@ final class SeptaskKitTaskListController: NSViewController {
   /// (empty for a CloudKit batch or a direct call). Those rows are this
   /// process's own doing and are kept off the passive-sync cues below.
   private func reload(animated: Bool = true, locallyChanged: Set<String> = []) {
-    // Every edit funnels through commitRename, which reloads — so a skipped
-    // refresh here is picked up the moment the edit ends. The settle window
-    // ends in a reload of its own, so skipping here is likewise not a loss.
-    if isTitleEditorActive || isSettling || composingTaskId != nil || isApplyingMove { return }
+    // Only two states HOLD a reload back, and both end in one of their own:
+    // a move batch (one write per task, see `move(to:taskIDs:)`) and a drag
+    // (drop targets must not shift between validate and accept). Editing,
+    // composing and the settle window no longer skip — they PIN their rows
+    // (see `pinned`) and let everything else update, so a list never sits
+    // stale behind an open editor or a lingering completion.
+    if isApplyingMove || isDragActive {
+      heldReload = true
+      return
+    }
+    heldReload = false
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
+    renderedDay = SeptenaDate.today
 
     // What's on screen right now, for the passive-sync diff below.
     let priorTasks = rows.compactMap(\.task)
@@ -812,6 +860,10 @@ final class SeptaskKitTaskListController: NSViewController {
     let selected = Set(tableView.selectedRowIndexes.compactMap { row in
       rows.indices.contains(row) ? rows[row].task?.id : nil
     })
+    // Where the selection sat, for the fallback below: when every selected
+    // row leaves (complete, move, delete, a remote change), the selection
+    // falls to the next task by id instead of to nothing.
+    let lastSelectedIndex = tableView.selectedRowIndexes.last
 
     let pool = LocalCache.tasks(in: context, filter: filter)
     // Capsules first: `chipped()` reads the snapshot, so it has to be current
@@ -941,7 +993,9 @@ final class SeptaskKitTaskListController: NSViewController {
       })
     }
 
-    apply(newRows, animated: animated)
+    let priorRows = rows
+    let live = liveEditorIDs
+    apply(pinned(newRows, liveEditors: live), animated: animated, preserving: live)
     emptyLabel.isHidden = !rows.isEmpty
     refreshEmptyLabel()
     onStoreChanged?()
@@ -951,8 +1005,91 @@ final class SeptaskKitTaskListController: NSViewController {
         guard let id = rows[$0].task?.id else { return false }
         return selected.contains(id)
       })
-      tableView.selectRowIndexes(indexes, byExtendingSelection: false)
+      if !indexes.isEmpty {
+        tableView.selectRowIndexes(indexes, byExtendingSelection: false)
+      } else if let successor = successorTaskId(in: priorRows, after: lastSelectedIndex,
+                                                excluding: selected),
+                let row = rows.firstIndex(where: { $0.task?.id == successor }) {
+        tableView.selectRowIndexes([row], byExtendingSelection: false)
+        tableView.scrollRowToVisible(row)
+      } else {
+        tableView.deselectAll(nil)
+      }
     }
+  }
+
+  /// Rows whose CELL holds live state a reload must not touch: the open
+  /// composer and a live ⌘R / new-task field editor.
+  private var liveEditorIDs: Set<String> {
+    var ids: Set<String> = []
+    if let composingTaskId { ids.insert(composingTaskId) }
+    if isTitleEditorActive, let editingTaskId { ids.insert(editingTaskId) }
+    return ids
+  }
+
+  /// Keep pinned rows on screen through a reload: the live editors, and the
+  /// rows lingering in the settle window. A pinned row the fresh read still
+  /// has keeps its ON-SCREEN value (the restyled-done copy, or the pre-edit
+  /// copy under a live editor, whose cell must not be reconfigured); one the
+  /// fresh read dropped is put back after the nearest surviving row that sat
+  /// above it. Everything else takes the fresh read. The pins come off when
+  /// their state ends — settle end, composer collapse and edit commit all
+  /// reload, and then the rows go wherever the data says.
+  private func pinned(_ fresh: [Row], liveEditors: Set<String>) -> [Row] {
+    let pins = liveEditors.union(settlingIDs)
+    guard !pins.isEmpty else { return fresh }
+    var result = fresh
+    let oldByKey = Dictionary(rows.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
+    for index in result.indices {
+      guard let id = result[index].task?.id, pins.contains(id),
+            let old = oldByKey[result[index].key] else { continue }
+      result[index] = old
+    }
+    var present = Set(result.map(\.key))
+    for (oldIndex, old) in rows.enumerated() {
+      guard let id = old.task?.id, pins.contains(id), !present.contains(old.key) else { continue }
+      var insertAt = 0
+      for above in stride(from: oldIndex - 1, through: 0, by: -1) {
+        if let anchor = result.firstIndex(where: { $0.key == rows[above].key }) {
+          insertAt = anchor + 1
+          break
+        }
+      }
+      result.insert(old, at: insertAt)
+      present.insert(old.key)
+    }
+    return result
+  }
+
+  /// The task that should take the selection once every selected row has
+  /// left: the first surviving task BELOW the old selection, else the nearest
+  /// one above. Task rows only (never a header, an event or the "New task"
+  /// line), and never a section heading.
+  private func successorTaskId(in prior: [Row], after index: Int?,
+                               excluding gone: Set<String>) -> String? {
+    guard let index, prior.indices.contains(index) else { return nil }
+    let survivors = Set(rows.compactMap { row -> String? in
+      guard let task = row.task, !task.isHeading else { return nil }
+      return task.id
+    })
+    func candidate(_ row: Row) -> String? {
+      guard let task = row.task, !task.isHeading, !gone.contains(task.id),
+            survivors.contains(task.id) else { return nil }
+      return task.id
+    }
+    for row in prior[(index + 1)...] {
+      if let id = candidate(row) { return id }
+    }
+    for row in prior[..<index].reversed() {
+      if let id = candidate(row) { return id }
+    }
+    return nil
+  }
+
+  /// Run a reload that `isApplyingMove` / `isDragActive` held back.
+  private func flushHeldReload() {
+    guard heldReload, !isApplyingMove, !isDragActive else { return }
+    reload()
   }
 
   /// Gated on the setting AND on access already being granted — this shell
@@ -1094,9 +1231,10 @@ final class SeptaskKitTaskListController: NSViewController {
     else { return [] }
     if justReconnectedClaude { return [.reconnectCue(state: .reconnected)] }
     if provider.isRefreshing { return [.reconnectCue(state: .refreshing)] }
-    // A real failure (network etc.) — a user-cancel leaves `lastError` nil,
-    // so the row stays in its calm default copy instead of crying wolf.
-    return [.reconnectCue(state: provider.lastError != nil ? .failed : .idle)]
+    // A real failure from the current interactive attempt (network etc.).
+    // `lastError` is diagnostic text and must not turn an expected expired
+    // token into a permanent warning after state reconciliation.
+    return [.reconnectCue(state: provider.lastRefreshFailed ? .failed : .idle)]
   }
 
   private func reconnectClaude() {
@@ -1125,6 +1263,7 @@ final class SeptaskKitTaskListController: NSViewController {
       _ = provider.needsReauth
       _ = provider.isRefreshing
       _ = provider.lastError
+      _ = provider.lastRefreshFailed
     } onChange: { [weak self] in
       Task { @MainActor in
         guard let self else { return }
@@ -1268,6 +1407,7 @@ final class SeptaskKitTaskListController: NSViewController {
       (tableView.view(atColumn: 0, row: index, makeIfNecessary: false)
         as? SeptaskKitTaskCell)?.playGhostCheckPulse()
     }
+    settlingIDs.formUnion(ghosted)
     restyle(ids: Array(ghosted), to: .done)
     beginSettle()
     return true
@@ -1327,11 +1467,10 @@ final class SeptaskKitTaskListController: NSViewController {
     TaskUndo.recordCreate(
       name: String(localized: "Import Reminder", comment: "SeptaskKit: undo action"),
       ids: [created.id], mutator: mutator,
-      rebuild: { [weak self] in
-        guard let self else { return [] }
-        return [self.mutator.create(title: pair.view.title,
-                                    deadline: pair.view.dueDate,
-                                    notes: pair.view.notes).id]
+      rebuild: { [mutator] in
+        [mutator.create(title: pair.view.title,
+                        deadline: pair.view.dueDate,
+                        notes: pair.view.notes).id]
       })
     reload()
   }
@@ -1353,12 +1492,11 @@ final class SeptaskKitTaskListController: NSViewController {
     TaskUndo.recordCreate(
       name: String(localized: "Import Reminders", comment: "SeptaskKit: undo action"),
       ids: createdIDs, mutator: mutator,
-      rebuild: { [weak self] in
-        guard let self else { return [] }
-        return pairs.map { pair in
-          self.mutator.create(title: pair.view.title,
-                              deadline: pair.view.dueDate,
-                              notes: pair.view.notes).id
+      rebuild: { [mutator] in
+        pairs.map { pair in
+          mutator.create(title: pair.view.title,
+                         deadline: pair.view.dueDate,
+                         notes: pair.view.notes).id
         }
       })
     reload()
@@ -1688,20 +1826,34 @@ final class SeptaskKitTaskListController: NSViewController {
   /// out where they sit, arrivals slide in, and everything else stays put.
   /// Falls back to a hard reload for filter switches / first population, and
   /// collapses to an instant swap under Reduce Motion.
-  private func apply(_ new: [Row], animated: Bool) {
+  /// `preserving` are rows whose cell holds a live editor: they are never
+  /// re-rendered here, and their presence forces the diff path even when a
+  /// hard reload was asked for — `reloadData()` would tear the editor down
+  /// mid-keystroke. Under Reduce Motion that diff runs without animation.
+  private func apply(_ new: [Row], animated: Bool, preserving: Set<String> = []) {
     let old = rows
     rows = new
 
-    guard animated, !old.isEmpty, !KitMotion.reduce else {
+    let diffable = !old.isEmpty && (animated && !KitMotion.reduce || !preserving.isEmpty)
+    guard diffable else {
       tableView.reloadData()
       return
+    }
+    let moving = animated && !KitMotion.reduce
+    let removeAnimation: NSTableView.AnimationOptions = moving ? KitMotion.removeRows : []
+    let insertAnimation: NSTableView.AnimationOptions = moving ? KitMotion.insertRows : []
+    func isPreserved(_ index: Int) -> Bool {
+      guard let id = new[index].task?.id else { return false }
+      return preserving.contains(id)
     }
 
     let oldKeys = old.map(\.key)
     let newKeys = new.map(\.key)
     if oldKeys == newKeys {
       var changed = IndexSet()
-      for index in new.indices where new[index] != old[index] { changed.insert(index) }
+      for index in new.indices where new[index] != old[index] && !isPreserved(index) {
+        changed.insert(index)
+      }
       if !changed.isEmpty {
         // Heights are CACHED: `reloadData(forRowIndexes:)` re-renders a cell
         // but never re-asks `heightOfRow`, so a row that just gained (or lost)
@@ -1730,9 +1882,9 @@ final class SeptaskKitTaskListController: NSViewController {
     for change in newKeys.difference(from: oldKeys) {
       switch change {
       case .remove(let offset, _, _):
-        tableView.removeRows(at: [offset], withAnimation: KitMotion.removeRows)
+        tableView.removeRows(at: [offset], withAnimation: removeAnimation)
       case .insert(let offset, _, _):
-        tableView.insertRows(at: [offset], withAnimation: KitMotion.insertRows)
+        tableView.insertRows(at: [offset], withAnimation: insertAnimation)
       }
     }
     tableView.endUpdates()
@@ -1746,7 +1898,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Surviving rows whose content changed (rename, date, today flag).
     let oldByKey = Dictionary(old.map { ($0.key, $0) }, uniquingKeysWith: { a, _ in a })
     var changed = IndexSet()
-    for index in new.indices {
+    for index in new.indices where !isPreserved(index) {
       if let previous = oldByKey[new[index].key], previous != new[index] {
         changed.insert(index)
       }
@@ -1799,25 +1951,19 @@ final class SeptaskKitTaskListController: NSViewController {
                                 atBottom: false)
       created.append(task.id)
     }
-    recordUndo(name: String(localized: "Paste Tasks", comment: "SeptaskKit: undo action"),
-               undo: { [weak self] in
-                 for id in created { self?.mutator.purge(id: id) }
-                 self?.reload()
-               },
-               redo: { [weak self] in
-                 guard let self else { return }
-                 // Re-create rather than un-purge: a purge is a real delete,
-                 // so there is no row left to restore.
-                 var again: [String] = []
-                 for title in titles.reversed() {
-                   let task = self.mutator.create(
-                     title: title, area: context.area, project: context.project,
-                     scheduled: context.scheduled, today: context.today, atBottom: false)
-                   again.append(task.id)
-                 }
-                 created = again
-                 self.reload()
-               })
+    // Re-create rather than un-purge on redo: a purge is a real delete, so
+    // there is no row left to restore.
+    let mutator = self.mutator
+    recordCreateUndo(name: String(localized: "Paste Tasks", comment: "SeptaskKit: undo action"),
+                     ids: created,
+                     rebuild: {
+                       titles.reversed().map { title in
+                         mutator.create(title: title, area: context.area,
+                                        project: context.project,
+                                        scheduled: context.scheduled, today: context.today,
+                                        atBottom: false).id
+                       }
+                     })
     reload()
     // Select what just landed, so ⌘K / move / delete act on the paste.
     let ids = Set(created)
@@ -1843,15 +1989,13 @@ final class SeptaskKitTaskListController: NSViewController {
   func duplicateSelection() {
     let originals = actionableSelection
     guard !originals.isEmpty else { return }
+    let mutator = self.mutator
     let ids = originals.map { mutator.duplicate($0).id }
     reload()
     recordCreateUndo(name: String(localized: "Duplicate Task",
                                   comment: "SeptaskKit: undo action"),
                      ids: ids,
-                     rebuild: { [weak self] in
-                       guard let self else { return [] }
-                       return originals.map { self.mutator.duplicate($0).id }
-                     })
+                     rebuild: { originals.map { mutator.duplicate($0).id } })
   }
 
   /// File the selection. `nil` area+project is the loose "Inbox" case.
@@ -1880,32 +2024,22 @@ final class SeptaskKitTaskListController: NSViewController {
       }
     }
 
-    recordUndo(name: String(localized: "Move Task", comment: "SeptaskKit: undo action"),
-              undo: { [weak self] in
-                guard let self else { return }
-                TaskUndo.restore(previous, using: self.mutator)
-                self.reload()
-                self.onStoreChanged?()
-              },
-              redo: { [weak self] in
-                guard let self else { return }
-                for entry in previous {
-                  apply(destination, id: entry.id)
-                }
-                self.reload()
-                self.onStoreChanged?()
-              })
-
     isApplyingMove = true
     for entry in previous {
       apply(destination, id: entry.id)
       mutator.acknowledge(id: entry.id)
     }
     isApplyingMove = false
-    // Each mutator posts synchronously. A single hard refresh after the batch
-    // avoids an intermediate animated diff leaving NSTableView out of sync
-    // with the final rows.
-    reload(animated: false)
+    // An open composer's List pill names the new home right away.
+    for entry in previous { refreshComposerRow(taskId: entry.id) }
+    // Redo is re-read from the store (`recordMove`), so the undo closures
+    // hold only the mutator and outlive this window.
+    TaskUndo.recordMove(before: previous, context: context, mutator: mutator)
+    // Each mutator posts synchronously, but `isApplyingMove` held every
+    // intermediate reload back, so this is ONE diff against the final rows:
+    // the moved rows animate out instead of the page blinking. The
+    // selection falls to the next task by id (see `reload`).
+    reload()
     onStoreChanged?()
   }
 
@@ -1932,6 +2066,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// pill asked. A multi-selection has no single row to point at, so it falls
   /// back to the centered command panel (SeptaskKitSurface.swift, Tier 2).
   func presentMoveMenu(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
     let selection = actionableSelection
     guard !selection.isEmpty else { return }
     let single = selection.count == 1
@@ -1956,6 +2091,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// picker: no preset submenu can silently flatten a fixed schedule into an
   /// after-completion rule.
   func presentRecurrencePanel(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
     let selection = actionableSelection
     guard !selection.isEmpty else { NSSound.beep(); return }
     guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
@@ -2024,6 +2160,46 @@ final class SeptaskKitTaskListController: NSViewController {
     onStoreChanged?()
   }
 
+  /// ⌘↑ / ⌘↓ — move the selected task(s) one slot within their group, the
+  /// keyboard twin of a drag reorder: same lists (`allowsReorder`), same
+  /// group bounds as a drop (`groupBounds`), same write
+  /// (`applyManualOrder`), same undo (`TaskUndo.recordReorder`). A
+  /// selection that spans groups, or is already at the group's edge, beeps.
+  /// Only manual order changes; the row never changes list this way.
+  func moveSelectionOneSlot(up: Bool) {
+    guard allowsReorder, composingTaskId == nil else { NSSound.beep(); return }
+    let picked = tableView.selectedRowIndexes.filter { index in
+      guard rows.indices.contains(index), let task = rows[index].task else { return false }
+      return !task.isHeading && task.status == .open
+    }
+    guard let first = picked.first, let last = picked.last else { NSSound.beep(); return }
+    let bounds = groupBounds(aroundGap: first)
+    guard bounds.contains(first), bounds.contains(last) else { NSSound.beep(); return }
+    let ids = picked.compactMap { rows[$0].task?.id }
+    let chosen = Set(ids)
+    let groupTasks = rows[bounds].compactMap { row -> SeptenaTask? in
+      guard let task = row.task, !task.isHeading, task.status == .open else { return nil }
+      return task
+    }
+    guard let firstPos = groupTasks.firstIndex(where: { chosen.contains($0.id) }),
+          let lastPos = groupTasks.lastIndex(where: { chosen.contains($0.id) })
+    else { NSSound.beep(); return }
+    let sequence = groupTasks.filter { !chosen.contains($0.id) }
+    let neighbor: SeptenaTask? = up
+      ? groupTasks[..<firstPos].last
+      : groupTasks[(lastPos + 1)...].first
+    guard let neighbor,
+          let neighborPos = sequence.firstIndex(where: { $0.id == neighbor.id })
+    else { NSSound.beep(); return }
+    let before = TaskUndo.positions(of: groupTasks.map(\.id), in: context)
+    applyManualOrder(ids: ids, into: sequence, at: up ? neighborPos : neighborPos + 1)
+    TaskUndo.recordReorder(before: before, context: context, mutator: mutator)
+    reload()
+    if let moved = rows.firstIndex(where: { $0.task.map { chosen.contains($0.id) } ?? false }) {
+      tableView.scrollRowToVisible(moved)
+    }
+  }
+
   /// The rows a command applies to (headings excluded — they only rename).
   private var actionableSelection: [SeptenaTask] {
     tableView.selectedRowIndexes.compactMap { row in
@@ -2035,6 +2211,11 @@ final class SeptaskKitTaskListController: NSViewController {
   // MARK: - Mutations
 
   func toggleCompleteSelection() {
+    // ⌘K with the row open: save the typed text, close, complete (Things).
+    if composingTaskId != nil {
+      completeComposingTask()
+      return
+    }
     // Mark-complete has no meaning in the trash — checkbox tap and ⌘K both
     // route to restore there (see `toggle(id:)`).
     guard filter != .recentlyDeleted else {
@@ -2076,15 +2257,10 @@ final class SeptaskKitTaskListController: NSViewController {
 
   private func restoreTasks(_ ids: [String]) {
     guard !ids.isEmpty else { return }
+    let mutator = self.mutator
     recordUndo(name: String(localized: "Restore Task", comment: "SeptaskKit: undo action"),
-              undo: { [weak self] in
-                for id in ids { self?.mutator.delete(id: id) }
-                self?.reload()
-              },
-              redo: { [weak self] in
-                for id in ids { self?.mutator.restore(id: id) }
-                self?.reload()
-              })
+              undo: { for id in ids { mutator.delete(id: id) } },
+              redo: { for id in ids { mutator.restore(id: id) } })
     for id in ids { mutator.restore(id: id) }
     reload()
   }
@@ -2101,31 +2277,29 @@ final class SeptaskKitTaskListController: NSViewController {
   /// the diffed reload's fade. Views that keep completed rows (Logbook) and
   /// pure reopens refresh immediately.
   ///
-  /// Restyling and `isSettling = true` happen BEFORE any `mutator` call —
+  /// Restyling and the `settlingIDs` pin happen BEFORE any `mutator` call —
   /// `TaskMutator.complete`/`uncomplete` post `.septenaTasksChanged`
   /// SYNCHRONOUSLY (`commitAndPush` → `TaskChange.post`, on the calling
-  /// thread, before the call returns). `reload()`'s only defense against that
-  /// racing ahead of the restyle is the `isSettling` flag, so it has to
-  /// already be true by the time the first mutator call fires — setting it
-  /// afterward is a no-op, the notification's reload already ran and wiped
-  /// the row before the linger ever started. This IS why the linger
-  /// previously didn't linger.
+  /// thread, before the call returns). Any reload that runs from there keeps
+  /// the pinned rows on screen (`pinned`) while the rest of the list
+  /// updates, so the pin has to be in place by the time the first mutator
+  /// call fires — set afterward, a reload could wipe the row before the
+  /// linger ever started.
   private func apply(completing: [SeptenaTask], reopening: [SeptenaTask]) {
     if !completing.isEmpty || !reopening.isEmpty {
       let completingIds = completing.map(\.id)
       let reopeningIds = reopening.map(\.id)
+      let mutator = self.mutator
       recordUndo(name: completingIds.isEmpty
                     ? String(localized: "Reopen Task", comment: "SeptaskKit: undo action")
                     : String(localized: "Complete Task", comment: "SeptaskKit: undo action"),
-                undo: { [weak self] in
-                  for id in completingIds { self?.mutator.uncomplete(id: id) }
-                  for id in reopeningIds { self?.mutator.complete(id: id) }
-                  self?.reload()
+                undo: {
+                  for id in completingIds { mutator.uncomplete(id: id) }
+                  for id in reopeningIds { mutator.complete(id: id) }
                 },
-                redo: { [weak self] in
-                  for id in completingIds { self?.mutator.complete(id: id) }
-                  for id in reopeningIds { self?.mutator.uncomplete(id: id) }
-                  self?.reload()
+                redo: {
+                  for id in completingIds { mutator.complete(id: id) }
+                  for id in reopeningIds { mutator.uncomplete(id: id) }
                 })
     }
     guard !completing.isEmpty else {
@@ -2134,9 +2308,10 @@ final class SeptaskKitTaskListController: NSViewController {
         // done but not yet dropped, so ⌘K (or a second checkbox tap) has to
         // read as "unchecked" right now — those seconds are exactly the window
         // in which the completion is meant to be reversible. `reload()` is
-        // suppressed while settling (that suppression IS the linger), so
+        // pinned while settling (that pin IS the linger), so
         // restyle in place and let the settle timer's own reload resolve the
         // list. Rows still lingering from the same batch keep their beat.
+        settlingIDs.subtract(reopening.map(\.id))
         restyle(ids: reopening.map(\.id), to: .open)
         for task in reopening { mutator.uncomplete(id: task.id) }
         return
@@ -2162,6 +2337,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
 
     isSettling = true
+    settlingIDs.formUnion(completing.map(\.id))
     // The row stays where it is, restyled as completed, for the settle window
     // — you see what you just did before it leaves.
     restyle(ids: completing.map(\.id), to: .done)
@@ -2178,15 +2354,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Undo reopens via `uncomplete` (status → open), matching SwiftUI's cancel.
   private func applyCancel(_ tasks: [SeptenaTask]) {
     let ids = tasks.map(\.id)
-    recordUndo(name: String(localized: "Cancel Task", comment: "SeptaskKit: undo action"),
-              undo: { [weak self] in
-                for id in ids { self?.mutator.uncomplete(id: id) }
-                self?.reload()
-              },
-              redo: { [weak self] in
-                for id in ids { self?.mutator.cancel(id: id) }
-                self?.reload()
-              })
+    TaskUndo.recordCancel(ids: ids, mutator: mutator)
 
     let dropsFinished: Bool
     switch filter {
@@ -2200,6 +2368,7 @@ final class SeptaskKitTaskListController: NSViewController {
     }
 
     isSettling = true
+    settlingIDs.formUnion(ids)
     restyle(ids: ids, to: .cancelled)
     for id in ids { mutator.cancel(id: id) }
     beginSettle()
@@ -2212,13 +2381,17 @@ final class SeptaskKitTaskListController: NSViewController {
   /// complete/cancel, and back to open when a lingering row is un-checked.
   private func restyle(ids: [String], to status: TaskStatus) {
     let wanted = Set(ids)
+    // A row under a live editor keeps its cell: re-rendering it would drop
+    // the typed text and the caret. Its value still changes, and the
+    // composer's own checkbox is refreshed by `refreshComposerRow`.
+    let live = liveEditorIDs
     var restyled = IndexSet()
     for index in rows.indices {
       if case .task(var task, let chip, let suggestion) = rows[index],
          wanted.contains(task.id) {
         task.status = status
         rows[index] = .task(task, chip: chip, suggestion: suggestion)
-        restyled.insert(index)
+        if !live.contains(task.id) { restyled.insert(index) }
       }
     }
     guard !restyled.isEmpty else { return }
@@ -2228,7 +2401,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Hold the list still for the settle window, then let the completed rows
   /// fade out on the next diffed reload.
   ///
-  /// Reloads are suppressed meanwhile rather than merely delayed: completing a
+  /// The settling rows are PINNED meanwhile (reloads still run for the rest of
+  /// the list): completing a
   /// task queues a CloudKit change, and the batch's `.septenaTasksChanged`
   /// would otherwise land mid-linger and yank the row out early — which is
   /// exactly the "row vanishes the instant you check it" feel this removes.
@@ -2238,6 +2412,7 @@ final class SeptaskKitTaskListController: NSViewController {
     let work = DispatchWorkItem { [weak self] in
       guard let self else { return }
       self.isSettling = false
+      self.settlingIDs.removeAll()
       self.settleWorkItem = nil
       self.reload()
     }
@@ -2251,6 +2426,7 @@ final class SeptaskKitTaskListController: NSViewController {
     settleWorkItem?.cancel()
     settleWorkItem = nil
     isSettling = false
+    settlingIDs.removeAll()
   }
 
   // MARK: - Dates (⌘S When, ⌘⇧D Deadline, ⌘⇧. Clear)
@@ -2258,6 +2434,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Anchor a date popover to the focused row and apply the choice to the
   /// whole actionable selection.
   func presentDatePopover(kind: SeptaskKitDatePopover.Kind) {
+    commitComposerTextIfOpen()
     let selection = actionableSelection
     guard !selection.isEmpty, tableView.selectedRow >= 0 else { return }
 
@@ -2289,6 +2466,7 @@ final class SeptaskKitTaskListController: NSViewController {
           self.mutator.setDeadline(id: task.id, date: date)
         }
         self.mutator.acknowledge(id: task.id)
+        self.refreshComposerRow(taskId: task.id)
       }
       self.reload()
       self.recordScheduleUndo(
@@ -2341,6 +2519,9 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func toggleTodaySelection() {
+    // Typed text first: the reload below keeps an open composer's cell, but
+    // the store must already hold what was typed.
+    commitComposerTextIfOpen()
     let before = actionableSelection.map(scheduleSnapshot)
     for task in actionableSelection {
       if task.today {
@@ -2350,6 +2531,7 @@ final class SeptaskKitTaskListController: NSViewController {
         pendingPromoteFlash.insert(task.id)
       }
       mutator.acknowledge(id: task.id)
+      refreshComposerRow(taskId: task.id)
     }
     reload()
     playPendingPromoteFlashes()
@@ -2359,41 +2541,50 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   func deleteSelection() {
+    // A deleted row must not stay pinned open as a composer (`reload` keeps
+    // the composing row on screen), so save and fold it first.
+    commitOpenEdits()
     let victims = actionableSelection
     guard !victims.isEmpty else { return }
-    let anchor = tableView.selectedRowIndexes.first ?? 0
+    let ids = victims.map(\.id)
     if filter == .recentlyDeleted {
       // ⌘⌫ already means "delete" everywhere else; in the trash itself that
-      // naturally reads as the final, permanent delete.
-      purgeTasks(victims.map(\.id))
-    } else {
-      let ids = victims.map(\.id)
-      recordUndo(name: String(localized: "Delete Task", comment: "SeptaskKit: undo action"),
-                undo: { [weak self] in
-                  for id in ids { self?.mutator.restore(id: id) }
-                  self?.reload()
-                },
-                redo: { [weak self] in
-                  for id in ids { self?.mutator.delete(id: id) }
-                  self?.reload()
-                })
-      for task in victims {
-        mutator.delete(id: task.id)
-      }
-      reload()
+      // naturally reads as the final, permanent delete — which has no undo,
+      // so it asks first.
+      confirmPurge(count: ids.count) { [weak self] in self?.purgeTasks(ids) }
+      return
     }
-    // Standard list behavior: selection moves to the nearest surviving row.
-    if !rows.isEmpty {
-      tableView.selectRowIndexes([min(anchor, rows.count - 1)],
-                                 byExtendingSelection: false)
-    }
+    TaskUndo.recordDelete(ids: ids, mutator: mutator)
+    for id in ids { mutator.delete(id: id) }
+    // Selection falls to the next task by id (see `reload`), never to a raw
+    // index that can land on a header, an event or the "New task" line.
+    reload()
+  }
+
+  /// Permanent delete is the one task command with no undo, so it confirms
+  /// first — as a sheet on this window, Cancel the Return-safe default
+  /// (`KitPrompt`'s sheet form).
+  private func confirmPurge(count: Int, then purge: @escaping @MainActor () -> Void) {
+    KitPrompt.confirmDestructive(
+      title: count == 1
+        ? String(localized: "Delete this task permanently?",
+                 comment: "SeptaskKit: permanent delete confirm (one task)")
+        : String(localized: "Delete \(count) tasks permanently?",
+                 comment: "SeptaskKit: permanent delete confirm (several tasks)"),
+      message: String(localized: "You can't undo this.",
+                      comment: "SeptaskKit: permanent delete confirm"),
+      confirmTitle: String(localized: "Delete Permanently", comment: "SeptaskKit: context menu"),
+      in: view.window,
+      onConfirm: purge)
   }
 
   private func commitRename(id: String, title: String) {
-    clearEditingTitle()
+    if editingTaskId == id { clearEditingTitle() }
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     let wasNew = (id == pendingNewTaskId)
-    pendingNewTaskId = nil
+    // Only THIS row's marker. A ⌘N made while this rename was still live
+    // owns the marker now, and wiping it would leave that row unpurgeable.
+    if wasNew { pendingNewTaskId = nil }
     if wasNew, trimmed.isEmpty {
       // The ⌘N row was escaped/committed empty — it never really existed for
       // the user, so remove it entirely rather than soft-deleting to trash.
@@ -2404,22 +2595,27 @@ final class SeptaskKitTaskListController: NSViewController {
       // to register for a brand-new row.
       mutator.update(id: id, title: trimmed)
       recordNewTaskUndo(id: id)
-    } else if let task = rows.compactMap(\.task).first(where: { $0.id == id }),
+    } else if let task = LocalCache.task(id: id, in: context),
               !trimmed.isEmpty, trimmed != task.title {
-      let previousTitle = task.title
-      recordUndo(name: String(localized: "Rename Task", comment: "SeptaskKit: undo action"),
-                undo: { [weak self] in
-                  self?.mutator.update(id: id, title: previousTitle)
-                  self?.reload()
-                },
-                redo: { [weak self] in
-                  self?.mutator.update(id: id, title: trimmed)
-                  self?.reload()
-                })
+      // Read the STORE for "before": `rows` can hold a pinned pre-edit copy.
       mutator.update(id: id, title: trimmed)
+      TaskUndo.recordRename(id: id, before: task.title, after: trimmed, mutator: mutator)
     }
     reload()
-    view.window?.makeFirstResponder(tableView)
+    // Take the keyboard back only when nothing else claimed it while this
+    // commit waited a tick: a composer or field editor opened since (⌘N
+    // during a live rename), or a click into the sidebar / inspector, keeps
+    // its focus.
+    let responder = view.window?.firstResponder
+    let claimedElsewhere: Bool
+    if responder is NSText {
+      claimedElsewhere = true
+    } else if let other = responder as? NSView {
+      claimedElsewhere = !other.isDescendant(of: tableView)
+    } else {
+      claimedElsewhere = false
+    }
+    if !claimedElsewhere { view.window?.makeFirstResponder(tableView) }
   }
 
   // MARK: - Creation (⌘N)
@@ -2437,22 +2633,19 @@ final class SeptaskKitTaskListController: NSViewController {
   /// clicked in. ⌘N (inInbox: false) keeps inheriting, which is what makes it
   /// land in the group you are working in.
   func createTask(inInbox: Bool = false) {
-    if isTitleEditorActive {
-      // Commit the in-flight edit first; commitRename runs synchronously.
-      view.window?.makeFirstResponder(tableView)
-    }
-    if composingTaskId != nil {
-      // A composer left open would otherwise silently swallow the reload
-      // below (reload() no-ops while `composingTaskId` is set) — the new
-      // task would be created but never actually show up. Closing it first
-      // gives ⌘N a clean slate no matter what was being edited before.
-      collapseComposer(commit: true)
-    }
+    // Save and close whatever is open FIRST, synchronously — a live ⌘R
+    // rename included, whose own commit would otherwise land a tick later,
+    // on top of the row this creates. Read the anchor afterwards: closing a
+    // composer reselects its row.
+    commitOpenEdits()
 
     guard let context = creationContext(inInbox: inInbox) else {
       NSSound.beep()
       return
     }
+    // Things: a new task lands directly BELOW the selected one when it joins
+    // that task's list. Captured before the create changes the selection.
+    let anchor = inInbox ? nil : focusedTaskForCreate()
 
     // Bottom-positioned for anything landing in the Inbox run: the "New task"
     // line sits at the FOOT of that run, so a top-positioned create opens the
@@ -2473,6 +2666,10 @@ final class SeptaskKitTaskListController: NSViewController {
                               deferPush: true,
                               atBottom: landsInInboxRun)
     pendingNewTaskId = task.id
+    if let anchor { place(newTaskId: task.id, below: anchor, context: context) }
+    // Not gated by the settle window any more (it pins its rows instead of
+    // skipping the reload), so ⌘N within a completion's linger still finds
+    // the row it just made.
     reload(animated: false)
     guard let row = rows.firstIndex(where: { $0.task?.id == task.id }) else { return }
     tableView.selectRowIndexes([row], byExtendingSelection: false)
@@ -2488,6 +2685,44 @@ final class SeptaskKitTaskListController: NSViewController {
       // editor is still one keystroke away as ⌘R.
       beginComposing(id: task.id)
     }
+  }
+
+  /// Move a just-created task to sit directly below `anchor`, when it landed
+  /// in the anchor's own list (same area / project; Upcoming excluded, where
+  /// the new row's day need not be the anchor's). Elsewhere the default
+  /// placement stands. On a project page the new row also joins the anchor's
+  /// section. The slot is the midpoint to the anchor's next neighbour in the
+  /// rendered group; if precision has run out there, the default placement
+  /// stands rather than renumbering the whole list for one new row.
+  ///
+  /// Known cost: `reorder` pushes immediately, so this draft reaches CloudKit
+  /// before its first title (the create itself defers its push). Fixing that
+  /// needs a `position` on `TaskMutator.create`.
+  private func place(newTaskId id: String, below anchor: SeptenaTask,
+                     context filing: (area: String?, project: String?, today: Bool, scheduled: Date?)) {
+    guard filter != .upcoming, allowsReorder, !anchor.isHeading,
+          anchor.area == filing.area, anchor.project == filing.project,
+          let anchorRow = rows.firstIndex(where: { $0.task?.id == anchor.id })
+    else { return }
+    var below: Double?
+    for index in (anchorRow + 1)..<rows.count {
+      if case .header = rows[index] { break }
+      guard let next = rows[index].task else { continue }
+      if next.isHeading { break }
+      guard next.status == .open, next.area == anchor.area,
+            next.project == anchor.project, next.heading == anchor.heading
+      else { break }
+      below = next.orderKey
+      break
+    }
+    let above = anchor.orderKey
+    guard let slot = TaskOrder.positions(count: 1, above: above, below: below).first,
+          slot > above, below.map({ slot < $0 }) ?? true
+    else { return }
+    if case .project = filter, let heading = anchor.heading {
+      mutator.setHeading(id: id, heading: heading)
+    }
+    mutator.reorder(id: id, toPosition: slot)
   }
 
   /// Where a newly created task should be filed, given the list being looked
@@ -2561,12 +2796,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// because the only caller is a Today header — the row belongs both to
   /// Today and to that list, which is exactly what the header represents.
   private func createTask(inArea area: String?, project: String?) {
-    if isTitleEditorActive {
-      view.window?.makeFirstResponder(tableView)
-    }
-    if composingTaskId != nil {
-      collapseComposer(commit: true)
-    }
+    commitOpenEdits()
     let task = mutator.create(title: "", area: area, project: project,
                               scheduled: nil, today: true, deferPush: true, atBottom: false)
     pendingNewTaskId = task.id
@@ -2616,11 +2846,15 @@ final class SeptaskKitTaskListController: NSViewController {
       cell.beginEditing()
       return
     }
+    // Retry by task ID, never by the captured index: a reload in between
+    // (a sync batch, a settle ending) can put a different row at that index.
+    guard let id = rows.indices.contains(row) ? rows[row].task?.id : nil else { return }
     DispatchQueue.main.async { [weak self] in
-      guard let self, self.rows.indices.contains(row) else { return }
-      if let cell = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: true)
+      guard let self,
+            let fresh = self.rows.firstIndex(where: { $0.task?.id == id }) else { return }
+      if let cell = self.tableView.view(atColumn: 0, row: fresh, makeIfNecessary: true)
         as? SeptaskKitTaskCell {
-        self.markEditingTitle(atRow: row)
+        self.markEditingTitle(atRow: fresh)
         cell.beginEditing()
       }
     }
@@ -2628,7 +2862,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Flag the row as title-editing and repaint just that row view — NOT a
   /// `reloadData`, which would tear down the field editor we are about to
-  /// attach (the same hazard `isTitleEditorActive` guards `reload()` against).
+  /// attach (the same hazard `reload` avoids by preserving `liveEditorIDs`).
   private func markEditingTitle(atRow row: Int) {
     editingTaskId = rows[row].task?.id
     repaintEditingRow(row)
@@ -2692,11 +2926,39 @@ final class SeptaskKitTaskListController: NSViewController {
   /// all. Descending is `↓` on the title's last line or Tab, both of which
   /// read top-to-bottom instead of as a chord.
   func commitComposerEditing() {
-    guard composingTaskId != nil else { return }
+    // ⌘↩ in a bare field editor (⌘R, the "New task" line) finishes it too.
+    if composingTaskId == nil, isTitleEditorActive {
+      commitFieldEditorNow()
+      return
+    }
+    guard let id = composingTaskId else { return }
     // Deferred one tick for the same first-responder reentrancy reason as
     // `KitComposerCell.deferCommitAndCollapse` — the key event that asked is
-    // still on the stack.
-    DispatchQueue.main.async { [weak self] in self?.collapseComposer(commit: true) }
+    // still on the stack. Keyed to the row that asked, so a second ⌘↩ (or a
+    // composer opened in between) can't fold a different row.
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.composingTaskId == id else { return }
+      self.collapseComposer(commit: true)
+    }
+  }
+
+  /// Write the open composer's typed title / notes to the store WITHOUT
+  /// closing it — before a command that acts on the composing row (⌘T, ⌘S,
+  /// ⌘⇧D, ⌘M, Repeat) and may re-read it. Idempotent: the cell only reports
+  /// text that differs from what it last committed.
+  private func commitComposerTextIfOpen() {
+    guard let id = composingTaskId else { return }
+    composerCell(for: id)?.commit()
+  }
+
+  /// ⌘K or the composer's own checkbox with the row open: save the typed
+  /// text, close the row, then complete it through the ordinary path (undo,
+  /// settle beat) — Things' "complete from the open to-do".
+  private func completeComposingTask() {
+    guard let id = composingTaskId else { return }
+    collapseComposer(commit: true, animated: false)
+    guard rows.contains(where: { $0.task?.id == id }) else { return }
+    toggle(id: id)
   }
 
   /// ⌥↩ — open the closed selected row straight into its notes (revealed,
@@ -2778,9 +3040,9 @@ final class SeptaskKitTaskListController: NSViewController {
     if commit, let row = rows.firstIndex(where: { $0.task?.id == taskId }),
        let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
          as? KitComposerCell {
-      // Mutator notifications fire sync; `reload()` no-ops while
-      // `composingTaskId` is still set, so the height animation below owns
-      // the visual fold instead of racing a full-list reload.
+      // The mutator's notification coalesces onto the next run-loop turn
+      // (`scheduleReload`), so the height animation below owns the visual
+      // fold; the reload at its end lands whatever changed meanwhile.
       cell.commit()
     }
     // Resign before the height fold — a live field editor would keep edit
@@ -2822,13 +3084,23 @@ final class SeptaskKitTaskListController: NSViewController {
     // in the still-tall frame (a visible jump).
     animateComposerHeight(ofRow: row, animated: animated, reveal: false) { [weak self] in
       guard let self else { return }
-      self.tableView.reloadData(forRowIndexes: [row], columnIndexes: [0])
-      self.refreshCardGeometry()
-      // Keep the just-closed task selected so Esc returns to the closed-row
-      // keyboard surface (arrows / ⌘K / …) instead of an empty selection.
-      if self.rows.indices.contains(row) {
-        self.tableView.selectRowIndexes([row], byExtendingSelection: false)
+      // By ID, not the index captured before the fold: a reload during the
+      // animation can have moved the row.
+      if let closed = self.rows.firstIndex(where: { $0.task?.id == taskId }),
+         self.composingTaskId != taskId {
+        self.tableView.reloadData(forRowIndexes: [closed], columnIndexes: [0])
+        self.refreshCardGeometry()
+        // Keep the just-closed task selected so Esc returns to the closed-row
+        // keyboard surface (arrows / ⌘K / …) instead of an empty selection —
+        // unless the user already selected something else meanwhile.
+        let current = self.tableView.selectedRowIndexes
+        if self.composingTaskId == nil, current.isEmpty || current == [closed] {
+          self.tableView.selectRowIndexes([closed], byExtendingSelection: false)
+        }
       }
+      // The pin is off: anything that changed while the row was open (a sync
+      // batch, a ⌘T that took it off this list) lands now.
+      self.reload()
     }
   }
 
@@ -2997,10 +3269,17 @@ final class SeptaskKitTaskListController: NSViewController {
     }
 
     cell.onCommit = { [weak self] title, notes in
-      guard let self else { return }
+      guard let self,
+            // Compare against the STORE, not the `task` this closure captured:
+            // a pill, a sync batch or an earlier commit may have moved it on.
+            let current = LocalCache.task(id: task.id, in: self.context) else { return }
       let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-      let titleChanged = !trimmed.isEmpty && trimmed != task.title
-      let notesChanged = notes != task.notes
+      let titleChanged = !trimmed.isEmpty && trimmed != current.title
+      // Same normalization on both sides as the cell applies to what it
+      // saves (trailing whitespace only), so an untouched row never rewrites
+      // its notes — and never syncs a no-op.
+      let storedNotes = KitComposerCell.normalizedNotes(current.notes)
+      let notesChanged = KitComposerCell.normalizedNotes(notes) != storedNotes
       guard titleChanged || notesChanged else { return }
       // Title and notes are one logical edit. Send one save/notification; an
       // empty notes string is intentional because the backend uses it to clear
@@ -3008,8 +3287,24 @@ final class SeptaskKitTaskListController: NSViewController {
       self.mutator.update(id: task.id,
                           title: titleChanged ? trimmed : nil,
                           notes: notesChanged ? (notes ?? "") : nil)
+      // A brand-new row's first save is its CREATION, recorded when it closes
+      // (`collapseComposer` → `recordNewTaskUndo`); an edit to an existing row
+      // is undoable as an edit.
+      if task.id != self.pendingNewTaskId {
+        TaskUndo.recordEdit(id: task.id,
+                            beforeTitle: current.title,
+                            afterTitle: titleChanged ? trimmed : current.title,
+                            beforeNotes: current.notes,
+                            afterNotes: notesChanged ? (notes ?? "") : current.notes,
+                            mutator: self.mutator)
+      }
     }
-    cell.onCollapse = { [weak self] in self?.collapseComposer(commit: false) }
+    // Keyed to this row: a deferred collapse that lands after a different row
+    // opened must not fold that one.
+    cell.onCollapse = { [weak self] in
+      guard let self, self.composingTaskId == task.id else { return }
+      self.collapseComposer(commit: true)
+    }
 
     cell.onAction = { [weak self] action in
       guard let self else { return }
@@ -3026,36 +3321,13 @@ final class SeptaskKitTaskListController: NSViewController {
           self?.reload()
         }
       case .toggleComplete:
-        let wasOpen = task.status == .open
-        self.recordUndo(name: wasOpen
-                          ? String(localized: "Complete Task", comment: "SeptaskKit: undo action")
-                          : String(localized: "Reopen Task", comment: "SeptaskKit: undo action"),
-                        undo: { [weak self] in
-                          if wasOpen { self?.mutator.uncomplete(id: task.id) }
-                          else { self?.mutator.complete(id: task.id) }
-                          self?.reload()
-                        },
-                        redo: { [weak self] in
-                          if wasOpen { self?.mutator.complete(id: task.id) }
-                          else { self?.mutator.uncomplete(id: task.id) }
-                          self?.reload()
-                        })
-        if wasOpen {
-          self.mutator.complete(id: task.id)
-          self.mutator.acknowledge(id: task.id)
-        } else {
-          self.mutator.uncomplete(id: task.id)
-        }
-        self.collapseComposer(commit: true)
+        // Same path as ⌘K from the open row: save, close, then complete with
+        // the ordinary undo and settle beat.
+        self.completeComposingTask()
 
       case .toggleToday:
-        if task.today {
-          self.mutator.removeFromToday(id: task.id)
-        } else {
-          self.mutator.moveToToday(id: task.id)
-        }
-        self.mutator.acknowledge(id: task.id)
-        self.refreshComposerRow(taskId: task.id)
+        // ⌘T's own path, so the pill gets the same undo and promote cue.
+        self.toggleTodaySelection()
 
       case .when(let anchor):
         SeptaskKitDatePopover.present(kind: .when,
@@ -3316,14 +3588,18 @@ final class SeptaskKitTaskListController: NSViewController {
     let row = tableView.selectedRow
     guard row >= 0, let heading = rows[row].task, heading.isHeading else { return }
     // Exact copy from TaskListView's confirmationDialog — same story either shell.
-    guard KitPrompt.confirmDestructive(
+    let headingId = heading.id
+    KitPrompt.confirmDestructive(
       title: String(localized: "Delete this section?", comment: "Project heading delete confirm"),
       message: String(localized: "Its tasks stay in the project.",
                       comment: "Project heading delete confirm"),
-      confirmTitle: String(localized: "Delete Section", comment: "SeptaskKit: heading CRUD")
-    ) else { return }
-    mutator.delete(id: heading.id)
-    reload()
+      confirmTitle: String(localized: "Delete Section", comment: "SeptaskKit: heading CRUD"),
+      in: view.window
+    ) { [weak self] in
+      guard let self else { return }
+      self.mutator.delete(id: headingId)
+      self.reload()
+    }
   }
 
   private func item(_ title: String, _ action: Selector, _ key: String,
@@ -3373,6 +3649,36 @@ final class SeptaskKitTaskListController: NSViewController {
   }
   @objc private func menuCreateNextCopy() { createNextCopySelection() }
   @objc private func menuDelete() { deleteSelection() }
+}
+
+// MARK: - Context menu validation
+
+extension SeptaskKitTaskListController: NSMenuItemValidation {
+  /// The row menus are built once and reused, so every item is checked
+  /// against the REAL selection each time it opens — never left enabled for
+  /// a selection that no longer holds a task.
+  func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+    switch menuItem.action {
+    // Navigation and page-level items don't depend on a selected row.
+    case #selector(navMenuSelect(_:)):
+      return true
+    case #selector(menuNewSection):
+      if case .project = filter { return true }
+      return false
+    case #selector(menuRename):
+      let row = tableView.selectedRow
+      return rows.indices.contains(row) && rows[row].task != nil
+    case #selector(menuDeleteHeading):
+      let row = tableView.selectedRow
+      return rows.indices.contains(row) && rows[row].task?.isHeading == true
+    case #selector(menuApplySuggestion(_:)):
+      return actionableSelection.count == 1 && menuSuggestions.indices.contains(menuItem.tag)
+    case #selector(menuPauseResumeRepeat), #selector(menuCreateNextCopy):
+      return actionableSelection.contains { $0.recurrence != nil }
+    default:
+      return hasActionableSelection
+    }
+  }
 }
 
 // MARK: - Context menu freshness
@@ -3506,6 +3812,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// headers from selection on its own (`rows[row].task != nil`), so nothing
   /// downstream actually needed `isGroupRow` to be true.
   func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { false }
+
+  /// Type-select matches the task TITLE — the cell's own string would be the
+  /// chip or the date. Rows with no task (headers, events, the "New task"
+  /// line) don't take part.
+  func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?,
+                 row: Int) -> String? {
+    guard rows.indices.contains(row) else { return nil }
+    return rows[row].task?.title
+  }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
     // The "New task" line is selectable even though it carries no task, so
@@ -3733,6 +4048,25 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     return item
   }
 
+  /// A drag that starts here holds reloads until it ends (`isDragActive`).
+  func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession,
+                 willBeginAt screenPoint: NSPoint, forRowIndexes rowIndexes: IndexSet) {
+    isDragActive = true
+  }
+
+  func tableView(_ tableView: NSTableView, draggingSession session: NSDraggingSession,
+                 endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+    endDragHold()
+  }
+
+  /// Let held reloads through again — the drag dropped, ended, or left.
+  private func endDragHold() {
+    dropAboveRow = nil
+    guard isDragActive else { return }
+    isDragActive = false
+    flushHeldReload()
+  }
+
   func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo,
                  proposedRow row: Int,
                  proposedDropOperation operation: NSTableView.DropOperation)
@@ -3741,6 +4075,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       dropAboveRow = nil
       return []
     }
+    // From the first hover until the drop, the rows this indicator points
+    // at must be the rows `acceptDrop` resolves: hold sync reloads.
+    isDragActive = true
     // Never drop into the logged-footer / completed block — clamp the
     // indicator to the open-work region above it.
     let target = clampDropRow(row) ?? row
@@ -3756,6 +4093,12 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo,
                  row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
     dropAboveRow = nil
+    // Release the hold BEFORE writing: `rows` is still exactly what the
+    // indicator showed (nothing reloads until the explicit `reload()` below —
+    // the mutators' notifications coalesce onto the next run-loop turn).
+    isDragActive = false
+    // Every exit (a refused drop included) lets a held sync reload through.
+    defer { flushHeldReload() }
     let ids = KitDrag.ids(from: info)
     guard !ids.isEmpty else { return false }
     let insertAt = clampDropRow(row) ?? row
@@ -3768,32 +4111,96 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     }
 
     let dragged = Set(ids)
+    // Order within the RECEIVING group only — the open task rows between the
+    // headers around the gap. A neighbour from a different group (grouped
+    // Today's next list, Upcoming's next day) has an unrelated order key.
+    let bounds = groupBounds(aroundGap: insertAt)
+    func orderable(_ row: Row) -> SeptenaTask? {
+      guard let task = row.task, !task.isHeading, task.status == .open,
+            !dragged.contains(task.id) else { return nil }
+      return task
+    }
+    let sequence = rows[bounds].compactMap(orderable)
+    let insertion = rows[bounds.lowerBound..<max(bounds.lowerBound, insertAt)]
+      .compactMap(orderable).count
 
-    // Neighbor order keys around the insertion gap, skipping headers and the
-    // rows being moved. TaskOrder.positions spaces the drop between them.
-    // (The midpoint-exhaustion renumber pass is shared via `applyManualOrder`.)
-    var aboveKey: Double?
-    for index in stride(from: insertAt - 1, through: 0, by: -1) {
-      if let task = rows[index].task, !task.isHeading, !dragged.contains(task.id) {
-        aboveKey = task.orderKey
-        break
-      }
-    }
-    var belowKey: Double?
-    for index in insertAt..<rows.count {
-      if let task = rows[index].task, !task.isHeading, !dragged.contains(task.id) {
-        belowKey = task.orderKey
-        break
-      }
-    }
+    // Undo: one ⌘Z puts back order, filing and day together (one event, one
+    // undo group). Captured before any write.
+    let positionsBefore = TaskUndo.positions(of: sequence.map(\.id) + ids, in: context)
+    let draggedTasks = ids.compactMap { LocalCache.task(id: $0, in: context) }
+    let filingBefore = draggedTasks.map(TaskUndo.FilingSnapshot.init)
+    let scheduleBefore = draggedTasks.map(TaskUndo.ScheduleSnapshot.init)
 
-    let positions = TaskOrder.positions(count: ids.count, above: aboveKey, below: belowKey)
-    for (id, position) in zip(ids, positions) {
-      mutator.reorder(id: id, toPosition: position)
+    // Re-file and re-date FIRST: re-homing resets `position` to the top of
+    // the new home, so ordering has to be written after it, not before.
+    let refiled = refileIfGroupedDrop(ids: ids, at: insertAt)
+    let rescheduled = rescheduleIfUpcomingDrop(ids: ids, at: insertAt)
+    // Through the shared midpoint-with-renumber fallback, so an exhausted
+    // gap can't land the row next to the wrong neighbour.
+    applyManualOrder(ids: ids, into: sequence, at: insertion)
+
+    if refiled {
+      TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
     }
-    refileIfGroupedDrop(ids: ids, at: insertAt, dragged: dragged)
+    if rescheduled {
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+        before: scheduleBefore, context: context, mutator: mutator)
+    }
+    TaskUndo.recordReorder(before: positionsBefore, context: context, mutator: mutator)
     reload()
     return true
+  }
+
+  /// The rows of the group around a drop gap (or a row): from just below the
+  /// nearest header / section heading above, to just above the next one.
+  private func groupBounds(aroundGap gap: Int) -> Range<Int> {
+    func isBreak(_ row: Row) -> Bool {
+      if case .header = row { return true }
+      return row.task?.isHeading == true
+    }
+    let gap = min(max(gap, 0), rows.count)
+    var start = 0
+    for index in stride(from: gap - 1, through: 0, by: -1) where isBreak(rows[index]) {
+      start = index + 1
+      break
+    }
+    var end = rows.count
+    for index in gap..<rows.count where isBreak(rows[index]) {
+      end = index
+      break
+    }
+    return start..<max(start, end)
+  }
+
+  /// Upcoming: a drop under another day's header moves the task to THAT day
+  /// (Things). The same write the When popover makes for a future date —
+  /// `reschedule`, with the fixed-repeat question, then off Today — so the
+  /// row lands in the bucket it was dropped in. Returns whether anything
+  /// changed.
+  private func rescheduleIfUpcomingDrop(ids: [String], at gap: Int) -> Bool {
+    guard filter == .upcoming else { return false }
+    var dayKey: String?
+    for index in stride(from: min(gap, rows.count) - 1, through: 0, by: -1) {
+      if case .header(let id, _, _, _) = rows[index] {
+        if id.hasPrefix("day-") { dayKey = String(id.dropFirst(4)) }
+        break
+      }
+    }
+    guard let dayKey, let date = SeptenaDate.parse(dayKey) else { return false }
+    let today = SeptenaDate.today
+    var changed = false
+    for id in ids {
+      guard let task = LocalCache.task(id: id, in: context) else { continue }
+      // The bucket `upcomingBuckets` filed it under — already there: no-op.
+      let bucket = [task.scheduled, task.deadline].compactMap { $0 }.filter { $0 > today }.min()
+      guard bucket != dayKey, let mode = rescheduleMode(for: task, newDate: date) else { continue }
+      mutator.reschedule(id: id, date: date, mode: mode)
+      mutator.removeFromToday(id: id)
+      mutator.acknowledge(id: id)
+      changed = true
+    }
+    return changed
   }
 
   /// Drop row clamped to the open-work region — never into the logged
@@ -3853,6 +4260,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     let dragged = Set(ids)
     guard !ids.isEmpty else { return false }
     let remaining = headings.filter { !dragged.contains($0.id) }
+    let positionsBefore = TaskUndo.positions(of: headings.map(\.id), in: context)
     // Insert before the first non-dragged heading at or below the gap;
     // none → append.
     var insertion = remaining.count
@@ -3864,6 +4272,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
     }
     applyManualOrder(ids: ids, into: remaining, at: insertion)
+    TaskUndo.recordReorder(before: positionsBefore, context: context, mutator: mutator)
     reload()
     return true
   }
@@ -3898,13 +4307,23 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       insertion = idx + 1
     }
 
+    // Undo puts back both the section and the order — one gesture.
+    let positionsBefore = TaskUndo.positions(of: groupRows.map(\.id) + ids, in: context)
+    let filingBefore = ids.compactMap { LocalCache.task(id: $0, in: context) }
+      .map(TaskUndo.FilingSnapshot.init)
+    var refiled = false
     for id in ids {
       guard let task = byId[id] else { continue }
       if resolvedHeading(task, headingIds: headingIds) != group {
         mutator.setHeading(id: id, heading: group)
+        refiled = true
       }
     }
     applyManualOrder(ids: ids, into: groupRows, at: insertion)
+    if refiled {
+      TaskUndo.recordMove(before: filingBefore, context: context, mutator: mutator)
+    }
+    TaskUndo.recordReorder(before: positionsBefore, context: context, mutator: mutator)
     reload()
     return true
   }
@@ -3938,14 +4357,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// group also re-files the task there (Things behavior): the receiving
   /// group is the nearest header above the insertion gap; none means the
   /// loose zone.
-  private func refileIfGroupedDrop(ids: [String], at row: Int, dragged: Set<String>) {
+  /// Returns whether any task changed list (so the caller records a move).
+  private func refileIfGroupedDrop(ids: [String], at row: Int) -> Bool {
     let grouped: Bool
     switch filter {
     case .today: grouped = todayGroupsByList
     case .unscheduled: grouped = true
     default: grouped = false
     }
-    guard grouped else { return }
+    guard grouped else { return false }
 
     var targetProject: String?
     var targetArea: String?
@@ -3957,20 +4377,21 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
     }
 
-    let byId = Dictionary(rows.compactMap(\.task).map { ($0.id, $0) },
-                          uniquingKeysWith: { a, _ in a })
+    var anyMoved = false
     for id in ids {
-      guard let task = byId[id] else { continue }
-      var moved = false
+      // The store, not `rows`: a drag from another window's list carries ids
+      // this table may not be showing.
+      guard let task = LocalCache.task(id: id, in: context) else { continue }
       // Area only matters outside a project group (a project implies its area).
       let destinationChanged = task.project != targetProject
         || (targetProject == nil && task.area != targetArea)
       if destinationChanged {
         mutator.moveToList(id: id, area: targetArea, project: targetProject)
-        moved = true
+        mutator.acknowledge(id: id)
+        anyMoved = true
       }
-      if moved { mutator.acknowledge(id: id) }
     }
+    return anyMoved
   }
 
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?,
@@ -4415,7 +4836,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
     // flag the SwiftUI row reads (`TaskCheckboxModel`) — without it the AppKit
     // Today list kept drawing gold after the user turned aging off.
-    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled) ? nil : task.todayTenureFill()
+    // Aging shows on the Today list only: inside an area or project the same
+    // gray reads as noise about a list the row isn't being judged in.
+    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter != .today)
+      ? nil : task.todayTenureFill()
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
     checkbox.agentCue = !done && task.showsAgentCue()
 
@@ -4585,12 +5009,28 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     onRename?(taskId, title.stringValue)
   }
 
+  /// End the edit NOW and hand back what was typed, without firing
+  /// `onRename` — for a caller that commits synchronously itself
+  /// (`SeptaskKitTaskListController.commitOpenEdits`). Nil when no edit is
+  /// live. `editing` drops first, so the end-editing notification that
+  /// `abortEditing` may post finds nothing to commit.
+  func takeEditForCommit() -> String? {
+    guard editing else { return nil }
+    let text = title.currentEditor()?.string ?? title.stringValue
+    editing = false
+    _ = title.abortEditing()
+    title.isEditable = false
+    title.lineBreakMode = .byTruncatingTail
+    title.cell?.truncatesLastVisibleLine = true
+    return text
+  }
+
   func control(_ control: NSControl, textView: NSTextView,
                doCommandBy commandSelector: Selector) -> Bool {
-    // Escape cancels: restore the original title, then let editing end —
-    // controlTextDidEndEditing sees an unchanged string and commits nothing.
+    // Escape SAVES, like Return and click-away — one edit contract for every
+    // editor in the list; ⌘Z takes a save back. It used to revert, which
+    // threw away a new row's typed title and then purged the row as empty.
     if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-      title.stringValue = plainTitle
       window?.makeFirstResponder(nil)
       return true
     }
@@ -6196,6 +6636,11 @@ final class SeptaskKitTableView: NSTableView {
   /// Drag left the table or ended — clear the insertion line. `validateDrop`
   /// is not called on exit, so the table has to report this itself.
   var onDragEnded: (() -> Void)?
+  /// ⌘↑ (true) / ⌘↓ (false) — move the selection one slot.
+  var onMoveSelection: ((Bool) -> Void)?
+  /// The inline composer is open — decides which commands still reach a row
+  /// while one of ITS text views holds the caret.
+  var isComposing: (() -> Bool)?
 
   /// A click in the page's side padding is a click on the PAGE, not on the
   /// row that happens to share its y. The card occupies the content column
@@ -6245,11 +6690,71 @@ final class SeptaskKitTableView: NSTableView {
     return super.validateUserInterfaceItem(item)
   }
 
+  /// Where the keyboard is, as far as row commands are concerned.
+  private enum TextFocus {
+    /// No text view holds the caret — every row command applies.
+    case noText
+    /// A text view OUTSIDE this table (inspector, sidebar rename, a search
+    /// field). `performKeyEquivalent` walks the whole window, so without this
+    /// the list would steal ⌘K / ⌘⌫ / ⌘R from text the user is typing there.
+    case elsewhere
+    /// The open composer's title or notes.
+    case composer
+    /// A bare field editor in a row (⌘R rename, "New task" line, header "+").
+    case fieldEditor
+  }
+
+  private var textFocus: TextFocus {
+    guard let text = window?.firstResponder as? NSText else { return .noText }
+    guard text.isDescendant(of: self) else { return .elsewhere }
+    return isComposing?() == true ? .composer : .fieldEditor
+  }
+
   override func performKeyEquivalent(with event: NSEvent) -> Bool {
-    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    // Only the four real modifiers: arrows carry `.function` / `.numericPad`,
+    // and Caps Lock must not turn ⌘K into an unknown chord.
+    let flags = event.modifierFlags.intersection([.command, .option, .shift, .control])
+    let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+    let focus = textFocus
+
+    // Typing elsewhere in the window: none of this list's bindings apply.
+    if focus == .elsewhere { return super.performKeyEquivalent(with: event) }
+
+    // While a text view in a row holds the caret, only commands that make
+    // sense mid-edit get through, and each saves what was typed first (the
+    // controller does that). Everything else — ⌘⌫ (delete to line start),
+    // ⌘↑/⌘↓, ⌘R, ⌘D … — belongs to the text.
+    if focus != .noText {
+      let composer = focus == .composer
+      let command = flags == .command
+      let commandShift = flags == [.command, .shift]
+      let commandOption = flags == [.command, .option]
+      let allowed: Bool
+      if command, ["\r", "\u{3}", "n", ","].contains(key) {
+        allowed = true            // ⌘↩ save + close, ⌘N save then create, ⌘, settings
+      } else if (commandShift && key == "f") || (commandOption && key == "i") {
+        allowed = true            // Quick Find, inspector: window-level, no row write
+      } else if (command && ["k", "t", "s", "m"].contains(key))
+                  || (commandShift && ["m", "d"].contains(key)) {
+        allowed = composer        // act on the composing row (text saved first)
+      } else {
+        allowed = false
+      }
+      guard allowed else { return super.performKeyEquivalent(with: event) }
+    }
+
+    // ⌘↑ / ⌘↓ — keyboard reorder. Arrow keys report their function-key
+    // characters, never letters.
+    if flags == [.command], let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first {
+      switch Int(scalar.value) {
+      case NSUpArrowFunctionKey: onMoveSelection?(true); return true
+      case NSDownArrowFunctionKey: onMoveSelection?(false); return true
+      default: break
+      }
+    }
 
     if flags == [.command, .option] {
-      switch event.charactersIgnoringModifiers?.lowercased() {
+      switch key {
       // ⌥⌘I — the platform's inspector toggle.
       case "i": onToggleInspector?(); return true
       // ⌥⌘M — file into the SUGGESTED list, deliberately one modifier from
@@ -6265,7 +6770,7 @@ final class SeptaskKitTableView: NSTableView {
     // Cancel equivalent), matching TaskRowShortcuts. ⌘⇧F is Quick Find, the
     // same binding the SwiftUI window uses.
     if flags == [.command, .shift] {
-      switch event.charactersIgnoringModifiers?.lowercased() {
+      switch key {
       case "d": onDeadline?(); return true
       case ".": onClearSchedule?(); return true
       case "f": onQuickFind?(); return true
@@ -6277,13 +6782,17 @@ final class SeptaskKitTableView: NSTableView {
     guard flags == .command else {
       return super.performKeyEquivalent(with: event)
     }
-    switch event.charactersIgnoringModifiers {
-    // ⌘↩ / ⌘keypad-Enter — commit and close, the platform's "finish this"
-    // (Mail's Send, a sheet's default action). Caught here rather than in the
+    switch key {
+    // ⌘↩ / ⌘keypad-Enter — save and close the open row (composer or field
+    // editor), the platform's "finish this". Caught here rather than in the
     // composer cell so ONE handler covers the caret being in the title, in
-    // notes, or on a pill, and so the text views' key bindings never see it —
-    // ⌘↩ has no standard text binding, a text view would just beep.
-    case "\r", "\u{3}": onCommitEditing?(); return true
+    // notes, or on a pill. With nothing open it is not ours: pass it on.
+    case "\r", "\u{3}":
+      guard isComposing?() == true || focus == .fieldEditor else {
+        return super.performKeyEquivalent(with: event)
+      }
+      onCommitEditing?()
+      return true
     case "k": onToggleComplete?(); return true
     case "t": onToggleToday?(); return true
     case "r": onBeginEdit?(); return true
@@ -6292,7 +6801,7 @@ final class SeptaskKitTableView: NSTableView {
     case "d": onDuplicate?(); return true
     case "m": onMove?(); return true
     case ",": SeptaskKitSettingsWindow.show(); return true
-    case "\u{7F}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
+    case "\u{7f}": onDelete?(); return true   // ⌘⌫, matching TaskRowShortcuts.delete
     default: return super.performKeyEquivalent(with: event)
     }
   }
