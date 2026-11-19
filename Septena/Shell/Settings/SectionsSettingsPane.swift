@@ -408,9 +408,6 @@ struct SectionDetailPane: View {
     theme.setColor(hex, for: sectionKey)
   }
 
-  /// Per-key content. Tasks gets local prefs; the rest pull cached
-  /// catalog data from `SettingsStore`. Unknown / un-cataloged keys
-  /// fall through to identity-only.
   /// Section-specific content is plugin-driven. Each migrated plugin
   /// returns one or more `Section { ... }` blocks via `detailPaneContent`;
   /// sections without a plugin or without a detail-pane override
@@ -428,7 +425,8 @@ struct SectionDetailPane: View {
   // All per-section detail content now lives in the corresponding
   // plugin's `detailPaneContent()` view. Sections without an override
   // render the identity row + onboarding trigger only. See e.g.
-  // CaffeineDetailContent / TasksDetailContent / NutritionDetailContent.
+  // CaffeineDetailContent / NutritionDetailContent. Tasks has none: its
+  // settings live on the top-level Settings ▸ Tasks pane.
 }
 
 // MARK: - Per-section notification toggles
@@ -529,6 +527,18 @@ struct NotificationsOverviewPane: View {
         }
       } footer: {
         Text("The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day.")
+      }
+
+      // The overdue badge is a task setting; it lives on the Tasks pane.
+      // This is only a pointer, not a second toggle.
+      Section {
+        NavigationLink(value: SettingsView.SettingsDestination.tasks) {
+          Label("Overdue badge", systemImage: "app.badge")
+        }
+      } header: {
+        Text("Badge")
+      } footer: {
+        Text("Set the app icon badge for overdue tasks in Tasks settings.")
       }
 
       if notificationsEnabled {

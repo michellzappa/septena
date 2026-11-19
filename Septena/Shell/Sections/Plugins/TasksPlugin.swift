@@ -16,7 +16,8 @@ enum TasksPlugin: SectionPlugin {
   // user route the tile straight there instead.
   static func destinationView() -> AnyView? { AnyView(TasksDestinationView()) }
 
-  static func detailPaneContent() -> AnyView? { AnyView(TasksDetailContent()) }
+  // No `detailPaneContent`: task settings live on the top-level
+  // Settings ▸ Tasks pane (`TaskSettingsPane`), not under Sections ▸ Tasks.
 
   static var exportContribution: SectionExportContribution? {
     SectionExportContribution(
@@ -98,15 +99,6 @@ enum TasksPlugin: SectionPlugin {
     "createdAt": ISO8601DateFormatter().string(from: e.createdAt),
     "position": e.position, "dataBase64": data.base64EncodedString(),
   ])
-}
-
-// Thin full-app adapter: the actual rows live in Shell/Tasks/
-// TaskSettingsSections.swift, shared with Septask's dedicated Settings
-// (docs/SEPTASK.md) so the two apps' task knobs can't drift.
-private struct TasksDetailContent: View {
-  var body: some View {
-    TaskSettingsSections()
-  }
 }
 
 @MainActor func taskExportDict(_ e: TaskEntity) -> [String: Any] {

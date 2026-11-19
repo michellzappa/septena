@@ -72,3 +72,25 @@ struct SettingsTopGradient: View {
     .ignoresSafeArea()
   }
 }
+
+#if os(macOS)
+extension View {
+  /// One row of a macOS Settings sidebar (`List(selection:)` in a
+  /// `NavigationSplitView`), shared by Septena and Septask. The native
+  /// selection would paint the app accent, which is the black/white ink, as a
+  /// solid bar with inverted text. So the native fill is suppressed and the
+  /// selected row wears the app's canonical inset selection instead
+  /// (`SidebarMacRowBackground`, the same token as the Tasks sidebar), with
+  /// normal ink text. One selection language, see `SelectionLanguage.swift`.
+  func settingsSidebarRow<Tag: Hashable>(_ tag: Tag, selection: Tag?) -> some View {
+    self
+      .tag(tag)
+      .listRowBackground(SidebarMacRowBackground(isSelected: selection == tag))
+      .septenaSuppressListCellSelection()
+      // The list still treats the row as selected and flips its text to
+      // white for a prominent background. The selection here is a light
+      // accent wash, so the text keeps its normal ink.
+      .environment(\.backgroundProminence, .standard)
+  }
+}
+#endif

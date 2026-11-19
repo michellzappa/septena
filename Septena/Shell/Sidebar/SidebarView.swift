@@ -326,7 +326,7 @@ struct SidebarRootView: View {
         id: "tasks",
         title: "Tasks",
         localActions: { AnyView(tasksMenuExtraRows) },
-        add: usesPushNavigation ? .action { nav.shouldStartCreating = true } : nil
+        add: usesPushNavigation ? .action { nav.requestNewTask() } : nil
       )
       #else
       // Let SwiftUI supply the macOS sidebar material, row metrics, active
@@ -452,12 +452,12 @@ struct SidebarRootView: View {
     #if !SEPTASK
     Divider()
     // Page-specific settings, in the same slot Next uses (just above the
-    // shared Settings row): Tasks has no dedicated pane — its knobs live in
-    // Settings ▸ Sections ▸ Tasks, so deep-link straight there. Rides
-    // `NavigationState` (iOS forwards it through the shared settings sheet).
-    // Septask has no Settings surface until P3, so the entry is compiled out.
+    // shared Settings row): deep-link to the top-level Settings ▸ Tasks
+    // pane. Rides `NavigationState` (iOS forwards it through the shared
+    // settings sheet). Septask has its own Settings shell, so the entry is
+    // compiled out there.
     Button {
-      nav.settingsDestination = .section("tasks")
+      nav.settingsDestination = .tasks
       nav.showSettings = true
     } label: {
       Label("Task Settings", systemImage: "checklist")
@@ -478,7 +478,7 @@ struct SidebarRootView: View {
         // Land on Today (where the triage band lives) instead of a separate
         // Inbox page (retired). The composer seeds from the Today filter.
         nav.path = [.filter(.today)]
-        nav.shouldStartCreating = true
+        nav.requestNewTask()
       },
       onCreateProject: { title, areaId in createProject(title: title, areaId: areaId) },
       onCreateArea: { createArea() },
@@ -1709,6 +1709,7 @@ private struct SidebarTaskDrop: ViewModifier {
   let kind: Kind
   let mutator: TaskMutator
   @Environment(\.usesPushNavigation) private var usesPushNavigation
+  @Environment(\.modelContext) private var modelContext
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
@@ -1725,7 +1726,13 @@ private struct SidebarTaskDrop: ViewModifier {
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
+                  // One drop = one undo step (shake / ⌘Z), covering every
+                  // dragged row. Today rides in the filing snapshot, so a
+                  // drop on Today undoes too.
+                  let before = ids.compactMap { LocalCache.task(id: $0, in: modelContext) }
+                    .map(TaskUndo.FilingSnapshot.init)
                   for id in ids { rehome(id) }
+                  TaskUndo.recordMove(before: before, context: modelContext, mutator: mutator)
                   return true
                 })
     } else {

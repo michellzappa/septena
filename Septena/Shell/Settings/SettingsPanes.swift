@@ -1940,8 +1940,7 @@ struct MotionGalleryPane: View {
 // installed `SectionEntity` (label/color) overrides the defaults when
 // present. Per-key content below uses cached catalog data from
 // `SettingsStore` — intake catalogs, etc. Sections
-// without catalog data show identity only. Tasks is special-cased to
-// host the local task prefs (badge, today, sort) that used to live in
-// a top-level Tasks pane.
+// without catalog data show identity only. Task settings are not here:
+// they live on the top-level Settings ▸ Tasks pane (`TaskSettingsPane`).
 
 // MARK: - Palette

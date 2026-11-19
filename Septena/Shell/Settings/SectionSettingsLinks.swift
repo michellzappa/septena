@@ -20,18 +20,13 @@ enum SectionSettingsLinks {
   static func forSection(_ sectionKey: String) -> [SectionSettingsRoute] {
     switch sectionKey {
     case "tasks":
-      [
-        link(.connectedApp(.reminders),
-             detail: "Choose the Reminders list to bring into your Inbox."),
-        link(.connectedApp(.calendar),
-             detail: "Choose which calendar events appear with Today and Upcoming."),
-        link(.connectedApp(.things),
-             detail: "Move a Things database into Tasks with a one-time import."),
-        link(.claudeAI,
-             title: "AI & Claude",
-             systemImage: "brain.head.profile",
-             detail: "Choose how Claude can create and organize tasks."),
-      ]
+      // Every task setting lives on the top-level Settings ▸ Tasks pane
+      // (which itself links Reminders, Calendar, Things, and Claude). This
+      // page keeps only the section switches, plus this one way back.
+      [link(.tasks,
+            title: "Task settings",
+            systemImage: "checklist",
+            detail: "Today, adding tasks, calendar, Reminders, badge, and Claude.")]
 
     case "activity":
       [link(.connectedApp(.appleHealth),

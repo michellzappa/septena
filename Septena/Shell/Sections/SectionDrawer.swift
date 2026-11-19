@@ -397,6 +397,14 @@ struct SectionDrawer<Content: View>: View {
   @State private var showingSettings = false
   #endif
 
+  #if !SEPTASK
+  /// Where "Customize <Section>" lands: Tasks has its own top-level
+  /// Settings ▸ Tasks pane; every other section opens its Sections page.
+  private var settingsDestination: SettingsView.SettingsDestination {
+    sectionKey == "tasks" ? .tasks : .section(sectionKey)
+  }
+  #endif
+
   private var resolvedAccent: Color {
     accent ?? theme.color(for: sectionKey)
   }
@@ -536,7 +544,7 @@ struct SectionDrawer<Content: View>: View {
                     settingsAction()
                   } else {
                     #if os(macOS) && !SEPTASK
-                    nav.settingsDestination = .section(sectionKey)
+                    nav.settingsDestination = settingsDestination
                     nav.showSettings = true
                     #elseif os(macOS)
                     // Septask compiles no Settings surface until P3 (and
@@ -617,7 +625,7 @@ struct SectionDrawer<Content: View>: View {
     // no SettingsView (its own settings shell is P3 — docs/SEPTASK.md).
     #if os(iOS) && !SEPTASK
     .sheet(isPresented: $showingSettings) {
-      SettingsView(initialDestination: .section(sectionKey))
+      SettingsView(initialDestination: settingsDestination)
     }
     #endif
     // The section name is the standard inline nav-bar title — plain text in

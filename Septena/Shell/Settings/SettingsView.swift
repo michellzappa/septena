@@ -17,8 +17,8 @@ import UIKit
 //   • Sync            — server URL + manual sync
 //   • Privacy         — analytics consent
 //   • About           — version / links
+//   • Tasks           — every task setting (shared `TaskSettingsPane`)
 //   ── Sections ────────────────────────────
-//   • Tasks           — badge, today toggle, task sort + identity
 //   • Training, Nutrition, Sleep, Habits, Intake, …
 //                     — identity + (where applicable) catalog data
 //
@@ -235,6 +235,7 @@ struct SettingsView: View {
   enum SettingsDestination: Hashable {
     case account
     // Root rows (Apple-style intent groups), in sidebar order.
+    case tasks           // every task setting (shared TaskSettingsPane)
     case sections        // collapsed per-section list (absorbs Manage Sections)
     case home            // homepage: layout, timeline, welcome, insights
     case notifications   // promoted to root
@@ -367,16 +368,19 @@ struct SettingsView: View {
   private func sidebarList(selection: Binding<SettingsDestination?>) -> some View {
     List(selection: selection) {
       SwiftUI.Section {
-        IdentityHeaderRow().tag(SettingsDestination.account)
+        IdentityHeaderRow()
+          .settingsSidebarRow(.account, selection: selection.wrappedValue)
       }
       SwiftUI.Section {
         ForEach(staticDestinations, id: \.self) { dest in
-          staticRow(dest).tag(dest)
+          staticRow(dest)
+            .settingsSidebarRow(dest, selection: selection.wrappedValue)
         }
       }
       // About on its own, below Feedback — gray disc tile, set apart.
       SwiftUI.Section {
-        aboutRow.tag(SettingsDestination.about)
+        aboutRow
+          .settingsSidebarRow(.about, selection: selection.wrappedValue)
       }
     }
   }
@@ -386,8 +390,21 @@ struct SettingsView: View {
     // Seven intent groups. The profile card above this list is destination 0;
     // About/Advanced live under Account so utility pages don't consume root
     // slots, and the former General controls sit inside Home.
-    [.sections, .home, .notifications, .connectionsAI,
+    // Tasks leads: it is the one section every user has, and its settings
+    // used to hide two levels down under Sections ▸ Tasks.
+    [.tasks, .sections, .home, .notifications, .connectionsAI,
      .sharingData, .privacy, .feedback]
+  }
+
+  /// Septena's navigation value for each linked row on the shared Tasks pane.
+  static func taskSettingsDestination(_ link: TaskSettingsLink) -> SettingsDestination {
+    switch link {
+    case .section:   return .section("tasks")
+    case .reminders: return .connectedApp(.reminders)
+    case .calendar:  return .connectedApp(.calendar)
+    case .things:    return .connectedApp(.things)
+    case .claudeAI:  return .claudeAI
+    }
   }
 
   private func staticRow(_ dest: SettingsDestination) -> some View {
@@ -425,6 +442,7 @@ struct SettingsView: View {
   private func title(for dest: SettingsDestination) -> String {
     switch dest {
     case .account:      return "Account"
+    case .tasks:        return "Tasks"
     case .sections:     return "Sections"
     case .home:         return "Home"
     case .connectionsAI: return "Connections & AI"
@@ -470,6 +488,7 @@ struct SettingsView: View {
   private func icon(for dest: SettingsDestination) -> String {
     switch dest {
     case .account:      return "person.crop.circle"
+    case .tasks:        return "checklist"
     case .sections:     return "square.grid.2x2"
     case .home:         return "house"
     case .connectionsAI: return "brain.head.profile"
@@ -522,6 +541,7 @@ struct SettingsView: View {
   private func pane(for dest: SettingsDestination) -> some View {
     switch dest {
     case .account:           AccountSettingsPane()
+    case .tasks:             TaskSettingsPane(destination: Self.taskSettingsDestination)
     case .sections:          SectionsSettingsPane()
     case .home:              HomeSettingsPane()
     case .connectionsAI:     ConnectionsAISettingsPane()
@@ -554,6 +574,9 @@ struct SettingsView: View {
     case .advanced:          AdvancedSettingsPane()
     case .motionGallery:     MotionGalleryPane()
     case .milestonePreview:  MilestonePreviewPane()
+    #if os(macOS)
+    #else
+    #endif
     #if os(macOS)
     case .localMcp:          LocalMCPSettingsPane()
     #else
