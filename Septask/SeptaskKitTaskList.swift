@@ -3384,6 +3384,11 @@ final class SeptaskKitTaskListController: NSViewController {
                                       initial: KitDayFormat.date(fromWire: task.scheduled),
                                       relativeTo: anchor.bounds, of: anchor) { [weak self] date, today in
           guard let self else { return }
+          // Capture at the gesture (from the STORE: an earlier pill may have
+          // moved the captured `task` on), record after: the same undo step
+          // the ⌘S popover registers, so ⌘Z takes back a pill change too.
+          let before = [LocalCache.task(id: task.id, in: self.context) ?? task]
+            .map(self.scheduleSnapshot)
           if today {
             self.mutator.moveToToday(id: task.id)
           } else {
@@ -3392,15 +3397,24 @@ final class SeptaskKitTaskListController: NSViewController {
           }
           self.mutator.acknowledge(id: task.id)
           self.refreshComposerRow(taskId: task.id)
+          self.recordScheduleUndo(
+            name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
+            before: before)
         }
 
       case .deadline(let anchor):
         SeptaskKitDatePopover.present(kind: .deadline,
                                       initial: KitDayFormat.date(fromWire: task.deadline),
                                       relativeTo: anchor.bounds, of: anchor) { [weak self] date, _ in
-          self?.mutator.setDeadline(id: task.id, date: date)
-          self?.mutator.acknowledge(id: task.id)
-          self?.refreshComposerRow(taskId: task.id)
+          guard let self else { return }
+          let before = [LocalCache.task(id: task.id, in: self.context) ?? task]
+            .map(self.scheduleSnapshot)
+          self.mutator.setDeadline(id: task.id, date: date)
+          self.mutator.acknowledge(id: task.id)
+          self.refreshComposerRow(taskId: task.id)
+          self.recordScheduleUndo(
+            name: String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
+            before: before)
         }
 
       case .list(let anchor):
