@@ -304,8 +304,22 @@ private struct SeptaskAccountPane: View {
 /// One page, not a hub: the shared AI + Claude sections (the Claude row opens
 /// the task backend pane), then Connected Apps (docs/SETTINGS_FLATTEN_SPEC.md).
 private struct SeptaskConnectionsAISettingsPane: View {
+  @Environment(\.modelContext) private var modelContext
+  @Environment(CKEngine.self) private var ckEngine
+  @Environment(SettingsStore.self) private var store
+
   var body: some View {
     ClaudeAISettingsPane {
+      Section {
+        Toggle("Pause all agents", isOn: Binding(
+          get: { store.agentsPaused },
+          set: { store.setAgentsPaused($0, context: modelContext, engine: ckEngine) }
+        ))
+      } header: {
+        Text("Agents")
+      } footer: {
+        Text("While paused, no agent can pick up or work on a task. Stop one task from its conversation instead.")
+      }
       Section {
         NavigationLink(value: SeptaskSettingsView.Destination.reminders) {
           Label("Reminders", systemImage: "checklist")

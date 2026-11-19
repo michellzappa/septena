@@ -1723,6 +1723,11 @@ struct AppSettings: Codable {
   /// source-stable.
   var rolledInDismissedOn: String? = nil
 
+  /// "Pause all agents" (docs/TASK_FACTORY_SPEC.md §10). While true the task
+  /// backend refuses every agent claim. Account-wide, so a pause on one device
+  /// holds on all of them. Nil → not paused.
+  var agentsPaused: Bool? = nil
+
   /// When the first-run welcome (section picker + chained onboarding) was
   /// completed. The durable, cross-device "this account has been welcomed"
   /// marker: synced so a returning user's *new* device never re-shows the

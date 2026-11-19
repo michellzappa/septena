@@ -22,7 +22,8 @@ import Foundation
 // Keep the two lists in lockstep.
 
 enum SeptaskSyncedSettings {
-  static let keys = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone"]
+  static let keys = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone",
+                     "agentsPaused"]
 
   /// The blob. `v1`: the shape is `AppSettings`' own JSON.
   static let storeKey = "septask.syncedSettings.v1"
@@ -62,6 +63,7 @@ enum SeptaskSyncedSettings {
     case "calendarHiddenTitles": return s.calendarHiddenTitles.map { .array($0.map { .string($0) }) } ?? .null
     case "rolledInDismissedOn": return .from(s.rolledInDismissedOn)
     case "homeTimezone": return .from(s.time?.homeTimezone)
+    case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
     default: return .null
     }
   }
@@ -88,6 +90,12 @@ enum SeptaskSyncedSettings {
       guard let x = string() else { return false }
       // `homeTimezone` is not optional in `AppTimeSettings`: no zone, no block.
       s.time = x.map { AppTimeSettings(homeTimezone: $0, travelMode: nil, travelTimezone: nil) }
+    case "agentsPaused":
+      switch v {
+      case .null: s.agentsPaused = nil
+      case .bool(let b): s.agentsPaused = b
+      default: return false
+      }
     case "calendarHiddenTitles":
       switch v {
       case .null: s.calendarHiddenTitles = nil

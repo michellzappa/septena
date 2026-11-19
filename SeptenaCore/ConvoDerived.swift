@@ -37,7 +37,7 @@ extension TaskConvo {
   /// backend filter and the badge (the gateway mirrors this rule in TS): marked
   /// for Claude, OR last provider turn low-confidence — and not terminal.
   func isPendingReasoning() -> Bool {
-    guard !isTerminal else { return false }
+    guard !isTerminal, stoppedAt == nil else { return false }
     if assignee == .claude { return true }
     if let c = lastProviderTurn?.confidence, c < 0.5 { return true }
     return false
@@ -60,6 +60,12 @@ func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
                         nextAction: "No conversation yet", pendingReasoning: pending)
   }
 
+  // The user stopped agent work: nothing is owed by anyone until they resume.
+  if convo.stoppedAt != nil {
+    return ConvoDerived(stage: .inProgress, badge: nil,
+                        nextAction: "Stopped", pendingReasoning: false)
+  }
+
   if convo.hasOpenProviderQuestion {
     return ConvoDerived(stage: .awaitingHuman, badge: .needsYou,
                         nextAction: "Tap to answer", pendingReasoning: pending)
@@ -67,6 +73,9 @@ func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
 
   // Agent owes the next move (just confirmed, or the user just chose).
   let stage: ConvoStage = (convo.confirmedIntent == nil) ? .clarifying : .inProgress
+  // A claim lease is wall-clock time on the backend, not the app's day, and
+  // this projection is nonisolated, so it reads the real clock.
+  let working = convo.isClaimed(at: Date())
   return ConvoDerived(stage: stage, badge: .working,
-                      nextAction: "Claude's move", pendingReasoning: pending)
+                      nextAction: working ? "Claude is working" : "Claude's move", pendingReasoning: pending)
 }

@@ -230,6 +230,17 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "convo.assignee")
   }
 
+  /// Stops (or resumes) agent work on a task. Resuming also hands the task
+  /// back to Claude, since that is the only reason to resume.
+  func setConvoStopped(id: String, _ stopped: Bool) {
+    guard let entity = fetch(id: id) else { return }
+    var convo = entity.conversation
+    convo.stoppedAt = stopped ? Date() : nil
+    if !stopped { convo.assignee = .claude }
+    entity.conversation = convo
+    commitAndPush(entity, op: stopped ? "convo.stop" : "convo.resume")
+  }
+
   func setConvoArtifact(id: String, _ artifact: ConvoArtifact) {
     guard let entity = fetch(id: id) else { return }
     var convo = entity.conversation

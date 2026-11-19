@@ -108,6 +108,7 @@ final class KitConversationView: NSView {
     if let open { stack.addArrangedSubview(questionBlock(open)) }
     if let meta = metaRow() { stack.addArrangedSubview(meta) }
     if convo.isTerminal { stack.addArrangedSubview(terminalRow()) }
+    if let agent = agentRow() { stack.addArrangedSubview(agent) }
     if let artifact = convo.artifact { stack.addArrangedSubview(artifactBlock(artifact)) }
     if let handoff = convo.handoff { stack.addArrangedSubview(handoffView(handoff)) }
 
@@ -250,6 +251,33 @@ final class KitConversationView: NSView {
     return block
   }
 
+  /// Agent status with the human's stop, while the agent owes the next move
+  /// (Claude assigned, no open question, not terminal). Stopped: the backend
+  /// refuses every agent write until Resume (ADR 0008).
+  private func agentRow() -> NSView? {
+    let stopped = convo.stoppedAt != nil
+    guard !convo.isTerminal, openQuestion == nil, stopped || convo.assignee == .claude else { return nil }
+    let text = stopped
+      ? String(localized: "Agent work stopped", comment: "SeptaskKit: the user stopped agent work on a task")
+      : convo.isClaimed(at: DayClock.appNow)
+        ? String(localized: "Claude is working…", comment: "SeptaskKit: an agent holds the task")
+        : String(localized: "Waiting for Claude", comment: "SeptaskKit: assigned to Claude, not picked up yet")
+    let label = NSTextField(labelWithString: text)
+    label.font = SeptaskKitTheme.chip
+    label.textColor = SeptaskKitTheme.inkSecondary
+    let title = stopped
+      ? String(localized: "Resume", comment: "SeptaskKit: let agents work this task again")
+      : String(localized: "Stop", comment: "SeptaskKit: stop agent work on this task")
+    let button = NSButton(title: title, target: self, action: #selector(toggleStopped))
+    button.bezelStyle = .rounded
+    button.controlSize = .small
+    let row = NSStackView(views: [label, button])
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 8
+    return row
+  }
+
   /// The conversation reached a terminal state. `wontDo` reads grey and
   /// neutral rather than red — deciding not to do something is a valid
   /// outcome, not a failure.
@@ -382,6 +410,13 @@ final class KitConversationView: NSView {
     showOther = false
     append(ConvoTurn(seq: 0, role: .user, step: open.step,
                      otherText: text, inReplyTo: open.seq, ts: Date()))
+  }
+
+  @objc private func toggleStopped() {
+    guard let taskID else { return }
+    mutator.setConvoStopped(id: taskID, convo.stoppedAt == nil)
+    convo = mutator.conversation(id: taskID) ?? convo
+    rebuild()
   }
 
   /// `seq: 0` is deliberate — `appendConvoTurn` assigns the real sequence

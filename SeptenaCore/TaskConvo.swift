@@ -100,9 +100,22 @@ struct TaskConvo: Codable, Hashable {
   var endState: ConvoEndState?
   var endStateNote: String?      // e.g. needsVerify: *what* to verify
   var assignee: ConvoAssignee?   // nil = router-decided
+  /// The user stopped agent work on this task. Only the app writes it; the
+  /// backend refuses every agent write while it is set (ADR 0008).
+  var stoppedAt: Date?
+  /// The agent claim (docs/TASK_FACTORY_SPEC.md §5). Server-owned: pulled
+  /// from the backend, never pushed. A claim past `claimUntil` is dead.
+  var claimedBy: String?
+  var claimUntil: Date?
 
   /// True once a terminal `endState` is recorded.
   var isTerminal: Bool { endState != nil && endState != .open }
+
+  /// An agent holds a live claim on this task right now.
+  func isClaimed(at now: Date) -> Bool {
+    guard claimedBy != nil, let until = claimUntil else { return false }
+    return until > now
+  }
 
   /// `seq` for the next appended turn (1-based).
   var nextSeq: Int { (thread.map(\.seq).max() ?? 0) + 1 }

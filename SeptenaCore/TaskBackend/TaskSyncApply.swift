@@ -512,6 +512,9 @@ extension TaskSyncEngine {
     take("endState") { convo.endState = $0.stringValue.flatMap(ConvoEndState.init(rawValue:)) }
     take("endStateNote") { convo.endStateNote = $0.stringValue }
     take("assignee") { convo.assignee = $0.stringValue.flatMap(ConvoAssignee.init(rawValue:)) }
+    take("stoppedAt") { convo.stoppedAt = Self.parseStamp($0.stringValue) }
+    take("claimedBy") { convo.claimedBy = $0.stringValue }
+    take("claimUntil") { convo.claimUntil = Self.parseStamp($0.stringValue) }
     take("artifact") { v in
       guard case .object(let o) = v, let kind = o["kind"]?.stringValue, let title = o["title"]?.stringValue,
             let body = o["body"]?.stringValue else { convo.artifact = nil; return }

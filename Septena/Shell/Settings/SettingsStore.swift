@@ -356,6 +356,19 @@ final class SettingsStore {
     SettingsMirror.upsert(settings: s, context: context, engine: engine)
   }
 
+  /// "Pause all agents". Synced account-wide; the task backend enforces it.
+  var agentsPaused: Bool { serverSettings?.agentsPaused == true }
+
+  func setAgentsPaused(_ paused: Bool, context: ModelContext, engine: CKEngine?) {
+    guard agentsPaused != paused else { return }
+    var s = serverSettings ?? AppSettings(sectionOrder: nil, targets: nil, units: nil,
+                                          time: nil, theme: nil, eink: nil,
+                                          nutrition: nil, hkSync: nil)
+    s.agentsPaused = paused
+    serverSettings = s
+    SettingsMirror.upsert(settings: s, context: context, engine: engine)
+  }
+
   /// Reconcile the synced privacy level with the device-local `@AppStorage`
   /// mirror `TelemetryClient` reads. Same inbound/outbound shape as
   /// `reconcileTrackFasting`:

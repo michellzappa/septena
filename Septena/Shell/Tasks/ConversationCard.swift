@@ -48,8 +48,7 @@ struct ConversationCard: View {
           } else if convo.isTerminal {
             terminalRow
           } else {
-            Label("Claude is working…", systemImage: "ellipsis.bubble")
-              .font(.caption).foregroundStyle(.secondary)
+            agentRow
           }
 
           // The agent-done bar (distinct from task completion = human-done).
@@ -141,6 +140,27 @@ struct ConversationCard: View {
     }
   }
 
+  /// Agent status with the human's stop. Stopped: the backend refuses every
+  /// agent write until Resume (ADR 0008).
+  @ViewBuilder private var agentRow: some View {
+    HStack(spacing: 8) {
+      if convo.stoppedAt != nil {
+        Label("Agent work stopped", systemImage: "stop.circle")
+          .font(.caption).foregroundStyle(.secondary)
+        Spacer(minLength: 0)
+        Button("Resume") { setStopped(false) }
+          .font(.caption).buttonStyle(.borderless)
+      } else {
+        Label(convo.isClaimed(at: DayClock.appNow) ? "Claude is working…" : "Waiting for Claude",
+              systemImage: "ellipsis.bubble")
+          .font(.caption).foregroundStyle(.secondary)
+        Spacer(minLength: 0)
+        Button("Stop", role: .destructive) { setStopped(true) }
+          .font(.caption).buttonStyle(.borderless)
+      }
+    }
+  }
+
   @ViewBuilder private var terminalRow: some View {
     let wontDo = convo.endState == .wontDo
     HStack(alignment: .top, spacing: 6) {
@@ -228,6 +248,11 @@ struct ConversationCard: View {
     append(ConvoTurn(seq: 0, role: .user, step: step, otherText: text, inReplyTo: replyTo, ts: Date()))
     otherText = ""
     showOther = false
+  }
+
+  private func setStopped(_ stopped: Bool) {
+    SeptenaServices.shared.taskMutator.setConvoStopped(id: taskID, stopped)
+    reload()
   }
 
   private func append(_ turn: ConvoTurn) {

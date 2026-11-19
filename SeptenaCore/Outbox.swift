@@ -160,6 +160,10 @@ final class TaskMutator {
     cloudBackend?.setConvoAssignee(id: id, assignee)
   }
 
+  func setConvoStopped(id: String, _ stopped: Bool) {
+    cloudBackend?.setConvoStopped(id: id, stopped)
+  }
+
   func setConvoArtifact(id: String, _ artifact: ConvoArtifact) {
     cloudBackend?.setConvoArtifact(id: id, artifact)
   }
