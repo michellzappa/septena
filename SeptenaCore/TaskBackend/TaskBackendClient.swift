@@ -77,11 +77,15 @@ actor TaskBackendClient {
     return (raw, hashed)
   }
 
-  func signIn(identityToken: String, rawNonce: String) async throws {
+  /// Returns the backend user id of the new session.
+  @discardableResult
+  func signIn(identityToken: String, rawNonce: String) async throws -> String {
     let body = try JSONEncoder().encode(["identityToken": identityToken, "nonce": rawNonce])
     let (data, status) = try await perform(path: "/v1/auth/apple", method: "POST", body: body, auth: nil)
     guard status == 200 else { throw Self.httpError(status, data) }
-    try adopt(decode(BackendSession.self, from: data, what: "session"))
+    let session = try decode(BackendSession.self, from: data, what: "session")
+    adopt(session)
+    return session.userId
   }
 
   func signOut() async {
