@@ -138,6 +138,12 @@ public final class ClaudeGatewayProvider {
   // MARK: Observable status (for Settings UI)
   public private(set) var lastRefreshAt: Date?
   public private(set) var lastError: String?
+  /// Whether the most recent interactive reconnect attempt failed. This is
+  /// deliberately separate from `lastError`: the latter is diagnostic text
+  /// for Settings and may outlive the token state that originally produced it.
+  /// The homepage cue should show the warning triangle only for a current
+  /// reconnect failure, not because an old error string happens to remain.
+  public private(set) var lastRefreshFailed = false
   public private(set) var isRefreshing = false
   /// True only while `ASWebAuthenticationSession` is on-screen. AppLock
   /// reads this so the sheet's `.inactive` transition isn't mistaken for a
@@ -220,10 +226,20 @@ public final class ClaudeGatewayProvider {
     let stamp = Self.connectionDefaults.double(forKey: Self.lastRefreshKey)
     let sharedRefresh = stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
     if isEnabled != sharedEnabled { isEnabled = sharedEnabled }
-    if lastRefreshAt != sharedRefresh { lastRefreshAt = sharedRefresh }
+    if lastRefreshAt != sharedRefresh {
+      lastRefreshAt = sharedRefresh
+      // A new shared stamp means the sibling app successfully re-minted the
+      // gateway token. Drop this process's old reconnect diagnosis too.
+      if sharedRefresh != nil {
+        lastError = nil
+        lastRefreshFailed = false
+        needsReauth = false
+      }
+    }
     if !sharedEnabled {
       needsReauth = false
       lastError = nil
+      lastRefreshFailed = false
     }
   }
 
@@ -260,6 +276,7 @@ public final class ClaudeGatewayProvider {
     // A comfortably-fresh token is trusted without a round-trip.
     if let age, age < Self.probeAfter {
       needsReauth = false
+      lastRefreshFailed = false
       logger.info("Claude gateway fresh on foreground (age \(Int(age), privacy: .public)s, no probe)")
       return
     }
@@ -272,10 +289,15 @@ public final class ClaudeGatewayProvider {
     switch await probeStoredToken() {
     case .some(true):
       needsReauth = false
+      lastError = nil
+      lastRefreshFailed = false
       logger.info("Claude gateway token verified live (age \(age.map(Int.init) ?? -1, privacy: .public)s)")
       if let age { recordMeasurement(ageSec: age, valid: true) }
     case .some(false):
       needsReauth = true
+      // Expiry is an expected auth checkpoint, not a failed reconnect.
+      lastError = nil
+      lastRefreshFailed = false
       // The measured CloudKit token lifetime — the real number behind the 7h
       // guess. Persisted (below) so it survives for later calibration.
       logger.info("Claude gateway token expired after \(age.map(Int.init) ?? -1, privacy: .public)s → needsReauth")
@@ -284,6 +306,9 @@ public final class ClaudeGatewayProvider {
       // Inconclusive (offline, or no stored token from a pre-upgrade connect):
       // fall back to the original time heuristic so behaviour never regresses.
       needsReauth = (age ?? .greatestFiniteMagnitude) >= Self.refreshInterval
+      // This path only establishes that the token needs attention; no
+      // interactive reconnect has failed in this foreground check.
+      lastRefreshFailed = false
       logger.info("Claude gateway probe inconclusive → time heuristic, needsReauth=\(self.needsReauth, privacy: .public)")
     }
   }
@@ -306,10 +331,13 @@ public final class ClaudeGatewayProvider {
     switch await probeStoredToken() {
     case .some(true):
       needsReauth = false
+      lastError = nil
+      lastRefreshFailed = false
       recordMeasurement(ageSec: age, valid: true)
       return .valid
     case .some(false):
       needsReauth = true
+      lastRefreshFailed = false
       recordMeasurement(ageSec: age, valid: false)
       return .expired
     case .none:
@@ -456,6 +484,12 @@ public final class ClaudeGatewayProvider {
     guard isEnabled else { return false }
     guard !isRefreshing else { return false }
     isRefreshing = true
+    // A new user-initiated attempt supersedes the previous attempt's
+    // failure. The cue becomes the Face ID checkpoint/spinner immediately;
+    // only this attempt's catch block can turn the warning back on.
+    lastError = nil
+    lastRefreshFailed = false
+    needsReauth = true
     defer { isRefreshing = false }
     do {
       let token = try await mintWebAuthToken()
@@ -465,6 +499,7 @@ public final class ClaudeGatewayProvider {
       // gateway now holds, so its validity tracks Claude's connection.
       KeychainStore.store(token, account: Self.tokenKeychainAccount, synchronizable: false)
       lastError = nil
+      lastRefreshFailed = false
       needsReauth = false
       lastRefreshAt = Date()
       Self.connectionDefaults.set(lastRefreshAt!.timeIntervalSince1970, forKey: Self.lastRefreshKey)
@@ -473,12 +508,16 @@ public final class ClaudeGatewayProvider {
       logger.info("Claude gateway token refreshed")
       return true
     } catch GatewayError.cancelled {
-      // Not a failure — keep `needsReauth` so the cue stays, leave `lastError`
-      // untouched so Settings doesn't show a stale "cancelled" error.
+      // Not a failure — keep the Face ID checkpoint up and leave Settings
+      // without stale error text from an earlier attempt.
+      lastError = nil
+      lastRefreshFailed = false
       logger.info("Claude gateway sign-in cancelled by user")
       return false
     } catch {
       lastError = error.localizedDescription
+      lastRefreshFailed = true
+      needsReauth = true
       logger.error("Claude gateway refresh failed: \(error.localizedDescription, privacy: .public)")
       return false
     }
@@ -498,6 +537,7 @@ public final class ClaudeGatewayProvider {
     reloadSharedState()
     isEnabled = false
     lastError = nil
+    lastRefreshFailed = false
     needsReauth = false
     KeychainStore.delete(account: Self.tokenKeychainAccount)
     // Withdraw any pending reconnect nudge.

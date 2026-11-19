@@ -27,9 +27,10 @@ struct ClaudeReconnectCue: View {
   // with a "Reconnected" flash instead of the cue silently vanishing.
   @State private var justReconnected = false
 
-  // A real refresh failure (network etc.) — distinct from a user-cancel,
-  // which leaves `lastError` nil so the cue stays in its calm default copy.
-  private var failed: Bool { provider.lastError != nil && provider.needsReauth }
+  // A real failure from the current interactive attempt (network etc.). Do
+  // not derive this from `lastError`: Settings keeps diagnostic text longer
+  // than the token state, and an old error must not replace Face ID here.
+  private var failed: Bool { provider.lastRefreshFailed && provider.needsReauth }
 
   var body: some View {
     if provider.isEnabled && (provider.needsReauth || justReconnected) {
