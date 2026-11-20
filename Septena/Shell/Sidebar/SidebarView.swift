@@ -319,20 +319,25 @@ struct SidebarRootView: View {
   private func sidebarListContent() -> some View {
     Group {
       #if os(iOS)
-      // iPhone + iPad share the Reminders-style home: the 2×2 smart-list grid is
-      // the first row of the scroll (so it scrolls *with* the area / project cards
-      // below the top chrome — not a separate pinned bar), then the grouped cards.
-      // A clear, zero-inset row spans the same width as the grouped cards below;
-      // hosting it as a section *header* inset the grid by the row-text padding
-      // and the negative-bleed hack couldn't fully cancel that on iPhone.
+      // iPhone + iPad share the Reminders-style home: the 2-column smart-list
+      // grid sits at the top of the scroll (so it scrolls *with* the area /
+      // project cards below the top chrome — not a separate pinned bar), then
+      // the grouped cards. Host it as an empty section's *header* with zero
+      // `listRowInsets` (rather than a section body row): `.insetGrouped` clips
+      // every section's body cells to the system grouped-section corner radius,
+      // which sliced the grid's outer combined corners differently from each
+      // tile's own radius. A section header sits outside that corner clip, and
+      // `.listRowInsets(EdgeInsets())` strips the default header text indent so
+      // the grid aligns flush with the grouped cards below.
       List(selection: sidebarSelection) {
         Section {
+        } header: {
           smartListGrid
+            .textCase(nil)
+            .foregroundStyle(Color.primary)
             .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
+            .accessibilityRemoveTraits(.isHeader)
         }
-        .listSectionSeparator(.hidden)
         areaProjectSections()
       }
       .modifier(IOSSidebarListChrome())
@@ -406,9 +411,10 @@ struct SidebarRootView: View {
   }
 
   #if os(iOS)
-  /// The 2-column grid of large smart-list tiles (Today / Upcoming / Anytime /
-  /// Logbook). Hosted as the first (clear, zero-inset) row of the sidebar List,
-  /// so it scrolls with the cards below and spans the same card width.
+  /// The 2-column grid of large smart-list tiles (Today / Upcoming / Repeating /
+  /// Anytime / Logbook). Hosted as a zero-inset section header at the top of the
+  /// sidebar List so it scrolls with the cards below, spans the same card width,
+  /// and stays outside `.insetGrouped`'s section corner clip.
   private var smartListGrid: some View {
     LazyVGrid(columns: [GridItem(.flexible(), spacing: IOSSidebarListMetrics.sectionSpacing),
                         GridItem(.flexible(), spacing: IOSSidebarListMetrics.sectionSpacing)],
@@ -1271,7 +1277,7 @@ struct SmartListTile: View {
       Spacer(minLength: 6)
       Text(title)
         .scaledFont(size: 15, weight: .regular)
-        .foregroundStyle(.primary)
+        .foregroundStyle(Color.primary)
         .lineLimit(1)
     }
     .padding(.horizontal, 12)
@@ -1291,7 +1297,7 @@ struct SmartListTile: View {
     if let n = count {
       Text("\(n)")
         .scaledFont(size: 26, weight: .bold)
-        .foregroundStyle(.primary)
+        .foregroundStyle(Color.primary)
         .monospacedDigit()
     }
   }
