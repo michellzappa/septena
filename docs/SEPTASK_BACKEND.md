@@ -123,6 +123,9 @@ sourceClient, acknowledgedAt, createdAt, rev, updatedAt, deletedAt.
 project). `todayPosition` is the manual order on Today, kept apart so
 reordering Today never reshuffles the home list, as in Things. It is null
 until the row is first ordered on Today; readers fall back to `position`.
+The app uses it since #66: `TaskEntity.todayPosition` (local, no CloudKit
+field), written by `TaskMutator.reorderToday` and cleared when an open task
+leaves Today; every Today surface sorts by `todayPosition ?? position`.
 
 **areas:** id, title, context, emoji, attachment, position, rev, updatedAt,
 deletedAt.

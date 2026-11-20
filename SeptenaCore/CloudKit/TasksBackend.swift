@@ -107,6 +107,13 @@ final class CloudKitTasksBackend {
   private func commitAndPush(_ entity: TaskEntity, op: String, deletion: Bool = false) -> Bool {
     let id = entity.id
     let title = entity.title
+    // An open task that left Today gives up its Today slot (#66), whichever
+    // write moved it out, so it comes back at its list position next time
+    // instead of at a stale slot. Done / cancelled rows keep it: reopening
+    // puts the row back where it stood.
+    if !deletion, entity.todayPosition != nil, entity.status == .open, !entity.isOnToday {
+      entity.todayPosition = nil
+    }
     // Read id/title BEFORE the save: on the purge path `entity` is already
     // marked deleted, and a deleted model's properties are only readable while
     // the deletion is still pending in the context.
@@ -1018,6 +1025,16 @@ final class CloudKitTasksBackend {
     entity.position = position
     entity.pendingSync = true
     commitAndPush(entity, op: "reorder")
+  }
+
+  /// Today's own order (#66). Writes `todayPosition` only, never `position`,
+  /// so the task keeps its place in its area / project list. nil clears the
+  /// slot (undo back to "never ordered on Today").
+  func reorderToday(id: String, toPosition position: Double?) {
+    guard let entity = fetch(id: id), entity.todayPosition != position else { return }
+    entity.todayPosition = position
+    entity.pendingSync = true
+    commitAndPush(entity, op: "reorderToday")
   }
 
   // MARK: Headings (project section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)

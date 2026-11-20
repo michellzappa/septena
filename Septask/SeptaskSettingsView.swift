@@ -10,6 +10,20 @@ import SwiftData
 /// (`TaskSettingsPane`, `ClaudeAISettingsPane`, `ThingsImportView`,
 /// `SettingsMirror`, `SettingsStore`, `SettingsChrome`, `ProfileAvatar`);
 /// only app-local surfaces (the About pages, task privacy copy) are here.
+/// Opens Settings on a given page, from outside Settings (the Get started
+/// checklist). The caller sets `pending` and opens Settings; the view reads it
+/// on appear, or on `didRequest` when it is already open.
+@MainActor
+enum SeptaskSettingsLink {
+  static var pending: SeptaskSettingsView.Destination?
+  static let didRequest = Notification.Name("septask.settings.openPage")
+
+  static func request(_ destination: SeptaskSettingsView.Destination) {
+    pending = destination
+    NotificationCenter.default.post(name: didRequest, object: nil)
+  }
+}
+
 struct SeptaskSettingsView: View {
   enum Destination: Hashable {
     case account
@@ -57,6 +71,8 @@ struct SeptaskSettingsView: View {
     }
     .frame(width: 820, height: 600)
     .onExitCommand { dismiss() }
+    .onAppear(perform: consumeLink)
+    .onReceive(NotificationCenter.default.publisher(for: SeptaskSettingsLink.didRequest)) { _ in consumeLink() }
     #else
     // iOS/iPad: the same list, pushed in a NavigationStack sheet — matching
     // SettingsView's compact presentation and its drag-to-dismiss affordance.
@@ -76,6 +92,19 @@ struct SeptaskSettingsView: View {
         }
     }
     .presentationDragIndicator(.visible)
+    .onAppear(perform: consumeLink)
+    .onReceive(NotificationCenter.default.publisher(for: SeptaskSettingsLink.didRequest)) { _ in consumeLink() }
+    #endif
+  }
+
+  /// Opens the page a caller asked for (`SeptaskSettingsLink`), once.
+  private func consumeLink() {
+    guard let destination = SeptaskSettingsLink.pending else { return }
+    SeptaskSettingsLink.pending = nil
+    #if os(macOS)
+    selection = destination
+    #else
+    path = [destination]
     #endif
   }
 

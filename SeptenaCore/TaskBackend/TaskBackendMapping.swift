@@ -171,9 +171,10 @@ enum TaskBackendMapping {
       "completedAt": c.stamp("completedAt", t.completedAt),
       "notes": c.text("notes", t.notes, max: notesMax),
       "position": c.real("position", t.position),
-      // Today has no order of its own locally yet: a row on Today starts with
-      // its list position there. Null for rows not on Today.
-      "todayPosition": t.deletedAt == nil && t.isOnToday ? c.real("todayPosition", t.position) : .null,
+      // Today's own order (#66). Null until the row is first ordered on
+      // Today; readers then fall back to `position` (docs/SEPTASK_BACKEND.md
+      // §5.2). The app clears it when an open row leaves Today.
+      "todayPosition": t.deletedAt == nil ? t.todayPosition.map { c.real("todayPosition", $0) } ?? .null : .null,
       "recurrenceUnit": c.text("recurrenceUnit", t.recurrenceUnit, max: 16),
       "recurrenceInterval": .int(Int64(t.recurrenceInterval)),
       "recurrenceAfterCompletion": .bool(t.recurrenceAfterCompletion),

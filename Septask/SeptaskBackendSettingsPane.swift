@@ -109,6 +109,7 @@ struct SeptaskBackendSettingsPane: View {
         _ = try await TaskBackendClient.shared.approvePairing(code: code)
         pairCode = ""
         pairResult = ("Approved. Finish in your browser.", false)
+        TaskNotices.completeStep(.connectAI)
       } catch TaskBackendError.http(_, let code) where code == "invalid_code" {
         pairResult = ("That code is wrong or has expired.", true)
       } catch TaskBackendError.http(_, let code) where code == "code_used" {

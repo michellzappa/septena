@@ -103,7 +103,8 @@ struct TaskListView: View {
     self.embeddedHeader = { AnyView(embeddedHeader()) }
     // Memoized: this init re-runs on every parent render (the values are
     // discarded for installed views), so a per-construction fetch was waste.
-    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    let structure = Self.launchStructure(filter: filter, embedded: embedded)
+      ?? StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
   }
@@ -118,7 +119,8 @@ struct TaskListView: View {
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(EmptyView()) }
     // Memoized — see the generic init above.
-    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    let structure = Self.launchStructure(filter: filter, embedded: embedded)
+      ?? StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
   }
@@ -127,7 +129,7 @@ struct TaskListView: View {
     get {
       storageFilter == filter
         ? itemsStorage
-        : localTasks()
+        : launchSnapshot?.today ?? localTasks()
     }
     nonmutating set {
       itemsStorage = newValue
@@ -145,6 +147,49 @@ struct TaskListView: View {
     )
   }
 
+  // MARK: Launch snapshot (#82, docs/LAUNCH_PERF.md)
+
+  /// Before the first task list frame on a cold launch, standalone Today
+  /// reads its rows from the Today snapshot file, not from SwiftData. Same
+  /// view, same rows, so the first `load()` swaps to the live list with no
+  /// visible change. nil on every other list, after the first frame, and
+  /// when the snapshot is from another day.
+  private var launchSnapshot: TodaySnapshotStore.Rows? {
+    guard filter == .today, !embedded, storageFilter != filter else { return nil }
+    return TodaySnapshotStore.launchRows(day: clock.today)
+  }
+
+  /// `init` runs before the environment exists, so it checks the day with
+  /// `SeptenaDate.today` (what `DayClock` starts with).
+  private static func launchStructure(filter: TaskFilter, embedded: Bool)
+    -> (areas: [Area], projects: [Project])? {
+    guard filter == .today, !embedded,
+          let rows = TodaySnapshotStore.launchRows(day: SeptenaDate.today) else { return nil }
+    return (rows.areas, rows.projects)
+  }
+
+  /// Skeleton rows instead of an empty Today while the account's first pull
+  /// has not landed (signed in on a new device). The pre-load frame already
+  /// reads the store, so this is the only time Today has nothing to draw and
+  /// is still loading. Signed out, offline (a pull error) or an empty
+  /// account after the pull: the normal empty Today.
+  @ViewBuilder
+  private var todaySkeleton: some View {
+    if !embedded, visibleItems.isEmpty, triageItems.isEmpty, awaitingFirstPull {
+      TaskSkeletonRows().asListRow()
+    }
+  }
+
+  private var awaitingFirstPull: Bool {
+    #if SEPTASK
+    let sync = TaskSyncEngine.shared
+    return sync.signedIn && sync.since == 0 && sync.lastPull == nil && sync.lastError == nil
+    #else
+    // Septena Life says "Getting your data" (`emptyStateRow`).
+    return false
+    #endif
+  }
+
   /// The Inbox — the unratified layer rendered as a section above Today (only on
   /// the Today view; see `triageSection`). Backed by `triageStorage` (populated
   /// in `load()` with the same settle-preservation as `items`), with a live
@@ -156,7 +201,8 @@ struct TaskListView: View {
     guard filter == .today else { return [] }
     let base = storageFilter == filter
       ? triageStorage
-      : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
+      : launchSnapshot?.inbox
+        ?? LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
     return base.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
@@ -1151,6 +1197,9 @@ struct TaskListView: View {
       scopeLoggedSection()
       taskListFooter
     }
+    // Snapshot rows are inert (#82): a tap must not act on a row read from
+    // the launch file. The first load swaps in the live rows a few frames on.
+    .allowsHitTesting(launchSnapshot == nil)
     // Click-away collapses the inline editor (Things-style) — selecting any
     // OTHER row folds the open editor, autosaving it. While editing, the list's
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
@@ -1430,6 +1479,7 @@ struct TaskListView: View {
         return AnyView(Group {
           AnyView(triageSection)
           AnyView(groupedOpenItems)
+          AnyView(todaySkeleton)
         })
       }
       // `Group`, not a stack: the rows stay direct children of the lazy
@@ -1438,6 +1488,7 @@ struct TaskListView: View {
       return AnyView(Group {
         AnyView(triageSection)
         AnyView(ungroupedOpenItems)
+        AnyView(todaySkeleton)
       })
     case .unscheduled:
       return AnyView(groupedOpenItems)
@@ -1521,7 +1572,10 @@ struct TaskListView: View {
           symbol: notice.symbol,
           title: Text(notice.title),
           detail: notice.detail.map { Text($0) },
-          onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil
+          onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil,
+          steps: notice.steps,
+          onStepToggle: { completeNoticeStep($0) },
+          onStepTap: { openNoticeStep($0) }
         ) {
           noticeAction(notice)
         }
@@ -1545,6 +1599,27 @@ struct TaskListView: View {
     #if SEPTASK
     if notice.id == .signIn { SeptaskSignInButton(compact: true) }
     #endif
+  }
+
+  /// Ticks a Get started step by hand, like checking off a task.
+  private func completeNoticeStep(_ id: TaskNoticeStep.ID) {
+    Haptics.tick()
+    TaskNotices.completeStep(id)
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+  }
+
+  /// Does a Get started step: opens the Settings page that sets it up, or
+  /// starts a new task.
+  private func openNoticeStep(_ id: TaskNoticeStep.ID) {
+    switch id {
+    case .addTask:
+      startCreate()
+    case .connectAI, .importTasks:
+      #if SEPTASK
+      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      nav.showSettings = true
+      #endif
+    }
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {
@@ -1656,8 +1731,9 @@ struct TaskListView: View {
   }
 
   /// True where the rendered order IS the manual `TaskOrder.key` order —
-  /// project / area pages and the Inbox. Date- and tier-sorted surfaces
-  /// (Today, Upcoming) and history views are never reorder targets.
+  /// project / area pages and the Inbox. Today reorders too, in its own order
+  /// (`orderLane`, #66; wired per card in `cardedRows`). Upcoming and history
+  /// views are never reorder targets.
   private var isManuallyOrderedList: Bool {
     switch filter {
     case .project, .area, .triage: return true
@@ -1679,41 +1755,59 @@ struct TaskListView: View {
   /// sort where the drop indicator promised — a heading silently landing in the
   /// wrong place once a project's headings had been shuffled enough.
   private func applyManualOrder(ids: [String], into sequence: [SeptenaTask], at insertion: Int) {
-    let above = insertion > 0 ? sequence[insertion - 1].orderKey : nil
-    let below = insertion < sequence.count ? sequence[insertion].orderKey : nil
+    let lane = orderLane
+    let above = insertion > 0 ? sequence[insertion - 1].orderKey(in: lane) : nil
+    let below = insertion < sequence.count ? sequence[insertion].orderKey(in: lane) : nil
     let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
     let strictlyPlaced =
       zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
       && (above.map { slots.first! > $0 } ?? true)
       && (below.map { slots.last! < $0 } ?? true)
     if strictlyPlaced {
-      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos, in: lane) }
       return
     }
     var final = sequence.map(\.id)
     final.insert(contentsOf: ids, at: insertion)
-    let base = sequence.first?.orderKey ?? TaskOrder.gap
+    let base = sequence.first?.orderKey(in: lane) ?? TaskOrder.gap
     for (i, id) in final.enumerated() {
       let pos = base + TaskOrder.gap * Double(i)
-      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos, in: lane)
     }
   }
+
+  /// The manual order this list shows and a reorder writes: Today has its
+  /// own (`todayPosition`), so reordering Today never moves a task in its
+  /// area / project list (#66).
+  private var orderLane: TaskOrderLane { filter == .today ? .today : .list }
 
   /// A reorder drop landed on `target`: insert the dragged ids above (`before`)
   /// or below it and persist new manual positions via the mutator. Neighbors
   /// are read from the rendered order with the dragged rows removed, so a drop
   /// one slot away from the original spot computes against the right keys.
-  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+  ///
+  /// Today (#66): `refileTo` is the Today group the target row sits in. A
+  /// row dragged in from another group is filed into it first (the old
+  /// group drop), then placed in Today's own order. `visibleItems` is Today
+  /// in that order, and each group is a run of it, so the global neighbours
+  /// place the row right in its group too. A target outside that order (a
+  /// triage-band row in the Inbox card) only files.
+  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool,
+                                 refileTo group: TodayDropTarget? = nil) -> Bool {
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
-    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
+    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else {
+      return group.map { handleTodayMoveDrop(ids: ids, target: $0) } ?? false
+    }
     // Snapshot every row the drop can rewrite (a renumber touches the whole
     // sequence), so shake / ⌘Z puts the old order back.
-    let undoBefore = TaskUndo.positions(of: remaining.map(\.id) + ids, in: modelContext)
+    let undoBefore = TaskUndo.reorderSnapshot(of: remaining.map(\.id) + ids, lane: orderLane,
+                                              in: modelContext)
+    if let group { _ = handleTodayMoveDrop(ids: ids, target: group) }
     applyManualOrder(ids: ids, into: remaining,
                      at: before ? targetIdx : targetIdx + 1)
-    TaskUndo.recordReorder(before: undoBefore, context: modelContext, mutator: mutator)
+    TaskUndo.recordReorder(undoBefore, context: modelContext, mutator: mutator)
     Haptics.tick()
     Task { await load() }
     return true
@@ -2061,10 +2155,9 @@ struct TaskListView: View {
       if todayGroupByList {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       } else {
-        classifiedIds = classified
-          .filter { $0.status == .open || model.settle.isSettling($0.id) }
-          .sorted(by: SeptenaTask.compareNextPageOrder)
-          .map(\.id)
+        // Same sequence `ungroupedOpenItems` renders: by list, Today's own
+        // order inside each list (#66).
+        classifiedIds = orderedFromGroupedOpen(pool: classified)
       }
       return todayInboxKeyboardIDs + classifiedIds
     case .unscheduled:
@@ -3172,10 +3265,14 @@ struct TaskListView: View {
                           moveDropTarget: TodayDropTarget? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
+    // Today rows reorder in Today's own order (#66). The row's reorder drop
+    // also files a row dragged in from another group, so the row-level
+    // group drop steps aside (the group headers keep theirs).
+    let todayReorder = filter == .today
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .modifier(todayMoveDrop(moveDropTarget))
+        .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
         .taskCardChrome(position,
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
@@ -3191,11 +3288,12 @@ struct TaskListView: View {
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
         // (`handleGroupedTaskDrop` reads the target row's group).
-        .modifier(TaskReorderDrop(perform: reorderable
+        .modifier(TaskReorderDrop(perform: reorderable || todayReorder
           ? { ids, before in
               grouped
                 ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
-                : handleReorderDrop(ids: ids, target: task, before: before) }
+                : handleReorderDrop(ids: ids, target: task, before: before,
+                                    refileTo: todayReorder ? moveDropTarget : nil) }
           : nil))
     }
     if appendQuickAdd {

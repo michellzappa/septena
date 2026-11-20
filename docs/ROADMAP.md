@@ -7,6 +7,13 @@ is one issue there. Update this file when the order changes. Rules:
 
 **Last updated:** 2026-11-19.
 
+**Public roadmap.** An issue labelled `roadmap` appears on
+`septena.app/roadmap`. Its public copy and feature ID live in the site repo,
+`content/roadmap.json`; status and Now/Next/Later follow the issue's state and
+milestone. When you add the label, add the copy there too (the site build fails
+on a listed issue without the label). Feature IDs: Starlings Docs
+`/product/feature-map-septena-task-app`.
+
 ## Tracks
 
 | Track | Spec | Label |

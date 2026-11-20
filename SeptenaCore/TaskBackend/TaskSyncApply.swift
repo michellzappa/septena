@@ -15,8 +15,8 @@ import SwiftData
 //   - Turns are append-only and ordered by the backend's `seq`.
 //   - Attachment rows arrive without bytes; `TaskAttachmentStore.localFile`
 //     downloads them when the attachment is opened.
-//   - `todayPosition` is ignored on pull: the local model has no Today order
-//     yet (§12).
+//   - `todayPosition` (Today's own order, #66) is applied like any field, so
+//     a queued local reorder wins until its push lands.
 //   - A `setting` row writes Septask's synced-settings blob
 //     (TaskSyncSettings.swift), unless that key has a queued local upsert.
 
@@ -481,6 +481,7 @@ extension TaskSyncEngine {
     take("completedAt") { t.completedAt = $0.stringValue }
     take("notes") { t.notes = $0.stringValue }
     take("position") { t.position = Self.double($0) ?? 0 }
+    take("todayPosition") { t.todayPosition = Self.double($0) }
     take("recurrenceUnit") { t.recurrenceUnit = $0.stringValue }
     take("recurrenceInterval") { t.recurrenceInterval = Self.int($0) ?? 1 }
     take("recurrenceAfterCompletion") { t.recurrenceAfterCompletion = Self.bool($0) ?? false }
@@ -491,7 +492,6 @@ extension TaskSyncEngine {
     take("sourceClient") { t.sourceClient = $0.stringValue }
     take("acknowledgedAt") { t.acknowledgedAt = Self.parseStamp($0.stringValue) }
     take("createdAt") { t.createdAt = Self.parseStamp($0.stringValue) ?? .distantPast }
-    // `todayPosition` is not stored locally (see the header).
     return applied
   }
 

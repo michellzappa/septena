@@ -293,6 +293,7 @@ struct ThingsImportView: View {
         applyProgress = progress
       }
       applyResult = result
+      TaskNotices.completeStep(.importTasks)
       snapshot = nil
       self.plan = nil
     } catch {

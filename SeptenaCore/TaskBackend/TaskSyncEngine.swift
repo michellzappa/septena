@@ -350,7 +350,7 @@ final class TaskSyncEngine {
 
     let mapped: [String: BackendJSON]
     switch TaskBackendMapping.task(t) {
-    case .success(let plan): mapped = plan.fields.filter { $0.key != "todayPosition" }
+    case .success(let plan): mapped = plan.fields
     case .failure(let issue): noteBlocked(issue); return
     }
     clearBlocked(.task, id)
@@ -365,13 +365,7 @@ final class TaskSyncEngine {
       base = mapped
       base["_remote"] = .bool(!deletedHere)
       base["_deleted"] = .bool(deletedHere)
-      if !deletedHere {
-        var fields = mapped
-        // todayPosition: no local Today order yet. A row on Today starts with
-        // its list position there (docs/SEPTASK_BACKEND.md §12).
-        if t.isOnToday, let p = mapped["position"] { fields["todayPosition"] = p }
-        enqueueUpsert(.task, id, fields, store: store)
-      }
+      if !deletedHere { enqueueUpsert(.task, id, mapped, store: store) }
       writeShadow(shadow, key, old: old, new: base, store: store)
       if !deletedHere { captureConvo(t, store: store, lookup: lookup) }
       return
@@ -408,10 +402,7 @@ final class TaskSyncEngine {
     } else {
       for (k, v) in mapped where (old[k] ?? .null).canonical != v.canonical { patch[k] = v }
     }
-    if !patch.isEmpty {
-      if patch["position"] != nil, t.isOnToday { patch["todayPosition"] = patch["position"] }
-      enqueueUpsert(.task, id, patch, store: store)
-    }
+    if !patch.isEmpty { enqueueUpsert(.task, id, patch, store: store) }
     for (k, v) in mapped { base[k] = v }
     base["_deleted"] = .bool(false)
     writeShadow(shadow, key, old: old, new: base, store: store)
@@ -1040,6 +1031,8 @@ final class TaskSyncEngine {
     disconnectSocket()
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
+    // The launch snapshot shows this account's Today (#82).
+    TodaySnapshotStore.invalidate()
   }
 
   /// Backend user id of the last sign-in on this device.
@@ -1093,6 +1086,8 @@ final class TaskSyncEngine {
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
     _ = StoreHealth.save(context, op: "taskSync.wipe")
+    // Account switch / delete: the launch snapshot holds the old rows (#82).
+    TodaySnapshotStore.invalidate()
     store()?.deleteEverything()
     since = 0
     settingsReady = false

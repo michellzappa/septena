@@ -110,6 +110,8 @@ final class SeptaskKitTaskListController: NSViewController {
     /// A notice on top of Today (sign in, rolled in, an explainer). Which
     /// ones show, and in what order, is decided by `TaskNotices`.
     case notice(TaskNotice)
+    /// One Get started step under its notice, drawn like a task row.
+    case noticeStep(TaskNoticeStep)
 
     var key: String {
       switch self {
@@ -123,6 +125,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
+      case .noticeStep(let step): return "notice-step:" + step.id.rawValue
       case .importAllReminders: return "import-all-reminders"
       }
     }
@@ -144,6 +147,8 @@ final class SeptaskKitTaskListController: NSViewController {
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
+      // Get started steps read as tasks, so they ride a card like tasks.
+      case .noticeStep: return true
       case .task(let task, _, _): return !task.isHeading
       }
     }
@@ -1193,7 +1198,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `observeBootstrapState`.
   private func noticeRows(_ pool: [SeptenaTask]) -> [Row] {
     TaskNotices.today(pool: pool, requiresSignIn: !TaskSyncEngine.shared.signedIn,
-                      today: SeptenaDate.today, context: context).map(Row.notice)
+                      today: SeptenaDate.today, context: context)
+      .flatMap { [Row.notice($0)] + $0.steps.map(Row.noticeStep) }
   }
 
   // MARK: - Inline notices (one component: `KitNoticeCell`)
@@ -1204,6 +1210,18 @@ final class SeptaskKitTaskListController: NSViewController {
       ?? KitNoticeCell(identifier: identifier)
     cell.configure(notice)
     return cell
+  }
+
+  /// Does a Get started step: opens the Settings page that sets it up, or
+  /// opens Quick Entry for a first task.
+  private func openNoticeStep(_ id: TaskNoticeStep.ID) {
+    switch id {
+    case .addTask:
+      SeptaskKitQuickEntry.show()
+    case .connectAI, .importTasks:
+      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      SeptaskKitSettingsWindow.show()
+    }
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {
@@ -1372,6 +1390,7 @@ final class SeptaskKitTaskListController: NSViewController {
     try? RemindersBridge.shared.delete([pair.reminder])
     reminderPairs.removeAll { $0.view.id == id }
     importingReminderID = nil
+    TaskNotices.completeStep(.importTasks)
     // Undoable like any other create. Redo re-creates (purge is a real
     // delete), and it deliberately does NOT put the reminder back in Apple
     // Reminders — that row is gone from EventKit and re-creating it there
@@ -1401,6 +1420,7 @@ final class SeptaskKitTaskListController: NSViewController {
     try? RemindersBridge.shared.delete(pairs.map(\.reminder))
     reminderPairs = []
     bulkImportingReminders = false
+    TaskNotices.completeStep(.importTasks)
     TaskUndo.recordCreate(
       name: String(localized: "Import Reminders", comment: "SeptaskKit: undo action"),
       ids: createdIDs, mutator: mutator,
@@ -2131,7 +2151,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// ⌘↑ / ⌘↓ — move the selected task(s) one slot within their group, the
   /// keyboard twin of a drag reorder: same lists (`allowsReorder`), same
   /// group bounds as a drop (`groupBounds`), same write
-  /// (`applyManualOrder`), same undo (`TaskUndo.recordReorder`). A
+  /// (`applyManualOrder`), same undo (`TaskUndo.recordReorder`). On Today
+  /// it moves the Today order only (`orderLane`, #66). A
   /// selection that spans groups, or is already at the group's edge, beeps.
   /// Only manual order changes; the row never changes list this way.
   func moveSelectionOneSlot(up: Bool) {
@@ -2159,9 +2180,9 @@ final class SeptaskKitTaskListController: NSViewController {
     guard let neighbor,
           let neighborPos = sequence.firstIndex(where: { $0.id == neighbor.id })
     else { NSSound.beep(); return }
-    let before = TaskUndo.positions(of: groupTasks.map(\.id), in: context)
+    let before = TaskUndo.reorderSnapshot(of: groupTasks.map(\.id), lane: orderLane, in: context)
     applyManualOrder(ids: ids, into: sequence, at: up ? neighborPos : neighborPos + 1)
-    TaskUndo.recordReorder(before: before, context: context, mutator: mutator)
+    TaskUndo.recordReorder(before, context: context, mutator: mutator)
     reload()
     if let moved = rows.firstIndex(where: { $0.task.map { chosen.contains($0.id) } ?? false }) {
       tableView.scrollRowToVisible(moved)
@@ -2726,17 +2747,17 @@ final class SeptaskKitTaskListController: NSViewController {
       guard next.status == .open, next.area == anchor.area,
             next.project == anchor.project, next.heading == anchor.heading
       else { break }
-      below = next.orderKey
+      below = next.orderKey(in: orderLane)
       break
     }
-    let above = anchor.orderKey
+    let above = anchor.orderKey(in: orderLane)
     guard let slot = TaskOrder.positions(count: 1, above: above, below: below).first,
           slot > above, below.map({ slot < $0 }) ?? true
     else { return }
     if case .project = filter, let heading = anchor.heading {
       mutator.setHeading(id: id, heading: heading)
     }
-    mutator.reorder(id: id, toPosition: slot)
+    mutator.reorder(id: id, toPosition: slot, in: orderLane)
   }
 
   /// Where a newly created task should be filed, given the list being looked
@@ -3925,6 +3946,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .importAllReminders: return SeptaskKitTheme.rowHeight
     // Inline notices: one component, its height follows its content.
     case .notice(let notice): return KitNoticeCell.height(for: KitNotice(notice))
+    case .noticeStep: return SeptaskKitTheme.rowHeight
     }
   }
 
@@ -4164,7 +4186,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     // Undo: one ⌘Z puts back order, filing and day together (one event, one
     // undo group). Captured before any write.
-    let positionsBefore = TaskUndo.positions(of: sequence.map(\.id) + ids, in: context)
+    let positionsBefore = TaskUndo.reorderSnapshot(of: sequence.map(\.id) + ids, lane: orderLane, in: context)
     let draggedTasks = ids.compactMap { LocalCache.task(id: $0, in: context) }
     let filingBefore = draggedTasks.map(TaskUndo.FilingSnapshot.init)
     let scheduleBefore = draggedTasks.map(TaskUndo.ScheduleSnapshot.init)
@@ -4185,7 +4207,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         name: String(localized: "Change When", comment: "SeptaskKit: undo action"),
         before: scheduleBefore, context: context, mutator: mutator)
     }
-    TaskUndo.recordReorder(before: positionsBefore, context: context, mutator: mutator)
+    TaskUndo.recordReorder(positionsBefore, context: context, mutator: mutator)
     reload()
     return true
   }
@@ -4254,27 +4276,34 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
   /// Persist a manual-order drop — same midpoint-with-renumber-fallback
   /// `TaskListView.applyManualOrder` uses, so exhausted gaps don't silently
-  /// land adjacent to the wrong neighbor.
+  /// land adjacent to the wrong neighbor. Writes the order of `orderLane`:
+  /// Today's own order on Today, `position` everywhere else (#66).
   private func applyManualOrder(ids: [String], into sequence: [SeptenaTask], at insertion: Int) {
-    let above = insertion > 0 ? sequence[insertion - 1].orderKey : nil
-    let below = insertion < sequence.count ? sequence[insertion].orderKey : nil
+    let lane = orderLane
+    let above = insertion > 0 ? sequence[insertion - 1].orderKey(in: lane) : nil
+    let below = insertion < sequence.count ? sequence[insertion].orderKey(in: lane) : nil
     let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
     let strictlyPlaced =
       zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
       && (above.map { slots.first! > $0 } ?? true)
       && (below.map { slots.last! < $0 } ?? true)
     if strictlyPlaced {
-      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos, in: lane) }
       return
     }
     var final = sequence.map(\.id)
     final.insert(contentsOf: ids, at: insertion)
-    let base = sequence.first?.orderKey ?? TaskOrder.gap
+    let base = sequence.first?.orderKey(in: lane) ?? TaskOrder.gap
     for (i, id) in final.enumerated() {
       let pos = base + TaskOrder.gap * Double(i)
-      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos, in: lane)
     }
   }
+
+  /// The manual order this list shows and a reorder writes: Today has its
+  /// own (`todayPosition`), so reordering Today never moves a task in its
+  /// area / project list (#66).
+  private var orderLane: TaskOrderLane { filter == .today ? .today : .list }
 
   /// Project-page drop: headings reorder among headings; tasks join the
   /// destination group's `heading` and take positions around the gap.
@@ -4508,6 +4537,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = noticeCell(KitNotice(notice))
       cell.onPrimary = notice.id == .signIn ? { SeptaskAppKitSignIn.shared.start() } : nil
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
+      return cell
+
+    case .noticeStep(let step):
+      let identifier = NSUserInterfaceItemIdentifier("noticeStepCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNoticeStepCell
+        ?? KitNoticeStepCell(identifier: identifier)
+      cell.configure(step)
+      cell.onToggle = { [weak self] in
+        guard !step.done else { return }
+        TaskNotices.completeStep(step.id)
+        self?.reload()
+      }
+      cell.onTap = { [weak self] in self?.openNoticeStep(step.id) }
       return cell
 
     case .reminder(let item, let importing):
