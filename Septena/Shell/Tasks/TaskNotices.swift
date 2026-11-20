@@ -69,6 +69,18 @@ struct TaskNoticeStep: Identifiable, Equatable {
   var title: String
   var detail: String
   var done: Bool
+
+  /// The step's identity in a task list's selection. Task ids are UUIDs, so
+  /// the `getstarted.` prefix can never collide with one; every task command
+  /// looks its id up as a task, finds none and does nothing.
+  var selectionID: String { Self.selectionPrefix + id.rawValue }
+  static let selectionPrefix = "getstarted."
+
+  /// The step a selection id names, or nil for a task id.
+  static func stepID(fromSelection selection: String) -> ID? {
+    guard selection.hasPrefix(selectionPrefix) else { return nil }
+    return ID(rawValue: String(selection.dropFirst(selectionPrefix.count)))
+  }
 }
 
 @MainActor
@@ -111,6 +123,21 @@ enum TaskNotices {
     var done = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
     guard done.insert(id.rawValue).inserted else { return }
     UserDefaults.standard.set(done.sorted(), forKey: stepsKey)
+  }
+
+  /// Unticks a step ticked by hand (Mark as Not Done). A step the data shows
+  /// as done (an agent task, an import, a first task) ticks itself again on
+  /// the next read, the same as before.
+  static func reopenStep(_ id: TaskNoticeStep.ID) {
+    var done = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
+    guard done.remove(id.rawValue) != nil else { return }
+    UserDefaults.standard.set(done.sorted(), forKey: stepsKey)
+  }
+
+  /// Ticks or unticks a step: the ⌘K / checkbox gesture on a step row, the
+  /// same toggle a task row has.
+  static func toggleStep(_ step: TaskNoticeStep) {
+    if step.done { reopenStep(step.id) } else { completeStep(step.id) }
   }
 
   // MARK: - Notices

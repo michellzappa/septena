@@ -250,19 +250,17 @@ private final class KitNoticeFill: NSView {
 
 /// One Get started step, drawn as a task row on a card: the task checkbox,
 /// then the title with its detail as the dimmed suffix a task row uses for its
-/// list name. The checkbox ticks the step by hand; the rest of the row does it
-/// (opens the right place). The SwiftUI counterpart is the `steps` rows of
-/// `TaskListNotice`.
+/// list name. It is a real row of the table: a click selects it, ↑/↓ reach
+/// it, Return or a double-click does the step and ⌘K ticks it (all wired by
+/// the controller, as for a task row). The checkbox ticks the step by hand.
+/// The SwiftUI counterpart is `TaskNoticeStepRow`.
 @MainActor
 final class KitNoticeStepCell: NSTableCellView {
   private let checkbox = KitCheckboxView()
   private let title = NSTextField(labelWithString: "")
-  private let hit = NSButton()
-  private var hitPin: KitContentColumnPin!
   private var leadingConstraint: NSLayoutConstraint!
   private var trailingConstraint: NSLayoutConstraint!
   var onToggle: (() -> Void)?
-  var onTap: (() -> Void)?
 
   init(identifier: NSUserInterfaceItemIdentifier) {
     super.init(frame: .zero)
@@ -276,19 +274,7 @@ final class KitNoticeStepCell: NSTableCellView {
     title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     title.kitA11yIgnore()
 
-    hit.translatesAutoresizingMaskIntoConstraints = false
-    hit.isBordered = false
-    hit.isTransparent = true
-    hit.title = ""
-    hit.setButtonType(.momentaryChange)
-    hit.refusesFirstResponder = true
-    hit.target = self
-    hit.action = #selector(fire)
-
     addSubview(title)
-    // Above the title so it takes clicks on the text; the checkbox stays on
-    // top of both so a tick never opens the step.
-    addSubview(hit)
     addSubview(checkbox)
     textField = title
 
@@ -296,7 +282,6 @@ final class KitNoticeStepCell: NSTableCellView {
       equalTo: leadingAnchor, constant: KitCardRowView.horizontalInset + SeptaskKitLayout.rowLeadingPad)
     trailingConstraint = title.trailingAnchor.constraint(
       lessThanOrEqualTo: trailingAnchor, constant: -(KitCardRowView.horizontalInset + 8))
-    hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
       checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -305,9 +290,7 @@ final class KitNoticeStepCell: NSTableCellView {
       title.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 7),
       title.centerYAnchor.constraint(equalTo: centerYAnchor),
       trailingConstraint,
-      hit.topAnchor.constraint(equalTo: topAnchor),
-      hit.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ] + hitPin.constraints)
+    ])
   }
 
   required init?(coder: NSCoder) { fatalError("KitNoticeStepCell is code-only") }
@@ -316,7 +299,6 @@ final class KitNoticeStepCell: NSTableCellView {
     let inset = SeptaskKitLayout.inset(for: bounds.width)
     leadingConstraint.constant = inset + SeptaskKitLayout.rowLeadingPad
     trailingConstraint.constant = -(inset + 8)
-    hitPin.update(width: bounds.width)
     super.layout()
   }
 
@@ -335,10 +317,12 @@ final class KitNoticeStepCell: NSTableCellView {
       string: "  " + step.detail,
       attributes: [.font: SeptaskKitTheme.meta, .foregroundColor: SeptaskKitTheme.inkSecondary]))
     title.attributedStringValue = text
-    hit.isEnabled = !step.done
-    kitA11yButton(label: step.title + ", " + step.detail)
+    // Read like a task row: a group named by its title, the checkbox inside
+    // it carries the done state.
+    setAccessibilityElement(true)
+    setAccessibilityRole(.group)
+    setAccessibilityLabel(step.title + ", " + step.detail)
+    setAccessibilityRoleDescription(nil)
   }
-
-  @objc private func fire() { onTap?() }
 }
 #endif

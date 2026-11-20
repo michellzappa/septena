@@ -442,8 +442,24 @@ struct TaskListView: View {
     var count: Int { tasks.count }
   }
 
+  /// The scope every task command acts on. Get started steps are list rows
+  /// (they take selection, arrows, Return and ⌘K) but never tasks, so their
+  /// ids are left out here: move, delete, schedule, copy and the rest find
+  /// nothing to act on when only steps are selected.
   private var selectionScope: ListSelectionScope<String> {
-    ListSelectionScope(selection: selection, orderedIDs: keyboardOrderedTaskIds)
+    ListSelectionScope(selection: selection.filter { TaskNoticeStep.stepID(fromSelection: $0) == nil },
+                       orderedIDs: keyboardOrderedTaskIds)
+  }
+
+  /// A task (or the New task line) is selected, not only Get started steps.
+  /// Gates the task commands' menu and shortcut entries.
+  private var hasTaskSelection: Bool {
+    selection.contains { TaskNoticeStep.stepID(fromSelection: $0) == nil }
+  }
+
+  /// The selected Get started steps, in list order.
+  private var selectedNoticeSteps: [TaskNoticeStep] {
+    todayNoticeSteps.filter { selection.contains($0.selectionID) }
   }
 
   private func orderedActionIDs() -> [String] {
@@ -564,14 +580,14 @@ struct TaskListView: View {
     #if os(macOS)
     return withSnackbar.focusedSceneValue(\.taskActions, TaskActions(
       newTask: { openContextualQuickAdd() },
-      toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
-      openWhen: selection.isEmpty ? nil : openWhenForSelected,
-      openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
-      openMove: selection.isEmpty ? nil : openMoveForSelected,
+      toggleToday: !hasTaskSelection ? nil : toggleTodayForSelected,
+      openWhen: !hasTaskSelection ? nil : openWhenForSelected,
+      openDeadline: !hasTaskSelection ? nil : openDeadlineForSelected,
+      openMove: !hasTaskSelection ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
-      cancel: selection.isEmpty ? nil : cancelSelected,
-      delete: selection.isEmpty ? nil : deleteSelected,
-      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
+      cancel: !hasTaskSelection ? nil : cancelSelected,
+      delete: !hasTaskSelection ? nil : deleteSelected,
+      clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
@@ -611,14 +627,14 @@ struct TaskListView: View {
   private var iPadRowCommandActions: TaskActions {
     TaskActions(
       newTask: { openContextualQuickAdd() },
-      toggleToday: selection.isEmpty ? nil : toggleTodayForSelected,
-      openWhen: selection.isEmpty ? nil : openWhenForSelected,
-      openDeadline: selection.isEmpty ? nil : openDeadlineForSelected,
-      openMove: selection.isEmpty ? nil : openMoveForSelected,
+      toggleToday: !hasTaskSelection ? nil : toggleTodayForSelected,
+      openWhen: !hasTaskSelection ? nil : openWhenForSelected,
+      openDeadline: !hasTaskSelection ? nil : openDeadlineForSelected,
+      openMove: !hasTaskSelection ? nil : openMoveForSelected,
       toggleComplete: selection.isEmpty ? nil : toggleSelected,
-      cancel: selection.isEmpty ? nil : cancelSelected,
-      delete: selection.isEmpty ? nil : deleteSelected,
-      clearSchedule: selection.isEmpty ? nil : clearScheduleForSelected,
+      cancel: !hasTaskSelection ? nil : cancelSelected,
+      delete: !hasTaskSelection ? nil : deleteSelected,
+      clearSchedule: !hasTaskSelection ? nil : clearScheduleForSelected,
       editDetails: editDetailsSelectedAction,
       duplicate: duplicateSelectedAction,
       copy: copySelectedAction
@@ -1323,6 +1339,11 @@ struct TaskListView: View {
       startCreate()  // folds any open editor first, same press
       return
     }
+    // A Get started step: Return, a double-click or a tap does the step.
+    if let stepID = TaskNoticeStep.stepID(fromSelection: id) {
+      openNoticeStep(stepID)
+      return
+    }
     guard selection.count <= 1 else { return }
     guard let task = currentTask(id: id) else { return }
     beginEdit(task)
@@ -1567,24 +1588,83 @@ struct TaskListView: View {
   @ViewBuilder
   private var noticesRow: some View {
     if filter == .today {
-      let _ = noticeEpoch
-      ForEach(TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
-                                today: clock.today, context: modelContext)) { notice in
+      ForEach(todayNotices) { notice in
         TaskListNotice(
           kind: notice.kind,
           symbol: notice.symbol,
           title: Text(notice.title),
           detail: notice.detail.map { Text($0) },
           onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil,
-          steps: notice.steps,
-          onStepToggle: { completeNoticeStep($0) },
-          onStepTap: { openNoticeStep($0) }
+          headsCard: !notice.steps.isEmpty
         ) {
           noticeAction(notice)
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
         .plainListChrome()
+        noticeStepRows(notice.steps)
       }
+    }
+  }
+
+  /// Today's notices, read once per render. `noticeEpoch` re-reads them after
+  /// a dismiss, a ticked step or a load.
+  private var todayNotices: [TaskNotice] {
+    guard filter == .today else { return [] }
+    let _ = noticeEpoch
+    return TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
+                             today: clock.today, context: modelContext)
+  }
+
+  /// The Get started steps on screen, in render order.
+  private var todayNoticeSteps: [TaskNoticeStep] {
+    todayNotices.flatMap(\.steps)
+  }
+
+  /// The Get started steps as rows of this list, on the card their notice
+  /// heads: the same selection, arrow keys, Return (open), ⌘K (tick), tap
+  /// and card slice as a task row. Kept a flat `ForEach` so each row is a
+  /// direct child of the scroll list, like `cardedRows`.
+  @ViewBuilder
+  private func noticeStepRows(_ steps: [TaskNoticeStep]) -> some View {
+    ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+      // The notice header is the card's first slice.
+      let position = TaskCardPosition(index: index + 1, count: steps.count + 1)
+      let isSelected = selection.contains(step.selectionID)
+      TaskNoticeStepRow(step: step, onToggle: { toggleNoticeStep(step) })
+        .asTaskRow(id: step.selectionID, isSelected: isSelected, isComplete: step.done)
+        .taskCardChrome(position, isSelected: isSelected)
+        .taskCardContextMenu(position) { noticeStepMenu(step) }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+  }
+
+  /// The step row's menu: what Return and ⌘K do, and hiding the checklist.
+  /// Nothing from the task menu applies to a step.
+  @ViewBuilder
+  private func noticeStepMenu(_ step: TaskNoticeStep) -> some View {
+    Button {
+      openNoticeStep(step.id)
+    } label: {
+      Label(String(localized: "Open", comment: "Get started step menu"),
+            systemImage: "arrow.up.forward")
+    }
+    Button {
+      toggleNoticeStep(step)
+    } label: {
+      if step.done {
+        Label(String(localized: "Mark as Not Done", comment: "Get started step menu"),
+              systemImage: "circle")
+      } else {
+        Label(String(localized: "Mark as Done", comment: "Get started step menu"),
+              systemImage: "checkmark.circle")
+      }
+    }
+    Divider()
+    Button {
+      dismissNotice(.getStarted)
+    } label: {
+      Label(String(localized: "Hide Get Started", comment: "Get started step menu"),
+            systemImage: "eye.slash")
     }
   }
 
@@ -1604,10 +1684,10 @@ struct TaskListView: View {
     #endif
   }
 
-  /// Ticks a Get started step by hand, like checking off a task.
-  private func completeNoticeStep(_ id: TaskNoticeStep.ID) {
+  /// Ticks or unticks a Get started step by hand, like a task's checkbox.
+  private func toggleNoticeStep(_ step: TaskNoticeStep) {
     Haptics.tick()
-    TaskNotices.completeStep(id)
+    TaskNotices.toggleStep(step)
     motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
   }
 
@@ -2166,7 +2246,8 @@ struct TaskListView: View {
         // order inside each list (#66).
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       }
-      return todayInboxKeyboardIDs + classifiedIds
+      // The Get started steps sit above everything, under their notice.
+      return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
     case .unscheduled:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
@@ -2279,6 +2360,17 @@ struct TaskListView: View {
   }
 
   private func toggleSelected() {
+    // ⌘K on Get started steps ticks them (or unticks them, when every
+    // selected step is already done), like completing tasks.
+    let steps = selectedNoticeSteps
+    if !steps.isEmpty {
+      let reopen = steps.allSatisfy(\.done)
+      Haptics.tick()
+      for step in steps {
+        if reopen { TaskNotices.reopenStep(step.id) } else { TaskNotices.completeStep(step.id) }
+      }
+      motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+    }
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     for id in ids {
@@ -2293,7 +2385,10 @@ struct TaskListView: View {
   /// as a side effect so the highlight follows.
   private func effectiveSelectionId() -> String? {
     if let id = selection.first(where: { currentTask(id: $0) != nil }) { return id }
-    guard let first = keyboardOrderedTaskIds.first else { return nil }
+    // Never a Get started step: no task command applies to one.
+    guard let first = keyboardOrderedTaskIds.first(where: {
+      TaskNoticeStep.stepID(fromSelection: $0) == nil
+    }) else { return nil }
     selectOnly(first)
     return first
   }

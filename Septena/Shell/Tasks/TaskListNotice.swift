@@ -26,38 +26,21 @@ struct TaskListNotice<Actions: View>: View {
   var detail: Text?
   /// Non-nil draws a small close button at the trailing edge.
   var onDismiss: (() -> Void)?
-  /// Checklist rows (the Get started notice), drawn as task rows inside the
-  /// card: the same checkbox, the same title and meta type. Empty for a plain
-  /// notice.
-  var steps: [TaskNoticeStep] = []
-  /// The row's checkbox: ticks the step by hand.
-  var onStepToggle: ((TaskNoticeStep.ID) -> Void)?
-  /// The row itself: does the step (opens the right place).
-  var onStepTap: ((TaskNoticeStep.ID) -> Void)?
+  /// True when list rows follow this notice on the same card (the Get
+  /// started steps, `TaskNoticeStepRow`): the notice draws the card's top
+  /// slice, with no gap under it, and the rows draw the rest.
+  var headsCard: Bool = false
   @ViewBuilder var actions: Actions
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      header
-      ForEach(steps) { step in
-        CheckableRow(
-          tint: Theme.inkPrimary,
-          isDone: step.done,
-          isInactive: step.done,
-          title: step.title,
-          subtitle: step.detail,
-          onToggle: { if !step.done { onStepToggle?(step.id) } },
-          onTap: step.done ? nil : { onStepTap?(step.id) })
-        .environment(\.rowHInset, 0)
-      }
-    }
-    .padding(.horizontal, TaskCardMetrics.contentInset)
-    .padding(.vertical, 10)
-    .background(fill)
-    // Same margin as the task cards below, so the notice sits in the card
-    // column rather than on its own inset.
-    .padding(.horizontal, TaskCardMetrics.margin)
-    .padding(.bottom, TaskCardMetrics.groupGap)
+    header
+      .padding(.horizontal, TaskCardMetrics.contentInset)
+      .padding(.vertical, 10)
+      .background(fill)
+      // Same margin as the task cards below, so the notice sits in the card
+      // column rather than on its own inset.
+      .padding(.horizontal, TaskCardMetrics.margin)
+      .padding(.bottom, headsCard ? 0 : TaskCardMetrics.groupGap)
   }
 
   private var header: some View {
@@ -116,7 +99,7 @@ struct TaskListNotice<Actions: View>: View {
   }
 
   private var fill: some View {
-    let shape = RoundedRectangle(cornerRadius: TaskCardMetrics.radius, style: .continuous)
+    let shape = (headsCard ? TaskCardPosition.top : .solo).cardShape
     return shape
       .fill(Theme.cardSurface)
       .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
@@ -137,5 +120,26 @@ extension TaskListNotice where Actions == EmptyView {
        onDismiss: (() -> Void)? = nil) {
     self.init(kind: kind, symbol: symbol, title: title, detail: detail,
               onDismiss: onDismiss, actions: { EmptyView() })
+  }
+}
+
+/// One Get started step as a row of the task list: the task checkbox, the
+/// title and its dimmed detail. The list makes it a real row (selection,
+/// arrow keys, Return, ⌘K, the card slice and the context menu) with
+/// `asTaskRow` and `taskCardChrome`, exactly as it does a task row; the step
+/// is never a task. The AppKit counterpart is `KitNoticeStepCell`.
+struct TaskNoticeStepRow: View {
+  let step: TaskNoticeStep
+  /// The checkbox: ticks or unticks the step.
+  let onToggle: () -> Void
+
+  var body: some View {
+    CheckableRow(
+      tint: Theme.inkPrimary,
+      isDone: step.done,
+      isInactive: step.done,
+      title: step.title,
+      subtitle: step.detail,
+      onToggle: onToggle)
   }
 }
