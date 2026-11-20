@@ -50,6 +50,14 @@ PUBLIC_URL = "https://mcp.septena.app"
 API_PUBLIC_URL = "https://api.septena.app"
 # Bundle ids accepted as the `aud` of a Sign in with Apple identity token.
 APPLE_AUDIENCES = "com.septena.cloud,com.septena.cloud.mac,com.septena.tasks,com.septena.tasks.mac"
+# Sync subscription (docs/SYNC_SUBSCRIPTION_SPEC.md §6). "false": the check
+# runs and logs `entitlement_would_block`, and nothing is refused. Flip to
+# "true" only after mz has a grant row (spec §6, "Grant yourself").
+ENTITLEMENT_ENFORCE = "false"
+# App Store purchases count only from these bundle ids and environments.
+# Sandbox stays on for TestFlight and P1 testing; drop it at public launch.
+APPLE_IAP_BUNDLE_IDS = "com.septena.tasks"
+APPLE_IAP_ENVIRONMENTS = "Production,Sandbox"
 
 # Created via `wrangler kv namespace create <NAME>`; paste returned IDs here.
 [[kv_namespaces]]
@@ -95,3 +103,5 @@ bucket_name = "septena-attachments"
 # TOKEN_ENC_KEY   — 32-byte base64 (openssl rand -base64 32) for AES-GCM
 # SESSION_SIGNING_KEY — 32-byte base64 (openssl rand -base64 32); signs the
 #                   task backend's access tokens. Separate from TOKEN_ENC_KEY.
+# ADMIN_TOKEN     — optional, 32-byte base64. Enables POST/DELETE
+#                   /v1/admin/grants (entitlement grant rows). Unset = 404.

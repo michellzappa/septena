@@ -82,9 +82,13 @@ Rules:
 
 1. The user taps a paid feature or "Turn on sync". The app asks for Sign in
    with Apple first if the install has no backend account.
-2. The app buys with `Product.purchase(options: [.appAccountToken(userId)])`,
-   where `userId` is the backend user UUID. This ties the transaction to the
-   account, not to the device.
+2. The app buys with `Product.purchase(options: [.appAccountToken(token)])`.
+   This ties the transaction to the account, not to the device. The backend
+   user id (`u_…`) is not a UUID, so `token` is a UUIDv5 of the user id in
+   the fixed namespace `b85c7060-77c8-4ea3-b8b4-fdee891cc9ef`, lowercase.
+   The app reads it from `GET /v1/entitlement` (`appAccountToken`) or
+   computes the same value. *(default, P0: mz can overrule before P1 ships;
+   after the first real purchase the namespace can never change.)*
 3. The app sends the signed transaction (JWS) to `POST /v1/entitlement/apple`.
 4. The Worker verifies the JWS with Apple's root certificates (App Store
    Server Library or an equal check in the Worker), checks that
@@ -104,6 +108,111 @@ Rules:
 - **Fail closed** on a missing or invalid row, with one exception: grace
   period and billing retry count as active (Apple's own rule).
 - A `grant` row (no expiry or a set expiry) covers mz, testers, and press.
+
+### 6.1 Implementation (P0, `backend/`)
+
+**Data.** Table `entitlements` in the user's `TaskStore` Durable Object, one
+row per source of access: `id` (`apple:<originalTransactionId>` or
+`grant:<name>`), `source`, `productId`, `expiresAt` (ms; null = no expiry),
+`originalTransactionId`, `status` (`active` / `grace` / `billing_retry` /
+`expired` / `revoked`), `environment`, `note`, `signedAt`, `updatedAt`. The
+user has sync when any row is active. An older Apple payload (`signedDate`)
+never overwrites a newer one. KV `TOKENS` maps `ent-otx:<originalTransactionId>`
+and `ent-aat:<appAccountToken>` to the user, so a webhook finds its user.
+Account deletion removes the rows with the rest of the Durable Object.
+
+**Active.** `active` until `expiresAt` + 24 h (a late renewal notification
+does not cut sync); `grace` until the grace period end + 24 h;
+`billing_retry` until `expiresAt` + 60 days or Apple's `EXPIRED`;
+`expired` and `revoked` never. A grant is active until its `expiresAt`.
+*(default: the 24 h leeway; mz can overrule.)*
+
+**Routes** (api.septena.app only; mcp.septena.app answers 404 as before):
+
+| Route | Auth | Does |
+|---|---|---|
+| `GET /v1/entitlement` | bearer | `userId`, `appAccountToken`, `active`, `enforced`, the rows |
+| `POST /v1/entitlement/apple` | bearer | body `{signedTransaction, signedRenewalInfo?}`; verifies, checks `appAccountToken`, bundle, environment, product; writes the row |
+| `POST /v1/webhooks/apple` | Apple JWS | App Store Server Notifications V2 `{signedPayload}`; 200 for any verified payload |
+| `POST /v1/admin/grants` | `X-Admin-Token` | body `{userId, name, note?, expiresAt?}`; writes `grant:<name>` |
+| `DELETE /v1/admin/grants/:userId/:name` | `X-Admin-Token` | removes a grant |
+
+The admin routes answer 404 while the `ADMIN_TOKEN` secret is unset.
+
+**Verification.** No library: `backend/src/entitlement/appleJws.ts` does
+the App Store Server Library's check with WebCrypto. ES256 header, `x5c` of
+three certificates; the intermediate must be signed by Apple Root CA - G3,
+which is pinned in the code (SHA-256
+`63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179`), never
+the chain's own root; the leaf must be signed by the intermediate; the leaf
+must carry OID 1.2.840.113635.100.6.11.1 and the intermediate
+1.2.840.113635.100.6.2.1; every certificate must be valid at the payload's
+`signedDate`; the leaf key verifies the JWS. Xcode StoreKit-testing
+transactions are signed locally and fail this check by design.
+
+**Counts as a purchase:** bundle id in `APPLE_IAP_BUNDLE_IDS`
+(`com.septena.tasks`), environment in `APPLE_IAP_ENVIRONMENTS`
+(`Production,Sandbox`), product id starting `com.septena.tasks.sync.`.
+*(default: Sandbox counts until public launch, so TestFlight and P1 testing
+work; remove it from the var at launch.)*
+
+**Status mapping (webhook).** `data.status` decides (1 active, 2 expired,
+3 billing retry, 4 grace, 5 revoked). Without it: `REFUND` / `REVOKE` →
+revoked, `EXPIRED` → expired, `DID_FAIL_TO_RENEW` → grace (subtype
+`GRACE_PERIOD`) or billing retry, `GRACE_PERIOD_EXPIRED` → billing retry,
+anything else → by `expiresDate`. A transaction with `revocationDate` is
+revoked. A transaction the app posts never moves a `grace` or
+`billing_retry` row to `expired`; only Apple's notifications do.
+
+**Enforcement.** One check, `hasSyncEntitlement` in
+`backend/src/entitlement/entitlement.ts`, used by the `/v1` middleware
+(`/sync/*`, `/attachments/*`, `/changes`) and by the api.septena.app
+connector's write tools (`tasks_*` writes, `tasks_claim`,
+`tasks_release`). Worker var `ENTITLEMENT_ENFORCE`:
+
+- `"false"` (the default in `wrangler.toml`): the check runs and logs
+  `entitlement_would_block` with the user id. Nothing is refused. A failed
+  check lets the call through.
+- `"true"`: no active row → 402 `{"error":"subscription_required"}` on
+  sync, a tool error on connector writes. A failed check blocks (fail
+  closed).
+
+The live connector on mcp.septena.app (CloudKit) is not gated.
+
+**App Store Connect (mz, P1).** Set the Production and Sandbox server
+notification URLs to `https://api.septena.app/v1/webhooks/apple`, version 2.
+
+### 6.2 Grant yourself (mz, one time)
+
+Run from `~/Dev/septena/backend` after this code is deployed.
+
+1. Make an admin token and store it as a Worker secret. Keep the value in
+   your password manager.
+
+   ```
+   openssl rand -base64 32 | tee /dev/tty | ./node_modules/.bin/wrangler secret put ADMIN_TOKEN
+   ```
+
+2. Find your user id. Start the tail, then open Septena on a device that
+   syncs. Copy `userId` from the first `entitlement_would_block` line.
+
+   ```
+   ./node_modules/.bin/wrangler tail septena-mcp-gateway --search entitlement_would_block
+   ```
+
+3. Write the grant (put your token and user id in):
+
+   ```
+   curl -sS -X POST https://api.septena.app/v1/admin/grants -H "X-Admin-Token: TOKEN" -H "Content-Type: application/json" -d '{"userId":"u_YOURID","name":"mz","note":"owner"}'
+   ```
+
+   The answer shows `"active": true`. The `entitlement_would_block` lines
+   for your user id stop.
+
+4. Only then set `ENTITLEMENT_ENFORCE = "true"` in `backend/wrangler.toml`
+   and deploy. A tester gets the same grant with their own `name`; give an
+   `expiresAt` (ISO 8601) for a time-limited grant. Remove one with
+   `curl -X DELETE https://api.septena.app/v1/admin/grants/u_ID/NAME -H "X-Admin-Token: TOKEN"`.
 
 ## 7. App behavior
 

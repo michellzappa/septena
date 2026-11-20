@@ -11,11 +11,18 @@ export interface Env {
   PUBLIC_URL: string;     // live connector origin (mcp.septena.app)
   API_PUBLIC_URL: string; // task backend origin (api.septena.app); also hosts the read-only MCP preview
   APPLE_AUDIENCES: string; // comma-separated bundle ids allowed as SIWA `aud`
+  // Sync subscription (docs/SYNC_SUBSCRIPTION_SPEC.md §6). "true" blocks
+  // unentitled sync with 402; anything else only logs what it would block.
+  ENTITLEMENT_ENFORCE: string;
+  APPLE_IAP_BUNDLE_IDS: string;    // comma-separated bundle ids whose purchases count
+  APPLE_IAP_ENVIRONMENTS: string;  // comma-separated: Production, Sandbox
 
   // Secrets (set via `wrangler secret put`)
   CK_API_TOKEN: string;
   TOKEN_ENC_KEY: string;
   SESSION_SIGNING_KEY: string; // 32-byte base64; signs task-backend access tokens
+  /// Optional. Unset = the /v1/admin routes answer 404. Grants entitlements.
+  ADMIN_TOKEN?: string;
 
   // KV namespaces
   STATE: KVNamespace;    // mid-OAuth state, short TTL

@@ -7,6 +7,23 @@ import { zPushBody, type Op } from "../store/ops.js";
 import { AppleIdentityError, userIdForAppleSub, verifyAppleIdentityToken } from "./appleIdentity.js";
 import { issueSession, refreshSession, revokeSession, storeFor, verifyAccessToken } from "./session.js";
 import { approvePairing, zPairApproveBody } from "../shadow/oauth.js";
+import {
+  appAccountTokenFor,
+  entitlementGate,
+  isEnforcing,
+  isRowActive,
+  rememberAppAccountToken,
+  rememberOriginalTransaction,
+  userForTransaction,
+} from "../entitlement/entitlement.js";
+import {
+  AppleJwsError,
+  verifyAppleJws,
+  type JwsRenewalInfo,
+  type JwsTransaction,
+  type NotificationV2,
+} from "../entitlement/appleJws.js";
+import { appleRow, rejectReason } from "../entitlement/apple.js";
 
 // Task backend API, mounted at /v1 (docs/SEPTASK_BACKEND.md in the app repo).
 // Phase 0: no app or MCP tool calls this yet. The live connector is unchanged.
@@ -85,11 +102,31 @@ async function requireUser(c: Ctx, next: Next) {
   await next();
 }
 
-api.use("/sync/*", requireUser);
-api.use("/attachments/*", requireUser);
+/// Paid paths (docs/SYNC_SUBSCRIPTION_SPEC.md §6). Runs after requireUser.
+/// With ENTITLEMENT_ENFORCE != "true" it only logs; see entitlementGate.
+async function requireSyncEntitlement(c: Ctx, next: Next) {
+  if ((await entitlementGate(c.env, c.get("userId"), "sync")) === "block") {
+    return c.json({ error: "subscription_required" }, 402);
+  }
+  await next();
+}
+
+/// Entitlement and admin routes exist only on api.septena.app, so
+/// mcp.septena.app answers exactly as before.
+async function apiHostOnly(c: Ctx, next: Next) {
+  if (new URL(c.req.url).host !== new URL(c.env.API_PUBLIC_URL).host) return c.notFound();
+  await next();
+}
+
+api.use("/sync/*", requireUser, requireSyncEntitlement);
+api.use("/attachments/*", requireUser, requireSyncEntitlement);
 api.use("/account", requireUser);
-api.use("/changes", requireUser);
+api.use("/changes", requireUser, requireSyncEntitlement);
 api.use("/pair/*", requireUser);
+api.use("/entitlement", apiHostOnly, requireUser);
+api.use("/entitlement/*", apiHostOnly, requireUser);
+api.use("/webhooks/*", apiHostOnly);
+api.use("/admin/*", apiHostOnly);
 
 api.post("/sync/push", async (c) => {
   const body = await parse(c, zPushBody);
@@ -184,6 +221,180 @@ api.post("/pair/approve", async (c) => {
   if (body instanceof Response) return body;
   const res = await approvePairing(c.env, c.get("userId"), body);
   return res.ok ? c.json({ ok: true, client: res.client }) : c.json({ error: res.error }, res.status);
+});
+
+// ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §5–§6) ----
+
+const zJws = z.string().min(20).max(20_000);
+
+/// The caller's entitlement, and the appAccountToken the app must pass to
+/// `Product.purchase(options: [.appAccountToken(_)])`.
+api.get("/entitlement", async (c) => {
+  const userId = c.get("userId");
+  const appAccountToken = await appAccountTokenFor(userId);
+  c.executionCtx.waitUntil(rememberAppAccountToken(c.env, userId, appAccountToken));
+  const rows = await storeFor(c.env, userId).entitlements();
+  const now = Date.now();
+  return c.json({
+    userId,
+    appAccountToken,
+    active: rows.some((r) => isRowActive(r, now)),
+    enforced: isEnforcing(c.env),
+    entitlements: rows.map((r) => ({ ...r, active: isRowActive(r, now) })),
+  });
+});
+
+/// A StoreKit 2 transaction the app holds (after purchase, and for every item
+/// of Transaction.currentEntitlements on restore).
+api.post("/entitlement/apple", async (c) => {
+  const body = await parse(c, z.object({ signedTransaction: zJws, signedRenewalInfo: zJws.optional() }).strict());
+  if (body instanceof Response) return body;
+  const userId = c.get("userId");
+  let tx: JwsTransaction;
+  let renewal: JwsRenewalInfo | undefined;
+  try {
+    tx = await verifyAppleJws<JwsTransaction>(body.signedTransaction);
+    if (body.signedRenewalInfo) renewal = await verifyAppleJws<JwsRenewalInfo>(body.signedRenewalInfo);
+  } catch (e) {
+    if (e instanceof AppleJwsError) {
+      logEvent("entitlement_apple", { ok: false, reason: e.message });
+      return c.json({ error: "invalid_signed_transaction" }, 400);
+    }
+    throw e;
+  }
+  const appAccountToken = await appAccountTokenFor(userId);
+  if (!tx.appAccountToken || tx.appAccountToken.toLowerCase() !== appAccountToken) {
+    logEvent("entitlement_apple", { ok: false, reason: "account_mismatch", userId });
+    return c.json({ error: "account_mismatch" }, 403);
+  }
+  if (renewal && renewal.originalTransactionId !== tx.originalTransactionId) {
+    return c.json({ error: "renewal_mismatch" }, 400);
+  }
+  const reject = rejectReason(c.env, tx);
+  if (reject) {
+    logEvent("entitlement_apple", { ok: false, reason: reject, userId });
+    return c.json({ error: reject }, 422);
+  }
+  const row = appleRow(tx, { renewal });
+  const store = storeFor(c.env, userId);
+  const written = await store.putEntitlement(row, "app");
+  await Promise.all([
+    rememberOriginalTransaction(c.env, userId, tx.originalTransactionId),
+    rememberAppAccountToken(c.env, userId, appAccountToken),
+  ]);
+  logEvent("entitlement_apple", { ok: true, userId, status: row.status, written });
+  const rows = await store.entitlements();
+  const now = Date.now();
+  return c.json({ active: rows.some((r) => isRowActive(r, now)), entitlement: rows.find((r) => r.id === row.id) ?? null });
+});
+
+/// App Store Server Notifications V2. Configure in App Store Connect as
+/// https://api.septena.app/v1/webhooks/apple (Production and Sandbox URLs).
+/// Answers 200 for anything verified, so Apple stops retrying; 400 only for
+/// a payload that fails verification.
+api.post("/webhooks/apple", async (c) => {
+  const body = await parse(c, z.object({ signedPayload: z.string().min(20).max(60_000) }));
+  if (body instanceof Response) return body;
+  let n: NotificationV2;
+  let tx: JwsTransaction | undefined;
+  let renewal: JwsRenewalInfo | undefined;
+  try {
+    n = await verifyAppleJws<NotificationV2>(body.signedPayload);
+    if (n.data?.signedTransactionInfo) tx = await verifyAppleJws<JwsTransaction>(n.data.signedTransactionInfo);
+    if (n.data?.signedRenewalInfo) renewal = await verifyAppleJws<JwsRenewalInfo>(n.data.signedRenewalInfo);
+  } catch (e) {
+    if (e instanceof AppleJwsError) {
+      logEvent("apple_webhook", { ok: false, reason: e.message });
+      return c.json({ error: "invalid_signed_payload" }, 400);
+    }
+    throw e;
+  }
+  const evt = { type: n.notificationType, subtype: n.subtype, uuid: n.notificationUUID };
+  if (!tx) {
+    // TEST, CONSUMPTION_REQUEST, summary notifications: nothing to record.
+    logEvent("apple_webhook", { ok: true, ...evt, ignored: "no_transaction" });
+    return c.json({ ok: true });
+  }
+  const reject = rejectReason(c.env, tx);
+  if (reject) {
+    logEvent("apple_webhook", { ok: true, ...evt, ignored: reject });
+    return c.json({ ok: true });
+  }
+  const userId = await userForTransaction(c.env, tx.originalTransactionId, tx.appAccountToken);
+  if (!userId) {
+    // The app has not posted this purchase or read its token yet. Its own
+    // POST /v1/entitlement/apple records the row when it does.
+    logEvent("apple_webhook", { ok: true, ...evt, ignored: "unknown_user" });
+    return c.json({ ok: true });
+  }
+  const row = appleRow(tx, { renewal, notification: n });
+  const written = await storeFor(c.env, userId).putEntitlement(row, "webhook");
+  await rememberOriginalTransaction(c.env, userId, tx.originalTransactionId);
+  logEvent("apple_webhook", { ok: true, ...evt, userId, status: row.status, written });
+  return c.json({ ok: true });
+});
+
+// ---- admin: grant rows (mz, testers, press) ----
+// Disabled (404) unless the ADMIN_TOKEN secret is set. The caller sends it as
+// `X-Admin-Token`. Exact commands: docs/SYNC_SUBSCRIPTION_SPEC.md §6.
+
+async function adminAllowed(c: Ctx): Promise<boolean> {
+  const secret = c.env.ADMIN_TOKEN;
+  const given = c.req.header("X-Admin-Token");
+  if (!secret || !given) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(secret)),
+    crypto.subtle.digest("SHA-256", enc.encode(given)),
+  ]);
+  // Equal-length digests, compared without an early exit.
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
+const zUserId = z.string().regex(/^u_[A-Za-z0-9_-]{20,64}$/);
+const zGrantName = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,39}$/);
+
+api.post("/admin/grants", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const body = await parse(c, z.object({
+    userId: zUserId,
+    name: zGrantName,
+    note: z.string().max(200).optional(),
+    expiresAt: z.string().datetime().optional(),
+  }).strict());
+  if (body instanceof Response) return body;
+  const now = Date.now();
+  const store = storeFor(c.env, body.userId);
+  await store.putEntitlement({
+    id: `grant:${body.name}`,
+    source: "grant",
+    productId: null,
+    expiresAt: body.expiresAt ? Date.parse(body.expiresAt) : null,
+    originalTransactionId: null,
+    status: "active",
+    environment: null,
+    note: body.note ?? null,
+    signedAt: now,
+  }, "admin");
+  logEvent("entitlement_grant", { userId: body.userId, name: body.name });
+  const rows = await store.entitlements();
+  return c.json({ active: rows.some((r) => isRowActive(r, now)), entitlements: rows });
+});
+
+api.delete("/admin/grants/:userId/:name", async (c) => {
+  if (!c.env.ADMIN_TOKEN) return c.notFound();
+  if (!(await adminAllowed(c))) return c.json({ error: "forbidden" }, 403);
+  const userId = zUserId.safeParse(c.req.param("userId"));
+  const name = zGrantName.safeParse(c.req.param("name"));
+  if (!userId.success || !name.success) return c.json({ error: "invalid_request" }, 400);
+  const removed = await storeFor(c.env, userId.data).deleteEntitlement(`grant:${name.data}`);
+  logEvent("entitlement_grant_revoked", { userId: userId.data, name: name.data, removed });
+  return removed ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
 });
 
 // ---- account deletion (§10) ----

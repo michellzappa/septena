@@ -17,6 +17,7 @@ import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
 import { GLOBAL_TOOLS } from "../mcp.js";
+import { entitlementGate } from "../entitlement/entitlement.js";
 import {
   type ConvoTurn,
   type TaskConvo,
@@ -61,6 +62,12 @@ const INSTRUCTIONS =
   "paused, stop: only the user can resume.";
 
 const RESOURCE_METADATA = (env: Env) => `${env.API_PUBLIC_URL}/.well-known/oauth-protected-resource`;
+
+/// A write refused because the account has no sync subscription (only when
+/// ENTITLEMENT_ENFORCE is "true"; docs/SYNC_SUBSCRIPTION_SPEC.md §6).
+const SUBSCRIPTION_MESSAGE =
+  "Claude can read these tasks but cannot change them: this Septena account has no sync subscription. " +
+  "Turn on sync in Septena's settings, then try again.";
 
 const RECONNECT_MESSAGE =
   "This Septena connection can only read tasks: it was set up before Claude could change them. " +
@@ -160,6 +167,9 @@ async function callTool(
       // In-band, so the connector stays connected and the model can relay it.
       return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
     }
+    if ((await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
+    }
     const args = zWriteArgs[name as WriteToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);
     const result = await runWriteTool(
@@ -173,6 +183,10 @@ async function callTool(
     // Claims and releases write; events and activity only read.
     if ((name === "tasks_claim" || name === "tasks_release") && !hasScope(grant, MCP_WRITE_SCOPE)) {
       return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
+    }
+    if ((name === "tasks_claim" || name === "tasks_release")
+      && (await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
     }
     const args = zAgentArgs[name as AgentToolName].safeParse(params.arguments ?? {});
     if (!args.success) return invalidArgs(id, args.error, era);

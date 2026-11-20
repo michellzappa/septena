@@ -12,6 +12,7 @@ import {
   type EntitySpec,
 } from "./columns.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
+import type { EntitlementRow } from "../entitlement/entitlement.js";
 
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
@@ -175,6 +176,11 @@ export class TaskStore extends DurableObject<Env> {
       );
       CREATE TABLE IF NOT EXISTS sessions (
         hash TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS entitlements (
+        id TEXT PRIMARY KEY, source TEXT NOT NULL, productId TEXT, expiresAt INTEGER,
+        originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
+        signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
       );
     `);
   }
@@ -750,6 +756,46 @@ export class TaskStore extends DurableObject<Env> {
 
   revokeSession(hash: string): void {
     this.sql.exec("DELETE FROM sessions WHERE hash = ?", hash);
+  }
+
+  // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §6) ----
+
+  entitlements(): EntitlementRow[] {
+    return this.sql.exec<Record<string, SqlStorageValue>>("SELECT * FROM entitlements ORDER BY id").toArray()
+      .map((r) => ({ ...r }) as unknown as EntitlementRow);
+  }
+
+  /// Writes one row unless a newer Apple payload already wrote it. `origin`
+  /// "app" (a transaction the app posted) never moves a grace or billing-retry
+  /// row to expired: the transaction alone cannot see grace or retry, only
+  /// Apple's notifications can. Returns whether the row was written.
+  putEntitlement(row: Omit<EntitlementRow, "updatedAt">, origin: "app" | "webhook" | "admin"): boolean {
+    return this.ctx.storage.transactionSync(() => {
+      const cur = this.sql.exec<{ status: string; signedAt: number }>(
+        "SELECT status, signedAt FROM entitlements WHERE id = ?", row.id,
+      ).toArray()[0];
+      if (cur && origin !== "admin") {
+        if (cur.signedAt > row.signedAt) return false;
+        if (origin === "app" && row.status === "expired" && (cur.status === "grace" || cur.status === "billing_retry")) {
+          return false;
+        }
+      }
+      this.sql.exec(
+        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, environment, note, signedAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET source = excluded.source, productId = excluded.productId,
+           expiresAt = excluded.expiresAt, originalTransactionId = excluded.originalTransactionId,
+           status = excluded.status, environment = excluded.environment, note = excluded.note,
+           signedAt = excluded.signedAt, updatedAt = excluded.updatedAt`,
+        row.id, row.source, row.productId, row.expiresAt, row.originalTransactionId, row.status,
+        row.environment, row.note, row.signedAt, Date.now(),
+      );
+      return true;
+    });
+  }
+
+  deleteEntitlement(id: string): boolean {
+    return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
   }
 
   /// Account deletion (§10). The Worker empties the user's R2 prefix.
