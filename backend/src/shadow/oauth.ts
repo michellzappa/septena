@@ -2,11 +2,10 @@ import type { Context } from "hono";
 import { z } from "zod";
 import type { Env } from "../env.js";
 import { getClient, putClient } from "../storage.js";
-import { logEvent, randomId, readCookie, sha256Base64Url } from "../util.js";
+import { escapeHtml, logEvent, randomId, readCookie, sha256Base64Url } from "../util.js";
 import { isValidTz } from "../tz.js";
 import { registerClient } from "../oauth/register.js";
 import { validateRedirectUri } from "../oauth/redirects.js";
-import { escapeHtml } from "../oauth/authorize.js";
 import { storeFor } from "../api/session.js";
 import { MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMcpToken } from "./tokens.js";
 
@@ -26,8 +25,7 @@ import { MCP_GRANT_SCOPE, MCP_SCOPES, issueMcpTokens, redeemMcpRefresh, revokeMc
 //   5. Claude trades the code (PKCE) at /oauth/token for an `sm1.` access token
 //      and a rotating `smr1.` refresh token, scope `tasks:read tasks:write`.
 //
-// Everything here runs only on the api host; mcp.septena.app keeps its own
-// handlers (src/oauth/*) unchanged. KV keys are under `v2:`.
+// KV keys are under `v2:`.
 
 const CLIENT_PREFIX = "v2:client:";
 const CODE_PREFIX = "v2:code:";
@@ -41,10 +39,6 @@ export const PAIR_MAX_FAILURES = 5;
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 8;
 const CODE_RE = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`);
-
-export function isApiHost(c: Context<{ Bindings: Env }>): boolean {
-  return new URL(c.req.url).host === new URL(c.env.API_PUBLIC_URL).host;
-}
 
 function newPairCode(): string {
   // Rejection sampling keeps every symbol equally likely.

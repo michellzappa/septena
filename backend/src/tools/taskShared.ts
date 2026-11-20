@@ -154,6 +154,10 @@ export function matchesView(t: TaskOut, view: TaskView, today: string, nowMs: nu
     case "upcoming":
       if (t.today) return false;
       return (!!t.scheduled && t.scheduled > today) || (!!t.deadline && t.deadline > today);
+    case "anytime":
+      // The app's Anytime list (LocalCache .unscheduled): open, not on Today,
+      // no date at all.
+      return !t.today && !t.scheduled && !t.deadline;
     default:
       return true;
   }

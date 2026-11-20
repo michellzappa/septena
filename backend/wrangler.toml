@@ -11,10 +11,9 @@ compatibility_flags = ["nodejs_compat_v2"]
 # ignores it. Requires:
 #   • septena.app DNS on Cloudflare (done)
 #   • Zone "Active" in the Cloudflare dashboard
+# mcp.septena.app (the CloudKit connector) was decommissioned 2026-11-20.
 routes = [
-  { pattern = "mcp.septena.app", custom_domain = true },
-  # Task backend API (/v1). Same Worker so the MCP tools can reach each
-  # user's TaskStore directly in a later phase.
+  # Task backend API (/v1) and the task MCP connector (/mcp).
   { pattern = "api.septena.app", custom_domain = true },
 ]
 
@@ -25,28 +24,16 @@ routes = [
 enabled = true
 head_sampling_rate = 1
 
-# Daily prune of dead access-token records (see scheduled handler).
-[triggers]
-crons = ["0 3 * * *"]
-
-# Allow importing .md files as text modules. Used by src/landing.ts to embed
-# the skill brief served at GET / and GET /skill.md without escaping the
-# markdown into a TS template literal.
+# Allow importing .md files as text modules. Used by src/index.ts to serve
+# the skill brief at GET /skill.md.
 [[rules]]
 type = "Text"
 globs = ["**/*.md"]
 fallthrough = true
 
 [vars]
-CK_CONTAINER = "iCloud.com.septena.cloud"
-# Flip to "production" once the CloudKit schema is deployed to Production.
-# Until then the gateway talks to CloudKit Development, accessible only to
-# Apple IDs on the developer team (i.e. you).
-CK_ENVIRONMENT = "development"
-CK_ZONE = "septena-v1"
-PUBLIC_URL = "https://mcp.septena.app"
-# Task backend origin. Requests on this host get the read-only MCP preview
-# (/mcp) and its pairing OAuth (/oauth/*, /.well-known/*); see src/shadow/.
+# Task backend origin: the /v1 API and the task MCP connector (/mcp) with its
+# pairing OAuth (/oauth/*, /.well-known/*); see src/shadow/.
 API_PUBLIC_URL = "https://api.septena.app"
 # Bundle ids accepted as the `aud` of a Sign in with Apple identity token.
 APPLE_AUDIENCES = "com.septena.cloud,com.septena.cloud.mac,com.septena.tasks,com.septena.tasks.mac"
@@ -81,9 +68,9 @@ class_name = "TaskStore"
 tag = "v1-task-store"
 new_sqlite_classes = ["TaskStore"]
 
-# Pending app-pairing codes for the api.septena.app MCP preview: one object per
-# code, so approve and the browser's poll see the same state at once (KV would
-# serve the poll a cached "pending" for up to a minute).
+# Pending app-pairing codes for the api.septena.app MCP connector: one object
+# per code, so approve and the browser's poll see the same state at once (KV
+# would serve the poll a cached "pending" for up to a minute).
 [[durable_objects.bindings]]
 name = "PAIRING"
 class_name = "PairingStore"
@@ -98,10 +85,7 @@ binding = "ATTACHMENTS"
 bucket_name = "septena-attachments"
 
 # ---- Secrets (NOT in this file — set via `wrangler secret put`) ----
-# CK_API_TOKEN    — CloudKit Dashboard → API Tokens; redirect URL must be
-#                   https://mcp.septena.app/auth/apple/callback
-# TOKEN_ENC_KEY   — 32-byte base64 (openssl rand -base64 32) for AES-GCM
 # SESSION_SIGNING_KEY — 32-byte base64 (openssl rand -base64 32); signs the
-#                   task backend's access tokens. Separate from TOKEN_ENC_KEY.
+#                   task backend's access tokens.
 # ADMIN_TOKEN     — optional, 32-byte base64. Enables POST/DELETE
 #                   /v1/admin/grants (entitlement grant rows). Unset = 404.

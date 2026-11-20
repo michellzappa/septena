@@ -16,7 +16,7 @@ import {
 import { zId } from "../store/columns.js";
 import type { Row } from "../store/TaskStore.js";
 import { isValidTz, todayYMD } from "../tz.js";
-import { GLOBAL_TOOLS } from "../mcp.js";
+import { TASK_TOOLS } from "../tools/taskTools.js";
 import { entitlementGate } from "../entitlement/entitlement.js";
 import {
   type ConvoTurn,
@@ -94,11 +94,11 @@ const zArgs = {
 };
 type ReadToolName = keyof typeof zArgs;
 
-// Every task tool of the live connector, in its order, with its definition.
+// Every task tool, in TASK_TOOLS order, with its definition.
 const TOOL_NAMES = new Set<string>([...Object.keys(zArgs), ...WRITE_TOOL_NAMES]);
-const LIVE_TOOLS: Tool[] = GLOBAL_TOOLS.filter((t) => TOOL_NAMES.has(t.name));
+const LIVE_TOOLS: Tool[] = TASK_TOOLS.filter((t) => TOOL_NAMES.has(t.name));
 if (LIVE_TOOLS.length !== TOOL_NAMES.size) {
-  throw new Error("api connector: a task tool has no live definition in src/mcp.ts");
+  throw new Error("api connector: a task tool has no definition in src/tools/taskTools.ts");
 }
 // Plus the agent loop, which only this connector serves (./agent.ts).
 const TOOLS: Tool[] = [...LIVE_TOOLS, ...AGENT_TOOLS];
