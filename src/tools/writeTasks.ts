@@ -47,10 +47,21 @@ export function unknownContainerMessage(
 
 const SHORTID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
+/// Six characters from SHORTID_ALPHABET. Rejection sampling keeps every
+/// character uniform: `b & 31` used to index past the 31-character alphabet
+/// one time in 32, dropping that character and leaving a short id.
 export function newTaskId(): string {
-  const buf = new Uint8Array(6);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, (b) => SHORTID_ALPHABET[b & 31]).join("");
+  const n = SHORTID_ALPHABET.length;
+  const limit = 256 - (256 % n);
+  let id = "";
+  while (id.length < 6) {
+    const buf = new Uint8Array(12);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b < limit && id.length < 6) id += SHORTID_ALPHABET[b % n];
+    }
+  }
+  return id;
 }
 
 interface CKModifyResponse {
