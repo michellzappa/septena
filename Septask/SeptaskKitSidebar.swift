@@ -1387,28 +1387,18 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
   }
 
   @objc private func deleteSelected() {
-    // Copy matches the SwiftUI sidebar's confirmation exactly (SidebarView) —
-    // one deletion story between the two shells. A window SHEET, not an
-    // app-modal alert, with Cancel as the Return default.
+    // Copy matches the SwiftUI sidebar's confirmation exactly
+    // (`ContainerDeleteCopy`) — one deletion story between the two shells. A
+    // window SHEET, not an app-modal alert, with Cancel as the Return default.
     switch selectedNode?.content {
     case .area(let area):
-      KitPrompt.confirmDestructive(
-        title: String(localized: "Delete \(area.title)?",
-                      comment: "SeptaskKit: delete area confirm"),
-        message: String(localized: "Projects in this area will be detached but not deleted.",
-                        comment: "Delete area confirmation body"),
-        in: view.window
-      ) { [weak self] in
+      let copy = ContainerDeleteCopy.area(id: area.id, title: area.title, context: context)
+      KitPrompt.confirmDestructive(title: copy.title, message: copy.message, in: view.window) { [weak self] in
         self?.deleteArea(area)
       }
     case .project(let project, _):
-      KitPrompt.confirmDestructive(
-        title: String(localized: "Delete \(project.title)?",
-                      comment: "SeptaskKit: delete project confirm"),
-        message: String(localized: "Tasks in this project will be moved to the inbox.",
-                        comment: "Delete project confirmation body"),
-        in: view.window
-      ) { [weak self] in
+      let copy = ContainerDeleteCopy.project(id: project.id, title: project.title, context: context)
+      KitPrompt.confirmDestructive(title: copy.title, message: copy.message, in: view.window) { [weak self] in
         self?.deleteProject(project)
       }
     default:
@@ -1416,35 +1406,29 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     }
   }
 
-  /// Delete is a hard delete in the store, so undo REBUILDS the area under
-  /// its old id with its old fields and position. Projects and tasks keep
-  /// pointing at that id, so they rejoin it as soon as it exists again.
+  /// The area delete takes its projects and every task in it to Recently
+  /// Deleted (`AreasMutator.delete`). Undo revives the area — every field,
+  /// sidebar position included — then its projects and tasks, each re-filed
+  /// exactly. One shared inverse (`TaskUndo.recordAreaDelete`) for every
+  /// surface that deletes an area.
   private func deleteArea(_ area: Area) {
     let mutator = areasMutator
-    let order = StructureCache.snapshot(in: context).areas.map(\.id)
+    let projects = projectsMutator
+    let snapshot = TaskUndo.areaDeleteSnapshot(id: area.id, areas: mutator, projects: projects,
+                                               context: context)
     bounceToTodayIfShowing(key: "area:\(area.id)")
     Task { try? await mutator.delete(id: area.id) }
-    recordStructure(
-      name: String(localized: "Delete Area", comment: "SeptaskKit: undo action"),
-      undo: {
-        Task {
-          _ = try? await mutator.createWithExplicitID(id: area.id, title: area.title,
-                                                      context: area.context)
-          if area.emoji != nil { try? await mutator.setEmoji(id: area.id, emoji: area.emoji) }
-          if area.attachment != nil {
-            try? await mutator.setAttachment(id: area.id, attachment: area.attachment)
-          }
-          try? await mutator.reorder(orderedIDs: order)
-        }
-      },
-      redo: { Task { try? await mutator.delete(id: area.id) } })
+    if let snapshot {
+      TaskUndo.recordAreaDelete(snapshot, areas: mutator, projects: projects,
+                                mutator: SeptenaServices.shared.taskMutator)
+    }
   }
 
-  /// The project delete also detaches its tasks (the mutator's cascade), so
-  /// undo rebuilds the project — every field, sidebar position included —
-  /// brings its headings back, and re-files exactly the tasks that were in
-  /// it. One shared inverse (`TaskUndo.recordProjectDelete`) for every
-  /// surface that deletes a project.
+  /// The project delete takes every task in it to Recently Deleted (the
+  /// mutator's cascade), so undo rebuilds the project — every field, sidebar
+  /// position included — brings its headings and tasks back, and re-files
+  /// each exactly. One shared inverse (`TaskUndo.recordProjectDelete`) for
+  /// every surface that deletes a project.
   private func deleteProject(_ project: Project) {
     let mutator = projectsMutator
     let snapshot = TaskUndo.projectDeleteSnapshot(id: project.id, projects: mutator,

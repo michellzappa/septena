@@ -92,17 +92,11 @@ enum TaskReads {
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: [], done: [])
 
-    case "triage":
-      // Unratified layer above Today (agent proposals + loose human captures).
-      // Superset of "inbox"; see `docs/TRIAGE_BAND_SPEC.md`.
-      let items = LocalCache.tasks(in: context, filter: .triage)
-      return TasksListResponse(view: view, today: todayIso, items: items,
-                               review: nil, done: nil)
-
-    case "inbox":
-      // The standalone Inbox page was retired; "inbox" now aliases the
-      // triage band (loose captures live there). See docs/TRIAGE_BAND_SPEC.md.
-      let items = LocalCache.tasks(in: context, filter: .triage)
+    case "inbox", "triage":
+      // Today's Inbox section, as both shells draw it: the triage band, then
+      // the Inbox members on Today (`TaskInbox`). "triage" is the retired
+      // name, kept as an alias — same as the backend connector.
+      let items = LocalCache.todayInboxTasks(in: context)
       return TasksListResponse(view: view, today: todayIso, items: items,
                                review: nil, done: nil)
 
@@ -185,10 +179,13 @@ enum TaskReads {
     var cancelledByDay: [String: Int] = [:]
     var madeByDay: [String: Int] = [:]
 
+    let dead = DeletedContainerLedger.snapshot()
     for e in LocalCache.liveEntities(in: context) {
       // Headings are dividers, not to-dos — never count toward openCount, the
       // smart-list badges, or the made/done histogram (see `TaskEntity.isHeading`).
       if e.isHeading { continue }
+      // Orphaned, awaiting delete (its area / project is gone): counts nowhere.
+      if DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead) { continue }
       if e.status == .open { allOpen += 1 }
       guard !e.pendingDeletion else { continue }
 
@@ -197,7 +194,7 @@ enum TaskReads {
       switch e.status {
       case .open:
         let undated = e.scheduled == nil && e.deadline == nil
-        if undated, e.project == nil, e.area == nil, !e.today { inbox += 1 }
+        if e.isInInbox { inbox += 1 }
         if !e.today {
           if let s = e.scheduled, s > today { upcoming += 1 }
           else if let d = e.deadline, d > today { upcoming += 1 }

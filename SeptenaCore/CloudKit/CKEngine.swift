@@ -81,6 +81,11 @@ var applyDeletedRecord: ((CKRecord.ID, CKRecord.RecordType) async -> Void)?
   /// optimistically and the mutator already posted a scoped change. Posting
   /// again would re-run the whole app's reload path for nothing.
 var applyDidFinishBatch: ((_ notify: Bool) async -> Void)?
+  /// Runs after a whole fetch pass has been applied (CKSyncEngine's
+  /// `didFetchChanges`): the point where every delete the server had for this
+  /// device is local. The delete-cascade sweep hangs off it
+  /// (`AreasMutator.sweepDeletedContainerOrphans`).
+var applyDidFetchChanges: (() async -> Void)?
 
   /// Current iCloud account status. Refreshed on init, when the system
   /// posts `.CKAccountChanged`, and any time `refreshAccountStatus()` is
@@ -246,23 +251,27 @@ func noteAreaDeletion(id: String) { if routeToTaskBackend(.area, id) { return };
 func noteProjectChange(id: String) { if routeToTaskBackend(.project, id) { return }; noteChange(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 func noteProjectDeletion(id: String) { if routeToTaskBackend(.project, id) { return }; noteDeletion(recordName: ProjectCloudKitSchema.recordName(for: id), kind: "project") }
 
-  /// Whether a deleted project can come back under its own id (undo). CloudKit
-  /// accepts a save under a deleted record name; the task backend never
-  /// revives a deleted row, so there it holds only while the delete still
-  /// waits in the outbox (`TaskSyncEngine.canReviveProject`).
-  func canReviveProject(id: String) -> Bool {
-    if TaskStoreMode.current == .backend { return TaskSyncEngine.shared.canReviveProject(id) }
+  /// Whether a deleted area / project can come back under its own id (undo).
+  /// CloudKit accepts a save under a deleted record name; the task backend
+  /// never revives a deleted row, so there it holds only while the delete
+  /// still waits in the outbox (`TaskSyncEngine.canRevive`).
+  func canReviveContainer(_ kind: DeletedContainerLedger.Kind, id: String) -> Bool {
+    if TaskStoreMode.current == .backend {
+      return TaskSyncEngine.shared.canRevive(kind == .area ? .area : .project, id)
+    }
     return true
   }
 
-  /// CloudKit only: take back a project delete that has not gone out yet, so
-  /// the revived row's save is an ordinary update of the record CloudKit still
-  /// has. Returns true when one was pending (the caller then keeps the row's
-  /// old system fields). The backend cancels its own held delete on capture.
-  func cancelPendingProjectDeletion(id: String) -> Bool {
+  /// CloudKit only: take back an area / project delete that has not gone out
+  /// yet, so the revived row's save is an ordinary update of the record
+  /// CloudKit still has. Returns true when one was pending (the caller then
+  /// keeps the row's old system fields). The backend cancels its own held
+  /// delete on capture.
+  func cancelPendingContainerDeletion(_ kind: DeletedContainerLedger.Kind, id: String) -> Bool {
     guard TaskStoreMode.current != .backend, let engine else { return false }
-    let recordID = CKRecord.ID(recordName: ProjectCloudKitSchema.recordName(for: id),
-                               zoneID: SeptenaCloudKit.zoneID)
+    let name = kind == .area ? AreaCloudKitSchema.recordName(for: id)
+                             : ProjectCloudKitSchema.recordName(for: id)
+    let recordID = CKRecord.ID(recordName: name, zoneID: SeptenaCloudKit.zoneID)
     let delete = CKSyncEngine.PendingRecordZoneChange.deleteRecord(recordID)
     guard engine.state.pendingRecordZoneChanges.contains(delete) else { return false }
     engine.state.remove(pendingRecordZoneChanges: [delete])
@@ -772,6 +781,8 @@ func handleEvent(
         logger.info("CKEngine bootstrap complete: \(self.bootstrapFetchedCount, privacy: .public) records")
         isBootstrapping = false
       }
+      let didFetch = await MainActor.run { self.applyDidFetchChanges }
+      await didFetch?()
 
     case .fetchedDatabaseChanges, .sentDatabaseChanges,
          .willFetchChanges,

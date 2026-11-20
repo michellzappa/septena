@@ -27,9 +27,9 @@ protocol ProjectsBackend: AnyObject {
 final class ProjectsMutator: ProjectsBackend {
   private let context: ModelContext
   private var ckBackend: CloudKitProjectsBackend?
-  /// Set once at startup so `delete` can cascade-clear the project link on
-  /// referencing tasks through the task write boundary. No retain cycle —
-  /// `TaskMutator` does not reference back. See `delete(id:)`.
+  /// Set once at startup so `delete` can move the project's tasks to Recently
+  /// Deleted through the task write boundary. No retain cycle — `TaskMutator`
+  /// does not reference back. See `delete(id:)`.
   weak var taskMutator: TaskMutator?
 
   init(context: ModelContext) {
@@ -71,40 +71,34 @@ final class ProjectsMutator: ProjectsBackend {
   func setAttachment(id: String, attachment: AreaAttachment?) async throws {
     try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
+  /// Delete a project and everything in it: every task (open AND done) and
+  /// every section heading goes to Recently Deleted — the same soft delete as
+  /// deleting a task — then the project row goes. Nothing lands in the Inbox
+  /// (`TaskInbox`). Undo is recorded at the gesture
+  /// (`TaskUndo.recordProjectDelete`), never here.
   func delete(id: String) async throws {
-    // Cascade: clear the project link on every task that referenced this
-    // project, so they truly "lose their project link" (as the delete dialog
-    // promises) instead of being left with a dangling id. A dangling id would
-    // otherwise be re-stubbed by `SeptenaServices.reconcileProjectGraph()` on
-    // the next launch — making the deletion reappear.
-    //
-    // The project's heading rows go to Recently Deleted (soft delete, which
-    // also dissolves their members' `heading`), and lose the project link too
-    // so a trashed heading cannot make the reconcile re-stub the project.
-    // Member tasks lose the project link AND any stale `heading`. Done and
-    // cancelled members need no special case: they end up unfiled but stay
-    // in the Logbook — Inbox membership (`isInTriageBand`) requires `.open`.
     let backend = try requireBackend()
-    let descriptor = FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { $0.project == id }
-    )
-    let referencing = (try? context.fetch(descriptor)) ?? []
-    let headingIDs = referencing.filter(\.isHeading).map(\.id)
-    let memberIDs = referencing.filter { !$0.isHeading }.map(\.id)
-    for headingID in headingIDs {
-      taskMutator?.delete(id: headingID)
-      taskMutator?.moveToProject(id: headingID, project: nil)
-    }
-    for taskID in memberIDs {
-      taskMutator?.moveToProject(id: taskID, project: nil)
-      // Re-read after the move: dissolving a heading above may already have
-      // cleared it.
-      let stillHeaded = ((try? context.fetch(FetchDescriptor<TaskEntity>(
-        predicate: #Predicate { $0.id == taskID && $0.heading != nil }
-      ))) ?? []).isEmpty == false
-      if stillHeaded { taskMutator?.setHeading(id: taskID, heading: nil) }
+    DeletedContainerLedger.record(.project, id)
+    let trashed = trashTasks(inProject: id)
+    if trashed > 0 {
+      SeptenaLog.info("[CK] project \(id) delete: \(trashed) task(s) → Recently Deleted")
     }
     try await backend.delete(id: id)
+  }
+
+  /// Soft-delete every live row filed in `projectID`, through the task write
+  /// boundary. Tasks go first, headings last: deleting a heading dissolves
+  /// its LIVE members (`heading = nil`), so trashing the members first keeps
+  /// their `heading` link for the undo / restore. Returns how many went.
+  @discardableResult
+  func trashTasks(inProject projectID: String) -> Int {
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.project == projectID && $0.deletedAt == nil }
+    ))) ?? []
+    let members = rows.filter { !$0.isHeading }.map(\.id)
+    let headings = rows.filter(\.isHeading).map(\.id)
+    for task in members + headings { taskMutator?.delete(id: task) }
+    return rows.count
   }
   func reorder(orderedIDs: [String]) async throws {
     try await requireBackend().reorder(orderedIDs: orderedIDs)
@@ -120,7 +114,9 @@ final class ProjectsMutator: ProjectsBackend {
     let id: String
     let title: String
     let statusRaw: String
-    let area: String?
+    /// `var` so an area-delete undo can re-file the project under a revived
+    /// area's new id (`TaskUndo.recordAreaDelete`).
+    var area: String?
     let created: String?
     let completedAt: String?
     let notes: String?
@@ -223,24 +219,26 @@ final class CloudKitProjectsBackend: ProjectsBackend {
     }
     let entity = ProjectEntity(id: id, title: title, area: area)
     context.insert(entity)
+    DeletedContainerLedger.forget(.project, id)
     commitAndPush(entity, op: "create(explicit-id)")
     return Project(entity)
   }
 
   func revive(_ s: ProjectsMutator.DeletedProject) -> String {
     if let existing = fetch(id: s.id) { return existing.id }
-    let sameID = engine.canReviveProject(id: s.id)
+    let sameID = engine.canReviveContainer(.project, id: s.id)
     let id = sameID ? s.id : uniqueShortcode()
     // CloudKit: a delete that never went out leaves the record in place, so
     // the save is an update and needs the old change tag. Otherwise the row
     // is new to CloudKit and must carry no system fields.
-    let keepSystemFields = sameID && engine.cancelPendingProjectDeletion(id: s.id)
+    let keepSystemFields = sameID && engine.cancelPendingContainerDeletion(.project, id: s.id)
     let entity = ProjectEntity(id: id, title: s.title, statusRaw: s.statusRaw, area: s.area,
                                created: s.created, completedAt: s.completedAt, notes: s.notes,
                                context: s.context, githubRepo: s.githubRepo,
                                attachmentJSON: s.attachmentJSON, position: s.position,
                                cloudKitSystemFields: keepSystemFields ? s.cloudKitSystemFields : nil)
     context.insert(entity)
+    DeletedContainerLedger.forget(.project, id)
     commitAndPush(entity, op: sameID ? "revive" : "revive(new-id)")
     return id
   }

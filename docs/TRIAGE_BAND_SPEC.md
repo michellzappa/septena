@@ -1,5 +1,14 @@
 # Triage Band — Inbox *over* Today
 
+> **Inbox rule (2026-11-20).** One predicate, in `TaskInbox` (`SeptenaCore/Models.swift`),
+> mirrored in `backend/src/tools/taskShared.ts`. Inbox = open, not deleted, not a
+> heading, no area, no project (`isInInbox`). The triage band is the unratified
+> part of it (`isInTriageBand` = `isInInbox` + `TaskInbox.isUnratified`). Today's
+> Inbox section = the band, then the Inbox members on Today
+> (`TaskInbox.showsInTodayInbox`, `LocalCache.todayInboxTasks`, MCP
+> `tasks_list view=inbox`; `triage` is an alias). Deleting an area or project
+> never puts tasks in the Inbox (`docs/RECENTLY_DELETED_SPEC.md`).
+
 **Status:** **Built + fully unified, rendered as a native "Inbox" section** —
 Inbox is a normal section (area-style header, standard checkbox rows, all items)
 on top of Today, on both the drawer and the full Tasks tab; the separate Inbox

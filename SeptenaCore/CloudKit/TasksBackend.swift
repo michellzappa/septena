@@ -537,11 +537,45 @@ final class CloudKitTasksBackend {
   /// Bring a task back from Recently Deleted: clear the marker, push the update.
   /// A row that `delete` kept local-only has no server record yet, so this
   /// push reaches CloudKit as an ordinary create.
+  ///
+  /// Never back to a dangling id: when its project / area no longer exists
+  /// (deleted with the task, and not brought back), the task returns to the
+  /// Inbox (`TaskInbox`); a `heading` whose row is gone or still in Recently
+  /// Deleted is cleared. The delete undo revives the container (and the
+  /// headings) BEFORE it restores the tasks, so it keeps their filing.
   func restore(id: String) {
     guard let entity = fetch(id: id) else { return }
+    if let project = entity.project, !projectExists(project) {
+      entity.project = nil
+      entity.heading = nil
+    }
+    if let area = entity.area, !areaExists(area) {
+      entity.area = nil
+    }
+    if let heading = entity.heading, !liveHeadingExists(heading) {
+      entity.heading = nil
+    }
     entity.deletedAt = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "restore")
+  }
+
+  private func projectExists(_ id: String) -> Bool {
+    ((try? context.fetchCount(FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.id == id }
+    ))) ?? 0) > 0
+  }
+
+  private func areaExists(_ id: String) -> Bool {
+    ((try? context.fetchCount(FetchDescriptor<AreaEntity>(
+      predicate: #Predicate { $0.id == id }
+    ))) ?? 0) > 0
+  }
+
+  private func liveHeadingExists(_ id: String) -> Bool {
+    ((try? context.fetchCount(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.id == id && $0.deletedAt == nil }
+    ))) ?? 0) > 0
   }
 
   /// Permanently destroy a task — the old hard-delete, now reachable only from

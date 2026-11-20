@@ -232,26 +232,23 @@ final class TaskEntity {
     return false
   }
 
-  /// Single definition of "is this open task in the triage band" — the
-  /// *unratified* layer rendered above Today (see `docs/TRIAGE_BAND_SPEC.md`).
-  /// Mirror of `SeptenaTask.isInTriageBand`; keep the two in lockstep.
-  ///
-  /// Agent rows: bare `acknowledge` clears the glow (`showsAgentCue`) but
-  /// must not evacuate an undated proposal from Inbox — only filing, a
-  /// when/today disposition (plus ack), or cue decay does that.
+  /// Filed nowhere: no area, no project. See `TaskInbox`.
+  var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
+
+  /// Inbox member: open, not deleted, not a heading, unfiled. The one Inbox
+  /// rule lives in `TaskInbox`; mirror of `SeptenaTask.isInInbox`.
+  var isInInbox: Bool {
+    TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
+                       area: area, project: project)
+  }
+
+  /// The triage band: Inbox members not yet ratified — the layer rendered
+  /// above Today (`docs/TRIAGE_BAND_SPEC.md`, `TaskInbox.isUnratified`).
+  /// Mirror of `SeptenaTask.isInTriageBand`.
   var isInTriageBand: Bool {
-    guard status == .open, !isHeading else { return false }
-    guard project == nil, area == nil else { return false }
-    if source == TaskSource.mcp {
-      guard createdAt != .distantPast else { return false }
-      let fresh = Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
-      guard fresh else { return false }
-      if today || scheduled != nil || deadline != nil {
-        return acknowledgedAt == nil
-      }
-      return true
-    }
-    return scheduled == nil && deadline == nil && !today
+    isInInbox && TaskInbox.isUnratified(source: source, createdAt: createdAt,
+                                        acknowledgedAt: acknowledgedAt, today: today,
+                                        scheduled: scheduled, deadline: deadline)
   }
 
   var recurrence: Recurrence? {
@@ -3960,9 +3957,22 @@ enum LocalCache {
   /// count or aggregate (see `TaskEntity.isHeading`).
   @MainActor
   static func liveTasks(in context: ModelContext) -> [SeptenaTask] {
-    liveEntities(in: context)
-      .filter { !$0.pendingDeletion && !$0.isHeading }
+    let dead = DeletedContainerLedger.snapshot()
+    return liveEntities(in: context)
+      .filter { !$0.pendingDeletion && !$0.isHeading
+        && !DeletedContainerLedger.hides(area: $0.area, project: $0.project, in: dead) }
       .map(SeptenaTask.init)
+  }
+
+  /// The Today page's Inbox section as one list: the triage band first, then
+  /// the Inbox members on Today (`TaskInbox.showsInTodayInbox`). The in-app
+  /// MCP `tasks_list view=inbox` reads this; the backend connector's
+  /// `inbox` view applies the same rule (`backend/src/tools/taskShared.ts`).
+  @MainActor
+  static func todayInboxTasks(in context: ModelContext) -> [SeptenaTask] {
+    let band = tasks(in: context, filter: .triage)
+    let bandIDs = Set(band.map(\.id))
+    return band + tasks(in: context, filter: .today).filter { $0.isInInbox && !bandIDs.contains($0.id) }
   }
 
   /// Assigned, non-cancelled tasks — the SuggestionEngine training corpus.
@@ -4112,9 +4122,10 @@ enum LocalCache {
     // the view keeps, over plain tuple fields.
     let rows = fetchEntities(for: filter, limit: limit, in: context)
     let today = SeptenaDate.today
+    let dead = DeletedContainerLedger.snapshot()
     let result = rows
       .compactMap { e -> (key: Double, id: String, task: SeptenaTask)? in
-        guard let task = convert(e, filter: filter, today: today) else { return nil }
+        guard let task = convert(e, filter: filter, today: today, dead: dead) else { return nil }
         // Today has its own manual order (#66); every other list uses `position`.
         return (filter == .today ? TaskOrder.todayKey(e) : TaskOrder.key(e), e.id, task)
       }
@@ -4151,19 +4162,20 @@ enum LocalCache {
     descriptor.fetchLimit = 1
     guard let entity = StoreHealth.fetch(context, descriptor).first else { return false }
     let today = SeptenaDate.today
+    let dead = DeletedContainerLedger.snapshot()
     if filter == .today {
-      return convert(entity, filter: .today, today: today) != nil
-        || convert(entity, filter: .triage, today: today) != nil
+      return convert(entity, filter: .today, today: today, dead: dead) != nil
+        || convert(entity, filter: .triage, today: today, dead: dead) != nil
     }
-    return convert(entity, filter: filter, today: today) != nil
+    return convert(entity, filter: filter, today: today, dead: dead) != nil
   }
 
   /// One row through the filter: nil when the row doesn't belong to `filter`,
   /// the wire DTO when it does. Extracted from the inline closure above so
   /// the (key, id) decoration stays readable.
   @MainActor
-  private static func convert(_ e: TaskEntity, filter: TaskFilter,
-                              today: String) -> SeptenaTask? {
+  private static func convert(_ e: TaskEntity, filter: TaskFilter, today: String,
+                              dead: (areas: Set<String>, projects: Set<String>)) -> SeptenaTask? {
     // Hide rows the user has deleted locally; the outbox drainer will
     // either confirm the deletion (row removed) or resurrect them if
     // the server rejects.
@@ -4185,6 +4197,11 @@ enum LocalCache {
     // project/area view, and the MCP `tasks_list`) was the one path that didn't,
     // so a deleted task kept rendering and looked un-deletable.
     if e.deletedAt != nil { return nil }
+    // Orphaned, awaiting delete: its area / project was deleted (here or on
+    // another device) and its own delete has not landed yet. Not Inbox, not
+    // any list — the post-pull sweep moves it to Recently Deleted
+    // (`DeletedContainerLedger`, `TaskInbox`).
+    if DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead) { return nil }
     switch filter {
     case .today:
       // Today = ratified-and-due. An unratified row that happens to be due

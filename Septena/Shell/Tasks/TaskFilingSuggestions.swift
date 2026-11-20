@@ -74,7 +74,7 @@ enum TaskFilingSuggestions {
   static func isLooseTodayInboxCapture(_ task: SeptenaTask, filter: TaskFilter) -> Bool {
     filter == .today && task.status == .open
       && task.scheduled == nil && task.deadline == nil
-      && task.project == nil && task.area == nil && task.today
+      && task.isUnfiled && task.today
   }
 
   /// Never suggest the place the task already is.

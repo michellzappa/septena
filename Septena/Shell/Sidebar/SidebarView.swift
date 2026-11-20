@@ -144,7 +144,13 @@ struct SidebarRootView: View {
       commitRenameProject: { p, name in renameProject(p, to: name) },
       commitRenameArea:    { a, name in renameArea(a, to: name) },
       commitDeleteProject: { p in deleteProject(p) },
-      commitDeleteArea:    { a in deleteArea(a) }
+      commitDeleteArea:    { a in deleteArea(a) },
+      projectDeleteCopy: { p in
+        ContainerDeleteCopy.project(id: p.id, title: p.title, context: modelContext)
+      },
+      areaDeleteCopy: { a in
+        ContainerDeleteCopy.area(id: a.id, title: a.title, context: modelContext)
+      }
     )
   }
 
@@ -241,9 +247,18 @@ struct SidebarRootView: View {
     if case .area(let id) = nav.path.last, id == area.id {
       nav.path = [.filter(.today)]
     }
+    // Capture before the delete; record at the gesture (CLAUDE.md).
+    let undoSnapshot = TaskUndo.areaDeleteSnapshot(id: area.id, areas: areasMutator,
+                                                   projects: projectsMutator, context: modelContext)
+    let areas = areasMutator
+    let projects = projectsMutator
+    let tasks = taskMutator
     Task {
       do {
         try await areasMutator.delete(id: area.id)
+        if let undoSnapshot {
+          TaskUndo.recordAreaDelete(undoSnapshot, areas: areas, projects: projects, mutator: tasks)
+        }
         await load()
       } catch {
         errorMessage = error.localizedDescription
@@ -1065,10 +1080,7 @@ struct SidebarRootView: View {
       }
       guard t.status == .open else { continue }
       // Smart-list buckets — mirror LocalCache.tasks(in:filter:) semantics.
-      if t.project == nil, t.area == nil,
-         t.scheduled == nil, t.deadline == nil, !t.today {
-        inbox += 1
-      }
+      if t.isInInbox { inbox += 1 }
       // The triage band (unratified) sits above Today and is excluded from it.
       if t.isInTriageBand { triage += 1 }
       if !t.isInTriageBand {
@@ -1568,6 +1580,8 @@ private struct RightClickAlerts: ViewModifier {
   let commitRenameArea:    (Area, String) -> Void
   let commitDeleteProject: (Project) -> Void
   let commitDeleteArea:    (Area) -> Void
+  let projectDeleteCopy: (Project) -> ContainerDeleteCopy.Text
+  let areaDeleteCopy: (Area) -> ContainerDeleteCopy.Text
 
   func body(content: Content) -> some View {
     content
@@ -1593,29 +1607,33 @@ private struct RightClickAlerts: ViewModifier {
         }
         Button("Cancel", role: .cancel) { renameAreaTarget = nil }
       }
-      .alert("Delete \(deleteProjectTarget?.title ?? "Project")?",
-             isPresented: Binding(
-              get: { deleteProjectTarget != nil },
-              set: { if !$0 { deleteProjectTarget = nil } })) {
+      // Copy states what goes with the container and where it goes
+      // (`ContainerDeleteCopy`, shared with the AppKit sheet).
+      .confirmationDialog(deleteProjectTarget.map { projectDeleteCopy($0).title } ?? "",
+                          isPresented: Binding(
+                            get: { deleteProjectTarget != nil },
+                            set: { if !$0 { deleteProjectTarget = nil } }),
+                          titleVisibility: .visible) {
         Button("Delete", role: .destructive) {
           if let p = deleteProjectTarget { commitDeleteProject(p) }
           deleteProjectTarget = nil
         }
         Button("Cancel", role: .cancel) { deleteProjectTarget = nil }
       } message: {
-        Text("Tasks in this project will be moved to the inbox.")
+        Text(deleteProjectTarget.map { projectDeleteCopy($0).message } ?? "")
       }
-      .alert("Delete \(deleteAreaTarget?.title ?? "Area")?",
-             isPresented: Binding(
-              get: { deleteAreaTarget != nil },
-              set: { if !$0 { deleteAreaTarget = nil } })) {
+      .confirmationDialog(deleteAreaTarget.map { areaDeleteCopy($0).title } ?? "",
+                          isPresented: Binding(
+                            get: { deleteAreaTarget != nil },
+                            set: { if !$0 { deleteAreaTarget = nil } }),
+                          titleVisibility: .visible) {
         Button("Delete", role: .destructive) {
           if let a = deleteAreaTarget { commitDeleteArea(a) }
           deleteAreaTarget = nil
         }
         Button("Cancel", role: .cancel) { deleteAreaTarget = nil }
       } message: {
-        Text("Projects in this area will be detached but not deleted.")
+        Text(deleteAreaTarget.map { areaDeleteCopy($0).message } ?? "")
       }
   }
 }

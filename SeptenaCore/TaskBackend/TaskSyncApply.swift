@@ -146,7 +146,6 @@ extension TaskSyncEngine {
     let shadows = store.allShadows()
     var touchedTasks = false
     var touchedStructure = false
-    var deletedAreas = false
     var turnsByTask: [String: [[String: BackendJSON]]] = [:]
     var settings: AppSettings?
 
@@ -177,10 +176,10 @@ extension TaskSyncEngine {
       case .area:
         if tombstone {
           if let a = fetchArea(id) { main.delete(a) }
-          DeletedAreaLedger.record(id)
-          deletedAreas = true
+          DeletedContainerLedger.record(.area, id)
           markGone(.area, id, shadow: shadows[key], store: store)
         } else if !pendingDelete.contains(key) {
+          DeletedContainerLedger.forget(.area, id)
           let a = fetchArea(id) ?? { let n = AreaEntity(id: id, title: ""); main.insert(n); return n }()
           let applied = applyAreaFields(a, change.row, skip: skip)
           let mapped = (try? TaskBackendMapping.area(a).get())?.fields ?? [:]
@@ -190,8 +189,10 @@ extension TaskSyncEngine {
       case .project:
         if tombstone {
           if let p = fetchProject(id) { main.delete(p) }
+          DeletedContainerLedger.record(.project, id)
           markGone(.project, id, shadow: shadows[key], store: store)
         } else if !pendingDelete.contains(key) {
+          DeletedContainerLedger.forget(.project, id)
           let p = fetchProject(id) ?? { let n = ProjectEntity(id: id, title: ""); main.insert(n); return n }()
           let applied = applyProjectFields(p, change.row, skip: skip)
           let mapped = (try? TaskBackendMapping.project(p).get())?.fields ?? [:]
@@ -255,12 +256,6 @@ extension TaskSyncEngine {
     }
     if touchedTasks { NotificationCenter.default.post(name: .septenaTasksChanged, object: nil) }
     if touchedStructure { NotificationCenter.default.post(name: .septenaStructureChanged, object: nil) }
-    if deletedAreas {
-      // Same follow-up as a CloudKit area deletion: detach tasks / projects
-      // that still point at it. Those writes go through the mutators, so
-      // they are queued like any edit.
-      Task { @MainActor in await SeptenaServices.shared.areasMutator.repairDeletedAreaReferences() }
-    }
     return true
   }
 
@@ -348,13 +343,13 @@ extension TaskSyncEngine {
       writeShadow(shadow, key, old: old, new: new, gone: true, store: store)
     case .area:
       if let a = fetchArea(id) { main.delete(a) }
-      DeletedAreaLedger.record(id)
+      DeletedContainerLedger.record(.area, id)
       markGone(.area, id, shadow: store.shadow("area:\(id)"), store: store)
       addIssue(.area, id, "change refused: the area is deleted on the backend")
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
-      Task { @MainActor in await SeptenaServices.shared.areasMutator.repairDeletedAreaReferences() }
     case .project:
       if let p = fetchProject(id) { main.delete(p) }
+      DeletedContainerLedger.record(.project, id)
       markGone(.project, id, shadow: store.shadow("project:\(id)"), store: store)
       addIssue(.project, id, "change refused: the project is deleted on the backend")
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)

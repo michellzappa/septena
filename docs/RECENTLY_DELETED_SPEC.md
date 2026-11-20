@@ -48,6 +48,33 @@ Every surface that lists tasks must exclude `deletedAt != nil`. Already covered:
 `RhythmHomepageView`, `MCPDispatch` (list paths). A trashed task must never leak
 into Today, search, Siri, Spotlight, the Rhythm dial, or MCP listings.
 
+## Deleting an area or a project (2026-11-20)
+
+Deleting a container never sends its tasks to the Inbox.
+
+| Delete | Effect |
+|----|--------|
+| Project | Every task in it (open and done) and every section heading goes to Recently Deleted through `delete(id:)`, then the project row goes (`ProjectsMutator.delete`). Tasks go before headings, so members keep their `heading` link. |
+| Area | Each of its projects is deleted as above, then every task filed directly in the area goes to Recently Deleted, then the area row goes (`AreasMutator.delete`). |
+
+- **Undo** is one step on the shared stack (`TaskUndo.recordProjectDelete`,
+  `recordAreaDelete`): it revives the area / project (same id when the sync
+  store allows it, else a new one), then its projects, headings and tasks,
+  and re-files each task exactly (area, project, heading, Today, `position`,
+  `todayPosition`).
+- **Restore one task** from Recently Deleted after its container is gone:
+  `restore(id:)` clears the dead `project` / `area` (and a `heading` whose row
+  is gone or still deleted), so the task lands in the Inbox. Never a
+  dangling id.
+- **Other devices** apply the task deletes they pull. A device that pulls the
+  container delete first records the id in `DeletedContainerLedger`; the
+  reads hide tasks that still point at it ("orphaned, awaiting delete", not
+  Inbox), and after a full pull `AreasMutator.sweepDeletedContainerOrphans`
+  moves any that are still live to Recently Deleted. This replaced the old
+  "detach to Inbox" repair.
+- The confirmation states the counts and that the tasks go to Recently
+  Deleted (`ContainerDeleteCopy`).
+
 ## Stages
 
 1. **Data layer (safety core)** — `deletedAt`↔`reservedString1` CK mapping;

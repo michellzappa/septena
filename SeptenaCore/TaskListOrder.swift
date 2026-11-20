@@ -16,10 +16,12 @@ import Foundation
 /// `areas` and `projects` come in already in sidebar order (`StructureCache`).
 enum TaskListOrder {
   ///
-  /// A dangling reference (an area or project id with no row — deleted on
-  /// another device, or not synced yet) counts as nil, so the row lands with
-  /// the loose work instead of dropping out of the list. Same for a project
-  /// whose area is gone: it sorts with the area-less projects.
+  /// A dangling reference (an area or project id with no row, not synced
+  /// yet) counts as nil for ORDER only, so the row stays in the list instead
+  /// of dropping out. It is not Inbox membership (`TaskInbox`). A row whose
+  /// area / project was DELETED never gets here: the reads hide it until its
+  /// own delete lands (`DeletedContainerLedger`). A project whose area is
+  /// gone sorts with the area-less projects.
   static func byList(_ pool: [SeptenaTask], areas: [Area], projects: [Project]) -> [SeptenaTask] {
     let areaIDs = Set(areas.map(\.id))
     let projectIDs = Set(projects.map(\.id))

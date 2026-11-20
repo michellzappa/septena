@@ -305,16 +305,30 @@ final class SeptenaServices {
         await recordRegistry.record(for: recordID)
       }
       ckEngine.applyFetchedRecord = { record in
+        // An area / project that exists again (another device undid its
+        // delete) is no longer a dead container.
+        let name = record.recordID.recordName
+        if record.recordType == AreaCloudKitSchema.recordType {
+          DeletedContainerLedger.forget(.area, AreaCloudKitSchema.entityID(from: name))
+        } else if record.recordType == ProjectCloudKitSchema.recordType {
+          DeletedContainerLedger.forget(.project, ProjectCloudKitSchema.entityID(from: name))
+        }
         await recordRegistry.apply(record)
       }
       ckEngine.applyDeletedRecord = { recordID, recordType in
-        // Remember a remotely deleted area so its tasks / projects get
-        // detached after the batch (`repairDeletedAreaReferences`) instead of
-        // vanishing from every list behind a dangling area id.
+        // Remember a remotely deleted area / project. Its tasks' own deletes
+        // come from the deleting device; until they land, the reads hide the
+        // tasks (`DeletedContainerLedger.hides`) and the post-fetch sweep
+        // moves any leftovers to Recently Deleted — never to the Inbox.
         if recordType == AreaCloudKitSchema.recordType {
-          DeletedAreaLedger.record(AreaCloudKitSchema.entityID(from: recordID.recordName))
+          DeletedContainerLedger.record(.area, AreaCloudKitSchema.entityID(from: recordID.recordName))
+        } else if recordType == ProjectCloudKitSchema.recordType {
+          DeletedContainerLedger.record(.project, ProjectCloudKitSchema.entityID(from: recordID.recordName))
         }
         await recordRegistry.delete(recordID: recordID, recordType: recordType)
+      }
+      ckEngine.applyDidFetchChanges = {
+        await self.areasMutator.sweepDeletedContainerOrphans()
       }
       ckEngine.applyDidFinishBatch = { notify in
         let changes = await recordRegistry.finishBatch()
@@ -331,11 +345,6 @@ final class SeptenaServices {
           if changes.touchedData {
             NotificationCenter.default.post(name: .septenaDataChanged, object: nil)
           }
-        }
-        // A remote area deletion (structure) or a late task carrying a
-        // deleted area id (tasks) leaves dangling references; detach them.
-        if changes.touchedStructure || changes.touchedTasks {
-          await self.areasMutator.repairDeletedAreaReferences()
         }
       }
       #endif
@@ -428,8 +437,9 @@ final class SeptenaServices {
     // Heal dangling project references now that the initial fetch has
     // landed (so we never stub a project that's merely mid-sync).
     await reconcileProjectGraph(context: context)
-    // Detach tasks / projects still pointing at an area deleted elsewhere.
-    await areasMutator.repairDeletedAreaReferences()
+    // Move tasks still pointing at an area / project deleted elsewhere to
+    // Recently Deleted (the receiver half of the delete cascade).
+    await areasMutator.sweepDeletedContainerOrphans()
     // Life-domain repairs run only in the full profile: a tasks-only process
     // (Septask) leaves gut/medication/event history untouched — those
     // migrators write through mutators that are unbound there, and the full
@@ -494,11 +504,17 @@ final class SeptenaServices {
   /// `projectsMutator` boundary (local update + CloudKit queue + notifications).
   @MainActor
   func reconcileProjectGraph(context: ModelContext) async {
-    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>())) ?? []
+    // Live tasks only, and never an id this device knows was deleted: a
+    // project delete leaves its tasks in Recently Deleted still pointing at
+    // it, and a stub would bring the deleted project back.
+    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.deletedAt == nil }
+    ))) ?? []
     let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
     let projectIds = Set(projects.map { $0.id })
     let referenced = Set(tasks.compactMap { $0.project })
-    let orphans = referenced.subtracting(projectIds).sorted()
+    let deleted = Set(DeletedContainerLedger.ids(.project))
+    let orphans = referenced.subtracting(projectIds).subtracting(deleted).sorted()
 
     for id in orphans {
       _ = try? await projectsMutator.createWithExplicitID(

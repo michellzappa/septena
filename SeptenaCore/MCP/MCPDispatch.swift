@@ -372,16 +372,16 @@ enum MCPDispatch {
     let all: [SeptenaTask]
     switch view {
     case "inbox", "triage":
-      all = LocalCache.tasks(in: ctx, filter: .triage)
-        + LocalCache.tasks(in: ctx, filter: .today).filter { $0.area == nil && $0.project == nil }
+      // Today's Inbox section (`TaskInbox`), the backend connector's `inbox`
+      // view, same rule.
+      all = LocalCache.todayInboxTasks(in: ctx)
     case "upcoming": all = LocalCache.tasks(in: ctx, filter: .upcoming)
     case "anytime", "someday": all = LocalCache.tasks(in: ctx, filter: .unscheduled)
     case "completed": all = LocalCache.tasks(in: ctx, filter: .logbook)
     default:
-      let today = LocalCache.tasks(in: ctx, filter: .today)
-      all = LocalCache.tasks(in: ctx, filter: .triage)
-        + today.filter { $0.area == nil && $0.project == nil }
-        + today.filter { $0.area != nil || $0.project != nil }
+      let inbox = LocalCache.todayInboxTasks(in: ctx)
+      let inboxIds = Set(inbox.map(\.id))
+      all = inbox + LocalCache.tasks(in: ctx, filter: .today).filter { !inboxIds.contains($0.id) }
     }
     // Truncation signal so a caller knows there's more beyond `limit` (the
     // classic "scanned completed to 400, missed #481, concluded deleted"
