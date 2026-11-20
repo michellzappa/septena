@@ -230,7 +230,7 @@ struct TextSizeSliderSection: View {
       }
     } footer: {
       #if os(macOS)
-      Text("Adjusts text size everywhere in the app. This is a per-device preference — it doesn’t change your other Septena devices.")
+      Text("Adjusts text size everywhere in the app. This is a per-device preference — it doesn’t change your other \(AppDisplayName.current) devices.")
       #else
       Text("Adjusts text size everywhere in the app. This nudges your device’s system text size — it doesn’t replace it, so any accessibility text size you’ve set is respected. Set your device’s base size in Settings ▸ Accessibility ▸ Display & Text Size.")
       #endif

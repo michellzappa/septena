@@ -107,7 +107,7 @@ struct ThingsImportView: View {
     } header: {
       Text("Options")
     } footer: {
-      Text("Things tags and headings are not first-class in Septena. Tasks filed in a project without a today, scheduled, or deadline date land in Inbox — preview shows where items will appear.")
+      Text("Things tags and headings are not first-class in \(AppDisplayName.current). Tasks filed in a project without a today, scheduled, or deadline date land in Inbox — preview shows where items will appear.")
     }
     .onChange(of: options) { _, _ in
       if scratchpadURL != nil { rebuildPlanFromScratchpad() }

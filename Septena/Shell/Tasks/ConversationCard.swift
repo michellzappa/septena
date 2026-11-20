@@ -284,7 +284,7 @@ struct AIExplainerView: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
-          Text("Some to-dos need a moment of thinking before you can act. Septena can talk that through with AI — right on the task.")
+          Text("Some to-dos need a moment of thinking before you can act. \(AppDisplayName.current) can talk that through with AI — right on the task.")
             .font(.headline)
 
           VStack(alignment: .leading, spacing: 0) {
@@ -307,14 +307,14 @@ struct AIExplainerView: View {
           VStack(alignment: .leading, spacing: 6) {
             Label("Some help is always on your device", systemImage: "iphone")
               .font(.subheadline).fontWeight(.semibold)
-            Text("Beyond conversations, Septena learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it.")
+            Text("Beyond conversations, \(AppDisplayName.current) learns small things locally — like the “Move to…” suggestion that figures out where a task belongs from your own history. That model trains on your device and never leaves it.")
               .font(.callout).foregroundStyle(.secondary)
           }
 
           VStack(alignment: .leading, spacing: 6) {
             Label("It's your AI — we never see your data", systemImage: "lock.fill")
               .font(.subheadline).fontWeight(.semibold)
-            Text("Septena never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations.")
+            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations.")
               .font(.callout).foregroundStyle(.secondary)
           }
           .padding(12)

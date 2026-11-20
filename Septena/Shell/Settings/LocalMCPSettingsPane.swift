@@ -42,7 +42,7 @@ struct LocalMCPSettingsPane: View {
           Label("MCP Server", systemImage: "server.rack")
         }
       } footer: {
-        Text("Lets Claude Code on this Mac read and write your Septena data "
+        Text("Lets Claude Code on this Mac read and write your \(AppDisplayName.current) data "
            + "directly through the app — no gateway, no token round-trip. "
            + "Listens on 127.0.0.1 only and requires the bearer token below.")
       }
@@ -92,7 +92,7 @@ struct LocalMCPSettingsPane: View {
             Label("Keep serving after quit", systemImage: "powersleep")
           }
         } footer: {
-          Text("Keep Septena running in the background after you press ⌘Q so it "
+          Text("Keep \(AppDisplayName.current) running in the background after you press ⌘Q so it "
              + "keeps answering Claude Code, instead of quitting. The Dock icon "
              + "and menu bar stay; reopening brings the window back, and "
              + "⌥⌘Q always quits completely. Off by default.")

@@ -59,11 +59,11 @@ public actor TelemetryClient {
     public var summary: String {
       switch self {
       case .none:
-        return "No usage data leaves your device. Septena learns nothing about how you use the app."
+        return "No usage data leaves your device. \(AppDisplayName.current) learns nothing about how you use the app."
       case .minimal:
-        return "Only that the app launched, its version, and an anonymous install ID — so Septena knows the app is healthy and which versions are in use. No screens, no sections."
+        return "Only that the app launched, its version, and an anonymous install ID — so \(AppDisplayName.current) knows the app is healthy and which versions are in use. No screens, no sections."
       case .balanced:
-        return "Adds which sections you enable and open, so Septena improves the areas people actually use. Never which individual screens you visit. Recommended."
+        return "Adds which sections you enable and open, so \(AppDisplayName.current) improves the areas people actually use. Never which individual screens you visit. Recommended."
       case .full:
         return "Adds the individual screens you open, for the most detailed picture of what to improve. Still no logged data, identity, or IP."
       }

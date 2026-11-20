@@ -1,7 +1,9 @@
 # App Store metadata — source of truth
 
-This file is the canonical store listing copy for every Septena platform.
-`appstore/metadata.mjs` parses it into fastlane `deliver` metadata files
+This file is the canonical store listing copy for every Septena Life platform
+(the life OS, `com.septena.cloud`; ADR 0007). The task app (Septena) has its
+own listing in `docs/APPSTORE-SEPTASK.md`. `appstore/metadata.mjs` parses this
+file into fastlane `deliver` metadata files
 (`appstore/metadata/<locale>/*.txt`) and the viz manifest. Edit copy **here**,
 never in the generated `.txt` files.
 
@@ -35,7 +37,7 @@ separated, no spaces needed after commas).
 
 ### name
 
-Septena
+Septena Life
 
 ### subtitle
 
@@ -47,24 +49,24 @@ Keep your whole life in one private place: tasks, sleep, training, mood, and mor
 
 ### description
 
-Your life ends up scattered across separate apps that never talk to each other. A tracker here, a journal there, a habit app you keep forgetting to open. Septena brings it all home: one private app for everything you track.
+Your life ends up scattered across separate apps that never talk to each other. A tracker here, a journal there, a habit app you keep forgetting to open. Septena Life brings it all home: one private app for everything you track.
 
 ONE APP FOR EVERYTHING
 One surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you turn on or quietly hide. A fact on its own is just a fact. Only when everything lives in one place can you see that two facts are connected. Turn on what matters, hide the rest, and your data stays exactly where it was.
 
 BUILT AROUND THE WEEK
-A day is too noisy and a month is too late. A week is where sleep, training, food, and habits start to relate. Open Septena and your last seven days are there at a glance, in heatmaps and quiet sparklines across every section. The Correlations view does the math you would never do by eye, like late afternoon coffee turning up in last night's sleep. It tells you plainly when the data is still too thin to trust, and streaks count only what you actually did.
+A day is too noisy and a month is too late. A week is where sleep, training, food, and habits start to relate. Open Septena Life and your last seven days are there at a glance, in heatmaps and quiet sparklines across every section. The Correlations view does the math you would never do by eye, like late afternoon coffee turning up in last night's sleep. It tells you plainly when the data is still too thin to trust, and streaks count only what you actually did.
 
 PRIVATE BY ARCHITECTURE
 There is no account to create and no server to trust. No ads, no analytics, no one looking over your shoulder. Your data lives on your device and syncs only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
 
 BRING YOUR OWN AI
-Septena ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
+Septena Life ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
 
 WHEREVER YOU ALREADY ARE
 A Home and Lock Screen widget for the day ahead. An Apple Watch app and complications for the few things that matter right now. Log hands-free with Siri and Shortcuts. Step back to any past day to see how it really went.
 
-Septena is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
+Septena Life is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
 
 Try it with a tap of demo data before you commit a single detail of your own.
 
@@ -74,7 +76,7 @@ habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,offline
 
 ### release_notes
 
-Septena's first public release. The Week dashboard, a full set of optional sections, cross-section correlations, an Apple Watch app, Home and Lock Screen widgets, and a demo mode so you can look around before committing any of your own data. Thank you for trying it.
+Septena Life's first public release. The Week dashboard, a full set of optional sections, cross-section correlations, an Apple Watch app, Home and Lock Screen widgets, and a demo mode so you can look around before committing any of your own data. Thank you for trying it.
 
 ### support_url
 
@@ -111,7 +113,7 @@ PRODUCTIVITY
 
 ### name
 
-Septena
+Septena Life
 
 ### subtitle
 
@@ -123,7 +125,7 @@ Your whole life in one calm Mac window: tasks, sleep, training, mood, and more. 
 
 ### description
 
-Your life ends up scattered across separate apps that never talk to each other. Septena brings it all home, now in a calm window on your Mac: one private app for everything you track.
+Your life ends up scattered across separate apps that never talk to each other. Septena Life brings it all home, now in a calm window on your Mac: one private app for everything you track.
 
 ONE APP FOR EVERYTHING
 One surface, so the things you track can finally relate. Tasks, training, sleep, nutrition, habits, mood, hydration, and more, each in its own section you turn on or quietly hide. A fact on its own is just a fact. Only when everything lives in one place can you see that two facts are connected. Turn on what matters, hide the rest, and your data stays exactly where it was.
@@ -135,12 +137,12 @@ PRIVATE BY ARCHITECTURE
 There is no account to create and no server to trust. No ads, no analytics. Your data lives on your devices and syncs only through your own iCloud, invisible even to us. Nothing to breach, sell, or shut down. Export all of it whenever you like.
 
 BRING YOUR OWN AI
-Septena ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
+Septena Life ships no AI of its own. It opens an optional door, so you can point your own AI at your data and ask it anything, with your permission and a visible record of everything it touches. Your call, your tools, your audit trail.
 
 ONE LIFE, EVERY SCREEN
-Septena syncs the same private dashboard across Mac, iPhone, iPad, and Apple Watch through your iCloud. Start on one, pick up on another.
+Septena Life syncs the same private dashboard across Mac, iPhone, iPad, and Apple Watch through your iCloud. Start on one, pick up on another.
 
-Septena is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
+Septena Life is made by an independent developer, for daily use first: fast, quiet, and calm. A place to run your life, and it's free.
 
 ### keywords
 
@@ -148,7 +150,7 @@ habit tracker,journal,planner,routine,sleep,mood,nutrition,fitness,diary,goals,w
 
 ### release_notes
 
-Septena's first release on the Mac. The full Week dashboard, a full set of optional sections, cross-section correlations, and private iCloud sync with your iPhone, iPad, and Apple Watch.
+Septena Life's first release on the Mac. The full Week dashboard, a full set of optional sections, cross-section correlations, and private iCloud sync with your iPhone, iPad, and Apple Watch.
 
 ### support_url
 

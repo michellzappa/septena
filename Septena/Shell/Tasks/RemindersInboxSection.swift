@@ -100,7 +100,7 @@ struct RemindersInboxSection: View {
   private var deniedNote: some View {
     ctaRow(icon: "exclamationmark.triangle",
            title: "Reminders access blocked",
-           subtitle: "Enable Septena in System Settings → Privacy → Reminders.")
+           subtitle: "Enable \(AppDisplayName.current) in System Settings → Privacy → Reminders.")
   }
 
   @ViewBuilder

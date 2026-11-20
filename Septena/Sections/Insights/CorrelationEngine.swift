@@ -694,7 +694,7 @@ struct CorrelationEngine {
 
   static func markdownReport(from result: Result) -> String {
     var lines: [String] = []
-    lines.append("# Septena Insights")
+    lines.append("# Septena Life Insights")
     if let range = result.dateRange {
       lines.append("Window: \(range.lowerBound) → \(range.upperBound) (\(result.coveredDays) days)")
     }
