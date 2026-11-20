@@ -250,36 +250,31 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     return a.id < b.id
   }
 
-  /// Whether this open task sits in the **triage band** — the *unratified*
-  /// layer that renders above Today (see `docs/TRIAGE_BAND_SPEC.md`). The
-  /// divider is ratification, not date: two captured-but-not-committed
-  /// populations belong here —
-  ///   • an agent proposal still inside its freshness window, and
-  ///   • a loose human capture with no disposition at all (the classic Inbox).
-  /// A project/area assignment is ALWAYS a disposition, for either population
-  /// — a task never sits in Inbox and a category at once.
-  ///
-  /// Agent rows leave the band when (a) filed, (b) given a when/today *and*
-  /// acknowledged, or (c) the freshness window decays. Bare `acknowledge`
-  /// alone must NOT yank an undated proposal into Anytime — that was the
-  /// "click a dashed row and it vanishes" bug (peek/select used to ack).
-  /// DTO mirror of `TaskEntity.isInTriageBand` — keep the two in lockstep.
+  /// Filed nowhere: no area and no project. Filing state only, any status.
+  /// See `TaskInbox`.
+  var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
+
+  /// Inbox member — see `TaskInbox.contains`. DTO mirror of
+  /// `TaskEntity.isInInbox`.
+  var isInInbox: Bool {
+    TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
+                       area: area, project: project)
+  }
+
+  /// Whether this task sits in the **triage band**: the Inbox members not yet
+  /// ratified (see `TaskInbox.isUnratified`, `docs/TRIAGE_BAND_SPEC.md`).
+  /// DTO mirror of `TaskEntity.isInTriageBand`.
   var isInTriageBand: Bool {
-    guard status == .open, !isHeading else { return false }
-    guard project == nil, area == nil else { return false }
-    if source == TaskSource.mcp {
-      guard createdAt != .distantPast else { return false }
-      let fresh = Date().timeIntervalSince(createdAt) < AgentCue.decayWindow
-      guard fresh else { return false }
-      // Proposed with a when/today: stay until acknowledged (then it crosses
-      // into Today/Upcoming). Undated: stay for the whole freshness window
-      // even after ack — glow clears, row does not exile itself.
-      if today || scheduled != nil || deadline != nil {
-        return acknowledgedAt == nil
-      }
-      return true
-    }
-    return scheduled == nil && deadline == nil && !today
+    isInInbox && TaskInbox.isUnratified(source: source, createdAt: createdAt,
+                                        acknowledgedAt: acknowledgedAt, today: today,
+                                        scheduled: scheduled, deadline: deadline)
+  }
+
+  /// The row the Today page draws in its Inbox section — see
+  /// `TaskInbox.showsInTodayInbox`.
+  var isInTodayInbox: Bool {
+    TaskInbox.showsInTodayInbox(isInInbox: isInInbox, isInTriageBand: isInTriageBand,
+                                isOnToday: isOnToday)
   }
 
   /// Native projection used by the SwiftData mirror. Keeping this typed avoids
@@ -2465,4 +2460,69 @@ public struct MoodHistoryPoint: Codable, Hashable {
 public struct MoodHistoryResponse: Codable {
   public let daily: [MoodHistoryPoint]
   public init(daily: [MoodHistoryPoint]) { self.daily = daily }
+}
+
+// MARK: - Inbox (the one rule)
+
+/// THE Inbox rule. Every surface that asks "is this task in the Inbox?" —
+/// both shells' Today Inbox section, sidebar counts, the triage band, the
+/// in-app MCP `tasks_list view=inbox|triage`, the task backend's connector
+/// (`backend/src/tools/taskShared.ts`, kept in lockstep) — reads it from
+/// here, through the `TaskEntity` / `SeptenaTask` properties that delegate to
+/// it. Do not spell `project == nil && area == nil` out at a call site again.
+///
+/// Inbox = open, not deleted, not a heading, no area, no project. Membership
+/// is filing state, nothing else. A task gets INTO the Inbox only by being
+/// created or moved there, or by being restored from Recently Deleted after
+/// its area / project is gone (`CloudKitTasksBackend.restore`). Deleting an
+/// area or a project never sends tasks to the Inbox: their tasks go to
+/// Recently Deleted (`ProjectsMutator.delete`, `AreasMutator.delete`).
+///
+/// A task whose area / project was deleted on another device is NOT unfiled
+/// while its own delete is still on the way: it keeps the dead id, the reads
+/// hide it (`DeletedContainerLedger.hides`) and the post-pull sweep moves it
+/// to Recently Deleted (`AreasMutator.sweepDeletedContainerOrphans`).
+enum TaskInbox {
+  /// Filing state alone, any status: no area, no project.
+  static func isUnfiled(area: String?, project: String?) -> Bool {
+    area == nil && project == nil
+  }
+
+  /// Inbox membership: open, not deleted, not a heading, unfiled.
+  static func contains(status: TaskStatus, isHeading: Bool, isDeleted: Bool,
+                       area: String?, project: String?) -> Bool {
+    status == .open && !isHeading && !isDeleted && isUnfiled(area: area, project: project)
+  }
+
+  /// The triage band's ratification rule, applied to an Inbox member (the
+  /// band is `contains && isUnratified`). Two unratified populations:
+  ///   • an agent proposal still inside its freshness window, and
+  ///   • a human capture with no disposition at all (no Today pin, no date).
+  ///
+  /// Agent rows leave the band when (a) filed, (b) given a when/today *and*
+  /// acknowledged, or (c) the freshness window decays. Bare `acknowledge`
+  /// alone must NOT yank an undated proposal into Anytime — that was the
+  /// "click a dashed row and it vanishes" bug (peek/select used to ack).
+  static func isUnratified(source: String?, createdAt: Date, acknowledgedAt: Date?,
+                           today: Bool, scheduled: String?, deadline: String?) -> Bool {
+    if source == TaskSource.mcp {
+      guard createdAt != .distantPast else { return false }
+      guard Date().timeIntervalSince(createdAt) < AgentCue.decayWindow else { return false }
+      // Proposed with a when/today: stay until acknowledged (then it crosses
+      // into Today/Upcoming). Undated: stay for the whole freshness window
+      // even after ack — glow clears, row does not exile itself.
+      if today || scheduled != nil || deadline != nil { return acknowledgedAt == nil }
+      return true
+    }
+    return scheduled == nil && deadline == nil && !today
+  }
+
+  /// What the Today page draws in its Inbox section: the triage band, then
+  /// the Inbox members that are on Today. An Inbox member dated for later
+  /// waits in Upcoming until its date arrives. Both shells build that
+  /// section from `LocalCache.tasks(filter: .triage)` plus the unfiled rows
+  /// of `.today`; `LocalCache.todayInboxTasks` is the same set as one list.
+  static func showsInTodayInbox(isInInbox: Bool, isInTriageBand: Bool, isOnToday: Bool) -> Bool {
+    isInTriageBand || (isInInbox && isOnToday)
+  }
 }

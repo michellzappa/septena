@@ -2118,7 +2118,7 @@ struct TaskListView: View {
   }
 
   private var todayLooseInboxRows: [SeptenaTask] {
-    todayOpenTaskPool.filter { $0.project == nil && $0.area == nil }
+    todayOpenTaskPool.filter(\.isUnfiled)
   }
 
   private var renderedTodayInboxRows: [SeptenaTask] {
@@ -2555,7 +2555,7 @@ struct TaskListView: View {
   private func isTask(_ task: SeptenaTask, alreadyIn target: TodayDropTarget) -> Bool {
     switch target {
     case .inbox:
-      return task.area == nil && task.project == nil
+      return task.isUnfiled
     case .area(let areaId):
       return task.project == nil && task.area == areaId
     case .project(let projectId):
@@ -3167,9 +3167,7 @@ struct TaskListView: View {
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
                             by: { $0.area! })
-    let loose = excludingQuickAddCapture(
-      pool.filter { $0.project == nil && $0.area == nil }
-    )
+    let loose = excludingQuickAddCapture(pool.filter(\.isUnfiled))
 
     // Loose tasks on Today are merged into the Inbox section above (triageSection).
     // For other filters (Unscheduled, Area, etc.) show them headerless as before.

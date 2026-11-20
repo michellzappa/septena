@@ -51,8 +51,8 @@ protocol AreasBackend: AnyObject {
 final class AreasMutator: AreasBackend {
   private let context: ModelContext
   private var ckBackend: CloudKitAreasBackend?
-  /// Set once at startup so `delete` can detach the area's tasks and projects
-  /// through their own write boundaries. Weak: neither points back here.
+  /// Set once at startup so `delete` can cascade into the area's projects and
+  /// tasks through their own write boundaries. Weak: neither points back here.
   weak var taskMutator: TaskMutator?
   weak var projectsMutator: ProjectsMutator?
 
@@ -89,56 +89,112 @@ final class AreasMutator: AreasBackend {
   func setAttachment(id: String, attachment: AreaAttachment?) async throws {
     try await requireBackend().setAttachment(id: id, attachment: attachment)
   }
-  /// Delete an area. Its projects and tasks are DETACHED first (area → nil),
-  /// never deleted: the confirm dialog promises that, and a dangling area id
-  /// hid the tasks from every list. Open loose tasks then land in the Inbox,
-  /// tasks in a project stay with the project.
+  /// Delete an area and everything filed in it: each of its projects is
+  /// deleted the way `ProjectsMutator.delete` deletes one (its tasks go to
+  /// Recently Deleted), then every task filed directly in the area goes to
+  /// Recently Deleted, then the area row goes. Nothing lands in the Inbox
+  /// (`TaskInbox`). Undo is recorded at the gesture (`TaskUndo.recordAreaDelete`).
   func delete(id: String) async throws {
     let backend = try requireBackend()
-    DeletedAreaLedger.record(id)
-    await detachReferences(toArea: id)
+    DeletedContainerLedger.record(.area, id)
+    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.area == id }
+    ))) ?? []
+    for project in projects.map(\.id) {
+      try? await projectsMutator?.delete(id: project)
+    }
+    let trashed = trashTasks(inArea: id)
+    if !projects.isEmpty || trashed > 0 {
+      SeptenaLog.info("[CK] area \(id) delete: \(projects.count) project(s), \(trashed) direct task(s) → Recently Deleted")
+    }
     try await backend.delete(id: id)
   }
   func reorder(orderedIDs: [String]) async throws {
     try await requireBackend().reorder(orderedIDs: orderedIDs)
   }
 
-  /// Clear the area link on every project and task that points at `areaID`,
-  /// through the projects / task mutators (local write + CloudKit push + the
-  /// usual notifications). Soft-deleted tasks are included, so a restore
-  /// from Recently Deleted cannot bring back a dangling id.
-  func detachReferences(toArea areaID: String) async {
-    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>(
-      predicate: #Predicate { $0.area == areaID }
-    ))) ?? []
-    for project in projects.map(\.id) {
-      try? await projectsMutator?.setArea(id: project, area: nil)
+  /// Soft-delete every live task (any status) filed directly in `areaID`,
+  /// through the task write boundary. Returns how many went.
+  @discardableResult
+  private func trashTasks(inArea areaID: String) -> Int {
+    let ids = ((try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.area == areaID && $0.deletedAt == nil }
+    ))) ?? []).map(\.id)
+    for task in ids { taskMutator?.delete(id: task) }
+    return ids.count
+  }
+
+  /// The receiver half of the delete cascade. The device that deletes an
+  /// area or project also sends every task delete; a device that pulls the
+  /// container delete first holds tasks that still point at a dead id. The
+  /// reads hide those (`DeletedContainerLedger.hides`), and this sweep, run
+  /// after a full pull, moves any that are still live to Recently Deleted —
+  /// never to the Inbox. Projects still filed in a deleted area are deleted
+  /// with their tasks. Only ids the ledger knows were deleted, never "any
+  /// unknown id": a container that is merely not fetched yet keeps its tasks.
+  /// Skips an id whose container exists again (undo, forensic re-create).
+  /// Idempotent; returns at once while the ledger is empty.
+  func sweepDeletedContainerOrphans() async {
+    let ledger = DeletedContainerLedger.snapshot()
+    guard !ledger.areas.isEmpty || !ledger.projects.isEmpty else { return }
+    let liveAreas = Set(((try? context.fetch(FetchDescriptor<AreaEntity>())) ?? []).map(\.id))
+    let projects = (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? []
+    let liveProjects = Set(projects.map(\.id))
+    let deadAreas = Array(ledger.areas.subtracting(liveAreas))
+    let deadProjects = Array(ledger.projects.subtracting(liveProjects))
+    guard !deadAreas.isEmpty || !deadProjects.isEmpty else { return }
+
+    // Projects still filed in a deleted area go with their tasks.
+    let doomedProjects = projects.filter { $0.area.map(deadAreas.contains) == true }.map(\.id)
+    for project in doomedProjects {
+      try? await projectsMutator?.delete(id: project)
     }
-    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { $0.area == areaID }
+    // Then every live task (any status, headings included) still pointing at
+    // a dead id. One fetch; tasks first, headings last, as in
+    // `ProjectsMutator.trashTasks`.
+    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { e in
+        e.deletedAt == nil
+          && (deadProjects.contains(e.project ?? "") || deadAreas.contains(e.area ?? ""))
+      }
     ))) ?? []
-    for task in tasks.map(\.id) {
-      taskMutator?.moveToArea(id: task, area: nil)
-    }
-    if !projects.isEmpty || !tasks.isEmpty {
-      SeptenaLog.info("[CK] area \(areaID) detached \(projects.count) project(s), \(tasks.count) task(s)")
+    let ids = rows.filter { !$0.isHeading }.map(\.id) + rows.filter(\.isHeading).map(\.id)
+    for task in ids { taskMutator?.delete(id: task) }
+    if !doomedProjects.isEmpty || !ids.isEmpty {
+      SeptenaLog.info("[CK] sweep: \(doomedProjects.count) project(s), \(ids.count) task(s) of deleted containers → Recently Deleted")
     }
   }
 
-  /// Repair for an area deleted on ANOTHER device (or by the MCP gateway):
-  /// the CloudKit apply removes the area row but leaves the tasks and
-  /// projects that point at it. Detach those for every area id the ledger
-  /// knows was deleted. Only ledger ids, never "any unknown id": an area that
-  /// is merely not fetched yet must not lose its tasks. Skips an id whose
-  /// area exists again (forensic re-create). Idempotent; cheap when clean.
-  func repairDeletedAreaReferences() async {
-    for areaID in DeletedAreaLedger.ids() {
-      let exists = ((try? context.fetchCount(FetchDescriptor<AreaEntity>(
-        predicate: #Predicate { $0.id == areaID }
-      ))) ?? 0) > 0
-      guard !exists else { continue }
-      await detachReferences(toArea: areaID)
-    }
+  // MARK: Undo support
+
+  /// Every stored field of an area, captured before a delete so an undo can
+  /// put the row back exactly. Capture it at the user gesture, BEFORE
+  /// `delete(id:)`; the undo is recorded by the caller
+  /// (`TaskUndo.recordAreaDelete`), never here.
+  struct DeletedArea {
+    let id: String
+    let title: String
+    let context: String?
+    let emoji: String?
+    let attachmentJSON: String?
+    let position: Int
+    let cloudKitSystemFields: Data?
+  }
+
+  func snapshotForDelete(id: String) -> DeletedArea? {
+    let descriptor = FetchDescriptor<AreaEntity>(predicate: #Predicate { $0.id == id })
+    guard let e = try? context.fetch(descriptor).first else { return nil }
+    return DeletedArea(id: e.id, title: e.title, context: e.context, emoji: e.emoji,
+                       attachmentJSON: e.attachmentJSON, position: e.position,
+                       cloudKitSystemFields: e.cloudKitSystemFields)
+  }
+
+  /// Bring a deleted area back — same id when the sync store allows it, else
+  /// a fresh one (`ProjectsMutator.revive` is the twin). Returns the id used.
+  @discardableResult
+  func revive(_ snapshot: DeletedArea) -> String? {
+    guard let backend = ckBackend else { return nil }
+    return backend.revive(snapshot)
   }
 
   /// Forensic — create a record with a specific id.
@@ -220,8 +276,26 @@ final class CloudKitAreasBackend: AreasBackend {
     }
     let entity = AreaEntity(id: id, title: title, context: ctx)
     context.insert(entity)
+    DeletedContainerLedger.forget(.area, id)
     commitAndPush(entity, op: "create(explicit-id)")
     return Area(entity)
+  }
+
+  func revive(_ s: AreasMutator.DeletedArea) -> String {
+    if let existing = fetch(id: s.id) { return existing.id }
+    let sameID = engine.canReviveContainer(.area, id: s.id)
+    let id = sameID ? s.id : uniqueShortcode()
+    // Same rule as `CloudKitProjectsBackend.revive`: a CloudKit delete that
+    // never went out leaves the record in place, so the save is an update
+    // and keeps the old change tag; otherwise the row is new to CloudKit.
+    let keepSystemFields = sameID && engine.cancelPendingContainerDeletion(.area, id: s.id)
+    let entity = AreaEntity(id: id, title: s.title, context: s.context, emoji: s.emoji,
+                            attachmentJSON: s.attachmentJSON, position: s.position,
+                            cloudKitSystemFields: keepSystemFields ? s.cloudKitSystemFields : nil)
+    context.insert(entity)
+    DeletedContainerLedger.forget(.area, id)
+    commitAndPush(entity, op: sameID ? "revive" : "revive(new-id)")
+    return id
   }
 
   func rename(id: String, to title: String) async throws {
@@ -274,27 +348,80 @@ final class CloudKitAreasBackend: AreasBackend {
   }
 }
 
-// MARK: - Deleted-area ledger
+// MARK: - Deleted-container ledger
 
-/// Area ids this device knows were deleted — locally, or by a CloudKit
-/// deletion applied from another device. `AreasMutator.repairDeletedAreaReferences`
-/// detaches tasks and projects that still point at one of these. A plain
-/// device-local list in `UserDefaults`; capped so it cannot grow without end.
-/// Thread-safe (`UserDefaults` is), so the CloudKit apply path can record ids
-/// off the main actor.
-enum DeletedAreaLedger {
-  private static let key = "septena.deletedAreaIDs"
+/// Area and project ids this device knows were deleted — locally, or by a
+/// delete pulled from another device (CloudKit or the task backend). Two
+/// readers:
+///   • the task reads hide a live task that still points at one of these
+///     (`hides`): its own delete is on the way, so it is "orphaned, awaiting
+///     delete", never Inbox (`TaskInbox`);
+///   • `AreasMutator.sweepDeletedContainerOrphans` moves such tasks to
+///     Recently Deleted after a full pull.
+/// An id leaves the ledger when its container exists again (undo revive, a
+/// forensic re-create, a pulled upsert). Device-local `UserDefaults`, capped
+/// per kind. Thread-safe: the CloudKit apply path records ids off the main
+/// actor, so the in-memory copy sits behind a lock.
+enum DeletedContainerLedger {
+  enum Kind: String, Sendable {
+    case area, project
+    /// `area` keeps the key of the old area-only ledger, so ids it recorded
+    /// stay known.
+    fileprivate var key: String {
+      switch self {
+      case .area: return "septena.deletedAreaIDs"
+      case .project: return "septena.deletedProjectIDs"
+      }
+    }
+  }
+
   private static let cap = 200
+  private static let lock = NSLock()
+  nonisolated(unsafe) private static var cache: [Kind: [String]] = [:]
 
-  static func record(_ id: String) {
-    var list = ids()
+  private static func load(_ kind: Kind) -> [String] {
+    if let list = cache[kind] { return list }
+    let list = UserDefaults.standard.stringArray(forKey: kind.key) ?? []
+    cache[kind] = list
+    return list
+  }
+
+  static func record(_ kind: Kind, _ id: String) {
+    lock.lock(); defer { lock.unlock() }
+    var list = load(kind)
     guard !list.contains(id) else { return }
     list.append(id)
     if list.count > cap { list.removeFirst(list.count - cap) }
-    UserDefaults.standard.set(list, forKey: key)
+    cache[kind] = list
+    UserDefaults.standard.set(list, forKey: kind.key)
   }
 
-  static func ids() -> [String] {
-    UserDefaults.standard.stringArray(forKey: key) ?? []
+  static func forget(_ kind: Kind, _ id: String) {
+    lock.lock(); defer { lock.unlock() }
+    var list = load(kind)
+    guard let index = list.firstIndex(of: id) else { return }
+    list.remove(at: index)
+    cache[kind] = list
+    UserDefaults.standard.set(list, forKey: kind.key)
+  }
+
+  static func ids(_ kind: Kind) -> [String] {
+    lock.lock(); defer { lock.unlock() }
+    return load(kind)
+  }
+
+  /// Both kinds as sets, for a read that checks many rows.
+  static func snapshot() -> (areas: Set<String>, projects: Set<String>) {
+    lock.lock(); defer { lock.unlock() }
+    return (Set(load(.area)), Set(load(.project)))
+  }
+
+  /// True when a live task's area or project was deleted and the task is only
+  /// waiting for its own delete. Pass a `snapshot()` when checking many rows.
+  static func hides(area: String?, project: String?,
+                    in dead: (areas: Set<String>, projects: Set<String>)) -> Bool {
+    if let project, dead.projects.contains(project) { return true }
+    if let area, dead.areas.contains(area) { return true }
+    return false
   }
 }

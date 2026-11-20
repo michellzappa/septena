@@ -276,7 +276,9 @@ enum TaskUndo {
   /// re-homing resets its position, so undo has to put both back too.
   struct FilingSnapshot: Equatable {
     let id: String
-    let area: String?
+    /// `var` so an area-delete undo can re-file under a revived area's new
+    /// id (`recordAreaDelete`).
+    var area: String?
     /// `var` so a project-delete undo can re-file under a revived project's
     /// new id (`recordProjectDelete`).
     var project: String?
@@ -413,15 +415,19 @@ enum TaskUndo {
            redo: { restore(after, using: mutator) })
   }
 
-  // MARK: - Project delete
+  // MARK: - Project / area delete
 
   /// What a project delete takes away: the project row, its section headings
-  /// (which go to Recently Deleted) and the filing of every task in it (the
-  /// cascade clears their project and heading). Capture BEFORE the delete.
+  /// and every task in it (open and done), all of which go to Recently
+  /// Deleted. Capture BEFORE the delete.
   struct ProjectDeleteSnapshot {
-    let project: ProjectsMutator.DeletedProject
+    var project: ProjectsMutator.DeletedProject
     let headings: [FilingSnapshot]
     let members: [FilingSnapshot]
+
+    /// Live tasks the delete moves to Recently Deleted (headings excluded):
+    /// the count the confirmation states.
+    var taskCount: Int { members.count }
   }
 
   static func projectDeleteSnapshot(id: String,
@@ -436,10 +442,30 @@ enum TaskUndo {
         .map(FilingSnapshot.init))
   }
 
-  /// Undo for a project delete: revive the project (same id when the sync
-  /// store allows it, else a new one — `ProjectsMutator.revive`), bring its
-  /// headings back from Recently Deleted, then re-file every task exactly as
-  /// it stood: heading, Today and position included. Redo deletes again
+  /// Bring one deleted project back with all it held: revive the row (same
+  /// id when the sync store allows it, else a new one —
+  /// `ProjectsMutator.revive`), restore its headings, then its tasks, from
+  /// Recently Deleted, and re-file each exactly as it stood: heading, Today,
+  /// list and Today positions included. Returns the id it used.
+  @discardableResult
+  private static func undoProjectDelete(_ snapshot: ProjectDeleteSnapshot,
+                                        projects: ProjectsMutator,
+                                        mutator: TaskMutator) -> String? {
+    guard let id = projects.revive(snapshot.project) else { return nil }
+    // Headings first, so a member's `heading` points at a live row when it
+    // comes back (`restore` clears a heading link that dangles).
+    for heading in snapshot.headings { mutator.restore(id: heading.id) }
+    for member in snapshot.members { mutator.restore(id: member.id) }
+    let filings = (snapshot.headings + snapshot.members).map { filing -> FilingSnapshot in
+      var refiled = filing
+      refiled.project = id
+      return refiled
+    }
+    restore(filings, using: mutator)
+    return id
+  }
+
+  /// Undo for a project delete (`undoProjectDelete`). Redo deletes again
   /// through the same cascade. Call AFTER starting the delete.
   static func recordProjectDelete(_ snapshot: ProjectDeleteSnapshot,
                                   projects: ProjectsMutator,
@@ -447,20 +473,145 @@ enum TaskUndo {
     var currentID = snapshot.project.id
     record(name: String(localized: "Delete Project", comment: "Undo action name"),
            undo: {
-             guard let id = projects.revive(snapshot.project) else { return }
+             if let id = undoProjectDelete(snapshot, projects: projects, mutator: mutator) {
+               currentID = id
+             }
+           },
+           redo: {
+             let id = currentID
+             Task { @MainActor in try? await projects.delete(id: id) }
+           })
+  }
+
+  /// What an area delete takes away: the area row, each of its projects (as
+  /// a project delete takes it) and every task filed directly in the area.
+  /// Capture BEFORE the delete.
+  struct AreaDeleteSnapshot {
+    let area: AreasMutator.DeletedArea
+    let projects: [ProjectDeleteSnapshot]
+    let members: [FilingSnapshot]
+
+    var projectCount: Int { projects.count }
+    /// Every task the delete moves to Recently Deleted: the area's own and
+    /// its projects'. The count the confirmation states.
+    var taskCount: Int { members.count + projects.reduce(0) { $0 + $1.taskCount } }
+  }
+
+  static func areaDeleteSnapshot(id: String,
+                                 areas: AreasMutator,
+                                 projects: ProjectsMutator,
+                                 context: ModelContext) -> AreaDeleteSnapshot? {
+    guard let area = areas.snapshotForDelete(id: id) else { return nil }
+    let projectIDs = ((try? context.fetch(FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.area == id }
+    ))) ?? []).map(\.id)
+    return AreaDeleteSnapshot(
+      area: area,
+      projects: projectIDs.compactMap {
+        projectDeleteSnapshot(id: $0, projects: projects, context: context)
+      },
+      members: LocalCache.allTasks(in: context)
+        .filter { $0.area == id }
+        .map(FilingSnapshot.init))
+  }
+
+  /// Undo for an area delete: revive the area (same id when allowed, else a
+  /// new one — `AreasMutator.revive`), then each project under it as a
+  /// project-delete undo does, then the area's own tasks from Recently
+  /// Deleted, re-filed exactly. One step on the stack. Redo deletes again
+  /// through the same cascade. Call AFTER starting the delete.
+  static func recordAreaDelete(_ snapshot: AreaDeleteSnapshot,
+                               areas: AreasMutator,
+                               projects: ProjectsMutator,
+                               mutator: TaskMutator) {
+    var currentID = snapshot.area.id
+    record(name: String(localized: "Delete Area", comment: "Undo action name"),
+           undo: {
+             guard let id = areas.revive(snapshot.area) else { return }
              currentID = id
-             for heading in snapshot.headings { mutator.restore(id: heading.id) }
-             // Headings first, so a member's `heading` points at a live row.
-             let filings = (snapshot.headings + snapshot.members).map { filing -> FilingSnapshot in
+             for var project in snapshot.projects {
+               project.project.area = id
+               undoProjectDelete(project, projects: projects, mutator: mutator)
+             }
+             for member in snapshot.members { mutator.restore(id: member.id) }
+             let filings = snapshot.members.map { filing -> FilingSnapshot in
                var refiled = filing
-               refiled.project = id
+               refiled.area = id
                return refiled
              }
              restore(filings, using: mutator)
            },
            redo: {
              let id = currentID
-             Task { @MainActor in try? await projects.delete(id: id) }
+             Task { @MainActor in try? await areas.delete(id: id) }
            })
+  }
+}
+
+// MARK: - Delete confirmation copy
+
+/// The confirmation every shell shows before an area / project delete: what
+/// goes, how many tasks go with it, where they go, and that ⌘Z brings it all
+/// back. One wording for the AppKit sheet and the SwiftUI dialogs.
+@MainActor
+enum ContainerDeleteCopy {
+  struct Text {
+    let title: String
+    let message: String
+  }
+
+  static func project(id: String, title: String, context: ModelContext) -> Text {
+    let tasks = LocalCache.allTasks(in: context).filter { $0.project == id }.count
+    let name = title.isEmpty ? String(localized: "Project", comment: "Delete confirm: untitled project") : title
+    let head: String
+    if tasks == 0 {
+      head = String(localized: "Delete “\(name)”?", comment: "Delete project confirm: no tasks")
+    } else {
+      head = String(localized: "Delete “\(name)” and its \(taskPhrase(tasks))?",
+                    comment: "Delete project confirm. Argument: “3 tasks”")
+    }
+    return Text(title: head, message: message(tasks: tasks))
+  }
+
+  static func area(id: String, title: String, context: ModelContext) -> Text {
+    let projectIDs = Set(((try? context.fetch(FetchDescriptor<ProjectEntity>(
+      predicate: #Predicate { $0.area == id }
+    ))) ?? []).map(\.id))
+    let tasks = LocalCache.allTasks(in: context).filter {
+      $0.area == id || $0.project.map(projectIDs.contains) == true
+    }.count
+    let name = title.isEmpty ? String(localized: "Area", comment: "Delete confirm: untitled area") : title
+    let head: String
+    switch (projectIDs.isEmpty, tasks == 0) {
+    case (true, true):
+      head = String(localized: "Delete “\(name)”?", comment: "Delete area confirm: empty")
+    case (true, false):
+      head = String(localized: "Delete “\(name)” and its \(taskPhrase(tasks))?",
+                    comment: "Delete area confirm, no projects. Argument: “3 tasks”")
+    case (false, true):
+      head = String(localized: "Delete “\(name)” and its \(projectPhrase(projectIDs.count))?",
+                    comment: "Delete area confirm, no tasks. Argument: “2 projects”")
+    case (false, false):
+      head = String(localized: "Delete “\(name)”, its \(projectPhrase(projectIDs.count)) and \(taskPhrase(tasks))?",
+                    comment: "Delete area confirm. Arguments: “2 projects”, “3 tasks”")
+    }
+    return Text(title: head, message: message(tasks: tasks))
+  }
+
+  private static func message(tasks: Int) -> String {
+    tasks == 0
+      ? String(localized: "You can undo this.", comment: "Delete area/project confirm body, no tasks")
+      : String(localized: "The tasks move to Recently Deleted. You can undo this.",
+               comment: "Delete area/project confirm body")
+  }
+
+  private static func taskPhrase(_ n: Int) -> String {
+    n == 1 ? String(localized: "1 task", comment: "Delete confirm count")
+           : String(localized: "\(n) tasks", comment: "Delete confirm count")
+  }
+
+  private static func projectPhrase(_ n: Int) -> String {
+    n == 1 ? String(localized: "1 project", comment: "Delete confirm count")
+           : String(localized: "\(n) projects", comment: "Delete confirm count")
   }
 }

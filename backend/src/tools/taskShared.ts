@@ -54,18 +54,34 @@ export function normalizeView(view: unknown): TaskView {
 // Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
 export const CUE_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
 
-/// Mirrors iOS TaskEntity.isInTriageBand — the unratified layer above Today.
-/// Agent arm: an unacknowledged MCP-authored row still inside the freshness
-/// window (reuses the agent-cue, so cue-decay = ratification-by-timeout).
-/// Human arm: a loose capture with no disposition at all (the classic Inbox).
+/// THE Inbox rule — mirrors SeptenaCore `TaskInbox` (Models.swift); keep the
+/// two in lockstep. Inbox = open, not deleted, not a heading, no area, no
+/// project. Deleted rows never reach these helpers (the readers drop them).
+/// Deleting an area or project never sends tasks here: the deleting device
+/// moves them to Recently Deleted.
+export function isUnfiled(t: TaskOut): boolean {
+  return !t.area && !t.project;
+}
+
+export function isInboxMember(t: TaskOut): boolean {
+  return t.status === "open" && t.kind !== "heading" && isUnfiled(t);
+}
+
+/// Mirrors SeptenaCore TaskInbox.isUnratified + TaskEntity.isInTriageBand —
+/// the unratified Inbox members, the layer above Today. Agent arm: an
+/// MCP-authored row inside the freshness window (reuses the agent-cue, so
+/// cue-decay = ratification-by-timeout); a dated proposal leaves once
+/// acknowledged, an undated one stays for the whole window. Human arm: a
+/// capture with no disposition at all (no Today pin, no date).
 export function inTriageBand(t: TaskOut, nowMs: number): boolean {
-  if (t.status !== "open" || t.kind === "heading") return false;
+  if (!isInboxMember(t)) return false;
   if (t.source === "mcp") {
-    if (t.acknowledgedAt) return false;
     if (!t.createdAt) return false;
-    return nowMs - t.createdAt < CUE_DECAY_MS;
+    if (nowMs - t.createdAt >= CUE_DECAY_MS) return false;
+    if (t.today || t.scheduled || t.deadline) return !t.acknowledgedAt;
+    return true;
   }
-  return !t.today && !t.area && !t.project && !t.scheduled && !t.deadline;
+  return !t.today && !t.scheduled && !t.deadline;
 }
 
 /// Mirrors SeptenaCore SeptenaTask.isOnToday: a `today` pin, or a scheduled /
@@ -75,12 +91,11 @@ export function isOnToday(t: TaskOut, today: string): boolean {
   return t.today || (!!t.scheduled && t.scheduled <= today) || (!!t.deadline && t.deadline <= today);
 }
 
-/// Today's Inbox section in the app (Septask SeptaskKitTaskList: the triage
-/// band, then the Today rows with no area and no project). One bucket: the
-/// user never sees "unratified" and "unfiled" as two states.
+/// Today's Inbox section in the app — mirrors TaskInbox.showsInTodayInbox:
+/// the triage band, then the Inbox members on Today. One bucket: the user
+/// never sees "unratified" and "unfiled" as two states.
 export function inInbox(t: TaskOut, today: string, nowMs: number): boolean {
-  if (inTriageBand(t, nowMs)) return true;
-  return isOnToday(t, today) && !t.area && !t.project;
+  return inTriageBand(t, nowMs) || (isInboxMember(t) && isOnToday(t, today));
 }
 
 /// Mirrors SeptenaCore SeptenaTask.daysOnToday: whole days since the task

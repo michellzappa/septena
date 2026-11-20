@@ -367,10 +367,16 @@ enum MCPDispatch {
     let limit = args.int("limit") ?? 100
     let filter: TaskFilter
     switch view {
-    case "triage": filter = .triage
-    // The standalone Inbox page was retired; accept "inbox" as an alias for
-    // the triage band so existing agent calls keep working.
-    case "inbox": filter = .triage
+    case "inbox", "triage":
+      // Today's Inbox section (`TaskInbox`): the triage band, then the Inbox
+      // members on Today — the backend connector's `inbox` view, same rule.
+      // "triage" is the retired name, kept as an alias.
+      let all = LocalCache.todayInboxTasks(in: ctx)
+      return [
+        "tasks": all.prefix(limit).map(taskJSON),
+        "total": all.count,
+        "truncated": all.count > limit,
+      ]
     case "upcoming": filter = .upcoming
     // "someday" is the retired bucket — accept it as an alias for "anytime"
     // so existing agent calls keep working.

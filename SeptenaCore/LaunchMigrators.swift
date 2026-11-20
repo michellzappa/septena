@@ -290,9 +290,7 @@ enum PeekAckProposalRecovery {
     var restored: [String] = []
     for row in rows {
       guard row.source == TaskSource.mcp,
-            row.status == .open,
-            row.deletedAt == nil,
-            row.project == nil, row.area == nil,
+            row.isInInbox,
             !row.today, row.scheduled == nil, row.deadline == nil,
             let acked = row.acknowledgedAt,
             row.createdAt != .distantPast

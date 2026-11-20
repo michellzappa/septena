@@ -214,6 +214,18 @@ wins. Turns never conflict (§5.3). **A deleted row stays deleted:** an update
 that arrives after the delete is dropped, and the DO writes it to `changes`
 with op `dropped` so the edit is still on record.
 
+**Area and project deletes cascade on the client, not on the server
+(2026-11-20).** The device that deletes an area or project first soft-deletes
+every task in it (open and done, headings included; an area also deletes its
+projects), then deletes the container. So the backend receives ordinary task
+`delete` ops plus the area / project `delete`; it does not cascade, and it
+never moves tasks to the Inbox. Area and project deletes are held in the
+outbox for `deleteGrace`, like task deletes, so ⌘Z can revive the row under
+the same id. A device that pulls a container delete before the task deletes
+hides those tasks, and moves any that are still live after the full pull to
+Recently Deleted (`AreasMutator.sweepDeletedContainerOrphans`). Restoring a
+task whose container is gone puts it in the Inbox, never on a dangling id.
+
 Recurrence: the next occurrence keeps its deterministic id (computed from the
 series and the completion stamp, as `TasksBackend.complete` / `uncomplete`
 do today). Two devices that both spawn it produce one row, because the upsert
@@ -367,6 +379,7 @@ tasks through CloudKit.
 | Sign-in in Septena | Septena asks for Sign in with Apple at first launch, for every user. |
 | Attachment limits | 25 MB per file, 2 GB per user (§10). |
 | Delete vs. late update | A deleted task stays deleted; the late edit is dropped and logged (§6.4). |
+| Area / project delete (2026-11-20) | Its tasks go to Recently Deleted, never to the Inbox; the deleting client cascades, the server does not (§6.4). One undo step restores everything. |
 | Manual order (2026-11-19) | Today has its own order (`todayPosition`), separate from the home list's `position`, as in Things. The backend column is live; the apps adopt it at cutover. |
 | Things-grade pass | Separate work. Needs mz's list of pains. Not part of this spec. |
 | Linked projects (2026-11-19) | GitHub Issues and Starlings tasks as project sources, run server-side after cutover. Spec: `docs/LINKED_PROJECTS_SPEC.md`. |

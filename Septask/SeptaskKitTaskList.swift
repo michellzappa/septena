@@ -878,7 +878,7 @@ final class SeptaskKitTaskListController: NSViewController {
       // SwiftUI's `ungroupedOpenItems` makes the same split — it renders only
       // tasks carrying a project or area, because Inbox is drawn above it.
       let rest = withoutTriage(pool)
-      let loose = rest.filter { $0.project == nil && $0.area == nil }
+      let loose = rest.filter(\.isUnfiled)
       // Flat still follows the SIDEBAR's order — area by area, each area's
       // projects after its direct work — so removing the headers changes what
       // you SEE, not the sequence you already know. `TaskListOrder.byList` is
@@ -1474,7 +1474,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private var newTaskLine: [Row] {
     guard let pendingNewTaskId,
           let pending = LocalCache.task(id: pendingNewTaskId, in: context),
-          pending.area == nil, pending.project == nil
+          pending.isUnfiled
     else { return [Row.newTask] }
     return []
   }
@@ -1761,7 +1761,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                by: { $0.project! })
     let byArea = Dictionary(grouping: pool.filter { $0.project == nil && $0.area != nil },
                             by: { $0.area! })
-    let loose = pool.filter { $0.project == nil && $0.area == nil }
+    let loose = pool.filter(\.isUnfiled)
     let progress = projectProgress()
 
     // Loose rows keep their chips: an agent proposal can name a project while
@@ -2695,7 +2695,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // ⌘N from the Inbox page and ⌘N on Today with no list inherited both land
     // on the line — not above it. A ⌘N that inherits a list from the focused
     // row still files into that group at the top, unchanged.
-    let landsInInboxRun = inInbox || (context.area == nil && context.project == nil)
+    let landsInInboxRun = inInbox || TaskInbox.isUnfiled(area: context.area, project: context.project)
     let task = mutator.create(title: "", area: context.area, project: context.project,
                               scheduled: context.scheduled, today: context.today,
                               deferPush: true,

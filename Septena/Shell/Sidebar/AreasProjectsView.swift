@@ -472,11 +472,12 @@ struct ProjectDetailView: View {
         .presentationDetents([.height(340), .large])
         .septenaSheetChrome()
     }
-    .alert("Delete \(project.title)?", isPresented: $showingDeleteConfirm) {
+    .confirmationDialog(deleteCopy.title, isPresented: $showingDeleteConfirm,
+                        titleVisibility: .visible) {
       Button("Delete", role: .destructive) { deleteProject() }
       Button("Cancel", role: .cancel) {}
     } message: {
-      Text("Tasks in this project keep their data but lose their project link.")
+      Text(deleteCopy.message)
     }
     .alert("Error", isPresented: Binding(
       get: { errorMessage != nil },
@@ -667,6 +668,14 @@ struct ProjectDetailView: View {
       do { try await projectsMutator.setStatus(id: project.id, status: newStatus) }
       catch { errorMessage = error.localizedDescription }
     }
+  }
+
+  /// The delete confirmation (`ContainerDeleteCopy`, shared with the sidebar
+  /// and the AppKit sheet): counts the tasks that go to Recently Deleted.
+  /// Counted only while the dialog is up: the body reads this on every pass.
+  private var deleteCopy: ContainerDeleteCopy.Text {
+    guard showingDeleteConfirm else { return ContainerDeleteCopy.Text(title: "", message: "") }
+    return ContainerDeleteCopy.project(id: project.id, title: project.title, context: modelContext)
   }
 
   private func deleteProject() {
