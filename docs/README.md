@@ -93,7 +93,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [agent-provenance-gateway-handoff.md](agent-provenance-gateway-handoff.md) | landed — historical |
 | [CORE_AI_iOS27_PREP.md](CORE_AI_iOS27_PREP.md) | research, pre-implementation |
 | [SPOTLIGHT_READABILITY_PLAN.md](SPOTLIGHT_READABILITY_PLAN.md) | phases 0–2 built |
-| [APP_INTENTS_BACKLOG.md](APP_INTENTS_BACKLOG.md) | backlog |
+| [APP_INTENTS_BACKLOG.md](APP_INTENTS_BACKLOG.md) | historical — open items moved to GitHub issues (2026-11-20) |
 
 ### Design system and UI
 
@@ -130,5 +130,5 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 
 [MESSAGING.md](MESSAGING.md) (moved to the Septena Starlings workspace), [MAKER_IDENTITY.md](MAKER_IDENTITY.md),
 [APPSTORE.md](APPSTORE.md), [feedback.md](feedback.md),
-[BACKLOG.md](BACKLOG.md) (being replaced by GitHub issues: move open items
-there when you touch them).
+[BACKLOG.md](BACKLOG.md) (historical: open items moved to GitHub issues on
+2026-11-20).

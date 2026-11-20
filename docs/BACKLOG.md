@@ -1,5 +1,9 @@
 # Septena Backlog
 
+> **Status: historical (2026-11-20).** The open items below moved to GitHub
+> issues on `michellzappa/septena` (#72–#78). Add new work as an issue, not here
+> (ADR 0001).
+
 Tracked work, not urgent. Ordered loosely by appeal, not priority.
 
 ## Interactions

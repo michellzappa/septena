@@ -1,5 +1,10 @@
 # App Intents Backlog
 
+> **Status: historical (2026-11-20).** The open items (AI-8 to AI-12 and the
+> iOS 27 watchlist) moved to one GitHub issue, #79. AI-4 is done: `mood_list`
+> and `mood_log` exist in `MCPToolCatalog`. The rationale below stays as
+> reference.
+
 Prioritized backlog for the App Intents surface. Companion to
 `docs/CORE_AI_iOS27_PREP.md` (Appendix B is the summary; this is the actionable
 list).
