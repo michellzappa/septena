@@ -288,6 +288,25 @@ final class TaskMutator {
     cloudBackend.reorder(id: id, toPosition: position)
   }
 
+  /// Today's own manual order (#66): writes `todayPosition`, never
+  /// `position`. nil clears the slot.
+  func reorderToday(id: String, toPosition position: Double?) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reorderToday called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reorderToday(id: id, toPosition: position)
+  }
+
+  /// The write of `lane`: `reorder` for a list, `reorderToday` for Today.
+  /// The one dispatch every reorder gesture goes through.
+  func reorder(id: String, toPosition position: Double, in lane: TaskOrderLane) {
+    switch lane {
+    case .list: reorder(id: id, toPosition: position)
+    case .today: reorderToday(id: id, toPosition: position)
+    }
+  }
+
   /// Create a project section-divider "heading" (docs/ORDERING_AND_HEADINGS_PLAN.md).
   @discardableResult
   func createHeading(title: String, project: String, atTop: Bool = false) -> SeptenaTask? {

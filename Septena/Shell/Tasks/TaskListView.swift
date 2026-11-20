@@ -1656,8 +1656,9 @@ struct TaskListView: View {
   }
 
   /// True where the rendered order IS the manual `TaskOrder.key` order —
-  /// project / area pages and the Inbox. Date- and tier-sorted surfaces
-  /// (Today, Upcoming) and history views are never reorder targets.
+  /// project / area pages and the Inbox. Today reorders too, in its own order
+  /// (`orderLane`, #66; wired per card in `cardedRows`). Upcoming and history
+  /// views are never reorder targets.
   private var isManuallyOrderedList: Bool {
     switch filter {
     case .project, .area, .triage: return true
@@ -1679,41 +1680,59 @@ struct TaskListView: View {
   /// sort where the drop indicator promised — a heading silently landing in the
   /// wrong place once a project's headings had been shuffled enough.
   private func applyManualOrder(ids: [String], into sequence: [SeptenaTask], at insertion: Int) {
-    let above = insertion > 0 ? sequence[insertion - 1].orderKey : nil
-    let below = insertion < sequence.count ? sequence[insertion].orderKey : nil
+    let lane = orderLane
+    let above = insertion > 0 ? sequence[insertion - 1].orderKey(in: lane) : nil
+    let below = insertion < sequence.count ? sequence[insertion].orderKey(in: lane) : nil
     let slots = TaskOrder.positions(count: ids.count, above: above, below: below)
     let strictlyPlaced =
       zip(slots, slots.dropFirst()).allSatisfy { $0 < $1 }
       && (above.map { slots.first! > $0 } ?? true)
       && (below.map { slots.last! < $0 } ?? true)
     if strictlyPlaced {
-      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos) }
+      for (id, pos) in zip(ids, slots) { mutator.reorder(id: id, toPosition: pos, in: lane) }
       return
     }
     var final = sequence.map(\.id)
     final.insert(contentsOf: ids, at: insertion)
-    let base = sequence.first?.orderKey ?? TaskOrder.gap
+    let base = sequence.first?.orderKey(in: lane) ?? TaskOrder.gap
     for (i, id) in final.enumerated() {
       let pos = base + TaskOrder.gap * Double(i)
-      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos)
+      mutator.reorder(id: id, toPosition: pos == 0 ? TaskOrder.gap / 2 : pos, in: lane)
     }
   }
+
+  /// The manual order this list shows and a reorder writes: Today has its
+  /// own (`todayPosition`), so reordering Today never moves a task in its
+  /// area / project list (#66).
+  private var orderLane: TaskOrderLane { filter == .today ? .today : .list }
 
   /// A reorder drop landed on `target`: insert the dragged ids above (`before`)
   /// or below it and persist new manual positions via the mutator. Neighbors
   /// are read from the rendered order with the dragged rows removed, so a drop
   /// one slot away from the original spot computes against the right keys.
-  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool) -> Bool {
+  ///
+  /// Today (#66): `refileTo` is the Today group the target row sits in. A
+  /// row dragged in from another group is filed into it first (the old
+  /// group drop), then placed in Today's own order. `visibleItems` is Today
+  /// in that order, and each group is a run of it, so the global neighbours
+  /// place the row right in its group too. A target outside that order (a
+  /// triage-band row in the Inbox card) only files.
+  private func handleReorderDrop(ids: [String], target: SeptenaTask, before: Bool,
+                                 refileTo group: TodayDropTarget? = nil) -> Bool {
     let dragged = Set(ids)
     guard !ids.isEmpty, !dragged.contains(target.id) else { return false }
     let remaining = excludingQuickAddCapture(visibleItems).filter { !dragged.contains($0.id) }
-    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else { return false }
+    guard let targetIdx = remaining.firstIndex(where: { $0.id == target.id }) else {
+      return group.map { handleTodayMoveDrop(ids: ids, target: $0) } ?? false
+    }
     // Snapshot every row the drop can rewrite (a renumber touches the whole
     // sequence), so shake / ⌘Z puts the old order back.
-    let undoBefore = TaskUndo.positions(of: remaining.map(\.id) + ids, in: modelContext)
+    let undoBefore = TaskUndo.reorderSnapshot(of: remaining.map(\.id) + ids, lane: orderLane,
+                                              in: modelContext)
+    if let group { _ = handleTodayMoveDrop(ids: ids, target: group) }
     applyManualOrder(ids: ids, into: remaining,
                      at: before ? targetIdx : targetIdx + 1)
-    TaskUndo.recordReorder(before: undoBefore, context: modelContext, mutator: mutator)
+    TaskUndo.recordReorder(undoBefore, context: modelContext, mutator: mutator)
     Haptics.tick()
     Task { await load() }
     return true
@@ -2061,10 +2080,9 @@ struct TaskListView: View {
       if todayGroupByList {
         classifiedIds = orderedFromGroupedOpen(pool: classified)
       } else {
-        classifiedIds = classified
-          .filter { $0.status == .open || model.settle.isSettling($0.id) }
-          .sorted(by: SeptenaTask.compareNextPageOrder)
-          .map(\.id)
+        // Same sequence `ungroupedOpenItems` renders: by list, Today's own
+        // order inside each list (#66).
+        classifiedIds = orderedFromGroupedOpen(pool: classified)
       }
       return todayInboxKeyboardIDs + classifiedIds
     case .unscheduled:
@@ -3154,9 +3172,13 @@ struct TaskListView: View {
                           moveDropTarget: TodayDropTarget? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
+    // Today rows reorder in Today's own order (#66). The row's reorder drop
+    // also files a row dragged in from another group, so the row-level
+    // group drop steps aside (the group headers keep theirs).
+    let todayReorder = filter == .today
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
-        .modifier(todayMoveDrop(moveDropTarget))
+        .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
         .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
@@ -3169,11 +3191,12 @@ struct TaskListView: View {
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
         // (`handleGroupedTaskDrop` reads the target row's group).
-        .modifier(TaskReorderDrop(perform: reorderable
+        .modifier(TaskReorderDrop(perform: reorderable || todayReorder
           ? { ids, before in
               grouped
                 ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
-                : handleReorderDrop(ids: ids, target: task, before: before) }
+                : handleReorderDrop(ids: ids, target: task, before: before,
+                                    refileTo: todayReorder ? moveDropTarget : nil) }
           : nil))
     }
     if appendQuickAdd {

@@ -100,6 +100,9 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// Rides alongside the entity, not the wire — set in `init(_:)`. `0` = never
   /// dragged (order falls back to `createdAt`).
   var position: Double = 0
+  /// Today's own manual order (see `TaskEntity.todayPosition`). Rides
+  /// alongside the entity, not the wire. nil = never ordered on Today.
+  var todayPosition: Double? = nil
   /// Row shape (`TaskKind`). `""`/absent = task, `"heading"` = a project
   /// section divider. Rides alongside the entity, not the wire. Read `isHeading`.
   var kind: String = ""
@@ -305,6 +308,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     acknowledgedAt: Date? = nil,
     createdAt: Date = .distantPast,
     position: Double = 0,
+    todayPosition: Double? = nil,
     kind: String = "",
     heading: String? = nil,
     conversation: TaskConvo = TaskConvo()
@@ -331,6 +335,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.acknowledgedAt = acknowledgedAt
     self.createdAt = createdAt
     self.position = position
+    self.todayPosition = todayPosition
     self.kind = kind
     self.heading = heading
     self.conversation = conversation

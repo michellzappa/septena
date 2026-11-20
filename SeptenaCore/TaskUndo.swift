@@ -281,6 +281,9 @@ enum TaskUndo {
     let heading: String?
     let today: Bool
     let position: Double
+    /// Today's own slot (#66). Leaving Today clears it, so a move that drops
+    /// the row off Today has to put it back too.
+    let todayPosition: Double?
 
     init(_ task: SeptenaTask) {
       id = task.id
@@ -289,6 +292,7 @@ enum TaskUndo {
       heading = task.heading
       today = task.today
       position = task.position
+      todayPosition = task.todayPosition
     }
   }
 
@@ -301,6 +305,7 @@ enum TaskUndo {
       mutator.setHeading(id: snapshot.id, heading: snapshot.heading)
       mutator.moveToToday(id: snapshot.id, today: snapshot.today)
       mutator.reorder(id: snapshot.id, toPosition: snapshot.position)
+      mutator.reorderToday(id: snapshot.id, toPosition: snapshot.todayPosition)
     }
   }
 
@@ -308,12 +313,15 @@ enum TaskUndo {
   /// reorder (drag or keyboard) and pass it to `recordReorder` after.
   static func positions(of ids: some Sequence<String>,
                         in context: ModelContext) -> [String: Double] {
-    let wanted = Set(ids)
-    var result: [String: Double] = [:]
-    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
-      result[task.id] = task.position
-    }
-    return result
+    orderSnapshot(of: ids, in: context, \.position)
+  }
+
+  /// Snapshot of Today slots (#66), keyed by task id; nil = never ordered on
+  /// Today. Capture it before a Today reorder and pass it to
+  /// `recordTodayReorder` after.
+  static func todayPositions(of ids: some Sequence<String>,
+                             in context: ModelContext) -> [String: Double?] {
+    orderSnapshot(of: ids, in: context, \.todayPosition)
   }
 
   /// Undo for a manual reorder. `before` holds the positions of every row the
@@ -322,11 +330,61 @@ enum TaskUndo {
   static func recordReorder(before: [String: Double],
                             context: ModelContext,
                             mutator: TaskMutator) {
-    guard !before.isEmpty else { return }
-    let after = positions(of: before.keys, in: context)
-    guard after != before else { return }
-    func apply(_ map: [String: Double]) {
-      for (id, position) in map { mutator.reorder(id: id, toPosition: position) }
+    recordOrderChange(before: before, after: positions(of: before.keys, in: context)) {
+      mutator.reorder(id: $0, toPosition: $1)
+    }
+  }
+
+  /// Undo for a Today reorder (#66) — `recordReorder` for `todayPosition`.
+  /// The list `position` is never touched, so it needs no snapshot.
+  static func recordTodayReorder(before: [String: Double?],
+                                 context: ModelContext,
+                                 mutator: TaskMutator) {
+    recordOrderChange(before: before, after: todayPositions(of: before.keys, in: context)) {
+      mutator.reorderToday(id: $0, toPosition: $1)
+    }
+  }
+
+  /// A reorder snapshot for either lane, so a gesture that serves both
+  /// (`TaskOrderLane`) captures and records through one call pair.
+  struct ReorderSnapshot {
+    let lane: TaskOrderLane
+    fileprivate let list: [String: Double]
+    fileprivate let today: [String: Double?]
+  }
+
+  static func reorderSnapshot(of ids: some Sequence<String>, lane: TaskOrderLane,
+                              in context: ModelContext) -> ReorderSnapshot {
+    switch lane {
+    case .list: return ReorderSnapshot(lane: lane, list: positions(of: ids, in: context), today: [:])
+    case .today: return ReorderSnapshot(lane: lane, list: [:], today: todayPositions(of: ids, in: context))
+    }
+  }
+
+  static func recordReorder(_ before: ReorderSnapshot, context: ModelContext, mutator: TaskMutator) {
+    switch before.lane {
+    case .list: recordReorder(before: before.list, context: context, mutator: mutator)
+    case .today: recordTodayReorder(before: before.today, context: context, mutator: mutator)
+    }
+  }
+
+  private static func orderSnapshot<Value>(of ids: some Sequence<String>, in context: ModelContext,
+                                           _ field: KeyPath<SeptenaTask, Value>) -> [String: Value] {
+    let wanted = Set(ids)
+    var result: [String: Value] = [:]
+    for task in LocalCache.allTasks(in: context) where wanted.contains(task.id) {
+      result[task.id] = task[keyPath: field]
+    }
+    return result
+  }
+
+  private static func recordOrderChange<Value: Equatable & Sendable>(
+    before: [String: Value], after: [String: Value],
+    write: @escaping @MainActor (String, Value) -> Void
+  ) {
+    guard !before.isEmpty, after != before else { return }
+    func apply(_ map: [String: Value]) {
+      for (id, value) in map { write(id, value) }
     }
     record(name: String(localized: "Reorder Tasks", comment: "Undo action name"),
            undo: { apply(before) },
