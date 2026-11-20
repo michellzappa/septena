@@ -2384,15 +2384,20 @@ struct TaskListView: View {
     recordImplicitRejectionIfMismatch(task: task,
                                       chosenKind: chosenKind,
                                       chosenId: chosenId)
-    if projectId != nil {
-      mutator.moveToProject(id: id, project: projectId)
-    } else {
-      mutator.moveToArea(id: id, area: areaId)
-      mutator.moveToProject(id: id, project: nil)
-    }
+    // One save per task, the same call the AppKit shell makes: the project
+    // wins over the area, and Inbox (both nil) clears area, project and
+    // heading together.
+    mutator.moveToList(id: id, area: areaId, project: projectId)
     mutator.acknowledge(id: id)
     if filter == .today, wasInTriage { promoteFlash.flash(id) }
     return true
+  }
+
+  /// True when `task` already lives where a move to (`areaId`, `projectId`)
+  /// would put it. Such a move is a no-op: no write, no toast, no undo step.
+  private func isTask(_ task: SeptenaTask, alreadyAt areaId: String?, _ projectId: String?) -> Bool {
+    if let projectId { return task.project == projectId }
+    return task.project == nil && task.area == areaId
   }
 
   /// Filing state as stored right now, for `TaskUndo.recordMove`.
@@ -2404,7 +2409,7 @@ struct TaskListView: View {
   private func destinationName(areaId: String?, projectId: String?) -> String {
     projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "No Project"
+      ?? "Inbox"
   }
 
   private func applyMove(id: String, areaId: String?, projectId: String?) {
@@ -2415,6 +2420,10 @@ struct TaskListView: View {
   /// lands on the shared undo stack, and the toast's Undo goes through the
   /// same entry, so the toast, shake and ⌘Z all reverse the same thing.
   private func applyMove(_ ids: [String], areaId: String?, projectId: String?) {
+    let ids = ids.filter { id in
+      guard let task = currentTask(id: id) else { return false }
+      return !isTask(task, alreadyAt: areaId, projectId)
+    }
     guard !ids.isEmpty else { return }
     Haptics.tick()
     let before = filingSnapshots(ids)

@@ -1728,11 +1728,15 @@ private struct SidebarTaskDrop: ViewModifier {
   private func rehome(_ id: String) {
     Haptics.tick()
     switch kind {
+    // One save per task, the same call the list and the AppKit sidebar make.
+    // A drop is a disposition, like filing from the list, so it also clears
+    // the agent cue (parity with `SeptaskKitSidebar`).
     case .area(let areaId):
-      mutator.moveToArea(id: id, area: areaId)
-      mutator.moveToProject(id: id, project: nil)
+      mutator.moveToList(id: id, area: areaId, project: nil)
+      mutator.acknowledge(id: id)
     case .project(let projectId):
-      mutator.moveToProject(id: id, project: projectId)
+      mutator.moveToList(id: id, area: nil, project: projectId)
+      mutator.acknowledge(id: id)
     case .today:
       mutator.moveToToday(id: id, today: true)
     }

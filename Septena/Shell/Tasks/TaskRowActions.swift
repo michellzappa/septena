@@ -231,16 +231,17 @@ struct TaskRowActions: ViewModifier {
   // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
-    Haptics.tick()
     let undoBefore = LocalCache.allTasks(in: modelContext)
       .filter { $0.id == id }
       .map(TaskUndo.FilingSnapshot.init)
-    if projectId != nil {
-      mutator.moveToProject(id: id, project: projectId)
-    } else {
-      mutator.moveToArea(id: id, area: areaId)
-      mutator.moveToProject(id: id, project: nil)
-    }
+    // Already there: a no-op, so no write, no toast and no undo step.
+    guard let current = undoBefore.first else { return }
+    let alreadyThere = projectId.map { current.project == $0 }
+      ?? (current.project == nil && current.area == areaId)
+    guard !alreadyThere else { return }
+    Haptics.tick()
+    // One save, the same call the Tasks list and the AppKit shell make.
+    mutator.moveToList(id: id, area: areaId, project: projectId)
     mutator.acknowledge(id: id)
     // The toast's own Undo button stays — it's the discoverable affordance on
     // iOS. It reverses through the SAME stack entry (via the ticket), so the
@@ -251,7 +252,7 @@ struct TaskRowActions: ViewModifier {
     let destName =
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "No Project"
+      ?? "Inbox"
     toastStore?.show("Moved to \(destName)") {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()

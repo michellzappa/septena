@@ -1970,7 +1970,15 @@ final class SeptaskKitTaskListController: NSViewController {
   private func move(to destination: KitMoveMenu.Destination, taskIDs: [String]) {
     let liveByID = Dictionary(LocalCache.allTasks(in: context).map { ($0.id, $0) },
                               uniquingKeysWith: { current, _ in current })
-    let selection = taskIDs.compactMap { liveByID[$0] }
+    // A task already filed at `destination` is a no-op: no write and no undo
+    // step (⌘Z must not "undo" nothing and skip the real action behind it).
+    let selection = taskIDs.compactMap { liveByID[$0] }.filter { task in
+      switch destination {
+      case .none: return task.area != nil || task.project != nil
+      case .area(let areaId): return task.project != nil || task.area != areaId
+      case .project(let projectId): return task.project != projectId
+      }
+    }
     guard !selection.isEmpty else { return }
     // Captured before mutating, so undo can restore each task's exact prior
     // filing, including a heading. A batch move can start from several
