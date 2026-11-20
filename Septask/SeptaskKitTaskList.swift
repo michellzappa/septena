@@ -242,15 +242,11 @@ final class SeptaskKitTaskListController: NSViewController {
   private let infoMenuItem = NSMenuItem()
   private let clearScheduleMenuItem = NSMenuItem()
   private let pauseRepeatMenuItem = NSMenuItem()
-  /// The ranked filing picks currently offered in the context menu's
-  /// "Suggested" section, best first — read back by `tag` when one is chosen.
-  /// Rebuilt on every menu open, like the Move submenu, because the answer
-  /// depends on the selected row.
+  /// The filing pick offered as the first item of the context menu's Move
+  /// submenu ("Suggested: <List>"), read back by `tag` when chosen. Rebuilt
+  /// on every menu open, with the Move submenu, because the answer depends on
+  /// the selected row.
   private var menuSuggestions: [SuggestionEngine.Suggestion] = []
-  /// The items this controller inserted for that section. The context menu is
-  /// built once and edited in place, so the next open has to take the previous
-  /// section back out before inserting the current one.
-  private var suggestedMenuItems: [NSMenuItem] = []
 
   /// The inspector follows the selection; the window owns the wiring.
   var onSelectionChange: ((SeptenaTask?) -> Void)?
@@ -1879,7 +1875,7 @@ final class SeptaskKitTaskListController: NSViewController {
 
   /// Copy the selection's titles — one per line. Reached through Edit ▸ Copy
   /// (the table implements `copy(_:)`, so the standard menu item finds it on
-  /// the responder chain) as well as the row menus.
+  /// the responder chain).
   func copySelection() {
     let titles = actionableSelection.map(\.title)
     guard !titles.isEmpty else { return }
@@ -3435,8 +3431,8 @@ final class SeptaskKitTaskListController: NSViewController {
     infoMenuItem.keyEquivalent = "i"
     infoMenuItem.keyEquivalentModifierMask = [.command, .option]
     menu.addItem(infoMenuItem)
-    menu.addItem(item(String(localized: "Copy", comment: "SeptaskKit: context menu"),
-                      #selector(menuCopy), "c", [.command]))
+    // No Copy item: ⌘C and Edit ▸ Copy copy the selection's titles. The row
+    // menu keeps to actions on the task itself (same as the SwiftUI menu).
     menu.addItem(item(String(localized: "Duplicate", comment: "SeptaskKit: context menu"),
                       #selector(menuDuplicate), "d", [.command]))
     menu.addItem(.separator())
@@ -3464,10 +3460,20 @@ final class SeptaskKitTaskListController: NSViewController {
     todayMenuItem.keyEquivalentModifierMask = [.command]
     menu.addItem(todayMenuItem)
 
-    menu.addItem(item(String(localized: "When…", comment: "SeptaskKit: context menu"),
-                      #selector(menuWhen), "s", [.command]))
-    menu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
-                      #selector(menuDeadline), "d", [.command, .shift]))
+    // When and Deadline share one submenu, as in the SwiftUI menu. They open
+    // separate popovers (one date each), so a submenu is the native way to
+    // offer both from one entry. The key equivalents stay on the items.
+    let scheduleItem = NSMenuItem(
+      title: String(localized: "Schedule", comment: "SeptaskKit: context menu"),
+      action: nil, keyEquivalent: "")
+    scheduleItem.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: nil)
+    let scheduleMenu = NSMenu()
+    scheduleMenu.addItem(item(String(localized: "When…", comment: "SeptaskKit: context menu"),
+                              #selector(menuWhen), "s", [.command]))
+    scheduleMenu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
+                              #selector(menuDeadline), "d", [.command, .shift]))
+    scheduleItem.submenu = scheduleMenu
+    menu.addItem(scheduleItem)
 
     clearScheduleMenuItem.title = String(localized: "Clear Schedule",
                                          comment: "SeptaskKit: context menu")
@@ -3666,7 +3672,6 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuToggleToday() { toggleTodaySelection() }
   @objc private func menuRename() { beginEditSelectedRow() }
   @objc private func menuInspector() { onToggleInspector?() }
-  @objc private func menuCopy() { copySelection() }
   @objc private func menuDuplicate() { duplicateSelection() }
 
   @objc private func menuMoveTo(_ sender: NSMenuItem) {
@@ -3678,7 +3683,7 @@ final class SeptaskKitTaskListController: NSViewController {
     move(to: destination)
   }
 
-  /// A pick from the "Suggested" section. The tag indexes `menuSuggestions`,
+  /// The Move submenu's "Suggested" item. The tag indexes `menuSuggestions`,
   /// which `menuNeedsUpdate` rebuilt for the row that is still selected.
   @objc private func menuApplySuggestion(_ sender: NSMenuItem) {
     let selection = actionableSelection
@@ -3740,63 +3745,47 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
   /// current selection (see `refreshPlacementMenuItems`).
   func menuNeedsUpdate(_ menu: NSMenu) {
     let snapshot = StructureCache.snapshot(in: context)
-    moveMenuItem.submenu = KitMoveMenu.build(areas: snapshot.areas,
-                                             projects: snapshot.projects,
-                                             target: self,
-                                             action: #selector(menuMoveTo(_:)))
-    refreshSuggestedMenuSection(menu, projects: snapshot.projects)
+    let moveMenu = KitMoveMenu.build(areas: snapshot.areas,
+                                     projects: snapshot.projects,
+                                     target: self,
+                                     action: #selector(menuMoveTo(_:)))
+    insertSuggestedMoveItem(into: moveMenu, projects: snapshot.projects)
+    moveMenuItem.submenu = moveMenu
     refreshPlacementMenuItems()
   }
 
-  /// The "Suggested" section — the same ranked filing picks the row capsule
-  /// offers, as menu items. The capsule is the one-tap path for the TOP pick;
-  /// this is where the runners-up live, exactly like the SwiftUI menu's
-  /// `Section("Suggested")` (`TaskListContextMenu`). Single selection only:
-  /// the picks are ranked for one title, so a multi-selection has no subject.
-  private func refreshSuggestedMenuSection(_ menu: NSMenu, projects: [Project]) {
-    for item in suggestedMenuItems { menu.removeItem(item) }
-    suggestedMenuItems = []
+  /// "Suggested: <List>" as the FIRST item of the Move submenu — the same
+  /// pick the row's "→ Suggested" capsule shows, so the menu and the capsule
+  /// never name different lists. Single selection only: a pick is ranked for
+  /// one title, so a multi-selection has no subject. Mirrors the SwiftUI
+  /// menu's Move submenu (`TaskListRowContextMenu`).
+  private func insertSuggestedMoveItem(into moveMenu: NSMenu, projects: [Project]) {
     menuSuggestions = []
-
     let selection = actionableSelection
     guard selection.count == 1, let task = selection.first else { return }
-    // Same GATE as the capsule — `TaskFilingSuggestions` decides which rows
-    // are suggestible, so the menu and the capsule can never disagree.
-    guard let ranked = TaskFilingSuggestions.ranked(
-      for: task, filter: filter, engine: SuggestionEngine.shared,
-      childProjectIds: Self.childProjectIds(in: projects)), !ranked.isEmpty
+    // The capsule's snapshot first; else the same GATE live
+    // (`TaskFilingSuggestions`), so the two can never disagree.
+    guard let suggestion = filingSuggestions[task.id]
+      ?? TaskFilingSuggestions.top(
+        for: task, filter: filter, engine: SuggestionEngine.shared,
+        childProjectIds: Self.childProjectIds(in: projects))
     else { return }
 
-    // Above the placement commands, so the section sits where SwiftUI puts it
-    // — read the row, then act on where it should go.
-    let anchor = menu.index(of: todayMenuItem)
-    guard anchor >= 0 else { return }
-
-    menuSuggestions = ranked
-    var items: [NSMenuItem] = [
-      NSMenuItem.sectionHeader(title: String(localized: "Suggested",
-                                             comment: "SeptaskKit: context menu section"))
-    ]
-    for (index, suggestion) in ranked.enumerated() {
-      let item = NSMenuItem(title: String(localized: "Move to \(suggestion.title)",
-                                          comment: "SeptaskKit: filing suggestion menu item"),
-                            action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
-      item.target = self
-      item.tag = index
-      // The top pick is what ⌥⌘M files into, so it wears the binding — the
-      // menu is where a keyboard shortcut with no button of its own gets
-      // discovered. The table handles the key itself; this only advertises it.
-      if index == 0 {
-        item.keyEquivalent = "m"
-        item.keyEquivalentModifierMask = [.command, .option]
-      }
-      item.image = NSImage(systemSymbolName: suggestion.kind == .area ? "tray" : "folder",
-                           accessibilityDescription: nil)
-      items.append(item)
-    }
-    items.append(.separator())
-    for (offset, item) in items.enumerated() { menu.insertItem(item, at: anchor + offset) }
-    suggestedMenuItems = items
+    menuSuggestions = [suggestion]
+    let item = NSMenuItem(title: String(localized: "Suggested: \(suggestion.title)",
+                                        comment: "SeptaskKit: Move submenu, the filing suggestion"),
+                          action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
+    item.target = self
+    item.tag = 0
+    // ⌥⌘M files into this pick, so the item wears the binding: the menu is
+    // where a shortcut with no button of its own gets discovered. The table
+    // handles the key itself; this only advertises it.
+    item.keyEquivalent = "m"
+    item.keyEquivalentModifierMask = [.command, .option]
+    // Same glyph as the capsule.
+    item.image = NSImage(systemSymbolName: "arrow.turn.down.right", accessibilityDescription: nil)
+    moveMenu.insertItem(item, at: 0)
+    moveMenu.insertItem(.separator(), at: 1)
   }
 
   /// Area → its active child projects, the shape `TaskFilingSuggestions` asks

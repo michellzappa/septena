@@ -8,8 +8,8 @@ import SwiftUI
 
 /// The full task context menu + its picker sheets, bundled into one modifier so
 /// any surface (the Tasks list, the Next feed) attaches the *same* menu — Edit
-/// Details…, Copy, Duplicate, Move to / Remove from Today, When…, Deadline…,
-/// Move…, Repeat…, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
+/// Details…, Move to / Remove from Today, Schedule (When… / Deadline…), Move,
+/// Repeat…, Duplicate, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
 /// `TaskListModalPresenter`, both shared with `TaskListView`, so the two
 /// surfaces can't drift. Which picker is open is owned per-row.
 ///
@@ -75,12 +75,6 @@ struct TaskRowActions: ViewModifier {
           target: .single(task),
           filter: filter,
           rankedSuggestions: nil,
-          onCopy: { target in
-            let titles = target.tasks.map(\.title)
-            guard !titles.isEmpty else { return }
-            SeptenaPasteboard.copy(titles.joined(separator: "\n"))
-            Haptics.tick()
-          },
           onDuplicate: { _ in duplicateTask(task) },
           onOpenDetail: { onOpenDetail?($0) },
           onApplySuggestion: { _, _ in },

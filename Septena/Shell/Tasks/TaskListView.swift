@@ -2804,7 +2804,6 @@ struct TaskListView: View {
         target: target,
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
-        onCopy: { target in copyTasks(target.ids) },
         onDuplicate: { target in duplicate(target.ids) },
         onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
@@ -2926,9 +2925,14 @@ struct TaskListView: View {
                                  childProjectIds: { childProjectIds(in: $0) })
   }
 
+  /// The menu's Move ▸ "Suggested" item reads `.first`, which has to be the
+  /// pick the row's chip shows (snapshotted in `load()`), not a fresh ranking
+  /// that may have moved on since.
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
     guard case let .single(task) = target else { return nil }
-    return filingRankedSuggestions(for: task)
+    let ranked = filingRankedSuggestions(for: task)
+    guard let chip = filingChipSuggestion(for: task) else { return ranked }
+    return [chip] + (ranked ?? []).filter { $0 != chip }
   }
 
   private func suggestionAlreadyMatches(_ task: SeptenaTask,
