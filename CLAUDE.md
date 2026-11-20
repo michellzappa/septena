@@ -551,6 +551,13 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   in `../septena-site/docs/` are older; the workspace wins. App engineering docs
   (schema, design spec, plans, specs) stay public in this `docs/`;
   `docs/MAKER_IDENTITY.md` stays here too because it sources in-app maker copy.
+- **Feature map of the task app:** Starlings Docs
+  `/product/feature-map-septena-task-app` lists every user-facing feature of
+  Septena (the Septask targets), with UI names vs code names, status per
+  platform, and how features connect. Read it before you write copy, specs,
+  issues or agent briefs. When you ship, remove or rename a user-facing feature,
+  update its row in the same session. Code wins over the map.
+  (`/strategy/feature-catalog` is the older Septena Life catalog.)
 - Match surrounding code: comment density, naming, idiom.
 - **Maker voice & identity** (the "made by mz" story across app, site, support,
   journal) is specified in `docs/MAKER_IDENTITY.md` — pull facts and copy blocks
