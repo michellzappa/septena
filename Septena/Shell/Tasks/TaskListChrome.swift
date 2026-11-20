@@ -15,6 +15,42 @@ enum TaskCardPosition {
     else if index == count - 1 { self = .bottom }
     else { self = .middle }
   }
+
+  /// The card slice this position paints: outer corners round only at the
+  /// card's top and bottom. One geometry for the chrome and the context-menu
+  /// preview, so the lifted row has exactly the card's outline.
+  var cardShape: UnevenRoundedRectangle {
+    let radius = TaskCardMetrics.radius
+    let topRadius = (self == .top || self == .solo) ? radius : 0
+    let bottomRadius = (self == .bottom || self == .solo) ? radius : 0
+    return UnevenRoundedRectangle(
+      topLeadingRadius: topRadius, bottomLeadingRadius: bottomRadius,
+      bottomTrailingRadius: bottomRadius, topTrailingRadius: topRadius,
+      style: .continuous)
+  }
+
+  /// Space `TaskCardChrome` adds under the slice to part this card from the
+  /// next one.
+  var trailingGap: CGFloat {
+    (self == .bottom || self == .solo) ? TaskCardMetrics.groupGap : 0
+  }
+}
+
+/// A row's visible card slice, in the frame of the view AFTER
+/// `taskCardChrome` (which adds the side margins and the gap below a card).
+/// Used as the context-menu preview shape, so the system lift carries the
+/// card background with the row instead of only its text.
+struct TaskCardSliceShape: Shape {
+  let position: TaskCardPosition
+
+  func path(in rect: CGRect) -> Path {
+    let margin = TaskCardMetrics.margin
+    let slice = CGRect(x: rect.minX + margin,
+                       y: rect.minY,
+                       width: max(0, rect.width - margin * 2),
+                       height: max(0, rect.height - position.trailingGap))
+    return position.cardShape.path(in: slice)
+  }
 }
 
 /// Geometry shared by task rows, group headers, inline editors, sidebar cards,
@@ -98,13 +134,7 @@ private struct TaskCardChrome: ViewModifier {
   @State private var hovered = false
 
   func body(content: Content) -> some View {
-    let radius = TaskCardMetrics.radius
-    let topRadius = (position == .top || position == .solo) ? radius : 0
-    let bottomRadius = (position == .bottom || position == .solo) ? radius : 0
-    let shape = UnevenRoundedRectangle(
-      topLeadingRadius: topRadius, bottomLeadingRadius: bottomRadius,
-      bottomTrailingRadius: bottomRadius, topTrailingRadius: topRadius,
-      style: .continuous)
+    let shape = position.cardShape
     content
       .environment(\.rowHInset, TaskCardMetrics.contentInset)
       .background(alignment: .bottom) {
@@ -119,7 +149,7 @@ private struct TaskCardChrome: ViewModifier {
         }
       }
       .padding(.horizontal, TaskCardMetrics.margin)
-      .padding(.bottom, (position == .bottom || position == .solo) ? TaskCardMetrics.groupGap : 0)
+      .padding(.bottom, position.trailingGap)
       .onHover { hovered = $0 }
   }
 }
@@ -127,6 +157,23 @@ private struct TaskCardChrome: ViewModifier {
 extension View {
   func taskCardChrome(_ position: TaskCardPosition, isSelected: Bool = false) -> some View {
     modifier(TaskCardChrome(position: position, isSelected: isSelected))
+  }
+
+  /// The row's context menu. Attach it AFTER `taskCardChrome`: the system
+  /// lift snapshots the view the menu sits on, so a menu attached inside the
+  /// chrome lifts only the text and leaves the card behind. The preview shape
+  /// clips the snapshot to the card slice (no side margins, no group gap).
+  func taskCardContextMenu<MenuItems: View>(
+    _ position: TaskCardPosition,
+    @ViewBuilder menuItems: () -> MenuItems
+  ) -> some View {
+    #if os(iOS)
+    contentShape(.contextMenuPreview, TaskCardSliceShape(position: position))
+      .contextMenu(menuItems: menuItems)
+    #else
+    // macOS shows no lift preview; the menu alone.
+    contextMenu(menuItems: menuItems)
+    #endif
   }
 
   /// Non-selectable full-width list content: headers, quick-add lines, and

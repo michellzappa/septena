@@ -2592,7 +2592,8 @@ struct TaskListView: View {
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
-    .contextMenu { taskContextMenu(for: task) }
+    // The context menu is attached by the caller, after the card chrome
+    // (`cardedRows` / `quickAddLine`), so the lift carries the card.
   }
 
   @ViewBuilder
@@ -2710,7 +2711,8 @@ struct TaskListView: View {
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
-    .contextMenu { taskContextMenu(for: task) }
+    // No `.contextMenu` here: `cardedRows` attaches it after the card chrome,
+    // so the iOS lift carries the card background, not just the text.
   }
 
   /// Foot quick-add for grouped lists (Anytime) — its own card on the canvas.
@@ -2747,6 +2749,9 @@ struct TaskListView: View {
        let task = quickAddCaptureTask, expandedEditId == task.id {
       taskRow(task)
         .id(Self.quickAddScrollID)
+        // The capture slot's open editor keeps its menu. Its card chrome is
+        // applied by the caller, which also carries the trigger row (no menu).
+        .contextMenu { taskContextMenu(for: task) }
     } else if quickAddDraftId == nil {
       // The primary trigger is a first-class *selectable* row: it carries the
       // quick-add sentinel id (also in `keyboardOrderedTaskIds`), so arrow-nav
@@ -3168,9 +3173,10 @@ struct TaskListView: View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
+      let position = TaskCardPosition(index: idx, count: cardCount)
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .modifier(todayMoveDrop(moveDropTarget))
-        .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
+        .taskCardChrome(position,
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
                         // so opening a task to edit it keeps (rather than strips)
@@ -3178,6 +3184,9 @@ struct TaskListView: View {
                         // it's the same unemphasized gray as a plain selection,
                         // Things/Reminders-style, never the section accent.
                         isSelected: selection.contains(task.id) || expandedEditId == task.id)
+        // After the chrome, so the iOS lift preview includes the card
+        // background, clipped to this row's slice of the card.
+        .taskCardContextMenu(position) { taskContextMenu(for: task) }
         // After the chrome, so the drop target (and its targeting wash) spans
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
