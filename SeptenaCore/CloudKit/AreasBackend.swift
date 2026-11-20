@@ -150,14 +150,23 @@ final class AreasMutator: AreasBackend {
       try? await projectsMutator?.delete(id: project)
     }
     // Then every live task (any status, headings included) still pointing at
-    // a dead id. One fetch; tasks first, headings last, as in
+    // a dead id. One plain equality fetch per id: Core Data cannot turn
+    // `contains(e.project ?? "")` into SQL and aborts the app at launch
+    // (2026-11-20). Tasks first, headings last, as in
     // `ProjectsMutator.trashTasks`.
-    let rows = (try? context.fetch(FetchDescriptor<TaskEntity>(
-      predicate: #Predicate { e in
-        e.deletedAt == nil
-          && (deadProjects.contains(e.project ?? "") || deadAreas.contains(e.area ?? ""))
-      }
-    ))) ?? []
+    var rows: [TaskEntity] = []
+    for id in deadProjects {
+      rows += (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.project == id && $0.deletedAt == nil }
+      ))) ?? []
+    }
+    for id in deadAreas {
+      rows += (try? context.fetch(FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.area == id && $0.deletedAt == nil }
+      ))) ?? []
+    }
+    var seen = Set<String>()
+    rows = rows.filter { seen.insert($0.id).inserted }
     let ids = rows.filter { !$0.isHeading }.map(\.id) + rows.filter(\.isHeading).map(\.id)
     for task in ids { taskMutator?.delete(id: task) }
     if !doomedProjects.isEmpty || !ids.isEmpty {
