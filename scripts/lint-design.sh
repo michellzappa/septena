@@ -166,6 +166,24 @@ if [ -n "$space_bound" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── SwiftData reserved property names ───────────────────────────────────────
+# A stored @Model property that shares a name with an NSManagedObject method
+# breaks the store at runtime, with no compile error: `entity` made fetch
+# predicates throw during SQL generation, and `entityName` made reads trap
+# after a save (Core Data's own method shadowed it). Only files that declare a
+# @Model are read. Check any other new name with
+# `NSManagedObject.instancesRespond(to: NSSelectorFromString("name"))`.
+reserved_model=$(grep -rlE --include="*.swift" '@Model' Septena Septask SeptenaCore 2>/dev/null \
+  | xargs grep -nHE '^[[:space:]]*(@[A-Za-z]+(\([^)]*\))?[[:space:]]+)*((public|private|fileprivate|internal)[[:space:]]+)?var[[:space:]]+(entity|entityName|objectID|description|isDeleted|managedObjectContext|isFault|hasChanges)\b' 2>/dev/null \
+  | grep -v 'septena-lint:allow model-reserved-name')
+if [ -n "$reserved_model" ]; then
+  printf '%s✗ %s%s\n' "$RED" "model-reserved-name" "$OFF"
+  errors=$((errors + 1))
+  printf '  %s\n' 'A @Model property must not reuse an NSManagedObject method name (entity, entityName, objectID, description, …). Rename it.'
+  printf '%s' "$DIM"; printf '%s\n' "$reserved_model" | head -8 | sed 's/^/    /'
+  printf '%s\n' "$OFF"
+fi
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

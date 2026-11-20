@@ -412,6 +412,29 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   the same way).
   Related, still open: `deferPush` means a new row is local-only until the
   first title write, so a crash in that window leaves a titleless task.
+- **A stored `@Model` property must not reuse an `NSManagedObject` method
+  name.** SwiftData sits on Core Data, so the name collides at runtime with no
+  compile error. `entity` broke fetch predicates (SQL generation threw), and
+  `entityName` made reads trap after a save (Core Data's own method shadowed
+  it). Before you add a stored name, check
+  `NSManagedObject.instancesRespond(to: NSSelectorFromString("name"))` for the
+  getter and the setter. Enforced by the `model-reserved-name` lint rule
+  (entity, entityName, objectID, description, isDeleted,
+  managedObjectContext, isFault, hasChanges).
+- **A deep SwiftUI view type overflows the iOS main-thread stack at launch.**
+  The crash is `EXC_BAD_ACCESS` in `swift_getTypeByMangledName`, before any
+  view draws. `TaskListView.taskListRows` hit it: a large `@ViewBuilder`
+  `switch` nests every branch into one generic type. The fix type-erases each
+  branch with `AnyView`. Keep large `@ViewBuilder` switches shallow, or split
+  the branches into their own views. macOS has a larger main stack, so a Mac
+  build that runs does not prove iOS is safe. Not greppable; this note is the
+  guardrail.
+- **iOS aborts on a menu shortcut that UIKit already owns.** A SwiftUI command
+  with ⌃⌘S collided with UIKit's own Show Sidebar and crashed at launch and on
+  typing. A shortcut the platform reserves stays inside `#if os(macOS)`. Before
+  you add a `.keyboardShortcut` to a command that iPad also compiles, check the
+  system menu for the same keys. Not greppable (the collision depends on the
+  platform's menus); this note is the guardrail.
 
 ## Where truth lives (priority order)
 
