@@ -1,0 +1,15 @@
+# Septena
+
+> Septena is a private task app for iPhone, iPad and Mac. Its tasks live on Septena's task server (`https://api.septena.app/mcp`), which AI agents connect to over streamable HTTP MCP with OAuth sign-in approved in the Septena app.
+
+If a person asked you to set up Septena or work tasks assigned to you, read `/agents.md` first.
+
+## Agent documentation
+
+- [Septena for agents](https://septena.app/agents.md): Setup instructions for MCP clients, the six-step agent task loop (`tasks_claim` through `tasks_release`), `tasks_agent_events` cursor polling, refusal rules, and safety boundaries.
+- [Septena for agents (human page)](https://septena.app/agents): Human-readable version of the setup and workflow guide.
+
+## Connector and legal
+
+- [Tasks MCP endpoint](https://api.septena.app/mcp): Streamable HTTP MCP server with OAuth 2.1 (PKCE + RFC 9728 protected-resource discovery).
+- [Privacy policy](https://www.septena.app/privacy): How Septena handles account and task data.

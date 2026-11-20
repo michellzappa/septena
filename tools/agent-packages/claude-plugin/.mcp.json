@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "septena": {
+      "type": "http",
+      "url": "https://api.septena.app/mcp"
+    }
+  }
+}
