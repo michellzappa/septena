@@ -1,0 +1,25 @@
+{
+  "name": "@septena/mcp-gateway",
+  "version": "0.2.0",
+  "description": "Hosted MCP server bridging Claude.ai to Septena's CloudKit data.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.13",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.94.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

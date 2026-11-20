@@ -1,0 +1,11 @@
+# Copy to .dev.vars (which is gitignored) and fill in for `wrangler dev`.
+# Production uses `wrangler secret put` instead — never commit real values.
+
+# CloudKit Dashboard → Tokens & Keys → API Tokens.
+# For local dev, the token's URL Redirect should point at the tunneled URL,
+# e.g. https://mcp-dev.septena.app/auth/apple/callback.
+CK_API_TOKEN=
+
+# 32-byte base64 key for AES-GCM encryption of CKWebAuthTokens at rest.
+# Generate: openssl rand -base64 32
+TOKEN_ENC_KEY=
