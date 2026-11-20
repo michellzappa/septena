@@ -162,6 +162,10 @@ launch.
   count, hosted-AI allowance. The alarm's pruning, every history read and every
   gate read this table. Apps fetch their limits from the server and never
   hardcode them.
+- **Gates read limits, never the plan name.** No code checks `plan == "paid"`.
+  A later tier (Pro, Supporter, Family; see the Starlings doc *Free and paid
+  plans*) is then a new row in the plan table and a new product in the same
+  subscription group, with no code change at the gates.
 - **Fail closed** on a missing or invalid row, with one exception: grace
   period and billing retry count as active (Apple's own rule).
 - A `grant` row (no expiry or a set expiry) covers mz, testers, and press.
