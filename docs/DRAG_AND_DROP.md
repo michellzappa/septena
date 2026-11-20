@@ -142,7 +142,7 @@ both. **The two paths must converge on this table.**
 |---|-----|-------|----------|
 | 1 | **Two re-home paths diverge.** Sidebar/menu re-home doesn't clear `heading` or set a landing `position`; in-list drop does. Unify in the backend so drag, menu, and MCP all inherit §4. | `TasksBackend.moveToArea`/`moveToProject`; `SidebarTaskDrop.rehome` | **P0 (model defect)** |
 | 2 | ✅ **DONE** — sidebar area/project order now syncs. `position: Int` on `AreaEntity`/`ProjectEntity` rides the reserved `reservedInt1` CK slot (additive, rides prod cutover); Move Up/Down renumbers 1…N via `Areas/ProjectsMutator.reorder(orderedIDs:)`; `NavigationState.positionOrdered` sorts by it, falling back to the legacy `UserDefaults` order until the first reorder migrates everyone. | `Persistence`, `Area/ProjectRecord`, `Areas/ProjectsBackend`, `SidebarView`, `NavigationState` | ~~P1~~ |
-| 3 | **Reorder disabled on date/tier-sorted lists** (Today, Upcoming) — `TaskReorderDrop.perform` is nil there. Decide: keep as derived-sort, or allow manual arrangement within Today like Things. | `TaskComponents`; `TaskListView` | P1 (decision) |
+| 3 | ✅ **DONE (#66)** — Today is manually arrangeable in its own order (`todayPosition`, `TaskOrderLane.today`), separate from the list `position`, as in Things. A drop into another Today group files the row there, then places it. Upcoming stays derived. | `TaskComponents`; `TaskListView`; `SeptaskKitTaskList` | ~~P1~~ |
 | 4 | **No drag-to-schedule** (drag task → a day in Upcoming to set `scheduled`). `schedule(id:date:)` exists; gesture unwired. Only meaningful where calendar + list co-visible. | — | P2 |
 | 5 | **Project → Area is menu-only.** Dragging a project row onto an area (sets `project.area`) is the natural sidebar gesture and is missing. | `SidebarView`; `AreasProjectsView` | P2 |
 | 6 | **No auto-scroll / spring-loading.** Custom `DropDelegate` doesn't get edge auto-scroll free; collapsed areas don't expand on hover-drag. | `TaskReorderDropDelegate`; `SidebarTaskDrop` | P2 |
@@ -161,7 +161,9 @@ both. **The two paths must converge on this table.**
   (gap #2). Area/project order follows the user across devices via a synced
   `position` field, like section color/enabled state — arrangement is user
   intent, not a device preference.
-- **Decision C — is Today manually arrangeable?** Keep Today as a derived
+- **Decision C — is Today manually arrangeable?** ✅ **Decided yes (mz,
+  2026-11-20, #66):** Today keeps its own manual order; see gap #3. The
+  original recommendation follows for history. Keep Today as a derived
   tier-sort (deadline/overdue → later → undated, then `position` within tier), or
   let the user drag freely within it? Recommend **keep derived** — Today's order
   carries meaning (urgency), and free reorder invites drift; but allow reorder

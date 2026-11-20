@@ -73,6 +73,16 @@ final class TaskEntity {
   /// rest; `TaskOrder.normalize` re-spaces and backfills (0 = unset) and is
   /// synced via CloudKit so the order matches across devices.
   var position: Double = 0
+  /// Today's own manual order (#66), kept apart from `position` so reordering
+  /// Today never moves the task in its area / project list (as in Things).
+  /// nil = never ordered on Today; Today then falls back to `TaskOrder.key`
+  /// (`TaskOrder.todayKey`). Written only by `TaskMutator.reorderToday`;
+  /// cleared when an open task leaves Today (`TasksBackend.commitAndPush`).
+  /// Optional, so the migration is lightweight. Synced through the task
+  /// backend's `todayPosition` column only: no CloudKit field (Septena Life
+  /// no longer shows tasks). Name checked: NSManagedObject has no
+  /// `todayPosition` / `setTodayPosition:` selector.
+  var todayPosition: Double?
   /// Legacy FastAPI-era optimistic-write guard; no longer consulted on the
   /// CloudKit path. Retained as a schema field pending Phase-2 cleanup.
   var pendingSync: Bool = false
@@ -158,7 +168,8 @@ final class TaskEntity {
        acknowledgedAt: Date? = nil,
        createdAt: Date = Date.distantPast,
        kind: String = "",
-       heading: String? = nil) {
+       heading: String? = nil,
+       todayPosition: Double? = nil) {
     self.id = id
     self.title = title
     self.statusRaw = statusRaw
@@ -192,6 +203,7 @@ final class TaskEntity {
     self.createdAt = createdAt
     self.kind = kind
     self.heading = heading
+    self.todayPosition = todayPosition
   }
 
   /// True when this row is a project section divider, not a to-do. The single
@@ -1778,6 +1790,7 @@ extension SeptenaTask {
       acknowledgedAt: e.acknowledgedAt,
       createdAt: e.createdAt,
       position: e.position,
+      todayPosition: e.todayPosition,
       kind: e.kind,
       heading: e.heading,
       conversation: e.conversation
@@ -1786,6 +1799,26 @@ extension SeptenaTask {
 
   /// Manual-order sort key — see `TaskOrder.key`.
   var orderKey: Double { TaskOrder.key(position: position, createdAt: createdAt) }
+
+  /// Today's sort key — see `TaskOrder.todayKey`.
+  var todayOrderKey: Double { todayPosition ?? orderKey }
+
+  /// The sort key of `lane` — the one read every reorder path uses.
+  func orderKey(in lane: TaskOrderLane) -> Double {
+    switch lane {
+    case .list: return orderKey
+    case .today: return todayOrderKey
+    }
+  }
+}
+
+/// Which manual order a list shows and a reorder writes (#66). Today has its
+/// own order (`todayPosition`); every other list uses `position`. A Today
+/// reorder never touches `position`, so the task keeps its place in its own
+/// area / project list.
+enum TaskOrderLane {
+  case list
+  case today
 }
 
 /// Manual task ordering (Things-style). Lists render strictly by `key`, so a
@@ -1808,6 +1841,15 @@ enum TaskOrder {
   }
   static func key(_ e: TaskEntity) -> Double {
     key(position: e.position, createdAt: e.createdAt)
+  }
+
+  /// Today's order key: `todayPosition` once the row was ordered on Today,
+  /// otherwise its list key. A row that lands on Today therefore starts at
+  /// its list position there, the same rule the task backend uses
+  /// (`backend/src/shadow/writes.ts`), so a new task (top of its list) is at
+  /// the top of Today.
+  static func todayKey(_ e: TaskEntity) -> Double {
+    e.todayPosition ?? key(e)
   }
 
   /// A position that sorts above every live task, so a freshly created task
@@ -4073,7 +4115,8 @@ enum LocalCache {
     let result = rows
       .compactMap { e -> (key: Double, id: String, task: SeptenaTask)? in
         guard let task = convert(e, filter: filter, today: today) else { return nil }
-        return (TaskOrder.key(e), e.id, task)
+        // Today has its own manual order (#66); every other list uses `position`.
+        return (filter == .today ? TaskOrder.todayKey(e) : TaskOrder.key(e), e.id, task)
       }
       .sorted { a, b in a.key != b.key ? a.key < b.key : a.id < b.id }
       .map(\.task)
