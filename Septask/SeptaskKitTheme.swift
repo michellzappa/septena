@@ -142,8 +142,10 @@ enum SeptaskKitTheme {
         let alpha: CGFloat = isDark ? 0.34 : 0.22
         return systemAccentColor.withAlphaComponent(alpha)
       }
-      let white: CGFloat = isDark ? 0.24 : 0.93
-      return NSColor(white: white, alpha: 0.5)
+      // A tint over the background, not an opaque gray: white 0.93 at 0.5
+      // matched the sidebar material, so an unfocused sidebar selection was
+      // invisible (2026-11-20). Black in light, white in dark, like Finder.
+      return isDark ? NSColor(white: 1, alpha: 0.14) : NSColor(white: 0, alpha: 0.10)
     }
   }
 
