@@ -3936,7 +3936,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return SeptaskKitTheme.rowHeight
     case .event: return SeptaskKitTheme.rowHeight
-    case .loggedFooter: return SeptenaTypeScale.size(.footnote) + 24
+    // Blank band above it as tall as a group title, so the footer reads as
+    // its own section, not glued to the last task (mz, 2026-11-20).
+    case .loggedFooter: return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
@@ -5464,6 +5466,10 @@ final class KitScreenTitleCell: NSTableCellView {
 /// column (not the wider page gutter).
 @MainActor
 final class KitLoggedFooterCell: NSTableCellView {
+  /// Empty space above the footer text: one group-title row (the same
+  /// `17 * factor + 26` a `.header` row is tall).
+  static var topGap: CGFloat { 17 * FontScale.shared.factor + 26 }
+
   /// Keeps the overlay inside the content column — see `KitContentColumnPin`.
   private var hitPin: KitContentColumnPin!
   private let label = NSTextField(labelWithString: "")
@@ -5507,9 +5513,10 @@ final class KitLoggedFooterCell: NSTableCellView {
     hitPin = KitContentColumnPin(hit, in: self)
     NSLayoutConstraint.activate([
       leadingConstraint,
-      label.centerYAnchor.constraint(equalTo: centerYAnchor),
+      // Centered in the band below the title-height gap.
+      label.centerYAnchor.constraint(equalTo: centerYAnchor, constant: Self.topGap / 2),
       trailingConstraint,
-      hit.topAnchor.constraint(equalTo: topAnchor),
+      hit.topAnchor.constraint(equalTo: topAnchor, constant: Self.topGap),
       hit.bottomAnchor.constraint(equalTo: bottomAnchor),
     ] + hitPin.constraints + [
     ])

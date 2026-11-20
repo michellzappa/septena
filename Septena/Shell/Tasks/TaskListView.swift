@@ -488,6 +488,9 @@ struct TaskListView: View {
   /// Bumped when a notice is dismissed, so `noticesRow` re-reads
   /// `TaskNotices` (which owns the dismissal state).
   @State private var noticeEpoch = 0
+  /// One group-title line of space above the logged footer (scales with
+  /// Dynamic Type like the titles it matches).
+  @ScaledMetric(relativeTo: .headline) private var loggedFooterGap: CGFloat = 34
 
   var body: some View {
     // Launch signpost (docs/LAUNCH_PERF.md). One-shot: a no-op after the
@@ -2053,6 +2056,10 @@ struct TaskListView: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(PlainHoverRowButtonStyle())
+    // Blank band above the footer as tall as a group title, so it reads as
+    // its own section, not glued to the last task (mz, 2026-11-20). Outside
+    // the button, so the gap isn't a tap target.
+    .padding(.top, loggedFooterGap)
     .asListRow()
   }
 
