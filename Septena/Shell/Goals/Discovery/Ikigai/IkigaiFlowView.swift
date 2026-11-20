@@ -88,7 +88,7 @@ struct IkigaiFlowView: View {
       VStack(alignment: .leading, spacing: 10) {
         Text("Turn a reflection into goals")
           .font(.largeTitle.weight(.bold))
-        Text("Fill four short quadrants. Septena uses the on-device model to draft a north-star goal and commitments you can save into Goals.")
+        Text("Fill four short quadrants. Septena Life uses the on-device model to draft a north-star goal and commitments you can save into Goals.")
           .font(.body)
           .foregroundStyle(.secondary)
       }

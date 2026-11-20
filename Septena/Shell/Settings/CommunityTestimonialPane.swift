@@ -117,7 +117,7 @@ struct CommunityTestimonialPane: View {
       } header: {
         Text("Your testimonial")
       } footer: {
-        Text("A sentence or two about how Septena helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved.")
+        Text("A sentence or two about how Septena Life helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved.")
       }
     } else if let mine {
       Section {

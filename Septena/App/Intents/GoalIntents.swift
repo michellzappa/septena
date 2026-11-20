@@ -14,7 +14,7 @@ import Foundation
 struct AddGoalIntent: SectionLogIntent {
   static let sectionKey = "goals"
   static let title: LocalizedStringResource = "Add Goal"
-  static let description = IntentDescription("Add a new goal to Septena.")
+  static let description = IntentDescription("Add a new goal to Septena Life.")
 
   @Parameter(title: "Goal", requestValueDialog: "What's the goal?")
   var text: String

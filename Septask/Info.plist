@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Septask</string>
+	<string>Septena</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -31,13 +31,13 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Septask shows today's calendar events above your task list.</string>
+	<string>Septena shows today's calendar events above your task list.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Septask shows today's calendar events above your task list.</string>
+	<string>Septena shows today's calendar events above your task list.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Septask imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>Septask imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

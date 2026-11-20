@@ -363,7 +363,7 @@ private struct SeptaskPrivacyPane: View {
   var body: some View {
     Form {
       Section {
-        Text("Septask keeps your tasks, areas, projects, task conversations and a few settings (your name, usage data level, hidden calendars) on your devices. When you sign in, they sync through Septena's own server, in a private store for your account. The server encrypts them at rest, but not end to end, because Claude has to be able to read them.")
+        Text("Septena keeps your tasks, areas, projects, task conversations and a few settings (your name, usage data level, hidden calendars) on your devices. When you sign in, they sync through Septena's own server, in a private store for your account. The server encrypts them at rest, but not end to end, because Claude has to be able to read them.")
       } header: {
         Text("Where your data lives")
       }

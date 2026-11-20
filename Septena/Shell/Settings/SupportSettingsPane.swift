@@ -46,7 +46,7 @@ struct SupportSettingsPane: View {
           // Block F (docs/MAKER_IDENTITY.md): personal, without pretending the
           // support desk is a brand. Only non-maintainers see it.
           if !isMaintainer {
-            Text("You're reaching me directly — I'm the one person who makes Septena, and I read every ticket.")
+            Text("You're reaching me directly — I'm the one person who makes Septena Life, and I read every ticket.")
           }
         }
 
@@ -112,7 +112,7 @@ struct SupportSettingsPane: View {
       Link(destination: URL(string: "mailto:mz@envisioning.com")!) {
         Label("Email support", systemImage: "envelope")
       }
-      Text("Email goes straight to me — I make Septena alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time.")
+      Text("Email goes straight to me — I make Septena Life alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time.")
         .font(.footnote)
         .foregroundStyle(.secondary)
       OpenAppleAccountButton()

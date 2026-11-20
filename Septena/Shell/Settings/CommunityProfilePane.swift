@@ -164,7 +164,7 @@ struct CommunityProfilePane: View {
         } footer: {
           Text(supporterTier?.isEmpty == false
                ? "Your Septena+ support shows a Supporter badge on your community profile. Thank you."
-               : "Septena is free. Supporters wear a Supporter badge here — manage it in Settings ▸ Support Septena.")
+               : "Septena Life is free. Supporters wear a Supporter badge here — manage it in Settings ▸ Support Septena Life.")
         }
 
         if role != "user" {

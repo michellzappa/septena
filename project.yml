@@ -93,7 +93,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Life
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
           - en
@@ -125,15 +125,15 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
-        NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
-        NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
-        NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
-        NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSCameraUsageDescription: Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
-        NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
+        NSRemindersFullAccessUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
+        NSCalendarsUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
+        NSHealthShareUsageDescription: Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
+        NSHealthUpdateUsageDescription: Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
+        NSPhotoLibraryUsageDescription: Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSCameraUsageDescription: Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
+        NSFaceIDUsageDescription: Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
         CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
@@ -173,7 +173,8 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Life
+        CFBundleName: Septena Life
         ITSAppUsesNonExemptEncryption: false
         CFBundleLocalizations:
           - en
@@ -182,15 +183,15 @@ targets:
           - es
           - pt-BR
         CFBundleIconFile: AppIcon
-        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
-        NSCalendarsUsageDescription: Septena shows upcoming events from your calendars on the Week dashboard.
-        NSHealthShareUsageDescription: Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
-        NSHealthUpdateUsageDescription: Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
-        NSPhotoLibraryUsageDescription: Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
-        NSCameraUsageDescription: Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
-        NSFaceIDUsageDescription: Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
+        NSRemindersFullAccessUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena Life imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
+        NSCalendarsUsageDescription: Septena Life shows upcoming events from your calendars on the Week dashboard.
+        NSHealthShareUsageDescription: Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.
+        NSHealthUpdateUsageDescription: Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.
+        NSPhotoLibraryUsageDescription: Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.
+        NSCameraUsageDescription: Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.
+        NSFaceIDUsageDescription: Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.
         WithingsClientID: $(WITHINGS_CLIENT_ID)
         WithingsClientSecret: $(WITHINGS_CLIENT_SECRET)
         CloudKitWebAPIToken: $(CLOUDKIT_WEB_API_TOKEN)
@@ -342,7 +343,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         CFBundleLocalizations:
           - en
           - fr
@@ -374,10 +375,10 @@ targets:
         # and the backend's silent push is not built yet).
         # The compiled task UI includes the Reminders inbox and the Today
         # calendar strip (EventKit) — access requests crash without these.
-        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
-        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -407,7 +408,7 @@ targets:
     info:
       path: ShareExtension/SeptenaShare-Info.plist
       properties:
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Life
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -436,7 +437,7 @@ targets:
     info:
       path: ShareExtension/SeptaskShare-Info.plist
       properties:
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -532,7 +533,8 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
+        CFBundleName: Septena
         CFBundleLocalizations:
           - en
           - fr
@@ -546,10 +548,10 @@ targets:
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SUAutomaticallyUpdate: false
-        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
-        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -628,7 +630,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septena
+        CFBundleDisplayName: Septena Life
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.cloud
         # Tap a training Live Activity card on the wrist → open the Watch app
@@ -700,7 +702,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.tasks
     configFiles:

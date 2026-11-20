@@ -47,7 +47,7 @@ struct RemindersImportView: View {
   @ViewBuilder
   private var permissionPrompt: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("Septena needs access to read your Reminders.")
+      Text("Septena Life needs access to read your Reminders.")
         .font(.septenaTaskTitle)
         .foregroundStyle(Theme.inkPrimary)
       Button {
@@ -71,7 +71,7 @@ struct RemindersImportView: View {
   @ViewBuilder
   private var deniedPrompt: some View {
     Text(access == .writeOnly
-         ? "Septena has write-only access. Enable Full Access in Settings → Privacy → Reminders."
+         ? "Septena Life has write-only access. Enable Full Access in Settings → Privacy → Reminders."
          : "Reminders access is denied. Enable it in Settings → Privacy → Reminders.")
       .font(.septenaTaskTitle)
       .foregroundStyle(Theme.inkPrimary)

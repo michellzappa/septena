@@ -132,7 +132,7 @@ struct TrainingSessionTypeQuery: EntityQuery {
 struct LogTrainingIntent: SectionLogIntent {
   static let sectionKey = "training"
   static let title: LocalizedStringResource = "Log Workout"
-  static let description = IntentDescription("Log an exercise set in Septena.")
+  static let description = IntentDescription("Log an exercise set in Septena Life.")
 
   @Parameter(title: "Exercise")
   var exercise: ExerciseChoice
@@ -232,7 +232,7 @@ struct StartTrainingSessionIntent: SectionLogIntent {
   static let sectionKey = "training"
   static let title: LocalizedStringResource = "Start Training Session"
   static let description = IntentDescription(
-    "Open Septena and start a training session of a chosen type.")
+    "Open Septena Life and start a training session of a chosen type.")
   static var openAppWhenRun: Bool = true
 
   @Parameter(title: "Session Type")

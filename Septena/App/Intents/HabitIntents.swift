@@ -124,7 +124,7 @@ struct MarkHabitDoneIntent: SectionLogIntent {
 struct AddHabitIntent: SectionLogIntent {
   static let sectionKey = "habits"
   static let title: LocalizedStringResource = "Add Habit"
-  static let description = IntentDescription("Add a new habit to Septena.")
+  static let description = IntentDescription("Add a new habit to Septena Life.")
 
   @Parameter(title: "Name", requestValueDialog: "Which habit?")
   var name: String

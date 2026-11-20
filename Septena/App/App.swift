@@ -499,7 +499,7 @@ struct SeptenaApp: App {
       // real exit. Otherwise plain ⌘Q quits as usual — soft-quit is gated off
       // by default, so this is the redundant-but-harmless explicit quit.
       CommandGroup(after: .appTermination) {
-        Button("Quit Septena Completely") { MacAppLifecycle.quitCompletely() }
+        Button("Quit Septena Life Completely") { MacAppLifecycle.quitCompletely() }
           .keyboardShortcut("q", modifiers: [.command, .option])
       }
       #endif
@@ -664,7 +664,7 @@ private struct ICloudRequirementModifier: ViewModifier {
         #endif
         Button("OK", role: .cancel) { }
       } message: {
-        Text("Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices.")
+        Text("Septena Life keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices.")
       }
   }
 

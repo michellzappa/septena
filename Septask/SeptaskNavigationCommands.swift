@@ -237,7 +237,7 @@ struct SeptaskCommandMenus: Commands {
       // The AppKit shell is the default window on macOS; this reopens it if
       // it was closed. No shortcut: ⌘0 is Reset Text Size, ⌘1–4 are the
       // lists, and the Dock icon reopens the window too.
-      Button("Septask Window") { SeptaskKitWindowController.show() }
+      Button("Septena Window") { SeptaskKitWindowController.show() }
       ClassicWindowCommand()
 
       // Shows the global hotkey `SeptaskKitQuickEntry.installHotKey()`

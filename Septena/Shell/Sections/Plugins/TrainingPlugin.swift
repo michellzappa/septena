@@ -67,7 +67,7 @@ enum TrainingPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "training",
-      intro: "Log your workouts — strength, cardio, or mobility. Pick the kinds of movement you do and Septena sets up a routine for each, ready to fill with exercises as you go.",
+      intro: "Log your workouts — strength, cardio, or mobility. Pick the kinds of movement you do and Septena Life sets up a routine for each, ready to fill with exercises as you go.",
       nounPlural: String(localized: "routines"),
       header: String(localized: "Training types"),
       footer: String(localized: "Each becomes a routine you can fill with your own exercises. Rename or add more anytime."),

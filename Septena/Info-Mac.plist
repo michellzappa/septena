@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Septena</string>
+	<string>Septena Life</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>
@@ -23,7 +23,7 @@
 		<string>pt-BR</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Septena Life</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -35,23 +35,23 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
+	<string>Septena Life shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Septena shows upcoming events from your calendars on the Week dashboard.</string>
+	<string>Septena Life shows upcoming events from your calendars on the Week dashboard.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.</string>
+	<string>Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.</string>
+	<string>Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
+	<string>Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.</string>
+	<string>Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.</string>
+	<string>Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena Life imports tasks from your Reminders lists into the Inbox.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>Septena imports tasks from your Reminders lists into the Inbox.</string>
+	<string>Septena Life imports tasks from your Reminders lists into the Inbox.</string>
 	<key>WithingsClientID</key>
 	<string>$(WITHINGS_CLIENT_ID)</string>
 	<key>WithingsClientSecret</key>

@@ -66,7 +66,7 @@ struct MacrosWidgetView: View {
     VStack(alignment: .leading, spacing: 8) {
       Text("Macros")
         .font(.subheadline.weight(.semibold))
-      Text("Nutrition off or no targets yet — open Septena once.")
+      Text("Nutrition off or no targets yet — open Septena Life once.")
         .font(.caption)
         .foregroundStyle(.secondary)
     }

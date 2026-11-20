@@ -98,7 +98,7 @@ final class AppLock {
 
     phase = .authenticating
     context.evaluatePolicy(.deviceOwnerAuthentication,
-                           localizedReason: "Unlock Septena") { success, _ in
+                           localizedReason: "Unlock Septena Life") { success, _ in
       Task { @MainActor in
         if success {
           self.phase = .unlocked
@@ -226,7 +226,7 @@ struct AppLockCover: View {
           Image(systemName: "lock.fill")
             .font(.system(size: 44, weight: .regular))
             .foregroundStyle(.secondary)
-          Text("Septena is locked")
+          Text("Septena Life is locked")
             .font(.headline)
             .foregroundStyle(.secondary)
           if lock.phase == .locked {

@@ -818,7 +818,7 @@ struct CorrelationEngine {
     [
       ("r", "Relationship strength from -1 to +1. Positive means both move up together; negative means one rises as the other falls."),
       ("p", "How surprising this result would be if the days were randomly shuffled. Smaller is stronger, but p alone is not enough."),
-      ("q", "The p-value after correcting for all the pairs Septena tested. Trusted insights use q so one lucky false positive is less likely."),
+      ("q", "The p-value after correcting for all the pairs Septena Life tested. Trusted insights use q so one lucky false positive is less likely."),
       ("n", "The number of overlapping days where both signals were available."),
       ("lag", "How many days earlier the possible driver is compared with the outcome. Lag 1 means yesterday's driver versus today's outcome."),
       ("buckets", "The same data split into low, middle, and high driver days. A clean trend across buckets is easier to trust than scattered points."),

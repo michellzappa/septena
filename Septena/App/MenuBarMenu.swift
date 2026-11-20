@@ -27,11 +27,11 @@ struct MenuBarMenu: View {
         Divider()
       }
 
-      Button("Open Septena") { activateMainWindow() }
+      Button("Open Septena Life") { activateMainWindow() }
       // ⌘Q soft-quits to the menu bar only when soft-quit is on (NSApp.terminate
       // routes through MacAppDelegate.applicationShouldTerminate); otherwise it
       // quits normally. "Quit Completely" always exits.
-      Button(softQuit ? "Hide Septena" : "Quit Septena") { NSApp.terminate(nil) }
+      Button(softQuit ? "Hide Septena Life" : "Quit Septena Life") { NSApp.terminate(nil) }
         .keyboardShortcut("q")
       if softQuit {
         Button("Quit Completely") { MacAppLifecycle.quitCompletely() }
