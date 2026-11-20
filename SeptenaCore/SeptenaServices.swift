@@ -1,5 +1,69 @@
 import Foundation
+import Observation
 import SwiftData
+
+/// "Is the first task list frame on screen yet?" Launch work the first frame
+/// does not need (services start, sync, imports, diagnostics, the Reminders
+/// mirror, the calendar agenda, filing suggestions) waits on this, so nothing
+/// competes with the first Today frame for the main thread
+/// (docs/LAUNCH_PERF.md).
+///
+/// `TaskListView` reports its first published rows; one frame later the
+/// phase flips. A launch that never shows a task list (the welcome flow,
+/// another route) is released by the timeout in `waitForFirstFrame`, so the
+/// deferred work always runs.
+@MainActor
+@Observable
+final class LaunchPhase {
+  static let shared = LaunchPhase()
+
+  /// True once the first task list frame is on screen (or the wait timed out).
+  private(set) var firstFrameDrawn = false
+  @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  /// Upper bound on how long deferred launch work waits for a task list.
+  static let maxWait: Duration = .milliseconds(1500)
+
+  private init() {}
+
+  /// Idempotent. Releases every waiter.
+  func markFirstFrameDrawn() {
+    guard !firstFrameDrawn else { return }
+    firstFrameDrawn = true
+    LaunchTrace.milestone("launch.firstFrameDrawn")
+    let pending = waiters
+    waiters = []
+    for waiter in pending { waiter.resume() }
+  }
+
+  /// A task list published rows: flip the phase once the run loop has had a
+  /// turn to commit that frame.
+  func noteRowsPublished() {
+    guard !firstFrameDrawn else { return }
+    Task { @MainActor in
+      await Self.nextFrame()
+      self.markFirstFrameDrawn()
+    }
+  }
+
+  /// Returns once the first frame is drawn, or after `maxWait`.
+  func waitForFirstFrame() async {
+    guard !firstFrameDrawn else { return }
+    let timeout = Task { @MainActor in
+      try? await Task.sleep(for: Self.maxWait)
+      if !Task.isCancelled { self.markFirstFrameDrawn() }
+    }
+    await withCheckedContinuation { waiters.append($0) }
+    timeout.cancel()
+  }
+
+  /// Suspend for about one display frame. A `Task.yield` on the main actor
+  /// can resume in the same run-loop turn, before Core Animation commits the
+  /// frame; a timer always fires in a later turn.
+  static func nextFrame() async {
+    try? await Task.sleep(for: .milliseconds(16))
+  }
+}
 
 /// Process-wide accessor for the task-mutation stack.
 ///
@@ -131,6 +195,62 @@ final class SeptenaServices {
     return enabledSectionKeys().contains(key)
   }
 
+  /// True once the mutators are bound (`bindWriteBoundary`).
+  private var writeBoundaryBound = false
+
+  /// Binds the mutators to the engine — the part of `start()` that makes a
+  /// mutation safe (an unbound `TaskMutator.create` traps). Idempotent and
+  /// cheap: assignments only, no fetch, no I/O. `start()` calls it; the
+  /// Septask launch also calls it BEFORE the first frame, so a tap on a row
+  /// or on + during the deferred start never reaches an unbound mutator
+  /// (docs/LAUNCH_PERF.md). Task writes made before `start()` finishes land
+  /// in the local store and the persistent sync outbox, which drains once
+  /// `TaskSyncEngine` runs.
+  func bindWriteBoundary() {
+    guard !writeBoundaryBound else { return }
+    writeBoundaryBound = true
+    LaunchTrace.spanSync("start.bindMutators") {
+      taskMutator.bind(ckEngine: ckEngine)
+      areasMutator.bind(ckEngine: ckEngine)
+      projectsMutator.bind(ckEngine: ckEngine)
+      // Lets project deletion cascade-clear the link on referencing tasks.
+      projectsMutator.taskMutator = taskMutator
+      // Lets area deletion detach its projects and tasks (never delete them).
+      areasMutator.taskMutator = taskMutator
+      areasMutator.projectsMutator = projectsMutator
+      // These three bind in BOTH profiles. They were the write set of
+      // Septask's Next page (trio toggles, intake nudges, the fast-break
+      // new-meal suggestion). Septask removed Next on 2026-11-19, so no
+      // Septask UI writes them now; they stay bound so any remaining shared
+      // write path (e.g. the in-app MCP dispatch) still reaches CloudKit.
+      // Moving them under the life-OS gate below is a separate decision.
+      checklistMutator.bind(ckEngine: ckEngine)
+      intakeMutator.bind(ckEngine: ckEngine)
+      nutritionMutator.bind(ckEngine: ckEngine)
+      // Everything below is life-OS-only. In the tasks-only profile (Septask)
+      // these mutators stay unbound — their write paths are never reachable
+      // from a task-only shell, and an unbound mutator dropping a write loudly
+      // beats one silently queueing changes the shell can't show.
+      // The provider stores (Oura / Withings / Readwise) also stay cold so a
+      // tasks-only process never talks to third-party APIs.
+      if !RuntimeProfile.current.isTasksOnly {
+        goalMutator.bind(ckEngine: ckEngine)
+        milestoneMutator.bind(ckEngine: ckEngine)
+        coachVoiceMutator.bind(ckEngine: ckEngine)
+        coachMessageMutator.bind(ckEngine: ckEngine)
+        gutMutator.bind(ckEngine: ckEngine)
+        activityMutator.bind(ckEngine: ckEngine)
+        symptomsMutator.bind(ckEngine: ckEngine)
+        medicationsMutator.bind(ckEngine: ckEngine)
+        groceryMutator.bind(ckEngine: ckEngine)
+        trainingMutator.bind(ckEngine: ckEngine)
+        OuraStore.shared.bind(ckEngine: ckEngine)
+        WithingsStore.shared.bind(ckEngine: ckEngine)
+        QuoteStore.shared.bind(ckEngine: ckEngine)
+      }
+    }
+  }
+
   /// Idempotent. First caller wires CKEngine's record provider / apply
   /// closures, binds the three mutators, and starts the engine.
   /// Subsequent callers await the same in-flight (or completed) work
@@ -219,44 +339,7 @@ final class SeptenaServices {
         }
       }
       #endif
-      taskMutator.bind(ckEngine: ckEngine)
-      areasMutator.bind(ckEngine: ckEngine)
-      projectsMutator.bind(ckEngine: ckEngine)
-      // Lets project deletion cascade-clear the link on referencing tasks.
-      projectsMutator.taskMutator = taskMutator
-      // Lets area deletion detach its projects and tasks (never delete them).
-      areasMutator.taskMutator = taskMutator
-      areasMutator.projectsMutator = projectsMutator
-      // These three bind in BOTH profiles. They were the write set of
-      // Septask's Next page (trio toggles, intake nudges, the fast-break
-      // new-meal suggestion). Septask removed Next on 2026-11-19, so no
-      // Septask UI writes them now; they stay bound so any remaining shared
-      // write path (e.g. the in-app MCP dispatch) still reaches CloudKit.
-      // Moving them under the life-OS gate below is a separate decision.
-      checklistMutator.bind(ckEngine: ckEngine)
-      intakeMutator.bind(ckEngine: ckEngine)
-      nutritionMutator.bind(ckEngine: ckEngine)
-      // Everything below is life-OS-only. In the tasks-only profile (Septask)
-      // these mutators stay unbound — their write paths are never reachable
-      // from a task-only shell, and an unbound mutator dropping a write loudly
-      // beats one silently queueing changes the shell can't show.
-      // The provider stores (Oura / Withings / Readwise) also stay cold so a
-      // tasks-only process never talks to third-party APIs.
-      if !RuntimeProfile.current.isTasksOnly {
-        goalMutator.bind(ckEngine: ckEngine)
-        milestoneMutator.bind(ckEngine: ckEngine)
-        coachVoiceMutator.bind(ckEngine: ckEngine)
-        coachMessageMutator.bind(ckEngine: ckEngine)
-        gutMutator.bind(ckEngine: ckEngine)
-        activityMutator.bind(ckEngine: ckEngine)
-        symptomsMutator.bind(ckEngine: ckEngine)
-        medicationsMutator.bind(ckEngine: ckEngine)
-        groceryMutator.bind(ckEngine: ckEngine)
-        trainingMutator.bind(ckEngine: ckEngine)
-        OuraStore.shared.bind(ckEngine: ckEngine)
-        WithingsStore.shared.bind(ckEngine: ckEngine)
-        QuoteStore.shared.bind(ckEngine: ckEngine)
-      }
+      bindWriteBoundary()
       // Demo-seed (screenshot) builds stay offline — never start sync.
       if !DemoSeedMode.isOn {
         #if !SEPTASK

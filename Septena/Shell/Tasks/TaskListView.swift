@@ -449,10 +449,9 @@ struct TaskListView: View {
   // Local semantic sorter — populates a "→ Suggested" chip on Inbox rows.
   @State private var suggestionEngine = SuggestionEngine.shared
   /// Per-row top filing suggestion — the "→ Suggested" capsule. Rebuilt by
-  /// `refreshFilingSuggestions()` synchronously on appear / filter-swap (so the
-  /// chip is on the first frame, not a beat late) and again inside `load()` on
-  /// passive syncs. Held in @State (not read live off the @Observable engine)
-  /// so the row chip renders reliably.
+  /// `refreshFilingSuggestions()` in the second pass of every `load()`, one
+  /// frame after the rows publish (docs/LAUNCH_PERF.md). Held in @State (not
+  /// read live off the @Observable engine) so the row chip renders reliably.
 
   /// done / (done + open) per project, mirroring the sidebar's aggregate so the
   /// project pie glyph in mixed-list headers (Today / Unscheduled) reads the
@@ -690,8 +689,18 @@ struct TaskListView: View {
       // type) builds a brand-new TaskListView, so `.onChange(of: filter)`
       // never fires and `model.calendarEvents` would otherwise stay empty until the
       // load lands — a visible layout jump.
-      refreshCalendarEvents()
-      Self.sweepAbandonedDraftsOnce(using: mutator, in: modelContext)
+      //
+      // Except on the launch frame (docs/LAUNCH_PERF.md): before the first
+      // task list frame is drawn, the agenda waits for `performLoad`'s second
+      // pass, so EventKit never sits in front of the first Today frame.
+      if LaunchPhase.shared.firstFrameDrawn { refreshCalendarEvents() }
+      // The draft sweep writes, so it waits for the first frame and for the
+      // services (a no-op wait after launch).
+      Task {
+        await LaunchPhase.shared.waitForFirstFrame()
+        await SeptenaServices.shared.start()
+        Self.sweepAbandonedDraftsOnce(using: mutator, in: modelContext)
+      }
       Task { await load() }
     }
     // CKSyncEngine fires .septenaTasksChanged at the end of every fetch
@@ -1538,7 +1547,9 @@ struct TaskListView: View {
 
   @ViewBuilder
   private var remindersRow: some View {
-    if filter == .today {
+    // Not on the launch frame: the Reminders mirror reads EventKit, so it
+    // mounts once the first Today frame is drawn (docs/LAUNCH_PERF.md).
+    if filter == .today && LaunchPhase.shared.firstFrameDrawn {
       // Pending Apple Reminders are unratified captures too — surface them in
       // the triage zone on Today, but only when something's actually pending
       // (no setup CTAs here, so an unconfigured user sees nothing).
@@ -3778,11 +3789,6 @@ struct TaskListView: View {
     } else {
       triageStorage = []
     }
-    // Rebuild the Inbox filing-suggestion snapshot (the "→ Suggested" capsule).
-    // Same call the synchronous on-appear / filter-swap path uses, so a passive
-    // re-read keeps the chips current; the engine's model build is memoized, so
-    // running it here and on appear trains at most once.
-    refreshFilingSuggestions()
     // Refresh dismissed state — banner reappears next day automatically.
     // Account-wide: `SettingsMirror` resolves the synced dismissal against the
     // device-local mirror, so a dismissal on any device lands here too.
@@ -3790,10 +3796,27 @@ struct TaskListView: View {
       let last = SettingsMirror.rolledInDismissedOn(context: modelContext)
       newTodosDismissed = (last == clock.today)
     }
-    refreshCalendarEvents()
     consumePendingTaskReveal()
     if filter == .today { LaunchTrace.milestone("launch.todayLoadDone") }
+    LaunchPhase.shared.noteRowsPublished()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
+    scheduleDecorationPass()
+  }
+
+  /// The second pass of a load (docs/LAUNCH_PERF.md): the rows are already
+  /// published, so the decorations that do not change which rows show wait
+  /// one frame. A newer load supersedes this one and runs its own pass.
+  private func scheduleDecorationPass() {
+    let generation = loadGeneration
+    Task {
+      await LaunchPhase.nextFrame()
+      guard generation == loadGeneration else { return }
+      // Rebuild the Inbox filing-suggestion snapshot (the "→ Suggested"
+      // capsule). The engine's model build is memoized, so a reload that
+      // changed nothing does not retrain it.
+      refreshFilingSuggestions()
+      refreshCalendarEvents()
+    }
   }
 
   /// Select and reveal a searched task only in the list that owns its route.

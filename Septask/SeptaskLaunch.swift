@@ -8,18 +8,30 @@ import UserNotifications
 // Everything here is idempotent — `services.start()` memoizes, the importer
 // no-ops with nothing pending — so whichever root comes up first wins and a
 // second call is harmless.
+//
+// Draw Today first (docs/LAUNCH_PERF.md): the first frame reads only the
+// local store. Before it, the launch binds the mutators (cheap, and it makes
+// a tap during the deferred start safe) and nothing else. Services start,
+// sync, imports, diagnostics and the badge wait for `LaunchPhase`, and
+// nothing awaits the network before the first frame. The wait is iOS-only:
+// the macOS AppKit shell draws its own list without `TaskListView`, so it
+// would only ever hit the timeout.
 @MainActor
 enum SeptaskLaunch {
   static func run(settings: SettingsStore) async {
     let services = SeptenaServices.shared
     let localStore = LocalStore.shared
 
+    services.bindWriteBoundary()
+    await waitForFirstFrameIfNeeded()
     await services.start()
-    SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-    SeptaskLegacyClaudeCleanup.runOnce()
-    SeptaskDiagnosticsCoordinator.shared.start()
-    BadgeManager.shared.start(context: localStore.container.mainContext)
-    Task {
+    LaunchTrace.spanSync("launch.deferredWork") {
+      SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+      SeptaskLegacyClaudeCleanup.runOnce()
+      SeptaskDiagnosticsCoordinator.shared.start()
+      BadgeManager.shared.start(context: localStore.container.mainContext)
+    }
+    Task(priority: .utility) {
       await services.absorbRemoteChanges()
       let context = localStore.container.mainContext
       settings.reloadFromMirror(context: context)
@@ -34,9 +46,12 @@ enum SeptaskLaunch {
   }
 
   /// Foreground refresh — the same work both roots do when their window
-  /// becomes active.
+  /// becomes active. On a cold launch iOS reports `.active` right away, so
+  /// this waits for the first frame too.
   static func activate() async {
     let services = SeptenaServices.shared
+    services.bindWriteBoundary()
+    await waitForFirstFrameIfNeeded()
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
     SeptaskDiagnosticsCoordinator.shared.start()
@@ -47,6 +62,14 @@ enum SeptaskLaunch {
     // the reliable place to advance fixed-schedule repeats. Idempotent —
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
+  }
+
+  /// iOS: hold deferred launch work until the first Today frame is drawn.
+  /// macOS: return at once (see the note above).
+  private static func waitForFirstFrameIfNeeded() async {
+    #if os(iOS)
+    await LaunchPhase.shared.waitForFirstFrame()
+    #endif
   }
 }
 
