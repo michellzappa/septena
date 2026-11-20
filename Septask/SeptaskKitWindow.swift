@@ -336,6 +336,8 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
       default: return false
       }
     }
+    // ⌘K also ticks a selected Get started step; nothing else applies to one.
+    if command == .toggleComplete { return list?.hasCompletableSelection ?? false }
     return list?.hasActionableSelection ?? false
   }
 

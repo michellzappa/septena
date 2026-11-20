@@ -113,12 +113,12 @@ enum MCPToolCatalog {
   static var tasks: [MCPTool] {
     [
       MCPTool(name: "tasks_list",
-              description: "List Septena tasks for a given view (today, triage, inbox, upcoming, anytime, completed). 'anytime' is the single home for open, dateless tasks (it absorbed the former 'someday' bucket). 'inbox' is the Inbox section shown on Today: tasks with no area and no project that are undated or due today, plus your proposals the user has not accepted ('triage' is the retired name for the same view). 'today' excludes your proposals the user has not accepted. Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
+              description: "List Septena tasks for a given view (today, inbox, upcoming, anytime, completed). 'today' is the whole Today page the user sees: the Inbox section first, then the filed tasks due today. 'inbox' is that Inbox section alone: unfiled tasks (no area or project) plus your proposals the user has not accepted. The user sees ONE Inbox; never describe it as two piles. 'anytime' = open tasks with no date that are not on Today. Each row carries `inbox: true` when it sits in the Inbox, and `daysOnToday: N` when it has carried over on Today undone for N days (the app darkens its checkbox; flag rows at 7+ as stuck). Returns {tasks, total, truncated}; truncated=true means more rows exist beyond limit.",
               inputSchema: ["type": "object", "properties": [
                 "view": ["type": "string",
-                         "enum": ["today", "triage", "inbox", "anytime", "upcoming", "completed"],
+                         "enum": ["today", "inbox", "anytime", "upcoming", "completed"],
                          "default": "today",
-                         "description": "Which task list to read. 'today' = ratified + due; 'inbox' = the Inbox section on Today ('triage' is an alias)."],
+                         "description": "Which task list to read. 'today' = the whole Today page, Inbox first; 'inbox' = the Inbox section alone."],
                 "limit": ["type": "integer", "minimum": 1, "maximum": 500, "default": 100],
               ]]),
       MCPTool(name: "tasks_get",

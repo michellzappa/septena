@@ -365,30 +365,28 @@ enum MCPDispatch {
   private static func tasksList(_ args: MCPArgs) -> Any {
     let view = args.string("view") ?? "today"
     let limit = args.int("limit") ?? 100
-    let filter: TaskFilter
+    // Today's page as the app draws it: ONE Inbox section (the triage band,
+    // then the Today rows with no area and no project), then the filed rows.
+    // Same rule as the hosted gateway (septena-mcp-gateway taskShared.ts).
+    // "triage" and "someday" are retired names, kept as aliases.
+    let all: [SeptenaTask]
     switch view {
     case "inbox", "triage":
-      // Today's Inbox section (`TaskInbox`): the triage band, then the Inbox
-      // members on Today — the backend connector's `inbox` view, same rule.
-      // "triage" is the retired name, kept as an alias.
-      let all = LocalCache.todayInboxTasks(in: ctx)
-      return [
-        "tasks": all.prefix(limit).map(taskJSON),
-        "total": all.count,
-        "truncated": all.count > limit,
-      ]
-    case "upcoming": filter = .upcoming
-    // "someday" is the retired bucket — accept it as an alias for "anytime"
-    // so existing agent calls keep working.
-    case "anytime", "someday": filter = .unscheduled
-    case "completed": filter = .logbook
-    default: filter = .today
+      // Today's Inbox section (`TaskInbox`), the backend connector's `inbox`
+      // view, same rule.
+      all = LocalCache.todayInboxTasks(in: ctx)
+    case "upcoming": all = LocalCache.tasks(in: ctx, filter: .upcoming)
+    case "anytime", "someday": all = LocalCache.tasks(in: ctx, filter: .unscheduled)
+    case "completed": all = LocalCache.tasks(in: ctx, filter: .logbook)
+    default:
+      let inbox = LocalCache.todayInboxTasks(in: ctx)
+      let inboxIds = Set(inbox.map(\.id))
+      all = inbox + LocalCache.tasks(in: ctx, filter: .today).filter { !inboxIds.contains($0.id) }
     }
     // Truncation signal so a caller knows there's more beyond `limit` (the
     // classic "scanned completed to 400, missed #481, concluded deleted"
     // misread). `total` is the full count for the view; `truncated` whether
     // the returned page leaves rows behind.
-    let all = LocalCache.tasks(in: ctx, filter: filter)
     return [
       "tasks": all.prefix(limit).map(taskJSON),
       "total": all.count,
@@ -726,6 +724,12 @@ enum MCPDispatch {
     if let c = t.completedAt { out["completedAt"] = c }
     if let n = t.notes { out["notes"] = n }
     if let r = t.recurrence { out["recurrence"] = recurrenceJSON(r) }
+    // Derived, absent when false / 0: `inbox` = the row sits in Today's Inbox
+    // section; `daysOnToday` = days carried over on Today undone (the
+    // darkened checkbox, `todayTenureFill`).
+    if t.isInTriageBand || (t.isOnToday && t.area == nil && t.project == nil) { out["inbox"] = true }
+    let days = t.daysOnToday()
+    if days > 0 { out["daysOnToday"] = days }
     return out
   }
 

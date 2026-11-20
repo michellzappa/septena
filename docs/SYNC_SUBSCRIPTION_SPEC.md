@@ -3,7 +3,9 @@
 **Status:** proposed 2026-11-19. Defaults marked *(default)* stand until mz
 overrules them in §11.
 **Decisions:** [ADR 0007](adr/0007-septena-is-the-task-app.md),
-[ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+[ADR 0002](adr/0002-own-backend-replaces-icloud.md),
+[ADR 0010](adr/0010-free-server-tier-with-limits.md) (free account with
+limits; changes §1, §3, §6, §7 on 2026-11-20).
 **Builds on:** the backend (`docs/SEPTASK_BACKEND.md`, auth in §7), the
 existing tip jar (`Septena/Shell/Settings/SupportStore.swift`,
 `SeptenaPlus.swift`, `Config/Septena.storekit`).
@@ -12,10 +14,11 @@ repo (`septena-site/docs/PRODUCT_DIRECTION.md`), not here.
 
 ## 1. Goal
 
-Septena (the task app) is free and complete on one device. One subscription
-pays for everything the server does: sync, agents that work while your
-devices sleep, links to other tools, and sharing. The rule is simple enough to
-say in one line: **the device is free, the server is paid.**
+Septena (the task app) is free and complete on one device. A free account
+adds the server with limits. One subscription lifts the limits: live sync on
+every device, full history, synced files, agents, links and sharing
+(ADR 0010). The rule in one line: **the device is free, the server is free
+with limits, paid lifts the limits.**
 
 ## 2. What exists and what is missing
 
@@ -48,22 +51,67 @@ say in one line: **the device is free, the server is paid.**
 
 ## 3. Free and paid
 
-| Free (on the device, no account) | Paid (needs the server) |
-|---|---|
-| Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Sync between devices, including the watch through the server |
-| Watch app paired to the phone *(default: the watch syncs through the phone, free)* | The hosted Claude connector (`mcp.septena.app`) |
-| The local MCP server on the Mac (Claude Code / Desktop on the same Mac) | Agents that run while every device sleeps (roadmap M2: scheduled runner, push questions) |
-| Import and export (plain JSON) | Linked projects: GitHub, Starlings, Linear (ADR 0003) |
-| | Shared projects with other people (ADR 0004) |
-| | Capture feeds (Gmail) and attachment storage in R2 |
+Three levels (ADR 0010). The earlier rule "the server is paid" is replaced.
+
+| Free, no account | Free account | Paid (€5 / €40) |
+|---|---|---|
+| Every task feature: lists, projects, areas, Today, Next, recurrence, fade, the composer, quick entry, widgets | Everything in the left column | Everything in the left column |
+| Watch app paired to the phone (syncs through the phone) | Server sync on 2 devices | Server sync on all devices, including the watch through the server |
+| The local MCP server on the Mac | Sync every few minutes (no live socket) | Live sync (socket) |
+| Import and export (plain JSON) | Change history: 30 days | Full change history, account restore *(pending a Cloudflare check)* |
+| Attachments on the device that added them | Recently Deleted: 30 days | Recently Deleted: 1 year |
+| | Attachments stay on the device that added them (no R2) | Attachments synced, 10 GB |
+| | Claude connector: read, plus a few writes a day | Claude connector without daily caps |
+| | Agents: a few runs a month | Agents within the run budget (ADR 0008) |
+| | Join shared projects | Create shared projects and invite |
+| | 1 linked project | Linked projects without a cap |
+| | Hosted AI: small monthly allowance *(if ADR 0009 is accepted)* | Hosted AI: larger allowance *(if ADR 0009 is accepted)* |
+
+Exact numbers ("a few", allowances) are set in the plan table (§6) and can
+change without a new ADR. Moving a free thing to paid still needs one.
 
 Rules:
 
 - A free user never needs an account. The app works from first launch with
-  no sign-in.
+  no sign-in. The account starts when the user adds a second device.
 - Nothing free today becomes paid later without a new ADR.
-- The cost line matches the price line: every paid feature costs us server
-  time or storage; no free feature does.
+- No limit touches the core task app. Tasks, lists, projects and areas have
+  no caps on any level.
+- A limit hides; it never deletes user rows. Export is free on every level.
+  Upgrading shows everything again.
+- New accounts start with a 14-day reverse trial: the full paid plan, then the
+  free account.
+
+### 3.1 History windows
+
+| History | Free account | Paid | How the limit works |
+|---|---|---|---|
+| Change log (`changes`, who changed what) | 30 days | 365 days | Pruned per plan by the daily alarm. A device offline past the window gets a full resync (exists). |
+| Logbook (completed tasks) | Last 90 days shown | All | Rows are kept on every level; reads page only within the window. |
+| Recently Deleted | 30 days | 1 year | User-facing restore window only. |
+| Deleted rows for sync (tombstones) | 90 days | 90 days | Same on every level: it protects sync, not a feature. |
+| Conversation turns | Kept | Kept | Not limited. |
+
+Pruning of the change log after a subscription lapses waits for the lapse
+period in §7 (12 months). It never runs on the day the subscription ends.
+
+### 3.2 Upsell moments
+
+An upsell appears only when the user meets a limit: once, with one tap, and
+it names what the user gets. All copy goes through the humanizer skill.
+
+| Moment | What the user sees |
+|---|---|
+| Third device signs in | The device works locally; one line says Plus syncs all devices. |
+| History reaches the window edge | A count of older changes, with one tap to Plus. |
+| A task with a file opens on another device | "1 file on your iPhone." Plus syncs files to all devices. |
+| An agent runs out of runs | The task says the agent resumes on the 1st, or now with Plus. The work waits. |
+| A free member shares a project | Joining is free; creating a share is the upsell. |
+| Connector write over the daily cap | The tool returns one line with the upgrade link. No nagging inside a conversation. |
+| Reverse trial ends | One notice listing what changes. No countdown screens. |
+
+Banned: timed nags, badges on paid features, blocked export, modals on
+launch.
 
 ## 4. Products
 
@@ -103,8 +151,17 @@ Rules:
 - App Store Server Notifications V2 go to `POST /v1/webhooks/apple`. The
   Worker verifies each signed payload and updates the row (renewal, expiry,
   refund, grace period, billing retry).
-- Every paid path checks the row in one place: a Hono middleware on `/v1`
-  sync routes, and the same check in the gateway before it reaches the DO.
+- Every server path checks the user's **plan** in one place: a Hono
+  middleware on `/v1` routes, and the same check in the gateway before it
+  reaches the DO. The plan is `paid` when any entitlement row is active,
+  `trial` during the reverse trial, else `free`.
+- **Plan table (ADR 0010).** One table in `backend/` maps each plan to its
+  limits: device count, sync mode (live / poll), change-log window, Logbook
+  window, Recently Deleted window, R2 attachments on/off and quota, connector
+  writes per day, agent runs per month, shared-project create, linked-project
+  count, hosted-AI allowance. The alarm's pruning, every history read and every
+  gate read this table. Apps fetch their limits from the server and never
+  hardcode them.
 - **Fail closed** on a missing or invalid row, with one exception: grace
   period and billing retry count as active (Apple's own rule).
 - A `grant` row (no expiry or a set expiry) covers mz, testers, and press.
@@ -217,10 +274,13 @@ Run from `~/Dev/septena/backend` after this code is deployed.
 ## 7. App behavior
 
 - **Active:** sync runs, the connector works, agents run.
-- **Never subscribed:** the app is the full free app. Paid features show one
-  quiet entry point each, never a modal on launch.
-- **Lapsed:** sync stops; local data stays on every device and stays fully
-  editable. The server keeps the data *(default: 12 months)*, then mails a
+- **No account:** the app is the full free app on one device. Server
+  features show one quiet entry point each, never a modal on launch.
+- **Free account:** sync runs within the free limits (§3). At a limit the app
+  shows the upsell for that moment (§3.2) and nothing else.
+- **Lapsed:** the account falls back to the free limits. The two most recently
+  used devices keep syncing; the others keep their local data and stop
+  syncing. Local data stays on every device and stays fully editable. The server keeps the data *(default: 12 months)*, then mails a
   warning before it deletes. Re-subscribing resumes sync with the server
   copy as the base and pushes local edits on top (the normal op queue).
 - The app never deletes local data because a subscription ended.
@@ -249,6 +309,7 @@ to the backend.
 |---|---|---|
 | P0 | Entitlement row, Apple JWS verify, webhook, `grant` rows, middleware on `/v1` and the gateway. mz has a `grant`. | A user without a row gets 402 on sync; mz syncs. |
 | P1 | Products in App Store Connect, StoreKit purchase + restore in the task app, account link, paywall sheet, lapsed state. Remove the tip jar from the task app. | A sandbox purchase turns on sync; a sandbox expiry stops it, and local data stays. |
+| P1.5 | Plan table and free-account limits (ADR 0010): device count, poll-only sync, history windows, local-only attachments, connector and agent caps, reverse trial, upsell moments (§3.2). | A free account syncs 2 devices; a third device stays local and shows the upsell; a paid account lifts every limit. |
 | P2 | Free-mode audit: every free feature works with no account and no network. | Fresh install, airplane mode, every free feature works. |
 | P3 | Stripe for the web client. | A web purchase turns on sync on iPhone. |
 
@@ -269,3 +330,6 @@ before any public release that uses the backend.
 | Tip jar in the task app | Removed |
 | Early TestFlight access as a subscriber perk | Yes |
 | Does the code stay open source? | Yes; the paid product is the hosted service |
+| Free server tier | Decided 2026-11-20: yes, a free account with limits (ADR 0010) |
+| Attachments on the free account | Decided 2026-11-20: none on the server; files stay on the device that added them |
+| Limit values ("a few" connector writes, agent runs, hosted-AI allowance) | Open: set in the plan table before P1.5 |
