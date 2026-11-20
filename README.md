@@ -154,7 +154,7 @@ Production CloudKit API token's URL Redirect: `https://mcp.septena.app/auth/appl
 
 ## Agent loop (api.septena.app only)
 
-The task connector at `api.septena.app/mcp` serves four tools the CloudKit
+The task connector at `api.septena.app/mcp` serves five tools the CloudKit
 connector does not have (`src/shadow/agent.ts`, app repo ADR 0008):
 
 | Tool | Does |
@@ -163,6 +163,7 @@ connector does not have (`src/shadow/agent.ts`, app repo ADR 0008):
 | `tasks_release(id, agent, why)` | Ends the agent's own claim; `why` goes to the log. |
 | `tasks_agent_events(since?, limit?)` | Pointer events with a cursor: `assigned`, `user_turn`, `stopped`, `resumed`, `paused`, `unpaused`. |
 | `tasks_activity(id?, limit?)` | The change log in words, with reasons. |
+| `tasks_history(id, limit?)` | One task's changes, newest first: who (you or Claude), the op, and each field's before and after. |
 
 The rules are enforced in `TaskStore`, so they hold for every caller:
 

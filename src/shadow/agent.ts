@@ -36,6 +36,10 @@ export const zAgentArgs = {
     id: zId.optional(),
     limit: z.number().int().min(1).max(200).optional(),
   }),
+  tasks_history: z.object({
+    id: zId,
+    limit: z.number().int().min(1).max(200).optional(),
+  }),
 };
 export type AgentToolName = keyof typeof zAgentArgs;
 export const AGENT_TOOL_NAMES = Object.keys(zAgentArgs) as AgentToolName[];
@@ -104,6 +108,21 @@ export const AGENT_TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: "tasks_history",
+    description:
+      "One task's change history, newest first, with the values before and after each change. `actor` is " +
+      "\"you\" for the user's own edits in the app and \"Claude\" for changes made through this connector. " +
+      "`changes` maps each changed field to [before, after]; long values are cut short.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Task id." },
+        limit: { type: "integer", minimum: 1, maximum: 200, description: "Default 50." },
+      },
+      required: ["id"],
+    },
+  },
 ];
 
 /// The holder string stored on the claim: the agent's name plus its pairing.
@@ -146,7 +165,24 @@ export async function runAgentTool(
       const rows = await store.history(null, (args.id as string | undefined) ?? null, null, (args.limit as number | undefined) ?? 50);
       return { activity: rows.map(describeChange) };
     }
+    case "tasks_history": {
+      const rows = await store.history(null, args.id as string, null, (args.limit as number | undefined) ?? 50);
+      return { id: args.id, history: rows.map(historyEntry) };
+    }
   }
+}
+
+/// One change log row for tasks_history: who, what, and before/after values.
+function historyEntry(e: ChangeEntry) {
+  const actor = isAgentActor(e.actor) ? "Claude" : e.actor.startsWith("app:") ? "you" : e.actor;
+  return {
+    at: e.at,
+    actor,
+    op: e.op,
+    entity: e.entity === "task" ? undefined : e.entity,
+    changes: e.diff ?? {},
+    why: e.reason ?? undefined,
+  };
 }
 
 const REFUSAL_RULES: Record<string, string> = {
