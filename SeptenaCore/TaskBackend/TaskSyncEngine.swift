@@ -1040,6 +1040,8 @@ final class TaskSyncEngine {
     disconnectSocket()
     await client.signOut()
     signedIn = TaskBackendClient.hasSession
+    // The launch snapshot shows this account's Today (#82).
+    TodaySnapshotStore.invalidate()
   }
 
   /// Backend user id of the last sign-in on this device.
@@ -1093,6 +1095,8 @@ final class TaskSyncEngine {
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     for a in (try? context.fetch(FetchDescriptor<AreaEntity>())) ?? [] { context.delete(a) }
     _ = StoreHealth.save(context, op: "taskSync.wipe")
+    // Account switch / delete: the launch snapshot holds the old rows (#82).
+    TodaySnapshotStore.invalidate()
     store()?.deleteEverything()
     since = 0
     settingsReady = false
