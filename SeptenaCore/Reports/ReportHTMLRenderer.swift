@@ -43,7 +43,7 @@ public enum ReportHTMLRenderer {
       \(sectionsHTML)
       <footer class="foot">
         <p>Aggregated trends only — no individual entries are shared. Generated on the owner's device. This view can be revoked at any time.</p>
-        <p class="gen">Made with <a href="https://www.septena.app">Septena</a> — one private app for everything you track. <a href="https://www.septena.app">www.septena.app</a></p>
+        <p class="gen">Made with <a href="https://www.septena.app">Septena Life</a> — one private app for everything you track. <a href="https://www.septena.app">www.septena.app</a></p>
       </footer>
     </main>
     </body>
@@ -59,14 +59,14 @@ public enum ReportHTMLRenderer {
   private static let socialMeta = """
   <meta name="robots" content="noindex, nofollow">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Septena">
-  <meta property="og:title" content="A private health report, shared with Septena">
-  <meta property="og:description" content="An aggregate, read-only summary — shared securely from Septena, one private app for everything you track.">
+  <meta property="og:site_name" content="Septena Life">
+  <meta property="og:title" content="A private health report, shared with Septena Life">
+  <meta property="og:description" content="An aggregate, read-only summary — shared securely from Septena Life, one private app for everything you track.">
   <meta property="og:image" content="https://www.septena.app/opengraph-image">
   <meta property="og:url" content="https://www.septena.app">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="A private health report, shared with Septena">
-  <meta name="twitter:description" content="An aggregate, read-only summary — shared securely from Septena.">
+  <meta name="twitter:title" content="A private health report, shared with Septena Life">
+  <meta name="twitter:description" content="An aggregate, read-only summary — shared securely from Septena Life.">
   <meta name="twitter:image" content="https://www.septena.app/opengraph-image">
   <meta name="theme-color" content="#f4f5f7">
   """

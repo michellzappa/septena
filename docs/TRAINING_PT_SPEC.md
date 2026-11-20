@@ -272,4 +272,4 @@ critical-path dependency for equipment-aware prescription.
 - Review: `SessionCompleteSheet.swift`, `MuscleVolume` (MuscleBalanceView.swift)
 - Settings + goals: `TrainingPlugin.swift` (`TrainingDetailContent`,
   `suggestedGoals`, `aimMetrics`)
-- MCP parity: in-app `SeptenaCore/MCP/` **and** `../septena-mcp-gateway`
+- MCP parity: in-app `SeptenaCore/MCP/` **and** `backend/`

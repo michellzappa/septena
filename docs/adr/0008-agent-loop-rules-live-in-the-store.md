@@ -73,6 +73,6 @@ shapes, with a fixed `mcp:claude` actor and no claim.
 ## Links
 
 - `docs/TASK_FACTORY_SPEC.md` §5, §10
-- `../septena-mcp-gateway/src/store/TaskStore.ts` (`claim`, `release`,
+- `backend/src/store/TaskStore.ts` (`claim`, `release`,
   `agentRefusal`, `agentEvents`)
-- `../septena-mcp-gateway/src/shadow/agent.ts`
+- `backend/src/shadow/agent.ts`

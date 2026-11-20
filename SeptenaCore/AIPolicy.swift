@@ -27,7 +27,7 @@ enum AIMode: String, CaseIterable, Codable, Sendable {
     case .auto:
       return "On-device first, escalating to Apple’s Private Cloud Compute or your own Claude only when a step needs more. Recommended."
     case .useMyClaude:
-      return "Prefer your connected Claude for the thinking — your account, your data. Septena still never runs AI on your tasks."
+      return "Prefer your connected Claude for the thinking — your account, your data. \(AppDisplayName.current) still never runs AI on your tasks."
     }
   }
 }

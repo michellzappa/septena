@@ -15,15 +15,9 @@ import SwiftUI
 // warning adds a light wash. The AppKit counterpart is `KitNoticeCell`
 // (Septask/SeptaskKitNotice.swift).
 
-/// What a notice is about. Drives the glyph tint and the fill.
-enum TaskListNoticeKind {
-  /// A fact the user can read and dismiss (tasks rolled into Today).
-  case info
-  /// Something the user should do (sign in).
-  case actionNeeded
-  /// Something went wrong (sync refused changes).
-  case warning
-}
+/// What a notice is about. One enum for both shells: `TaskNoticeKind`
+/// (TaskNotices.swift), where which notices show is decided.
+typealias TaskListNoticeKind = TaskNoticeKind
 
 struct TaskListNotice<Actions: View>: View {
   let kind: TaskListNoticeKind

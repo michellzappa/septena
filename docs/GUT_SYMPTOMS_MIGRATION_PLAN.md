@@ -131,7 +131,7 @@ there's a rollback window).
 - In-app: `MCPToolCatalog.swift:392` + `MCPDispatch.swift:894` — `gut_event_log`
   loses `blood`, `volume`?(keep volume), `discomfortLevel/Start/End`;
   `gut_events_list` output drops `blood`/`discomfortLevel`. `volume` stays.
-- Hosted gateway (`../septena-mcp-gateway`): same edits to the gut tools.
+- Hosted gateway (`backend/`): same edits to the gut tools.
 - Regenerate `skill.md` from `SectionRegistry.fullSkillMarkdown()` so the gut
   skill brief no longer advertises blood/discomfort.
 

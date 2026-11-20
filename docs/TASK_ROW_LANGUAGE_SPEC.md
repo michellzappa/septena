@@ -104,7 +104,7 @@ All task rows descend from a shared skeleton. Files:
 ### 2.3 AI / MCP surface
 
 Two servers, edited in lockstep (`CLAUDE.md`): in-app `LocalMCPServer`
-(`SeptenaCore/MCP/`) and the hosted gateway (`../septena-mcp-gateway`).
+(`SeptenaCore/MCP/`) and the hosted gateway (`backend/`).
 
 - **`tasks_create`** (`MCPToolCatalog.swift:82`) — inputs: `title`, `today`,
   `scheduled`, `deadline`, `area`, `project`, `notes`. **No `proposed` /
@@ -152,29 +152,23 @@ agent sort pill  ▸  date / today chip  ▸  (recurrence · notes glyphs)
 - **Date / today chip** — `trailingDate` as today, but it is now the *only* home
   for "today" (see §3.3). Overdue keeps its red treatment (coexists with an
   agent pill as a small flag glyph — §8).
-- **Today tenure fill (unifies arrived-today + carry-age).** The temporal axis
-  "how long has this been on Today" is one in-place treatment of the checkbox
-  itself (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`), not two
-  devices in two places. It folds together what used to be split — the amber
-  *box fill* for "arrived today" (`showsArrivedToday`, day 0) and a separate
-  *carry-age ring* (day 1+) — into a single treatment where the interior
-  fill opacity changes and, in language v2, the open outline warms in sync
-  (no shape changes). The interior tints `Theme.todayAccent` gold,
-  transparent on the arrival day and a seventh more opaque each carried
-  day, capped at ~70% opacity so an aged task never reads as a
-  solid/done box. It shows only once earned — a task that has carried over undone
-  (`daysOnToday ≥ 1`); hand-added / pinned / just-arrived-today / duplicated
-  rows stay transparent (`daysOnToday` cannot predate `created`). The box's amber *stroke* still means "this is on Today" (presence)
-  on off-Today surfaces (`isToday`); on the Today/Next surfaces the aging tint
-  fades in the outline alongside the fill.
+- **Today tenure fade (2026-11-20, replaces the tenure fill).** "How long
+  has this been on Today" is one treatment of the *row*, not the checkbox
+  (`SeptenaTask.todayTenureFill` → `TaskFade.rowOpacity`). From the first
+  carried day (`daysOnToday ≥ 1`) the title, meta and trailing cluster fade a
+  seventh of the way each day, down to `TaskFade.minOpacity` (0.55) at a week.
+  The checkbox never fades and never tints: it stays the target. Hand-added /
+  pinned / just-arrived rows stay at full strength. This is the visible half of
+  the fading list (`docs/TASK_FADE_SPEC.md` §4): with the fade fields the same
+  curve counts down to the task leaving the list. The earlier gray tenure fill
+  of the box interior is gone. The box's amber *stroke* still means "this is on
+  Today" on off-Today surfaces (`isToday`).
 
 ### 3.3 Color rules (the cleanup)
 
-- **Remove `isToday` tinting from the checkbox fill.** The checkbox stays gray
-  unless Today tenure (carried-over days) should be visually expressed: in
-  language v2, the fill opacity (and the open outline) warm in sync with
-  `tenureFill`. Today/overdue itself is still communicated via the right-side
-  chip.
+- **Remove `isToday` tinting from the checkbox fill.** The checkbox stays gray.
+  Today tenure fades the row instead (§3.2). Today/overdue itself is still
+  communicated via the right-side chip.
 - The only colors on a row: section/area **identity** accents (the dot, the sort
   pill's destination tint) and the **temporal** chip (today/overdue). Nothing
   else encodes state with color.
@@ -327,7 +321,8 @@ Ship behind a feature flag; one green build via `scripts/build.sh`.
   which unifies arrived-today (day 0) and carry-age (day 1+) into one in-place
   treatment — only the fill *opacity* grows with days-on-Today (transparent →
   ~70%), the shape never changes. The box's amber *stroke* is presence-only
-  (`isToday`, off-Today surfaces).
+  (`isToday`, off-Today surfaces). **Superseded again 2026-11-20:** the row
+  fades instead of the box filling (§3.2).
 - **Awaiting state.** Dropped from v1. Re-add the dimmed box later if "don't poke
   this, it's mid-processing" proves needed.
 - **Proposal-source override.** Is the per-connection "proposal" default

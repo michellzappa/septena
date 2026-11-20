@@ -68,7 +68,7 @@ struct CorrelationsHomepageView: View {
         if let report = markdownReport(for: r) {
           HStack {
             Spacer()
-            ShareLink(item: report, preview: SharePreview("Septena Correlations")) {
+            ShareLink(item: report, preview: SharePreview("Septena Life Correlations")) {
               Label("Share report", systemImage: "square.and.arrow.up")
                 .font(.footnote.weight(.medium))
             }

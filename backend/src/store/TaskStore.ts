@@ -1,0 +1,854 @@
+import { DurableObject } from "cloudflare:workers";
+import type { Env } from "../env.js";
+import {
+  ENTITIES,
+  ENTITY_NAMES,
+  MAX_USER_ATTACHMENT_BYTES,
+  addMissingColumnsSQL,
+  createTableSQL,
+  decodeRow,
+  encodeValue,
+  type EntityName,
+  type EntitySpec,
+} from "./columns.js";
+import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
+import type { EntitlementRow } from "../entitlement/entitlement.js";
+
+/// Per changed field: [before, after]. `null` means absent / cleared.
+export type ChangeDiff = Record<string, [unknown, unknown]>;
+
+export interface ChangeEntry {
+  rev: number;
+  entity: string;
+  id: string;
+  op: string;
+  fields: string[] | null;
+  diff: ChangeDiff | null;
+  actor: string;
+  at: string;
+  /// Why the writer made this change, when it said (agent writes).
+  reason: string | null;
+}
+
+/// Why a claim was refused. Every value is a rule the agent must respect,
+/// not a transient error to retry.
+export type ClaimRefusal =
+  | "not_found" | "closed" | "terminal" | "stopped" | "paused"
+  | "your_turn" | "held" | "budget";
+
+export type ClaimResult =
+  | { ok: true; holder: string; claimUntil: string; renewed: boolean; runsSinceUser: number }
+  | { ok: false; reason: ClaimRefusal; holder?: string; claimUntil?: string };
+
+/// One thing an agent may need to react to. A pointer, never content: the
+/// agent reads the task itself, so text in a task can never arrive as an
+/// order through this feed.
+export interface AgentEvent {
+  rev: number;
+  kind: "assigned" | "user_turn" | "stopped" | "resumed" | "paused" | "unpaused";
+  taskId: string | null;
+  at: string;
+}
+
+/// Agent writers (the MCP connector) carry an `mcp:` actor. Everything else
+/// (`app:<client>`) is the human.
+export const isAgentActor = (actor: string) => actor.startsWith("mcp:");
+
+/// Lease bounds for a claim. An agent that stops writing loses the task when
+/// the lease ends; the maximum keeps a crashed run from holding it for long.
+export const CLAIM_TTL_DEFAULT_MS = 30 * 60 * 1000;
+export const CLAIM_TTL_MAX_MS = 4 * 60 * 60 * 1000;
+/// Fresh claims allowed between two human turns on one task.
+export const AGENT_RUN_BUDGET = 5;
+
+const LOG_TEXT_MAX = 4_000;
+
+/// Long text (notes, artifacts) is cut in the log; the row itself keeps it.
+function clipForLog(v: unknown): unknown {
+  if (typeof v === "string" && v.length > LOG_TEXT_MAX) return `${v.slice(0, LOG_TEXT_MAX)}…`;
+  if (v !== null && typeof v === "object") {
+    const s = JSON.stringify(v);
+    if (s.length > LOG_TEXT_MAX) return `${s.slice(0, LOG_TEXT_MAX)}…`;
+  }
+  return v;
+}
+
+// TaskStore — one Durable Object per user, the single writer for that user's
+// task data (docs/SEPTASK_BACKEND.md in the app repo, §4–§6).
+//
+// The DO serializes every call, so `rev` is a total order with no gaps visible
+// to a reader: a pull never sees rev N+1 committed before rev N. Conflicts are
+// field-level last-writer-wins by arrival order, because an upsert writes only
+// the fields the push carried. A deleted row stays deleted (§6.4).
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TOMBSTONE_TTL_MS = 90 * DAY_MS;
+const CLIENT_OP_TTL_MS = 30 * DAY_MS;
+const CHANGE_LOG_TTL_MS = 365 * DAY_MS;
+const MAX_PULL = 1_000;
+const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
+
+const TURN_COLUMNS = [
+  "role", "step", "provider", "confidence", "question", "options",
+  "chosen", "otherText", "inReplyTo", "note", "ts",
+] as const;
+
+/// A decoded row as it crosses the RPC boundary: JSON values only.
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+export type Row = { [key: string]: Json };
+
+/// A turns row as the wire carries it: nulls dropped, options parsed. Shared
+/// by pull and the MCP preview's reads.
+function decodeTurnRow(raw: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = { ...raw };
+  for (const [k, v] of Object.entries(row)) if (v === null) delete row[k];
+  if (typeof row.options === "string") row.options = JSON.parse(row.options);
+  return row;
+}
+
+/// An open task with a conversation, as the agent queue reads it.
+export type ConvoCandidate = {
+  id: string; title: string | null; confirmedIntent: string | null;
+  assignee: string | null; endState: string | null;
+  stoppedAt: string | null; claimedBy: string | null; claimUntil: string | null;
+  lastProviderConfidence: number | null; awaitsHuman: number | null;
+};
+
+export interface PushOutcome {
+  result: PushResult;
+  /// Attachments this push deleted. The Worker removes their bytes from R2.
+  purgedAttachmentIds: string[];
+}
+
+export class TaskStore extends DurableObject<Env> {
+  private sql: SqlStorage;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    ctx.blockConcurrencyWhile(async () => {
+      this.migrate();
+      if ((await ctx.storage.getAlarm()) === null) {
+        await ctx.storage.setAlarm(Date.now() + DAY_MS);
+      }
+    });
+    // Keep-alive pings are answered without waking the object.
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
+  private migrate(): void {
+    this.migrateTables();
+    // The change log gained per-field before/after values after it shipped.
+    const changeCols = new Set(
+      this.sql.exec<{ name: string }>("PRAGMA table_info(changes)").toArray().map((r) => r.name),
+    );
+    if (!changeCols.has("diff")) this.sql.exec("ALTER TABLE changes ADD COLUMN diff TEXT");
+    if (!changeCols.has("reason")) this.sql.exec("ALTER TABLE changes ADD COLUMN reason TEXT");
+  }
+
+  private migrateTables(): void {
+    for (const name of ENTITY_NAMES) {
+      const spec = ENTITIES[name];
+      this.sql.exec(createTableSQL(spec));
+      const existing = new Set(
+        this.sql.exec<{ name: string }>(`PRAGMA table_info(${spec.table})`).toArray().map((r) => r.name),
+      );
+      for (const stmt of addMissingColumnsSQL(spec, existing)) this.sql.exec(stmt);
+    }
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS turns (
+        taskId TEXT NOT NULL, seq INTEGER NOT NULL,
+        role TEXT NOT NULL, step TEXT NOT NULL, provider TEXT, confidence REAL,
+        question TEXT, options TEXT, chosen TEXT, otherText TEXT,
+        inReplyTo INTEGER, note TEXT, ts TEXT NOT NULL,
+        rev INTEGER NOT NULL, updatedAt TEXT NOT NULL,
+        PRIMARY KEY (taskId, seq)
+      );
+      CREATE INDEX IF NOT EXISTS turns_rev ON turns(rev);
+      CREATE TABLE IF NOT EXISTS changes (
+        rev INTEGER PRIMARY KEY, entity TEXT NOT NULL, id TEXT NOT NULL,
+        op TEXT NOT NULL, fields TEXT, clientOpId TEXT, actor TEXT NOT NULL, at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS changes_row ON changes(entity, id, rev);
+      CREATE TABLE IF NOT EXISTS client_ops (
+        clientOpId TEXT PRIMARY KEY, result TEXT NOT NULL, at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        hash TEXT PRIMARY KEY, createdAt INTEGER NOT NULL, expiresAt INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS entitlements (
+        id TEXT PRIMARY KEY, source TEXT NOT NULL, productId TEXT, expiresAt INTEGER,
+        originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
+        signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
+      );
+    `);
+  }
+
+  // ---- rev counter ----
+
+  private meta(key: string): number {
+    const row = this.sql.exec<{ value: number }>("SELECT value FROM meta WHERE key = ?", key).toArray()[0];
+    return row?.value ?? 0;
+  }
+
+  private setMeta(key: string, value: number): void {
+    this.sql.exec("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value);
+  }
+
+  private nextRev(): number {
+    const rev = this.meta("rev") + 1;
+    this.setMeta("rev", rev);
+    return rev;
+  }
+
+  /// The writer's stated reason for the push in progress (push sets it).
+  private reason: string | null = null;
+
+  private log(
+    rev: number, entity: string, id: string, op: string, fields: string[] | null,
+    clientOpId: string | null, actor: string, at: string, diff: ChangeDiff | null = null,
+  ): void {
+    this.sql.exec(
+      "INSERT INTO changes (rev, entity, id, op, fields, clientOpId, actor, at, diff, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      rev, entity, id, op, fields ? JSON.stringify(fields) : null, clientOpId, actor, at,
+      diff && Object.keys(diff).length ? JSON.stringify(diff) : null, this.reason,
+    );
+  }
+
+  /// Before/after per field for the change log. `before` is the decoded row
+  /// (or null for an insert), `after` the pushed values. Only fields whose
+  /// value actually changed are kept; long text is cut to keep the log small.
+  private diffFor(before: Record<string, unknown> | null, after: Record<string, unknown>): ChangeDiff {
+    const out: ChangeDiff = {};
+    for (const [name, next] of Object.entries(after)) {
+      const prev = before ? (before[name] ?? null) : null;
+      if (JSON.stringify(prev) === JSON.stringify(next ?? null)) continue;
+      out[name] = [clipForLog(prev), clipForLog(next ?? null)];
+    }
+    return out;
+  }
+
+  /// History of one row (newest first), or of the whole store when `id` is
+  /// omitted. Paged by rev: pass the smallest rev seen as `before`.
+  history(entity: string | null, id: string | null, before: number | null, limit: number): ChangeEntry[] {
+    const where: string[] = [];
+    const args: (string | number)[] = [];
+    if (entity) { where.push("entity = ?"); args.push(entity); }
+    if (id) {
+      // Turns are logged as `taskId:seq`; a task's history includes them.
+      where.push("(id = ? OR id LIKE ?)"); args.push(id, `${id}:%`);
+    }
+    if (before !== null) { where.push("rev < ?"); args.push(before); }
+    const sql = `SELECT rev, entity, id, op, fields, diff, actor, at, reason FROM changes${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY rev DESC LIMIT ?`;
+    return this.sql.exec<{ rev: number; entity: string; id: string; op: string; fields: string | null; diff: string | null; actor: string; at: string; reason: string | null }>(sql, ...args, limit)
+      .toArray()
+      .map((r) => ({
+        rev: r.rev, entity: r.entity, id: r.id, op: r.op, actor: r.actor, at: r.at, reason: r.reason,
+        fields: r.fields ? (JSON.parse(r.fields) as string[]) : null,
+        diff: r.diff ? (JSON.parse(r.diff) as ChangeDiff) : null,
+      }));
+  }
+
+  // ---- push ----
+
+  push(ops: Op[], actor: string, reason: string | null = null): PushOutcome {
+    const purgedAttachmentIds: string[] = [];
+    this.reason = reason;
+    let results: OpResult[];
+    try {
+      results = this.ctx.storage.transactionSync(() => ops.map((op) => {
+        const seen = this.sql.exec<{ result: string }>("SELECT result FROM client_ops WHERE clientOpId = ?", op.clientOpId).toArray()[0];
+        if (seen) return JSON.parse(seen.result) as OpResult;
+        const result = this.apply(op, actor, purgedAttachmentIds);
+        this.sql.exec("INSERT INTO client_ops (clientOpId, result, at) VALUES (?, ?, ?)", op.clientOpId, JSON.stringify(result), Date.now());
+        return result;
+      }));
+    } finally {
+      this.reason = null;
+    }
+    const appliedThrough = this.meta("rev");
+    if (results.some((r) => r.status === "applied")) this.broadcast(appliedThrough);
+    return { result: { appliedThrough, results }, purgedAttachmentIds };
+  }
+
+  private apply(op: Op, actor: string, purgedAttachmentIds: string[]): OpResult {
+    const now = new Date().toISOString();
+    if (isAgentActor(actor)) {
+      const refusal = this.agentRefusal(op);
+      if (refusal) return { clientOpId: op.clientOpId, status: "rejected", reason: refusal };
+    }
+    if (op.op === "appendTurn") return this.appendTurn(op.clientOpId, op.taskId, op.turn, actor, now);
+
+    const spec: EntitySpec = ENTITIES[op.entity];
+    const row = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ?`, op.id).toArray()[0];
+
+    if (op.op === "delete") {
+      if (!row || row.deletedAt) return { clientOpId: op.clientOpId, status: "noop" };
+      const rev = this.nextRev();
+      this.sql.exec(`UPDATE ${spec.table} SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?`, now, rev, now, op.id);
+      // The deleted row's last values, so the log can show (and a later
+      // tool can restore) what was removed.
+      const gone = decodeRow(spec, row as Record<string, unknown>);
+      const snapshot: ChangeDiff = {};
+      for (const name of Object.keys(spec.columns)) {
+        if (gone[name] !== null && gone[name] !== undefined && gone[name] !== false) snapshot[name] = [clipForLog(gone[name]), null];
+      }
+      this.log(rev, op.entity, op.id, "delete", null, op.clientOpId, actor, now, snapshot);
+      if (op.entity === "attachment") purgedAttachmentIds.push(op.id);
+      if (op.entity === "task") {
+        this.tombstoneConvo(op.id, now);
+        purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
+      }
+      return { clientOpId: op.clientOpId, status: "applied", rev };
+    }
+
+    const names = Object.keys(op.fields);
+    if (row?.deletedAt) {
+      const rev = this.nextRev();
+      this.log(rev, op.entity, op.id, "dropped", names, op.clientOpId, actor, now, this.diffFor(null, op.fields));
+      return { clientOpId: op.clientOpId, status: "dropped", rev, reason: "deleted" };
+    }
+    if (names.length === 0) return { clientOpId: op.clientOpId, status: "noop" };
+
+    if (!row) {
+      const missing = spec.requiredOnInsert.filter((f) => op.fields[f] === undefined || op.fields[f] === null);
+      if (missing.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `missing_required:${missing.join(",")}` };
+      if (op.entity === "convo" && !this.liveTask(op.id)) return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
+      if (op.entity === "attachment") {
+        const quota = this.checkQuota(op.id, op.fields.byteCount as number);
+        if (quota) return { clientOpId: op.clientOpId, status: "rejected", reason: quota };
+      }
+    } else {
+      const locked = spec.updatable ? names.filter((f) => !spec.updatable!.includes(f)) : [];
+      if (locked.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `immutable:${locked.join(",")}` };
+      const cleared = spec.requiredOnInsert.filter((f) => op.fields[f] === null);
+      if (cleared.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `required:${cleared.join(",")}` };
+    }
+
+    const rev = this.nextRev();
+    const cols = Object.entries(spec.columns);
+    if (!row) {
+      const insertCols = cols.filter(([n, c]) => op.fields[n] !== undefined || c.dflt !== undefined);
+      const values = insertCols.map(([n, c]) => (op.fields[n] !== undefined ? encodeValue(c, op.fields[n]) : c.dflt ?? null));
+      const colList = insertCols.map(([n]) => `"${n}"`).concat(["id", "rev", "updatedAt"]).join(", ");
+      const marks = insertCols.map(() => "?").concat(["?", "?", "?"]).join(", ");
+      this.sql.exec(`INSERT INTO ${spec.table} (${colList}) VALUES (${marks})`, ...values, op.id, rev, now);
+    } else {
+      const sets = names.map((n) => `"${n}" = ?`).concat(["rev = ?", "updatedAt = ?"]).join(", ");
+      const values = names.map((n) => encodeValue(spec.columns[n], op.fields[n]));
+      this.sql.exec(`UPDATE ${spec.table} SET ${sets} WHERE id = ?`, ...values, rev, now, op.id);
+    }
+    const before = row ? decodeRow(spec, row as Record<string, unknown>) : null;
+    this.log(rev, op.entity, op.id, "upsert", names, op.clientOpId, actor, now, this.diffFor(before, op.fields));
+    return { clientOpId: op.clientOpId, status: "applied", rev };
+  }
+
+  /// The rules an agent write must pass, enforced here so no connector can
+  /// skip them: the stop is the human's alone, and a stopped task takes no
+  /// agent writes at all.
+  private agentRefusal(op: Op): string | null {
+    if (op.op === "upsert" && op.entity === "convo" && "stoppedAt" in op.fields) return "human_only:stoppedAt";
+    if (op.op === "upsert" && op.entity === "setting" && op.id === "agentsPaused") return "human_only:agentsPaused";
+    const taskId = op.op === "appendTurn" ? op.taskId
+      : (op.entity === "task" || op.entity === "convo") ? op.id
+      : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
+      : null;
+    if (taskId && this.convoStopped(taskId)) return "stopped";
+    return null;
+  }
+
+  private convoStopped(taskId: string): boolean {
+    return this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL AND stoppedAt IS NOT NULL", taskId).toArray().length > 0;
+  }
+
+  private liveTask(id: string): boolean {
+    return this.sql.exec("SELECT 1 FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray().length > 0;
+  }
+
+  private tombstoneConvo(taskId: string, now: string): void {
+    const live = this.sql.exec("SELECT 1 FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray().length > 0;
+    if (!live) return;
+    const rev = this.nextRev();
+    this.sql.exec("UPDATE convos SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, taskId);
+  }
+
+  /// A deleted task takes its attachments with it, so their bytes stop
+  /// counting against the quota. Returns the ids whose bytes to purge.
+  private tombstoneAttachments(taskId: string, now: string): string[] {
+    const ids = this.sql.exec<{ id: string }>("SELECT id FROM attachments WHERE taskId = ? AND deletedAt IS NULL", taskId).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE attachments SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+    return ids;
+  }
+
+  /// Returns a rejection reason, or null when the new attachment fits.
+  private checkQuota(id: string, byteCount: number): string | null {
+    const used = this.sql.exec<{ total: number | null }>(
+      "SELECT SUM(byteCount) AS total FROM attachments WHERE deletedAt IS NULL AND id != ?", id,
+    ).one().total ?? 0;
+    return used + byteCount > MAX_USER_ATTACHMENT_BYTES ? "quota_exceeded" : null;
+  }
+
+  private appendTurn(clientOpId: string, taskId: string, turn: Turn, actor: string, now: string): OpResult {
+    const task = this.sql.exec<{ deletedAt: string | null }>("SELECT deletedAt FROM tasks WHERE id = ?", taskId).toArray()[0];
+    if (!task) return { clientOpId, status: "rejected", reason: "unknown_task" };
+    if (task.deletedAt) {
+      const rev = this.nextRev();
+      this.log(rev, "turn", taskId, "dropped", null, clientOpId, actor, now);
+      return { clientOpId, status: "dropped", rev, reason: "deleted" };
+    }
+    const seq = (this.sql.exec<{ m: number | null }>("SELECT MAX(seq) AS m FROM turns WHERE taskId = ?", taskId).one().m ?? 0) + 1;
+    const rev = this.nextRev();
+    const values = TURN_COLUMNS.map((c) => {
+      const v = turn[c];
+      if (v === undefined) return null;
+      return c === "options" && v !== null ? JSON.stringify(v) : (v as string | number | null);
+    });
+    this.sql.exec(
+      `INSERT INTO turns (taskId, seq, ${TURN_COLUMNS.join(", ")}, rev, updatedAt) VALUES (?, ?, ${TURN_COLUMNS.map(() => "?").join(", ")}, ?, ?)`,
+      taskId, seq, ...values, rev, now,
+    );
+    this.log(rev, "turn", `${taskId}:${seq}`, "append", null, clientOpId, actor, now);
+    if (!isAgentActor(actor) && turn.role === "user") {
+      // The human spoke: the run budget starts over.
+      this.writeConvoServerFields(taskId, { runsSinceUser: 0 }, "budget", actor, now, true);
+    } else if (isAgentActor(actor) && turn.role === "provider" && turn.options?.length) {
+      // The agent asked: the ball is in the human's court, so the claim ends.
+      this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, now, true);
+    }
+    return { clientOpId, status: "applied", rev, seq };
+  }
+
+  // ---- agent claims (docs/TASK_FACTORY_SPEC.md §5) ----
+
+  /// Writes server-owned convo columns as their own rev, creating the convo
+  /// row when the task has none. `onlyIfChanged` skips a write that would
+  /// change nothing, so a quiet rule never bumps the rev.
+  private writeConvoServerFields(
+    taskId: string, fields: Record<string, string | number | null>, op: string,
+    actor: string, now: string, onlyIfChanged = false,
+  ): number | null {
+    const raw = this.sql.exec("SELECT * FROM convos WHERE id = ?", taskId).toArray()[0] as Record<string, unknown> | undefined;
+    if (raw?.deletedAt) return null;
+    if (onlyIfChanged && Object.entries(fields).every(([k, v]) => (raw?.[k] ?? null) === v)) return null;
+    if (onlyIfChanged && !raw) return null;
+    const rev = this.nextRev();
+    const names = Object.keys(fields);
+    if (raw) {
+      const sets = names.map((n) => `"${n}" = ?`).concat(["rev = ?", "updatedAt = ?"]).join(", ");
+      this.sql.exec(`UPDATE convos SET ${sets} WHERE id = ?`, ...Object.values(fields), rev, now, taskId);
+    } else {
+      const cols = names.map((n) => `"${n}"`).concat(["id", "rev", "updatedAt"]).join(", ");
+      const marks = names.map(() => "?").concat(["?", "?", "?"]).join(", ");
+      this.sql.exec(`INSERT INTO convos (${cols}) VALUES (${marks})`, ...Object.values(fields), taskId, rev, now);
+    }
+    const before: Record<string, unknown> = {};
+    for (const n of names) before[n] = raw?.[n] ?? null;
+    this.log(rev, "convo", taskId, op, names, null, actor, now, this.diffFor(before, fields));
+    return rev;
+  }
+
+  /// Takes or renews the claim on a task for `holder`. The DO serializes
+  /// calls, so two agents can never both win. Refuses, with the rule that
+  /// stopped it, when agents are paused, the human stopped the task, a
+  /// question waits for the human, another holder's lease is live, or the
+  /// run budget since the last human turn is spent.
+  claim(taskId: string, holder: string, ttlMs: number, actor: string, reason: string | null): ClaimResult {
+    const result = this.ctx.storage.transactionSync((): ClaimResult => {
+      if (this.readSetting("agentsPaused") === true) return { ok: false, reason: "paused" };
+      const task = this.sql.exec<{ status: string; deletedAt: string | null }>("SELECT status, deletedAt FROM tasks WHERE id = ?", taskId).toArray()[0];
+      if (!task || task.deletedAt) return { ok: false, reason: "not_found" };
+      if (task.status !== "open") return { ok: false, reason: "closed" };
+      const convo = this.sql.exec<{
+        endState: string | null; stoppedAt: string | null; claimedBy: string | null;
+        claimUntil: string | null; runsSinceUser: number | null;
+      }>("SELECT endState, stoppedAt, claimedBy, claimUntil, runsSinceUser FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
+      if (convo?.stoppedAt) return { ok: false, reason: "stopped" };
+      if (convo?.endState && convo.endState !== "open") return { ok: false, reason: "terminal" };
+      if (this.awaitsHuman(taskId)) return { ok: false, reason: "your_turn" };
+      const nowMs = Date.now();
+      const live = !!convo?.claimedBy && !!convo.claimUntil && Date.parse(convo.claimUntil) > nowMs;
+      if (live && convo!.claimedBy !== holder) {
+        return { ok: false, reason: "held", holder: convo!.claimedBy!, claimUntil: convo!.claimUntil! };
+      }
+      const renewed = live;
+      const runs = (convo?.runsSinceUser ?? 0) + (renewed ? 0 : 1);
+      if (!renewed && runs > AGENT_RUN_BUDGET) return { ok: false, reason: "budget" };
+      const claimUntil = new Date(nowMs + Math.min(Math.max(ttlMs, 60_000), CLAIM_TTL_MAX_MS)).toISOString();
+      this.reason = reason;
+      try {
+        this.writeConvoServerFields(taskId, { claimedBy: holder, claimUntil, runsSinceUser: runs }, renewed ? "renew" : "claim", actor, new Date(nowMs).toISOString());
+      } finally {
+        this.reason = null;
+      }
+      return { ok: true, holder, claimUntil, renewed, runsSinceUser: runs };
+    });
+    if (result.ok) this.broadcast(this.meta("rev"));
+    return result;
+  }
+
+  /// Ends `holder`'s claim. A lease that already ran out, or one held by
+  /// someone else, is left as it is. Returns whether a claim was cleared.
+  release(taskId: string, holder: string, actor: string, reason: string | null): boolean {
+    const rev = this.ctx.storage.transactionSync(() => {
+      const convo = this.sql.exec<{ claimedBy: string | null }>("SELECT claimedBy FROM convos WHERE id = ? AND deletedAt IS NULL", taskId).toArray()[0];
+      if (!convo || convo.claimedBy !== holder) return null;
+      this.reason = reason;
+      try {
+        return this.writeConvoServerFields(taskId, { claimedBy: null, claimUntil: null }, "release", actor, new Date().toISOString());
+      } finally {
+        this.reason = null;
+      }
+    });
+    if (rev !== null) this.broadcast(rev);
+    return rev !== null;
+  }
+
+  /// The last turn is the agent's question and no human turn followed it.
+  private awaitsHuman(taskId: string): boolean {
+    const last = this.sql.exec<{ role: string; options: string | null }>(
+      "SELECT role, options FROM turns WHERE taskId = ? ORDER BY seq DESC LIMIT 1", taskId,
+    ).toArray()[0];
+    if (!last || last.role !== "provider" || !last.options) return false;
+    const opts = JSON.parse(last.options) as unknown;
+    return Array.isArray(opts) && opts.length > 0;
+  }
+
+  /// The newest rev: the cursor for an agent that starts listening now.
+  head(): number {
+    return this.meta("rev");
+  }
+
+  /// What changed since `since` that an agent may need to act on, oldest
+  /// first, as pointers. `nextSince` is the cursor for the next call.
+  agentEvents(since: number, limit: number): { events: AgentEvent[]; nextSince: number } {
+    const n = Math.min(Math.max(limit, 1), 500);
+    const events: AgentEvent[] = [];
+    let cursor = since;
+    // Scan in pages so a long run of agent-only writes cannot starve the feed.
+    for (let page = 0; page < 10 && events.length < n; page++) {
+      const rows = this.sql.exec<{ rev: number; entity: string; id: string; op: string; diff: string | null; actor: string; at: string }>(
+        "SELECT rev, entity, id, op, diff, actor, at FROM changes WHERE rev > ? ORDER BY rev LIMIT 500", cursor,
+      ).toArray();
+      if (!rows.length) break;
+      for (const r of rows) {
+        cursor = r.rev;
+        if (isAgentActor(r.actor)) continue;
+        const diff = r.diff ? (JSON.parse(r.diff) as ChangeDiff) : {};
+        const push = (kind: AgentEvent["kind"], taskId: string | null) => events.push({ rev: r.rev, kind, taskId, at: r.at });
+        if (r.entity === "turn" && r.op === "append") {
+          // The app also writes on-device provider turns; only the human's count.
+          const [taskId, seq] = r.id.split(":");
+          const turn = this.sql.exec<{ role: string }>("SELECT role FROM turns WHERE taskId = ? AND seq = ?", taskId, Number(seq)).toArray()[0];
+          if (turn?.role === "user") push("user_turn", taskId);
+        }
+        else if (r.entity === "convo" && diff.assignee?.[1] === "claude") push("assigned", r.id);
+        else if (r.entity === "convo" && diff.stoppedAt) push(diff.stoppedAt[1] ? "stopped" : "resumed", r.id);
+        else if (r.entity === "setting" && r.id === "agentsPaused" && diff.value) push(diff.value[1] === true ? "paused" : "unpaused", null);
+        if (events.length >= n) break;
+      }
+    }
+    return { events, nextSince: events.length >= n ? cursor : Math.max(cursor, this.meta("rev")) };
+  }
+
+  // ---- pull ----
+
+  /// `includeSettings`: the client syncs the `setting` entity. Clients built
+  /// before it existed decode pulled entities strictly and would fail on it,
+  /// so they get no setting rows (their cursor still moves past them).
+  pull(since: number, limit: number, includeSettings = false): PullResult {
+    const n = Math.min(Math.max(limit, 1), MAX_PULL);
+    if (since > 0 && since < this.meta("purgedThrough")) {
+      return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
+    }
+    // Each table is already ordered by rev, so merging their first n rows and
+    // keeping the global first n is exact.
+    const merged: Array<{ rev: number; entity: EntityName | "turn"; row: Record<string, unknown> }> = [];
+    for (const name of ENTITY_NAMES) {
+      if (name === "setting" && !includeSettings) continue;
+      const spec: EntitySpec = ENTITIES[name];
+      for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
+        merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
+      }
+    }
+    for (const raw of this.sql.exec(`SELECT * FROM turns WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
+      merged.push({ rev: raw.rev as number, entity: "turn", row: decodeTurnRow(raw) });
+    }
+    merged.sort((a, b) => a.rev - b.rev);
+    const page = merged.slice(0, n);
+    const head = this.meta("rev");
+    const nextSince = page.length ? page[page.length - 1].rev : Math.max(since, head);
+    return {
+      changes: page.map(({ entity, row }) => ({ entity, row })),
+      nextSince,
+      hasMore: merged.length > n,
+    };
+  }
+
+  // ---- reads for the MCP preview (src/shadow/) ----
+  //
+  // SQL queries that return decoded rows (the same shape a pull carries), so
+  // a tool call never pulls the whole store. Live rows only: tombstones are
+  // never returned. Formatting into tool output happens in the Worker.
+
+  /// Open tasks (every one: the view filters need the whole open set), or
+  /// done tasks newest first, capped. Headings are never to-dos and are left
+  /// out. `total` counts every matching row, not only the returned ones.
+  readTasks(status: "open" | "done", limit: number): { rows: Row[]; total: number } {
+    const spec: EntitySpec = ENTITIES.task;
+    const where = "deletedAt IS NULL AND status = ? AND (kind IS NULL OR kind != 'heading')";
+    const total = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM tasks WHERE ${where}`, status).one().n;
+    const order = status === "done"
+      ? "ORDER BY completedAt IS NULL, completedAt DESC, rev DESC LIMIT ?"
+      : "ORDER BY scheduled IS NULL, scheduled, position IS NULL, position, rev";
+    const args: unknown[] = status === "done" ? [status, Math.min(Math.max(limit, 1), 500)] : [status];
+    const rows = this.sql.exec(`SELECT * FROM tasks WHERE ${where} ${order}`, ...args).toArray().map((r) => decodeRow(spec, r) as Row);
+    return { rows, total };
+  }
+
+  /// One live task with its conversation row and turns (oldest first).
+  readTask(id: string): { task: Row; convo: Row | null; turns: Row[] } | null {
+    const raw = this.sql.exec("SELECT * FROM tasks WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    if (!raw) return null;
+    const convoRaw = this.sql.exec("SELECT * FROM convos WHERE id = ? AND deletedAt IS NULL", id).toArray()[0];
+    const turns = this.sql.exec("SELECT * FROM turns WHERE taskId = ? ORDER BY seq", id).toArray().map((r) => decodeTurnRow(r) as Row);
+    return {
+      task: decodeRow(ENTITIES.task, raw) as Row,
+      convo: convoRaw ? (decodeRow(ENTITIES.convo, convoRaw) as Row) : null,
+      turns,
+    };
+  }
+
+  readAreas(limit: number): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM areas WHERE deletedAt IS NULL ORDER BY position IS NULL, position, title LIMIT ?",
+      Math.min(Math.max(limit, 1), 500),
+    ).toArray().map((r) => decodeRow(ENTITIES.area, r) as Row);
+  }
+
+  readProjects(status: "active" | "done" | "cancelled" | "all", limit: number): Row[] {
+    const n = Math.min(Math.max(limit, 1), 500);
+    const order = "ORDER BY position IS NULL, position, title LIMIT ?";
+    const rows = status === "all"
+      ? this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL ${order}`, n)
+      : this.sql.exec(`SELECT * FROM projects WHERE deletedAt IS NULL AND status = ? ${order}`, status, n);
+    return rows.toArray().map((r) => decodeRow(ENTITIES.project, r) as Row);
+  }
+
+  /// Open tasks that have a conversation, with what the pending-reasoning
+  /// rule needs: the convo fields and the confidence of the last provider
+  /// turn. The rule itself runs in the Worker (tools/taskShared.ts).
+  readConvoCandidates(): ConvoCandidate[] {
+    return this.sql.exec<ConvoCandidate>(`
+      SELECT t.id AS id, t.title AS title, c.confirmedIntent AS confirmedIntent,
+             c.assignee AS assignee, c.endState AS endState,
+             c.stoppedAt AS stoppedAt, c.claimedBy AS claimedBy, c.claimUntil AS claimUntil,
+             (SELECT confidence FROM turns WHERE taskId = t.id AND role = 'provider' ORDER BY seq DESC LIMIT 1)
+               AS lastProviderConfidence,
+             (SELECT CASE WHEN role = 'provider' AND options IS NOT NULL AND options != '[]' THEN 1 ELSE 0 END
+                FROM turns WHERE taskId = t.id ORDER BY seq DESC LIMIT 1) AS awaitsHuman
+      FROM tasks t LEFT JOIN convos c ON c.id = t.id AND c.deletedAt IS NULL
+      WHERE t.deletedAt IS NULL AND t.status = 'open'
+        AND (c.id IS NOT NULL OR EXISTS (SELECT 1 FROM turns WHERE taskId = t.id))
+      ORDER BY t.rev
+    `).toArray();
+  }
+
+  /// The lowest order key across live tasks, or null when there is none:
+  /// the app's `TaskOrder.extremeKey(highest: false)`. A row's key is its
+  /// `position` once it has one (0 is the app's "never dragged" value),
+  /// else its `createdAt` in seconds since 2001-01-01 (the app's
+  /// `timeIntervalSinceReferenceDate`). The MCP connector subtracts the app's
+  /// gap from it to put a row at the top of its list.
+  readOrderTop(): number | null {
+    return this.sql.exec<{ m: number | null }>(`
+      SELECT MIN(k) AS m FROM (
+        SELECT CASE
+          WHEN position IS NOT NULL AND position != 0 THEN position
+          WHEN createdAt IS NOT NULL THEN (julianday(createdAt) - 2440587.5) * 86400.0 - 978307200
+        END AS k
+        FROM tasks WHERE deletedAt IS NULL
+      )
+    `).one().m;
+  }
+
+  /// One synced setting's value (columns.ts `SETTING_VALUES`), or null when
+  /// it was never set.
+  readSetting(key: string): Json {
+    const raw = this.sql.exec("SELECT * FROM settings WHERE id = ? AND deletedAt IS NULL", key).toArray()[0];
+    if (!raw) return null;
+    return (decodeRow(ENTITIES.setting, raw).value ?? null) as Json;
+  }
+
+  // ---- pairing rate limit (src/shadow/oauth.ts) ----
+  //
+  // Wrong pairing codes this user entered in the current window. Kept in the
+  // user's own object so the count is exact and needs no KV.
+
+  pairFailures(): number {
+    if (Date.now() - this.meta("pairFailWindow") > PAIR_FAIL_WINDOW_MS) return 0;
+    return this.meta("pairFailCount");
+  }
+
+  notePairFailure(): number {
+    const now = Date.now();
+    const fresh = now - this.meta("pairFailWindow") > PAIR_FAIL_WINDOW_MS;
+    const count = fresh ? 1 : this.meta("pairFailCount") + 1;
+    if (fresh) this.setMeta("pairFailWindow", now);
+    this.setMeta("pairFailCount", count);
+    return count;
+  }
+
+  // ---- attachments ----
+
+  /// Checks an upload against the attachment's metadata row. Returns null when
+  /// the bytes may be stored, else an error code for the Worker to map.
+  checkUpload(id: string, contentLength: number): "not_found" | "size_mismatch" | null {
+    const row = this.sql.exec<{ byteCount: number }>(
+      "SELECT byteCount FROM attachments WHERE id = ? AND deletedAt IS NULL", id,
+    ).toArray()[0];
+    if (!row) return "not_found";
+    if (row.byteCount !== contentLength) return "size_mismatch";
+    return null;
+  }
+
+  finishUpload(id: string, actor: string): number | null {
+    const now = new Date().toISOString();
+    const live = this.sql.exec("SELECT 1 FROM attachments WHERE id = ? AND deletedAt IS NULL", id).toArray().length > 0;
+    if (!live) return null;
+    const rev = this.ctx.storage.transactionSync(() => {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE attachments SET uploadedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+      this.log(rev, "attachment", id, "upload", ["uploadedAt"], null, actor, now);
+      return rev;
+    });
+    this.broadcast(rev);
+    return rev;
+  }
+
+  downloadInfo(id: string): { contentType: string; filename: string } | null {
+    const row = this.sql.exec<{ contentType: string; filename: string }>(
+      "SELECT contentType, filename FROM attachments WHERE id = ? AND deletedAt IS NULL AND uploadedAt IS NOT NULL", id,
+    ).toArray()[0];
+    return row ?? null;
+  }
+
+  // ---- sessions (refresh tokens, stored hashed) ----
+
+  createSession(hash: string, expiresAt: number): void {
+    this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt) VALUES (?, ?, ?)", hash, Date.now(), expiresAt);
+  }
+
+  /// Single-use rotation: the old refresh token dies whether or not the new
+  /// one is ever used.
+  rotateSession(oldHash: string, newHash: string, expiresAt: number): boolean {
+    return this.ctx.storage.transactionSync(() => {
+      const row = this.sql.exec<{ expiresAt: number }>("SELECT expiresAt FROM sessions WHERE hash = ?", oldHash).toArray()[0];
+      this.sql.exec("DELETE FROM sessions WHERE hash = ?", oldHash);
+      if (!row || row.expiresAt < Date.now()) return false;
+      this.sql.exec("INSERT INTO sessions (hash, createdAt, expiresAt) VALUES (?, ?, ?)", newHash, Date.now(), expiresAt);
+      return true;
+    });
+  }
+
+  revokeSession(hash: string): void {
+    this.sql.exec("DELETE FROM sessions WHERE hash = ?", hash);
+  }
+
+  // ---- sync entitlement (docs/SYNC_SUBSCRIPTION_SPEC.md §6) ----
+
+  entitlements(): EntitlementRow[] {
+    return this.sql.exec<Record<string, SqlStorageValue>>("SELECT * FROM entitlements ORDER BY id").toArray()
+      .map((r) => ({ ...r }) as unknown as EntitlementRow);
+  }
+
+  /// Writes one row unless a newer Apple payload already wrote it. `origin`
+  /// "app" (a transaction the app posted) never moves a grace or billing-retry
+  /// row to expired: the transaction alone cannot see grace or retry, only
+  /// Apple's notifications can. Returns whether the row was written.
+  putEntitlement(row: Omit<EntitlementRow, "updatedAt">, origin: "app" | "webhook" | "admin"): boolean {
+    return this.ctx.storage.transactionSync(() => {
+      const cur = this.sql.exec<{ status: string; signedAt: number }>(
+        "SELECT status, signedAt FROM entitlements WHERE id = ?", row.id,
+      ).toArray()[0];
+      if (cur && origin !== "admin") {
+        if (cur.signedAt > row.signedAt) return false;
+        if (origin === "app" && row.status === "expired" && (cur.status === "grace" || cur.status === "billing_retry")) {
+          return false;
+        }
+      }
+      this.sql.exec(
+        `INSERT INTO entitlements (id, source, productId, expiresAt, originalTransactionId, status, environment, note, signedAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET source = excluded.source, productId = excluded.productId,
+           expiresAt = excluded.expiresAt, originalTransactionId = excluded.originalTransactionId,
+           status = excluded.status, environment = excluded.environment, note = excluded.note,
+           signedAt = excluded.signedAt, updatedAt = excluded.updatedAt`,
+        row.id, row.source, row.productId, row.expiresAt, row.originalTransactionId, row.status,
+        row.environment, row.note, row.signedAt, Date.now(),
+      );
+      return true;
+    });
+  }
+
+  deleteEntitlement(id: string): boolean {
+    return this.sql.exec("DELETE FROM entitlements WHERE id = ?", id).rowsWritten > 0;
+  }
+
+  /// Account deletion (§10). The Worker empties the user's R2 prefix.
+  async deleteAccount(): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) ws.close(1000, "account deleted");
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+  }
+
+  // ---- live nudge (§6.3) ----
+
+  override async fetch(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1]);
+    pair[1].send(JSON.stringify({ rev: this.meta("rev") }));
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  override async webSocketMessage(): Promise<void> {
+    // The socket carries nudges only; clients send nothing but pings.
+  }
+
+  override async webSocketClose(ws: WebSocket, code: number): Promise<void> {
+    try { ws.close(code, "closing"); } catch { /* already closed */ }
+  }
+
+  private broadcast(rev: number): void {
+    const msg = JSON.stringify({ rev });
+    for (const ws of this.ctx.getWebSockets()) {
+      try { ws.send(msg); } catch { /* dead socket; the runtime reaps it */ }
+    }
+  }
+
+  // ---- daily housekeeping ----
+
+  override async alarm(): Promise<void> {
+    const now = Date.now();
+    const tombstoneCutoff = new Date(now - TOMBSTONE_TTL_MS).toISOString();
+    this.ctx.storage.transactionSync(() => {
+      let purged = this.meta("purgedThrough");
+      for (const name of ENTITY_NAMES) {
+        const table = ENTITIES[name].table;
+        const m = this.sql.exec<{ m: number | null }>(`SELECT MAX(rev) AS m FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`, tombstoneCutoff).one().m;
+        if (m !== null) purged = Math.max(purged, m);
+        this.sql.exec(`DELETE FROM ${table} WHERE deletedAt IS NOT NULL AND deletedAt < ?`, tombstoneCutoff);
+      }
+      this.sql.exec("DELETE FROM turns WHERE taskId NOT IN (SELECT id FROM tasks)");
+      this.setMeta("purgedThrough", purged);
+      this.sql.exec("DELETE FROM client_ops WHERE at < ?", now - CLIENT_OP_TTL_MS);
+      this.sql.exec("DELETE FROM changes WHERE at < ?", new Date(now - CHANGE_LOG_TTL_MS).toISOString());
+      this.sql.exec("DELETE FROM sessions WHERE expiresAt < ?", now);
+    });
+    await this.ctx.storage.setAlarm(now + DAY_MS);
+  }
+}

@@ -118,11 +118,9 @@ struct TaskCheckbox: View {
   /// today indicator into the checkbox itself, so it no longer sits as a
   /// separate glyph inline with the title.
   var isToday: Bool = false
-  /// Language v2: fill (0…1) for the **Today tenure dial** that wraps the box —
-  /// the single temporal device that replaces the old amber `arrivedToday` box
-  /// fill *and* the trailing carry-age ring. `nil` → no dial. Driven by
-  /// `SeptenaTask.todayTenureFill`. Gold, concentric, fills one seventh per day
-  /// to full at a week; keeps the box itself pure form (no hue on the control).
+  /// Days carried on Today as 0…1 (`SeptenaTask.todayTenureFill`), nil when
+  /// not carried. The box draws nothing for it: the row fades instead
+  /// (`TaskFade`). Kept here for the VoiceOver hint only.
   var tenureFill: Double? = nil
   /// Rising-edge counter from `PromoteFlashStore` — plays a brief amber ring
   /// when the row is pinned to Today.
@@ -149,10 +147,6 @@ struct TaskCheckbox: View {
   private static let boxStroke: CGFloat = 1.4
   private static let checkSize: CGFloat = 12
   #endif
-  /// Tenure fill never reaches full opacity — a hair of translucency keeps an
-  /// aged Today task from reading as a solid/"done" box.
-  private static let tenureMaxOpacity: Double = 0.5
-
   /// Checkbox chrome is neutral gray by default; Today rows swap stroke
   /// and fill to `Theme.todayAccent`.
   private var boxStrokeColor: Color {
@@ -191,19 +185,8 @@ struct TaskCheckbox: View {
   private var checkboxButton: some View {
     Button(action: onToggle) {
       ZStack {
-        // Today tenure fill — the box's interior grays, deepening with
-        // days-on-Today (see `tenureFill`): transparent on the arrival day, a
-        // seventh more each carried day, capped just shy of opaque so an aged
-        // task never reads as a solid/done box. Shape never changes — only the
-        // fill's opacity (and, in language v2, the open outline darkens in sync).
-        // Sits behind the open stroke; hidden once done.
-        if TaskRowFlags.languageV2, !isDone, let tenureFill {
-          let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
-          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .fill(Theme.todayTenure.opacity(strength * Self.tenureMaxOpacity))
-            .frame(width: Self.boxSize, height: Self.boxSize)
-            .a11yAnimation(Theme.Motion.quick, value: strength)
-        }
+        // No tenure tint on the box: the row fades instead (`TaskFade`,
+        // applied by `CheckableRow`), so the checkbox stays a plain target.
         // Echo ring (habits) — the second, quieter pulse behind the main one.
         RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
           .strokeBorder((tint ?? boxFillColor).opacity(echoOpacity), lineWidth: 1.2)
@@ -228,18 +211,6 @@ struct TaskCheckbox: View {
           .a11yAnimation(Theme.Motion.quick, value: isDone)
           .a11yAnimation(Theme.Motion.quick, value: isToday)
 
-        // Language v2 aging: darken the outline in lockstep
-        // with the Today tenure fill, so we don't have a step change when
-        // `tenureFill` becomes non-nil.
-        if TaskRowFlags.languageV2, !isDone, !isToday, let tenureFill {
-          let strength = tenureFill.isFinite ? max(0, min(1, tenureFill)) : 0
-          RoundedRectangle(cornerRadius: Self.boxCorner, style: .continuous)
-            .strokeBorder(Theme.todayTenure.opacity(strength * Self.tenureMaxOpacity),
-                          lineWidth: Self.boxStroke)
-            .frame(width: Self.boxSize, height: Self.boxSize)
-            .opacity(isDone ? 0 : 1)
-            .a11yAnimation(Theme.Motion.quick, value: strength)
-        }
         // Fill + check, grouped so the feel choreography (drop, squash, dip)
         // moves them as one body. The fill pops with a touch of overshoot;
         // the check stamps in from smaller, reading as follow-through.

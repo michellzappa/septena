@@ -85,8 +85,6 @@ enum SeptaskKitTheme {
   static let checkboxCheck: NSColor = .textBackgroundColor
   /// Theme.todayAccent — the gold "promoted to Today" cue on the checkbox.
   static let todayAccent = NSColor(Theme.todayAccent)
-  /// Theme.todayTenure — the neutral gray the tenure dial darkens toward.
-  static let todayTenure = NSColor(Theme.todayTenure)
   /// Theme.overdueRed — late deadlines, platform red.
   static let overdueRed: NSColor = .systemRed
   /// Theme.noticeWarning — the glyph of a warning notice (`KitNoticeCell`).

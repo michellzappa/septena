@@ -560,8 +560,10 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   FastAPI references are migration history slated for cleanup.
 - **Two MCP servers, edited in lockstep.** There are TWO: the **in-app** server
   (`SeptenaCore/MCP/` — `LocalMCPServer` + `MCPDispatch` + `MCPToolCatalog`,
-  macOS, for Claude Code) and the **hosted gateway** (separate repo
-  `../septena-mcp-gateway`, Cloudflare Worker / TS, for consumer chat). **Any MCP
+  macOS, for Claude Code) and the **hosted gateway** (`backend/` in this repo,
+  Cloudflare Worker / TS, for consumer chat; imported with history from the
+  old `../septena-mcp-gateway` repo, which is now frozen: edit and deploy only
+  from `backend/`). **Any MCP
   tool change must land in BOTH, plus the docs/skills, in the same change** —
   never one without the others, or the two surfaces silently diverge. The
   gateway's `skill.md` is generated from `SectionRegistry.fullSkillMarkdown()`, so
@@ -583,5 +585,5 @@ findings: `docs/SEPTASK.md`). Four app schemes now exist: `Septena`,
   existing `claude mcp add` registration still speak the old shape. Deleting
   the legacy path takes the live connector offline. The era rules and constants
   are mirrored in `SeptenaCore/MCP/MCPRevision.swift` ⇄
-  `../septena-mcp-gateway/src/protocol.ts` — edit in lockstep like everything
+  `backend/src/protocol.ts` — edit in lockstep like everything
   else MCP.

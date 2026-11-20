@@ -145,6 +145,22 @@ Modals use a large continuous corner radius (`Theme.cornerRadius`, 22pt) to matc
 - No custom loading skeletons.
 - Network errors handled upstream by mutators; not surfaced in destination views.
 
+## 6.5 Notices and toasts
+
+Two channels tell the user something. Never a modal for an explanation.
+
+| Channel | For | Lifetime | Where |
+|---|---|---|---|
+| **Notice** | An action the user must take (sign in), a fact about the list (tasks rolled into Today), or an **explainer** for a feature the user just met (the Today fade) | Stays until it no longer applies or the user dismisses it | Inline card on top of the list: `TaskListNotice` (SwiftUI), `KitNoticeCell` (AppKit) |
+| **Toast** | A one-line confirmation of what the user just did, with an optional Undo | Leaves on its own (7 s) | Bottom capsule: `SeptenaToastStore` + `.septenaToastOverlay` |
+
+- **Which notices show is decided once**, in `TaskNotices` (`Septena/Shell/Tasks/TaskNotices.swift`). Both shells call it and only draw. Never add a notice by hand in one shell.
+- **Order:** action needed, then facts about today, then at most **one** explainer.
+- **An explanation never goes in a toast.** A toast can be missed; an explainer must stay until read.
+- **Explainers show once.** Trigger on the first time the user meets the feature in the list (the fade explainer: the first task that starts fading on Today). Dismissal is remembered (device-local today; a synced key is a follow-up).
+- **A lost write is neither** (`StoreHealthNotice`): it is an alert, because it is not confirmable or undoable.
+- Copy for notices and toasts goes through the humanizer pass like all human-facing copy.
+
 ## 7. Edit sheets
 
 Every create/edit form goes through `AdaptiveEditScaffold` ([SectionDrawer.swift](../Septena/Shell/Sections/SectionDrawer.swift)), presented by `.adaptiveDetail(item:)` / `.adaptiveDetail(isPresented:)`. The scaffold absorbs the cross-surface chrome so no form repeats it:

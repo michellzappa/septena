@@ -49,9 +49,19 @@ Set up 2026-11-19 so planned work keeps moving without mz.
   another session committed to its area in the last 24 h (each issue says how
   to check). `(mz)` issues are mz's steps: never do them, only prepare what
   they ask for.
-- **Gateway repo** (`../septena-mcp-gateway`, origin on a local volume, no
-  GitHub remote): commit there and push to its origin. Gate with
-  `npm run typecheck`. One Worker serves both `api.septena.app` and the LIVE
+- **Gateway (`backend/`)**: the Cloudflare Worker lives in `backend/` in this
+  repo (#83). Commit it here like any other change; this repo is public, so
+  never commit `.dev.vars` or secret values. The old
+  `/Users/mz/Dev/septena-mcp-gateway` checkout is frozen (mz archives it):
+  never commit, push or deploy from it. Gate with
+  `cd backend && ./node_modules/.bin/tsc --noEmit` (same as
+  `pnpm typecheck`). When `backend/node_modules` is missing, symlink the
+  frozen checkout's copy
+  (`ln -s /Users/mz/Dev/septena-mcp-gateway/node_modules backend/node_modules`,
+  gitignored) instead of `pnpm install`: an install downloads packages, and
+  downloads need mz's yes. Once that checkout is archived, ask mz before the
+  first `pnpm install --frozen-lockfile`. Deploys run from `backend/`
+  (`./node_modules/.bin/wrangler deploy`). One Worker serves both `api.septena.app` and the LIVE
   connector `mcp.septena.app`, so `wrangler deploy` unattended only when the
   change cannot alter any `mcp.septena.app` response (host-dispatched `api`
   routes only). Anything else: leave it undeployed and say so first in the

@@ -201,7 +201,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
   /// with no entry falls back to `shortDescription` via `explainer`.
   private static let explainerByKey: [String: String] = [
     "tasks": String(localized: "A real task manager — Inbox, Today, Upcoming, and Someday, with areas and projects. Capture anything in a second, then decide what today is; nothing gets dumped on your plate.", comment: "Section explainer"),
-    "training": String(localized: "Log strength, cardio, and mobility the day you do them. Septena tracks progression per exercise, surfaces your personal records, and shows whether the week landed.", comment: "Section explainer"),
+    "training": String(localized: "Log strength, cardio, and mobility the day you do them. Septena Life tracks progression per exercise, surfaces your personal records, and shows whether the week landed.", comment: "Section explainer"),
     "nutrition": String(localized: "Log a meal in seconds — protein, fat, carbs, calories, and what you ate. Targets are ranges to stay inside of, not rigid numbers you fail to hit.", comment: "Section explainer"),
     "sleep": String(localized: "Your sleep, brought in read-only from Oura and set beside the rest of your week — so it can finally relate to caffeine, training, and mood. Nothing to log by hand.", comment: "Section explainer"),
     "habits": String(localized: "A daily checklist bucketed by morning, afternoon, and evening. Streaks are counted from what you actually did — no grace days, no fudging.", comment: "Section explainer"),
@@ -209,7 +209,7 @@ public struct SectionManifest: Sendable, Hashable, Identifiable {
     "supplements": String(localized: "A daily checklist for your stack, one tap per item, with honest streaks and a single reminder timed to when you usually take them.", comment: "Section explainer"),
     "groceries": String(localized: "A running shopping list built from what's actually running low. Flag an item when you notice it's down; restocking stamps the date and clears the flag.", comment: "Section explainer"),
     "intake": String(localized: "One place for the consumables you want to watch — coffee, tea, alcohol, nicotine, or anything you define. Each kind gets its own methods, units, and a goal that fits: log it, hold a limit, cut back, or quit.", comment: "Section explainer"),
-    "body": String(localized: "Weight and body composition, read straight from your Withings scale and Apple Health. Nothing to log by hand — Septena sets the trend in context beside training and nutrition.", comment: "Section explainer"),
+    "body": String(localized: "Weight and body composition, read straight from your Withings scale and Apple Health. Nothing to log by hand — Septena Life sets the trend in context beside training and nutrition.", comment: "Section explainer"),
     "gut": String(localized: "A plain, quick digestive log on the Bristol scale. One tap to record, set beside what you ate so sensitivities can surface.", comment: "Section explainer"),
     "mood": String(localized: "A few seconds, a few times a day: where you are from unpleasant to pleasant, calm to energized, with a word and an optional note.", comment: "Section explainer"),
     "symptoms": String(localized: "Log a symptom with a severity and a time — headaches, pain, congestion, whatever you're watching — and see its rhythm across the week, beside the things that might set it off.", comment: "Section explainer"),

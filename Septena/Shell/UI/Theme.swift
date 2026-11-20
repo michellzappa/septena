@@ -293,12 +293,6 @@ enum Theme {
   /// it as a warm gold, light mode as a saturated amber.
   static let todayAccent    = Color(red: 0.96, green: 0.78, blue: 0.13)
 
-  /// Today tenure dial — the checkbox interior that darkens with each day a
-  /// task is carried on Today. Neutral gray, not gold: aging is a quiet "this
-  /// has been sitting here" cue, and gold stays reserved for the moment a
-  /// task is promoted to Today.
-  static let todayTenure    = Color.gray
-
   /// Next widget's signature tint — the app's violet accent (#7c3aed, the same
   /// swatch Insights uses). Pairs with `todayAccent`'s gold so the two
   /// home-screen list widgets read as siblings with distinct identities. Used on

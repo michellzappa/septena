@@ -89,6 +89,15 @@ day at rollover, on the device that runs first, and on the backend when the
 backend owns the job (ADR 0002). It is idempotent: two devices can run it
 with the same result.
 
+**The visible fade (decided 2026-11-20).** The countdown shows on the row,
+not on the checkbox: the title, meta and trailing cluster lose opacity as
+the task nears its fade, down to `TaskFade.minOpacity` (0.55, readable), and
+at the end the task leaves the list. The checkbox never fades or tints. One
+rule for both lists: `SeptenaCore/TaskFade.swift`. Shipped first on the
+existing Today tenure clock (`todayTenureFill`, days carried on Today, full
+at a week); P2 moves it to `touchedAt` against the fade window in every list.
+Touching the task restores full strength.
+
 **The Faded pile.** A sidebar smart list, "Faded", with a count. Rows are
 standard task rows. Opening or editing a faded task keeps it (clears
 `fadedAt`, stamps `touchedAt`).
@@ -178,6 +187,33 @@ This lives in the Next feed builder behind the runtime profile. Septask runs
 `RuntimeProfile.tasksOnly` with no provider stores, so it keeps manual order.
 Do not copy the feed file into `Septask/`.
 
+### 9.2 Memory and resurfacing
+
+The list may forget only because something remembers. The memory is the task
+store itself, not a separate AI store: a faded or let-go task keeps its notes,
+attachments, conversation and change history (the backend keeps the change log
+a year).
+
+- **Fade note.** When a task fades, the agent writes one provider turn on it
+  (`step = ground`, `note` only, no options): where it stood, why it mattered,
+  what it waited on. It is written from the task's own notes, conversation,
+  project and source. On-device first; Claude through the runner when the
+  conversation needs it. Example: "From the Lisbon trip planning, 12 Oct.
+  Waiting on dates from Ana. Passport expires in March."
+- **Resurfacing on a signal, never on a timer.** A faded task is proposed back
+  when something new connects to it: a new task or note that matches it, a date
+  in its notes coming close, its project becoming active again, or the user
+  asking ("what did I let go about the house?").
+- **It comes back as a proposal.** The task lands in the Inbox band with one
+  line on why now, above its fade note. One tap keeps it (clears `fadedAt`,
+  stamps `touchedAt`), one tap lets it go. An agent never moves a task to
+  Today and never deletes.
+- **Quiet by default.** At most 3 resurfaced tasks a week *(default)*. A task
+  the user let go in the sweep needs a stronger match than one that only
+  faded.
+- **Agent surface.** A search over faded and let-go tasks, and a `faded` event
+  on `tasks_agent_events` (ADR 0008), on the api.septena.app connector.
+
 ## 10. Phases
 
 | Phase | Content | Depends on |
@@ -188,13 +224,14 @@ Do not copy the feed file into `Septask/`.
 | P4 | §7 stuck question. | P1 |
 | P5 | §8 done-first view. | P2 |
 | P6 | §9 capture cleanup + effort, §9.1 readiness Next. | P1 |
+| P7 | §9.2 fade note, resurfacing, agent search and `faded` event. | P2 |
 
 P1 must land on the backend schema first if the cutover (M1) has happened,
 else on the local model with the backend fields specified for the cutover.
 
 Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
 "Septask"). Any new MCP field lands in the in-app server and
-`../septena-mcp-gateway` together.
+`backend/` together.
 
 ## 11. Open questions for mz
 
@@ -209,3 +246,5 @@ Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
 | Carry-over on Saturday and Sunday too | Yes |
 | Readiness source when both Oura and HealthKit exist | Oura |
 | Fade on by default for new users | Yes, with a Settings toggle to turn it off |
+| Resurfaced tasks per week | 3 |
+| Does a let-go task ever resurface? | Yes, on a stronger match than a faded one |

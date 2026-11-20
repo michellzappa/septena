@@ -80,7 +80,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       Toggle("Show completed tasks", isOn: TaskViewOptions.announcing($todayShowCompleted))
       Toggle(isOn: $showAging) {
         rowLabel("Show aging",
-                 detail: "Tint the checkbox as a task carries over day after day.")
+                 detail: "Fade a task a little more each day it carries over.")
       }
       // Same switch as View ▸ Group Today by List; `announcing` is what keeps
       // Septask's AppKit list in step when it's flipped from here.
@@ -91,7 +91,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Today")
     } footer: {
-      Text("Aging starts the day after a task lands on Today and deepens over a week. It resets when you move the task off Today or check it off.")
+      Text("A task starts fading the day after it lands on Today and keeps fading for a week. It comes back to full strength when you move it off Today or check it off.")
     }
   }
 
@@ -231,7 +231,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Appearance")
     } footer: {
-      Text("The accent is shared with Septena. Changing it here recolors Tasks there too.")
+      Text("The accent is shared with Septena Life. Changing it here recolors Tasks there too.")
     }
 
     // Text size and completion motion sit here, inline, instead of on a

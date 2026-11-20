@@ -132,7 +132,7 @@ struct SeptaskWelcomeView: View {
 
   /// Septask syncs through its own server, so the welcome asks for the one
   /// sign-in it needs. Skipping is allowed: tasks stay on this device and
-  /// Today keeps asking (`SeptaskSignInNotice`).
+  /// Today keeps asking (the `.signIn` notice in `TaskNotices`).
   @ViewBuilder
   private var signInRow: some View {
     if !TaskSyncEngine.shared.signedIn {

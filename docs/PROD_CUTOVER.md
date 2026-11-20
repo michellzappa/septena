@@ -133,7 +133,7 @@ You **cannot** peek Prod data from a debug/dev build — verify on a real Prod b
 ## Phase 7 — Gateway flip (DEFER until your data is in Prod)
 
 - [ ] **Leave `CK_ENVIRONMENT = "development"`** in
-      `../septena-mcp-gateway/wrangler.toml` for now. Flipping to `production`
+      `backend/wrangler.toml` for now. Flipping to `production`
       would point your consumer/chat MCP at the empty Prod DB. Flip only as part of
       the follow-on below (after your data is migrated), which also requires a
       **re-auth** pass (stored `ckWebAuthToken`s are Dev-minted) and a valid
