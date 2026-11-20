@@ -37,7 +37,21 @@ export interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-export type Tool = { name: string; description: string; inputSchema: unknown };
+export interface ToolAnnotations {
+  title: string;
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
+export type Tool = {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: unknown;
+  annotations: ToolAnnotations;
+};
 
 /// The live connector's protected-resource document. Default for
 /// `unauthorized()` so the live 401 stays byte-identical.
