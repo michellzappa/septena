@@ -8,18 +8,30 @@ import UserNotifications
 // Everything here is idempotent — `services.start()` memoizes, the importer
 // no-ops with nothing pending — so whichever root comes up first wins and a
 // second call is harmless.
+//
+// Draw Today first (docs/LAUNCH_PERF.md): the first frame reads only the
+// local store. Before it, the launch binds the mutators (cheap, and it makes
+// a tap during the deferred start safe) and nothing else. Services start,
+// sync, imports, diagnostics and the badge wait for `LaunchPhase`, and
+// nothing awaits the network before the first frame. The wait is iOS-only:
+// the macOS AppKit shell draws its own list without `TaskListView`, so it
+// would only ever hit the timeout.
 @MainActor
 enum SeptaskLaunch {
   static func run(settings: SettingsStore) async {
     let services = SeptenaServices.shared
     let localStore = LocalStore.shared
 
+    services.bindWriteBoundary()
+    await waitForFirstFrameIfNeeded()
     await services.start()
-    SharedTaskCaptureImporter.importPending(using: services.taskMutator)
-    SeptaskLegacyClaudeCleanup.runOnce()
-    SeptaskDiagnosticsCoordinator.shared.start()
-    BadgeManager.shared.start(context: localStore.container.mainContext)
-    Task {
+    LaunchTrace.spanSync("launch.deferredWork") {
+      SharedTaskCaptureImporter.importPending(using: services.taskMutator)
+      SeptaskLegacyClaudeCleanup.runOnce()
+      SeptaskDiagnosticsCoordinator.shared.start()
+      BadgeManager.shared.start(context: localStore.container.mainContext)
+    }
+    Task(priority: .utility) {
       await services.absorbRemoteChanges()
       let context = localStore.container.mainContext
       settings.reloadFromMirror(context: context)
@@ -34,9 +46,12 @@ enum SeptaskLaunch {
   }
 
   /// Foreground refresh — the same work both roots do when their window
-  /// becomes active.
+  /// becomes active. On a cold launch iOS reports `.active` right away, so
+  /// this waits for the first frame too.
   static func activate() async {
     let services = SeptenaServices.shared
+    services.bindWriteBoundary()
+    await waitForFirstFrameIfNeeded()
     await services.start()
     SharedTaskCaptureImporter.importPending(using: services.taskMutator)
     SeptaskDiagnosticsCoordinator.shared.start()
@@ -48,7 +63,83 @@ enum SeptaskLaunch {
     // keep in parity with Septena's `.active` branch in App.swift.
     services.taskMutator.catchUpFixedSchedules()
   }
+
+  /// iOS: hold deferred launch work until the first Today frame is drawn.
+  /// macOS: return at once (see the note above).
+  private static func waitForFirstFrameIfNeeded() async {
+    #if os(iOS)
+    await LaunchPhase.shared.waitForFirstFrame()
+    #endif
+  }
 }
+
+/// Real-use launch numbers from MetricKit (docs/LAUNCH_PERF.md). The system
+/// delivers one payload a day at most, with histograms of time to first draw
+/// and resume time across that day's launches. Each payload is logged to the
+/// unified log (subsystem `com.septena.cloud`, category "Launch") and its
+/// summary kept on this device under `lastSummaryKey`. It never leaves the
+/// device: it is not part of the weekly diagnostics batch.
+///
+/// iOS only: `MXAppLaunchMetric` does not exist on macOS.
+final class SeptaskLaunchMetrics: NSObject, @unchecked Sendable {
+  static let shared = SeptaskLaunchMetrics()
+  static let lastSummaryKey = "septask.launchMetrics.lastSummary"
+
+  /// Call once at launch. Idempotent (MetricKit keeps one entry per object).
+  func start() {
+    #if os(iOS)
+    MXMetricManager.shared.add(self)
+    #endif
+  }
+}
+
+#if os(iOS)
+import MetricKit
+import os
+
+extension SeptaskLaunchMetrics: MXMetricManagerSubscriber {
+  private static let logger = Logger(subsystem: Log.subsystem, category: "Launch")
+
+  func didReceive(_ payloads: [MXMetricPayload]) {
+    for payload in payloads {
+      guard let launch = payload.applicationLaunchMetrics else { continue }
+      var parts = ["period \(payload.timeStampBegin.formatted()) to \(payload.timeStampEnd.formatted())",
+                   "version \(payload.latestApplicationVersion)"]
+      parts.append("timeToFirstDraw " + Self.summary(launch.histogrammedTimeToFirstDraw))
+      if #available(iOS 15.2, *) {
+        parts.append("optimizedTimeToFirstDraw " + Self.summary(launch.histogrammedOptimizedTimeToFirstDraw))
+      }
+      parts.append("resume " + Self.summary(launch.histogrammedApplicationResumeTime))
+      let line = parts.joined(separator: "; ")
+      Self.logger.notice("MetricKit launch: \(line, privacy: .public)")
+      UserDefaults.standard.set(line, forKey: Self.lastSummaryKey)
+    }
+  }
+
+  /// "n=12 p50≈310ms p90≈540ms", from the bucket midpoints.
+  private static func summary(_ histogram: MXHistogram<UnitDuration>) -> String {
+    var buckets: [(ms: Double, count: Int)] = []
+    let enumerator = histogram.bucketEnumerator
+    while let bucket = enumerator.nextObject() as? MXHistogramBucket<UnitDuration> {
+      let start = bucket.bucketStart.converted(to: .milliseconds).value
+      let end = bucket.bucketEnd.converted(to: .milliseconds).value
+      buckets.append(((start + end) / 2, bucket.bucketCount))
+    }
+    let total = buckets.reduce(0) { $0 + $1.count }
+    guard total > 0 else { return "n=0" }
+    func percentile(_ p: Double) -> Int {
+      let target = Int((Double(total) * p).rounded(.up))
+      var seen = 0
+      for bucket in buckets {
+        seen += bucket.count
+        if seen >= target { return Int(bucket.ms) }
+      }
+      return Int(buckets.last?.ms ?? 0)
+    }
+    return "n=\(total) p50≈\(percentile(0.5))ms p90≈\(percentile(0.9))ms"
+  }
+}
+#endif
 
 /// One-time removal of the old hosted-gateway Claude connection
 /// (mcp.septena.app, a CloudKit web-auth token re-minted every ~8h with an

@@ -31,6 +31,13 @@ struct SeptaskApp: App {
   @NSApplicationDelegateAdaptor(SeptaskMacAppDelegate.self) private var appDelegate
   #endif
 
+  init() {
+    // Launch signpost (docs/LAUNCH_PERF.md). The stored properties above run
+    // first, so `launch.localStoreOpen` lands before this milestone.
+    LaunchTrace.milestone("launch.appInit")
+    SeptaskLaunchMetrics.shared.start()
+  }
+
   var body: some Scene {
     WindowGroup(id: "main") {
       SeptaskMainWindow(

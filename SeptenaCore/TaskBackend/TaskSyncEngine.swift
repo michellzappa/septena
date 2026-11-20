@@ -69,6 +69,8 @@ final class TaskSyncEngine {
   @ObservationIgnored var needsRepairPull = false
   @ObservationIgnored private var appActive = true
   @ObservationIgnored private var lastReconcile: Date = .distantPast
+  /// The first pull of this process is a launch signpost (docs/LAUNCH_PERF.md).
+  @ObservationIgnored private var firstPullTraced = false
   @ObservationIgnored private var socket: URLSessionWebSocketTask?
   @ObservationIgnored private var socketGeneration = 0
   @ObservationIgnored private var socketRetry: TimeInterval = 1
@@ -682,7 +684,12 @@ final class TaskSyncEngine {
           needsRepairPull = false
           since = 0
         }
-        try await pull(store: store)
+        if firstPullTraced {
+          try await pull(store: store)
+        } else {
+          firstPullTraced = true
+          try await LaunchTrace.span("sync.firstPull") { try await pull(store: store) }
+        }
         if !settingsReady { settingsReady = true }
         if reconcileSettings(store: store) { syncAgain = true }
         if reconcileFirst, Date().timeIntervalSince(lastReconcile) > 60 {

@@ -286,6 +286,88 @@ enum PerfTrace {
   }
 }
 
+// MARK: - Launch tracing
+
+/// Cold-launch measurement (docs/LAUNCH_PERF.md). Unlike `PerfTrace`, these
+/// signposts are ALWAYS on, in Release too: the number that matters is a
+/// Release build on a device, and a launch emits only a handful of them, so
+/// the cost is a few `os_signpost` calls per process. They land on their own
+/// Instruments track: subsystem `com.septena.cloud`, category "Launch".
+///
+/// Two shapes:
+/// - `span` / `spanSync`: an interval (LocalStore open, services start, …).
+/// - `milestone`: a one-shot point event (App.init, first Today body, Today
+///   rows on screen, first frame drawn). The first call per name wins, so a
+///   milestone on a hot path still fires once per process.
+///
+/// Every span and milestone also logs one info line with its time since the
+/// kernel created the process, so `log stream --predicate 'category ==
+/// "Launch"'` reads a launch without Instruments.
+enum LaunchTrace {
+  static let signposter = OSSignposter(subsystem: Log.subsystem, category: "Launch")
+  private static let logger = Logger(subsystem: Log.subsystem, category: "Launch")
+  private static let fired = OSAllocatedUnfairLock(initialState: Set<String>())
+
+  /// Wall-clock start of this process, read once from the kernel.
+  private static let processStart: Date? = {
+    var info = kinfo_proc()
+    var size = MemoryLayout<kinfo_proc>.stride
+    var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+    guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0 else { return nil }
+    let tv = info.kp_proc.p_starttime
+    return Date(timeIntervalSince1970: TimeInterval(tv.tv_sec) + TimeInterval(tv.tv_usec) / 1_000_000)
+  }()
+
+  /// Milliseconds since the kernel created this process (-1 when unknown).
+  static func msSinceProcessStart() -> Int {
+    guard let processStart else { return -1 }
+    return Int(Date().timeIntervalSince(processStart) * 1000)
+  }
+
+  /// One-shot point event. The first call per `name` in this process wins.
+  static func milestone(_ name: StaticString) {
+    let key = name.description
+    let isFirst = fired.withLock { $0.insert(key).inserted }
+    guard isFirst else { return }
+    let ms = msSinceProcessStart()
+    signposter.emitEvent(name, "\(ms, privacy: .public) ms since process start")
+    logger.info("\(key, privacy: .public) at \(ms, privacy: .public) ms")
+  }
+
+  /// Time an async interval.
+  @discardableResult
+  static func span<T>(_ name: StaticString,
+                      _ body: () async throws -> T) async rethrows -> T {
+    let state = signposter.beginInterval(name)
+    let start = DispatchTime.now().uptimeNanoseconds
+    defer {
+      signposter.endInterval(name, state)
+      log(name, start)
+    }
+    return try await body()
+  }
+
+  /// Time a synchronous interval.
+  @discardableResult
+  static func spanSync<T>(_ name: StaticString,
+                          _ body: () throws -> T) rethrows -> T {
+    let state = signposter.beginInterval(name)
+    let start = DispatchTime.now().uptimeNanoseconds
+    defer {
+      signposter.endInterval(name, state)
+      log(name, start)
+    }
+    return try body()
+  }
+
+  private static func log(_ name: StaticString, _ startNanos: UInt64) {
+    let ms = Int((DispatchTime.now().uptimeNanoseconds &- startNanos) / 1_000_000)
+    let key = name.description
+    let end = msSinceProcessStart()
+    logger.info("\(key, privacy: .public) took \(ms, privacy: .public) ms, ended at \(end, privacy: .public) ms")
+  }
+}
+
 // MARK: - Errors
 
 /// Shared error type used by OuraProvider / WithingsProvider for HTTP
