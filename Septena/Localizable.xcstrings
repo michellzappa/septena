@@ -1000,7 +1000,7 @@
     "A quiet reminder when the Claude connection needs a refresh." : {
 
     },
-    "A sentence or two about how Septena helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved." : {
+    "A sentence or two about how Septena Life helps you (10–500 characters). With your profile public, it can appear with your name on the website once approved." : {
 
     },
     "A short title and, optionally, the problem you're trying to solve." : {
@@ -1079,7 +1079,7 @@
         }
       }
     },
-    "Activity tracking runs on iPhone / iPad. Open Septena there to start syncing steps and recovery metrics." : {
+    "Activity tracking runs on iPhone / iPad. Open Septena Life there to start syncing steps and recovery metrics." : {
 
     },
     "Add" : {
@@ -1582,7 +1582,7 @@
         }
       }
     },
-    "Analytics is processed by Septena on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud." : {
+    "Analytics is processed by Septena Life on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud." : {
 
     },
     "Analytics is provided by Plausible Analytics (EU-hosted, cookie-free)." : {
@@ -2249,12 +2249,12 @@
     "Choose how far AI may reach, connect Claude through MCP, and review the skills that teach models how to use your sections." : {
 
     },
-    "Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals." : {
+    "Choose the principles you want to live by. Septena Life drafts a north-star and commitments you can save into Goals." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Escolha os princípios pelos quais você quer viver. O Septena esboça uma estrela-guia e compromissos que você pode salvar em Metas."
+            "value" : "Escolha os princípios pelos quais você quer viver. O Septena Life esboça uma estrela-guia e compromissos que você pode salvar em Metas."
           }
         }
       }
@@ -2457,12 +2457,12 @@
         }
       }
     },
-    "Connect Claude or another MCP client to mcp.septena.app to read and write your Septena data. The brief below is what the model needs to know to use the connection well." : {
+    "Connect Claude or another MCP client to mcp.septena.app to read and write your Septena Life data. The brief below is what the model needs to know to use the connection well." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conecte o Claude ou outro cliente MCP a mcp.septena.app para ler e gravar seus dados do Septena. O resumo abaixo é o que o modelo precisa saber para usar bem a conexão."
+            "value" : "Conecte o Claude ou outro cliente MCP a mcp.septena.app para ler e gravar seus dados do Septena Life. O resumo abaixo é o que o modelo precisa saber para usar bem a conexão."
           }
         }
       }
@@ -2507,12 +2507,12 @@
         }
       }
     },
-    "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude." : {
+    "Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena Life data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conectar permite que o Claude (em claude.ai ou no app do Claude) leia e grave seus dados do Septena pelo conector MCP. Seus dados ficam no iCloud — o gateway só repassa um token de acesso de curta duração, que este app renova automaticamente. Use o endereço abaixo para adicionar o conector no Claude."
+            "value" : "Conectar permite que o Claude (em claude.ai ou no app do Claude) leia e grave seus dados do Septena Life pelo conector MCP. Seus dados ficam no iCloud — o gateway só repassa um token de acesso de curta duração, que este app renova automaticamente. Use o endereço abaixo para adicionar o conector no Claude."
           }
         }
       }
@@ -3221,7 +3221,7 @@
     "Effort scale" : {
 
     },
-    "Either there's nothing recorded for these metrics yet, or Septena's read access was turned off. Check Settings → Health → Data Access & Devices → Septena." : {
+    "Either there's nothing recorded for these metrics yet, or Septena Life's read access was turned off. Check Settings → Health → Data Access & Devices → Septena Life." : {
 
     },
     "Either way, an AI reads and writes the same private data — and everything it touches is marked." : {
@@ -3254,7 +3254,7 @@
         }
       }
     },
-    "Email goes straight to me — I make Septena alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time." : {
+    "Email goes straight to me — I make Septena Life alone. In-app tickets tie to your Apple ID; sign in to iCloud to use them, or email any time." : {
 
     },
     "Emerald" : {
@@ -3512,12 +3512,12 @@
         }
       }
     },
-    "Fill four short quadrants. Septena uses the on-device model to draft a north-star goal and commitments you can save into Goals." : {
+    "Fill four short quadrants. Septena Life uses the on-device model to draft a north-star goal and commitments you can save into Goals." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preencha quatro quadrantes curtos. O Septena usa o modelo no dispositivo para esboçar uma meta estrela-guia e compromissos que você pode salvar em Metas."
+            "value" : "Preencha quatro quadrantes curtos. O Septena Life usa o modelo no dispositivo para esboçar uma meta estrela-guia e compromissos que você pode salvar em Metas."
           }
         }
       }
@@ -4001,7 +4001,7 @@
         }
       }
     },
-    "Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too." : {
+    "Hi, I'm Michell. Septena Life is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too." : {
 
     },
     "Hidden" : {
@@ -4661,12 +4661,12 @@
     "Learned, time-of-day nudge cards at the top of the Next list — they appear around when you usually do the thing and go quiet once you log it. Turn the lot off, or just the kinds you don't want." : {
 
     },
-    "Learning your rhythm — a couple more completions and Septena will predict the next one." : {
+    "Learning your rhythm — a couple more completions and Septena Life will predict the next one." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aprendendo o seu ritmo — mais algumas conclusões e o Septena vai prever a próxima."
+            "value" : "Aprendendo o seu ritmo — mais algumas conclusões e o Septena Life vai prever a próxima."
           }
         }
       }
@@ -5337,12 +5337,12 @@
     "New Area…" : {
       "comment" : "SeptaskKit localization pass 2026-08-09"
     },
-    "New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled." : {
+    "New entries you log in Septena Life will be sent to Apple Health. Existing entries are not back-filled." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Novas entradas que você registrar no Septena serão enviadas ao Apple Health. As entradas existentes não são preenchidas retroativamente."
+            "value" : "Novas entradas que você registrar no Septena Life serão enviadas ao Apple Health. As entradas existentes não são preenchidas retroativamente."
           }
         }
       }
@@ -5735,7 +5735,7 @@
     "Not supported on this device." : {
 
     },
-    "Not syncing — showing the last calendar Septena could fetch." : {
+    "Not syncing — showing the last calendar Septena Life could fetch." : {
 
     },
     "Note" : {
@@ -6017,22 +6017,22 @@
         }
       }
     },
-    "Open the Shortcuts app to build shortcuts and automations from Septena's actions. Trigger them with Siri on iPhone and iPad." : {
+    "Open the Shortcuts app to build shortcuts and automations from Septena Life's actions. Trigger them with Siri on iPhone and iPad." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abra o app Atalhos para criar atalhos e automações a partir das ações do Septena. Acione-os com a Siri no iPhone e no iPad."
+            "value" : "Abra o app Atalhos para criar atalhos e automações a partir das ações do Septena Life. Acione-os com a Siri no iPhone e no iPad."
           }
         }
       }
     },
-    "Opens the Shortcuts app with every Septena action ready to drop into a shortcut, Home Screen tile, or automation." : {
+    "Opens the Shortcuts app with every Septena Life action ready to drop into a shortcut, Home Screen tile, or automation." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Abre o app Atalhos com cada ação do Septena pronta para entrar em um atalho, bloco da Tela de Início ou automação."
+            "value" : "Abre o app Atalhos com cada ação do Septena Life pronta para entrar em um atalho, bloco da Tela de Início ou automação."
           }
         }
       }
@@ -6470,12 +6470,12 @@
     "Rating optional" : {
 
     },
-    "Re-enable in Settings → Health → Data Access & Devices → Septena." : {
+    "Re-enable in Settings → Health → Data Access & Devices → Septena Life." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reative em Ajustes → Saúde → Acesso a Dados e Dispositivos → Septena."
+            "value" : "Reative em Ajustes → Saúde → Acesso a Dados e Dispositivos → Septena Life."
           }
         }
       }
@@ -6953,53 +6953,53 @@
         }
       }
     },
-    "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
+    "Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
+            "value" : "O Septena Life anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
           }
         }
       }
     },
-    "Septena is free. All of it. Always." : {
+    "Septena Life is free. All of it. Always." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena é gratuito. Tudo. Sempre."
+            "value" : "O Septena Life é gratuito. Tudo. Sempre."
           }
         }
       }
     },
-    "Septena is locked" : {
+    "Septena Life is locked" : {
 
     },
-    "Septena is open source. Read exactly what's collected and when, in the code:" : {
+    "Septena Life is open source. Read exactly what's collected and when, in the code:" : {
 
     },
-    "Septena keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
+    "Septena Life keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena guarda todos os seus dados no seu iCloud privado, então precisa que você esteja conectado. Abra os Ajustes e entre no iCloud para usar o app e sincronizar entre seus dispositivos."
+            "value" : "O Septena Life guarda todos os seus dados no seu iCloud privado, então precisa que você esteja conectado. Abra os Ajustes e entre no iCloud para usar o app e sincronizar entre seus dispositivos."
           }
         }
       }
     },
-    "Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID." : {
+    "Septena Life keeps everything in your private iCloud — there's no separate Septena Life account. Your data and membership are tied to your Apple ID." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena guarda tudo no seu iCloud privado — não existe uma conta Septena separada. Seus dados e sua assinatura ficam vinculados ao seu Apple ID."
+            "value" : "O Septena Life guarda tudo no seu iCloud privado — não existe uma conta Septena Life separada. Seus dados e sua assinatura ficam vinculados ao seu Apple ID."
           }
         }
       }
     },
-    "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data." : {
+    "Septena Life keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data." : {
 
     },
     "Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone." : {
@@ -7013,12 +7013,12 @@
         }
       }
     },
-    "Septena needs access to read your Reminders." : {
+    "Septena Life needs access to read your Reminders." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena precisa de acesso para ler seus Lembretes."
+            "value" : "O Septena Life precisa de acesso para ler seus Lembretes."
           }
         }
       }
@@ -7035,25 +7035,25 @@
     "Septena open — spectrum" : {
 
     },
-    "Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
+    "Septena Life pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena puxa passos, minutos de exercício, VO2 máx, VFC e frequência cardíaca de repouso do HealthKit. Os dados nunca saem do seu telefone."
+            "value" : "O Septena Life puxa passos, minutos de exercício, VO2 máx, VFC e frequência cardíaca de repouso do HealthKit. Os dados nunca saem do seu telefone."
           }
         }
       }
     },
-    "Septena reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device." : {
+    "Septena Life reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device." : {
 
     },
-    "Septena summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
+    "Septena Life summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena resume seus últimos 7 dias de registros (no dispositivo, nada sai do seu telefone) e os reflete diante de quatro virtudes cardeais. Um espelho, não um placar."
+            "value" : "O Septena Life resume seus últimos 7 dias de registros (no dispositivo, nada sai do seu telefone) e os reflete diante de quatro virtudes cardeais. Um espelho, não um placar."
           }
         }
       }
@@ -7464,12 +7464,12 @@
         }
       }
     },
-    "Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled." : {
+    "Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena Life. New entries are sent going forward — existing ones aren't back-filled." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Algumas categorias estão desativadas no Apple Health. Para permiti-las, abra Saúde → Perfil → Apps → Septena. Novas entradas são enviadas daqui em diante — as existentes não são preenchidas retroativamente."
+            "value" : "Algumas categorias estão desativadas no Apple Health. Para permiti-las, abra Saúde → Perfil → Apps → Septena Life. Novas entradas são enviadas daqui em diante — as existentes não são preenchidas retroativamente."
           }
         }
       }
@@ -7996,12 +7996,12 @@
         }
       }
     },
-    "Thank you — you're the reason Septena stays free and independent." : {
+    "Thank you — you're the reason Septena Life stays free and independent." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Obrigado — você é o motivo de o Septena seguir gratuito e independente."
+            "value" : "Obrigado — você é o motivo de o Septena Life seguir gratuito e independente."
           }
         }
       }
@@ -8080,7 +8080,7 @@
         }
       }
     },
-    "The local MCP server lets Claude Code connect directly to Septena through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server." : {
+    "The local MCP server lets Claude Code connect directly to Septena Life through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server." : {
 
     },
     "The master switch. Each nudge fires around when you usually log it and goes quiet once it's marked for the day." : {
@@ -8109,7 +8109,7 @@
     "The seven discs unfurl in the rainbow — everyday, in-app" : {
 
     },
-    "These controls are shared across Septena. Open one to change its canonical setting without leaving this section's context." : {
+    "These controls are shared across Septena Life. Open one to change its canonical setting without leaving this section's context." : {
 
     },
     "These four groups are the raw material for the north-star and commitments." : {
@@ -8175,12 +8175,12 @@
         }
       }
     },
-    "This is the focused set Septena will turn into a north-star and commitments." : {
+    "This is the focused set Septena Life will turn into a north-star and commitments." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Este é o conjunto enxuto que o Septena vai transformar em uma estrela-guia e compromissos."
+            "value" : "Este é o conjunto enxuto que o Septena Life vai transformar em uma estrela-guia e compromissos."
           }
         }
       }
@@ -9094,7 +9094,7 @@
         }
       }
     },
-    "You're reaching me directly — I'm the one person who makes Septena, and I read every ticket." : {
+    "You're reaching me directly — I'm the one person who makes Septena Life, and I read every ticket." : {
 
     },
     "Your anonymous community identity. Useful when granting maintainer access from the server." : {

@@ -311,7 +311,7 @@ struct AppleHealthDetail: View {
           }
         }
       } footer: {
-        Text("Septena reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device.")
+        Text("Septena Life reads activity and recovery metrics from Apple Health and can write your mood, meals, macros, and water back. Nothing leaves your device.")
       }
 
       // ── Write Toggles (shown once the user has been through the sheet) ───
@@ -324,9 +324,9 @@ struct AppleHealthDetail: View {
           Text("Write to Health")
         } footer: {
           if anyDenied {
-            Text("Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena. New entries are sent going forward — existing ones aren't back-filled.")
+            Text("Some categories are turned off in Apple Health. To allow them, open Health → Profile → Apps → Septena Life. New entries are sent going forward — existing ones aren't back-filled.")
           } else {
-            Text("New entries you log in Septena will be sent to Apple Health. Existing entries are not back-filled.")
+            Text("New entries you log in Septena Life will be sent to Apple Health. Existing entries are not back-filled.")
           }
         }
       }
@@ -431,7 +431,7 @@ private struct PhotosDetail: View {
   var body: some View {
     Form {
       Section {
-        Text("Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.")
+        Text("Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }

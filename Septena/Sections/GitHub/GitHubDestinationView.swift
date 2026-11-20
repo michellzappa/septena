@@ -110,7 +110,7 @@ struct GitHubDestinationView: View {
       DrawerSection {
         Label {
           VStack(alignment: .leading, spacing: 2) {
-            Text("Not syncing — showing the last calendar Septena could fetch.")
+            Text("Not syncing — showing the last calendar Septena Life could fetch.")
               .font(.subheadline)
             Text(provider.lastError ?? "Check the token in Settings › Integrations › GitHub.")
               .font(.caption)

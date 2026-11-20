@@ -47,7 +47,7 @@ struct AboutSettingsPane: View {
       }
 
       Section {
-        Text("Septena keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data.")
+        Text("Septena Life keeps the everyday things you track in one place: tasks, habits, what you eat, how you sleep. It syncs across your devices over iCloud and stays yours alone — and it's open source, so you can read exactly how it handles your data.")
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -56,7 +56,7 @@ struct AboutSettingsPane: View {
       // it live in docs/MAKER_IDENTITY.md (Block A) — keep this in step with it.
       Section {
         VStack(alignment: .leading, spacing: 12) {
-          Text("Hi, I'm Michell. Septena is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too.")
+          Text("Hi, I'm Michell. Septena Life is built by me alone, with AI as my pair-programmer. No team, no investors, no analytics watching you. If something's rough, that's on me; if something's thoughtful, it's probably the part I use every day too.")
             .font(.callout)
             .foregroundStyle(.secondary)
           HStack(spacing: 8) {
@@ -442,7 +442,7 @@ struct SkillsSettingsPane: View {
       } header: {
         Text("MCP")
       } footer: {
-        Text("Connect Claude or another MCP client to mcp.septena.app to read and write your Septena data. The brief below is what the model needs to know to use the connection well.")
+        Text("Connect Claude or another MCP client to mcp.septena.app to read and write your Septena Life data. The brief below is what the model needs to know to use the connection well.")
       }
 
       Section {

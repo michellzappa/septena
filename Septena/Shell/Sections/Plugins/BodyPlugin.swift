@@ -16,7 +16,7 @@ enum BodyPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "body",
-      intro: "Weight and body-composition trends from HealthKit and Withings. Septena reads; it never writes back.",
+      intro: "Weight and body-composition trends from HealthKit and Withings. Septena Life reads; it never writes back.",
       bullets: [
         .init("Withings wins for composition", "Fat %, muscle, water. HealthKit fills in days Withings missed.", icon: "figure.stand"),
         .init("Trend over spikes", "The multi-week direction is what matters — daily noise gets smoothed.", icon: "chart.line.uptrend.xyaxis"),

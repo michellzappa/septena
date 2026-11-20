@@ -19,7 +19,7 @@ import Foundation
 struct LogWaterIntent: SectionLogIntent {
   static let sectionKey = "hydration"
   static let title: LocalizedStringResource = "Log Water"
-  static let description = IntentDescription("Log water intake in Septena.")
+  static let description = IntentDescription("Log water intake in Septena Life.")
 
   @Parameter(title: "Milliliters", default: 250, requestValueDialog: "How many milliliters?")
   var milliliters: Int

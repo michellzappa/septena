@@ -47,7 +47,7 @@ struct PrivacySettingsPane: View {
         Text("App Lock")
       } footer: {
         Text(AppLock.isAvailable
-             ? "Asks for \(AppLock.biometryLabel) or your passcode when you reopen Septena. Your data is already protected by your device passcode — this adds a gate in front of the app itself, for when the phone is unlocked and handed over."
+             ? "Asks for \(AppLock.biometryLabel) or your passcode when you reopen Septena Life. Your data is already protected by your device passcode — this adds a gate in front of the app itself, for when the phone is unlocked and handed over."
              : "Set up \(AppLock.biometryLabel) or a device passcode in Settings to use App Lock.")
       }
 
@@ -104,7 +104,7 @@ struct PrivacySettingsPane: View {
       Section("What is never sent — at any level") {
         bullet("Anything you log — food, intake, supplements, sleep, mood, notes. None of it leaves your device through analytics.")
         bullet("Your community profile, iCloud identity, or anything that links analytics to your personal data.")
-        bullet("Your IP address. Cloudflare receives it to deliver the request, but Septena does not store it in analytics tables.")
+        bullet("Your IP address. Cloudflare receives it to deliver the request, but Septena Life does not store it in analytics tables.")
       }
 
       // Future: opt-in donation of select, anonymized life data to support
@@ -129,11 +129,11 @@ struct PrivacySettingsPane: View {
         EmptyView()
       } footer: {
         VStack(alignment: .leading, spacing: 8) {
-          Text("Analytics is processed by Septena on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud.")
+          Text("Analytics is processed by Septena Life on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud.")
           Link("cloudflare.com/privacypolicy",
                destination: URL(string: "https://www.cloudflare.com/privacypolicy/")!)
             .font(.callout)
-          Text("Septena is open source. Read exactly what's collected and when, in the code:")
+          Text("Septena Life is open source. Read exactly what's collected and when, in the code:")
             .padding(.top, 4)
           Link("View the analytics source on GitHub",
                destination: URL(string: "https://github.com/michellzappa/septena/blob/main/SeptenaCore/Telemetry.swift")!)
@@ -199,7 +199,7 @@ struct MCPServerUnavailablePane: View {
       Section {
         Label("MCP Server runs on Mac", systemImage: "server.rack")
       } footer: {
-        Text("The local MCP server lets Claude Code connect directly to Septena through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server.")
+        Text("The local MCP server lets Claude Code connect directly to Septena Life through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server.")
       }
     }
     .formStyle(.grouped)
@@ -1240,7 +1240,7 @@ struct SeptenaPlusPaywall: View {
     VStack(alignment: .leading, spacing: 14) {
       SeptenaDiscMark(size: 56)
       VStack(alignment: .leading, spacing: 6) {
-        Text("Septena is free. All of it. Always.")
+        Text("Septena Life is free. All of it. Always.")
           .font(.title2.weight(.semibold))
         Text("Every section, every feature — yours, with nothing held back and no ads watching you. That's a promise, not a trial. If it's become part of how you run your life, you can chip in to keep it independent. You won't unlock anything — there's nothing to unlock.")
           .font(.subheadline)
@@ -1440,7 +1440,7 @@ struct AccountSettingsPane: View {
       } header: {
         Text("iCloud")
       } footer: {
-        Text("Septena keeps everything in your private iCloud — there's no separate Septena account. Your data and membership are tied to your Apple ID.")
+        Text("Septena Life keeps everything in your private iCloud — there's no separate Septena Life account. Your data and membership are tied to your Apple ID.")
       }
 
       // macOS only (renders nothing on iOS). Optional Sign in with Apple — the
@@ -1467,7 +1467,7 @@ struct AccountSettingsPane: View {
       } header: {
         Text("You're a supporter")
       } footer: {
-        Text("Thank you — you're the reason Septena stays free and independent.")
+        Text("Thank you — you're the reason Septena Life stays free and independent.")
       }
       Section {
         Button("Restore purchases") {

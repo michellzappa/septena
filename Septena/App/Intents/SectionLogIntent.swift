@@ -72,6 +72,6 @@ struct SectionRetiredError: Error, CustomLocalizedStringResourceConvertible {
 struct SectionDisabledError: Error, CustomLocalizedStringResourceConvertible {
   let label: String
   var localizedStringResource: LocalizedStringResource {
-    "\(label) is turned off in Septena. Turn it on to use this action."
+    "\(label) is turned off in Septena Life. Turn it on to use this action."
   }
 }

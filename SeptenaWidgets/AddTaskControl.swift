@@ -15,6 +15,6 @@ struct AddTaskControl: ControlWidget {
       }
     }
     .displayName("Add Task")
-    .description("Open Septena to capture a to-do.")
+    .description("Open Septena Life to capture a to-do.")
   }
 }

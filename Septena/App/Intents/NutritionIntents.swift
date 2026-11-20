@@ -45,7 +45,7 @@ enum MealType: String, AppEnum {
 struct LogMealIntent: SectionLogIntent {
   static let sectionKey = "nutrition"
   static let title: LocalizedStringResource = "Log a Meal"
-  static let description = IntentDescription("Log what you ate to Septena.")
+  static let description = IntentDescription("Log what you ate to Septena Life.")
 
   @Parameter(title: "Foods", requestValueDialog: "What did you eat?")
   var foods: String

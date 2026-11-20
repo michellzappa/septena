@@ -17,8 +17,8 @@ enum ActivityPlugin: SectionPlugin {
       sectionKey: "activity",
       intro: "Step counts and movement minutes from HealthKit, alongside the rest of your daily data.",
       bullets: [
-        .init("Read-only", "Septena observes HealthKit; never writes back.", icon: "lock"),
-        .init("HealthKit permission", "Granted in iOS Settings → Privacy → Health → Septena. Without it the section stays empty.", icon: "heart.text.square"),
+        .init("Read-only", "Septena Life observes HealthKit; never writes back.", icon: "lock"),
+        .init("HealthKit permission", "Granted in iOS Settings → Privacy → Health → Septena Life. Without it the section stays empty.", icon: "heart.text.square"),
       ],
       complete: complete
     ))

@@ -88,7 +88,7 @@ struct SiriShortcutsSettingsPane: View {
       } header: {
         Text("Shortcuts")
       } footer: {
-        Text("Opens the Shortcuts app with every Septena action ready to drop into a shortcut, Home Screen tile, or automation.")
+        Text("Opens the Shortcuts app with every Septena Life action ready to drop into a shortcut, Home Screen tile, or automation.")
       }
 
       // One DismissableSiriTip per voice action — mirrors the 10 built-in
@@ -110,7 +110,7 @@ struct SiriShortcutsSettingsPane: View {
       }
       #else
       Section {
-        Text("Open the Shortcuts app to build shortcuts and automations from Septena's actions. Trigger them with Siri on iPhone and iPad.")
+        Text("Open the Shortcuts app to build shortcuts and automations from Septena Life's actions. Trigger them with Siri on iPhone and iPad.")
           .foregroundStyle(.secondary)
       } header: {
         Text("Shortcuts")

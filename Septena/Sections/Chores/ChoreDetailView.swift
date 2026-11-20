@@ -62,7 +62,7 @@ struct ChoreDetailView: View {
       if confident, let predicted = learnedNextDue(last: lastCompleted, gap: learned) {
         cadenceCard.note = "At your real pace, expect this again \(LogDetailFormat.relativeDay(predicted, today: today))."
       } else if !confident {
-        cadenceCard.note = "Learning your rhythm — a couple more completions and Septena will predict the next one."
+        cadenceCard.note = "Learning your rhythm — a couple more completions and Septena Life will predict the next one."
       }
     } else {
       cadenceCard.note = "No rhythm yet — the schedule drives the next-due date until there's a pattern to learn from."

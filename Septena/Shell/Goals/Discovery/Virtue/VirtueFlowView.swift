@@ -111,7 +111,7 @@ struct VirtueFlowView: View {
       VStack(alignment: .leading, spacing: 10) {
         Text("Hold the week up to the light")
           .font(.largeTitle.weight(.bold))
-        Text("Septena summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard.")
+        Text("Septena Life summarizes your last 7 days of logs (on device, nothing leaves your phone) and reflects them against four cardinal virtues. A mirror, not a scorecard.")
           .font(.body)
           .foregroundStyle(.secondary)
       }

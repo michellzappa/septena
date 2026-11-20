@@ -77,7 +77,7 @@ struct ValuesFlowView: View {
       VStack(alignment: .leading, spacing: 10) {
         Text("Turn values into goals")
           .font(.largeTitle.weight(.bold))
-        Text("Choose the principles you want to live by. Septena drafts a north-star and commitments you can save into Goals.")
+        Text("Choose the principles you want to live by. Septena Life drafts a north-star and commitments you can save into Goals.")
           .font(.body)
           .foregroundStyle(.secondary)
       }
@@ -106,7 +106,7 @@ struct ValuesFlowView: View {
         VStack(alignment: .leading, spacing: 8) {
           Text("Review your values")
             .font(.title2.weight(.semibold))
-          Text("This is the focused set Septena will turn into a north-star and commitments.")
+          Text("This is the focused set Septena Life will turn into a north-star and commitments.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }

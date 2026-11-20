@@ -112,7 +112,7 @@ struct SectionContextualSettings: View {
       } header: {
         Label("Related Settings", systemImage: "slider.horizontal.3")
       } footer: {
-        Text("These controls are shared across Septena. Open one to change its canonical setting without leaving this section's context.")
+        Text("These controls are shared across Septena Life. Open one to change its canonical setting without leaving this section's context.")
       }
     }
   }

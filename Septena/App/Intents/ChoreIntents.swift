@@ -98,7 +98,7 @@ struct CompleteChoreIntent: SectionLogIntent {
 struct AddChoreIntent: SectionLogIntent {
   static let sectionKey = "chores"
   static let title: LocalizedStringResource = "Add Chore"
-  static let description = IntentDescription("Add a new recurring chore to Septena.")
+  static let description = IntentDescription("Add a new recurring chore to Septena Life.")
 
   @Parameter(title: "Name", requestValueDialog: "Which chore?")
   var name: String

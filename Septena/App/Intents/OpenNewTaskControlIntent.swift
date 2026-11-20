@@ -6,7 +6,7 @@ import Foundation
 /// the create flow (same as toolbar + / ⌘N).
 struct OpenNewTaskControlIntent: AppIntent {
   static var title: LocalizedStringResource = "Add Task"
-  static var description = IntentDescription("Open Septena to a new to-do.")
+  static var description = IntentDescription("Open Septena Life to a new to-do.")
   static var openAppWhenRun: Bool = true
 
   @MainActor

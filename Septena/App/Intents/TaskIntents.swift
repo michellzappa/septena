@@ -98,7 +98,7 @@ struct CompleteTaskIntent: SectionLogIntent {
   // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
   static let isDiscoverable = false
   static let title: LocalizedStringResource = "Complete Task"
-  static let description = IntentDescription("Mark a Septena task as done.")
+  static let description = IntentDescription("Mark a Septena Life task as done.")
 
   @Parameter(title: "Task")
   var task: TaskChoice
@@ -122,7 +122,7 @@ struct MoveTaskToTodayIntent: SectionLogIntent {
   // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
   static let isDiscoverable = false
   static let title: LocalizedStringResource = "Move Task to Today"
-  static let description = IntentDescription("Pin a Septena task to Today.")
+  static let description = IntentDescription("Pin a Septena Life task to Today.")
 
   @Parameter(title: "Task")
   var task: TaskChoice
@@ -148,7 +148,7 @@ struct DeferTaskIntent: SectionLogIntent {
   // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
   static let isDiscoverable = false
   static let title: LocalizedStringResource = "Defer Task"
-  static let description = IntentDescription("Schedule a Septena task for a future day and take it off Today.")
+  static let description = IntentDescription("Schedule a Septena Life task for a future day and take it off Today.")
 
   @Parameter(title: "Task")
   var task: TaskChoice

@@ -192,7 +192,7 @@ struct WelcomeView: View {
       AppIconPreview(option: .default, size: 72)
         .accessibilityHidden(true)
 
-      Text("Welcome to Septena")
+      Text("Welcome to Septena Life")
         .font(.septenaWordmark)
         .multilineTextAlignment(.center)
 

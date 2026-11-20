@@ -14,7 +14,7 @@ struct AddTaskIntent: SectionLogIntent {
   // Hidden from Shortcuts: Septena Life retired Tasks (ADR 0007).
   static let isDiscoverable = false
   static let title: LocalizedStringResource = "Add Task"
-  static let description = IntentDescription("Add a new to-do to Septena.")
+  static let description = IntentDescription("Add a new to-do to Septena Life.")
 
   @Parameter(title: "Title", requestValueDialog: "What's the task?")
   var taskTitle: String
@@ -23,6 +23,6 @@ struct AddTaskIntent: SectionLogIntent {
   func perform() async throws -> some IntentResult & ProvidesDialog {
     try await requireSection()
     _ = SeptenaServices.shared.taskMutator.create(title: taskTitle)
-    return .result(dialog: "Added “\(taskTitle)” to Septena.")
+    return .result(dialog: "Added “\(taskTitle)” to Septena Life.")
   }
 }

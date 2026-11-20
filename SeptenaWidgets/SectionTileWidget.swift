@@ -102,7 +102,7 @@ struct SectionTileWidgetView: View {
         .font(.subheadline.weight(.semibold))
       Text(entry.itemID == nil
            ? "Pick a section when adding this widget."
-           : "Section off or no data yet — open Septena once.")
+           : "Section off or no data yet — open Septena Life once.")
         .font(.caption)
         .foregroundStyle(.secondary)
     }

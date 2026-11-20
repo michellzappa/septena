@@ -35,7 +35,7 @@ struct ClaudeGatewayDetail: View {
           }
         }
       } footer: {
-        Text("Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude.")
+        Text("Connecting lets Claude (at claude.ai or in the Claude app) read and write your Septena Life data via the MCP connector. Your data stays in iCloud — the gateway only relays a short-lived access token, which this app refreshes automatically. Use the address below to add the connector in Claude.")
       }
 
       Section {
@@ -127,7 +127,7 @@ struct ClaudeGatewayDetail: View {
       Section {
         explainerRow(icon: "link",
                      title: "A small relay",
-                     text: "Claude talks to Septena through a connector at mcp.septena.app. Add it in Claude (claude.ai or the Claude app) using that address.")
+                     text: "Claude talks to Septena Life through a connector at mcp.septena.app. Add it in Claude (claude.ai or the Claude app) using that address.")
         explainerRow(icon: "lock.icloud",
                      title: "Your data stays private",
                      text: "Reads and writes go straight to your own private iCloud database. The relay never stores your data — it only passes a short-lived access token through.")

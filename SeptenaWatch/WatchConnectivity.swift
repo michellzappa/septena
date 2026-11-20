@@ -181,7 +181,7 @@ final class WatchConnectivity {
         let payload  = record["payload"] as? Data,
         let response = try? JSONDecoder().decode(NextItemsResponse.self, from: payload)
       else {
-        errorMessage = "Couldn't read the watch snapshot. Open Septena on your iPhone."
+        errorMessage = "Couldn't read the watch snapshot. Open Septena Life on your iPhone."
         isLoading = false
         return
       }
@@ -230,7 +230,7 @@ final class WatchConnectivity {
       // CloudKit reports task cancellation as `.operationCancelled` — same
       // benign supersede case as above; don't show it.
     } catch let ckError as CKError where ckError.code == .unknownItem {
-      errorMessage = "No data yet. Open Septena on your iPhone to sync your watch."
+      errorMessage = "No data yet. Open Septena Life on your iPhone to sync your watch."
     } catch {
       errorMessage = error.localizedDescription
     }

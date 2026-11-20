@@ -69,7 +69,7 @@ struct TasksTodayWidgetView: View {
       header: header(totalCount: 0, compact: family == .systemSmall),
       isEmpty: false
     ) {
-      Text("Open Septena once to load today.")
+      Text("Open Septena Life once to load today.")
         .font(.caption)
         .foregroundStyle(.secondary)
     }

@@ -98,7 +98,7 @@ struct ActivityDestinationView: View {
       VStack(alignment: .leading, spacing: 12) {
         Text("Read Apple Health on this device")
           .font(.septenaCardTitle)
-        Text("Septena pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone.")
+        Text("Septena Life pulls steps, exercise minutes, VO2 max, HRV and resting heart rate from HealthKit. Data never leaves your phone.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
         Button("Grant access") {
@@ -118,7 +118,7 @@ struct ActivityDestinationView: View {
       VStack(alignment: .leading, spacing: 8) {
         Text("No Health data coming through")
           .font(.septenaCardTitle)
-        Text("Either there's nothing recorded for these metrics yet, or Septena's read access was turned off. Check Settings → Health → Data Access & Devices → Septena.")
+        Text("Either there's nothing recorded for these metrics yet, or Septena Life's read access was turned off. Check Settings → Health → Data Access & Devices → Septena Life.")
           .font(.subheadline)
           .foregroundStyle(.secondary)
         Button("Check access") {
@@ -136,13 +136,13 @@ struct ActivityDestinationView: View {
         if !bridge.isAvailable {
           Text("HealthKit isn't available on this device")
             .font(.septenaCardTitle)
-          Text("Activity tracking runs on iPhone / iPad. Open Septena there to start syncing steps and recovery metrics.")
+          Text("Activity tracking runs on iPhone / iPad. Open Septena Life there to start syncing steps and recovery metrics.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         } else {
           Text("Health access denied")
             .font(.septenaCardTitle)
-          Text("Re-enable in Settings → Health → Data Access & Devices → Septena.")
+          Text("Re-enable in Settings → Health → Data Access & Devices → Septena Life.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
         }

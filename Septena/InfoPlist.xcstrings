@@ -8,7 +8,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Septena"
+            "value" : "Septena Life"
           }
         }
       }
@@ -20,7 +20,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Septena"
+            "value" : "Septena Life"
           }
         }
       }
@@ -31,13 +31,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena shows upcoming events from your calendars on the Week dashboard."
+            "value" : "Septena Life shows upcoming events from your calendars on the Week dashboard."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana."
+            "value" : "O Septena Life mostra eventos futuros dos seus calendários no painel da Semana."
           }
         }
       }
@@ -48,13 +48,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena shows upcoming events from your calendars on the Week dashboard."
+            "value" : "Septena Life shows upcoming events from your calendars on the Week dashboard."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena mostra eventos futuros dos seus calendários no painel da Semana."
+            "value" : "O Septena Life mostra eventos futuros dos seus calendários no painel da Semana."
           }
         }
       }
@@ -66,7 +66,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Septena uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device."
+            "value" : "Septena Life uses the camera to photograph your meals so it can read the nutrition label or estimate macros on-device. Photos stay on your device."
           }
         }
       }
@@ -78,7 +78,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Septena uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone."
+            "value" : "Septena Life uses Face ID to unlock the app when App Lock is turned on, so your private logs stay covered on an unlocked phone."
           }
         }
       }
@@ -89,13 +89,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device."
+            "value" : "Septena Life reads your activity and recovery metrics (steps, exercise, VO2, HRV, resting heart rate) so the Activity tile can show them on the Week dashboard. Data stays on your device."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena lê suas métricas de atividade e recuperação (passos, exercício, VO2, VFC, frequência cardíaca de repouso) para que o bloco Atividade possa mostrá-las no painel da Semana. Os dados ficam no seu dispositivo."
+            "value" : "O Septena Life lê suas métricas de atividade e recuperação (passos, exercício, VO2, VFC, frequência cardíaca de repouso) para que o bloco Atividade possa mostrá-las no painel da Semana. Os dados ficam no seu dispositivo."
           }
         }
       }
@@ -106,13 +106,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device."
+            "value" : "Septena Life saves your mood check-ins and nutrition entries (meals, macros, water) to HealthKit so they appear in the Health app alongside your other data. Data stays on your device."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena salva seus check-ins de humor e entradas de nutrição (refeições, macros, água) no HealthKit para que apareçam no app Saúde junto aos seus outros dados. Os dados ficam no seu dispositivo."
+            "value" : "O Septena Life salva seus check-ins de humor e entradas de nutrição (refeições, macros, água) no HealthKit para que apareçam no app Saúde junto aos seus outros dados. Os dados ficam no seu dispositivo."
           }
         }
       }
@@ -123,13 +123,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device."
+            "value" : "Septena Life attaches photos to your meal entries and shows their thumbnails in your nutrition log. Photos stay on your device."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
+            "value" : "O Septena Life anexa fotos às suas refeições e mostra as miniaturas no seu registro de nutrição. As fotos ficam no seu dispositivo."
           }
         }
       }
@@ -140,13 +140,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena imports tasks from your Reminders lists into the Inbox."
+            "value" : "Septena Life imports tasks from your Reminders lists into the Inbox."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada."
+            "value" : "O Septena Life importa tarefas das suas listas de Lembretes para a Caixa de entrada."
           }
         }
       }
@@ -157,13 +157,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Septena imports tasks from your Reminders lists into the Inbox."
+            "value" : "Septena Life imports tasks from your Reminders lists into the Inbox."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Septena importa tarefas das suas listas de Lembretes para a Caixa de entrada."
+            "value" : "O Septena Life importa tarefas das suas listas de Lembretes para a Caixa de entrada."
           }
         }
       }

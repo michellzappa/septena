@@ -98,7 +98,7 @@ struct MarkSupplementTakenIntent: SectionLogIntent {
 struct AddSupplementIntent: SectionLogIntent {
   static let sectionKey = "supplements"
   static let title: LocalizedStringResource = "Add Supplement"
-  static let description = IntentDescription("Add a new supplement to Septena.")
+  static let description = IntentDescription("Add a new supplement to Septena Life.")
 
   @Parameter(title: "Name", requestValueDialog: "Which supplement?")
   var name: String

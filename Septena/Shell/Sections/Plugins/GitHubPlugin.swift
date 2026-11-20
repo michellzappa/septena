@@ -16,7 +16,7 @@ enum GitHubPlugin: SectionPlugin {
   static func onboarding(complete: @escaping () -> Void) -> AnyView? {
     AnyView(SectionOnboarding(
       sectionKey: "github",
-      intro: "Your commit activity as a contribution heatmap. Septena reads your GitHub calendar; it never writes anything back.",
+      intro: "Your commit activity as a contribution heatmap. Septena Life reads your GitHub calendar; it never writes anything back.",
       bullets: [
         .init("Read-only, on this device",
               "Paste a personal access token once — it stays in this device's Keychain and is never sent to any Septena server.",
