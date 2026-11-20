@@ -100,7 +100,6 @@ private struct SeptaskMainWindow: View {
   var body: some View {
     SeptaskRootView()
       .overlay { LogCommitOverlay() }
-      .septaskWelcomeGate()
       // No CloudKit batch listener: Septask's settings arrive with the task
       // backend pull, and `SettingsStore` reloads itself on
       // `.septaskSettingsPulled`. Septask has no section colors to repaint.

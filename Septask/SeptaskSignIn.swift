@@ -168,7 +168,6 @@ struct SeptaskDeleteAccountSection: View {
 
 private struct SeptaskDeleteAccountSheet: View {
   @Environment(\.dismiss) private var dismiss
-  @AppStorage(SeptaskWelcome.completedKey) private var welcomeCompleted = false
   @State private var working = false
   @State private var error: String?
 
@@ -217,7 +216,8 @@ private struct SeptaskDeleteAccountSheet: View {
       do {
         try await TaskSyncEngine.shared.deleteAccount()
         dismiss()
-        showWelcome()
+        // Back to the first run: Today shows Get started again.
+        TaskNotices.resetGetStarted()
       } catch {
         let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         self.error = String(localized: "Couldn't delete your account. Nothing was deleted. \(detail)",
@@ -225,17 +225,6 @@ private struct SeptaskDeleteAccountSheet: View {
         working = false
       }
     }
-  }
-
-  /// Back to the first run. iOS: the welcome gate watches the same key.
-  /// Mac: the AppKit shell hosts the welcome itself.
-  private func showWelcome() {
-    welcomeCompleted = false
-    #if os(macOS)
-    if let shell = SeptaskKitWindowController.existing?.window {
-      SeptaskKitWelcome.presentIfNeeded(over: shell)
-    }
-    #endif
   }
 }
 

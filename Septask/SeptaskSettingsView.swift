@@ -508,7 +508,6 @@ private struct SeptaskPrivacyPane: View {
 // MARK: - About
 
 private struct SeptaskAboutPane: View {
-  @AppStorage(SeptaskWelcome.completedKey) private var welcomeCompleted = false
   @Environment(\.openURL) private var openURL
 
   var body: some View {
@@ -571,7 +570,7 @@ private struct SeptaskAboutPane: View {
         .disabled(!SeptaskUpdater.isConfigured)
         #endif
         #endif
-        Button("Show Welcome Again") { welcomeCompleted = false }
+        Button("Show Get Started Again") { TaskNotices.resetGetStarted() }
       }
 
       Section {

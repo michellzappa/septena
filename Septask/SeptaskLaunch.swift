@@ -222,14 +222,9 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
     // Accessibility permission, no event tap). ⌃Space is the system input
     // source switch and Moom's binding, so it is not used.
     SeptaskKitQuickEntry.installHotKey()
+    // No welcome screen: a fresh install lands on Today, where the Get
+    // started checklist and the sign-in notice (`TaskNotices`) take over.
     SeptaskKitWindowController.show()
-    // First run: the AppKit shell is the default window on macOS, so a fresh
-    // install would otherwise land in an empty task list with no introduction
-    // — the SwiftUI welcome gate rides the classic window, which no longer
-    // opens at launch. Same view, same completion key, hosted as a sheet.
-    if let shell = SeptaskKitWindowController.existing?.window {
-      SeptaskKitWelcome.presentIfNeeded(over: shell)
-    }
     // Sparkle starts scheduled checks when the controller is created. Local
     // Debug builds intentionally have no update key and must not prompt.
     #if !DEBUG
@@ -244,13 +239,6 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
                                      hasVisibleWindows flag: Bool) -> Bool {
     if !flag {
       SeptaskKitWindowController.show()
-      // Second chance for the welcome: if the shell window wasn't up at launch
-      // there was nothing to host the sheet, and it would otherwise never
-      // appear again. `presentIfNeeded` self-gates, so this is a no-op once
-      // the user has finished it.
-      if let shell = SeptaskKitWindowController.existing?.window {
-        SeptaskKitWelcome.presentIfNeeded(over: shell)
-      }
     }
     return true
   }

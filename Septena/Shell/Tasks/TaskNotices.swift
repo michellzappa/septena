@@ -117,6 +117,16 @@ enum TaskNotices {
     }
   }
 
+  /// Shows Get started again from the start (Settings ▸ About, and after an
+  /// account is deleted). Steps the data still proves come back ticked.
+  static func resetGetStarted() {
+    var seen = Set(UserDefaults.standard.stringArray(forKey: seenKey) ?? [])
+    seen.remove(TaskNotice.ID.getStarted.rawValue)
+    UserDefaults.standard.set(seen.sorted(), forKey: seenKey)
+    UserDefaults.standard.removeObject(forKey: stepsKey)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+  }
+
   /// Ticks a checklist step: by hand from its checkbox, or from the code
   /// path that just did the thing (pairing approved, an import finished).
   static func completeStep(_ id: TaskNoticeStep.ID) {
