@@ -3,17 +3,15 @@ import { randomId, sha256Base64Url } from "../util.js";
 
 // OAuth tokens for the task connector on api.septena.app.
 //
-// Same model as the live connector (src/storage.ts) and the app sessions
-// (src/api/session.ts): a 1-hour access token, a rotating refresh token, and
+// Same model as the app sessions (src/api/session.ts): a 1-hour access token, a rotating refresh token, and
 // KV records keyed by sha256(token) so a KV leak yields no usable bearer. A
 // spent refresh token presented again is a replay and kills the family.
 //
 // Distinct prefixes keep the three token kinds apart:
 //   sa1.  / sr1.   app session (session.ts)       — never accepted here
 //   sm1.  / smr1.  MCP task connector (this file)         — never accepted by /v1
-//   (none)         live connector (storage.ts)     — random, no prefix
-// KV keys live under `v2:` so they never collide with the live `token:`,
-// `refresh:` and `rtfamily:` records (or the cleanup cron that scans those).
+// KV keys live under `v2:`, apart from the `token:`, `refresh:` and
+// `rtfamily:` records the retired CloudKit connector left (they expire by TTL).
 
 export const MCP_READ_SCOPE = "tasks:read";
 export const MCP_WRITE_SCOPE = "tasks:write";

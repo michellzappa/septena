@@ -73,27 +73,19 @@ function objectKeys(sourceFile, varName) {
     .filter(Boolean);
 }
 
-const mcpFile = parseFile("src/mcp.ts");
+const taskToolsFile = parseFile("src/tools/taskTools.ts");
 const agentFile = parseFile("src/shadow/agent.ts");
 const shadowMcpFile = parseFile("src/shadow/mcp.ts");
 const shadowWritesFile = parseFile("src/shadow/writes.ts");
 
-const globalTools = extractToolArray(findConstInitializer(mcpFile, "GLOBAL_TOOLS"));
-const sectionToolsInit = findConstInitializer(mcpFile, "SECTION_TOOLS");
-assert.ok(ts.isObjectLiteralExpression(sectionToolsInit));
-const sectionTools = [];
-for (const prop of sectionToolsInit.properties) {
-  if (!ts.isPropertyAssignment(prop)) continue;
-  sectionTools.push(...extractToolArray(prop.initializer));
-}
+const taskTools = extractToolArray(findConstInitializer(taskToolsFile, "TASK_TOOLS"));
 const agentTools = extractToolArray(findConstInitializer(agentFile, "AGENT_TOOLS"));
-const allTools = [...globalTools, ...sectionTools, ...agentTools];
+const allTools = [...taskTools, ...agentTools];
 const byName = new Map(allTools.map((t) => [t.name, t]));
 
-test("every tool has unique name, title, and explicit MCP ToolAnnotations", () => {
+test("every api.septena.app tool has unique name, title, and explicit MCP ToolAnnotations", () => {
   assert.equal(byName.size, allTools.length, "duplicate tool names detected");
-  assert.ok(globalTools.length >= 24, `expected at least 24 global tools, got ${globalTools.length}`);
-  assert.ok(sectionTools.length >= 48, `expected at least 48 section tools, got ${sectionTools.length}`);
+  assert.equal(taskTools.length, 17, `expected 17 task tools, got ${taskTools.length}`);
   assert.equal(agentTools.length, 5, "expected 5 agent tools");
 
   for (const tool of allTools) {
@@ -134,6 +126,8 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
     "tasks_history",
   ]);
   const expectedDestructive = new Set(["tasks_complete", "tasks_update"]);
+
+  assert.equal(apiConnectorNames.size, allTools.length, "tool definitions and handlers must match 1:1");
 
   for (const name of apiConnectorNames) {
     const tool = byName.get(name);
