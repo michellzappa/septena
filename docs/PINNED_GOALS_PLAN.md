@@ -82,7 +82,7 @@ The full-width tile design (informed by `DesignSpec.md` / `Theme.swift` /
 6. **MCP both servers, lockstep** — `goals_create` / `goals_list` / `goals_update`
    already exist; surface `pinned` in the schema + the new per-habit metric keys in
    the metric catalog, and mirror in the hosted gateway
-   (`../septena-mcp-gateway`) + the section skill.
+   (`backend/`) + the section skill.
 
 ## The streak residue
 

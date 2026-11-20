@@ -38,6 +38,8 @@ GitHub labels: `spec`, `adr`, `ready-for-agent`, `needs-mz`, and one
 
 Septena and Septask leave iCloud. Data moves to the own backend
 (`api.septena.app`). See [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+The backend source is the Cloudflare Worker in `../backend/` (it also serves
+the MCP gateway on `mcp.septena.app`).
 New specs design for the backend only. Docs that assume CloudKit is the
 product are stale on that point, even when the rest still holds.
 

@@ -137,7 +137,7 @@ handlers in `SeptenaCore/MCP/MCPDispatch.swift`, and include list tools in
 `readOnlyTools` when they only read the local mirror. If the hosted gateway is
 expected to expose the same section, mirror the schema and handlers there too.
 
-The gateway repo's `skill.md` is generated from
+The gateway's `backend/skill.md` is generated from
 `SectionRegistry.fullSkillMarkdown()`, so keep the plugin brief in sync with the
 actual MCP tools. A section with only `mcpSkill` text is documented for agents
 but not executable.

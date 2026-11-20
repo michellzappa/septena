@@ -104,7 +104,7 @@ All task rows descend from a shared skeleton. Files:
 ### 2.3 AI / MCP surface
 
 Two servers, edited in lockstep (`CLAUDE.md`): in-app `LocalMCPServer`
-(`SeptenaCore/MCP/`) and the hosted gateway (`../septena-mcp-gateway`).
+(`SeptenaCore/MCP/`) and the hosted gateway (`backend/`).
 
 - **`tasks_create`** (`MCPToolCatalog.swift:82`) — inputs: `title`, `today`,
   `scheduled`, `deadline`, `area`, `project`, `notes`. **No `proposed` /

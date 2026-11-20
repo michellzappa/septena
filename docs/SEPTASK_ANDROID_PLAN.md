@@ -101,7 +101,7 @@ Septena/Septask (Apple)          Claude (MCP)          Septask Android
 
 ## 2. Backend plan (gateway repo)
 
-All phases land in `../septena-mcp-gateway`. Each is independently
+All phases land in `backend/`. Each is independently
 deployable; nothing here touches the Apple apps.
 
 ### B0 — Spike: prove the loop (≈ Septask P0)

@@ -86,7 +86,7 @@ Wire into `TaskEntity.toCloudKitRecord()` (write) and `TaskEntity.apply(_:)` (re
 - **Prod:** the prod schema deploy is already pending (per `project_event_occurred_at`) — fold these three fields into that same deploy rather than a separate one.
 - Reads of records lacking the field must tolerate absence (optional `String?`, no force-unwrap) — mirror the existing `createWithFieldFallback`/optional-field handling so unknown-field writes/reads don't throw.
 
-### 3.3 Gateway / MCP server — `../septena-mcp-gateway` (Cloudflare Worker, TypeScript)
+### 3.3 Gateway / MCP server — `backend/` (Cloudflare Worker, TypeScript)
 
 The stamp lives in `createTask()` at `src/tools/writeTasks.ts:124`. The reference pattern is already in `src/tools/nutrition.ts:192` (`logNutritionEntry` sets `source: { value: "mcp" }`).
 

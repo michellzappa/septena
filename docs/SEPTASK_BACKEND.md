@@ -57,8 +57,10 @@ the same server with credentials we control and can refresh.
   sections, settings). If yes, that reference crosses stores and needs a rule.
 - Whether task-related settings (`SettingsKey.todayGroupByList` and others)
   sync through the CloudKit `Settings` record or stay in local defaults.
-- The current state of `../septena-mcp-gateway` — the repo is not checked out
-  on this machine, so this spec did not read its code.
+- The current state of the gateway — it was not checked out on this machine
+  when this spec was written, so the spec did not read its code. Since #83 the
+  gateway lives in `backend/` in this repo (the old `../septena-mcp-gateway`
+  checkout is frozen).
 
 ## 4. Architecture
 

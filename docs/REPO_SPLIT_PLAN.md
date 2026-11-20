@@ -11,8 +11,10 @@ Decisions taken in #68:
 - This repo (`michellzappa/septena`) stays the task app (Septena). It keeps its
   history, issues, factory and MIT licence, and stays public.
 - The life OS (Septena Life) moves to a new repo `michellzappa/septena-life`.
-- The gateway moves into `backend/` in this repo (#83). That move does not
-  depend on this plan. Either can land first.
+- The gateway moved into `backend/` in this repo (#83, done 2026-11-20, with
+  history). Deploys run from `backend/`. The old
+  `/Users/mz/Dev/septena-mcp-gateway` checkout is frozen; mz archives it after
+  a week.
 
 Names in this doc: "task app" = the `Septask*` targets (ships as Septena).
 "Life app" = the `Septena*` targets (ships as Septena Life). Code identifiers
@@ -229,7 +231,7 @@ Rule: these become per-repo files. septena-life is a full-history copy
 | `Septena/Resources/changelog.json` | septena-life (only the life app bundles it). The task app gets its own changelog later. |
 | `reports-worker/` | septena-life (practitioner reports are life) *(default)* |
 | `community-worker/` | stays (both apps call it through `SeptenaCore/Community`) *(default)* |
-| `backend/` (after #83) | stays. It also serves life's tools on `mcp.septena.app`. |
+| `backend/` (landed in #83) | stays. It also serves life's tools on `mcp.septena.app`. |
 | `appstore/metadata`, `metadata-mac`, `panels.config.mjs`, `capture.sh` life paths | septena-life |
 | `appstore/metadata-septask*`, `panels.septask.mjs`, `raw-septask`, `screenshots-septask` | stays |
 | `appstore/` render tooling (`render.mjs`, `validate.mjs`, `serve.mjs`, `devices.mjs`, `theme.mjs`, `components.mjs`, `apps.mjs`, `viz/`) | both (copy at clone) *(default)* |

@@ -194,7 +194,7 @@ else on the local model with the backend fields specified for the cutover.
 
 Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
 "Septask"). Any new MCP field lands in the in-app server and
-`../septena-mcp-gateway` together.
+`backend/` together.
 
 ## 11. Open questions for mz
 

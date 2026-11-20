@@ -61,6 +61,7 @@ checklist, including CloudKit and report-worker setup.
 |   `-- Sections/                  # SectionManifest and MCP skill model
 |-- SeptenaWatch/                  # Watch companion app
 |-- SeptenaWatchComplication/      # WidgetKit complications
+|-- backend/                       # Cloudflare Worker: mcp.septena.app + api.septena.app
 |-- docs/                          # DesignSpec (design system) + backlog
 |-- project.yml                    # XcodeGen project definition
 `-- *_HANDOFF.md                   # Migration notes; verify against current code
@@ -152,7 +153,7 @@ Mutators are the write boundary. Views and intents should not write SwiftData en
 | `AddTaskIntent.swift`, `App/Intents/` | App Intents for tasks and section logging. |
 | `Telemetry.swift` | Optional anonymous aggregate telemetry via the Cloudflare worker. |
 
-The hosted MCP gateway is `https://mcp.septena.app/mcp`. The app mirrors the section skill briefs in Settings so the LLM-facing tool catalog and the in-app section definitions can stay aligned.
+The hosted MCP gateway is `https://mcp.septena.app/mcp`. Its source is the Cloudflare Worker in `backend/` (deployed from there with wrangler; the same Worker serves the task backend on `api.septena.app`). The app mirrors the section skill briefs in Settings so the LLM-facing tool catalog and the in-app section definitions can stay aligned.
 
 ## Settings And Import/Export
 
