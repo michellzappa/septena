@@ -58,6 +58,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | Doc | Status |
 |---|---|
 | [SEPTASK_BACKEND.md](SEPTASK_BACKEND.md) | building (migration track) |
+| [REPO_SPLIT_PLAN.md](REPO_SPLIT_PLAN.md) | proposal (#84): Septena Life moves to `septena-life` |
 | [SYNC_SUBSCRIPTION_SPEC.md](SYNC_SUBSCRIPTION_SPEC.md) | proposed (launch track) |
 | [IDENTIFIERS.md](IDENTIFIERS.md) | current |
 | [CloudKitSchema.md](CloudKitSchema.md) | current until the iCloud exit, then historical |
