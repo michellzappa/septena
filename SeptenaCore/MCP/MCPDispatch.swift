@@ -201,7 +201,7 @@ enum MCPDispatch {
       return first
     }
     if !started {
-      throw MCPError.rejected("Septena is still starting up (CloudKit sync in progress) — retry in a moment.")
+      throw MCPError.rejected("\(AppDisplayName.current) is still starting up (CloudKit sync in progress) — retry in a moment.")
     }
   }
 

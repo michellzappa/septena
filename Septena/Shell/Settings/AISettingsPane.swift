@@ -65,7 +65,7 @@ struct ClaudeAISettingsPane<Extra: View>: View {
       } header: {
         Text("How far AI may reach")
       } footer: {
-        Text("Septena never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go.")
+        Text("\(AppDisplayName.current) never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go.")
       }
 
       Section {

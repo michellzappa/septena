@@ -36,7 +36,7 @@ struct RemindersInboxDetail: View {
       case .denied, .writeOnly:
         Section {
           Text(access == .writeOnly
-               ? "Septena has write-only access. Enable Full Access in Settings → Privacy → Reminders."
+               ? "\(AppDisplayName.current) has write-only access. Enable Full Access in Settings → Privacy → Reminders."
                : "Reminders access is denied. Enable it in Settings → Privacy → Reminders.")
             .font(.callout)
         }
@@ -174,7 +174,7 @@ struct CalendarDetail: View {
       case .denied, .writeOnly:
         Section {
           Text(access == .writeOnly
-               ? "Septena has write-only access. Enable Full Access in Settings → Privacy → Calendars."
+               ? "\(AppDisplayName.current) has write-only access. Enable Full Access in Settings → Privacy → Calendars."
                : "Calendar access is denied. Enable it in Settings → Privacy → Calendars.")
             .font(.callout)
         }

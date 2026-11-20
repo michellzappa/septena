@@ -224,6 +224,7 @@
 		226BFDEF2964B3BA661ACC67 /* DayTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880B70E1267B3CAAFFBA9D65 /* DayTimelineView.swift */; };
 		22819EF39EF685F6AE05D67A /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		22CE6E07D02E3FA677E2660A /* CalendarEventRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B42CD8FF9478F0EB45F2714 /* CalendarEventRow.swift */; };
+		22DC752EEB916BE9545C210B /* AppDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522653F0A698B3733B4B544A /* AppDisplayName.swift */; };
 		22E80459251ED3BF381616A6 /* SettingsKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92560D7D40C6F2BDFB34FC46 /* SettingsKeys.swift */; };
 		23066386CF43922C111C7CEB /* CoachBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03669C5350B224AF8B8C7845 /* CoachBackend.swift */; };
 		235C8E02A2E919E2E5FA23D0 /* SchemaSeedRegistrar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8ACF72CEC4EEB78A6951E1 /* SchemaSeedRegistrar.swift */; };
@@ -489,6 +490,7 @@
 		4A9BF2842C0AC601AF8B7099 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DC8E705099DB99718A8596 /* Persistence.swift */; };
 		4AC33F7CD66B2919EBE12CC6 /* StoreHealthNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8489149F1CB48EE9B3F75F7B /* StoreHealthNotice.swift */; };
 		4ACD0224383D936B2D2D3A72 /* TaskAttachmentRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2F87B4161EF331B1441432 /* TaskAttachmentRecord.swift */; };
+		4AD46D10C3F517C3364FC13D /* AppDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522653F0A698B3733B4B544A /* AppDisplayName.swift */; };
 		4AFF560E6A7C38047C30638D /* AddInfoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8762C7A4DFED340274D8BD37 /* AddInfoSection.swift */; };
 		4B050912C385585F94136803 /* QuickFindView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB04CA79A9C3207CCE972F9 /* QuickFindView.swift */; };
 		4BA1838E3CC3C1C86A148DCE /* MCPDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9944B4E8F1540B42EC6CCC17 /* MCPDispatch.swift */; };
@@ -992,6 +994,7 @@
 		9BB4EA54B6DB8B01A7CE8C19 /* AddTaskPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */; };
 		9BE25314B179473CC0A6CE7D /* IntakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D41E004025226ADBE31D93 /* IntakePlugin.swift */; };
 		9BE6D5FA6C63EE22A7784A91 /* SharedTaskCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37AB9FCF3C334DF3B18BBE8C /* SharedTaskCapture.swift */; };
+		9C7638375D2BCAB65980F9EE /* AppDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522653F0A698B3733B4B544A /* AppDisplayName.swift */; };
 		9C818D3C62F5B038E04E973B /* RhythmWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E807B4F41EC2581024D07E0B /* RhythmWire.swift */; };
 		9C9C6D849A8E0510B7D27B51 /* TaskSettingsSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499AEACE1CC5414188E16EF1 /* TaskSettingsSections.swift */; };
 		9CAD930E25C753412B370666 /* SeptaskKitRowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB81B427091F5C066DC6900 /* SeptaskKitRowViews.swift */; };
@@ -1568,6 +1571,7 @@
 		F21704F2D348D306CBC132AB /* SuggestionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6DD7C05D998EF1301A6410D /* SuggestionEngine.swift */; };
 		F2425F67935D5882EF56C171 /* TrainingDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C8645572712693D81587B7C /* TrainingDestinationView.swift */; };
 		F27A49A18DF9CF2FC68436D0 /* TasksWidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FC87654F413302D31832AE /* TasksWidgetSnapshotStore.swift */; };
+		F2902E7A33B04C7E185EC866 /* AppDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 522653F0A698B3733B4B544A /* AppDisplayName.swift */; };
 		F2AF8350E5FC97BC1A0A51CD /* CommunityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AE874D502585AA472CA027E /* CommunityClient.swift */; };
 		F2E23796C2E01C85E7B0EADC /* OpenNewTaskRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A65D55D33941FC6A0CDDA /* OpenNewTaskRouting.swift */; };
 		F31CE72568F0764C3F02F3FE /* RingStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035453AA7844A66C20E64324 /* RingStyles.swift */; };
@@ -1952,6 +1956,7 @@
 		5122E5C1D750654468CDCE96 /* SeptenaWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeptenaWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51885FDFDB9CF27D638FBD81 /* DiscoveryShelf.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryShelf.swift; sourceTree = "<group>"; };
 		520E04C092F9CD8F83865655 /* TaskKeyboardContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskKeyboardContractTests.swift; sourceTree = "<group>"; };
+		522653F0A698B3733B4B544A /* AppDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDisplayName.swift; sourceTree = "<group>"; };
 		524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaAttachment.swift; sourceTree = "<group>"; };
 		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		530B8FDCAE87F532F06C9F1F /* EditIntakeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditIntakeEntrySheet.swift; sourceTree = "<group>"; };
@@ -3386,6 +3391,7 @@
 				B54EBDD344E387CF1C7B01D4 /* AdaptiveColor.swift */,
 				7CE066849A08E248408104E3 /* AIModelTag.swift */,
 				63575F69CDDCCE079FDAEE04 /* AIPolicy.swift */,
+				522653F0A698B3733B4B544A /* AppDisplayName.swift */,
 				524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */,
 				4C2EF2CED379173B8A54F378 /* AttachmentFeed.swift */,
 				8EC7C9D9CAC52C91AFE79AE7 /* BadgeManager.swift */,
@@ -4188,6 +4194,7 @@
 				A5E48D6DB81E755634A1D6BD /* AddTaskPage.swift in Sources */,
 				A6CDD7A6959034273646A61C /* AmbientLight.swift in Sources */,
 				32AA2153DFF0D9C590FAD447 /* AppAttestClient.swift in Sources */,
+				4AD46D10C3F517C3364FC13D /* AppDisplayName.swift in Sources */,
 				158214D5C9B0DE9531F83520 /* AreaAttachment.swift in Sources */,
 				ACAABE4070DAF77ACBF26CA9 /* AreasBackend.swift in Sources */,
 				93C38FFB6DF0530D2979F97D /* AreasProjectsView.swift in Sources */,
@@ -4498,6 +4505,7 @@
 				25E8A556F4476BD84FD81158 /* AddTaskPage.swift in Sources */,
 				96FB147454022EBFBF926B9F /* AmbientLight.swift in Sources */,
 				898AAE7FD3FAC62A1483D18F /* AppAttestClient.swift in Sources */,
+				9C7638375D2BCAB65980F9EE /* AppDisplayName.swift in Sources */,
 				45851C3F622ABD71EAB43574 /* AreaAttachment.swift in Sources */,
 				0D7FFEEFAA43DDC505BB85D9 /* AreasBackend.swift in Sources */,
 				9B37CDE704E4EED5E1FB869B /* AreasProjectsView.swift in Sources */,
@@ -4801,6 +4809,7 @@
 				262BCA840BF28F47B44CE247 /* AmbientLight.swift in Sources */,
 				2933A423AA89C0FC06C738DD /* App.swift in Sources */,
 				1E49405865D5B2F03CC98499 /* AppAttestClient.swift in Sources */,
+				22DC752EEB916BE9545C210B /* AppDisplayName.swift in Sources */,
 				DEA2045EF8AC5881F6EA6403 /* AppLock.swift in Sources */,
 				E666EB185C74070004ACD166 /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				26310B62ED88D10E7CA8040D /* AreaAttachment.swift in Sources */,
@@ -5362,6 +5371,7 @@
 				04D117D5F2EB083A9423E808 /* AmbientLight.swift in Sources */,
 				1872D480184BC0A84068D022 /* App.swift in Sources */,
 				BB01E5596948745ABE6D9A40 /* AppAttestClient.swift in Sources */,
+				F2902E7A33B04C7E185EC866 /* AppDisplayName.swift in Sources */,
 				887BECF5F9C96F017814AA60 /* AppLock.swift in Sources */,
 				DEF6485917B66FBC2949A92D /* AppleIntelligenceUnavailableCard.swift in Sources */,
 				3F6197E64BB37124A0668AB1 /* AreaAttachment.swift in Sources */,
