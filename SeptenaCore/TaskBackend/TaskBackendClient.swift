@@ -216,6 +216,24 @@ actor TaskBackendClient {
     return request
   }
 
+  // MARK: - History
+
+  /// One task's change log, newest first (`GET /v1/changes?entity=task&id=`).
+  /// Page back with `before`: the smallest `rev` already shown.
+  func history(taskID: String, limit: Int = TaskHistory.pageSize, before: Int? = nil) async throws -> [BackendChange] {
+    var parts = URLComponents()
+    parts.path = "/v1/changes"
+    parts.queryItems = [
+      URLQueryItem(name: "entity", value: BackendEntity.task.rawValue),
+      URLQueryItem(name: "id", value: taskID),
+      URLQueryItem(name: "limit", value: String(min(max(limit, 1), 500))),
+    ] + (before.map { [URLQueryItem(name: "before", value: String($0))] } ?? [])
+    guard let path = parts.string else { throw TaskBackendError.badResponse("bad path") }
+    let (data, status) = try await authed(path: path, method: "GET", body: nil)
+    guard status == 200 else { throw Self.httpError(status, data) }
+    return try decode(BackendChangesResponse.self, from: data, what: "history").changes
+  }
+
   // MARK: - Claude connector pairing (MCP preview)
 
   /// Approves the pairing code that the api.septena.app connector page shows,

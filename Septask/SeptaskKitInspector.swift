@@ -28,6 +28,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let conversationLabel = NSTextField(labelWithString:
     String(localized: "Conversation", comment: "SeptaskKit: inspector section"))
   private let conversationView = KitConversationView()
+  /// Who changed the task and what (SeptaskKitHistory.swift). Loads only
+  /// while open.
+  private let historyView = KitHistoryView()
   /// The pane's own close control — the VISIBLE twin of `cancelOperation`'s
   /// Escape handling. The inspector is a plain split-view item with no title
   /// bar of its own, so without this the only ways out are Escape and ⌥⌘I,
@@ -126,8 +129,16 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     conversationView.onAppend = { [weak self] in self?.refresh() }
     form.addArrangedSubview(conversationLabel)
     form.addArrangedSubview(conversationView)
+    historyView.translatesAutoresizingMaskIntoConstraints = false
+    historyView.listTitle = { [weak self] id in
+      guard let self else { return nil }
+      let snapshot = StructureCache.snapshot(in: self.context)
+      return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
+    }
+    form.addArrangedSubview(historyView)
     form.setCustomSpacing(14, after: repeatButton)
     form.setCustomSpacing(14, after: notesScroll)
+    form.setCustomSpacing(14, after: conversationView)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
     placeholder.translatesAutoresizingMaskIntoConstraints = false
@@ -201,6 +212,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      historyView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
       placeholder.centerXAnchor.constraint(equalTo: root.centerXAnchor),
       placeholder.centerYAnchor.constraint(equalTo: root.centerYAnchor),
@@ -280,6 +292,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
         reloadTextIfIdle(next)
         refreshReadOnlyFields(next)
         refreshConversation(next)
+        historyView.configure(taskID: next.id)
       }
       return
     }
@@ -304,6 +317,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     loadNotes(next.notes ?? "")
     refreshReadOnlyFields(next)
     refreshConversation(next)
+    historyView.configure(taskID: next.id)
     formScroll?.contentView.scroll(to: .zero)
   }
 

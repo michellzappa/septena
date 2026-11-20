@@ -424,6 +424,8 @@ struct TaskComposerCard: View {
         // docs/TASK_CONVERSATIONS_PHASE1.md.
         if let task = editingTask {
           ConversationSection(task: task, accent: accent)
+          // Not for an inline create held as a placeholder row: it has no log.
+          if !deferredCreate { TaskHistorySection(taskID: task.id) }
         }
       }
       // Indent the rail/conversation to align with the title text (past the
