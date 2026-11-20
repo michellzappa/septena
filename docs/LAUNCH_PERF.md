@@ -1,7 +1,7 @@
 # Launch performance (Septena task app, iOS)
 
-Status: active. Issues #80 (measure), #81 (draw Today first), and the launch
-snapshot follow-up.
+Status: active. Issues #80 (measure), #81 (draw Today first), #82 (launch
+screen, Today snapshot, skeleton rows).
 
 **Target:** under **400 ms** from tap to a real Today list on iPhone Air,
 cold launch, Release build.
@@ -18,6 +18,7 @@ created the process.
 | `launch.localStoreOpen` | interval | `LocalStore.init` (`Persistence.swift`) | SwiftData `ModelContainer` open |
 | `launch.appInit` | event | `SeptaskApp.init` | App struct created (after the store opened) |
 | `launch.firstTodayBody` | event | `TaskListView.body` | First Today body evaluation |
+| `launch.snapshotUsed` | event | `TodaySnapshotStore.launchRows` (`TodaySnapshot.swift`) | Today read its rows from the launch snapshot (absent: no usable snapshot) |
 | `launch.todayLoadDone` | event | `TaskListView.performLoad` | First Today `load()` published its rows |
 | `launch.firstFrameDrawn` | event | `LaunchPhase` (`SeptenaServices.swift`) | One frame after the first rows (or the 1.5 s timeout); deferred launch work starts here |
 | `start.bindMutators` | interval | `SeptenaServices.bindWriteBoundary()` | Mutator binding, the write boundary; runs before the first frame |
@@ -69,6 +70,46 @@ The wait for the first frame is iOS-only. The macOS AppKit shell draws its
 list without `TaskListView`, so on macOS the launch work runs as before.
 The two-pass `load()`, the deferred Reminders mirror and the deferred
 draft sweep apply on both platforms.
+
+## Launch screen
+
+The iOS launch screen (`UILaunchScreen` in `project.yml`, Septask target)
+shows the seven-disc glyph, 60 pt, centered, in systemGray2 on the system
+background. Assets: `Septask/Assets.xcassets/LaunchGlyph` (two vector PDFs,
+light and dark) and `LaunchBackground` (white / black). The PDFs are
+generated from the icon's own `discs.svg`:
+`swift scripts/render-launch-glyph.swift`. Never hand-draw the mark.
+
+## Today snapshot
+
+A cold launch draws its first Today frame without a SwiftData fetch
+(`SeptenaCore/TodaySnapshot.swift`):
+
+- **File:** `Application Support/TodaySnapshot.json`, excluded from
+  backup. Versioned JSON: the day, the Today rows, the Inbox rows (full
+  row DTOs, notes cut to 80 characters), and the areas and projects in
+  sidebar order. At most 150 rows, a size guard only.
+- **Writer:** `TodaySnapshotWriter`, iOS task app only, started with the
+  deferred launch work. It rewrites the file 2 s after a burst of
+  `.septenaTasksChanged` / `.septenaStructureChanged` posts and at day
+  rollover. An empty Today removes the file. Signed out: no write.
+- **Reader:** `TaskListView` on standalone Today, before its first
+  `load()`, and only until `LaunchPhase` reports the first frame. The rows
+  feed the same view, so the first `load()` swaps to the live rows with no
+  layout change. The list ignores taps while it shows snapshot rows.
+- **Invalidation:** sign-out, account switch and account delete remove the
+  file (`TaskSyncEngine`). A snapshot from another day than
+  `DayClock.today` is never used.
+- **Still before the first frame:** the SwiftData store open
+  (`launch.localStoreOpen`), Today's notices read, and the view itself.
+
+## Skeleton rows
+
+Today shows placeholder rows (`TaskSkeletonRows`) instead of an empty list
+only while it has no rows and the account's first pull has not landed
+(signed in, no pull yet, no sync error). Signed out, offline or an empty
+account: the normal empty Today. Never a spinner on Today. The rows pulse
+slowly; with Reduce Motion on they stay still.
 
 ## Record a cold launch
 

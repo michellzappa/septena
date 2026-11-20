@@ -103,7 +103,8 @@ struct TaskListView: View {
     self.embeddedHeader = { AnyView(embeddedHeader()) }
     // Memoized: this init re-runs on every parent render (the values are
     // discarded for installed views), so a per-construction fetch was waste.
-    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    let structure = Self.launchStructure(filter: filter, embedded: embedded)
+      ?? StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
   }
@@ -118,7 +119,8 @@ struct TaskListView: View {
     self.excludeProjectedTasks = excludeProjectedTasks
     self.embeddedHeader = { AnyView(EmptyView()) }
     // Memoized — see the generic init above.
-    let structure = StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
+    let structure = Self.launchStructure(filter: filter, embedded: embedded)
+      ?? StructureCache.snapshot(in: LocalStore.shared.container.mainContext)
     _areas = State(initialValue: structure.areas)
     _projects = State(initialValue: structure.projects)
   }
@@ -127,7 +129,7 @@ struct TaskListView: View {
     get {
       storageFilter == filter
         ? itemsStorage
-        : localTasks()
+        : launchSnapshot?.today ?? localTasks()
     }
     nonmutating set {
       itemsStorage = newValue
@@ -145,6 +147,49 @@ struct TaskListView: View {
     )
   }
 
+  // MARK: Launch snapshot (#82, docs/LAUNCH_PERF.md)
+
+  /// Before the first task list frame on a cold launch, standalone Today
+  /// reads its rows from the Today snapshot file, not from SwiftData. Same
+  /// view, same rows, so the first `load()` swaps to the live list with no
+  /// visible change. nil on every other list, after the first frame, and
+  /// when the snapshot is from another day.
+  private var launchSnapshot: TodaySnapshotStore.Rows? {
+    guard filter == .today, !embedded, storageFilter != filter else { return nil }
+    return TodaySnapshotStore.launchRows(day: clock.today)
+  }
+
+  /// `init` runs before the environment exists, so it checks the day with
+  /// `SeptenaDate.today` (what `DayClock` starts with).
+  private static func launchStructure(filter: TaskFilter, embedded: Bool)
+    -> (areas: [Area], projects: [Project])? {
+    guard filter == .today, !embedded,
+          let rows = TodaySnapshotStore.launchRows(day: SeptenaDate.today) else { return nil }
+    return (rows.areas, rows.projects)
+  }
+
+  /// Skeleton rows instead of an empty Today while the account's first pull
+  /// has not landed (signed in on a new device). The pre-load frame already
+  /// reads the store, so this is the only time Today has nothing to draw and
+  /// is still loading. Signed out, offline (a pull error) or an empty
+  /// account after the pull: the normal empty Today.
+  @ViewBuilder
+  private var todaySkeleton: some View {
+    if !embedded, visibleItems.isEmpty, triageItems.isEmpty, awaitingFirstPull {
+      TaskSkeletonRows().asListRow()
+    }
+  }
+
+  private var awaitingFirstPull: Bool {
+    #if SEPTASK
+    let sync = TaskSyncEngine.shared
+    return sync.signedIn && sync.since == 0 && sync.lastPull == nil && sync.lastError == nil
+    #else
+    // Septena Life says "Getting your data" (`emptyStateRow`).
+    return false
+    #endif
+  }
+
   /// The Inbox — the unratified layer rendered as a section above Today (only on
   /// the Today view; see `triageSection`). Backed by `triageStorage` (populated
   /// in `load()` with the same settle-preservation as `items`), with a live
@@ -156,7 +201,8 @@ struct TaskListView: View {
     guard filter == .today else { return [] }
     let base = storageFilter == filter
       ? triageStorage
-      : LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
+      : launchSnapshot?.inbox
+        ?? LocalCache.tasks(in: LocalStore.shared.container.mainContext, filter: .triage)
     return base.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
@@ -1151,6 +1197,9 @@ struct TaskListView: View {
       scopeLoggedSection()
       taskListFooter
     }
+    // Snapshot rows are inert (#82): a tap must not act on a row read from
+    // the launch file. The first load swaps in the live rows a few frames on.
+    .allowsHitTesting(launchSnapshot == nil)
     // Click-away collapses the inline editor (Things-style) — selecting any
     // OTHER row folds the open editor, autosaving it. While editing, the list's
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
@@ -1430,6 +1479,7 @@ struct TaskListView: View {
         return AnyView(Group {
           AnyView(triageSection)
           AnyView(groupedOpenItems)
+          AnyView(todaySkeleton)
         })
       }
       // `Group`, not a stack: the rows stay direct children of the lazy
@@ -1438,6 +1488,7 @@ struct TaskListView: View {
       return AnyView(Group {
         AnyView(triageSection)
         AnyView(ungroupedOpenItems)
+        AnyView(todaySkeleton)
       })
     case .unscheduled:
       return AnyView(groupedOpenItems)
