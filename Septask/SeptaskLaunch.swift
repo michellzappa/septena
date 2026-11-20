@@ -50,6 +50,74 @@ enum SeptaskLaunch {
   }
 }
 
+/// Real-use launch numbers from MetricKit (docs/LAUNCH_PERF.md). The system
+/// delivers one payload a day at most, with histograms of time to first draw
+/// and resume time across that day's launches. Each payload is logged to the
+/// unified log (subsystem `com.septena.cloud`, category "Launch") and its
+/// summary kept on this device under `lastSummaryKey`. It never leaves the
+/// device: it is not part of the weekly diagnostics batch.
+///
+/// iOS only: `MXAppLaunchMetric` does not exist on macOS.
+final class SeptaskLaunchMetrics: NSObject, @unchecked Sendable {
+  static let shared = SeptaskLaunchMetrics()
+  static let lastSummaryKey = "septask.launchMetrics.lastSummary"
+
+  /// Call once at launch. Idempotent (MetricKit keeps one entry per object).
+  func start() {
+    #if os(iOS)
+    MXMetricManager.shared.add(self)
+    #endif
+  }
+}
+
+#if os(iOS)
+import MetricKit
+import os
+
+extension SeptaskLaunchMetrics: MXMetricManagerSubscriber {
+  private static let logger = Logger(subsystem: Log.subsystem, category: "Launch")
+
+  func didReceive(_ payloads: [MXMetricPayload]) {
+    for payload in payloads {
+      guard let launch = payload.applicationLaunchMetrics else { continue }
+      var parts = ["period \(payload.timeStampBegin.formatted()) to \(payload.timeStampEnd.formatted())",
+                   "version \(payload.latestApplicationVersion)"]
+      parts.append("timeToFirstDraw " + Self.summary(launch.histogrammedTimeToFirstDraw))
+      if #available(iOS 15.2, *) {
+        parts.append("optimizedTimeToFirstDraw " + Self.summary(launch.histogrammedOptimizedTimeToFirstDraw))
+      }
+      parts.append("resume " + Self.summary(launch.histogrammedApplicationResumeTime))
+      let line = parts.joined(separator: "; ")
+      Self.logger.notice("MetricKit launch: \(line, privacy: .public)")
+      UserDefaults.standard.set(line, forKey: Self.lastSummaryKey)
+    }
+  }
+
+  /// "n=12 p50≈310ms p90≈540ms", from the bucket midpoints.
+  private static func summary(_ histogram: MXHistogram<UnitDuration>) -> String {
+    var buckets: [(ms: Double, count: Int)] = []
+    let enumerator = histogram.bucketEnumerator
+    while let bucket = enumerator.nextObject() as? MXHistogramBucket<UnitDuration> {
+      let start = bucket.bucketStart.converted(to: .milliseconds).value
+      let end = bucket.bucketEnd.converted(to: .milliseconds).value
+      buckets.append(((start + end) / 2, bucket.bucketCount))
+    }
+    let total = buckets.reduce(0) { $0 + $1.count }
+    guard total > 0 else { return "n=0" }
+    func percentile(_ p: Double) -> Int {
+      let target = Int((Double(total) * p).rounded(.up))
+      var seen = 0
+      for bucket in buckets {
+        seen += bucket.count
+        if seen >= target { return Int(bucket.ms) }
+      }
+      return Int(buckets.last?.ms ?? 0)
+    }
+    return "n=\(total) p50≈\(percentile(0.5))ms p90≈\(percentile(0.9))ms"
+  }
+}
+#endif
+
 /// One-time removal of the old hosted-gateway Claude connection
 /// (mcp.septena.app, a CloudKit web-auth token re-minted every ~8h with an
 /// Apple sign-in). Septask no longer compiles `ClaudeGatewayProvider` or

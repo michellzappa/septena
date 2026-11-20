@@ -467,6 +467,9 @@ struct TaskListView: View {
   @State private var newTodosDismissed: Bool = false
 
   var body: some View {
+    // Launch signpost (docs/LAUNCH_PERF.md). One-shot: a no-op after the
+    // first call, so it costs a lock read on later renders.
+    if filter == .today { LaunchTrace.milestone("launch.firstTodayBody") }
     let content = taskList
       .environment(promoteFlash)
       .septenaToastStore(toastStore)
@@ -3789,6 +3792,7 @@ struct TaskListView: View {
     }
     refreshCalendarEvents()
     consumePendingTaskReveal()
+    if filter == .today { LaunchTrace.milestone("launch.todayLoadDone") }
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
   }
 

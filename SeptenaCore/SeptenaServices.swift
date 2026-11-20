@@ -166,7 +166,8 @@ final class SeptenaServices {
       // Legacy `hasOnboarded` backfill only — manifest seeding waits for the
       // first CloudKit pull in `absorbRemoteChanges()` so a reinstall never
       // writes all-off placeholder rows over synced section state.
-      PerfTrace.spanSync("start.backfillSectionOnboarding") {
+      // `start.*` spans are launch signposts (docs/LAUNCH_PERF.md).
+      LaunchTrace.spanSync("start.backfillSectionOnboarding") {
         SettingsMirror.backfillHasOnboardedForLegacySections(context: context)
       }
       #if SEPTASK
@@ -175,7 +176,9 @@ final class SeptenaServices {
       // kinds route to `TaskSyncEngine` (TaskStoreMode is always `backend`
       // here) and every other kind is dropped by the unstarted engine.
       TaskStoreMode.markDeviceBackend()
-      SeptaskSyncedSettings.seedIfNeeded(from: SettingsMirror.loadCloudKitSettingsRow(context: context))
+      LaunchTrace.spanSync("start.seedSyncedSettings") {
+        SeptaskSyncedSettings.seedIfNeeded(from: SettingsMirror.loadCloudKitSettingsRow(context: context))
+      }
       #else
       let recordRegistry = CloudKitRecordRegistry(modelContainer: LocalStore.shared.container)
       ckEngine.recordProvider = { recordID in
@@ -264,7 +267,7 @@ final class SeptenaServices {
         // local-first at exactly the moment it matters most. The awaited
         // fetch + post-fetch repairs live in `absorbRemoteChanges()`, which
         // App.swift runs off the critical path after the first frame.
-        PerfTrace.spanSync("start.ckEngineStart") {
+        LaunchTrace.spanSync("start.ckEngineStart") {
           ckEngine.start()
         }
         // Same-device sibling app wrote (Septena ↔ Septask): fetch its
@@ -281,7 +284,9 @@ final class SeptenaServices {
         #endif
         // Septask: tasks, areas, projects, attachments, conversations and
         // settings sync with api.septena.app. No-op in Septena.
-        TaskSyncEngine.shared.start()
+        LaunchTrace.spanSync("start.taskSyncStart") {
+          TaskSyncEngine.shared.start()
+        }
       }
       // Fixed-schedule repeats are a promise about DATES, so the series has
       // to advance when the date does — not only when someone ticks a box.
@@ -300,7 +305,8 @@ final class SeptenaServices {
       }
     }
     startTask = task
-    await task.value
+    // Only the first caller times it: later callers just join the same work.
+    await LaunchTrace.span("launch.servicesStart") { await task.value }
   }
 
   /// Launch follow-up to `start()`: pull the server's current state, then run

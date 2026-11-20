@@ -3739,7 +3739,11 @@ final class LocalStore {
       #endif
     }
     do {
-      container = try ModelContainer(for: schema, configurations: [config])
+      // Launch signpost (docs/LAUNCH_PERF.md): the store open is on the
+      // cold-launch critical path of both apps.
+      container = try LaunchTrace.spanSync("launch.localStoreOpen") {
+        try ModelContainer(for: schema, configurations: [config])
+      }
     } catch let error {
       // Never erase a local-first store as a recovery mechanism. It can
       // contain writes that have not reached CloudKit yet (offline work,
