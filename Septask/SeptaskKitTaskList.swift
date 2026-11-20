@@ -110,7 +110,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// A notice on top of Today (sign in, rolled in, an explainer). Which
     /// ones show, and in what order, is decided by `TaskNotices`.
     case notice(TaskNotice)
-    /// One Get started step under its notice, drawn like a task row.
+    /// One Get started step under its notice: a real, selectable row (↑/↓,
+    /// Return, ⌘K, type-select, right-click) that is never a task. Every task
+    /// command reads `task`, which is nil here, so it does nothing.
     case noticeStep(TaskNoticeStep)
 
     var key: String {
@@ -125,13 +127,18 @@ final class SeptaskKitTaskListController: NSViewController {
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
-      case .noticeStep(let step): return "notice-step:" + step.id.rawValue
+      case .noticeStep(let step): return step.selectionID
       case .importAllReminders: return "import-all-reminders"
       }
     }
 
     var task: SeptenaTask? {
       if case .task(let task, _, _) = self { return task }
+      return nil
+    }
+
+    var noticeStep: TaskNoticeStep? {
+      if case .noticeStep(let step) = self { return step }
       return nil
     }
 
@@ -461,6 +468,14 @@ final class SeptaskKitTaskListController: NSViewController {
         if case .project = self.filter {
           self.buildBlankSpaceMenu().popUp(positioning: nil, at: point, in: tableView)
         }
+        return
+      }
+      // A Get started step has its own short menu: no task command applies.
+      if self.rows.indices.contains(row), self.rows[row].noticeStep != nil {
+        if !tableView.selectedRowIndexes.contains(row) {
+          tableView.selectRowIndexes([row], byExtendingSelection: false)
+        }
+        self.buildNoticeStepMenu().popUp(positioning: nil, at: point, in: tableView)
         return
       }
       // Only a TASK row has a task menu. A header, an event, the "New task"
@@ -1893,6 +1908,17 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Whether a row command has anything to act on — drives menu enablement.
   var hasActionableSelection: Bool { !actionableSelection.isEmpty }
 
+  /// The selected Get started steps. They take Return (open), ⌘K (tick) and
+  /// their own context menu; no task command sees them.
+  private var selectedNoticeSteps: [TaskNoticeStep] {
+    tableView.selectedRowIndexes.compactMap { row in
+      rows.indices.contains(row) ? rows[row].noticeStep : nil
+    }
+  }
+
+  /// ⌘K and Task ▸ Complete have a target: a task or a Get started step.
+  var hasCompletableSelection: Bool { hasActionableSelection || !selectedNoticeSteps.isEmpty }
+
   /// Copy the selection's titles — one per line. Reached through Edit ▸ Copy
   /// (the table implements `copy(_:)`, so the standard menu item finds it on
   /// the responder chain).
@@ -2211,10 +2237,23 @@ final class SeptaskKitTaskListController: NSViewController {
       restoreTasks(actionableSelection.map(\.id))
       return
     }
+    toggleSelectedNoticeSteps()
     let selection = actionableSelection
     guard !selection.isEmpty else { return }
     apply(completing: selection.filter { $0.status == .open },
          reopening: selection.filter { $0.status != .open })
+  }
+
+  /// ⌘K on Get started steps: ticks them, or unticks them when every
+  /// selected step is already done (the task rule for a mixed selection).
+  private func toggleSelectedNoticeSteps() {
+    let steps = selectedNoticeSteps
+    guard !steps.isEmpty else { return }
+    let reopen = steps.allSatisfy(\.done)
+    for step in steps {
+      if reopen { TaskNotices.reopenStep(step.id) } else { TaskNotices.completeStep(step.id) }
+    }
+    reload()
   }
 
   /// Cancel open tasks in the selection — same settle beat as complete
@@ -2938,6 +2977,11 @@ final class SeptaskKitTaskListController: NSViewController {
       createTask(inInbox: true)
       return
     }
+    // Return on a Get started step does the step.
+    if rows.indices.contains(row), let step = rows[row].noticeStep {
+      openNoticeStep(step.id)
+      return
+    }
     guard row >= 0, let task = rows[row].task else { return }
     // A section heading has no pills/notes to open a full composer for —
     // same as the SwiftUI project page, renaming it is a bare title edit.
@@ -3014,7 +3058,9 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   @objc private func beginEditFromDoubleClick() {
-    guard tableView.clickedRow >= 0, rows[tableView.clickedRow].task != nil else { return }
+    guard tableView.clickedRow >= 0,
+          rows[tableView.clickedRow].task != nil || rows[tableView.clickedRow].noticeStep != nil
+    else { return }
     tableView.selectRowIndexes([tableView.clickedRow], byExtendingSelection: false)
     beginComposingSelectedRow()
   }
@@ -3645,6 +3691,33 @@ final class SeptaskKitTaskListController: NSViewController {
     return menu
   }
 
+  /// Right-click on a Get started step: the same three things the keyboard
+  /// does (Return, ⌘K) plus hiding the checklist. Nothing from the task menu
+  /// applies to a step.
+  private func buildNoticeStepMenu() -> NSMenu {
+    let menu = NSMenu()
+    menu.addItem(item(String(localized: "Open", comment: "SeptaskKit: Get started step menu"),
+                      #selector(menuOpenNoticeStep), "", []))
+    let steps = selectedNoticeSteps
+    let toggleTitle = !steps.isEmpty && steps.allSatisfy(\.done)
+      ? String(localized: "Mark as Not Done", comment: "SeptaskKit: Get started step menu")
+      : String(localized: "Mark as Done", comment: "SeptaskKit: Get started step menu")
+    menu.addItem(item(toggleTitle, #selector(menuToggleNoticeStep), "k", [.command]))
+    menu.addItem(.separator())
+    menu.addItem(item(String(localized: "Hide Get Started", comment: "SeptaskKit: Get started step menu"),
+                      #selector(menuHideGetStarted), "", []))
+    return menu
+  }
+
+  @objc private func menuOpenNoticeStep() {
+    guard let step = selectedNoticeSteps.first else { return }
+    openNoticeStep(step.id)
+  }
+
+  @objc private func menuToggleNoticeStep() { toggleSelectedNoticeSteps() }
+
+  @objc private func menuHideGetStarted() { dismissNotice(.getStarted) }
+
   /// New Section lands as a named row and opens for editing, the way ⌘N lands
   /// a new task and the way Finder lands a new folder. It used to stop the app
   /// with a modal text prompt while the row it was about to create sat right
@@ -3752,6 +3825,10 @@ extension SeptaskKitTaskListController: NSMenuItemValidation {
       return actionableSelection.count == 1 && menuSuggestions.indices.contains(menuItem.tag)
     case #selector(menuPauseResumeRepeat), #selector(menuCreateNextCopy):
       return actionableSelection.contains { $0.recurrence != nil }
+    case #selector(menuOpenNoticeStep), #selector(menuToggleNoticeStep):
+      return !selectedNoticeSteps.isEmpty
+    case #selector(menuHideGetStarted):
+      return true
     default:
       return hasActionableSelection
     }
@@ -3880,7 +3957,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?,
                  row: Int) -> String? {
     guard rows.indices.contains(row) else { return nil }
-    return rows[row].task?.title
+    return rows[row].task?.title ?? rows[row].noticeStep?.title
   }
 
   func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
@@ -3889,6 +3966,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     // where the trigger row joins `keyboardOrderedTaskIds`. Every other
     // taskless row (headers, screen title, logged footer) stays unselectable.
     if case .newTask = rows[row] { return true }
+    // Get started steps are list rows too; the notice header above them is
+    // not (it has no task and no step).
+    if case .noticeStep = rows[row] { return true }
     return rows[row].task != nil
   }
 
@@ -4544,12 +4624,11 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNoticeStepCell
         ?? KitNoticeStepCell(identifier: identifier)
       cell.configure(step)
+      // The checkbox ticks and unticks, like a task's.
       cell.onToggle = { [weak self] in
-        guard !step.done else { return }
-        TaskNotices.completeStep(step.id)
+        TaskNotices.toggleStep(step)
         self?.reload()
       }
-      cell.onTap = { [weak self] in self?.openNoticeStep(step.id) }
       return cell
 
     case .reminder(let item, let importing):
