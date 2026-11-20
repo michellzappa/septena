@@ -205,16 +205,6 @@
         }
       }
     },
-    "%@ anonymous Septask installs reported for %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ anonymous Septask installs reported for %2$@."
-          }
-        }
-      }
-    },
     "%@ avg steps · %@ active days" : {
       "localizations" : {
         "en" : {
@@ -2920,9 +2910,6 @@
     "Deleted tasks appear here for 30 days before being permanently removed." : {
 
     },
-    "Deleting either app does not delete your data, and hiding Tasks in Septena does not turn Septask off. Your data stays in your iCloud, not in an account or on a server of ours." : {
-
-    },
     "Despondent" : {
       "localizations" : {
         "pt-BR" : {
@@ -5331,9 +5318,6 @@
         }
       }
     },
-    "Neither app is a lesser version of the other. Septask makes task work the whole experience; Septena puts that same work in a wider personal picture." : {
-
-    },
     "Never" : {
       "localizations" : {
         "pt-BR" : {
@@ -6959,18 +6943,6 @@
     "Septask" : {
 
     },
-    "Septask (AppKit)" : {
-      "comment" : "SeptaskKit localization pass 2026-08-09"
-    },
-    "Septask gives your task life a dedicated, calm home: Inbox, Today, Upcoming, areas, projects, and task conversations. It stands on its own for the days when tasks are all you want to think about." : {
-
-    },
-    "Septask is part of Septena, the private app for the things you choose to track across your life. Septena adds optional sections for habits, training, nutrition, sleep, mood, health, and more — then lets you see those pieces together over time." : {
-
-    },
-    "Septask keeps your tasks in your private iCloud — nothing lives on a server of ours." : {
-
-    },
     "Septena" : {
       "localizations" : {
         "pt-BR" : {
@@ -7955,9 +7927,6 @@
         }
       }
     },
-    "Tasks is always on in Septask. Set its color and behavior here; shared task settings carry over to Septena." : {
-
-    },
     "Tasks tab" : {
       "localizations" : {
         "pt-BR" : {
@@ -7980,9 +7949,6 @@
           }
         }
       }
-    },
-    "Tell us what feels great, what gets in the way, or what would make Septask more useful. Your email app opens with a Septask feedback subject." : {
-
     },
     "Temperance" : {
       "localizations" : {
@@ -8137,9 +8103,6 @@
         }
       }
     },
-    "The reminder is scheduled by whichever app you last used, so reconnecting works entirely from Septask. Reminders for task deadlines are planned — they'll live here." : {
-
-    },
     "The seven discs unfurl in foil — the Septena+ thank-you" : {
 
     },
@@ -8211,9 +8174,6 @@
           }
         }
       }
-    },
-    "This is a separate, opt-in weekly summary for improving Septask. It is not required for updates, iCloud sync, or support." : {
-
     },
     "This is the focused set Septena will turn into a north-star and commitments." : {
       "localizations" : {
@@ -8848,9 +8808,6 @@
         }
       }
     },
-    "Welcome to Septask" : {
-
-    },
     "Welcome to Septena" : {
 
     },
@@ -9156,9 +9113,6 @@
     "Your lines join the rotation alongside the packs you've enabled." : {
 
     },
-    "Your name and supporter status are shared with Septena via iCloud. There's no Septask account — your identity is your Apple ID, and supporting happens in Septena." : {
-
-    },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
@@ -9200,9 +9154,6 @@
 
     },
     "Your tasks and their contents are never sent through analytics — only anonymous, aggregate usage at the level you choose above. This setting syncs across your devices via iCloud." : {
-
-    },
-    "Your tasks, areas, projects, and task conversations live in your private iCloud database, synced by CloudKit. There is no Septask account and no server of ours holding your data." : {
 
     },
     "Your testimonial" : {

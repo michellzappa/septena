@@ -342,7 +342,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         CFBundleLocalizations:
           - en
           - fr
@@ -374,10 +374,10 @@ targets:
         # and the backend's silent push is not built yet).
         # The compiled task UI includes the Reminders inbox and the Today
         # calendar strip (EventKit) — access requests crash without these.
-        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
-        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -436,7 +436,7 @@ targets:
     info:
       path: ShareExtension/SeptaskShare-Info.plist
       properties:
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -532,7 +532,8 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
+        CFBundleName: Septena
         CFBundleLocalizations:
           - en
           - fr
@@ -546,10 +547,10 @@ targets:
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SUAutomaticallyUpdate: false
-        NSRemindersFullAccessUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSRemindersUsageDescription: Septask imports tasks from your Reminders lists into the Inbox.
-        NSCalendarsFullAccessUsageDescription: Septask shows today's calendar events above your task list.
-        NSCalendarsUsageDescription: Septask shows today's calendar events above your task list.
+        NSRemindersFullAccessUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSRemindersUsageDescription: Septena imports tasks from your Reminders lists into the Inbox.
+        NSCalendarsFullAccessUsageDescription: Septena shows today's calendar events above your task list.
+        NSCalendarsUsageDescription: Septena shows today's calendar events above your task list.
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -700,7 +701,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleDisplayName: Septask
+        CFBundleDisplayName: Septena
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.septena.tasks
     configFiles:

@@ -74,7 +74,7 @@ enum TaskStoreSwitchError: LocalizedError, Equatable {
 
   var errorDescription: String? {
     switch self {
-    case .unavailable: return "Only Septask can change where tasks sync."
+    case .unavailable: return "Only the Septena task app can change where tasks sync."
     case .notSignedIn: return "Sign in to the task backend first."
     case .alreadyInMode: return "Tasks already sync this way."
     case .busy: return "A switch is already running."

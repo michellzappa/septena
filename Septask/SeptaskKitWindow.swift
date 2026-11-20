@@ -111,7 +111,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     list.onNavigate = { [weak sidebar] destination in sidebar?.select(destination) }
 
     let window = KitShellWindow(contentViewController: split)
-    window.title = String(localized: "Septask (AppKit)",
+    window.title = String(localized: "Septena",
                           comment: "SeptaskKit: window title")
     // Full-size content view, so the list scrolls UNDER the title bar and the
     // sidebar runs the whole window height — plus a toolbar, which is what
