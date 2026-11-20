@@ -135,9 +135,11 @@ enum TaskUndo {
   /// clears an already-landed scheduled or deadline date, which would undo
   /// more than the command did.
   ///
-  /// One known fidelity limit, same as the AppKit original: `todaySetOn`
-  /// re-stamps to the current day, so undo restores Today MEMBERSHIP but not
-  /// the row's original tenure age (the gold dial resets).
+  /// One known fidelity limit, same as the AppKit original: when the command
+  /// took a row OFF Today, undo re-pins it and `todaySetOn` re-stamps to the
+  /// current day, so undo restores Today MEMBERSHIP but not the row's original
+  /// tenure age (the gold dial resets). A row whose Today flag the command did
+  /// not change keeps its tenure: `moveToToday` is a no-op then.
   static func restore(_ snapshots: [ScheduleSnapshot],
                       using mutator: TaskMutator) {
     for snapshot in snapshots {
@@ -272,7 +274,7 @@ enum TaskUndo {
   /// row in a half-moved state on the way through. Today and the manual
   /// position ride along: filing out of the Inbox can pin a row to Today, and
   /// re-homing resets its position, so undo has to put both back too.
-  struct FilingSnapshot {
+  struct FilingSnapshot: Equatable {
     let id: String
     let area: String?
     /// `var` so a project-delete undo can re-file under a revived project's
@@ -400,6 +402,12 @@ enum TaskUndo {
       .filter { wanted.contains($0.id) }
       .map(FilingSnapshot.init)
     guard !after.isEmpty else { return }
+    // A move into the list the task already lives in changed nothing, so it
+    // gets no undo step: ⌘Z must not "undo" a no-op and skip the real action
+    // behind it. Compared by id, because the caller's order and the store's
+    // order differ.
+    let beforeByID = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    guard after.contains(where: { beforeByID[$0.id] != $0 }) else { return }
     record(name: String(localized: "Move Task", comment: "Undo action name"),
            undo: { restore(before, using: mutator) },
            redo: { restore(after, using: mutator) })

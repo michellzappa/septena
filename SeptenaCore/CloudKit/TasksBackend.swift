@@ -598,6 +598,10 @@ final class CloudKitTasksBackend {
 
   func moveToToday(id: String, today: Bool) {
     guard let entity = fetch(id: id) else { return }
+    // Already in that state: change nothing. A re-pin used to re-stamp
+    // `todaySetOn`, so undoing a move (`TaskUndo.restore`, which always
+    // writes Today) reset the row's Today tenure to zero.
+    if entity.today == today, !today || entity.todaySetOn != nil { return }
     entity.today = today
     entity.todaySetOn = today ? SeptenaDate.today : nil
     entity.pendingSync = true
@@ -961,8 +965,9 @@ final class CloudKitTasksBackend {
     guard let entity = fetch(id: id) else { return }
     let targetArea = project == nil ? area : nil
     let ratifying = (targetArea != nil || project != nil) && entity.isInTriageBand
-    let entersNewHome = (targetArea != nil || project != nil)
-      && (entity.area != targetArea || entity.project != project)
+    // Any real change of list is a new home, the Inbox included: a task that
+    // leaves a project for the Inbox must not keep that project's section FK.
+    let entersNewHome = entity.area != targetArea || entity.project != project
 
     entity.area = targetArea
     entity.project = project
@@ -990,11 +995,17 @@ final class CloudKitTasksBackend {
     // exempt: they keep their own order and carry their section via
     // `rehomeHeadingMembers` below.
     let entersNewHome = project != nil && (entity.project != project || entity.area != nil)
+    // Leaving a project (to the Inbox, or as the first half of an area move)
+    // also leaves its sections: a heading FK only means something inside its
+    // own project.
+    let leavesProject = project == nil && entity.project != nil
     entity.project = project
     if project != nil { entity.area = nil }
     if entersNewHome, !entity.isHeading {
       entity.heading = nil
       entity.position = TaskOrder.topPosition(in: context)
+    } else if leavesProject, !entity.isHeading {
+      entity.heading = nil
     }
     if ratifying {
       entity.today = true

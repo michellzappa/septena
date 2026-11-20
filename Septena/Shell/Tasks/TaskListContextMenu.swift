@@ -103,7 +103,6 @@ struct TaskListRowContextMenu: View {
   let target: TaskListView.ActionTarget
   let filter: TaskFilter
   let rankedSuggestions: [SuggestionEngine.Suggestion]?
-  let onCopy: (TaskListView.ActionTarget) -> Void
   let onDuplicate: (TaskListView.ActionTarget) -> Void
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
@@ -128,6 +127,8 @@ struct TaskListRowContextMenu: View {
   private var count: Int { target.count }
 
   var body: some View {
+    // No Copy item: copying titles stays on ⌘C and Edit ▸ Copy, which act on
+    // the selection. The row menu keeps to actions on the task itself.
     if case let .single(task) = target {
       Button {
         onOpenDetail(task)
@@ -136,37 +137,6 @@ struct TaskListRowContextMenu: View {
       }
       .keyboardShortcut(TaskRowShortcuts.editDetails)
 
-      Button {
-        onCopy(target)
-      } label: {
-        Label("Copy", systemImage: "doc.on.doc")
-      }
-      .keyboardShortcut(TaskRowShortcuts.copy)
-
-      Divider()
-    } else if target.isBulk {
-      Button {
-        onCopy(target)
-      } label: {
-        Label("Copy Titles", systemImage: "doc.on.doc")
-      }
-      .keyboardShortcut(TaskRowShortcuts.copy)
-
-      Divider()
-    }
-
-    if let rankedSuggestions,
-       case let .single(task) = target {
-      Section("Suggested") {
-        ForEach(Array(rankedSuggestions.enumerated()), id: \.element) { _, suggestion in
-          Button {
-            onApplySuggestion(task, suggestion)
-          } label: {
-            Label("Move to \(suggestion.title)",
-                  systemImage: suggestion.kind == .area ? "tray" : "folder")
-          }
-        }
-      }
       Divider()
     }
 
@@ -186,35 +156,45 @@ struct TaskListRowContextMenu: View {
       .keyboardShortcut(TaskRowShortcuts.toggleToday)
     }
 
-    Button {
-      onOpenWhen(target)
-    } label: {
-      Label(whenLabel, systemImage: "calendar")
-    }
-    .keyboardShortcut(TaskRowShortcuts.when)
-
-    Button {
-      onOpenDeadline(target)
-    } label: {
-      Label(deadlineLabel, systemImage: "flag")
-    }
-    .keyboardShortcut(TaskRowShortcuts.deadline)
-
+    // When and Deadline share one submenu. The two pickers are separate
+    // sheets (`DatePickerSheet` edits one date), so a native submenu is the
+    // standard way to offer both from one entry. Shortcuts sit on the items,
+    // not the `Menu`, for the same reason as Move's below.
     Menu {
       Button {
-        onOpenMove(target)
+        onOpenWhen(target)
       } label: {
-        Label("More…", systemImage: "ellipsis")
+        Label(whenLabel, systemImage: "calendar")
       }
-      // ⌘⇧M lives on the sheet-opening item, not the parent Menu: a shortcut on
-      // the Menu container propagates to every submenu row (Inbox, each area,
-      // each project, More…), so all of them showed ⌘⇧M. Attaching it here — the
-      // action that mirrors the menu-bar "Move…" — marks only the one item.
-      .keyboardShortcut(TaskRowShortcuts.move)
+      .keyboardShortcut(TaskRowShortcuts.when)
+
+      Button {
+        onOpenDeadline(target)
+      } label: {
+        Label(deadlineLabel, systemImage: "flag")
+      }
+      .keyboardShortcut(TaskRowShortcuts.deadline)
+    } label: {
+      Label(scheduleLabel, systemImage: "calendar")
+    }
+
+    Menu {
+      // The filing suggestion comes first: it is the same pick as the row's
+      // suggestion chip, one tap away. Single task only (a pick is ranked for
+      // one title).
+      if let suggestion = rankedSuggestions?.first,
+         case let .single(task) = target {
+        Button {
+          onApplySuggestion(task, suggestion)
+        } label: {
+          // Same glyph as the chip.
+          Label("Suggested: \(suggestion.title)",
+                systemImage: suggestion.kind == .project ? "number" : "folder")
+        }
+        Divider()
+      }
 
       if !target.tasks.allSatisfy(\.isInTriageBand) {
-        Divider()
-
         Button {
           onMoveTo(target, nil, nil)
         } label: {
@@ -242,6 +222,19 @@ struct TaskListRowContextMenu: View {
           }
         }
       }
+
+      Divider()
+
+      Button {
+        onOpenMove(target)
+      } label: {
+        Label("More…", systemImage: "ellipsis")
+      }
+      // ⌘⇧M lives on the sheet-opening item, not the parent Menu: a shortcut on
+      // the Menu container propagates to every submenu row (Inbox, each area,
+      // each project, More…), so all of them showed ⌘⇧M. Attaching it here — the
+      // action that mirrors the menu-bar "Move…" — marks only the one item.
+      .keyboardShortcut(TaskRowShortcuts.move)
     } label: {
       Label(moveLabel, systemImage: "folder")
     }
@@ -326,6 +319,10 @@ struct TaskListRowContextMenu: View {
 
   private var deadlineLabel: String {
     "Deadline…"
+  }
+
+  private var scheduleLabel: String {
+    "Schedule"
   }
 
   private var moveLabel: String {

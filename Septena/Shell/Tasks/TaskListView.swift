@@ -2477,15 +2477,20 @@ struct TaskListView: View {
     recordImplicitRejectionIfMismatch(task: task,
                                       chosenKind: chosenKind,
                                       chosenId: chosenId)
-    if projectId != nil {
-      mutator.moveToProject(id: id, project: projectId)
-    } else {
-      mutator.moveToArea(id: id, area: areaId)
-      mutator.moveToProject(id: id, project: nil)
-    }
+    // One save per task, the same call the AppKit shell makes: the project
+    // wins over the area, and Inbox (both nil) clears area, project and
+    // heading together.
+    mutator.moveToList(id: id, area: areaId, project: projectId)
     mutator.acknowledge(id: id)
     if filter == .today, wasInTriage { promoteFlash.flash(id) }
     return true
+  }
+
+  /// True when `task` already lives where a move to (`areaId`, `projectId`)
+  /// would put it. Such a move is a no-op: no write, no toast, no undo step.
+  private func isTask(_ task: SeptenaTask, alreadyAt areaId: String?, _ projectId: String?) -> Bool {
+    if let projectId { return task.project == projectId }
+    return task.project == nil && task.area == areaId
   }
 
   /// Filing state as stored right now, for `TaskUndo.recordMove`.
@@ -2497,7 +2502,7 @@ struct TaskListView: View {
   private func destinationName(areaId: String?, projectId: String?) -> String {
     projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "No Project"
+      ?? "Inbox"
   }
 
   private func applyMove(id: String, areaId: String?, projectId: String?) {
@@ -2508,6 +2513,10 @@ struct TaskListView: View {
   /// lands on the shared undo stack, and the toast's Undo goes through the
   /// same entry, so the toast, shake and ⌘Z all reverse the same thing.
   private func applyMove(_ ids: [String], areaId: String?, projectId: String?) {
+    let ids = ids.filter { id in
+      guard let task = currentTask(id: id) else { return false }
+      return !isTask(task, alreadyAt: areaId, projectId)
+    }
     guard !ids.isEmpty else { return }
     Haptics.tick()
     let before = filingSnapshots(ids)
@@ -2676,7 +2685,8 @@ struct TaskListView: View {
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
-    .contextMenu { taskContextMenu(for: task) }
+    // The context menu is attached by the caller, after the card chrome
+    // (`cardedRows` / `quickAddLine`), so the lift carries the card.
   }
 
   @ViewBuilder
@@ -2794,7 +2804,8 @@ struct TaskListView: View {
     .septenaOnRightClick {
       if !selection.contains(task.id) { selectOnly(task.id) }
     }
-    .contextMenu { taskContextMenu(for: task) }
+    // No `.contextMenu` here: `cardedRows` attaches it after the card chrome,
+    // so the iOS lift carries the card background, not just the text.
   }
 
   /// Foot quick-add for grouped lists (Anytime) — its own card on the canvas.
@@ -2831,6 +2842,9 @@ struct TaskListView: View {
        let task = quickAddCaptureTask, expandedEditId == task.id {
       taskRow(task)
         .id(Self.quickAddScrollID)
+        // The capture slot's open editor keeps its menu. Its card chrome is
+        // applied by the caller, which also carries the trigger row (no menu).
+        .contextMenu { taskContextMenu(for: task) }
     } else if quickAddDraftId == nil {
       // The primary trigger is a first-class *selectable* row: it carries the
       // quick-add sentinel id (also in `keyboardOrderedTaskIds`), so arrow-nav
@@ -2888,7 +2902,6 @@ struct TaskListView: View {
         target: target,
         filter: filter,
         rankedSuggestions: rankedSuggestions(for: target),
-        onCopy: { target in copyTasks(target.ids) },
         onDuplicate: { target in duplicate(target.ids) },
         onOpenDetail: { task in beginEdit(task) },
         onApplySuggestion: applySuggestion,
@@ -3010,9 +3023,14 @@ struct TaskListView: View {
                                  childProjectIds: { childProjectIds(in: $0) })
   }
 
+  /// The menu's Move ▸ "Suggested" item reads `.first`, which has to be the
+  /// pick the row's chip shows (snapshotted in `load()`), not a fresh ranking
+  /// that may have moved on since.
   private func rankedSuggestions(for target: ActionTarget) -> [SuggestionEngine.Suggestion]? {
     guard case let .single(task) = target else { return nil }
-    return filingRankedSuggestions(for: task)
+    let ranked = filingRankedSuggestions(for: task)
+    guard let chip = filingChipSuggestion(for: task) else { return ranked }
+    return [chip] + (ranked ?? []).filter { $0 != chip }
   }
 
   private func suggestionAlreadyMatches(_ task: SeptenaTask,
@@ -3252,9 +3270,10 @@ struct TaskListView: View {
     // group drop steps aside (the group headers keep theirs).
     let todayReorder = filter == .today
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
+      let position = TaskCardPosition(index: idx, count: cardCount)
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
         .modifier(todayMoveDrop(todayReorder ? nil : moveDropTarget))
-        .taskCardChrome(TaskCardPosition(index: idx, count: cardCount),
+        .taskCardChrome(position,
                         // The "active" row — the selected row OR the one open in
                         // the inline editor — carries the neutral selection fill,
                         // so opening a task to edit it keeps (rather than strips)
@@ -3262,6 +3281,9 @@ struct TaskListView: View {
                         // it's the same unemphasized gray as a plain selection,
                         // Things/Reminders-style, never the section accent.
                         isSelected: selection.contains(task.id) || expandedEditId == task.id)
+        // After the chrome, so the iOS lift preview includes the card
+        // background, clipped to this row's slice of the card.
+        .taskCardContextMenu(position) { taskContextMenu(for: task) }
         // After the chrome, so the drop target (and its targeting wash) spans
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings

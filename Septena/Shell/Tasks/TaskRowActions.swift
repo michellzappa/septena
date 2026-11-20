@@ -8,8 +8,8 @@ import SwiftUI
 
 /// The full task context menu + its picker sheets, bundled into one modifier so
 /// any surface (the Tasks list, the Next feed) attaches the *same* menu — Edit
-/// Details…, Copy, Duplicate, Move to / Remove from Today, When…, Deadline…,
-/// Move…, Repeat…, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
+/// Details…, Move to / Remove from Today, Schedule (When… / Deadline…), Move,
+/// Repeat…, Duplicate, Cancel, Delete. The menu body is `TaskListRowContextMenu` and the sheets are
 /// `TaskListModalPresenter`, both shared with `TaskListView`, so the two
 /// surfaces can't drift. Which picker is open is owned per-row.
 ///
@@ -75,12 +75,6 @@ struct TaskRowActions: ViewModifier {
           target: .single(task),
           filter: filter,
           rankedSuggestions: nil,
-          onCopy: { target in
-            let titles = target.tasks.map(\.title)
-            guard !titles.isEmpty else { return }
-            SeptenaPasteboard.copy(titles.joined(separator: "\n"))
-            Haptics.tick()
-          },
           onDuplicate: { _ in duplicateTask(task) },
           onOpenDetail: { onOpenDetail?($0) },
           onApplySuggestion: { _, _ in },
@@ -231,16 +225,17 @@ struct TaskRowActions: ViewModifier {
   // Mirrors `TaskListView.applyMove`, minus the Inbox suggestion-rejection
   // bookkeeping (no classifier on surfaces that use this).
   private func applyMove(id: String, areaId: String?, projectId: String?) {
-    Haptics.tick()
     let undoBefore = LocalCache.allTasks(in: modelContext)
       .filter { $0.id == id }
       .map(TaskUndo.FilingSnapshot.init)
-    if projectId != nil {
-      mutator.moveToProject(id: id, project: projectId)
-    } else {
-      mutator.moveToArea(id: id, area: areaId)
-      mutator.moveToProject(id: id, project: nil)
-    }
+    // Already there: a no-op, so no write, no toast and no undo step.
+    guard let current = undoBefore.first else { return }
+    let alreadyThere = projectId.map { current.project == $0 }
+      ?? (current.project == nil && current.area == areaId)
+    guard !alreadyThere else { return }
+    Haptics.tick()
+    // One save, the same call the Tasks list and the AppKit shell make.
+    mutator.moveToList(id: id, area: areaId, project: projectId)
     mutator.acknowledge(id: id)
     // The toast's own Undo button stays — it's the discoverable affordance on
     // iOS. It reverses through the SAME stack entry (via the ticket), so the
@@ -251,7 +246,7 @@ struct TaskRowActions: ViewModifier {
     let destName =
       projectId.flatMap { pid in projects.first { $0.id == pid }?.title }
       ?? areaId.flatMap { aid in areas.first { $0.id == aid }?.title }
-      ?? "No Project"
+      ?? "Inbox"
     toastStore?.show("Moved to \(destName)") {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       onChange?()
