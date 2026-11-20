@@ -37,6 +37,9 @@ struct TaskNotice: Identifiable, Equatable {
     case rolledIn
     /// Explainer: tasks carried on Today fade (docs/TASK_FADE_SPEC.md §4).
     case fadeIntro
+    /// The first-run checklist (Septask): steps drawn like task rows that
+    /// tick off as the user does them.
+    case getStarted
   }
 
   let id: ID
@@ -47,6 +50,25 @@ struct TaskNotice: Identifiable, Equatable {
   /// Title of the trailing action. The shell wires the action itself by `id`.
   var primaryTitle: String?
   var dismissible: Bool
+  /// Checklist rows under the notice, drawn like task rows. Empty for a
+  /// plain notice.
+  var steps: [TaskNoticeStep] = []
+}
+
+/// One row of a checklist notice. `done` comes from what the user actually
+/// did (an approved agent pairing, an import, a first task) or from ticking
+/// the row by hand, the same gesture as checking off a task.
+struct TaskNoticeStep: Identifiable, Equatable {
+  enum ID: String, CaseIterable {
+    case connectAI
+    case importTasks
+    case addTask
+  }
+
+  let id: ID
+  var title: String
+  var detail: String
+  var done: Bool
 }
 
 @MainActor
@@ -59,7 +81,13 @@ enum TaskNotices {
     var out: [TaskNotice] = []
     if requiresSignIn { out.append(signIn) }
     if let rolled = rolledIn(pool: pool, today: today, context: context) { out.append(rolled) }
-    if let explainer = explainers(pool: pool).first { out.append(explainer) }
+    // Onboarding counts as the one explainer slot: never a tip and a
+    // checklist at once.
+    if let start = getStarted(context: context) {
+      out.append(start)
+    } else if let explainer = explainers(pool: pool).first {
+      out.append(explainer)
+    }
     return out
   }
 
@@ -72,9 +100,17 @@ enum TaskNotices {
     case .rolledIn:
       SettingsMirror.dismissRolledIn(on: today, context: context,
                                      engine: SeptenaServices.shared.ckEngine)
-    case .fadeIntro:
+    case .fadeIntro, .getStarted:
       markSeen(id)
     }
+  }
+
+  /// Ticks a checklist step: by hand from its checkbox, or from the code
+  /// path that just did the thing (pairing approved, an import finished).
+  static func completeStep(_ id: TaskNoticeStep.ID) {
+    var done = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
+    guard done.insert(id.rawValue).inserted else { return }
+    UserDefaults.standard.set(done.sorted(), forKey: stepsKey)
   }
 
   // MARK: - Notices
@@ -122,6 +158,69 @@ enum TaskNotices {
         : String(localized: "\(count) tasks rolled into Today",
                  comment: "Start-of-day notice: tasks arrived on Today on their own"),
       detail: nil, primaryTitle: nil, dismissible: true)
+  }
+
+  // MARK: - Get started (Septask)
+  //
+  // Shown until every step is done or the user dismisses it. A step is done
+  // once ticked, or once the data shows it happened: a task an agent wrote
+  // (an agent is connected), a task imported from Things, a task the user
+  // added. Done is latched, so a finished step never costs a query again.
+
+  private static let stepsKey = "septena.notices.getStarted.steps.v1"
+
+  private static func getStarted(context: ModelContext) -> TaskNotice? {
+    #if SEPTASK
+    guard !hasSeen(.getStarted) else { return nil }
+    let latched = Set(UserDefaults.standard.stringArray(forKey: stepsKey) ?? [])
+    func done(_ id: TaskNoticeStep.ID, source: String) -> Bool {
+      if latched.contains(id.rawValue) { return true }
+      let descriptor = FetchDescriptor<TaskEntity>(predicate: #Predicate { $0.source == source })
+      guard ((try? context.fetchCount(descriptor)) ?? 0) > 0 else { return false }
+      completeStep(id)
+      return true
+    }
+    let steps = [
+      TaskNoticeStep(
+        id: .connectAI,
+        title: String(localized: "Connect your AI",
+                      comment: "Get started step: connect Claude or another agent"),
+        detail: String(localized: "Claude, ChatGPT, Claude Code and more",
+                       comment: "Get started step detail: which agents can connect"),
+        done: done(.connectAI, source: TaskSource.mcp)),
+      TaskNoticeStep(
+        id: .importTasks,
+        title: String(localized: "Bring in your tasks",
+                      comment: "Get started step: import tasks from another app"),
+        detail: String(localized: "From Reminders or Things",
+                       comment: "Get started step detail: where tasks can be imported from"),
+        done: done(.importTasks, source: TaskSource.things)),
+      TaskNoticeStep(
+        id: .addTask,
+        title: String(localized: "Add your first task",
+                      comment: "Get started step: create a task"),
+        detail: addTaskDetail,
+        done: done(.addTask, source: TaskSource.app)),
+    ]
+    guard steps.contains(where: { !$0.done }) else { return nil }
+    return TaskNotice(
+      id: .getStarted, kind: .info, symbol: "sparkles",
+      title: String(localized: "Get started with Septena",
+                    comment: "Get started checklist title on Today"),
+      detail: nil, primaryTitle: nil, dismissible: true, steps: steps)
+    #else
+    return nil
+    #endif
+  }
+
+  private static var addTaskDetail: String {
+    #if os(macOS)
+    String(localized: "Or press ⌃⌥Space anywhere on your Mac",
+           comment: "Get started step detail: the Quick Entry shortcut on Mac")
+    #else
+    String(localized: "It lands in your Inbox until you decide",
+           comment: "Get started step detail: where a new task goes")
+    #endif
   }
 
   // MARK: - Explainers

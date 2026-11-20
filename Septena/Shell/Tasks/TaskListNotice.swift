@@ -26,9 +26,41 @@ struct TaskListNotice<Actions: View>: View {
   var detail: Text?
   /// Non-nil draws a small close button at the trailing edge.
   var onDismiss: (() -> Void)?
+  /// Checklist rows (the Get started notice), drawn as task rows inside the
+  /// card: the same checkbox, the same title and meta type. Empty for a plain
+  /// notice.
+  var steps: [TaskNoticeStep] = []
+  /// The row's checkbox: ticks the step by hand.
+  var onStepToggle: ((TaskNoticeStep.ID) -> Void)?
+  /// The row itself: does the step (opens the right place).
+  var onStepTap: ((TaskNoticeStep.ID) -> Void)?
   @ViewBuilder var actions: Actions
 
   var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      header
+      ForEach(steps) { step in
+        CheckableRow(
+          tint: Theme.inkPrimary,
+          isDone: step.done,
+          isInactive: step.done,
+          title: step.title,
+          subtitle: step.detail,
+          onToggle: { if !step.done { onStepToggle?(step.id) } },
+          onTap: step.done ? nil : { onStepTap?(step.id) })
+        .environment(\.rowHInset, 0)
+      }
+    }
+    .padding(.horizontal, TaskCardMetrics.contentInset)
+    .padding(.vertical, 10)
+    .background(fill)
+    // Same margin as the task cards below, so the notice sits in the card
+    // column rather than on its own inset.
+    .padding(.horizontal, TaskCardMetrics.margin)
+    .padding(.bottom, TaskCardMetrics.groupGap)
+  }
+
+  private var header: some View {
     HStack(alignment: .firstTextBaseline, spacing: Theme.iconTextGap) {
       Image(systemName: symbol)
         .scaledFont(size: 16)
@@ -50,13 +82,6 @@ struct TaskListNotice<Actions: View>: View {
       #endif
       if let onDismiss { dismissButton(onDismiss) }
     }
-    .padding(.horizontal, TaskCardMetrics.contentInset)
-    .padding(.vertical, 10)
-    .background(fill)
-    // Same margin as the task cards below, so the notice sits in the card
-    // column rather than on its own inset.
-    .padding(.horizontal, TaskCardMetrics.margin)
-    .padding(.bottom, TaskCardMetrics.groupGap)
   }
 
   private var message: some View {

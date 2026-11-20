@@ -1521,7 +1521,10 @@ struct TaskListView: View {
           symbol: notice.symbol,
           title: Text(notice.title),
           detail: notice.detail.map { Text($0) },
-          onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil
+          onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil,
+          steps: notice.steps,
+          onStepToggle: { completeNoticeStep($0) },
+          onStepTap: { openNoticeStep($0) }
         ) {
           noticeAction(notice)
         }
@@ -1545,6 +1548,27 @@ struct TaskListView: View {
     #if SEPTASK
     if notice.id == .signIn { SeptaskSignInButton(compact: true) }
     #endif
+  }
+
+  /// Ticks a Get started step by hand, like checking off a task.
+  private func completeNoticeStep(_ id: TaskNoticeStep.ID) {
+    Haptics.tick()
+    TaskNotices.completeStep(id)
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+  }
+
+  /// Does a Get started step: opens the Settings page that sets it up, or
+  /// starts a new task.
+  private func openNoticeStep(_ id: TaskNoticeStep.ID) {
+    switch id {
+    case .addTask:
+      startCreate()
+    case .connectAI, .importTasks:
+      #if SEPTASK
+      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      nav.showSettings = true
+      #endif
+    }
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {

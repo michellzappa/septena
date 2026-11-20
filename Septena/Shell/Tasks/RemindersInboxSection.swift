@@ -241,6 +241,7 @@ struct RemindersInboxSection: View {
     )
     try? bridge.delete([pair.reminder])
     pairs.removeAll { $0.view.id == pair.view.id }
+    TaskNotices.completeStep(.importTasks)
     onImported()
   }
 
@@ -261,6 +262,7 @@ struct RemindersInboxSection: View {
     if !succeeded.isEmpty {
       try? bridge.delete(succeeded)
       pairs.removeAll { succeededIDs.contains($0.view.id) }
+      TaskNotices.completeStep(.importTasks)
       onImported()
     }
   }

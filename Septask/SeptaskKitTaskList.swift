@@ -110,6 +110,8 @@ final class SeptaskKitTaskListController: NSViewController {
     /// A notice on top of Today (sign in, rolled in, an explainer). Which
     /// ones show, and in what order, is decided by `TaskNotices`.
     case notice(TaskNotice)
+    /// One Get started step under its notice, drawn like a task row.
+    case noticeStep(TaskNoticeStep)
 
     var key: String {
       switch self {
@@ -123,6 +125,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
       case .notice(let notice): return "notice:" + notice.id.rawValue
+      case .noticeStep(let step): return "notice-step:" + step.id.rawValue
       case .importAllReminders: return "import-all-reminders"
       }
     }
@@ -144,6 +147,8 @@ final class SeptaskKitTaskListController: NSViewController {
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
+      // Get started steps read as tasks, so they ride a card like tasks.
+      case .noticeStep: return true
       case .task(let task, _, _): return !task.isHeading
       }
     }
@@ -1197,7 +1202,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// `observeBootstrapState`.
   private func noticeRows(_ pool: [SeptenaTask]) -> [Row] {
     TaskNotices.today(pool: pool, requiresSignIn: !TaskSyncEngine.shared.signedIn,
-                      today: SeptenaDate.today, context: context).map(Row.notice)
+                      today: SeptenaDate.today, context: context)
+      .flatMap { [Row.notice($0)] + $0.steps.map(Row.noticeStep) }
   }
 
   // MARK: - Inline notices (one component: `KitNoticeCell`)
@@ -1208,6 +1214,18 @@ final class SeptaskKitTaskListController: NSViewController {
       ?? KitNoticeCell(identifier: identifier)
     cell.configure(notice)
     return cell
+  }
+
+  /// Does a Get started step: opens the Settings page that sets it up, or
+  /// opens Quick Entry for a first task.
+  private func openNoticeStep(_ id: TaskNoticeStep.ID) {
+    switch id {
+    case .addTask:
+      SeptaskKitQuickEntry.show()
+    case .connectAI, .importTasks:
+      SeptaskSettingsLink.request(id == .connectAI ? .taskBackend : .connectionsAI)
+      SeptaskKitSettingsWindow.show()
+    }
   }
 
   private func dismissNotice(_ id: TaskNotice.ID) {
@@ -1376,6 +1394,7 @@ final class SeptaskKitTaskListController: NSViewController {
     try? RemindersBridge.shared.delete([pair.reminder])
     reminderPairs.removeAll { $0.view.id == id }
     importingReminderID = nil
+    TaskNotices.completeStep(.importTasks)
     // Undoable like any other create. Redo re-creates (purge is a real
     // delete), and it deliberately does NOT put the reminder back in Apple
     // Reminders — that row is gone from EventKit and re-creating it there
@@ -1405,6 +1424,7 @@ final class SeptaskKitTaskListController: NSViewController {
     try? RemindersBridge.shared.delete(pairs.map(\.reminder))
     reminderPairs = []
     bulkImportingReminders = false
+    TaskNotices.completeStep(.importTasks)
     TaskUndo.recordCreate(
       name: String(localized: "Import Reminders", comment: "SeptaskKit: undo action"),
       ids: createdIDs, mutator: mutator,
@@ -3928,6 +3948,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .importAllReminders: return SeptaskKitTheme.rowHeight
     // Inline notices: one component, its height follows its content.
     case .notice(let notice): return KitNoticeCell.height(for: KitNotice(notice))
+    case .noticeStep: return SeptaskKitTheme.rowHeight
     }
   }
 
@@ -4511,6 +4532,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = noticeCell(KitNotice(notice))
       cell.onPrimary = notice.id == .signIn ? { SeptaskAppKitSignIn.shared.start() } : nil
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
+      return cell
+
+    case .noticeStep(let step):
+      let identifier = NSUserInterfaceItemIdentifier("noticeStepCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitNoticeStepCell
+        ?? KitNoticeStepCell(identifier: identifier)
+      cell.configure(step)
+      cell.onToggle = { [weak self] in
+        guard !step.done else { return }
+        TaskNotices.completeStep(step.id)
+        self?.reload()
+      }
+      cell.onTap = { [weak self] in self?.openNoticeStep(step.id) }
       return cell
 
     case .reminder(let item, let importing):
