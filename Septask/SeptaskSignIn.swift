@@ -51,7 +51,7 @@ enum SeptaskSignIn {
 // MARK: - SwiftUI
 
 /// The Apple button, with progress and the error line under it. `compact`
-/// is the size for an inline notice (`SeptaskSignInNotice`); the full size
+/// is the size for an inline notice (the `.signIn` notice in `TaskNotices`); the full size
 /// is for the welcome and Settings.
 struct SeptaskSignInButton: View {
   var compact = false
@@ -235,39 +235,6 @@ private struct SeptaskDeleteAccountSheet: View {
     if let shell = SeptaskKitWindowController.existing?.window {
       SeptaskKitWelcome.presentIfNeeded(over: shell)
     }
-    #endif
-  }
-}
-
-/// Today's sign-in notice on the SwiftUI task list, drawn by the shared
-/// `TaskListNotice` with Apple's button as its action. Draws nothing once
-/// signed in. The AppKit Today draws the same notice through `KitNoticeCell`.
-struct SeptaskSignInNotice: View {
-  private var sync: TaskSyncEngine { .shared }
-
-  var body: some View {
-    if !sync.signedIn {
-      TaskListNotice(
-        kind: .actionNeeded,
-        symbol: "person.crop.circle.badge.exclamationmark",
-        title: Text("Not signed in"),
-        detail: Text(detail)
-      ) {
-        SeptaskSignInButton(compact: true)
-      }
-    }
-  }
-
-  private var detail: String {
-    #if os(macOS)
-    String(localized: "Your changes stay on this Mac until you sign in.",
-           comment: "Septask: Today notice detail when the task backend has no session")
-    #else
-    UIDevice.current.userInterfaceIdiom == .pad
-      ? String(localized: "Your changes stay on this iPad until you sign in.",
-               comment: "Septask: Today notice detail when the task backend has no session, iPad")
-      : String(localized: "Your changes stay on this iPhone until you sign in.",
-               comment: "Septask: Today notice detail when the task backend has no session, iPhone")
     #endif
   }
 }

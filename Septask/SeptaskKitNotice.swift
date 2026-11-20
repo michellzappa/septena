@@ -17,15 +17,9 @@ import AppKit
 // The fill is the card surface, never a selection color (one selection
 // language per surface). Only a warning tints it, with a light wash.
 
-/// What a notice is about. Drives the glyph tint and the fill.
-enum KitNoticeKind {
-  /// A fact the user can read and dismiss (tasks rolled into Today).
-  case info
-  /// Something the user should do (sign in).
-  case actionNeeded
-  /// Something went wrong (sync refused changes).
-  case warning
-}
+/// What a notice is about. One enum for both shells: `TaskNoticeKind`
+/// (Septena/Shell/Tasks/TaskNotices.swift), where which notices show is decided.
+typealias KitNoticeKind = TaskNoticeKind
 
 /// One notice's content. The cell owns the layout; callers only say this.
 struct KitNotice {
@@ -37,6 +31,15 @@ struct KitNotice {
   var primaryTitle: String?
   /// True draws a small close button at the trailing edge.
   var dismissible: Bool
+}
+
+extension KitNotice {
+  /// The AppKit drawing of a shared notice (`TaskNotices`).
+  init(_ notice: TaskNotice) {
+    self.init(kind: notice.kind, symbol: notice.symbol, title: notice.title,
+              detail: notice.detail, primaryTitle: notice.primaryTitle,
+              dismissible: notice.dismissible)
+  }
 }
 
 @MainActor

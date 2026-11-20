@@ -160,26 +160,6 @@ struct TaskListView: View {
     return base.filter { $0.status == .open || model.settle.isSettling($0.id) }
   }
 
-  /// Tasks that rolled into Today on their own — scheduled for a date strictly
-  /// before today, so a plan the user made earlier is now sitting here. Items
-  /// scheduled *for* today, or merely due today, don't count as "new": the user
-  /// just placed those. Drives the "You have N new to-dos" banner.
-  ///
-  /// Read from `items` — the rows already on Today. This used to filter a
-  /// separate `review` bucket that was only ever assigned `[]`, which is why the
-  /// banner could never appear. There is no second bucket to populate: a
-  /// rolled-in task IS a Today row, and rendering it twice (banner + its own
-  /// section) is exactly what we don't want.
-  private var rolledInReview: [SeptenaTask] {
-    guard filter == .today else { return [] }
-    let today = clock.today
-    return items.filter { task in
-      guard task.status == .open else { return false }
-      guard let s = task.scheduled, !s.isEmpty else { return false }
-      return String(s.prefix(10)) < today
-    }
-  }
-
   @State private var isLoading = false
   @State private var errorMessage: String?
   /// Every user action and sync notification used to schedule its own complete
@@ -460,11 +440,9 @@ struct TaskListView: View {
   /// Snapshotted in `load()` from the full local corpus, since `items` is
   /// filter-scoped and never holds a project's done rows.
 
-  // "You have N new to-dos" banner — compact start-of-day welcome that
-  // surfaces tasks rolling in from scheduled-past or due-today. Dismissed
-  // per-day via UserDefaults (local only); reappears the next morning.
-  // Cross-device same-day dismissal sync is in the backlog.
-  @State private var newTodosDismissed: Bool = false
+  /// Bumped when a notice is dismissed, so `noticesRow` re-reads
+  /// `TaskNotices` (which owns the dismissal state).
+  @State private var noticeEpoch = 0
 
   var body: some View {
     let content = taskList
@@ -1320,15 +1298,8 @@ struct TaskListView: View {
   @ViewBuilder
   private var taskListHeader: some View {
     titleRow
-    #if SEPTASK
-    // Backend-only: signed out, Today asks for the sign-in (draws nothing
-    // once signed in).
-    if filter == .today && !TaskSyncEngine.shared.signedIn {
-      SeptaskSignInNotice().plainListChrome()
-    }
-    #endif
+    noticesRow
     todayCalendarRow
-    newTodosBannerRow
     remindersRow
     if showsQuickAddAtTop { quickAddTopRow }
     emptyStateRow
@@ -1525,12 +1496,48 @@ struct TaskListView: View {
     }
   }
 
+  /// Today's notices (sign in, rolled in, an explainer), decided once in
+  /// `TaskNotices` and read the same way by the AppKit list.
   @ViewBuilder
-  private var newTodosBannerRow: some View {
-    if filter == .today && !rolledInReview.isEmpty && !newTodosDismissed {
-      newTodosBanner(count: rolledInReview.count)
+  private var noticesRow: some View {
+    if filter == .today {
+      let _ = noticeEpoch
+      ForEach(TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
+                                today: clock.today, context: modelContext)) { notice in
+        TaskListNotice(
+          kind: notice.kind,
+          symbol: notice.symbol,
+          title: Text(notice.title),
+          detail: notice.detail.map { Text($0) },
+          onDismiss: notice.dismissible ? { dismissNotice(notice.id) } : nil
+        ) {
+          noticeAction(notice)
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
         .plainListChrome()
+      }
     }
+  }
+
+  /// Backend-only Septask asks for the sign-in while it has no session.
+  private var requiresSignIn: Bool {
+    #if SEPTASK
+    !TaskSyncEngine.shared.signedIn
+    #else
+    false
+    #endif
+  }
+
+  @ViewBuilder
+  private func noticeAction(_ notice: TaskNotice) -> some View {
+    #if SEPTASK
+    if notice.id == .signIn { SeptaskSignInButton(compact: true) }
+    #endif
+  }
+
+  private func dismissNotice(_ id: TaskNotice.ID) {
+    TaskNotices.dismiss(id, today: clock.today, context: modelContext)
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
   }
 
   @ViewBuilder
@@ -3780,13 +3787,8 @@ struct TaskListView: View {
     // re-read keeps the chips current; the engine's model build is memoized, so
     // running it here and on appear trains at most once.
     refreshFilingSuggestions()
-    // Refresh dismissed state — banner reappears next day automatically.
-    // Account-wide: `SettingsMirror` resolves the synced dismissal against the
-    // device-local mirror, so a dismissal on any device lands here too.
-    if filter == .today {
-      let last = SettingsMirror.rolledInDismissedOn(context: modelContext)
-      newTodosDismissed = (last == clock.today)
-    }
+    // A synced dismissal from another device lands on the next read.
+    noticeEpoch &+= 1
     refreshCalendarEvents()
     consumePendingTaskReveal()
     SeptenaLog.info("[TaskList] load done count=\(items.count)")
@@ -3872,28 +3874,6 @@ struct TaskListView: View {
       candidates: candidates,
       rankedTop: { filingRankedSuggestions(for: $0)?.first }
     )
-  }
-
-  // MARK: - New-to-dos banner
-
-  /// Start-of-day notice for tasks that rolled into Today on their own — a
-  /// plan made on an earlier day whose date has now arrived. Dismissing
-  /// persists today's date so it stays gone for the rest of the day and
-  /// returns tomorrow. Drawn by the shared `TaskListNotice`, like every other
-  /// inline notice on the task lists.
-  private func newTodosBanner(count: Int) -> some View {
-    TaskListNotice(
-      kind: .info,
-      symbol: "arrow.down.circle",
-      title: Text(count == 1
-                  ? "1 task rolled into Today"
-                  : "\(count) tasks rolled into Today"),
-      onDismiss: {
-        SettingsMirror.dismissRolledIn(on: clock.today, context: modelContext,
-                                       engine: SeptenaServices.shared.ckEngine)
-        motion.run(.easeOut(duration: 0.2)) { newTodosDismissed = true }
-      })
-    .transition(.opacity.combined(with: .move(edge: .top)))
   }
 
   // MARK: - Title chrome

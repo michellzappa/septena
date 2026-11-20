@@ -107,13 +107,9 @@ final class SeptaskKitTaskListController: NSViewController {
     /// One pending Apple Reminder, click to import. `importing` drives the
     /// in-flight dimming so a slow EventKit delete doesn't look like a no-op.
     case reminder(ImportedReminder, importing: Bool)
-    /// "N tasks rolled into Today" — the dismissible start-of-day notice for
-    /// work that arrived on its own because a date the user set earlier has
-    /// now come round.
-    case rolledInBanner(count: Int)
-    /// "Not signed in" — Today's ask for the task-backend sign-in (Septask is
-    /// backend-only; signed out, edits wait in the outbox).
-    case signInBanner
+    /// A notice on top of Today (sign in, rolled in, an explainer). Which
+    /// ones show, and in what order, is decided by `TaskNotices`.
+    case notice(TaskNotice)
 
     var key: String {
       switch self {
@@ -126,8 +122,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .newTask: return "new-task"
       case .addSection: return "add-section"
       case .reminder(let item, _): return "reminder:" + item.id
-      case .rolledInBanner: return "rolled-in-banner"
-      case .signInBanner: return "sign-in-banner"
+      case .notice(let notice): return "notice:" + notice.id.rawValue
       case .importAllReminders: return "import-all-reminders"
       }
     }
@@ -145,7 +140,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .header, .screenTitle, .loggedFooter, .addSection: return false
       // A notice, not an item: it sits on the page like a header, NOT on a
       // card. A statement about your list must not look like a row of it.
-      case .rolledInBanner, .signInBanner: return false
+      case .notice: return false
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
@@ -869,7 +864,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + signInBanner() + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
         + todayLoggedRows()
     case .today:
@@ -901,7 +896,7 @@ final class SeptaskKitTaskListController: NSViewController {
                               comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
-      newRows = titleRows + signInBanner() + agenda() + rolledInBanner(pool) + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
@@ -1191,42 +1186,18 @@ final class SeptaskKitTaskListController: NSViewController {
   /// agent proposals (docs/TRIAGE_BAND_SPEC.md). This is why the sidebar has
   /// no separate Inbox row: the band IS the inbox, and it lives here, exactly
   /// as the SwiftUI Today renders it.
-  // MARK: - Rolled-into-Today banner
+  // MARK: - Notices
   //
-  // The counterpart of `TaskListView.newTodosBanner` (both draw through the
-  // shared notice component: `KitNoticeCell` / `TaskListNotice`). NOTE this is a BANNER,
-  // not a bucket: there is no separate "review" section, and an earlier
-  // version of the parity doc was wrong about that. The rows it counts are
-  // already on Today; the notice just says how many of them arrived on their
-  // own because a date set earlier has now come round.
-  //
-  // Dismissal persists today's date, so it stays gone for the rest of the day
-  // and returns tomorrow — the SAME UserDefaults key SwiftUI uses, so
-  // dismissing in one shell dismisses in the other.
+  // Which notices sit on top of Today, their order and their dismissal live
+  // in `TaskNotices` (Septena/Shell/Tasks), shared with the SwiftUI list. This
+  // shell only draws them (`KitNoticeCell`) and wires each one's action.
 
-  private func rolledInBanner(_ pool: [SeptenaTask]) -> [Row] {
-    let today = SeptenaDate.today
-    // Account-wide, not per-device: `SettingsMirror` resolves the synced
-    // dismissal against the device-local mirror, so dismissing on one device
-    // clears the banner on all of them.
-    guard SettingsMirror.rolledInDismissedOn(context: context) != today
-    else { return [] }
-    // Read from the rows already on Today, exactly like `rolledInReview`:
-    // scheduled STRICTLY before today. A task scheduled FOR today, or merely
-    // due today, isn't "new" — the user placed it.
-    let count = pool.filter { task in
-      guard task.status == .open, let scheduled = task.scheduled, !scheduled.isEmpty
-      else { return false }
-      return String(scheduled.prefix(10)) < today
-    }.count
-    guard count > 0 else { return [] }
-    return [.rolledInBanner(count: count)]
-  }
-
-  /// Today's sign-in notice: present while this device has no backend
-  /// session (`observeBootstrapState` reloads when that changes).
-  private func signInBanner() -> [Row] {
-    TaskSyncEngine.shared.signedIn ? [] : [.signInBanner]
+  /// Today's notices, from the shared `TaskNotices` (the SwiftUI list reads
+  /// the same function). Sign-in state changes reload through
+  /// `observeBootstrapState`.
+  private func noticeRows(_ pool: [SeptenaTask]) -> [Row] {
+    TaskNotices.today(pool: pool, requiresSignIn: !TaskSyncEngine.shared.signedIn,
+                      today: SeptenaDate.today, context: context).map(Row.notice)
   }
 
   // MARK: - Inline notices (one component: `KitNoticeCell`)
@@ -1239,40 +1210,8 @@ final class SeptaskKitTaskListController: NSViewController {
     return cell
   }
 
-  static func rolledInNotice(count: Int) -> KitNotice {
-    KitNotice(
-      kind: .info,
-      symbol: "arrow.down.circle",
-      title: count == 1
-        ? String(localized: "1 task rolled into Today",
-                 comment: "SeptaskKit: start-of-day rolled-in notice, singular")
-        : String(localized: "\(count) tasks rolled into Today",
-                 comment: "SeptaskKit: start-of-day rolled-in notice, plural"),
-      detail: nil,
-      primaryTitle: nil,
-      dismissible: true)
-  }
-
-  /// Opens the same Sign in with Apple flow as Settings
-  /// (`SeptaskAppKitSignIn`). A standard bordered button, not Apple's
-  /// `ASAuthorizationAppleIDButton`: at a compact row height that control
-  /// drew as a bare black bar with only the logo.
-  static var signInNotice: KitNotice {
-    KitNotice(
-      kind: .actionNeeded,
-      symbol: "person.crop.circle.badge.exclamationmark",
-      title: String(localized: "Not signed in",
-                    comment: "SeptaskKit: Today notice title when the task backend has no session"),
-      detail: String(localized: "Your changes stay on this Mac until you sign in.",
-                     comment: "SeptaskKit: Today notice detail when the task backend has no session"),
-      primaryTitle: String(localized: "Sign in…",
-                           comment: "SeptaskKit: Today notice button that starts Sign in with Apple"),
-      dismissible: false)
-  }
-
-  private func dismissRolledInBanner() {
-    SettingsMirror.dismissRolledIn(on: SeptenaDate.today, context: context,
-                                   engine: SeptenaServices.shared.ckEngine)
+  private func dismissNotice(_ id: TaskNotice.ID) {
+    TaskNotices.dismiss(id, today: SeptenaDate.today, context: context)
     reload()
   }
 
@@ -3988,8 +3927,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .reminder: return SeptaskKitTheme.rowHeight
     case .importAllReminders: return SeptaskKitTheme.rowHeight
     // Inline notices: one component, its height follows its content.
-    case .rolledInBanner(let count): return KitNoticeCell.height(for: Self.rolledInNotice(count: count))
-    case .signInBanner: return KitNoticeCell.height(for: Self.signInNotice)
+    case .notice(let notice): return KitNoticeCell.height(for: KitNotice(notice))
     }
   }
 
@@ -4569,16 +4507,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       cell.onTap = { [weak self] in self?.importAllReminders() }
       return cell
 
-    case .signInBanner:
-      let cell = noticeCell(Self.signInNotice)
-      cell.onPrimary = { SeptaskAppKitSignIn.shared.start() }
-      cell.onDismiss = nil
-      return cell
-
-    case .rolledInBanner(let count):
-      let cell = noticeCell(Self.rolledInNotice(count: count))
-      cell.onPrimary = nil
-      cell.onDismiss = { [weak self] in self?.dismissRolledInBanner() }
+    case .notice(let notice):
+      let cell = noticeCell(KitNotice(notice))
+      cell.onPrimary = notice.id == .signIn ? { SeptaskAppKitSignIn.shared.start() } : nil
+      cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
       return cell
 
     case .reminder(let item, let importing):
