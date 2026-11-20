@@ -167,8 +167,8 @@ enum SettingsKey {
   /// Settings → Integrations, so the default can't surprise-prompt). Read by
   /// `TaskListView`.
   static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
-  /// Whether open Today tasks deepen their checkbox tint the longer they sit
-  /// on Today undone (`SeptenaTask.todayTenureFill` → `TaskCheckbox.tenureFill`).
+  /// Whether open Today tasks fade the longer they sit on Today undone
+  /// (`SeptenaTask.todayTenureFill` → `TaskFade.rowOpacity`).
   /// Absent → on. Read by `TaskCheckboxModel`.
   static let tasksShowAging = "septena.tasks.showAging"
   /// How many lines a task row's title may occupy before it truncates, on

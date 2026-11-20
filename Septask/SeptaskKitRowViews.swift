@@ -31,18 +31,15 @@ final class KitCheckboxView: NSButton {
   var isDone = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var isDashed = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var isToday = false { didSet { needsDisplay = true; refreshAccessibility() } }
-  /// Today tenure dial (0…1) — gray interior deepening one seventh per carried
-  /// day (`SeptenaTask.todayTenureFill`). nil = no dial.
+  /// Days carried on Today as 0…1 (`SeptenaTask.todayTenureFill`). The box
+  /// draws nothing for it: the cell fades its row instead (`TaskFade`). Kept
+  /// for the VoiceOver hint only.
   var tenureFill: Double? = nil { didSet { needsDisplay = true; refreshAccessibility() } }
   /// Unread agent context on a committed task — the haloed corner dot.
   var cornerDot = false { didSet { needsDisplay = true; refreshAccessibility() } }
   /// A fresh, unacknowledged agent-created row — the cue ring.
   var agentCue = false { didSet { needsDisplay = true; refreshAccessibility() } }
   var onToggle: (() -> Void)?
-
-  /// Matches `TaskCheckbox.tenureMaxOpacity`: never fully opaque, so an aged
-  /// Today task can't read as a solid/done box.
-  private static let tenureMaxOpacity: CGFloat = 0.5
 
   override var intrinsicContentSize: NSSize {
     NSSize(width: Self.tapSize, height: Self.tapSize)
@@ -161,14 +158,6 @@ final class KitCheckboxView: NSButton {
       return
     }
 
-    // Tenure dial sits BEHIND the outline: the interior grays and deepens
-    // with days carried on Today, while the box keeps its pure form.
-    if let tenureFill, tenureFill > 0 {
-      let strength = CGFloat(min(1, max(0, tenureFill))) * Self.tenureMaxOpacity
-      SeptaskKitTheme.todayTenure.withAlphaComponent(strength).setFill()
-      NSBezierPath(roundedRect: box, xRadius: Self.corner, yRadius: Self.corner).fill()
-    }
-
     let inset = box.insetBy(dx: Self.stroke / 2, dy: Self.stroke / 2)
     let path = NSBezierPath(roundedRect: inset, xRadius: Self.corner, yRadius: Self.corner)
     path.lineWidth = Self.stroke
@@ -178,15 +167,6 @@ final class KitCheckboxView: NSButton {
     }
     if isToday {
       SeptaskKitTheme.todayAccent.setStroke()
-    } else if let tenureFill, tenureFill > 0 {
-      // Matches TaskCheckbox exactly: when the pinned badge ISN'T shown (the
-      // Today screen suppresses it — redundant there), the outline itself
-      // darkens in lockstep with the tenure fill instead of jumping to a
-      // new color, so there's no step-change on day 1.
-      let strength = CGFloat(min(1, max(0, tenureFill))) * Self.tenureMaxOpacity
-      SeptaskKitTheme.checkboxStroke.blended(withFraction: strength,
-                                             of: SeptaskKitTheme.todayTenure)?.setStroke()
-        ?? SeptaskKitTheme.checkboxStroke.setStroke()
     } else {
       SeptaskKitTheme.checkboxStroke.setStroke()
     }

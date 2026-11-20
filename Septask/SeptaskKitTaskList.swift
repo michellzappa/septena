@@ -4928,8 +4928,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // Recently Deleted rows are out of every list, Today included: no gold
     // Today badge there.
     checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil
-    // The remaining cue vocabulary, matching `TaskCheckboxModel`: gold tenure
-    // dial for days carried on Today, corner dot for unread agent context on a
+    // The remaining cue vocabulary, matching `TaskCheckboxModel`: the row
+    // fade for days carried on Today (`TaskFade`), corner dot for unread agent context on a
     // committed row (proposals are excluded — they already read as dashed),
     // and the cue ring while an agent row is fresh and unengaged.
     // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
@@ -4939,6 +4939,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // gray reads as noise about a list the row isn't being judged in.
     checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter != .today)
       ? nil : task.todayTenureFill()
+    // The row fades, not the box: same curve as `CheckableRow`.
+    let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
+    for view in [title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+      view.alphaValue = fade
+    }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
     checkbox.agentCue = !done && task.showsAgentCue()
 

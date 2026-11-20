@@ -188,7 +188,8 @@ struct CheckableRow<Trailing: View>: View {
   /// `cornerDot` = unread-context marker on a committed task.
   var dashed: Bool = false
   var cornerDot: Color? = nil
-  /// Forwarded to `TaskCheckbox`: fill (0…1) for the Today tenure dial, or nil.
+  /// Days carried on Today as 0…1, or nil. Fades the row's text and trailing
+  /// cluster (`TaskFade`); the checkbox stays at full strength.
   var tenureFill: Double? = nil
   /// The checkbox celebration this row plays on check (see `CheckFeel`).
   /// Standardized to the default `.stamp` across every checkable row.
@@ -299,9 +300,12 @@ struct CheckableRow<Trailing: View>: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
+      .opacity(TaskFade.rowOpacity(tenureFill))
 
       trailing()
+        .opacity(TaskFade.rowOpacity(tenureFill))
     }
+    .a11yAnimation(Theme.Motion.quick, value: tenureFill)
     .padding(.horizontal, rowHInset)
     .padding(.vertical, rowVInset)
     .background(selectionHighlight)
