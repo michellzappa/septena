@@ -24,7 +24,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
 | Other clients (web, Android) | spec to rewrite on the backend | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
-| Launch — Septena name and paid sync | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007 | `track:launch` |
+| Launch — Septena name, free account, paid sync | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
 
 ## Milestones
 
