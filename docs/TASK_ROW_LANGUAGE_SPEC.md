@@ -153,11 +153,12 @@ agent sort pill  ▸  date / today chip  ▸  (recurrence · notes glyphs)
   for "today" (see §3.3). Overdue keeps its red treatment (coexists with an
   agent pill as a small flag glyph — §8).
 - **Today tenure fade (2026-11-20, replaces the tenure fill).** "How long
-  has this been on Today" is one treatment of the *row*, not the checkbox
+  has this been on Today" is one treatment of the whole *row*
   (`SeptenaTask.todayTenureFill` → `TaskFade.rowOpacity`). From the first
-  carried day (`daysOnToday ≥ 1`) the title, meta and trailing cluster fade a
+  carried day (`daysOnToday ≥ 1`) the checkbox, title, meta and trailing cluster fade a
   seventh of the way each day, down to `TaskFade.minOpacity` (0.55) at a week.
-  The checkbox never fades and never tints: it stays the target. Hand-added /
+  The checkbox fades by the same amount (2026-11-20) and never tints; it stays
+  tappable. Hand-added /
   pinned / just-arrived rows stay at full strength. This is the visible half of
   the fading list (`docs/TASK_FADE_SPEC.md` §4): with the fade fields the same
   curve counts down to the task leaving the list. The earlier gray tenure fill

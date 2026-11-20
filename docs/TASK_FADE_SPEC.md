@@ -89,10 +89,11 @@ day at rollover, on the device that runs first, and on the backend when the
 backend owns the job (ADR 0002). It is idempotent: two devices can run it
 with the same result.
 
-**The visible fade (decided 2026-11-20).** The countdown shows on the row,
-not on the checkbox: the title, meta and trailing cluster lose opacity as
-the task nears its fade, down to `TaskFade.minOpacity` (0.55, readable), and
-at the end the task leaves the list. The checkbox never fades or tints. One
+**The visible fade (decided 2026-11-20).** The countdown shows on the whole
+row: the checkbox, title, meta and trailing cluster lose opacity together, by
+the same amount, as the task nears its fade, down to `TaskFade.minOpacity`
+(0.55, readable), and at the end the task leaves the list. The checkbox never
+tints and stays tappable. One
 rule for both lists: `SeptenaCore/TaskFade.swift`. Shipped first on the
 existing Today tenure clock (`todayTenureFill`, days carried on Today, full
 at a week); P2 moves it to `touchedAt` against the fade window in every list.

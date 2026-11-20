@@ -4910,9 +4910,9 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // gray reads as noise about a list the row isn't being judged in.
     checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter != .today)
       ? nil : task.todayTenureFill()
-    // The row fades, not the box: same curve as `CheckableRow`.
+    // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted

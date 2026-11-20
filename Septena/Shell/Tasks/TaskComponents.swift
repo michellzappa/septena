@@ -189,7 +189,7 @@ struct CheckableRow<Trailing: View>: View {
   var dashed: Bool = false
   var cornerDot: Color? = nil
   /// Days carried on Today as 0…1, or nil. Fades the row's text and trailing
-  /// cluster (`TaskFade`); the checkbox stays at full strength.
+  /// cluster and checkbox, all by the same amount (`TaskFade`).
   var tenureFill: Double? = nil
   /// The checkbox celebration this row plays on check (see `CheckFeel`).
   /// Standardized to the default `.stamp` across every checkable row.
@@ -280,6 +280,9 @@ struct CheckableRow<Trailing: View>: View {
       )
       .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
       .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
+      // The checkbox fades with the row, by the same amount (mz, 2026-11-20),
+      // so a slipping task reads as one fading line. It stays tappable.
+      .opacity(TaskFade.rowOpacity(tenureFill))
 
       if let leadingEmoji {
         Text(leadingEmoji).font(.body)
