@@ -322,16 +322,10 @@ private struct TextureTileButton: View {
             .strokeBorder(Theme.border.opacity(0.45), lineWidth: 0.5)
         )
 
-        VStack(alignment: .leading, spacing: 1) {
-          Text(info.name)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-          Text(info.tag)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-        }
+        Text(info.name)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.primary)
+          .lineLimit(1)
       }
       .padding(7)
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -349,7 +343,7 @@ private struct TextureTileButton: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel("\(info.name), \(info.tag)")
+    .accessibilityLabel(info.name)
     .accessibilityAddTraits(isCurrent ? .isSelected : [])
   }
 }
