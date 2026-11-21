@@ -119,7 +119,8 @@ enum TaskJSONTransfer {
   private static func areaDict(_ e: AreaEntity) -> [String: Any] {
     compact([
       "id": e.id, "title": e.title, "context": e.context,
-      "emoji": e.emoji, "position": e.position, "updatedAt": e.updatedAt,
+      "emoji": e.emoji, "attachmentJSON": e.attachmentJSON,
+      "position": e.position, "updatedAt": e.updatedAt,
     ])
   }
 
@@ -128,16 +129,19 @@ enum TaskJSONTransfer {
       "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
       "created": e.created, "completedAt": e.completedAt,
       "notes": e.notes, "context": e.context, "githubRepo": e.githubRepo,
+      "attachmentJSON": e.attachmentJSON,
       "position": e.position, "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
   }
 
   private static func taskDict(_ e: TaskEntity) -> [String: Any] {
-    compact([
+    let iso = ISO8601DateFormatter()
+    return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
       "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
       "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
       "area": e.area, "project": e.project, "notes": e.notes,
+      "conversationJSON": e.conversationJSON,
       "recurrenceUnit": e.recurrenceUnit,
       "recurrenceInterval": e.recurrenceUnit != nil ? e.recurrenceInterval : nil,
       "recurrenceAfterCompletion": e.recurrenceUnit != nil ? e.recurrenceAfterCompletion : nil,
@@ -155,6 +159,15 @@ enum TaskJSONTransfer {
       "kind": e.kind.isEmpty ? nil : e.kind,
       "heading": e.heading,
       "sortIndex": e.sortIndex,
+      "source": e.source,
+      "sourceClient": e.sourceClient,
+      "acknowledgedAt": e.acknowledgedAt.map { iso.string(from: $0) },
+      "createdAt": e.createdAt == .distantPast ? nil : iso.string(from: e.createdAt),
+      "touchedAt": e.touchedAt.map { iso.string(from: $0) },
+      "deferCount": e.deferCount > 0 ? e.deferCount : nil,
+      "fadedAt": e.fadedAt.map { iso.string(from: $0) },
+      "dropReason": e.dropReason,
+      "effort": e.effort,
       "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
   }
@@ -281,6 +294,7 @@ enum TaskJSONTransfer {
     entity.title = title
     entity.context = r["context"] as? String
     entity.emoji = r["emoji"] as? String
+    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     if let updated = r["updatedAt"] as? String { entity.updatedAt = updated }
     return id
@@ -304,6 +318,7 @@ enum TaskJSONTransfer {
     entity.notes = r["notes"] as? String
     entity.context = r["context"] as? String
     entity.githubRepo = r["githubRepo"] as? String
+    entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }
     entity.updatedAt = r["updatedAt"] as? String
     entity.deletedAt = r["deletedAt"] as? String
@@ -363,6 +378,17 @@ enum TaskJSONTransfer {
     entity.reminderMode = nonEmptyString(r["reminderMode"])
     entity.reminderSnoozedUntil = nonEmptyString(r["reminderSnoozedUntil"])
     entity.reminderDismissedAt = nonEmptyString(r["reminderDismissedAt"])
+    entity.conversationJSON = nonEmptyString(r["conversationJSON"])
+    entity.source = nonEmptyString(r["source"])
+    entity.sourceClient = nonEmptyString(r["sourceClient"])
+    let iso = ISO8601DateFormatter()
+    if let ack = nonEmptyString(r["acknowledgedAt"]) { entity.acknowledgedAt = iso.date(from: ack) }
+    if let cr = nonEmptyString(r["createdAt"]), let d = iso.date(from: cr) { entity.createdAt = d }
+    if let touched = nonEmptyString(r["touchedAt"]) { entity.touchedAt = iso.date(from: touched) }
+    if let defers = intValue(r["deferCount"]) { entity.deferCount = max(0, defers) }
+    if let faded = nonEmptyString(r["fadedAt"]) { entity.fadedAt = iso.date(from: faded) }
+    entity.dropReason = nonEmptyString(r["dropReason"])
+    entity.effort = nonEmptyString(r["effort"])
     if let pos = doubleValue(r["position"]) { entity.position = pos }
     entity.todayPosition = doubleValue(r["todayPosition"])
     if let sort = intValue(r["sortIndex"]) { entity.sortIndex = sort }
@@ -439,11 +465,230 @@ enum TaskJSONTransfer {
     default: return ProjectStatus.active.rawValue
     }
   }
+
+  // MARK: - Markdown & CSV Export (docs/DATA_EXPORT_SPEC.md, EX0)
+
+  enum ExportFormat: String, CaseIterable, Identifiable {
+    case json
+    case markdown
+    case csv
+
+    var id: String { rawValue }
+
+    var label: String {
+      switch self {
+      case .json: return String(localized: "JSON Backup", comment: "Export format")
+      case .markdown: return String(localized: "Markdown", comment: "Export format")
+      case .csv: return String(localized: "CSV", comment: "Export format")
+      }
+    }
+
+    var contentType: UTType {
+      switch self {
+      case .json: return .json
+      case .markdown: return UTType(filenameExtension: "md") ?? .plainText
+      case .csv: return .commaSeparatedText
+      }
+    }
+
+    var fileExtension: String {
+      switch self {
+      case .json: return "json"
+      case .markdown: return "md"
+      case .csv: return "csv"
+      }
+    }
+
+    @MainActor
+    func suggestedFilename(stamp: String? = nil) -> String {
+      "septena-tasks-\(stamp ?? TaskJSONTransfer.todayStamp).\(fileExtension)"
+    }
+  }
+
+  static func exportData(format: ExportFormat,
+                         includeCompleted: Bool = true,
+                         context: ModelContext? = nil) throws -> Data {
+    switch format {
+    case .json:
+      return try exportJSON(context: context)
+    case .markdown:
+      let text = try exportMarkdown(context: context, includeCompleted: includeCompleted)
+      return Data(text.utf8)
+    case .csv:
+      let text = try exportCSV(context: context, includeCompleted: includeCompleted)
+      return Data(text.utf8)
+    }
+  }
+
+  static func exportMarkdown(context: ModelContext? = nil, includeCompleted: Bool = true) throws -> String {
+    let context = context ?? LocalStore.shared.container.mainContext
+    let areas = try context.fetch(FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+      .filter { $0.deletedAt == nil }
+    let allTasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+      .filter { $0.deletedAt == nil }
+
+    let openTasks = allTasks.filter { !$0.isHeading && $0.status == .open }
+    let headingsByProject = Dictionary(grouping: allTasks.filter(\.isHeading)) { $0.project ?? "" }
+    let completedTasks = allTasks
+      .filter { !$0.isHeading && $0.status != .open }
+      .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+
+    var lines: [String] = [
+      "# Septena Tasks",
+      "",
+      "_Exported \(todayStamp)_",
+      "",
+    ]
+
+    func appendTask(_ t: TaskEntity, indent: String = "") {
+      let box: String
+      switch t.status {
+      case .open: box = "[ ]"
+      case .done: box = "[x]"
+      case .cancelled: box = "[-]"
+      }
+      var meta: [String] = []
+      if t.today && t.status == .open { meta.append("today") }
+      if let s = t.scheduled { meta.append("when: \(s)") }
+      if let d = t.deadline { meta.append("deadline: \(d)") }
+      if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
+      if let rem = t.reminderAt { meta.append("reminder: \(rem)") }
+      if let doneAt = t.completedAt, t.status != .open { meta.append("done: \(String(doneAt.prefix(10)))") }
+      let suffix = meta.isEmpty ? "" : " _(\(meta.joined(separator: ", ")))_"
+      lines.append("\(indent)- \(box) \(t.title)\(suffix)")
+      if let notes = t.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+        for noteLine in notes.components(separatedBy: .newlines) {
+          lines.append("\(indent)  > \(noteLine)")
+        }
+      }
+    }
+
+    func appendProject(_ p: ProjectEntity, headingLevel: String) {
+      let projectTasks = openTasks.filter { $0.project == p.id }
+      let sections = (headingsByProject[p.id] ?? []).sorted { $0.position < $1.position }
+      lines.append("\(headingLevel) \(p.title)")
+      if let notes = p.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+        lines.append("")
+        lines.append(notes)
+      }
+      lines.append("")
+      let unsectioned = projectTasks.filter { $0.heading == nil }
+      for t in unsectioned { appendTask(t) }
+      if !unsectioned.isEmpty { lines.append("") }
+      for s in sections {
+        let inSection = projectTasks.filter { $0.heading == s.id }
+        guard !inSection.isEmpty else { continue }
+        lines.append("\(headingLevel)# \(s.title)")
+        lines.append("")
+        for t in inSection { appendTask(t) }
+        lines.append("")
+      }
+    }
+
+    let inbox = openTasks.filter { $0.area == nil && $0.project == nil }
+    if !inbox.isEmpty {
+      lines.append("## Inbox")
+      lines.append("")
+      for t in inbox { appendTask(t) }
+      lines.append("")
+    }
+
+    for area in areas {
+      let areaTasks = openTasks.filter { $0.area == area.id && $0.project == nil }
+      let areaProjects = projects.filter { $0.area == area.id }
+      guard !areaTasks.isEmpty || !areaProjects.isEmpty else { continue }
+      let prefix = area.emoji.map { "\($0) " } ?? ""
+      lines.append("## \(prefix)\(area.title)")
+      lines.append("")
+      for t in areaTasks { appendTask(t) }
+      if !areaTasks.isEmpty { lines.append("") }
+      for p in areaProjects { appendProject(p, headingLevel: "###") }
+    }
+
+    let standaloneProjects = projects.filter { $0.area == nil }
+    if !standaloneProjects.isEmpty {
+      lines.append("## Projects")
+      lines.append("")
+      for p in standaloneProjects { appendProject(p, headingLevel: "###") }
+    }
+
+    if includeCompleted && !completedTasks.isEmpty {
+      lines.append("## Logbook")
+      lines.append("")
+      for t in completedTasks { appendTask(t) }
+      lines.append("")
+    }
+
+    return lines.joined(separator: "\n")
+  }
+
+  /// RFC 4180 CSV with UTF-8 BOM for clean spreadsheet / importer ingestion.
+  static func exportCSV(context: ModelContext? = nil, includeCompleted: Bool = true) throws -> String {
+    let context = context ?? LocalStore.shared.container.mainContext
+    let areas = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<AreaEntity>()).map { ($0.id, $0.title) })
+    let projects = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<ProjectEntity>()).map { ($0.id, $0) })
+    let allTasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+      .filter { $0.deletedAt == nil }
+    let headings = Dictionary(uniqueKeysWithValues: allTasks.filter(\.isHeading).map { ($0.id, $0.title) })
+    let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
+
+    var out: [String] = [
+      "\u{FEFF}id,title,status,area,project,section,today,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+    ]
+    for t in rows {
+      let projectEntity = t.project.flatMap { projects[$0] }
+      let areaName = (t.area ?? projectEntity?.area).flatMap { areas[$0] } ?? ""
+      let projectName = projectEntity?.title ?? ""
+      let sectionName = t.heading.flatMap { headings[$0] } ?? ""
+      let cols: [String] = [
+        t.id,
+        t.title,
+        t.statusRaw,
+        areaName,
+        projectName,
+        sectionName,
+        t.today ? "true" : "false",
+        t.scheduled ?? "",
+        t.deadline ?? "",
+        t.reminderAt ?? "",
+        t.recurrence?.shortLabel ?? "",
+        t.notes ?? "",
+        t.created ?? "",
+        t.completedAt ?? "",
+      ]
+      out.append(cols.map(csvEscape).joined(separator: ","))
+    }
+    return out.joined(separator: "\r\n") + "\r\n"
+  }
+
+  static func csvEscape(_ value: String) -> String {
+    if value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r") {
+      return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    }
+    return value
+  }
 }
 
 // MARK: - Transferable & FileDocument
 
-/// Lazily builds the JSON dump when the share sheet asks for bytes.
+/// Lazily builds the export bytes when the share sheet asks for them.
+struct TaskExportFile: Transferable {
+  let format: TaskJSONTransfer.ExportFormat
+  let includeCompleted: Bool
+  let suggestedName: String
+
+  static var transferRepresentation: some TransferRepresentation {
+    DataRepresentation(exportedContentType: .data) { item in
+      try await MainActor.run {
+        try TaskJSONTransfer.exportData(format: item.format, includeCompleted: item.includeCompleted)
+      }
+    }
+    .suggestedFileName { $0.suggestedName }
+  }
+}
+
+/// Kept for compatibility with any caller referencing the original JSON transferable.
 struct TaskJSONExportFile: Transferable {
   let suggestedName: String
 
@@ -456,7 +701,7 @@ struct TaskJSONExportFile: Transferable {
 }
 
 struct TaskJSONDocument: FileDocument {
-  static var readableContentTypes: [UTType] { [.json] }
+  static var readableContentTypes: [UTType] { [.json, .plainText, .commaSeparatedText] }
   var data: Data
 
   init(data: Data) { self.data = data }
@@ -474,6 +719,8 @@ struct TaskJSONDocument: FileDocument {
 
 struct SeptaskImportExportPane: View {
   @Environment(\.modelContext) private var modelContext
+  @State private var exportFormat: TaskJSONTransfer.ExportFormat = .json
+  @State private var includeCompleted = true
   @State private var exportDocument: TaskJSONDocument?
   @State private var showingFileExporter = false
   @State private var exportError: String?
@@ -496,8 +743,8 @@ struct SeptaskImportExportPane: View {
     .fileExporter(
       isPresented: $showingFileExporter,
       document: exportDocument,
-      contentType: .json,
-      defaultFilename: TaskJSONTransfer.suggestedFilename
+      contentType: exportFormat.contentType,
+      defaultFilename: exportFormat.suggestedFilename()
     ) { result in
       if case .failure(let error) = result {
         exportError = error.localizedDescription
@@ -535,23 +782,41 @@ struct SeptaskImportExportPane: View {
   }
 
   private var exportSection: some View {
-    let filename = TaskJSONTransfer.suggestedFilename
+    let filename = exportFormat.suggestedFilename()
     return Section {
+      Picker("Format", selection: $exportFormat) {
+        ForEach(TaskJSONTransfer.ExportFormat.allCases) { fmt in
+          Text(fmt.label).tag(fmt)
+        }
+      }
+      .pickerStyle(.segmented)
+
+      if exportFormat != .json {
+        Toggle("Include completed tasks", isOn: $includeCompleted)
+      }
+
       Button {
         do {
-          exportDocument = TaskJSONDocument(data: try TaskJSONTransfer.exportJSON(context: modelContext))
+          let bytes = try TaskJSONTransfer.exportData(
+            format: exportFormat,
+            includeCompleted: includeCompleted,
+            context: modelContext
+          )
+          exportDocument = TaskJSONDocument(data: bytes)
           showingFileExporter = true
           exportError = nil
         } catch {
           exportError = error.localizedDescription
         }
       } label: {
-        Label("Save JSON Backup…", systemImage: "square.and.arrow.down")
+        Label("Save \(exportFormat.label)…", systemImage: "square.and.arrow.down")
       }
 
-      ShareLink(item: TaskJSONExportFile(suggestedName: filename),
+      ShareLink(item: TaskExportFile(format: exportFormat,
+                                     includeCompleted: includeCompleted,
+                                     suggestedName: filename),
                 preview: SharePreview(filename, image: Image(systemName: "doc.text"))) {
-        Label("Share JSON Backup…", systemImage: "square.and.arrow.up")
+        Label("Share \(exportFormat.label)…", systemImage: "square.and.arrow.up")
       }
 
       if let exportError {
@@ -562,7 +827,7 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Export")
     } footer: {
-      Text("Exports every task, project, area, and local attachment as plain JSON. Works offline with no account.")
+      Text("JSON Backup is lossless (every task, project, area, conversation, and local attachment). Exports are unencrypted files stored where you choose. Free on every tier, offline with no account.")
     }
   }
 
