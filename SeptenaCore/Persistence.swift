@@ -1400,6 +1400,39 @@ enum LocalCache {
   }
 
   @MainActor
+  /// Open faded tasks belonging to a project or directly to an area, sorted
+  /// most-recently-faded-first. Used by project and area pages when the global
+  /// `tasksShowFaded` setting is on; kept separate from `tasks(in:filter:)` so
+  /// counts, progress rings, and open-list queries never include faded rows.
+  static func fadedTasks(in context: ModelContext, scope filter: TaskFilter) -> [SeptenaTask] {
+    let rows: [TaskEntity]
+    let areaDirectOnly: Bool
+    switch filter {
+    case .project(let pid):
+      rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.project == pid }
+      ))
+      areaDirectOnly = false
+    case .area(let aid):
+      rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
+        predicate: #Predicate { $0.area == aid }
+      ))
+      areaDirectOnly = true
+    default:
+      return []
+    }
+    let dead = DeletedContainerLedger.snapshot()
+    return rows
+      .filter { e in
+        guard !e.pendingDeletion, e.deletedAt == nil, !e.isHeading, e.isFaded else { return false }
+        if areaDirectOnly, e.project != nil { return false }
+        return !DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead)
+      }
+      .map(SeptenaTask.init)
+      .sorted { ($0.fadedAt ?? .distantPast) > ($1.fadedAt ?? .distantPast) }
+  }
+
+  @MainActor
   /// Every task except Recently-Deleted ones. Used by aggregates (sidebar
   /// counts, project progress glyphs) and the suggestion engine — none of
   /// which should see trashed rows. Honors the same `deletedAt`/`pendingDeletion`

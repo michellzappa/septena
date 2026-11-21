@@ -268,6 +268,7 @@ enum RegistrySettings {
     static let todayShowCompleted = "septena.today.showCompleted"
     static let todayGroupByList = "septena.today.groupByList"
     static let tasksShowAging = "septena.tasks.showAging"
+    static let tasksShowFaded = "septena.tasks.showFaded"
     static let tasksTitleLines = "septena.tasks.titleLines"
     static let tasksFilingSuggestions = "septena.tasks.filingSuggestions"
     static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
@@ -290,6 +291,7 @@ enum RegistrySettings {
     static let todayShowCompleted: Bool = true
     static let todayGroupByList: Bool = true
     static let tasksShowAging: Bool = true
+    static let tasksShowFaded: Bool = true
     static let tasksTitleLines: Int = 2
     static let tasksFilingSuggestions: Bool = true
     static let tasksShowCalendarEvents: Bool = true
@@ -358,6 +360,7 @@ enum RegistrySettings {
       RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: "Group Today by list", detail: "When off, tasks appear in one list with their project or area underneath.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: "Show completed tasks", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: "Fade inactive tasks", detail: "Tasks without activity for 14 days fade out and move to Faded.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowFaded", page: nil, surface: nil, label: "Show faded tasks", detail: "Show faded tasks in projects and areas.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: "Suggest where to file", detail: "Learn where you usually file similar tasks.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: "Overdue app icon badge", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
     ]),

@@ -56,7 +56,7 @@ final class KitCheckboxView: NSButton {
   }
 
   private var usesStandardBox: Bool {
-    isDone || (!isDashed && !isToday)
+    isDone || !isDashed
   }
 
   override var intrinsicContentSize: NSSize {
@@ -223,11 +223,7 @@ final class KitCheckboxView: NSButton {
       // Unratified proposal — the readiness form from language v2.
       path.setLineDash([2.5, 2.0], count: 2, phase: 0)
     }
-    if isToday {
-      SeptaskKitTheme.todayAccent.setStroke()
-    } else {
-      SeptaskKitTheme.checkboxStroke.setStroke()
-    }
+    SeptaskKitTheme.checkboxStroke.setStroke()
     path.stroke()
   }
 }

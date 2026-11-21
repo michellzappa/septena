@@ -44,6 +44,8 @@ struct SeptaskSettingsView: View {
     RegistrySettings.Defaults.todayGroupByList
   @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool =
     RegistrySettings.Defaults.tasksShowAging
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFaded: Bool =
+    RegistrySettings.Defaults.tasksShowFaded
   @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool =
     RegistrySettings.Defaults.tasksFilingSuggestions
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool =
@@ -444,6 +446,10 @@ struct SeptaskSettingsView: View {
       Toggle(label, isOn: TaskViewOptions.announcing($todayShowCompleted))
     case "tasksShowAging":
       Toggle(isOn: TaskViewOptions.announcing($showAging)) {
+        rowLabel(label, detail: item.detail)
+      }
+    case "tasksShowFaded":
+      Toggle(isOn: TaskViewOptions.announcing($showFaded)) {
         rowLabel(label, detail: item.detail)
       }
     case "tasksFilingSuggestions":

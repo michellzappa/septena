@@ -146,20 +146,13 @@ struct TaskCheckbox: View {
   private static let boxStroke: CGFloat = 1.4
   private static let checkSize: CGFloat = 12
   #endif
-  /// Checkbox chrome is neutral gray by default; Today rows swap stroke
-  /// and fill to `Theme.todayAccent`.
+  /// Checkbox chrome stays neutral gray — Today status lives on the row's
+  /// trailing Today pill, not as a yellow box stroke.
   private var boxStrokeColor: Color {
-    // Legacy: amber box meant "is on Today" on off-Today surfaces.
-    if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    // Language v2: outline is "presence" amber when the surface wants it
-    // (i.e. `isToday` is true). For aging, we fade an amber overlay in sync
-    // with `tenureFill` below (no step-change on day 1+).
-    if TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    return Theme.checkboxStroke
+    Theme.checkboxStroke
   }
   private var boxFillColor: Color {
-    if !TaskRowFlags.languageV2, isToday { return Theme.todayAccent }
-    return Theme.checkboxFill
+    Theme.checkboxFill
   }
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -182,11 +175,10 @@ struct TaskCheckbox: View {
   @State private var bodyDip: CGFloat = 0      // tuck: box dips, then recovers
 
   /// On macOS, use the native system checkbox control for every standard open
-  /// and done state. Fall back to custom drawing only for open cues the system
-  /// checkbox cannot express (dashed proposal / gold Today indicator).
+  /// and done state. Fall back to custom drawing only for dashed proposals.
   private var usesStandardCheckbox: Bool {
     #if os(macOS)
-    !dashed && (!isToday || isDone)
+    !dashed || isDone
     #else
     false
     #endif

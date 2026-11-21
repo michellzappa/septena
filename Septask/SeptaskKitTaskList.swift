@@ -90,6 +90,7 @@ final class SeptaskKitTaskListController: NSViewController {
     case projectTarget(id: String, title: String, progress: Double)
     case task(SeptenaTask, chip: Chip?, suggestion: SuggestionEngine.Suggestion?)
     case event(Event)
+    case fadedFooter(count: Int, expanded: Bool)
     case loggedFooter(count: Int, expanded: Bool)
     /// Foot of Today's Inbox card — the clickable "New task" line, the AppKit
     /// counterpart of SwiftUI's `QuickAddTriggerRow`. It carries no task, so
@@ -123,6 +124,7 @@ final class SeptaskKitTaskListController: NSViewController {
       case .projectTarget(let id, _, _): return "project-target:" + id
       case .task(let task, _, _): return task.id
       case .event(let event): return "e:" + event.id
+      case .fadedFooter: return "faded-footer"
       case .loggedFooter: return "logged-footer"
       case .newTask: return "new-task"
       case .addSection: return "add-section"
@@ -148,7 +150,7 @@ final class SeptaskKitTaskListController: NSViewController {
     /// so they break the card run the same way a Today area/project header does.
     var isCardRow: Bool {
       switch self {
-      case .header, .screenTitle, .loggedFooter, .addSection: return false
+      case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection: return false
       // A notice, not an item: it sits on the page like a header, NOT on a
       // card. A statement about your list must not look like a row of it.
       case .notice: return false
@@ -504,7 +506,7 @@ final class SeptaskKitTaskListController: NSViewController {
         menu = self.buildHeadingContextMenu()
       } else if self.filter == .recentlyDeleted {
         menu = recentlyDeletedMenu
-      } else if self.filter == .faded {
+      } else if self.filter == .faded || (self.rows[row].task?.isFaded == true) {
         menu = fadedMenu
       } else {
         menu = contextMenu
@@ -961,8 +963,10 @@ final class SeptaskKitTaskListController: NSViewController {
       completed.sort { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
 
       let open = pool.filter { $0.status == .open }
+      let faded = showsFadedInLists ? LocalCache.fadedTasks(in: context, scope: filter) : []
       if case .project(let projectId) = filter {
         newRows = titleRows + projectGrouped(open: open, projectId: projectId)
+          + fadedFooterRows(faded: faded)
           + loggedFooterRows(completed: completed)
       } else {
         // Area: flat (headings only live inside a project), and only
@@ -991,7 +995,9 @@ final class SeptaskKitTaskListController: NSViewController {
           }
         }
         newRows = titleRows + direct.map(unchipped)
-          + projectRows + loggedFooterRows(completed: completed)
+          + projectRows
+          + fadedFooterRows(faded: faded)
+          + loggedFooterRows(completed: completed)
       }
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
@@ -1814,6 +1820,42 @@ final class SeptaskKitTaskListController: NSViewController {
     // whole BLOCK of rows below the footer in one go, and an instant
     // reveal/collapse reads as correct disclosure behavior on its own —
     // no need to fight the diff machinery for what's an infrequent toggle.
+    reload(animated: false)
+  }
+
+  /// Mirrors SettingsKey.tasksShowFaded's contract: absent → on.
+  private var showsFadedInLists: Bool {
+    UserDefaults.standard.object(forKey: SettingsKey.tasksShowFaded) == nil
+      ? RegistrySettings.Defaults.tasksShowFaded
+      : UserDefaults.standard.bool(forKey: SettingsKey.tasksShowFaded)
+  }
+
+  private static let fadedCollapsedKey = "septena.tasks.projectFadedCollapsed"
+
+  private func fadedCollapsedIds() -> Set<String> {
+    guard let data = UserDefaults.standard.data(forKey: Self.fadedCollapsedKey) else { return [] }
+    return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+  }
+
+  /// Collapsible faded-tasks section for projects & areas. Starts expanded
+  /// while Settings ▸ Lists ▸ Show faded tasks is on (mirrors Today's
+  /// completed footer); clicking folds or unfolds per list.
+  private func fadedFooterRows(faded: [SeptenaTask]) -> [Row] {
+    guard let key = scopeId, !faded.isEmpty else { return [] }
+    let expanded = !fadedCollapsedIds().contains(key)
+    var rows: [Row] = [.fadedFooter(count: faded.count, expanded: expanded)]
+    if expanded {
+      rows.append(contentsOf: faded.map(unchipped))
+    }
+    return rows
+  }
+
+  func toggleFadedExpanded() {
+    guard let key = scopeId else { return }
+    var ids = fadedCollapsedIds()
+    if ids.contains(key) { ids.remove(key) } else { ids.insert(key) }
+    UserDefaults.standard.set((try? JSONEncoder().encode(ids)) ?? Data(),
+                              forKey: Self.fadedCollapsedKey)
     reload(animated: false)
   }
 
@@ -4166,7 +4208,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     case .event: return SeptaskKitTheme.rowHeight
     // Blank band above it as tall as a group title, so the footer reads as
     // its own section, not glued to the last task (mz, 2026-11-20).
-    case .loggedFooter: return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
+    case .fadedFooter, .loggedFooter:
+      return KitLoggedFooterCell.topGap + SeptenaTypeScale.size(.footnote) + 24
     case .newTask: return SeptaskKitTheme.rowHeight
     // Same band as the logged footer — both are quiet meta-font page footers.
     case .addSection: return SeptenaTypeScale.size(.footnote) + 24
@@ -4498,8 +4541,10 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// already valid (so validateDrop can avoid a redundant setDropRow).
   private func clampDropRow(_ row: Int) -> Int? {
     guard let footer = rows.firstIndex(where: {
-      if case .loggedFooter = $0 { return true }
-      return false
+      switch $0 {
+      case .fadedFooter, .loggedFooter: return true
+      default: return false
+      }
     }), row > footer else { return nil }
     return footer
   }
@@ -4732,11 +4777,19 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       }
       return cell
 
+    case .fadedFooter(let count, let expanded):
+      let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
+      let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
+        ?? KitLoggedFooterCell(identifier: identifier)
+      cell.configure(count: count, expanded: expanded, kind: .faded)
+      cell.onTap = { [weak self] in self?.toggleFadedExpanded() }
+      return cell
+
     case .loggedFooter(let count, let expanded):
       let identifier = NSUserInterfaceItemIdentifier("loggedFooterCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitLoggedFooterCell
         ?? KitLoggedFooterCell(identifier: identifier)
-      cell.configure(count: count, expanded: expanded)
+      cell.configure(count: count, expanded: expanded, kind: .logged)
       cell.onTap = { [weak self] in self?.toggleLoggedExpanded() }
       return cell
 
@@ -4931,6 +4984,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let title = NSTextField(labelWithString: "")
   private let notesGlyph = NSImageView()
   private let chip = KitChipView()
+  private let statusChip = KitChipView()
   private let issueChip = KitChipView()
   private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
@@ -5020,8 +5074,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     let trailingShove = NSView()
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
-    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, scheduleGlyph,
-                                      detail, repeatGlyph, notesGlyph])
+    let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
+                                      scheduleGlyph, detail, repeatGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5042,6 +5096,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     shoveCollapsed.isActive = true
     trailing.kitA11yIgnore()
     chip.kitA11yIgnore()
+    statusChip.kitA11yIgnore()
     issueChip.kitA11yIgnore()
 
     addSubview(checkbox)
@@ -5135,6 +5190,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       checkbox.kitA11yIgnore()
       notesGlyph.isHidden = true
       chip.isHidden = true
+      statusChip.isHidden = true
       issueChip.isHidden = true
       scheduleGlyph.isHidden = true
       detail.stringValue = ""
@@ -5167,22 +5223,20 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // `isOnToday`, not the raw `today` field) it shows solid.
     // Recently Deleted rows are out of every list, Today included: no gold
     // Today badge there.
-    checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil
-    // The remaining cue vocabulary, matching `TaskCheckboxModel`: the row
-    // fade for days carried on Today (`TaskFade`), corner dot for unread agent context on a
-    // committed row (proposals are excluded — they already read as dashed),
-    // and the cue ring while an agent row is fresh and unengaged.
-    // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
-    // flag the SwiftUI row reads (`TaskCheckboxModel`) — without it the AppKit
-    // Today list kept drawing gold after the user turned aging off.
+    let showFadedInScope = task.isFaded && filter != .faded
+    checkbox.isToday = task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
-    // `fadeFill()` so rows in the Faded pile stay fully readable.
-    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
-      ? nil : task.fadeFill()
+    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself rows stay at
+    // full opacity; inside projects and areas faded rows render visibly faded.
+    if showFadedInScope {
+      checkbox.tenureFill = 1.0
+    } else {
+      checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
+        ? nil : task.fadeFill()
+    }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, issueChip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5234,6 +5288,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.configure(symbol: chipValue.symbol, title: chipValue.title)
     } else {
       chip.isHidden = true
+    }
+
+    if showFadedInScope {
+      statusChip.isHidden = false
+      statusChip.configure(symbol: "circle.dashed",
+                           title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+    } else if !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded {
+      statusChip.isHidden = false
+      statusChip.configure(symbol: "sun.max.fill",
+                           title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
+    } else {
+      statusChip.isHidden = true
     }
 
     configureDetail(with: task, filter: filter, done: done)
@@ -5305,10 +5371,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       let today = KitDayFormat.todayDate() ?? Date()
       let scheduledDay = Calendar.current.startOfDay(for: date)
       let todayDay = Calendar.current.startOfDay(for: today)
-      // Today already communicates its own current-day membership. Match
-      // SwiftUI by hiding past/today When dates there, while future dates and
-      // all scheduled dates on other surfaces remain visible.
-      if filter != .today || scheduledDay > todayDay {
+      // Today already communicates its own current-day membership, and off-Today
+      // surfaces show a trailing Today pill for on-Today tasks. Hide redundant
+      // today/past When dates in both cases while keeping future When dates.
+      let coveredByTodayPill = !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded && scheduledDay <= todayDay
+      if !coveredByTodayPill && (filter != .today || scheduledDay > todayDay) {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
         detail.stringValue = KitDayFormat.taskDate(scheduled)
         detail.isHidden = false
@@ -5822,12 +5889,32 @@ final class KitLoggedFooterCell: NSTableCellView {
     super.layout()
   }
 
-  func configure(count: Int, expanded: Bool) {
-    let text = expanded
-      ? String(localized: "Hide \(count) logged items",
-               comment: "Project/area footer — collapse completed tasks (plural)")
-      : String(localized: "Show \(count) logged items",
-               comment: "Project/area footer — expand completed tasks (plural)")
+  enum Kind { case logged, faded }
+
+  func configure(count: Int, expanded: Bool, kind: Kind = .logged) {
+    let text: String
+    switch kind {
+    case .logged:
+      text = expanded
+        ? String(localized: "Hide \(count) logged items",
+                 comment: "Project/area footer — collapse completed tasks (plural)")
+        : String(localized: "Show \(count) logged items",
+                 comment: "Project/area footer — expand completed tasks (plural)")
+    case .faded:
+      if expanded {
+        text = count == 1
+          ? String(localized: "Hide 1 faded item",
+                   comment: "Project/area footer — collapse faded tasks (singular)")
+          : String(localized: "Hide \(count) faded items",
+                   comment: "Project/area footer — collapse faded tasks (plural)")
+      } else {
+        text = count == 1
+          ? String(localized: "Show 1 faded item",
+                   comment: "Project/area footer — expand faded tasks (singular)")
+          : String(localized: "Show \(count) faded items",
+                   comment: "Project/area footer — expand faded tasks (plural)")
+      }
+    }
     label.stringValue = text
     kitA11yButton(label: text)
   }

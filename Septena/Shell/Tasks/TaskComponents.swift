@@ -479,16 +479,17 @@ struct TaskCheckboxModel {
   var cornerDot: Color?
   var tenureFill: Double?
 
-  init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool) {
+  init(task: SeptenaTask, accent: Color, showsTodayIndicator: Bool,
+       showsFadedIndicator: Bool = false) {
     // A volunteered, still-unratified agent proposal — the dashed "not a task
     // yet" form. Human captures stay solid; only MCP triage-band rows read so.
     let isProposal = task.isInTriageBand && task.source == TaskSource.mcp
     tint = accent
     isDone = task.status == .done
     // A row in Recently Deleted is out of every list, Today included, so it
-    // never shows the gold Today badge or the Today aging.
+    // never shows Today status or fading.
     let isDeleted = task.deletedAt != nil
-    isToday = task.isOnToday && showsTodayIndicator && !isDeleted
+    isToday = task.isOnToday && showsTodayIndicator && !isDeleted && !task.isFaded
     dashed = TaskRowFlags.languageV2 && isProposal
     // Accent corner dot for a committed task carrying unread agent context.
     // Proposals are excluded (they already read as dashed).
@@ -498,9 +499,15 @@ struct TaskCheckboxModel {
       return nil
     }()
     // Countdown toward the 14-day fade window in every open list
-    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
-    // `fadeFill()` so rows in the Faded pile stay fully readable.
-    tenureFill = TaskRowFlags.agingEnabled && !isDeleted ? task.fadeFill() : nil
+    // (`docs/TASK_FADE_SPEC.md` §4). Inside the Faded pile itself
+    // (`showsFadedIndicator == false`), faded rows stay at full opacity; inside
+    // a project or area (`showsFadedIndicator == true`), they render visibly
+    // faded at `TaskFade.minOpacity`.
+    if task.isFaded && showsFadedIndicator && !isDeleted {
+      tenureFill = 1.0
+    } else {
+      tenureFill = TaskRowFlags.agingEnabled && !isDeleted ? task.fadeFill() : nil
+    }
   }
 }
 
@@ -546,10 +553,12 @@ struct TaskRow: View {
   /// only). The deep list maps these from its `TaskFilter`.
   var suppressProject: Bool = false
   var suppressArea: Bool = false
-  /// Show the "promoted to Today" accent in the checkbox, and the scheduled
-  /// date in the trailing. Pass `false` on Today / Next surfaces (where every
-  /// row is already today, so both are noise).
+  /// Show the trailing Today pill (and scheduled date) on off-Today surfaces.
+  /// Pass `false` on Today / Next surfaces (where every row is already Today).
   var showsTodayIndicator: Bool = true
+  /// Show a trailing Faded pill and faded row opacity when a faded task appears
+  /// inside a project or area. Pass `false` inside the Faded pile itself.
+  var showsFadedIndicator: Bool = false
   /// Highlight this row while its edit modal is open (see `CheckableRow`).
   var isSelected: Bool = false
   /// Native `List(selection:)` cursor on the deep task list.
@@ -608,7 +617,8 @@ struct TaskRow: View {
     // The box is derived once, in `TaskCheckboxModel`, shared with the inline
     // editor's checkbox so view-row and edit-row can't drift.
     let box = TaskCheckboxModel(task: task, accent: accent,
-                                showsTodayIndicator: showsTodayIndicator)
+                                showsTodayIndicator: showsTodayIndicator,
+                                showsFadedIndicator: showsFadedIndicator)
     return CheckableRow(
       tint: box.tint,
       isDone: box.isDone,
@@ -647,6 +657,13 @@ struct TaskRow: View {
     if let accessory { accessory }
     if let issue = task.linkedIssue {
       TaskIssueChip(issue: issue)
+    }
+    if showsFadedIndicator && task.isFaded {
+      TaskStatusPill(symbol: "circle.dashed",
+                     title: String(localized: "Faded", comment: "Task row trailing pill when task is faded"))
+    } else if showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded {
+      TaskStatusPill(symbol: "sun.max.fill",
+                     title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     }
     trailingDate
     if task.recurrence != nil {
@@ -725,8 +742,10 @@ struct TaskRow: View {
     } else if let scheduled = task.scheduled.flatMap(SeptenaDate.parse) {
       let schedDay = cal.startOfDay(for: scheduled)
       // On Today / Next, past/today When dates are noise (the row is already
-      // on Today) — but a future When date should still read (sort + label).
-      if showsTodayIndicator || schedDay > today {
+      // on Today). On off-Today surfaces, when the Today pill is shown for an
+      // on-Today task, skip repeating today/past When dates beside it.
+      let coveredByTodayPill = showsTodayIndicator && task.isOnToday && task.status == .open && task.deletedAt == nil && !task.isFaded && schedDay <= today
+      if !coveredByTodayPill && (showsTodayIndicator || schedDay > today) {
         HStack(spacing: 4) {
           Image(systemName: "calendar").scaledFont(size: 11)
           Text(Self.shortDate(scheduled)).font(.septenaMeta)
@@ -734,8 +753,6 @@ struct TaskRow: View {
         .foregroundStyle(Theme.inkSecondary)
       }
     }
-    // Language v2: an on-Today task seen on an off-Today surface is signalled by
-    // the amber checkbox (see `boxStrokeColor`), not a right-edge "Today" chip.
   }
 
   static func shortDate(_ d: Date) -> String {
@@ -745,6 +762,27 @@ struct TaskRow: View {
     let f = DateFormatter()
     f.setLocalizedDateFormatFromTemplate("MMMd")
     return f.string(from: d)
+  }
+}
+
+/// Quiet read-only status pill (`☀ Today`, `◌ Faded`) on the trailing edge of
+/// an off-Today / project task row. Same visual family as `TaskIssueChip`.
+private struct TaskStatusPill: View {
+  let symbol: String
+  let title: String
+
+  var body: some View {
+    HStack(spacing: 3) {
+      Image(systemName: symbol)
+        .scaledFont(size: 10)
+      Text(title)
+        .font(.septenaMetaSmall)
+    }
+    .foregroundStyle(Theme.inkSecondary)
+    .padding(.horizontal, 6)
+    .padding(.vertical, 2)
+    .background(Theme.mutedSurface, in: Capsule())
+    .accessibilityLabel(title)
   }
 }
 

@@ -45,6 +45,10 @@ struct TaskListView: View {
   let embeddedHeader: () -> AnyView
 
   @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
+  /// Global switch: show faded tasks inside projects and areas (collapsed
+  /// toggleable section starting open when enabled).
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFadedInLists: Bool =
+    RegistrySettings.Defaults.tasksShowFaded
   /// Things-style grouped Today (area / project sections) vs a single flat
   /// list under Inbox with list subtitles and due-first ordering.
   @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
@@ -68,6 +72,7 @@ struct TaskListView: View {
   // happens when @State lags behind a prop change.
   @State private var itemsStorage: [SeptenaTask] = []
   @State private var triageStorage: [SeptenaTask] = []
+  @State private var fadedScopeStorage: [SeptenaTask] = []
   @State private var storageFilter: TaskFilter? = nil
   /// The archive is deliberately incremental: 1,000 completed tasks should
   /// not be decoded, sorted, and rendered just to open the Logbook.
@@ -359,6 +364,32 @@ struct TaskListView: View {
     if set.contains(id) { set.remove(id) } else { set.insert(id) }
     a11yAnimate(.easeInOut(duration: 0.2)) {
       scopeLoggedExpandedData = (try? JSONEncoder().encode(set)) ?? Data()
+    }
+  }
+
+  /// Project / area ids whose faded-task section was collapsed by hand.
+  /// Starts expanded while `showFadedInLists` is on (mirrors Today's completed
+  /// footer: the global setting promises faded tasks are shown).
+  @AppStorage("septena.tasks.projectFadedCollapsed") private var scopeFadedCollapsedData: Data = Data()
+  private var scopeFadedCollapsedIds: Set<String> {
+    (try? JSONDecoder().decode(Set<String>.self, from: scopeFadedCollapsedData)) ?? []
+  }
+  private var isScopeFadedExpanded: Bool {
+    guard let id = scopeLoggedFilterId else { return false }
+    return !scopeFadedCollapsedIds.contains(id)
+  }
+  private var fadedScopeItems: [SeptenaTask] {
+    guard showFadedInLists, scopeLoggedFilterId != nil else { return [] }
+    if storageFilter == filter { return fadedScopeStorage }
+    return LocalCache.fadedTasks(in: modelContext, scope: filter)
+  }
+  private func toggleScopeFadedExpanded() {
+    guard let id = scopeLoggedFilterId else { return }
+    Haptics.tick()
+    var set = scopeFadedCollapsedIds
+    if set.contains(id) { set.remove(id) } else { set.insert(id) }
+    a11yAnimate(.easeInOut(duration: 0.2)) {
+      scopeFadedCollapsedData = (try? JSONEncoder().encode(set)) ?? Data()
     }
   }
 
@@ -797,6 +828,7 @@ struct TaskListView: View {
     // Flipping the opt-in in Settings should land immediately — fetch on, clear
     // off — without waiting for the next load.
     .onChange(of: showCalendarEvents) { _, _ in refreshCalendarEvents() }
+    .onChange(of: showFadedInLists) { _, _ in Task { await load() } }
     .onChange(of: clock.today) { _, _ in
       guard filter == .today else { return }
       Task { await load() }
@@ -1229,6 +1261,7 @@ struct TaskListView: View {
       // inside the open-task card via `cardedRows(appendQuickAdd:)`. Grouped
       // lists (Anytime) get a foot solo card here instead.
       if showsQuickAddAtFoot && !attachesQuickAddToVisibleCard { quickAddFootCard }
+      scopeFadedSection()
       scopeLoggedSection()
       taskListFooter
     }
@@ -2197,6 +2230,54 @@ struct TaskListView: View {
   }
 
   /// Things-style footer on project / area pages: a quiet link that expands
+  /// Faded tasks for this project or area, shown when Settings ▸ Lists ▸ Show
+  /// faded tasks is on. Starts open; tapping the footer folds/unfolds per list.
+  @ViewBuilder
+  private func scopeFadedSection() -> some View {
+    if scopeLoggedFilterId != nil, !fadedScopeItems.isEmpty {
+      scopeFadedToggleRow
+      if isScopeFadedExpanded {
+        cardedRows(fadedScopeItems)
+      }
+    }
+  }
+
+  private var scopeFadedToggleLabel: String {
+    let count = fadedScopeItems.count
+    if isScopeFadedExpanded {
+      return count == 1
+        ? String(localized: "Hide 1 faded item",
+                 comment: "Project/area footer — collapse faded tasks (singular)")
+        : String(localized: "Hide \(count) faded items",
+                 comment: "Project/area footer — collapse faded tasks (plural)")
+    }
+    return count == 1
+      ? String(localized: "Show 1 faded item",
+               comment: "Project/area footer — expand faded tasks (singular)")
+      : String(localized: "Show \(count) faded items",
+               comment: "Project/area footer — expand faded tasks (plural)")
+  }
+
+  private var scopeFadedToggleRow: some View {
+    Button {
+      if closeActiveEditIfNeeded() { return }
+      toggleScopeFadedExpanded()
+    } label: {
+      Text(scopeFadedToggleLabel)
+        .font(.septenaMeta)
+        .monospacedDigit()
+        .foregroundStyle(Theme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, TaskCardMetrics.headerLeading)
+        .padding(.trailing, TaskCardMetrics.margin)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(PlainHoverRowButtonStyle())
+    .padding(.top, loggedFooterGap)
+    .asListRow()
+  }
+
   /// completed tasks for this list. Reuses `row(_:)` so checkboxes and context
   /// menus match the open list.
   @ViewBuilder
@@ -2276,11 +2357,9 @@ struct TaskListView: View {
 
   private func currentTask(id: String?) -> SeptenaTask? {
     guard let id else { return nil }
-    // Include `triageItems` — the Inbox rows on Today are real, selectable rows
-    // but live outside `items`. Omitting them meant a selected Inbox task
-    // couldn't be resolved, so keyboard commands fell back to the first row of
-    // the first project/area (the "Space/⌘T acts on the wrong task" bug).
-    return (triageItems + items).first(where: { $0.id == id })
+    // Include `triageItems` and `fadedScopeItems` — Inbox rows on Today and
+    // faded rows in projects/areas are real, selectable rows outside `items`.
+    return (triageItems + items + fadedScopeItems).first(where: { $0.id == id })
   }
 
   // MARK: - Keyboard navigation
@@ -2356,8 +2435,11 @@ struct TaskListView: View {
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
       return upcomingBuckets().flatMap { $0.tasks.map(\.id) }
     case .project, .area:
-      // Foot-of-card quick-add sits after the open rows, before the logged scope.
+      // Foot-of-card quick-add sits after the open rows, before the faded & logged scopes.
       var ids = visibleItems.map(\.id) + quickAddOrderedIds
+      if isScopeFadedExpanded {
+        ids.append(contentsOf: fadedScopeItems.map(\.id))
+      }
       if isScopeLoggedExpanded {
         ids.append(contentsOf: loggedScopeItems.map(\.id))
       }
@@ -3032,6 +3114,7 @@ struct TaskListView: View {
       suppressProject: suppressProject,
       suppressArea: suppressArea,
       showsTodayIndicator: filter != .today,
+      showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
       accessory: accessory,
       titleMatchID: "edit-title-\(task.id)",
@@ -3147,7 +3230,7 @@ struct TaskListView: View {
       } label: {
         Label("Delete Permanently", systemImage: "trash")
       }
-    } else if filter == .faded {
+    } else if filter == .faded || (!target.tasks.isEmpty && target.tasks.allSatisfy(\.isFaded)) {
       // Faded pile (`docs/TASK_FADE_SPEC.md` §4): Keep restores to the task's
       // original list with undo; Let Go cancels with dropReason = "faded".
       Button {
@@ -4025,7 +4108,7 @@ struct TaskListView: View {
     func drop(_ list: inout [SeptenaTask]) {
       list.removeAll { $0.id == id }
     }
-    drop(&items); drop(&triageStorage)
+    drop(&items); drop(&triageStorage); drop(&fadedScopeStorage)
   }
 
   /// Replace a visible row wholesale — the same pattern as `flipStatus` /
@@ -4187,6 +4270,9 @@ struct TaskListView: View {
     } else {
       triageStorage = []
     }
+    fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil)
+      ? LocalCache.fadedTasks(in: modelContext, scope: filter)
+      : []
     // A synced dismissal from another device lands on the next read.
     noticeEpoch &+= 1
     // Filing suggestions and the calendar agenda come one frame after the

@@ -41,6 +41,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   #endif
   @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = RegistrySettings.Defaults.tasksShowCalendarEvents
   @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = RegistrySettings.Defaults.tasksShowAging
+  @AppStorage(SettingsKey.tasksShowFaded) private var showFaded: Bool = RegistrySettings.Defaults.tasksShowFaded
   @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = RegistrySettings.Defaults.tasksFilingSuggestions
   @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = RegistrySettings.Defaults.tasksTitleLines
 
@@ -81,6 +82,10 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       Toggle(isOn: TaskViewOptions.announcing($showAging)) {
         rowLabel("Fade inactive tasks",
                  detail: "Tasks without activity for 14 days fade out and move to Faded.")
+      }
+      Toggle(isOn: TaskViewOptions.announcing($showFaded)) {
+        rowLabel("Show faded tasks",
+                 detail: "Show faded tasks in projects and areas.")
       }
       // Same switch as View ▸ Group Today by List; `announcing` is what keeps
       // Septask's AppKit list in step when it's flipped from here.

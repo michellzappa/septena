@@ -97,6 +97,14 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "task.aging"
     },
+    "tasksShowFaded": {
+      "scope": "device",
+      "storageKey": "septena.tasks.showFaded",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "task.aging"
+    },
     "tasksTitleLines": {
       "scope": "device",
       "storageKey": "septena.tasks.titleLines",
@@ -369,6 +377,12 @@
           "key": "tasksShowAging",
           "label": "Fade inactive tasks",
           "detail": "Tasks without activity for 14 days fade out and move to Faded."
+        },
+        {
+          "kind": "setting",
+          "key": "tasksShowFaded",
+          "label": "Show faded tasks",
+          "detail": "Show faded tasks in projects and areas."
         },
         {
           "kind": "setting",
