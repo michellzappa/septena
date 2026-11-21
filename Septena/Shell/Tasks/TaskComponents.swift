@@ -180,23 +180,47 @@ extension VerticalAlignment {
   static let rowTitleCenter = VerticalAlignment(RowTitleCenter.self)
 }
 
-struct CheckableRow<Trailing: View>: View {
-  var tint: Color
-  var isDone: Bool
-  var isToday: Bool = false
-  /// Readiness form (language v2) forwarded to `TaskCheckbox`: dashed = proposal,
-  /// `cornerDot` = unread-context marker on a committed task.
-  var dashed: Bool = false
-  var cornerDot: Color? = nil
+/// Default leading slot for `CheckableRow`: the standard `TaskCheckbox` with
+/// its optional hero-animation anchor. Kept as a concrete wrapper type so
+/// `CheckableRow` can accept a custom leading control (such as the Reminders
+/// import arrow) without losing static typing or `AnyView` erasure.
+struct TaskCheckboxSlot: View {
+  let tint: Color
+  let isDone: Bool
+  let dashed: Bool
+  let cornerDot: Color?
+  let isToday: Bool
+  let tenureFill: Double?
+  let promoteFlashTrigger: Int
+  let feel: CheckFeel
+  let checkboxMatchID: String?
+  let heroMatchNS: Namespace.ID?
+  let heroMatchIsSource: Bool
+  let onToggle: () -> Void
+
+  var body: some View {
+    TaskCheckbox(
+      tint: tint,
+      isDone: isDone,
+      dashed: dashed,
+      cornerDot: cornerDot,
+      isToday: isToday,
+      tenureFill: tenureFill,
+      promotePulseTrigger: promoteFlashTrigger,
+      feel: feel,
+      onToggle: onToggle
+    )
+    .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
+  }
+}
+
+struct CheckableRow<Leading: View, Trailing: View>: View {
   /// Days carried on Today as 0…1, or nil. Fades the row's text and trailing
-  /// cluster and checkbox, all by the same amount (`TaskFade`).
+  /// cluster and leading control, all by the same amount (`TaskFade`).
   var tenureFill: Double? = nil
-  /// The checkbox celebration this row plays on check (see `CheckFeel`).
-  /// Standardized to the default `.stamp` across every checkable row.
-  var feel: CheckFeel = .stamp
   /// Strikethrough + dimmed title. Usually `isDone`, but habits fold in
   /// skipped and chores fold in deferred, so the caller decides.
-  var isInactive: Bool
+  var isInactive: Bool = false
   /// Optional leading emoji (checklist sections). Off → the title sits next
   /// to the box. Tasks leave this nil; their agent cue rides the trailing slot.
   var leadingEmoji: String? = nil
@@ -230,13 +254,12 @@ struct CheckableRow<Trailing: View>: View {
   /// instead of cross-fading into a new position. Shared namespace, distinct
   /// ids. Nil everywhere else.
   var titleMatchID: String? = nil
-  var checkboxMatchID: String? = nil
   var heroMatchNS: Namespace.ID? = nil
   /// Which endpoint of the hero glide is the `matchedGeometryEffect` source.
   /// Closed row and open editor must never both be `true` during a transition.
   var heroMatchIsSource: Bool = true
+  @ViewBuilder var leading: () -> Leading
   @ViewBuilder var trailing: () -> Trailing
-  let onToggle: () -> Void
   var onTap: (() -> Void)? = nil
 
   @Environment(\.rowHInset) private var rowHInset
@@ -267,22 +290,11 @@ struct CheckableRow<Trailing: View>: View {
 
   var body: some View {
     HStack(alignment: .rowTitleCenter, spacing: Theme.iconTextGap) {
-      TaskCheckbox(
-        tint: tint,
-        isDone: isDone,
-        dashed: dashed,
-        cornerDot: cornerDot,
-        isToday: isToday,
-        tenureFill: tenureFill,
-        promotePulseTrigger: promoteFlashTrigger,
-        feel: feel,
-        onToggle: onToggle
-      )
-      .matchedHeroGeometry(checkboxMatchID, heroMatchNS, isSource: heroMatchIsSource)
-      .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
-      // The checkbox fades with the row, by the same amount (mz, 2026-11-20),
-      // so a slipping task reads as one fading line. It stays tappable.
-      .opacity(TaskFade.rowOpacity(tenureFill))
+      leading()
+        .alignmentGuide(.rowTitleCenter) { d in d[VerticalAlignment.center] }
+        // The leading control fades with the row, by the same amount (mz, 2026-11-20),
+        // so a slipping task reads as one fading line. It stays tappable.
+        .opacity(TaskFade.rowOpacity(tenureFill))
 
       if let leadingEmoji {
         Text(leadingEmoji).font(.body)
@@ -341,7 +353,71 @@ struct CheckableRow<Trailing: View>: View {
   }
 }
 
-extension CheckableRow where Trailing == EmptyView {
+extension CheckableRow where Leading == TaskCheckboxSlot {
+  init(
+    tint: Color,
+    isDone: Bool,
+    isToday: Bool = false,
+    dashed: Bool = false,
+    cornerDot: Color? = nil,
+    tenureFill: Double? = nil,
+    feel: CheckFeel = .stamp,
+    isInactive: Bool,
+    leadingEmoji: String? = nil,
+    title: String,
+    showsNotesGlyph: Bool = false,
+    subtitle: String? = nil,
+    titleBandHeight: CGFloat? = nil,
+    titleLineLimit: Int = 2,
+    isSelected: Bool = false,
+    isListSelected: Bool = false,
+    promoteFlashTrigger: Int = 0,
+    titleMatchID: String? = nil,
+    checkboxMatchID: String? = nil,
+    heroMatchNS: Namespace.ID? = nil,
+    heroMatchIsSource: Bool = true,
+    @ViewBuilder trailing: @escaping () -> Trailing,
+    onToggle: @escaping () -> Void,
+    onTap: (() -> Void)? = nil
+  ) {
+    self.init(
+      tenureFill: tenureFill,
+      isInactive: isInactive,
+      leadingEmoji: leadingEmoji,
+      title: title,
+      showsNotesGlyph: showsNotesGlyph,
+      subtitle: subtitle,
+      titleBandHeight: titleBandHeight,
+      titleLineLimit: titleLineLimit,
+      isSelected: isSelected,
+      isListSelected: isListSelected,
+      promoteFlashTrigger: promoteFlashTrigger,
+      titleMatchID: titleMatchID,
+      heroMatchNS: heroMatchNS,
+      heroMatchIsSource: heroMatchIsSource,
+      leading: {
+        TaskCheckboxSlot(
+          tint: tint,
+          isDone: isDone,
+          dashed: dashed,
+          cornerDot: cornerDot,
+          isToday: isToday,
+          tenureFill: tenureFill,
+          promoteFlashTrigger: promoteFlashTrigger,
+          feel: feel,
+          checkboxMatchID: checkboxMatchID,
+          heroMatchNS: heroMatchNS,
+          heroMatchIsSource: heroMatchIsSource,
+          onToggle: onToggle
+        )
+      },
+      trailing: trailing,
+      onTap: onTap
+    )
+  }
+}
+
+extension CheckableRow where Leading == TaskCheckboxSlot, Trailing == EmptyView {
   init(tint: Color, isDone: Bool, isToday: Bool = false,
        isInactive: Bool, leadingEmoji: String? = nil,
        title: String, subtitle: String? = nil, isSelected: Bool = false,
@@ -662,7 +738,7 @@ struct TaskRow: View {
     // the amber checkbox (see `boxStrokeColor`), not a right-edge "Today" chip.
   }
 
-  private static func shortDate(_ d: Date) -> String {
+  static func shortDate(_ d: Date) -> String {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
     if cal.isDateInTomorrow(d) { return "Tomorrow" }
