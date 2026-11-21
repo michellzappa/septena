@@ -2013,6 +2013,7 @@ struct TaskListView: View {
     }
     model.noteCreated(draft.id)
     draftEditIds.insert(draft.id)
+    UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
     Haptics.tick()
     AddInfoSection.tasks.notifyTilesChanged()
     Task {

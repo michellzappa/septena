@@ -1778,6 +1778,7 @@ private struct SidebarTaskDrop: ViewModifier {
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
                   if TaskDragIDs.isNewTaskPayload(ids) {
+                    UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
                     Haptics.tick()
                     switch kind {
                     case .area(let areaId):

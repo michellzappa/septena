@@ -39,6 +39,7 @@ struct SeptaskRootView: View {
   @Environment(SettingsStore.self) private var settingsStore
   @Environment(LogCommitCenter.self) private var logCommit
   @State private var selection: SeptaskTab = .today
+  @AppStorage("septena.magicPlusDragHintSeen") private var magicPlusDragHintSeen = false
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   @Environment(\.verticalSizeClass) private var vSize
@@ -229,11 +230,12 @@ struct SeptaskRootView: View {
     )
   }
 
-  /// Standard iOS 26 `TabView` with the native detached `+` slot (`role: .search`)
-  /// so the 3-tab pill narrows cleanly alongside `+` when expanded and collapses
-  /// symmetrically opposite `+` when minimized on scroll. Because SwiftUI does
-  /// not expose `.draggable` on a system `Tab`, a transparent circular hit-target
-  /// sits directly over the detached `+` slot to provide native drag-and-drop.
+  /// Standard iOS 26 `TabView` with a detached `role: .search` slot (requires
+  /// `.searchable` on a `NavigationStack` so iOS 26 actually separates the
+  /// fourth slot and narrows the 3-tab pill to its left). Our own tactile
+  /// Magic Plus orb sits directly over that detached bottom-right slot so it is
+  /// visibly separate from the tab pill in both expanded and minimized states,
+  /// signals draggability, and supports native `.draggable(TaskDragIDs.newTask)`.
   private var systemTabView: some View {
     ZStack(alignment: .bottomTrailing) {
       TabView(selection: tabSelection) {
@@ -248,47 +250,113 @@ struct SeptaskRootView: View {
         Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
           NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
         }
+        // `.searchable` on a `NavigationStack` is what makes iOS 26 detach this
+        // slot from the 3-tab pill; taps and drags are handled by `magicPlusOrb`.
         Tab("New Task", systemImage: "plus",
             value: SeptaskTab.newTask, role: .search) {
-          Color.clear
+          NavigationStack { Color.clear }
+            .searchable(text: .constant(""))
         }
       }
       .tabBarMinimizeBehavior(.onScrollDown)
 
-      magicPlusDragOverlay
-        .padding(.trailing, 18)
-        .padding(.bottom, 18)
-        .ignoresSafeArea(.all, edges: .bottom)
+      VStack(alignment: .trailing, spacing: 8) {
+        if !magicPlusDragHintSeen {
+          magicPlusDragHint
+        }
+        magicPlusOrb
+      }
+      .padding(.trailing, 20)
+      .padding(.bottom, 21)
+      .ignoresSafeArea(.all, edges: .bottom)
     }
   }
 
-  /// Transparent Magic Plus hit-target aligned over the system `TabView`'s
-  /// detached trailing `+` circle:
+  /// One-time subtle coach pill above Magic Plus so users discover press-and-
+  /// drag placement without cluttering the chrome permanently. Dismisses on tap
+  /// or automatically after the first Magic Plus drag-and-drop.
+  private var magicPlusDragHint: some View {
+    Button {
+      a11yAnimate(.easeOut(duration: 0.2)) {
+        magicPlusDragHintSeen = true
+      }
+    } label: {
+      HStack(spacing: 5) {
+        Image(systemName: "hand.point.up.left.and.text")
+          .scaledFont(size: 11, weight: .medium)
+        Text("Hold & drag + to place")
+          .font(.septenaCaption)
+      }
+      .foregroundStyle(.secondary)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 6)
+      .contentShape(Capsule())
+      .glassCapsule()
+    }
+    .buttonStyle(.plain)
+    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottomTrailing)))
+  }
+
+  /// Separate floating Magic Plus orb anchored in the detached bottom-right
+  /// tab-bar slot:
+  /// - Solid accent orb + subtle 6-dot grip beneath `+` communicates a
+  ///   grabbable object rather than a flat tap-only tab icon.
   /// - Tap: opens `SeptaskQuickAdd` without leaving the active tab.
-  /// - Press-and-drag: carries `TaskDragIDs.newTask` through native iOS drag
-  ///   and drop into any `TaskReorderDrop`, `TaskMoveDrop`, or `SidebarTaskDrop`.
-  /// Uses a 0.001-opacity fill so UIKit's `UIDragInteraction` always hit-tests
-  /// it reliably while the underlying system Liquid Glass circle renders the UI.
-  private var magicPlusDragOverlay: some View {
+  /// - Hold & drag: carries `TaskDragIDs.newTask` through native iOS drag and
+  ///   drop into any `TaskReorderDrop`, `TaskMoveDrop`, or `SidebarTaskDrop`.
+  private var magicPlusOrb: some View {
     Button {
       Haptics.tap()
       nav.presentAddInfo(section: .tasks)
     } label: {
-      Circle()
-        .fill(Color.primary.opacity(0.001))
-        .frame(width: 64, height: 64)
-        .contentShape(Circle())
+      ZStack {
+        Circle()
+          .fill(Color.accentColor.gradient)
+          .overlay(
+            Circle()
+              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+          )
+          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        VStack(spacing: 4) {
+          Image(systemName: "plus")
+            .scaledFont(size: 21, weight: .bold)
+            .foregroundStyle(Color.white)
+          magicPlusGripDots
+        }
+        .offset(y: 2)
+      }
+      .frame(width: 60, height: 60)
+      .contentShape(Circle())
     }
     .buttonStyle(.plain)
     .contentShape(.dragPreview, Circle())
     .accessibilityHidden(true)
     .draggable(TaskDragIDs.newTask) {
-      Image(systemName: "plus")
-        .scaledFont(size: 20, weight: .semibold)
-        .foregroundStyle(Color.accentColor)
-        .frame(width: 52, height: 52)
-        .background(.regularMaterial, in: Circle())
-        .contentShape(.dragPreview, Circle())
+      ZStack {
+        Circle()
+          .fill(Color.accentColor.gradient)
+          .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
+        Image(systemName: "plus")
+          .scaledFont(size: 22, weight: .bold)
+          .foregroundStyle(Color.white)
+      }
+      .frame(width: 56, height: 56)
+      .contentShape(.dragPreview, Circle())
+    }
+  }
+
+  /// Subtle 3×2 tactile grip dots under `+` signaling the orb can be dragged.
+  private var magicPlusGripDots: some View {
+    VStack(spacing: 2.5) {
+      ForEach(0..<2, id: \.self) { _ in
+        HStack(spacing: 3) {
+          ForEach(0..<3, id: \.self) { _ in
+            Circle()
+              .fill(Color.white.opacity(0.55))
+              .frame(width: 2.5, height: 2.5)
+          }
+        }
+      }
     }
   }
   #endif
