@@ -69,6 +69,10 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "**/*.entitlements"
+          # iOS uses the 31 prebaked `.appiconset` assets in Assets.xcassets
+          # (Light + Dark luminosity variants); excluding the legacy Icon
+          # Composer bundle prevents Xcode 26 from overriding `AppIcon`.
+          - "AppIcon.icon"
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
@@ -185,6 +189,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.septena.tasks
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         # No global accent: controls, toggles, selection and menus use the
         # platform accent (the user's System Settings accent on macOS).
         GENERATE_INFOPLIST_FILE: NO

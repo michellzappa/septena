@@ -98,9 +98,16 @@ struct AppearancePickerView: View {
         }
       }
 
+      #if os(iOS)
       Divider()
 
-      // 3. Header Wash Texture (Pure Canvas + 6 procedural surfaces)
+      // 3. App Icon (Style + Color, 31 prebaked Light/Dark assets)
+      AppIconPickerSection()
+      #endif
+
+      Divider()
+
+      // 4. Header Wash Texture (Pure Canvas + 6 procedural surfaces)
       VStack(alignment: .leading, spacing: 8) {
         Text("Header Texture")
           .font(.subheadline.weight(.medium))
