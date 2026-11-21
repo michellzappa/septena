@@ -201,19 +201,8 @@ final class TaskListModel {
       if !filingSuggestions.isEmpty { filingSuggestions = [:] }
       return
     }
-    // Today's Inbox gets the richer per-id ranked picks; every other creatable
-    // list just primes the general model so area-direct rows can be ranked on
-    // demand.
-    if filter == .today {
-      engine.refresh(inbox: LocalCache.tasks(in: context, filter: .triage),
-                     allTasks: LocalCache.trainingTasks(in: context),
-                     projects: projects,
-                     areas: areas)
-    } else {
-      engine.prepare(allTasks: LocalCache.trainingTasks(in: context),
-                     projects: projects,
-                     areas: areas)
-    }
+    TaskFilingSuggestions.prime(filter: filter, context: context, engine: engine,
+                                projects: projects, areas: areas)
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     for task in candidates {
       if let top = rankedTop(task) { fresh[task.id] = top }

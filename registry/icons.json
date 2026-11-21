@@ -19,6 +19,7 @@
     "list.anytime": { "sfSymbol": "rectangle.stack.fill", "material": "layers", "lucide": "layers" },
     "list.logbook": { "sfSymbol": "checkmark", "material": "check", "lucide": "check" },
     "list.faded": { "sfSymbol": "circle.dashed", "material": "blur_circular", "lucide": "circle-dashed" },
+    "list.starred": { "sfSymbol": "star.fill", "material": "star", "lucide": "star" },
     "list.recently_deleted": { "sfSymbol": "trash", "material": "delete", "lucide": "trash-2" },
     "place.area": { "sfSymbol": "folder", "material": "folder", "lucide": "folder" },
     "place.project": { "sfSymbol": "number", "material": "tag", "lucide": "hash" },

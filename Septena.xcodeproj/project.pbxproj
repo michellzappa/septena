@@ -267,7 +267,6 @@
 		89703F76F497967F8679E1B5 /* ThingsDateDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FDD0F2C1A80067D2D24A9ED /* ThingsDateDecoder.swift */; };
 		8AAFE48C3652AB776D97FEF2 /* CalendarBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7027B881D1D8B1B09B105034 /* CalendarBridge.swift */; };
 		8AD0982CB98F89B2F2B1906C /* SeptaskAdvancedPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007ADCA5CCD8264B72917365 /* SeptaskAdvancedPane.swift */; };
-		8AE6AE4CCBACDFC9DAB4FBDD /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 082090BB7214A62F42FB880A /* AppIcon.icon */; };
 		8B09D5DEEED83A94783845A1 /* TaskInlineRows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D0C61D7F9B6E0488BAFBD5B /* TaskInlineRows.swift */; };
 		8C275121535B9BBAF0450A9B /* SyncIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50416E7F1C401C7BE3A931AA /* SyncIndicator.swift */; };
 		8CBD416577DE67B21A307546 /* SettingsColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26C27D6A377796108D4A027 /* SettingsColor.swift */; };
@@ -560,7 +559,6 @@
 		05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocaleFormatting.swift; sourceTree = "<group>"; };
 		05E2A7AB5904326E9BD02D85 /* TaskAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachments.swift; sourceTree = "<group>"; };
 		064AD7254B378893C472B2D9 /* SeptenaPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptenaPage.swift; sourceTree = "<group>"; };
-		082090BB7214A62F42FB880A /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		0AE874D502585AA472CA027E /* CommunityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityClient.swift; sourceTree = "<group>"; };
 		0C06A1D1AB36E3778302425C /* TasksTodayComplicationData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksTodayComplicationData.swift; sourceTree = "<group>"; };
 		0D0BB8C54E2E81F47170B26C /* ThingsImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThingsImportView.swift; sourceTree = "<group>"; };
@@ -835,7 +833,6 @@
 			isa = PBXGroup;
 			children = (
 				BC28ED53CB3851082AE51E3B /* AppIcon.icns */,
-				082090BB7214A62F42FB880A /* AppIcon.icon */,
 				5B607B2041EC629B65EAF216 /* Assets.xcassets */,
 				552273A19DD4EF320AF9CE31 /* Info-Mac.plist */,
 				1734D6038C418B2F57FDECFA /* Info.plist */,
@@ -1560,7 +1557,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				C48320FAFDDFE4BA50351EAF /* AppIcon.icns in Resources */,
-				8AE6AE4CCBACDFC9DAB4FBDD /* AppIcon.icon in Resources */,
 				24B78DD653EEBECD27F770A4 /* Assets.xcassets in Resources */,
 				5F8890F11B6D2D88C754C9E9 /* Info.plist in Resources */,
 				DF15FB5A5E41D74EE466EB7F /* Localizable.xcstrings in Resources */,

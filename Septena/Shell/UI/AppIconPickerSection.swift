@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// In-app App Icon picker for Settings ▸ Appearance (iOS).
+/// In-app App Icon picker for Settings ▸ Appearance (iOS, iPadOS, and macOS).
 ///
 /// Presents:
 ///   • 4 Icon Styles (`Default`, `Light`, `Framed`, `Stealth`) with live vector
 ///     previews matching the 31 prebaked `.appiconset` assets.
 ///   • Compact Icon Color selector (`Default` = follows Accent above, or choose
 ///     any of the 7 exotic fruits + `Mono` independently).
-#if os(iOS)
 struct AppIconPickerSection: View {
   private let appearance = AppearancePreferences.shared
   @Environment(\.colorScheme) private var colorScheme
@@ -184,7 +183,6 @@ private struct IconStyleTileButton: View {
     .accessibilityAddTraits(isCurrent ? .isSelected : [])
   }
 }
-#endif
 
 // MARK: - Native Vector Preview (Matches `tools/logo-builder/dial-svg.mjs`)
 

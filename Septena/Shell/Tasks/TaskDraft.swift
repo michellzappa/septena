@@ -12,8 +12,10 @@ struct TaskDraft: Equatable {
   var title: String = ""
   var notes: String = ""
   var onToday: Bool = false
+  var starred: Bool = false
   var scheduled: Date? = nil
   var deadline: Date? = nil
+  var reminder: TaskReminder? = nil
   var recurrence: Recurrence? = nil
   var areaId: String? = nil
   var projectId: String? = nil
@@ -36,6 +38,7 @@ struct TaskDraft: Equatable {
     case .upcoming:        scheduled = Calendar.current.date(byAdding: .day, value: 1, to: DayClock.appNow)
     case .project(let id): projectId = id
     case .area(let id):    areaId = id
+    case .starred:         starred = true
     case .triage, .review, .unscheduled, .repeating, .logbook, .faded, .recentlyDeleted: break
     }
   }
@@ -45,8 +48,10 @@ struct TaskDraft: Equatable {
     title = task.title
     notes = task.notes ?? ""
     onToday = task.today
+    starred = task.starred
     scheduled = SeptenaDate.parse(task.scheduled)
     deadline = SeptenaDate.parse(task.deadline)
+    reminder = task.reminder
     recurrence = task.recurrence
     areaId = task.area
     projectId = task.project
@@ -92,6 +97,13 @@ struct TaskDraft: Equatable {
       atBottom: atBottom
     )
     if let recurrence { mutator.setRecurrence(id: task.id, recurrence: recurrence) }
+    if let reminder {
+      mutator.setReminder(id: task.id, reminder: reminder)
+      Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+    }
+    if starred {
+      mutator.setStarred(id: task.id, starred: true)
+    }
     return task
   }
 
@@ -156,7 +168,9 @@ struct TaskDraft: Equatable {
     let filingBefore = TaskUndo.FilingSnapshot(original)
     let scheduleChanged = storedScheduled != prior.storedScheduled
       || pinToday != prior.pinToday
+      || starred != prior.starred
       || deadline != prior.deadline
+      || reminder != prior.reminder
       || recurrence != prior.recurrence
     let filingChanged = projectId != prior.projectId
       || (projectId == nil && areaId != prior.areaId)
@@ -171,8 +185,17 @@ struct TaskDraft: Equatable {
     if deadline != prior.deadline {
       mutator.setDeadline(id: id, date: deadline)
     }
+    if reminder != prior.reminder {
+      mutator.setReminder(id: id, reminder: reminder)
+      if reminder != nil {
+        Task { await TaskReminderScheduler.shared.requestAuthorizationIfNeeded() }
+      }
+    }
     if recurrence != prior.recurrence {
       mutator.setRecurrence(id: id, recurrence: recurrence)
+    }
+    if starred != prior.starred {
+      mutator.setStarred(id: id, starred: starred)
     }
     // Project and area are mutually exclusive: a project owns its area, and the
     // backend's `moveToProject` clears area (create() does the same via

@@ -1230,7 +1230,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .faded:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .starred, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -1380,6 +1380,9 @@ enum LocalCache {
     case .unscheduled:
       guard e.status == .open, !e.today,
             e.scheduled == nil, e.deadline == nil else { return nil }
+      return SeptenaTask(e)
+    case .starred:
+      guard e.status == .open, e.starred else { return nil }
       return SeptenaTask(e)
     case .logbook:
       // The Logbook archives finished work — both completed and cancelled

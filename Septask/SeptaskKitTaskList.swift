@@ -156,9 +156,10 @@ final class SeptaskKitTaskListController: NSViewController {
     var isCardRow: Bool {
       switch self {
       case .header, .screenTitle, .fadedFooter, .loggedFooter, .addSection, .containerNotes: return false
-      // A notice, not an item: it sits on the page like a header, NOT on a
-      // card. A statement about your list must not look like a row of it.
-      case .notice: return false
+      // A standalone notice sits on the page with its own card fill. A notice
+      // with checklist steps (`Get started`) heads its steps' card so the
+      // header and rows share one seamless frosted surface (matching iOS).
+      case .notice(let notice): return !notice.steps.isEmpty
       // Rides the Inbox card with the reminder rows it acts on.
       case .importAllReminders: return true
       case .projectTarget, .event, .newTask, .reminder: return true
@@ -258,6 +259,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Placement items — titles / visibility refresh on every open from the
   /// current selection (see `refreshPlacementMenuItems`).
   private let todayMenuItem = NSMenuItem()
+  private let starMenuItem = NSMenuItem()
   /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
   /// what ⌥⌘I will actually do next.
   private let infoMenuItem = NSMenuItem()
@@ -462,6 +464,8 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onDuplicate = { [weak self] in self?.duplicateSelection() }
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
+    tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
+    tableView.onToggleStar = { [weak self] in self?.toggleStarSelection() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -1029,7 +1033,7 @@ final class SeptaskKitTaskListController: NSViewController {
         + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
-    case .unscheduled:
+    case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
       // Scoped reads return every live status; capture the done subset for
@@ -1638,8 +1642,8 @@ final class SeptaskKitTaskListController: NSViewController {
   /// rows are exactly why loose lists still need this — they can carry a
   /// project while sitting in the band.
   /// A row with no list-membership chip — scoped pages already name their
-  /// context. It still carries a filing capsule where the gate allows one
-  /// (an area page ranks area-direct rows against that area's projects).
+  /// context. Inline filing capsules live strictly on Inbox (never on Area or
+  /// Project pages — those keep their suggestion inside the Move submenu).
   private func unchipped(_ task: SeptenaTask) -> Row {
     .task(task, chip: nil, suggestion: filingSuggestions[task.id])
   }
@@ -1648,9 +1652,11 @@ final class SeptaskKitTaskListController: NSViewController {
     .task(task, chip: chip(for: task), suggestion: filingSuggestions[task.id])
   }
 
-  /// Per-row top filing pick, snapshotted each reload so the capsule paints on
-  /// the same frame as the row. The GATE is `TaskFilingSuggestions`, shared
-  /// with the SwiftUI list — this only decides when to ask.
+  /// Per-row top filing pick for the inline capsule, snapshotted each reload
+  /// so the capsule paints on the same frame as the row. The GATE is
+  /// `TaskFilingSuggestions.capsuleTop`, shared with the SwiftUI list — inline
+  /// pills appear strictly on Inbox while `prime` keeps the model warm for the
+  /// context menu's Move submenu on Area pages too.
   private func refreshFilingSuggestions(pool: [SeptenaTask]) {
     guard TaskRowFlags.filingSuggestionsEnabled else {
       if !filingSuggestions.isEmpty { filingSuggestions = [:] }
@@ -1663,9 +1669,9 @@ final class SeptaskKitTaskListController: NSViewController {
     let childIds = Self.childProjectIds(in: structure.projects)
     var fresh: [String: SuggestionEngine.Suggestion] = [:]
     for task in pool {
-      if let top = TaskFilingSuggestions.top(for: task, filter: filter,
-                                             engine: SuggestionEngine.shared,
-                                             childProjectIds: childIds) {
+      if let top = TaskFilingSuggestions.capsuleTop(for: task, filter: filter,
+                                                    engine: SuggestionEngine.shared,
+                                                    childProjectIds: childIds) {
         fresh[task.id] = top
       }
     }
@@ -1787,6 +1793,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .unscheduled:
       return .screenTitle(title: String(localized: "Anytime", comment: "Smart list title"),
                           icon: .symbol("rectangle.stack.fill"))
+    case .starred:
+      return .screenTitle(title: String(localized: "Starred", comment: "Smart list title"),
+                          icon: .symbol("star.fill"))
     case .logbook:
       return .screenTitle(title: String(localized: "Logbook", comment: "Smart list title"),
                           icon: .symbol("checkmark"))
@@ -2323,6 +2332,39 @@ final class SeptaskKitTaskListController: NSViewController {
     return .rect(tableView.rect(ofRow: tableView.selectedRow), tableView)
   }
 
+  /// Open the Reminder popover (⌥⌘R) for the current selection, anchored to
+  /// the row or composer pill. Progressive disclosure — only sets/clears the
+  /// reminder without altering the task's `scheduled` date.
+  func presentReminderPopover(anchor: KitSurfaceAnchor? = nil) {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    guard case .rect(let rect, let host)? = anchor ?? selectedRowAnchor else {
+      NSSound.beep()
+      return
+    }
+    let initial = selection.count == 1 ? selection[0].reminder : nil
+    let anyHasReminder = selection.contains { $0.reminder != nil }
+    SeptaskKitReminderPopover.present(
+      initial: initial,
+      anyHasReminder: anyHasReminder,
+      relativeTo: rect,
+      of: host
+    ) { [weak self] reminder in
+      guard let self else { return }
+      let before = selection.map(self.scheduleSnapshot)
+      for task in selection {
+        self.mutator.setReminder(id: task.id, reminder: reminder)
+        self.refreshComposerRow(taskId: task.id)
+      }
+      self.reload()
+      self.recordScheduleUndo(name: String(localized: "Change Reminder",
+                                           comment: "SeptaskKit: undo action"),
+                              before: before)
+      self.onStoreChanged?()
+    }
+  }
+
   /// Open the Repeat editor for the current selection, anchored to the row it
   /// edits like When and Deadline. It is intentionally the only AppKit rule
   /// picker: no preset submenu can silently flatten a fixed schedule into an
@@ -2801,6 +2843,28 @@ final class SeptaskKitTaskListController: NSViewController {
                        before: before)
   }
 
+  /// ⌥⌘S — star or unstar the current selection (if all are starred, unstar
+  /// all; otherwise star all). Recorded on the shared `TaskUndo` stack.
+  func toggleStarSelection() {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    let nextStarred = !selection.allSatisfy(\.starred)
+    let before = selection.map(scheduleSnapshot)
+    for task in selection {
+      mutator.setStarred(id: task.id, starred: nextStarred)
+      refreshComposerRow(taskId: task.id)
+    }
+    reload()
+    recordScheduleUndo(
+      name: nextStarred
+        ? String(localized: "Star", comment: "SeptaskKit: undo action")
+        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+      before: before
+    )
+    onStoreChanged?()
+  }
+
   func deleteSelection() {
     // A deleted row must not stay pinned open as a composer (`reload` keeps
     // the composing row on screen), so save and fold it first.
@@ -2980,6 +3044,9 @@ final class SeptaskKitTaskListController: NSViewController {
                               scheduled: context.scheduled, today: context.today,
                               deferPush: true,
                               atBottom: landsInInboxRun)
+    if filter == .starred {
+      mutator.setStarred(id: task.id, starred: true)
+    }
     pendingNewTaskId = task.id
     if let anchor { place(newTaskId: task.id, below: anchor, context: context) }
     // Not gated by the settle window any more (it pins its rows instead of
@@ -3059,7 +3126,7 @@ final class SeptaskKitTaskListController: NSViewController {
         area = focused.area
         project = focused.project
       }
-    case .unscheduled:
+    case .unscheduled, .starred:
       if let focused = focusedTaskForCreate() {
         area = focused.area
         project = focused.project
@@ -3716,6 +3783,13 @@ final class SeptaskKitTaskListController: NSViewController {
             before: before)
         }
 
+      case .reminder(let anchor):
+        self.presentReminderPopover(anchor: .rect(anchor.bounds, anchor))
+        self.refreshComposerRow(taskId: task.id)
+
+      case .toggleStar:
+        self.toggleStarSelection()
+
       case .list(let anchor):
         // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
@@ -3776,6 +3850,12 @@ final class SeptaskKitTaskListController: NSViewController {
     todayMenuItem.keyEquivalentModifierMask = [.command]
     menu.addItem(todayMenuItem)
 
+    starMenuItem.action = #selector(menuToggleStar)
+    starMenuItem.target = self
+    starMenuItem.keyEquivalent = "s"
+    starMenuItem.keyEquivalentModifierMask = [.command, .option]
+    menu.addItem(starMenuItem)
+
     // When and Deadline share one submenu, as in the SwiftUI menu. They open
     // separate popovers (one date each), so a submenu is the native way to
     // offer both from one entry. The key equivalents stay on the items.
@@ -3788,6 +3868,8 @@ final class SeptaskKitTaskListController: NSViewController {
                               #selector(menuWhen), "s", [.command]))
     scheduleMenu.addItem(item(String(localized: "Deadline…", comment: "SeptaskKit: context menu"),
                               #selector(menuDeadline), "d", [.command, .shift]))
+    scheduleMenu.addItem(item(String(localized: "Reminder…", comment: "SeptaskKit: context menu"),
+                              #selector(menuReminder), "r", [.command, .option]))
     scheduleItem.submenu = scheduleMenu
     menu.addItem(scheduleItem)
 
@@ -3963,10 +4045,14 @@ final class SeptaskKitTaskListController: NSViewController {
       for project in areaProjects { menu.addItem(projectItem(project)) }
     }
 
+    let hasStarred = !LocalCache.tasks(in: context, filter: .starred).isEmpty
     let hasFaded = !LocalCache.tasks(in: context, filter: .faded).isEmpty
     let hasDeleted = !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty
-    if hasFaded || hasDeleted {
+    if hasStarred || hasFaded || hasDeleted {
       menu.addItem(.separator())
+      if hasStarred {
+        menu.addItem(destItem(.filter(.starred, title: TaskFilter.starred.title)))
+      }
       if hasFaded {
         menu.addItem(destItem(.filter(.faded, title: TaskFilter.faded.title)))
       }
@@ -4072,6 +4158,7 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuToggleComplete() { toggleCompleteSelection() }
   @objc private func menuCancel() { cancelSelection() }
   @objc private func menuToggleToday() { toggleTodaySelection() }
+  @objc private func menuToggleStar() { toggleStarSelection() }
   @objc private func menuRename() { beginEditSelectedRow() }
   @objc private func menuInspector() { onToggleInspector?() }
   @objc private func menuDuplicate() { duplicateSelection() }
@@ -4099,6 +4186,7 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuClearSchedule() { clearScheduleSelection() }
 
   @objc private func menuRepeat() { presentRecurrencePanel() }
+  @objc private func menuReminder() { presentReminderPopover() }
 
   @objc private func menuPauseResumeRepeat() {
     let selection = actionableSelection.filter { $0.recurrence != nil }
@@ -4169,9 +4257,11 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
     menuSuggestions = []
     let selection = actionableSelection
     guard selection.count == 1, let task = selection.first else { return }
-    // The capsule's snapshot first; else the same GATE live
-    // (`TaskFilingSuggestions`), so the two can never disagree.
-    guard let suggestion = filingSuggestions[task.id]
+    // The capsule's snapshot first (Inbox); else the same GATE live
+    // (`TaskFilingSuggestions.top`) so Area pages still offer a suggested
+    // child project inside the Move submenu even without a row capsule.
+    let capsulePick = filingSuggestions[task.id]
+    guard let suggestion = capsulePick
       ?? TaskFilingSuggestions.top(
         for: task, filter: filter, engine: SuggestionEngine.shared,
         childProjectIds: Self.childProjectIds(in: projects))
@@ -4183,11 +4273,13 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
                           action: #selector(menuApplySuggestion(_:)), keyEquivalent: "")
     item.target = self
     item.tag = 0
-    // ⌥⌘M files into this pick, so the item wears the binding: the menu is
-    // where a shortcut with no button of its own gets discovered. The table
-    // handles the key itself; this only advertises it.
-    item.keyEquivalent = "m"
-    item.keyEquivalentModifierMask = [.command, .option]
+    // ⌥⌘M files into the row's visible capsule pick; only advertise the
+    // binding when the row actually carries a capsule (Inbox), so the menu
+    // never promises a shortcut that is a deliberate no-op on Area pages.
+    if capsulePick != nil {
+      item.keyEquivalent = "m"
+      item.keyEquivalentModifierMask = [.command, .option]
+    }
     // Same glyph as the capsule.
     item.image = NSImage(systemSymbolName: "arrow.turn.down.right", accessibilityDescription: nil)
     moveMenu.insertItem(item, at: 0)
@@ -4227,6 +4319,12 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
       todayMenuItem.title = String(localized: "Move to Today",
                                    comment: "SeptaskKit: context menu")
     }
+
+    let allStarred = !selection.isEmpty && selection.allSatisfy(\.starred)
+    starMenuItem.isHidden = selection.isEmpty
+    starMenuItem.title = allStarred
+      ? String(localized: "Remove Star", comment: "SeptaskKit: context menu")
+      : String(localized: "Star", comment: "SeptaskKit: context menu")
 
     let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
     clearScheduleMenuItem.isHidden = !canClear
@@ -4830,7 +4928,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     let grouped: Bool
     switch filter {
     case .today: grouped = todayGroupsByList
-    case .unscheduled: grouped = true
+    case .unscheduled, .starred: grouped = true
     default: grouped = false
     }
     guard grouped else { return false }
@@ -5126,7 +5224,10 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let suggestionChip = KitSuggestionChipView()
   private let scheduleGlyph = NSImageView()
   private let detail = NSTextField(labelWithString: "")
+  private let reminderGlyph = NSImageView()
+  private let reminderLabel = NSTextField(labelWithString: "")
   private let repeatGlyph = NSImageView()
+  private let starGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
@@ -5190,6 +5291,25 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     scheduleGlyph.setContentHuggingPriority(.required, for: .horizontal)
     scheduleGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
 
+    reminderGlyph.translatesAutoresizingMaskIntoConstraints = false
+    reminderGlyph.image = NSImage(systemSymbolName: "bell.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    reminderGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    reminderGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    reminderGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderGlyph.kitA11yIgnore()
+    reminderGlyph.isHidden = true
+
+    reminderLabel.font = SeptaskKitTheme.meta
+    reminderLabel.textColor = SeptaskKitTheme.inkSecondary
+    reminderLabel.lineBreakMode = .byClipping
+    reminderLabel.isEditable = false
+    reminderLabel.isSelectable = false
+    reminderLabel.setContentHuggingPriority(.required, for: .horizontal)
+    reminderLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    reminderLabel.kitA11yIgnore()
+    reminderLabel.isHidden = true
+
     // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
     // glyph view rather than a "↻" concatenated onto the date string — per the
     // DesignSpec, a glyph is a view, never baked into a formatted label.
@@ -5202,6 +5322,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     repeatGlyph.kitA11yIgnore()
 
+    starGlyph.translatesAutoresizingMaskIntoConstraints = false
+    starGlyph.contentTintColor = SeptaskKitTheme.todayAccent
+    starGlyph.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    starGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    starGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    starGlyph.kitA11yIgnore()
+    starGlyph.isHidden = true
+
     // Trailing cluster hugs the row's right edge. Order matches the row language
     // spec: variable meta inboard, micro-glyphs outboard
     // (chip · date · recurrence · notes). A leading spacer absorbs any extra
@@ -5212,7 +5341,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      scheduleGlyph, detail, repeatGlyph, notesGlyph])
+                                      reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5373,7 +5502,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     }
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
-    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+    for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
+                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5463,6 +5593,23 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // a weekly task is in on its own day — hit the branch that hides the date
     // and lost its repeat marker entirely.
     repeatGlyph.isHidden = task.recurrence == nil
+    starGlyph.isHidden = !task.starred
+
+    // Quiet trailing bell + time badge only when an open task has an active
+    // reminder (progressive disclosure: zero chrome otherwise).
+    if !done && task.status == .open && task.deletedAt == nil,
+       let badge = task.reminder?.badgeText() {
+      let tint = badge.isPastDue ? SeptaskKitTheme.overdueRed : SeptaskKitTheme.inkSecondary
+      reminderGlyph.contentTintColor = tint
+      reminderLabel.textColor = tint
+      reminderLabel.stringValue = badge.text
+      reminderGlyph.isHidden = false
+      reminderLabel.isHidden = false
+    } else {
+      reminderGlyph.isHidden = true
+      reminderLabel.isHidden = true
+      reminderLabel.stringValue = ""
+    }
 
     if task.status == .done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
@@ -6970,6 +7117,8 @@ final class SeptaskKitTableView: NSTableView {
   var onMove: (() -> Void)?
   /// ⌥⌘M — file the selection into its suggested list (the row capsule's pick).
   var onFileSuggested: (() -> Void)?
+  var onReminder: (() -> Void)?
+  var onToggleStar: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7079,7 +7228,8 @@ final class SeptaskKitTableView: NSTableView {
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
         allowed = true            // Quick Find, inspector: window-level, no row write
       } else if (command && ["k", "t", "s", "m"].contains(key))
-                  || (commandShift && ["m", "d"].contains(key)) {
+                  || (commandShift && ["m", "d"].contains(key))
+                  || (commandOption && ["r", "s"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -7106,6 +7256,10 @@ final class SeptaskKitTableView: NSTableView {
       // suggested one commits without a picker, so it must be impossible to
       // hit by accident. Same relationship ⌥⌘K has to ⌘K.
       case "m": onFileSuggested?(); return true
+      // ⌥⌘R — set/edit timed reminder (docs/TIMED_REMINDERS_SPEC.md §5).
+      case "r": onReminder?(); return true
+      // ⌥⌘S — star / unstar selected tasks (docs/STAR_PRIORITY_SPEC.md §3).
+      case "s": onToggleStar?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }

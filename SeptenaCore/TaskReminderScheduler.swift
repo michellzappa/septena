@@ -3,6 +3,8 @@ import SwiftData
 import UserNotifications
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
 #endif
 
 // Local OS notification scheduler and action handler for timed task reminders
@@ -345,7 +347,7 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
 
   /// Resolves `fireAt` into an absolute `Date` in `timeZone`, handling DST
   /// spring-forward gaps by snapping forward to the first valid instant.
-  static func resolveFireDate(fireAt: String, mode: TaskReminderMode, timeZone: TimeZone) -> Date? {
+  nonisolated static func resolveFireDate(fireAt: String, mode: TaskReminderMode, timeZone: TimeZone) -> Date? {
     if mode == .fixed {
       return parseISOInstant(fireAt)
     }
@@ -369,7 +371,7 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     return nil
   }
 
-  private static func parseISOInstant(_ value: String) -> Date? {
+  nonisolated private static func parseISOInstant(_ value: String) -> Date? {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     if let d = f.date(from: value) { return d }
@@ -397,5 +399,128 @@ final class TaskReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
       return abs(next.timeIntervalSince(fireDate)) < 60
     }
     return false
+  }
+
+  /// Opens the platform's Notifications settings screen when authorization is
+  /// denied, backing the non-blocking banner in TR2 (`docs/TIMED_REMINDERS_SPEC.md` §5).
+  static func openNotificationSettings() {
+    #if os(macOS)
+    if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
+      NSWorkspace.shared.open(url)
+    }
+    #elseif os(iOS)
+    if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+      UIApplication.shared.open(url)
+    }
+    #endif
+  }
+
+  nonisolated static func parseISOInstantPublic(_ value: String) -> Date? {
+    parseISOInstant(value)
+  }
+}
+
+// MARK: - TaskReminder UI & formatting helpers (TR2)
+
+extension TaskReminder {
+  private static let timeOnlyFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateStyle = .none
+    f.timeStyle = .short
+    return f
+  }()
+
+  private static let weekdayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("EEE")
+    return f
+  }()
+
+  private static let monthDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("MMMd")
+    return f
+  }()
+
+  static func make(date: Date, mode: TaskReminderMode = .floating, calendar: Calendar = .current) -> TaskReminder {
+    switch mode {
+    case .floating:
+      let c = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+      let wire = String(format: "%04d-%02d-%02dT%02d:%02d",
+                        c.year ?? 1970, c.month ?? 1, c.day ?? 1,
+                        c.hour ?? 9, c.minute ?? 0)
+      return TaskReminder(fireAt: wire, mode: .floating)
+    case .fixed:
+      let f = ISO8601DateFormatter()
+      f.formatOptions = [.withInternetDateTime]
+      f.timeZone = TimeZone(secondsFromGMT: 0)
+      return TaskReminder(fireAt: f.string(from: date), mode: .fixed)
+    }
+  }
+
+  func effectiveFireDate(timeZone: TimeZone = .current) -> Date? {
+    if let snoozed = snoozedUntil, let d = TaskReminderScheduler.parseISOInstantPublic(snoozed) {
+      return d
+    }
+    return TaskReminderScheduler.resolveFireDate(fireAt: fireAt, mode: mode, timeZone: timeZone)
+  }
+
+  /// Quiet row/pill label for an active (undismissed) reminder.
+  /// Returns nil if dismissed or unparseable.
+  @MainActor
+  func badgeText(now explicitNow: Date? = nil) -> (text: String, isPastDue: Bool)? {
+    let now = explicitNow ?? DayClock.appNow
+    guard dismissedAt == nil, let fire = effectiveFireDate() else { return nil }
+    let cal = Calendar.current
+    let time = Self.timeOnlyFormatter.string(from: fire)
+    let isPastDue = fire < now
+    if cal.isDate(fire, inSameDayAs: now) {
+      return (time, isPastDue)
+    }
+    let startNow = cal.startOfDay(for: now)
+    let startFire = cal.startOfDay(for: fire)
+    let days = cal.dateComponents([.day], from: startNow, to: startFire).day ?? 99
+    if days > 0 && days < 7 {
+      return ("\(Self.weekdayFormatter.string(from: fire)) \(time)", isPastDue)
+    }
+    return ("\(Self.monthDayFormatter.string(from: fire)), \(time)", isPastDue)
+  }
+
+  /// Standard quick presets for progressive-disclosure reminder pickers.
+  @MainActor
+  static func quickPresets(now explicitNow: Date? = nil, calendar: Calendar = .current) -> [(title: String, date: Date)] {
+    let now = explicitNow ?? DayClock.appNow
+    var result: [(String, Date)] = []
+
+    // 1. In 1 hour (seconds zeroed)
+    if let oneHour = calendar.date(byAdding: .hour, value: 1, to: now) {
+      var comps = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: oneHour)
+      comps.second = 0
+      if let clean = calendar.date(from: comps) {
+        result.append((String(localized: "In 1 hour", comment: "Reminder quick preset"), clean))
+      }
+    }
+
+    // 2. Tonight 18:00 (when still before 18:00)
+    var tonightComps = calendar.dateComponents([.year, .month, .day], from: now)
+    tonightComps.hour = 18
+    tonightComps.minute = 0
+    tonightComps.second = 0
+    if let tonight = calendar.date(from: tonightComps), tonight > now.addingTimeInterval(15 * 60) {
+      result.append((String(localized: "Tonight 18:00", comment: "Reminder quick preset"), tonight))
+    }
+
+    // 3. Tomorrow 09:00
+    if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) {
+      var comps = calendar.dateComponents([.year, .month, .day], from: tomorrow)
+      comps.hour = 9
+      comps.minute = 0
+      comps.second = 0
+      if let tmw9 = calendar.date(from: comps) {
+        result.append((String(localized: "Tomorrow 09:00", comment: "Reminder quick preset"), tmw9))
+      }
+    }
+
+    return result
   }
 }

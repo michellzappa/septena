@@ -49,6 +49,8 @@
     "telemetryLevel": ["none", "minimal", "balanced", "full"],
     "appearanceMode": ["system", "light", "dark"],
     "accentColor": ["colorful", "tamarillo", "persimmon", "yuzu", "carambola", "acai", "pitaya", "jabuticaba"],
+    "appIconFinish": ["obsidian", "ceramic", "framed", "stealth"],
+    "appIconColor": ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"],
     "canvasTexture": ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"],
     "textureMotion": ["still", "slowDrift"]
   },

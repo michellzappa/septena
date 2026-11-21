@@ -416,6 +416,8 @@ struct TaskListView: View {
   // Repeat picker
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+  @State private var reminderTargetId: String?
+  @State private var starredOnlyFilter = false
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -551,6 +553,7 @@ struct TaskListView: View {
         moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
+        reminderTargetId: $reminderTargetId,
         areas: areas,
         projects: projects,
         currentTask: currentTask,
@@ -564,7 +567,8 @@ struct TaskListView: View {
           Haptics.tick()
           mutator.setRecurrencePaused(id: id, paused: paused)
           Task { await load() }
-        }
+        },
+        applyReminder: applyReminder
       ))
       .sheet(isPresented: Binding(
         get: { sweepSheetTasks != nil },
@@ -685,7 +689,13 @@ struct TaskListView: View {
   #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
-    #if os(iOS) && !SEPTASK
+    #if os(iOS) && SEPTASK
+    // Compact iPhone Septena uses the canonical bottom-right Magic Plus orb
+    // for creation; top-right stays Search (and Project's overflow menu).
+    // Split layouts (iPad / unfolded Duo) have no Magic Plus orb, so embedded
+    // Area/Project lists keep the toolbar "+" there.
+    embedded && filter != .recentlyDeleted && filter != .faded && usesPushNavigation
+    #elseif os(iOS)
     embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
     #else
     embedded && filter != .recentlyDeleted && filter != .faded
@@ -1219,10 +1229,9 @@ struct TaskListView: View {
     quickAddGroupTarget = nil
   }
 
-  /// True on grouped Today when area / project headers should expose a "+".
-  private var showsGroupedHeaderQuickAdd: Bool {
-    filter == .today && todayGroupByList && allowsInlineCreate
-  }
+  /// Area / project group headers on Today stay clean (no trailing `+` button —
+  /// capture happens via Magic Plus / New task / ⌘N, matching AppKit).
+  private var showsGroupedHeaderQuickAdd: Bool { false }
 
   /// Compact iPhone Septena uses the floating Magic Plus orb instead of an idle
   /// "New task" trigger row in Inbox — the capture slot mounts only while an
@@ -1601,11 +1610,43 @@ struct TaskListView: View {
   /// stack at launch on iPhone (EXC_BAD_ACCESS in swift_getTypeByMangledName,
   /// 2026-11-19). `AnyView` at this one seam caps the depth; the rows inside
   /// keep their concrete types.
+  private var showsStarFilterPill: Bool {
+    switch filter {
+    case .starred, .logbook, .recentlyDeleted, .faded:
+      return false
+    default:
+      return items.contains(where: \.starred)
+    }
+  }
+
+  @ViewBuilder
+  private var starFilterBar: some View {
+    if showsStarFilterPill {
+      HStack {
+        SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
+          Haptics.tick()
+          a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
+        } label: {
+          HStack(spacing: 4) {
+            Image(systemName: "star.fill")
+              .scaledFont(size: 11)
+            Text("Starred")
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, TaskCardMetrics.margin)
+      .padding(.top, 4)
+      .padding(.bottom, 6)
+    }
+  }
+
   private var taskListRows: AnyView {
     switch filter {
     case .today:
       if todayGroupByList {
         return AnyView(Group {
+          AnyView(starFilterBar)
           AnyView(triageSection)
           AnyView(groupedOpenItems)
           AnyView(todaySkeleton)
@@ -1615,20 +1656,36 @@ struct TaskListView: View {
       // stack (AnyView forwards the view list), so laziness and per-row
       // identity hold. No lifecycle modifiers hang off this Group.
       return AnyView(Group {
+        AnyView(starFilterBar)
         AnyView(triageSection)
         AnyView(ungroupedOpenItems)
         AnyView(todaySkeleton)
       })
-    case .unscheduled:
-      return AnyView(groupedOpenItems)
+    case .unscheduled, .starred:
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedOpenItems)
+      })
     case .upcoming:
-      return AnyView(groupedUpcomingItems)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedUpcomingItems)
+      })
     case .project:
-      return AnyView(projectGroupedRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(projectGroupedRows)
+      })
     case .review:
-      return AnyView(reviewRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(reviewRows)
+      })
     default:
-      return AnyView(visibleRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(visibleRows)
+      })
     }
   }
 
@@ -2593,7 +2650,7 @@ struct TaskListView: View {
       }
       // The Get started steps sit above everything, under their notice.
       return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
-    case .unscheduled:
+    case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
@@ -2862,6 +2919,15 @@ struct TaskListView: View {
     recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                       [id]) {
       mutator.setRecurrence(id: id, recurrence: rule)
+    }
+    Task { await load() }
+  }
+
+  private func applyReminder(id: String, reminder: TaskReminder?) {
+    Haptics.tick()
+    recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
+                      [id]) {
+      mutator.setReminder(id: id, reminder: reminder)
     }
     Task { await load() }
   }
@@ -3472,11 +3538,24 @@ struct TaskListView: View {
             applyRemoveFromToday(ids)
           }
         },
+        onToggleStar: { ids, starred in
+          Haptics.tick()
+          recordingSchedule(starred
+                            ? String(localized: "Star", comment: "Undo action name")
+                            : String(localized: "Remove Star", comment: "Undo action name"),
+                            ids) {
+            for id in ids { mutator.setStarred(id: id, starred: starred) }
+          }
+          Task { await load() }
+        },
         onOpenWhen: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
         },
         onOpenDeadline: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
+        },
+        onOpenReminder: { task in
+          reminderTargetId = task.id
         },
         onClearSchedule: { ids in
           for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }
@@ -3926,6 +4005,9 @@ struct TaskListView: View {
     if hideHistoricalDone {
       result = result.filter { $0.status == .open || model.settle.isSettling($0.id) }
     }
+    if starredOnlyFilter && showsStarFilterPill {
+      result = result.filter(\.starred)
+    }
     return result
   }
 
@@ -3934,7 +4016,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review, .faded: return true
+    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false
@@ -4628,10 +4710,10 @@ struct TaskListView: View {
     model.refreshCalendarEvents(filter: filter, enabled: showCalendarEvents)
   }
 
-  /// Rebuild the per-row filing-suggestion snapshot (the "→ Suggested"
-  /// capsule). Owned by `TaskListModel`; the candidate set and the ranking
-  /// closure come from here so the snapshot and the on-demand context-menu
-  /// path stay one code path.
+  /// Rebuild the per-row filing-suggestion snapshot (the Inbox "→ Suggested"
+  /// capsule). Owned by `TaskListModel`; primes the engine for every creatable
+  /// list (so Area context menus still rank child projects on demand) while
+  /// snapshotting inline capsules strictly on Inbox via `capsuleTop`.
   private func refreshFilingSuggestions() {
     var seen = Set<String>()
     let candidates = (triageItems + items).filter {
@@ -4644,7 +4726,12 @@ struct TaskListView: View {
       projects: projects,
       areas: areas,
       candidates: candidates,
-      rankedTop: { filingRankedSuggestions(for: $0)?.first }
+      rankedTop: {
+        TaskFilingSuggestions.capsuleTop(
+          for: $0, filter: filter, engine: suggestionEngine,
+          childProjectIds: { childProjectIds(in: $0) }
+        )
+      }
     )
   }
 

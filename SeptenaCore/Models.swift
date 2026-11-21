@@ -816,6 +816,7 @@ enum TaskFilter: Equatable, Hashable {
   case upcoming
   case repeating
   case unscheduled
+  case starred
   case logbook
   /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4).
   case faded
@@ -831,6 +832,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return "upcoming"
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
+    case .starred: return "all"
     case .logbook: return "logbook"
     case .faded: return "all"
     case .recentlyDeleted: return "all"
@@ -848,6 +850,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return "upcoming"
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
+    case .starred: return "starred"
     case .logbook: return "logbook"
     case .faded: return "faded"
     case .recentlyDeleted: return "recentlyDeleted"
@@ -867,6 +870,7 @@ enum TaskFilter: Equatable, Hashable {
     case .upcoming: return String(localized: "Upcoming", comment: "Task filter")
     case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
+    case .starred: return String(localized: "Starred", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
     case .faded: return String(localized: "Faded", comment: "Task filter")
     case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")

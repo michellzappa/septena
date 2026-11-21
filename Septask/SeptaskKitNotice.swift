@@ -31,6 +31,10 @@ struct KitNotice {
   var primaryTitle: String?
   /// True draws a small close button at the trailing edge.
   var dismissible: Bool
+  /// True when checklist rows (`KitNoticeStepCell`) follow immediately on the
+  /// same card: `KitCardRowView` owns the unified card backdrop and this cell
+  /// drops its bottom gap so the header joins directly onto row 1.
+  var headsCard: Bool = false
 }
 
 extension KitNotice {
@@ -38,7 +42,7 @@ extension KitNotice {
   init(_ notice: TaskNotice) {
     self.init(kind: notice.kind, symbol: notice.symbol, title: notice.title,
               detail: notice.detail, primaryTitle: notice.primaryTitle,
-              dismissible: notice.dismissible)
+              dismissible: notice.dismissible, headsCard: !notice.steps.isEmpty)
   }
 }
 
@@ -59,7 +63,8 @@ final class KitNoticeCell: NSTableCellView {
     let line = lineHeight(SeptaskKitTheme.meta)
     let text = notice.detail == nil ? line : line * 2 + 1
     let control: CGFloat = notice.primaryTitle == nil ? 16 : 22
-    return ceil(max(text, control)) + verticalPad * 2 + bottomGap
+    let gap: CGFloat = notice.headsCard ? 0 : bottomGap
+    return ceil(max(text, control)) + verticalPad * 2 + gap
   }
 
   private static func lineHeight(_ font: NSFont) -> CGFloat {
@@ -74,6 +79,7 @@ final class KitNoticeCell: NSTableCellView {
   private let primary = NSButton(title: "", target: nil, action: nil)
   private let dismiss = NSButton()
   private var pin: KitContentColumnPin!
+  private var fillBottom: NSLayoutConstraint!
   private var textToPrimary: NSLayoutConstraint!
   private var textToDismiss: NSLayoutConstraint!
   private var primaryToDismiss: NSLayoutConstraint!
@@ -144,6 +150,7 @@ final class KitNoticeCell: NSTableCellView {
     textField = titleLabel
 
     pin = KitContentColumnPin(fill, in: self)
+    fillBottom = fill.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.bottomGap)
     textToPrimary = textStack.trailingAnchor.constraint(
       lessThanOrEqualTo: primary.leadingAnchor, constant: -10)
     textToDismiss = textStack.trailingAnchor.constraint(
@@ -154,7 +161,7 @@ final class KitNoticeCell: NSTableCellView {
       equalTo: fill.trailingAnchor, constant: -10)
     NSLayoutConstraint.activate(pin.constraints + [
       fill.topAnchor.constraint(equalTo: topAnchor),
-      fill.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.bottomGap),
+      fillBottom,
       glyph.centerXAnchor.constraint(equalTo: fill.leadingAnchor,
                                      constant: SeptaskKitLayout.leadingGlyphCenterX),
       glyph.centerYAnchor.constraint(equalTo: fill.centerYAnchor),
@@ -178,6 +185,8 @@ final class KitNoticeCell: NSTableCellView {
 
   func configure(_ notice: KitNotice) {
     fill.kind = notice.kind
+    fill.drawsSurface = !notice.headsCard
+    fillBottom.constant = notice.headsCard ? 0 : -Self.bottomGap
     glyph.image = NSImage(systemSymbolName: notice.symbol, accessibilityDescription: nil)?
       .withSymbolConfiguration(.init(pointSize: SeptenaTypeScale.size(.body), weight: .regular))
     glyph.contentTintColor = Self.tint(for: notice.kind)
@@ -228,31 +237,30 @@ final class KitNoticeCell: NSTableCellView {
   @objc private func fireDismiss() { onDismiss?() }
 }
 
-/// The notice's rounded fill. Uses macOS 26+ frosted `NSGlassEffectView` when a
-/// Header Wash texture is active (falling back to solid `cardSurface` when no
-/// texture is set or Reduce Transparency is enabled).
+/// The notice's rounded fill. Uses the exact same frosted `NSVisualEffectView`
+/// + translucent `cardSurface` veil + top specular rim recipe (`KitCardGlassStyle`)
+/// as `KitCardRowView` when a Header Wash texture is active, falling back to
+/// solid `cardSurface` when no texture is set or Reduce Transparency is enabled.
+/// When `drawsSurface == false` (a checklist notice heading a `KitCardRowView`
+/// card run), `KitCardRowView` paints the unified card backdrop instead.
 @MainActor
 final class KitNoticeFill: NSView {
   var kind: KitNoticeKind = .info { didSet { syncGlass(); needsDisplay = true } }
-  private let glassView: NSGlassEffectView = {
-    let v = NSGlassEffectView()
-    v.style = .regular
-    v.cornerRadius = KitCardRowView.corner
-    v.translatesAutoresizingMaskIntoConstraints = false
+  var drawsSurface: Bool = true { didSet { syncGlass(); needsDisplay = true } }
+
+  private let effectView: KitPassthroughVisualEffectView = {
+    let v = KitCardGlassStyle.makeBackdrop()
+    v.layer?.mask = CAShapeLayer()
     return v
   }()
+  private let overlayView = KitNoticeGlassOverlayView()
 
   override var isFlipped: Bool { true }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
-    addSubview(glassView)
-    NSLayoutConstraint.activate([
-      glassView.leadingAnchor.constraint(equalTo: leadingAnchor),
-      glassView.trailingAnchor.constraint(equalTo: trailingAnchor),
-      glassView.topAnchor.constraint(equalTo: topAnchor),
-      glassView.bottomAnchor.constraint(equalTo: bottomAnchor),
-    ])
+    addSubview(effectView)
+    addSubview(overlayView, positioned: .above, relativeTo: effectView)
     syncGlass()
   }
 
@@ -263,23 +271,45 @@ final class KitNoticeFill: NSView {
     needsDisplay = true
   }
 
+  override func viewDidChangeEffectiveAppearance() {
+    super.viewDidChangeEffectiveAppearance()
+    syncGlass()
+    needsDisplay = true
+  }
+
+  override func layout() {
+    super.layout()
+    syncGlass()
+  }
+
   private var usesGlass: Bool {
     AppearancePreferences.shared.hasActiveTexture
       && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
   }
 
   private func syncGlass() {
-    let active = usesGlass
-    glassView.isHidden = !active
-    if active {
-      glassView.tintColor = kind == .warning
-        ? SeptaskKitTheme.noticeWarning.withAlphaComponent(0.14)
-        : nil
+    let active = drawsSurface && usesGlass
+    effectView.isHidden = !active
+    overlayView.isHidden = !active
+    guard active, bounds.width > 1, bounds.height > 1 else { return }
+
+    effectView.frame = bounds
+    let local = NSRect(origin: .zero, size: bounds.size)
+    let maskPath = NSBezierPath(roundedRect: local,
+                                xRadius: KitCardRowView.corner,
+                                yRadius: KitCardRowView.corner)
+    if let mask = effectView.layer?.mask as? CAShapeLayer {
+      mask.frame = local
+      mask.path = maskPath.cgPath
     }
+
+    overlayView.frame = bounds
+    overlayView.kind = kind
+    overlayView.needsDisplay = true
   }
 
   override func draw(_ dirtyRect: NSRect) {
-    guard !usesGlass else { return }
+    guard drawsSurface, !usesGlass else { return }
     let path = NSBezierPath(roundedRect: bounds,
                             xRadius: KitCardRowView.corner, yRadius: KitCardRowView.corner)
     SeptaskKitTheme.cardSurface.setFill()
@@ -288,6 +318,37 @@ final class KitNoticeFill: NSView {
       SeptaskKitTheme.noticeWarningWash.setFill()
       path.fill()
     }
+  }
+}
+
+/// Translucent card veil, optional warning wash, and top specular rim drawn on
+/// top of `KitNoticeFill`'s frosted `NSVisualEffectView` — identical to
+/// `KitCardGlassOverlayView` so standalone notices and task cards share one
+/// unified material language.
+@MainActor
+private final class KitNoticeGlassOverlayView: NSView {
+  var kind: KitNoticeKind = .info
+
+  override var isFlipped: Bool { true }
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func draw(_ dirtyRect: NSRect) {
+    let path = NSBezierPath(roundedRect: bounds,
+                            xRadius: KitCardRowView.corner, yRadius: KitCardRowView.corner)
+    let isDark = KitCardGlassStyle.isDark(effectiveAppearance)
+    NSGraphicsContext.saveGraphicsState()
+    KitCardGlassStyle.veilColor(isDark: isDark).setFill()
+    path.fill()
+    if kind == .warning {
+      SeptaskKitTheme.noticeWarningWash.setFill()
+      path.fill()
+    }
+    path.addClip()
+    let rim = NSRect(x: bounds.minX, y: bounds.minY,
+                     width: bounds.width, height: KitCardGlassStyle.topRimHeight)
+    KitCardGlassStyle.topRimColor(isDark: isDark).setFill()
+    rim.fill()
+    NSGraphicsContext.restoreGraphicsState()
   }
 }
 

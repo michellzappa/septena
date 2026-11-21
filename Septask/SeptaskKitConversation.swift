@@ -197,11 +197,13 @@ final class KitConversationView: NSView {
     title.textColor = SeptaskKitTheme.inkPrimary
     title.isSelectable = true
 
+    let rawOptions = question.options ?? []
+    let stackVertically = rawOptions.contains(where: { $0.count > 22 }) || rawOptions.count > 3
     let options = NSStackView()
-    options.orientation = .horizontal
-    options.alignment = .centerY
+    options.orientation = stackVertically ? .vertical : .horizontal
+    options.alignment = stackVertically ? .leading : .centerY
     options.spacing = 6
-    for option in question.options ?? [] {
+    for option in rawOptions {
       let pill = KitPillButton()
       pill.title = option
       pill.onPress = { [weak self] _ in

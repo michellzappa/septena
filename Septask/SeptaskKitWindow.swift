@@ -365,9 +365,11 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
     case .toggleComplete: list.toggleCompleteSelection()
     case .cancel: list.cancelSelection()
     case .toggleToday: list.toggleTodaySelection()
+    case .toggleStar: list.toggleStarSelection()
     case .rename: list.beginEditSelectedRow()
     case .when: list.presentDatePopover(kind: .when)
     case .deadline: list.presentDatePopover(kind: .deadline)
+    case .reminder: list.presentReminderPopover()
     case .clearSchedule: list.clearScheduleSelection()
     case .delete: list.deleteSelection()
     case .repeatEditor: list.presentRecurrencePanel()
@@ -378,7 +380,7 @@ final class SeptaskKitWindowController: NSWindowController, NSWindowDelegate {
   }
 
   enum RowCommand {
-    case toggleComplete, cancel, toggleToday, rename, when, deadline, clearSchedule, delete
+    case toggleComplete, cancel, toggleToday, toggleStar, rename, when, deadline, reminder, clearSchedule, delete
     case duplicate, move, createNextCopy
     case repeatEditor
   }

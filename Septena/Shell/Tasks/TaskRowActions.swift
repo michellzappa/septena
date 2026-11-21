@@ -37,6 +37,7 @@ struct TaskRowActions: ViewModifier {
   @State private var moveTargetIds: [String] = []
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
+  @State private var reminderTargetId: String?
 
   @Environment(PromoteFlashStore.self) private var promoteFlash
   @Environment(\.septenaToast) private var toastStore
@@ -99,11 +100,24 @@ struct TaskRowActions: ViewModifier {
             }
             onChange?()
           },
+          onToggleStar: { ids, starred in
+            Haptics.tick()
+            recordingSchedule(starred
+                              ? String(localized: "Star", comment: "Undo action name")
+                              : String(localized: "Remove Star", comment: "Undo action name"),
+                              ids) {
+              for id in ids { mutator.setStarred(id: id, starred: starred) }
+            }
+            onChange?()
+          },
           onOpenWhen: { target in
             whenSheet = .init(taskIds: target.ids, kind: .scheduled)
           },
           onOpenDeadline: { target in
             whenSheet = .init(taskIds: target.ids, kind: .deadline)
+          },
+          onOpenReminder: { t in
+            reminderTargetId = t.id
           },
           onClearSchedule: { ids in
             Haptics.tick()
@@ -162,6 +176,7 @@ struct TaskRowActions: ViewModifier {
         moveTargetIds: $moveTargetIds,
         showingRepeatSheet: $showingRepeatSheet,
         repeatTargetId: $repeatTargetId,
+        reminderTargetId: $reminderTargetId,
         areas: areas,
         projects: projects,
         currentTask: { _ in task },
@@ -187,6 +202,14 @@ struct TaskRowActions: ViewModifier {
           recordingSchedule(String(localized: "Change Repeat", comment: "Undo action name"),
                             [id]) {
             mutator.setRecurrencePaused(id: id, paused: paused)
+          }
+          onChange?()
+        },
+        applyReminder: { id, reminder in
+          Haptics.tick()
+          recordingSchedule(String(localized: "Change Reminder", comment: "Undo action name"),
+                            [id]) {
+            mutator.setReminder(id: id, reminder: reminder)
           }
           onChange?()
         }

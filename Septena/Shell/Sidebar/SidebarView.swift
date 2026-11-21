@@ -33,6 +33,7 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
+  @State private var starredCount: Int = 0
   @State private var fadedCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
 
@@ -655,6 +656,7 @@ struct SidebarRootView: View {
     var routes = TaskDestinations.sidebarRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
+    if starredCount > 0 { routes.append(.filter(.starred)) }
     if fadedCount > 0 { routes.append(.filter(.faded)) }
     if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
     return routes
@@ -762,9 +764,19 @@ struct SidebarRootView: View {
         }
       }
     }
-    // Faded pile & Recently Deleted — shown at the foot when non-empty.
-    if fadedCount > 0 || recentlyDeletedCount > 0 {
+    // Starred, Faded & Recently Deleted — shown conditionally when non-empty.
+    if starredCount > 0 || fadedCount > 0 || recentlyDeletedCount > 0 {
       Section {
+        if starredCount > 0 {
+          compactRow(route: .filter(.starred)) {
+            navRow(.filter(.starred)) {
+              SmartListRow(icon: "star.fill",
+                           iconColor: Theme.todayAccent,
+                           title: "Starred",
+                           count: starredCount)
+            }
+          }
+        }
         if fadedCount > 0 {
           compactRow(route: .filter(.faded)) {
             navRow(.filter(.faded)) {
@@ -1106,6 +1118,7 @@ struct SidebarRootView: View {
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
+    let starred = LocalCache.tasks(in: modelContext, filter: .starred).count
     let faded = LocalCache.tasks(in: modelContext, filter: .faded).count
     let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
     guard !StoreHealth.readsFailed(since: token) else {
@@ -1116,6 +1129,7 @@ struct SidebarRootView: View {
     projects = structure.projects
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
+    starredCount = starred
     fadedCount = faded
     recentlyDeletedCount = deleted
     reconcileSidebarSelection()

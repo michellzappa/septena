@@ -114,37 +114,26 @@ struct TaskListNotice<Actions: View>: View {
   @ViewBuilder
   private var fill: some View {
     let shape = (headsCard ? TaskCardPosition.top : .solo).cardShape
-    if useLiquidGlass {
-      #if os(iOS)
-      if !headsCard {
-        shape
-          .fill(.thinMaterial)
-          .glassEffect(
-            kind == .warning ? .regular.tint(Theme.noticeWarning.opacity(0.16)) : .regular,
-            in: shape
-          )
-      } else {
-        ZStack {
+    ZStack(alignment: .bottom) {
+      if useLiquidGlass {
+        ZStack(alignment: .top) {
           shape.fill(.thinMaterial)
           shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.28 : 0.36))
           if kind == .warning {
             shape.fill(Theme.noticeWarning.opacity(0.12))
           }
+          Color.white.opacity(colorScheme == .dark ? 0.14 : 0.72)
+            .frame(height: 0.75)
         }
+        .clipShape(shape)
+      } else {
+        shape
+          .fill(Theme.cardSurface)
+          .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
       }
-      #else
-      ZStack {
-        shape.fill(.thinMaterial)
-        shape.fill(Theme.cardSurface.opacity(colorScheme == .dark ? 0.30 : 0.40))
-        if kind == .warning {
-          shape.fill(Theme.noticeWarning.opacity(0.12))
-        }
+      if headsCard {
+        Rectangle().fill(Theme.border).frame(height: 0.5)
       }
-      #endif
-    } else {
-      shape
-        .fill(Theme.cardSurface)
-        .overlay(shape.fill(kind == .warning ? Theme.noticeWarning.opacity(0.12) : Color.clear))
     }
   }
 

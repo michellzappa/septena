@@ -17,7 +17,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let notesView = NSTextView()
   private let whenButton = NSButton()
   private let deadlineButton = NSButton()
+  private let reminderButton = NSButton()
   private let repeatButton = NSButton()
+  private let starButton = NSButton()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
@@ -96,7 +98,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     notesLabel.textColor = SeptaskKitTheme.iconMuted
 
     for (button, action) in [(whenButton, #selector(editWhen)),
-                             (deadlineButton, #selector(editDeadline))] {
+                             (deadlineButton, #selector(editDeadline)),
+                             (reminderButton, #selector(editReminder)),
+                             (starButton, #selector(toggleStar))] {
       button.bezelStyle = .rounded
       button.target = self
       button.action = action
@@ -118,7 +122,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(listLabel)
     form.addArrangedSubview(whenButton)
     form.addArrangedSubview(deadlineButton)
+    form.addArrangedSubview(reminderButton)
     form.addArrangedSubview(repeatButton)
+    form.addArrangedSubview(starButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
     conversationLabel.font = SeptaskKitTheme.chip
@@ -136,7 +142,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
     }
     form.addArrangedSubview(historyView)
-    form.setCustomSpacing(14, after: repeatButton)
+    form.setCustomSpacing(14, after: starButton)
     form.setCustomSpacing(14, after: notesScroll)
     form.setCustomSpacing(14, after: conversationView)
 
@@ -225,8 +231,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     titleField.nextKeyView = notesView
     notesView.nextKeyView = whenButton
     whenButton.nextKeyView = deadlineButton
-    deadlineButton.nextKeyView = repeatButton
-    repeatButton.nextKeyView = titleField
+    deadlineButton.nextKeyView = reminderButton
+    reminderButton.nextKeyView = repeatButton
+    repeatButton.nextKeyView = starButton
+    starButton.nextKeyView = titleField
     show(nil)
   }
 
@@ -392,6 +400,13 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       ?? String(localized: "None", comment: "No deadline")
     deadlineButton.title = String(localized: "Deadline: \(deadlineValue)",
                                   comment: "SeptaskKit: inspector deadline field")
+    if let badge = next.reminder?.badgeText() {
+      reminderButton.title = String(localized: "Reminder: \(badge.text)",
+                                    comment: "SeptaskKit: inspector reminder field")
+    } else {
+      reminderButton.title = String(localized: "Add Reminder…",
+                                    comment: "SeptaskKit: inspector add reminder")
+    }
     listLabel.stringValue = listDescription(for: next)
 
     let repeatValue = next.recurrence.map { rule in
@@ -402,6 +417,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     } ?? String(localized: "None", comment: "No repeat")
     repeatButton.title = String(localized: "Repeat: \(repeatValue)",
                                 comment: "SeptaskKit: inspector repeat field")
+    starButton.title = next.starred
+      ? String(localized: "Starred ★", comment: "SeptaskKit: inspector starred active")
+      : String(localized: "Star", comment: "SeptaskKit: inspector star button")
   }
 
   /// Show or hide the conversation section. Hiding the LABEL too is the point:
@@ -601,6 +619,38 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
 
   @objc private func editWhen() { presentPopover(kind: .when, from: whenButton) }
   @objc private func editDeadline() { presentPopover(kind: .deadline, from: deadlineButton) }
+
+  @objc private func toggleStar() {
+    guard let current = task else { return }
+    let nextStarred = !current.starred
+    let before = [TaskUndo.ScheduleSnapshot(current)]
+    mutator.setStarred(id: current.id, starred: nextStarred)
+    TaskUndo.recordScheduleChange(
+      name: nextStarred
+        ? String(localized: "Star", comment: "SeptaskKit: undo action")
+        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+      before: before, context: context, mutator: mutator)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    refresh()
+  }
+
+  @objc private func editReminder() {
+    guard let current = task else { return }
+    SeptaskKitReminderPopover.present(
+      initial: current.reminder,
+      relativeTo: reminderButton.bounds,
+      of: reminderButton
+    ) { [weak self] reminder in
+      guard let self else { return }
+      let before = [TaskUndo.ScheduleSnapshot(current)]
+      self.mutator.setReminder(id: current.id, reminder: reminder)
+      TaskUndo.recordScheduleChange(
+        name: String(localized: "Change Reminder", comment: "SeptaskKit: undo action"),
+        before: before, context: self.context, mutator: self.mutator)
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+      self.refresh()
+    }
+  }
 
   private func presentPopover(kind: SeptaskKitDatePopover.Kind, from button: NSButton) {
     guard let current = task else { return }
