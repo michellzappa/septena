@@ -169,11 +169,11 @@ enum HeaderWashEngine {
 
     let vol = volume(for: params.seed)
     let zSlice = params.phase * 0.036
-    let swayX = params.phase == 0 ? 0.0 : sin(params.phase * 0.04) * 0.05
-    let swayY = params.phase == 0 ? 0.0 : cos(params.phase * 0.032) * 0.04
 
+    // Pure in-place 3D slice morphing: zero X/Y positional shift when animation
+    // toggles on or off; elevation contours evolve continuously from z = 0.
     func sample(_ x: Double, _ y: Double, octaves: Int = 4) -> Double {
-      vol.fbm(x + swayX, y + swayY, z: zSlice, octaves: octaves)
+      vol.fbm(x, y, z: zSlice, octaves: octaves)
     }
 
     func setStroke(_ alpha: Double) {

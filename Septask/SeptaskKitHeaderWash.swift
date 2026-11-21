@@ -96,7 +96,7 @@ final class KitHeaderWashView: NSView {
       accent: prefs.accentRGB(isDark: isDark),
       intensity: prefs.textureIntensity,
       seed: AppearancePreferences.resolvedSeed(dayISO: dayISO, projectID: projectID),
-      phase: shouldAnimate ? elapsedPhase : 0,
+      phase: elapsedPhase,
       fadeHeight: fadeHeight,
       mini: false,
       increaseContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
@@ -134,9 +134,6 @@ final class KitHeaderWashView: NSView {
       driftTimer = timer
     } else {
       stopTimer()
-      if !AppearancePreferences.shared.isSlowDrift {
-        elapsedPhase = 0
-      }
     }
   }
 

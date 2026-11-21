@@ -19,9 +19,12 @@ struct HeaderWashView: View {
   @Environment(\.colorSchemeContrast) private var contrast
   @Environment(\.scenePhase) private var scenePhase
 
-  /// Reference instant for smooth elapsed `phase` seconds when `slowDrift` is
-  /// active. Calendar day / seed NEVER reads `Date()` — it comes from `dayClock.today`.
-  @State private var motionAnchor = Date.distantPast
+  /// Continuous animation phase tracking: when `shouldAnimate` toggles on, phase
+  /// advances smoothly from `accumulatedPhase` (0 on first enable) with zero
+  /// discontinuity, and freezes cleanly in place when paused or toggled off.
+  /// Calendar day / seed NEVER reads `Date()` — it comes from `dayClock.today`.
+  @State private var accumulatedPhase: Double = 0
+  @State private var runStartDate: Date? = nil
   @State private var lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
 
   private var shouldAnimate: Bool {
@@ -31,12 +34,17 @@ struct HeaderWashView: View {
       && scenePhase == .active
   }
 
+  private func phase(at date: Date) -> Double {
+    guard shouldAnimate, let start = runStartDate else {
+      return accumulatedPhase
+    }
+    return accumulatedPhase + max(0, date.timeIntervalSince(start))
+  }
+
   var body: some View {
     if appearance.hasActiveTexture {
       TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: !shouldAnimate)) { timeline in
-        let elapsed: Double = shouldAnimate
-          ? max(0, timeline.date.timeIntervalSince(motionAnchor))
-          : 0
+        let currentPhase = phase(at: timeline.date)
         let isDark = colorScheme == .dark
         let params = HeaderWashParams(
           style: appearance.canvasTexture,
@@ -44,7 +52,7 @@ struct HeaderWashView: View {
           accent: appearance.accentRGB(isDark: isDark),
           intensity: appearance.textureIntensity,
           seed: AppearancePreferences.resolvedSeed(dayISO: dayClock.today, projectID: projectID),
-          phase: elapsed,
+          phase: currentPhase,
           fadeHeight: fadeHeight,
           mini: false,
           increaseContrast: contrast == .increased
@@ -60,10 +68,18 @@ struct HeaderWashView: View {
       .allowsHitTesting(false)
       .accessibilityHidden(true)
       .onAppear {
-        if motionAnchor == .distantPast {
-          motionAnchor = Date()
-        }
         lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        if shouldAnimate && runStartDate == nil {
+          runStartDate = Date()
+        }
+      }
+      .onChange(of: shouldAnimate) { _, active in
+        if active {
+          runStartDate = Date()
+        } else if let start = runStartDate {
+          accumulatedPhase += max(0, Date().timeIntervalSince(start))
+          runStartDate = nil
+        }
       }
       .onReceive(NotificationCenter.default.publisher(for: .NSProcessInfoPowerStateDidChange)) { _ in
         lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
