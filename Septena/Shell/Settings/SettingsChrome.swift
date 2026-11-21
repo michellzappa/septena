@@ -18,35 +18,27 @@ enum SettingsAccentPalette {
   ]
 }
 
-/// The Settings-row icon for an About page: the seven Septena discs in white
-/// on a neutral gray tile, matching `ColoredGlyph`'s shape and sheen (white
-/// glyph on a saturated fill) so it sits flush with the colored rows above it.
-/// Gray (not a brand accent) marks About as a utility row, while the white
-/// discs keep it unmistakably the app's own mark. Disc placement reuses the
-/// shared `SeptenaPlus` constants so the emblem can't drift.
+/// The Settings-row and About-pane icon: renders the user's active Septena
+/// Upright Compass app icon (`AppearancePreferences.shared`) at any size,
+/// adapting to Light/Dark appearance (while Stealth stays dark).
 struct SeptenaDiscTile: View {
   var size: CGFloat = 29
+  private let appearance = AppearancePreferences.shared
   @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
-    let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-    let gray = Color(white: colorScheme == .dark ? 0.32 : 0.55)
-    ZStack {
-      shape.fill(gray)
-      shape.fill(
-        LinearGradient(
-          colors: [Color.white.opacity(0.26), .clear, Color.black.opacity(0.07)],
-          startPoint: .top, endPoint: .bottom
-        )
-      )
-      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { _, center in
-        Circle()
-          .fill(Color.white)
-          .frame(width: size * 0.168, height: size * 0.168)
-          .position(x: size * center.x, y: size * center.y)
-      }
-    }
+    let isDark = colorScheme == .dark
+    SeptenaCompassIconView(
+      finish: appearance.resolvedAppIconFinish,
+      color: appearance.resolvedAppIconColor,
+      isDarkOS: isDark
+    )
     .frame(width: size, height: size)
+    .shadow(
+      color: Color.black.opacity(size >= 40 ? (isDark ? 0.42 : 0.16) : 0.0),
+      radius: size >= 40 ? 8 : 0,
+      y: size >= 40 ? 4 : 0
+    )
   }
 }
 

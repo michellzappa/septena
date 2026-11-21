@@ -243,37 +243,46 @@ struct IgnitionView: View {
   }
 }
 
-// MARK: - Septena open (the mark unfurling)
+// MARK: - Septena open (the compass mark unfurling)
 
-/// The Septena mark unfurling: the seven canonical discs start clustered tight
-/// at the center, then radiate outward along their heptagonal vectors —
-/// *growing* the whole way out before they fade at the edges. The headline +
-/// caption spring in over the center. A seven-disc burst where `IgnitionView`
-/// is a three-ring one. The `palette` decides the coloring — spectrum for
-/// everyday in-app celebrations, gold for premium Septena+ moments. Honors
-/// Reduce Motion the same way (never rendered under it).
+/// Minimal upright North pointer shape for the 0° bearing of the celebration burst.
+private struct CompassNorthBurstPointer: Shape {
+  func path(in rect: CGRect) -> Path {
+    var p = Path()
+    let w = rect.width
+    let h = rect.height
+    p.move(to: CGPoint(x: w * 0.5, y: 0))
+    p.addLine(to: CGPoint(x: w, y: h))
+    p.addLine(to: CGPoint(x: w * 0.5, y: h * 0.78))
+    p.addLine(to: CGPoint(x: 0, y: h))
+    p.closeSubpath()
+    return p
+  }
+}
+
+/// The Septena Compass mark unfurling: the upright North pointer and six
+/// machined dial ticks start clustered tight at the center, then radiate
+/// outward along their 7-way compass bearings — growing as they expand before
+/// fading at the edges. The headline + caption spring in over the center.
+/// Honors Reduce Motion the same way (never rendered under it).
 struct SeptenaOpenView: View {
   let headline: String
   let caption: String
   let palette: SeptenaMarkPalette
   let trigger: Int
 
-  /// Point distance a unit heptagon vector travels at `spread == 1`. The
-  /// regular heptagon's vectors are ~0.277 long, so a disc reaches ~100pt out.
-  private let travel: CGFloat = 360
-  private let dotSize: CGFloat = 20
+  /// Radial distance traveled at `spread == 1`.
+  private let travel: CGFloat = 104
 
-  /// Per-disc fill. Spectrum gives each its canonical color; gold paints all
-  /// seven in the foil.
-  private func discColor(_ index: Int) -> Color {
+  private func bearingColor(_ index: Int) -> Color {
     switch palette {
-    case .spectrum: return SeptenaPlus.discColors[index]
+    case .spectrum: return SeptenaPlus.discColors[index % SeptenaPlus.discColors.count]
     case .gold:     return SeptenaPlus.foil
     }
   }
 
   /// Headline + caption color. Gold matches the foil; the spectrum's text
-  /// stays neutral so it doesn't compete with the seven colored discs.
+  /// stays neutral so it doesn't compete with the seven bearings.
   private var textColor: Color {
     switch palette {
     case .spectrum: return .primary
@@ -289,16 +298,26 @@ struct SeptenaOpenView: View {
 
   var body: some View {
     ZStack {
-      ForEach(Array(SeptenaPlus.discCenters.enumerated()), id: \.offset) { index, center in
-        // Direction from the heptagon's center (0.5, 0.5) to this disc.
-        let dx = center.x - 0.5
-        let dy = center.y - 0.5
-        Circle()
-          .fill(discColor(index))
-          .frame(width: dotSize, height: dotSize)
-          .scaleEffect(dotScale)
-          .opacity(dotOpacity)
-          .offset(x: dx * travel * spread, y: dy * travel * spread)
+      ForEach(0..<7, id: \.self) { index in
+        let deg = -90.0 + Double(index) * (360.0 / 7.0)
+        let rad = deg * .pi / 180.0
+        let dx = CGFloat(cos(rad))
+        let dy = CGFloat(sin(rad))
+        Group {
+          if index == 0 {
+            CompassNorthBurstPointer()
+              .fill(bearingColor(index))
+              .frame(width: 14, height: 18)
+          } else {
+            Capsule()
+              .fill(bearingColor(index))
+              .frame(width: 6, height: 16)
+              .rotationEffect(.degrees(deg + 90.0))
+          }
+        }
+        .scaleEffect(dotScale)
+        .opacity(dotOpacity)
+        .offset(x: dx * travel * spread, y: dy * travel * spread)
       }
       VStack(spacing: 2) {
         Text(headline)

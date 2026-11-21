@@ -1,17 +1,13 @@
 #!/usr/bin/env swift
 // Renders the iOS launch-screen glyph for the task app (Septask target) from
-// the app icon's own disc geometry, so the mark is never redrawn by hand.
+// the canonical Septena Upright Compass geometry (`tools/logo-builder/dial-svg.mjs`),
+// so the boot screen wears a quiet monochrome vector version of the app icon.
 //
 //   swift scripts/render-launch-glyph.swift
 //
-// Source: Septask/AppIcon.icon/Assets/discs.svg. Like every shipped icon asset
-// (docs/SEPTASK.md, "Icon Notes"), it reads the raw cx/cy/r as 1024-canvas
-// pixels and ignores the viewBox transform.
-//
 // Output: Septask/Assets.xcassets/LaunchGlyph.imageset, two vector PDFs
-// (light and dark appearance). The discs are fitted into a 60 pt square,
-// centered on the disc cluster. The tint is subtle on purpose: systemGray2
-// (light #AEAEB2, dark #636366) on the system background.
+// (light and dark appearance). Fitted into a 60 pt square with subtle
+// systemGray2 tint (light #AEAEB2, dark #636366) on the system background.
 
 import CoreGraphics
 import Foundation
@@ -19,31 +15,21 @@ import Foundation
 let root = URL(fileURLWithPath: CommandLine.arguments.count > 1
   ? CommandLine.arguments[1]
   : FileManager.default.currentDirectoryPath)
-let svgURL = root.appendingPathComponent("Septask/AppIcon.icon/Assets/discs.svg")
 let outDir = root.appendingPathComponent("Septask/Assets.xcassets/LaunchGlyph.imageset")
 
-let svg = try String(contentsOf: svgURL, encoding: .utf8)
-let pattern = try NSRegularExpression(
-  pattern: #"<circle\s+cx="([\d.]+)"\s+cy="([\d.]+)"\s+r="([\d.]+)""#)
-let discs: [(x: Double, y: Double, r: Double)] = pattern
-  .matches(in: svg, range: NSRange(svg.startIndex..., in: svg))
-  .map { m in
-    func num(_ i: Int) -> Double { Double(svg[Range(m.range(at: i), in: svg)!])! }
-    return (num(1), num(2), num(3))
-  }
-guard discs.count == 7 else {
-  fatalError("expected 7 discs in \(svgURL.path), found \(discs.count)")
-}
-
-let minX = discs.map { $0.x - $0.r }.min()!
-let maxX = discs.map { $0.x + $0.r }.max()!
-let minY = discs.map { $0.y - $0.r }.min()!
-let maxY = discs.map { $0.y + $0.r }.max()!
-
 let side: CGFloat = 60
-let scale = side / CGFloat(max(maxX - minX, maxY - minY))
-let centerX = (minX + maxX) / 2
-let centerY = (minY + maxY) / 2
+// Canonical 1024-canvas dial geometry (matches tools/logo-builder/dial-svg.mjs)
+let outerRingRadius: CGFloat = 376
+let outerRingStroke: CGFloat = 34
+let maxExtent = outerRingRadius + outerRingStroke / 2
+let scale = (side * 0.5) / maxExtent
+let mid = side * 0.5
+
+@inline(__always)
+func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+  // SVG y grows down from 512; PDF y grows up from mid.
+  CGPoint(x: mid + (x - 512) * scale, y: mid - (y - 512) * scale)
+}
 
 func render(_ name: String, rgb: (CGFloat, CGFloat, CGFloat)) throws {
   let url = outDir.appendingPathComponent(name)
@@ -52,14 +38,67 @@ func render(_ name: String, rgb: (CGFloat, CGFloat, CGFloat)) throws {
     fatalError("could not open \(url.path)")
   }
   ctx.beginPDFPage(nil)
-  ctx.setFillColor(CGColor(srgbRed: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255, alpha: 1))
-  for d in discs {
-    // SVG y grows down, PDF y grows up.
-    let x = side / 2 + CGFloat(d.x - centerX) * scale
-    let y = side / 2 - CGFloat(d.y - centerY) * scale
-    let r = CGFloat(d.r) * scale
-    ctx.fillEllipse(in: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r))
+
+  func color(alpha: CGFloat) -> CGColor {
+    CGColor(srgbRed: rgb.0 / 255, green: rgb.1 / 255, blue: rgb.2 / 255, alpha: alpha)
   }
+
+  // 1. Subtle compass bezel ring
+  ctx.saveGState()
+  ctx.setStrokeColor(color(alpha: 0.52))
+  ctx.setLineWidth(outerRingStroke * scale)
+  let rPx = outerRingRadius * scale
+  ctx.strokeEllipse(in: CGRect(x: mid - rPx, y: mid - rPx, width: rPx * 2, height: rPx * 2))
+  ctx.restoreGState()
+
+  // 2. Six machined rounded dial ticks at k = 1...6 (7-way bearings)
+  ctx.saveGState()
+  ctx.setStrokeColor(color(alpha: 0.50))
+  ctx.setLineWidth(26 * scale)
+  ctx.setLineCap(.round)
+  let step = 360.0 / 7.0
+  for i in 1..<7 {
+    let rad = (-90.0 + Double(i) * step) * .pi / 180.0
+    let p0 = pt(512 + CGFloat(cos(rad)) * 258, 512 + CGFloat(sin(rad)) * 258)
+    let p1 = pt(512 + CGFloat(cos(rad)) * 310, 512 + CGFloat(sin(rad)) * 310)
+    ctx.move(to: p0)
+    ctx.addLine(to: p1)
+    ctx.strokePath()
+  }
+  ctx.restoreGState()
+
+  // 3. Upright North compass pointer (-90°)
+  ctx.saveGState()
+  ctx.setFillColor(color(alpha: 1.0))
+  let a0 = -90.0 * .pi / 180.0
+  let aL = (-90.0 - 11.2) * .pi / 180.0
+  let aR = (-90.0 + 11.2) * .pi / 180.0
+  let tip   = pt(512 + CGFloat(cos(a0)) * 336, 512 + CGFloat(sin(a0)) * 336)
+  let right = pt(512 + CGFloat(cos(aR)) * 238, 512 + CGFloat(sin(aR)) * 238)
+  let notch = pt(512 + CGFloat(cos(a0)) * 260, 512 + CGFloat(sin(a0)) * 260)
+  let left  = pt(512 + CGFloat(cos(aL)) * 238, 512 + CGFloat(sin(aL)) * 238)
+  ctx.beginPath()
+  ctx.move(to: tip)
+  ctx.addLine(to: right)
+  ctx.addLine(to: notch)
+  ctx.addLine(to: left)
+  ctx.closePath()
+  ctx.fillPath()
+  ctx.restoreGState()
+
+  // 4. Sculpted checkmark collinear to the 2nd tick (-38.57°): M 377 511 L 460 598 L 639 426
+  ctx.saveGState()
+  ctx.setStrokeColor(color(alpha: 1.0))
+  ctx.setLineWidth(68 * scale)
+  ctx.setLineCap(.round)
+  ctx.setLineJoin(.round)
+  ctx.beginPath()
+  ctx.move(to: pt(377, 511))
+  ctx.addLine(to: pt(460, 598))
+  ctx.addLine(to: pt(639, 426))
+  ctx.strokePath()
+  ctx.restoreGState()
+
   ctx.endPDFPage()
   ctx.closePDF()
 }

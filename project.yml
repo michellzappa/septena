@@ -69,10 +69,6 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "**/*.entitlements"
-          # iOS uses the 31 prebaked `.appiconset` assets in Assets.xcassets
-          # (Light + Dark luminosity variants); excluding the legacy Icon
-          # Composer bundle prevents Xcode 26 from overriding `AppIcon`.
-          - "AppIcon.icon"
       - path: SeptenaCore
         excludes:
           - "**/.DS_Store"
@@ -149,8 +145,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # The app glyph, small and subtle, centered on the system background
         # (white / black). Both are Septask/Assets.xcassets assets with light
-        # and dark variants; the glyph PDFs are generated from the icon's own
-        # discs by scripts/render-launch-glyph.swift (#82).
+        # and dark variants; the monochrome compass glyph PDFs are generated
+        # by scripts/render-launch-glyph.swift (#82).
         UILaunchScreen:
           UIImageName: LaunchGlyph
           UIColorName: LaunchBackground

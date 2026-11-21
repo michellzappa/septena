@@ -184,7 +184,48 @@ for path in args {
     fs.writeFileSync(path.join(setDir, 'Contents.json'), JSON.stringify(contents, null, 2) + '\n', 'utf8');
   }
 
-  console.log(`Done! Generated ${iconSets.length} .appiconset bundles (${iconSets.length * 2} opaque 1024px PNGs).`);
+  // 5. Also update watchOS AppIcon (1024px opaque full-bleed Default Compass)
+  const watchIconPath = path.join(repoRoot, 'SeptaskWatch', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-1024.png');
+  if (fs.existsSync(path.dirname(watchIconPath))) {
+    fs.copyFileSync(path.join(assetsDir, 'AppIcon.appiconset', 'AppIcon-1024.png'), watchIconPath);
+    console.log(`Updated watchOS icon -> ${path.relative(repoRoot, watchIconPath)}`);
+  }
+
+  // 6. Also generate macOS `Septask/AppIcon.icns` (squircle-clipped Default Compass)
+  const macSvgPath = path.join(tmpDir, 'MacAppIcon.svg');
+  const macSvg = renderDialSVG('septena-compass', paletteById.persimmon, {
+    shellMode: 'black',
+    faceMode: 'white',
+    mono: false,
+    fullBleed: false,
+    size: 1024,
+    uid: 'mac_appicon',
+  });
+  fs.writeFileSync(macSvgPath, macSvg, 'utf8');
+  execFileSync('qlmanage', ['-t', '-s', '1024', '-o', tmpDir, macSvgPath], { stdio: 'ignore' });
+  const mac1024Png = `${macSvgPath}.png`;
+  const iconsetDir = path.join(tmpDir, 'AppIcon.iconset');
+  fs.mkdirSync(iconsetDir, { recursive: true });
+  const macSizes = [
+    ['icon_16x16.png', 16],
+    ['icon_16x16@2x.png', 32],
+    ['icon_32x32.png', 32],
+    ['icon_32x32@2x.png', 64],
+    ['icon_128x128.png', 128],
+    ['icon_128x128@2x.png', 256],
+    ['icon_256x256.png', 256],
+    ['icon_256x256@2x.png', 512],
+    ['icon_512x512.png', 512],
+    ['icon_512x512@2x.png', 1024],
+  ];
+  for (const [fname, px] of macSizes) {
+    execFileSync('sips', ['-z', String(px), String(px), mac1024Png, '--out', path.join(iconsetDir, fname)], { stdio: 'ignore' });
+  }
+  const macIcnsPath = path.join(repoRoot, 'Septask', 'AppIcon.icns');
+  execFileSync('iconutil', ['-c', 'icns', iconsetDir, '-o', macIcnsPath], { stdio: 'inherit' });
+  console.log(`Updated macOS icon -> ${path.relative(repoRoot, macIcnsPath)}`);
+
+  console.log(`Done! Generated ${iconSets.length} iOS .appiconset bundles (${iconSets.length * 2} opaque 1024px PNGs), watchOS icon, and macOS AppIcon.icns.`);
 } finally {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 }
