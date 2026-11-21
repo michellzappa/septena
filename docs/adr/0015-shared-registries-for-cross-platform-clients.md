@@ -1,4 +1,4 @@
-# 0014. Keep cross-platform task-app contracts in shared JSON registries
+# 0015. Keep cross-platform task-app contracts in shared JSON registries
 
 - Status: proposed
 - Date: 2026-11-21
