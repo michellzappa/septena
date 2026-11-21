@@ -100,6 +100,23 @@ The outage is the time between step 8 and step 9. While the new zone is
 pending, it serves no worker traffic. The old workers stay in freeze until
 then.
 
+## 3a. Progress (2026-11-21)
+
+- Done: steps 1 to 5. Both backends run the copy routes; the new backend,
+  community worker and site run on the new account's `workers.dev`
+  subdomain (`septena-mcp-gateway`, the name wrangler registered). New
+  secrets are in the macOS keychain under `septena-cf/*`.
+- Copy tool: `backend/scripts/account-move.mjs` (`users`, `kv`, `stores`,
+  `r2`). It reads `ADMIN_TOKEN` from the keychain.
+- Rehearsal: `stores --suffix _rehearsal` copied the only user (mz) into a
+  separate id on the new account; every table count matched (2,090 tasks,
+  2,903 change rows). No attachments exist. The D1 export produced 19
+  tables and 519 rows.
+- KV is copied once, in the freeze window, into empty namespaces. A copy
+  before the freeze could keep a token alive on the new account after the
+  old account revoked it.
+- Remove the `_rehearsal` store with the old-account cleanup in step 12.
+
 ## 4. Checks before the old account is cleaned
 
 - Every user's task, area, project, convo and turn counts match.
