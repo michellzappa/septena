@@ -138,24 +138,3 @@ extension JSONDecoder {
     return d
   }()
 }
-
-// MARK: - TaskEntity accessor
-
-extension TaskEntity {
-  /// Decoded conversation (empty if none yet). Assigning re-encodes to
-  /// `conversationJSON`. Go through `TaskMutator` to persist + sync — this
-  /// accessor only (de)serializes.
-  var conversation: TaskConvo {
-    get {
-      guard let json = conversationJSON,
-            let data = json.data(using: .utf8),
-            let convo = try? JSONDecoder.taskConvo.decode(TaskConvo.self, from: data)
-      else { return TaskConvo() }
-      return convo
-    }
-    set {
-      conversationJSON = (try? JSONEncoder.taskConvo.encode(newValue))
-        .flatMap { String(data: $0, encoding: .utf8) }
-    }
-  }
-}

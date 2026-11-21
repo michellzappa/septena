@@ -864,6 +864,8 @@ targets:
       - path: SeptenaCore/ThingsImport/ThingsToSeptenaMapper.swift
       - path: SeptenaCore/WakingDay.swift
       - path: SeptenaCore/TrainingSessionSpans.swift
+      - path: SeptenaCore/TaskConvo.swift
+      - path: SeptenaCore/ConvoDerived.swift
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
