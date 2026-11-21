@@ -38,6 +38,7 @@ struct SeptaskRootView: View {
   @Environment(LogCommitCenter.self) private var logCommit
   @State private var selection: SeptaskTab = .today
   @AppStorage("septena.magicPlusDragHintSeen") private var magicPlusDragHintSeen = false
+  @Namespace private var tabBubble
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   @Environment(\.verticalSizeClass) private var vSize
@@ -191,33 +192,24 @@ struct SeptaskRootView: View {
   #endif
 
   #if os(iOS)
-  /// User tab-bar selection bridge:
-  /// - Tapping `Tasks` (whether switching from Today/Upcoming or re-tapping
-  ///   Tasks) always clears `nav.path` so the Tasks tab lands at its top-level
-  ///   index rather than staying trapped inside a previously pushed folder.
+  /// User tap on a bottom tab item:
+  /// - Tapping `Tasks` (switching from Today/Upcoming or re-tapping Tasks)
+  ///   always clears `nav.path` so Tasks lands at its top-level index.
   /// - Switching to Today or Upcoming clears any stale Tasks stack route.
   ///
   /// Programmatic navigation (e.g. tapping a project from Quick Find or a task
-  /// row) sets `selection = .tasks` directly in `.onChange(of: nav.path)` and
-  /// bypasses this setter so the pushed route is preserved.
-  private var tabSelection: Binding<SeptaskTab> {
-    Binding(
-      get: { selection },
-      set: { tapped in
-        switch tapped {
-        case .tasks:
-          if !nav.path.isEmpty {
-            nav.path = []
-          }
-          selection = .tasks
-        case .today, .upcoming:
-          if !nav.path.isEmpty {
-            nav.path = []
-          }
-          selection = tapped
-        }
+  /// row) sets `selection = .tasks` directly in `.onChange(of: nav.path)` so
+  /// the pushed route is preserved.
+  private func selectTab(_ tapped: SeptaskTab) {
+    Haptics.tap()
+    if !nav.path.isEmpty {
+      nav.path = []
+    }
+    if selection != tapped {
+      a11yAnimate(.snappy(duration: 0.24)) {
+        selection = tapped
       }
-    )
+    }
   }
 
   /// Start a new task inline (never a modal sheet/drawer):
@@ -246,36 +238,88 @@ struct SeptaskRootView: View {
     nav.requestNewTask()
   }
 
-  /// Standard iOS 26 3-tab `TabView` (`Tasks`, `Today`, `Upcoming`) paired with
-  /// the separate floating Magic Plus orb anchored just above the bottom-right
-  /// edge of the tab bar so it never overlaps `Upcoming` when expanded and
-  /// stays behind the keyboard when typing inline.
+  /// Compact iPhone root: active tab full-screen with bottom scroll clearance,
+  /// paired with a single bottom row — Liquid Glass 3-tab pill aligned leftmost
+  /// and the separate draggable Magic Plus orb at the exact same height on the
+  /// bottom-right.
   private var systemTabView: some View {
-    ZStack(alignment: .bottomTrailing) {
-      TabView(selection: tabSelection) {
-        // Septask has no section colors: the bar, the tabs and their content
-        // all take the platform accent (no `.tint` on the TabView).
-        Tab("Tasks", systemImage: "checkmark", value: SeptaskTab.tasks) {
-          ContentView()
-        }
-        Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
-          NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
-        }
-        Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
-          NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
-        }
-      }
-      .tabBarMinimizeBehavior(.onScrollDown)
+    ZStack(alignment: .bottom) {
+      activeTabContent
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaPadding(.bottom, 76)
 
-      VStack(alignment: .trailing, spacing: 8) {
+      VStack(alignment: .trailing, spacing: 10) {
         if !magicPlusDragHintSeen {
           magicPlusDragHint
         }
-        magicPlusOrb
+        HStack(alignment: .center, spacing: 12) {
+          bottomTabPill
+          Spacer(minLength: 0)
+          magicPlusOrb
+        }
       }
-      .padding(.trailing, 20)
-      .padding(.bottom, 92)
+      .padding(.horizontal, 16)
+      .padding(.bottom, 21)
       .ignoresSafeArea(.all, edges: .bottom)
+    }
+  }
+
+  @ViewBuilder
+  private var activeTabContent: some View {
+    switch selection {
+    case .tasks:
+      ContentView()
+    case .today:
+      NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
+    case .upcoming:
+      NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
+    }
+  }
+
+  private var bottomTabItems: [(tab: SeptaskTab, title: String, icon: String)] {
+    [
+      (.tasks, "Tasks", "checkmark"),
+      (.today, "Today", "sun.max.fill"),
+      (.upcoming, "Upcoming", "calendar"),
+    ]
+  }
+
+  /// Left-aligned Liquid Glass 3-tab pill matching iOS 26 tab-bar proportions
+  /// and height (`60pt`) alongside the bottom-right Magic Plus orb.
+  private var bottomTabPill: some View {
+    GlassEffectContainer {
+      HStack(spacing: 2) {
+        ForEach(bottomTabItems, id: \.tab) { item in
+          let isActive = selection == item.tab
+          Button {
+            selectTab(item.tab)
+          } label: {
+            VStack(spacing: 2) {
+              Image(systemName: item.icon)
+                .scaledFont(size: 18, weight: .semibold)
+              Text(item.title)
+                .scaledFont(size: 10, weight: .medium)
+                .lineLimit(1)
+            }
+            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+            .frame(minWidth: 74, maxHeight: .infinity)
+            .padding(.horizontal, 6)
+            .background {
+              if isActive {
+                Capsule()
+                  .fill(Color.primary.opacity(0.11))
+                  .matchedGeometryEffect(id: "septask-tab-pill", in: tabBubble)
+              }
+            }
+            .contentShape(Capsule())
+          }
+          .buttonStyle(.plain)
+          .glassEffectID(item.tab, in: tabBubble)
+        }
+      }
+      .padding(4)
+      .frame(height: 60)
+      .glassSegmentTrack()
     }
   }
 
