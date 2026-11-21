@@ -509,12 +509,13 @@ struct MagicPlusRowDropModifier: ViewModifier {
 
   /// Subtle dashed-outline landing slot revealed in the parted row gap.
   private var ghostSlotPlaceholder: some View {
-    RoundedRectangle(cornerRadius: 10, style: .continuous)
-      .strokeBorder(Color.accentColor.opacity(0.45),
+    let accent = AppearancePreferences.shared.accentSwiftUIColor
+    return RoundedRectangle(cornerRadius: 10, style: .continuous)
+      .strokeBorder(accent.opacity(0.45),
                     style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
       .background(
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-          .fill(Color.accentColor.opacity(0.06))
+          .fill(accent.opacity(0.06))
       )
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.vertical, 4)
@@ -658,12 +659,16 @@ struct MagicPlusFloatingOverlay: View {
       )
       .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
     } else {
+      let appearance = AppearancePreferences.shared
+      let accent = appearance.accentSwiftUIColor
+      let ink = appearance.checkInkSwiftUIColor
+
       switch drag.activeTarget?.kind {
       case .taskRow(let context):
         // Morph into a crisp live ghost task row ready to land in the parted gap.
         HStack(spacing: 12) {
           RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .strokeBorder(Color.accentColor, lineWidth: 2)
+            .strokeBorder(accent, lineWidth: 2)
             .frame(width: 20, height: 20)
           Text("New Task")
             .font(.septenaTaskTitle)
@@ -672,11 +677,11 @@ struct MagicPlusFloatingOverlay: View {
           if let context, !context.isEmpty {
             Text(context)
               .font(.septenaCaption)
-              .foregroundStyle(Color.accentColor)
+              .foregroundStyle(accent)
               .lineLimit(1)
               .padding(.horizontal, 8)
               .padding(.vertical, 3)
-              .background(Color.accentColor.opacity(0.14), in: Capsule())
+              .background(accent.opacity(0.14), in: Capsule())
           }
         }
         .padding(.horizontal, 14)
@@ -684,54 +689,54 @@ struct MagicPlusFloatingOverlay: View {
         .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
           RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5)
+            .strokeBorder(accent.opacity(0.7), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
 
       case .taskSection(let label):
-        morphPill(icon: "checkmark.circle.fill", title: label)
+        morphPill(icon: "checkmark.circle.fill", title: label, accent: accent, ink: ink)
 
       case .newProject(let label):
-        morphPill(icon: "number.circle.fill", title: label)
+        morphPill(icon: "number.circle.fill", title: label, accent: accent, ink: ink)
 
       case .newArea:
-        morphPill(icon: "square.stack.3d.up.fill", title: "New Area")
+        morphPill(icon: "square.stack.3d.up.fill", title: "New Area", accent: accent, ink: ink)
 
       case nil:
-        // Free-floating lifted blue "+" orb.
+        // Free-floating lifted Magic Plus orb pinned to the user's selected accent.
         ZStack {
           Circle()
-            .fill(Color.accentColor.gradient)
+            .fill(accent.gradient)
             .overlay(
               Circle()
-                .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+                .strokeBorder(ink.opacity(0.28), lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
           Image(systemName: "plus")
             .scaledFont(size: 24, weight: .bold)
-            .foregroundStyle(Color.white)
+            .foregroundStyle(ink)
         }
         .frame(width: 62, height: 62)
       }
     }
   }
 
-  private func morphPill(icon: String, title: String) -> some View {
+  private func morphPill(icon: String, title: String, accent: Color, ink: Color) -> some View {
     HStack(spacing: 8) {
       Image(systemName: icon)
         .scaledFont(size: 16, weight: .semibold)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(ink)
       Text(title)
         .font(.septenaButton)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(ink)
         .lineLimit(1)
     }
     .padding(.horizontal, 16)
     .frame(height: 44)
-    .background(Color.accentColor.gradient, in: Capsule())
+    .background(accent.gradient, in: Capsule())
     .overlay(
       Capsule()
-        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+        .strokeBorder(ink.opacity(0.25), lineWidth: 1)
     )
     .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
   }

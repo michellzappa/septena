@@ -296,10 +296,12 @@ struct SeptaskRootView: View {
           ContentView()
         }
         Tab("Today", systemImage: "sun.max.fill", value: SeptaskTab.today) {
-          NavigationStack { TaskListView(filter: .today) }.tint(theme.accent)
+          NavigationStack { TaskListView(filter: .today) }
+            .tint(AppearancePreferences.shared.accentSwiftUIColor)
         }
         Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
-          NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
+          NavigationStack { TaskListView(filter: .upcoming) }
+            .tint(AppearancePreferences.shared.accentSwiftUIColor)
         }
       }
       .tabBarMinimizeBehavior(.onScrollDown)
@@ -383,24 +385,30 @@ private struct MagicPlusOrb: View {
   let onNewArea: () -> Void
 
   var body: some View {
+    let appearance = AppearancePreferences.shared
+    let accent = appearance.accentSwiftUIColor
+    let ink = appearance.checkInkSwiftUIColor
+
     // Keep both the resting "+" orb and the cancel socket inside one stable
     // ZStack (toggling opacity/scale, never swapping container identity) so
     // SwiftUI's active DragGesture never drops mid-drag.
     ZStack {
-      // Resting "+" orb — hidden completely while dragging.
+      // Resting "+" orb — hidden completely while dragging. Always renders in
+      // the user's selected accent color (`AppearancePreferences.shared`) so
+      // it never drifts across tabs, areas, or projects.
       ZStack {
         Circle()
-          .fill(Color.accentColor.gradient)
+          .fill(accent.gradient)
           .overlay(
             Circle()
-              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+              .strokeBorder(ink.opacity(0.22), lineWidth: 0.75)
           )
           .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
         VStack(spacing: 4) {
           Image(systemName: "plus")
             .scaledFont(size: 21, weight: .bold)
-            .foregroundStyle(Color.white)
-          gripDots
+            .foregroundStyle(ink)
+          gripDots(ink: ink)
         }
         .offset(y: 2)
       }
@@ -464,13 +472,13 @@ private struct MagicPlusOrb: View {
   }
 
   /// Subtle 3×2 tactile grip dots beneath `+` signaling the orb can be dragged.
-  private var gripDots: some View {
+  private func gripDots(ink: Color) -> some View {
     VStack(spacing: 2.5) {
       ForEach(0..<2, id: \.self) { _ in
         HStack(spacing: 3) {
           ForEach(0..<3, id: \.self) { _ in
             Circle()
-              .fill(Color.white.opacity(0.55))
+              .fill(ink.opacity(0.55))
               .frame(width: 2.5, height: 2.5)
           }
         }
@@ -512,7 +520,7 @@ private struct MagicPlusOrb: View {
       HStack(spacing: 12) {
         Image(systemName: icon)
           .scaledFont(size: 16, weight: .medium)
-          .foregroundStyle(Color.accentColor)
+          .foregroundStyle(AppearancePreferences.shared.accentSwiftUIColor)
           .frame(width: 22)
         Text(title)
           .font(.septenaSidebarRow)
