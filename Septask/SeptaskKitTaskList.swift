@@ -1021,8 +1021,11 @@ final class SeptaskKitTaskListController: NSViewController {
     // falls to the next task by id instead of to nothing.
     let lastSelectedIndex = tableView.selectedRowIndexes.last
 
-    let rawPool = LocalCache.tasks(in: context, filter: filter)
-    let rawTriage = filter == .today ? LocalCache.tasks(in: context, filter: .triage) : []
+    // Today and its triage band come from one fetch of the open rows; the
+    // band feeds the suggestion snapshot, the tag bar and `triageBand(_:)`.
+    let todayLists = filter == .today ? LocalCache.todayAndTriage(in: context) : nil
+    let rawPool = todayLists?.today ?? LocalCache.tasks(in: context, filter: filter)
+    let rawTriage = todayLists?.triage ?? []
     // Progressive disclosure: discover ONLY tags actually present in this list;
     // when none exist, no tag filter bar appears (docs/TAGS_SPEC.md §3).
     let listTags: [TaskTag] = {
@@ -1062,7 +1065,7 @@ final class SeptaskKitTaskListController: NSViewController {
     var newRows: [Row]
     switch filter {
     case .today where todayGroupsByList:
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + groupedByList(withoutTriage(pool), inboxFooter: newTaskLine)
         + todayLoggedRows()
     case .today:
@@ -1094,7 +1097,7 @@ final class SeptaskKitTaskListController: NSViewController {
                               comment: "SeptaskKit: flat Today divider above tasks filed in an area or project"),
                 icon: .symbol("list.bullet"), count: classified.count)
       ]
-      newRows = titleRows + noticeRows(pool) + agenda() + triageBand()
+      newRows = titleRows + noticeRows(pool) + agenda() + triageBand(rawTriage)
         + loose.map(chipped) + newTaskLine
         + listsHeader
         + classified.map(chipped)
@@ -1664,8 +1667,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// capture slot whether or not anything sits in it. Matches
   /// `TaskListView.triageSection`, which shows the section whenever
   /// `allowsInlineCreate` regardless of row count.
-  private func triageBand() -> [Row] {
-    let rawBand = LocalCache.tasks(in: context, filter: .triage)
+  private func triageBand(_ rawBand: [SeptenaTask]) -> [Row] {
     let band = activeTagFilterIDs.isEmpty
       ? rawBand
       : rawBand.filter { activeTagFilterIDs.isSubset(of: Set($0.tags)) }
@@ -2009,8 +2011,7 @@ final class SeptaskKitTaskListController: NSViewController {
   private func todayLoggedRows() -> [Row] {
     guard todayShowsCompleted else { return [] }
     let today = SeptenaDate.today
-    let done = LocalCache.tasks(in: context, filter: .logbook)
-      .filter { ($0.completedAt ?? "").hasPrefix(today) }
+    let done = LocalCache.tasksCompleted(onDay: today, in: context)
       .sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
     return loggedFooterRows(completed: done)
   }
@@ -2304,7 +2305,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private func move(to destination: KitMoveMenu.Destination, taskIDs: [String]) {
-    let liveByID = Dictionary(LocalCache.allTasks(in: context).map { ($0.id, $0) },
+    let liveByID = Dictionary(LocalCache.liveTasks(ids: taskIDs, in: context).map { ($0.id, $0) },
                               uniquingKeysWith: { current, _ in current })
     // A task already filed at `destination` is a no-op: no write and no undo
     // step (⌘Z must not "undo" nothing and skip the real action behind it).
@@ -3752,7 +3753,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// value and would otherwise keep acting on a stale pre-edit snapshot.
   private func refreshComposerRow(taskId: String) {
     guard composingTaskId == taskId,
-          let fresh = LocalCache.allTasks(in: context).first(where: { $0.id == taskId }),
+          let fresh = LocalCache.liveTasks(ids: [taskId], in: context).first,
           let row = rows.firstIndex(where: { $0.task?.id == taskId }),
           let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false)
             as? KitComposerCell
@@ -7017,9 +7018,7 @@ final class KitReminderCell: NSTableCellView {
     if cal.isDateInTomorrow(date) {
       return String(localized: "Tomorrow", comment: "Relative day label")
     }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: date)
+    return SeptenaDate.monthDay(date)
   }
 
   /// Reads `SeptenaDate.today` rather than `Date()`, so time travel moves this

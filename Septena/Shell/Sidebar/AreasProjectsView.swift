@@ -133,7 +133,9 @@ struct AreaDetailView: View {
   private static func cachedProjectProgress(areaId: String,
                                             context: ModelContext) -> [String: Double] {
     let ratios = LocalCache.projectCompletionRatios(in: context)
-    let ids = Set(LocalCache.projects(in: context)
+    // StructureCache, not a fresh fetch: SwiftUI re-runs this view's init on
+    // every parent render.
+    let ids = Set(StructureCache.snapshot(in: context).projects
       .filter { $0.area == areaId && $0.status == .active }
       .map(\.id))
     return ratios.filter { ids.contains($0.key) }

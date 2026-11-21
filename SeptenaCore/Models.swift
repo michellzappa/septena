@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // Mirror of Septena api/routers/tasks.py — tasks/projects/areas only.
 
@@ -1257,7 +1258,27 @@ enum SeptenaDate {
     return cal.date(from: c)
   }
 
-  static var today: String { formatter.string(from: Date()) }
+  /// Today's `yyyy-MM-dd`. Row filters read this several times per task on
+  /// every list repaint (`isOnToday`, triage, the row-object build), so the
+  /// string is formatted once per day, not once per read. The memo holds the
+  /// day's bounds in the formatter's own time zone, and a clock that moves
+  /// outside them (midnight, a manual clock change) formats again.
+  static var today: String {
+    let now = Date()
+    if let hit = todayMemo.withLock({ m in
+      m.flatMap { now >= $0.start && now < $0.end ? $0.day : nil }
+    }) { return hit }
+    let day = formatter.string(from: now)
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = formatter.timeZone
+    let start = cal.startOfDay(for: now)
+    let end = cal.date(byAdding: .day, value: 1, to: start) ?? now
+    todayMemo.withLock { $0 = (day, start, end) }
+    return day
+  }
+
+  private static let todayMemo =
+    OSAllocatedUnfairLock<(day: String, start: Date, end: Date)?>(initialState: nil)
 
   /// ISO date `n` calendar days after `iso` (negative = before).
   static func offsetDays(_ n: Int, from iso: String) -> String? {
@@ -1294,6 +1315,10 @@ enum SeptenaDate {
   /// weekday name within the last week, else "MMM d". Returns the raw
   /// string unchanged if it can't be parsed. Single home for the
   /// browse/backfill sheet titles that each carried a copy of this.
+  /// Localized short month + day ("May 14"). One shared formatter: row date
+  /// labels used to build a new `DateFormatter` on every render.
+  static func monthDay(_ d: Date) -> String { monthDayFormatter.string(from: d) }
+
   static func friendlyLabel(_ iso: String) -> String {
     guard let d = parse(iso) else { return iso }
     let cal = Calendar.current

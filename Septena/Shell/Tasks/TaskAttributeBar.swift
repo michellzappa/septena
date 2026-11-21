@@ -119,7 +119,7 @@ struct TaskAttributeBar: View {
         }
         if let task = discussTask {
           let ctx = LocalStore.shared.container.mainContext
-          let liveTask = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
+          let liveTask = LocalCache.liveTasks(ids: [task.id], in: ctx).first ?? task
           let taskTags = LocalCache.resolvedTags(for: liveTask, tagsByID: LocalCache.tagsByID(in: ctx))
           let tagValue: String? = taskTags.isEmpty
             ? nil
@@ -225,7 +225,7 @@ struct TaskAttributeBar: View {
     case .tags:
       discussTask.map { task in
         let ctx = LocalStore.shared.container.mainContext
-        let live = LocalCache.allTasks(in: ctx).first(where: { $0.id == task.id }) ?? task
+        let live = LocalCache.liveTasks(ids: [task.id], in: ctx).first ?? task
         return !LocalCache.resolvedTags(for: live, tagsByID: LocalCache.tagsByID(in: ctx)).isEmpty
       } ?? false
     case .checklist:  discussTask.map { !LocalCache.checklistItems(forTaskID: $0.id, in: LocalStore.shared.container.mainContext).isEmpty } ?? false
@@ -334,9 +334,7 @@ struct TaskAttributeBar: View {
     let cal = Calendar.current
     if cal.isDateInToday(d) { return "Today" }
     if cal.isDateInTomorrow(d) { return "Tomorrow" }
-    let f = DateFormatter()
-    f.setLocalizedDateFormatFromTemplate("MMMd")
-    return f.string(from: d)
+    return SeptenaDate.monthDay(d)
   }
 }
 
@@ -1275,7 +1273,7 @@ private struct TaskTagsPanel: View {
   private func reload() {
     let ctx = LocalStore.shared.container.mainContext
     allTags = LocalCache.allTags(in: ctx)
-    assignedIDs = LocalCache.allTasks(in: ctx).first(where: { $0.id == taskID })?.tags ?? []
+    assignedIDs = LocalCache.liveTasks(ids: [taskID], in: ctx).first?.tags ?? []
   }
 
   private func toggle(_ tag: TaskTag) {
