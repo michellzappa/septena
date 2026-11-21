@@ -44,6 +44,11 @@ struct SeptaskRootView: View {
   @State private var newProjectInitialAreaId: String? = nil
   @State private var showingNewAreaAlert = false
   @State private var newAreaName = ""
+  /// The first run (`SeptaskFirstRun.swift`), shown once per account.
+  @State private var showingFirstRun = false
+  /// Settings ▸ About ▸ Show Welcome Again sets this; observed so the flow
+  /// opens at once instead of on the next launch.
+  @AppStorage(SettingsKey.welcomeForce) private var welcomeForce = false
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
   @Environment(\.verticalSizeClass) private var vSize
@@ -129,6 +134,22 @@ struct SeptaskRootView: View {
         TextField("Area name", text: $newAreaName)
         Button("Create") { createArea() }
         Button("Cancel", role: .cancel) { newAreaName = "" }
+      }
+      .fullScreenCover(isPresented: $showingFirstRun) {
+        withEnvironment(SeptaskFirstRunView { showingFirstRun = false })
+          .environment(\.modelContext, modelContext)
+      }
+      .task {
+        await SeptaskFirstRunGate.resolve(settings: settingsStore)
+        showingFirstRun = SeptaskFirstRunGate.shouldPresent(settings: settingsStore, context: modelContext)
+      }
+      // A cover cannot open over the Settings sheet, so a forced welcome
+      // waits until Settings has closed.
+      .onChange(of: welcomeForce) { _, forced in
+        if forced, !nav.showSettings { showingFirstRun = true }
+      }
+      .onChange(of: nav.showSettings) { _, open in
+        if !open, welcomeForce, !showingFirstRun { showingFirstRun = true }
       }
       #else
       .onChange(of: nav.showSettings) { _, open in

@@ -73,6 +73,15 @@
       "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
       "featureId": "lists.today"
     },
+    "onboardedAt": {
+      "scope": "synced",
+      "type": "string",
+      "format": "stamp",
+      "default": null,
+      "ui": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "onboarding.first-run"
+    },
     "accentColor": {
       "scope": "synced",
       "storageKey": "septena.appearance.accentColor",
@@ -685,6 +694,7 @@
           "items": [
             { "kind": "customSurface", "surface": "check_updates", "platforms": ["macos", "windows"], "featureId": "mac.updates" },
             { "kind": "customSurface", "surface": "reset_get_started" },
+            { "kind": "customSurface", "surface": "reset_first_run", "label": "Show Welcome Again", "featureId": "onboarding.first-run" },
             { "kind": "customSurface", "surface": "send_feedback", "icon": "settings.feedback" }
           ]
         },

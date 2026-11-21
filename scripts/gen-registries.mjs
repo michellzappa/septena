@@ -169,6 +169,9 @@ function validateSettings(settings, entities, icons, caps) {
     if (def.enum !== undefined) {
       assert(def.enum in entities.enums, `settings.json: ${key} unknown enum "${def.enum}"`);
     }
+    if (def.format !== undefined) {
+      assert(def.format in entities.patterns, `settings.json: ${key} unknown format "${def.format}"`);
+    }
     if (def.options !== undefined) {
       assert(Array.isArray(def.options) && def.options.length > 0, `settings.json: ${key} options must be non-empty array`);
       for (const opt of def.options) {
@@ -347,6 +350,56 @@ function validateActions(actions, icons, caps, destIds) {
       assert(id in actions.actions, `actions.json: shortcutsSheet.${grp.id} references unknown action "${id}"`);
     }
   }
+}
+
+// First run (ADR 0015): the steps, copy and button actions every client
+// renders. `kind` picks the view; `action` is the only behavior a button may
+// name, so a client implements a closed set and the registry stays data.
+const FIRST_RUN_KINDS = new Set(["intro", "account", "choices", "connectAgent", "finish"]);
+const FIRST_RUN_ACTIONS = new Set(["next", "finish", "signIn", "importThings", "importReminders", "copySetupPrompt", "copyFirstPrompt"]);
+const FIRST_RUN_CONDITIONS = new Set(["signedIn"]);
+
+function validateFirstRun(surfaces, icons, caps, settings) {
+  const fr = surfaces.firstRun;
+  assert(fr && Array.isArray(fr.steps) && fr.steps.length > 0, "surfaces.json: firstRun.steps missing");
+  assert(fr.featureId in caps.capabilities, `surfaces.json: firstRun unknown featureId "${fr.featureId}"`);
+  const done = settings.keys[fr.completionSetting];
+  assert(done && done.scope === "synced", `surfaces.json: firstRun.completionSetting "${fr.completionSetting}" must be a synced settings key`);
+  assert(typeof fr.prompts?.setup === "string" && typeof fr.prompts?.first === "string", "surfaces.json: firstRun.prompts needs setup and first");
+  const getStarted = surfaces.notices.items.find((n) => n.id === "getStarted");
+  const stepIds = new Set((getStarted?.steps ?? []).map((st) => st.id));
+  const platforms = new Set(caps.platforms);
+  const ids = new Set();
+  const checkButton = (ctx, b) => {
+    if (b === undefined) return;
+    assert(typeof b.title === "string" && b.title.length > 0, `surfaces.json: firstRun ${ctx} button missing title`);
+    assert(FIRST_RUN_ACTIONS.has(b.action), `surfaces.json: firstRun ${ctx} unknown action "${b.action}"`);
+  };
+  for (const st of fr.steps) {
+    assert(!ids.has(st.id), `surfaces.json: firstRun duplicate step "${st.id}"`);
+    ids.add(st.id);
+    assert(FIRST_RUN_KINDS.has(st.kind), `surfaces.json: firstRun ${st.id} unknown kind "${st.kind}"`);
+    assert(st.icon in icons.icons, `surfaces.json: firstRun ${st.id} unknown icon "${st.icon}"`);
+    assert(typeof st.title === "string" && st.title.length > 0, `surfaces.json: firstRun ${st.id} missing title`);
+    for (const c of [st.skipWhen, st.requires]) {
+      if (c !== undefined) assert(FIRST_RUN_CONDITIONS.has(c), `surfaces.json: firstRun ${st.id} unknown condition "${c}"`);
+    }
+    if (st.completesGetStartedStep !== undefined) {
+      assert(stepIds.has(st.completesGetStartedStep), `surfaces.json: firstRun ${st.id} unknown Get started step "${st.completesGetStartedStep}"`);
+    }
+    for (const pt of st.points ?? []) assert(pt.icon in icons.icons, `surfaces.json: firstRun ${st.id} point unknown icon "${pt.icon}"`);
+    for (const ch of st.choices ?? []) {
+      assert(ch.icon in icons.icons, `surfaces.json: firstRun ${st.id}.${ch.id} unknown icon "${ch.icon}"`);
+      assert(FIRST_RUN_ACTIONS.has(ch.action), `surfaces.json: firstRun ${st.id}.${ch.id} unknown action "${ch.action}"`);
+      for (const p of ch.platforms ?? []) assert(platforms.has(p), `surfaces.json: firstRun ${st.id}.${ch.id} unknown platform "${p}"`);
+    }
+    checkButton(`${st.id}.primary`, st.primary);
+    checkButton(`${st.id}.secondary`, st.secondary);
+    checkButton(`${st.id}.tertiary`, st.tertiary);
+    checkButton(`${st.id}.afterDone`, st.afterDone);
+    if (st.kind === "choices") assert((st.choices ?? []).length > 0, `surfaces.json: firstRun ${st.id} needs choices`);
+  }
+  assert(fr.steps[fr.steps.length - 1].kind === "finish", "surfaces.json: firstRun last step must be kind finish");
 }
 
 function validateSurfaces(surfaces, icons, caps) {
@@ -773,6 +826,70 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("}");
   lines.push("");
 
+  // 8b. First run (surfaces.json `firstRun`)
+  const fr = surfaces.firstRun;
+  const frButton = (b) => (b === undefined ? "nil" : `RegistryFirstRunButton(title: ${swiftStr(b.title)}, action: ${swiftStr(b.action)})`);
+  lines.push("/// One button in the first run. `action` is one of a closed set the client implements.");
+  lines.push("struct RegistryFirstRunButton: Sendable, Hashable {");
+  lines.push("  let title: String");
+  lines.push("  let action: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryFirstRunPoint: Sendable, Hashable {");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("}");
+  lines.push("");
+  lines.push("struct RegistryFirstRunChoice: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let detail: String");
+  lines.push("  let action: String");
+  lines.push("  let platforms: [String]");
+  lines.push("}");
+  lines.push("");
+  lines.push("/// One first-run step (`registry/surfaces.json` `firstRun.steps`). `kind` picks the view.");
+  lines.push("struct RegistryFirstRunStep: Sendable, Hashable, Identifiable {");
+  lines.push("  let id: String");
+  lines.push("  let kind: String");
+  lines.push("  let icon: String");
+  lines.push("  let title: String");
+  lines.push("  let body: String");
+  lines.push("  let footnote: String?");
+  lines.push("  let returningTitle: String?");
+  lines.push("  let returningBody: String?");
+  lines.push("  let skipWhen: String?");
+  lines.push("  let requires: String?");
+  lines.push("  let completesGetStartedStep: String?");
+  lines.push("  let points: [RegistryFirstRunPoint]");
+  lines.push("  let choices: [RegistryFirstRunChoice]");
+  lines.push("  let instructions: [String]");
+  lines.push("  let primary: RegistryFirstRunButton?");
+  lines.push("  let secondary: RegistryFirstRunButton?");
+  lines.push("  let tertiary: RegistryFirstRunButton?");
+  lines.push("  /// Replaces `secondary` once the step's work is done (paired, imported).");
+  lines.push("  let afterDone: RegistryFirstRunButton?");
+  lines.push("}");
+  lines.push("");
+  lines.push("enum RegistryFirstRun {");
+  lines.push(`  static let featureId: String = ${swiftStr(fr.featureId)}`);
+  lines.push(`  /// The synced setting that records a finished first run, so a second device skips it.`);
+  lines.push(`  static let completionSetting: String = ${swiftStr(fr.completionSetting)}`);
+  lines.push(`  static let setupPrompt: String = ${swiftStr(fr.prompts.setup)}`);
+  lines.push(`  static let firstPrompt: String = ${swiftStr(fr.prompts.first)}`);
+  lines.push("  static let steps: [RegistryFirstRunStep] = [");
+  for (const st of fr.steps) {
+    const points = (st.points ?? []).map((pt) => `RegistryFirstRunPoint(icon: ${swiftStr(pt.icon)}, title: ${swiftStr(pt.title)}, detail: ${swiftStr(pt.detail)})`).join(", ");
+    const choices = (st.choices ?? []).map((ch) => `RegistryFirstRunChoice(id: ${swiftStr(ch.id)}, icon: ${swiftStr(ch.icon)}, title: ${swiftStr(ch.title)}, detail: ${swiftStr(ch.detail)}, action: ${swiftStr(ch.action)}, platforms: [${(ch.platforms ?? []).map(swiftStr).join(", ")}])`).join(", ");
+    const instructions = (st.instructions ?? []).map(swiftStr).join(", ");
+    lines.push(`    RegistryFirstRunStep(id: ${swiftStr(st.id)}, kind: ${swiftStr(st.kind)}, icon: ${swiftStr(st.icon)}, title: ${swiftStr(st.title)}, body: ${swiftStr(st.body ?? "")}, footnote: ${swiftOptStr(st.footnote)}, returningTitle: ${swiftOptStr(st.returningTitle)}, returningBody: ${swiftOptStr(st.returningBody)}, skipWhen: ${swiftOptStr(st.skipWhen)}, requires: ${swiftOptStr(st.requires)}, completesGetStartedStep: ${swiftOptStr(st.completesGetStartedStep)}, points: [${points}], choices: [${choices}], instructions: [${instructions}], primary: ${frButton(st.primary)}, secondary: ${frButton(st.secondary)}, tertiary: ${frButton(st.tertiary)}, afterDone: ${frButton(st.afterDone)}),`);
+  }
+  lines.push("  ]");
+  lines.push("}");
+  lines.push("");
+
   // 9. Capabilities parity ledger
   lines.push("/// Canonical capability parity ledger (`registry/capabilities.json`, ADR 0013 / ADR 0015).");
   lines.push("enum RegistryCapabilities {");
@@ -836,6 +953,7 @@ function generateTS({ entities, rules, icons, tokens, caps, settings, dests, act
   lines.push(`export const CAPABILITIES = ${JSON.stringify(caps.capabilities)} as const;`);
   lines.push(`export const ACTIONS_CATALOG = ${JSON.stringify({ actions: actions.actions, contextMenus: actions.contextMenus, swipeActions: actions.swipeActions, shortcutsSheet: actions.shortcutsSheet })} as const;`);
   lines.push(`export const SURFACES_CATALOG = ${JSON.stringify({ notices: surfaces.notices, prompts: surfaces.prompts, toasts: surfaces.toasts, taskAttributes: surfaces.taskAttributes })} as const;`);
+  lines.push(`export const FIRST_RUN = ${JSON.stringify(surfaces.firstRun)} as const;`);
   lines.push("");
   return lines.join("\n");
 }
@@ -874,6 +992,7 @@ validateSettings(settings, entities, icons, caps);
 const destIds = validateDestinations(dests, icons, caps);
 validateActions(actions, icons, caps, destIds);
 validateSurfaces(surfaces, icons, caps);
+validateFirstRun(surfaces, icons, caps, settings);
 validateConformance();
 
 const bundle = { entities, rules, icons, tokens, caps, settings, dests, actions, surfaces };

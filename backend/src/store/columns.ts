@@ -74,6 +74,9 @@ export const SETTING_VALUES = {
   getStartedDismissed: z.boolean(),
   /// "Get started" checklist steps completed (step raw IDs).
   getStartedSteps: z.array(z.string().max(64)).max(32),
+  /// When the first run (registry/surfaces.json `firstRun`) finished on any
+  /// device. Set once; a second device that signs in skips the first run.
+  onboardedAt: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax),
   /// App accent color ID (ADR 0019: colorful default + 7 exotic fruits).
   accentColor: z.enum(ENTITY_ENUMS.accentColor),
   /// Procedural header-wash canvas texture ID (ADR 0019).

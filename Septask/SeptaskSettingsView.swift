@@ -722,6 +722,8 @@ private struct SeptaskPrivacyPane: View {
 
 private struct SeptaskAboutPane: View {
   @Environment(\.openURL) private var openURL
+  @Environment(SettingsStore.self) private var settingsStore
+  @Environment(NavigationState.self) private var nav
 
   var body: some View {
     Form {
@@ -755,6 +757,16 @@ private struct SeptaskAboutPane: View {
         #endif
         #endif
         Button("Show Get Started Again") { TaskNotices.resetGetStarted() }
+        // This device only: the synced `onboardedAt` stays, so other devices
+        // are not asked again (`SettingsStore.resetWelcomeForTesting`).
+        Button("Show Welcome Again") {
+          settingsStore.resetWelcomeForTesting()
+          #if os(macOS)
+          SeptaskKitFirstRunWindow.present()
+          #else
+          nav.showSettings = false
+          #endif
+        }
         Link(destination: URL(string: "mailto:mz@envisioning.com?subject=Septena%20feedback")!) {
           Label("Send feedback", systemImage: RegistryIcons.sfSymbols["settings.feedback"] ?? "paperplane")
         }

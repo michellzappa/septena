@@ -13,14 +13,11 @@ struct SeptaskClaudePairingSections: View {
   private enum CopiedTarget: Equatable { case url, setupPrompt, starterPrompt }
 
   private var sync: TaskSyncEngine { .shared }
-  @State private var pairCode = ""
-  @State private var pairing = false
-  @State private var pairResult: (text: String, failed: Bool)?
   @State private var copied: CopiedTarget?
   private static let connectorURL = "https://api.septena.app/mcp"
-  private static let setupPrompt = "Set up Septena for me using https://septena.app/agents.md"
-  private static let starterPrompt =
-    "Set up my Septena areas, projects, and tasks by following https://api.septena.app/onboard.md"
+  // One copy of each prompt, shared with the first run (`registry/surfaces.json`).
+  private static let setupPrompt = RegistryFirstRun.setupPrompt
+  private static let starterPrompt = RegistryFirstRun.firstPrompt
 
   var body: some View {
     if !sync.signedIn {
@@ -55,6 +52,45 @@ struct SeptaskClaudePairingSections: View {
           }
         }
       }
+      SeptaskPairingCodeField()
+    } header: {
+      Text("Connect Claude")
+    } footer: {
+      Text("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.")
+    }
+  }
+
+  private func copyText(_ text: String, target: CopiedTarget) {
+    SeptaskClipboard.copy(text)
+    copied = target
+  }
+}
+
+/// Puts text on the system pasteboard, on both platforms.
+@MainActor
+enum SeptaskClipboard {
+  static func copy(_ text: String) {
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    #else
+    UIPasteboard.general.string = text
+    #endif
+  }
+}
+
+/// The pairing code Claude's browser page shows, approved through the task
+/// backend. Used by Settings ▸ Connect Claude and by the first run, so the
+/// approval and its error copy exist once. `onApproved` runs after success.
+struct SeptaskPairingCodeField: View {
+  var onApproved: (() -> Void)?
+  private var sync: TaskSyncEngine { .shared }
+  @State private var pairCode = ""
+  @State private var pairing = false
+  @State private var pairResult: (text: String, failed: Bool)?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
       HStack {
         TextField("Code from the browser page", text: $pairCode)
           .font(.body.monospaced())
@@ -74,21 +110,7 @@ struct SeptaskClaudePairingSections: View {
           .font(.caption)
           .foregroundStyle(pairResult.failed ? .red : .secondary)
       }
-    } header: {
-      Text("Connect Claude")
-    } footer: {
-      Text("Paste the setup prompt into Claude, or add the connector URL to Claude as a custom connector. When your browser shows a code, enter it here. Once connected, paste the first prompt to set up your areas, projects and tasks. Only enter a code from a browser window you opened yourself.")
     }
-  }
-
-  private func copyText(_ text: String, target: CopiedTarget) {
-    #if os(macOS)
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
-    #else
-    UIPasteboard.general.string = text
-    #endif
-    copied = target
   }
 
   private func approvePairing() {
@@ -103,6 +125,7 @@ struct SeptaskClaudePairingSections: View {
         pairCode = ""
         pairResult = ("Approved. Finish in your browser.", false)
         TaskNotices.completeStep(.connectAI)
+        onApproved?()
       } catch TaskBackendError.http(_, let code) where code == "invalid_code" {
         pairResult = ("That code is wrong or has expired.", true)
       } catch TaskBackendError.http(_, let code) where code == "code_used" {

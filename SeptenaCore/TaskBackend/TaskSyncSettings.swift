@@ -65,6 +65,8 @@ enum SeptaskSyncedSettings {
     case "agentsPaused": return s.agentsPaused.map { .bool($0) } ?? .null
     case "getStartedDismissed": return s.getStartedDismissed.map { .bool($0) } ?? .null
     case "getStartedSteps": return s.getStartedSteps.map { .array($0.map { .string($0) }) } ?? .null
+    // A `Date` on device, an ISO instant on the wire (registry format "stamp").
+    case "onboardedAt": return s.onboardedAt.map { .string(stampFormatter.string(from: $0)) } ?? .null
     case "accentColor": return .from(s.accentColor)
     case "canvasTexture": return .from(s.canvasTexture)
     case "textureIntensity": return s.textureIntensity.map { .int(Int64($0)) } ?? .null
@@ -75,6 +77,10 @@ enum SeptaskSyncedSettings {
 
   /// Sets one key from a JSON value. False when the value has the wrong
   /// shape (the field is then left as it was).
+  /// ISO 8601 with a zone, the backend's `stamp` pattern. Built per use:
+  /// `ISO8601DateFormatter` is not `Sendable`.
+  private static var stampFormatter: ISO8601DateFormatter { ISO8601DateFormatter() }
+
   @discardableResult
   static func apply(_ key: String, _ v: BackendJSON, to s: inout AppSettings) -> Bool {
     func string() -> String?? {
@@ -91,6 +97,11 @@ enum SeptaskSyncedSettings {
     case "rolledInDismissedOn":
       guard let x = string() else { return false }
       s.rolledInDismissedOn = x
+    case "onboardedAt":
+      guard let x = string() else { return false }
+      guard let raw = x else { s.onboardedAt = nil; break }
+      guard let date = stampFormatter.date(from: raw) else { return false }
+      s.onboardedAt = date
     case "homeTimezone":
       guard let x = string() else { return false }
       // `homeTimezone` is not optional in `AppTimeSettings`: no zone, no block.
