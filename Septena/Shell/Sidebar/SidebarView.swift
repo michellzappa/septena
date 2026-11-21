@@ -351,6 +351,12 @@ struct SidebarRootView: View {
                 newAreaName = ""
                 showingNewArea = true
               })
+      .magicPlusSectionDrop(id: "mp-sidebar-new-area", kind: .newArea,
+                            priority: 1, highlights: false) {
+        Haptics.tick()
+        newAreaName = ""
+        showingNewArea = true
+      }
       #endif
       .modifier(IOSSidebarListChrome())
       .septenaNeutralListSelection()
@@ -836,10 +842,18 @@ struct SidebarRootView: View {
       newProjectInArea = area.id
       showingNewProject = true
     })
+    .magicPlusSectionDrop(id: "mp-sidebar-area-\(area.id)",
+                          kind: .newProject(label: "New Project in \(area.title)")) {
+      Haptics.tick()
+      newProjectInArea = area.id
+      showingNewProject = true
+    }
   }
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
+    let parentTitle = parent.flatMap { pid in areas.first(where: { $0.id == pid })?.title }
+    let magicLabel = parentTitle.map { "New Project in \($0)" } ?? "New Project"
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
@@ -864,6 +878,12 @@ struct SidebarRootView: View {
       newProjectInArea = parent
       showingNewProject = true
     })
+    .magicPlusSectionDrop(id: "mp-sidebar-proj-\(project.id)",
+                          kind: .newProject(label: magicLabel)) {
+      Haptics.tick()
+      newProjectInArea = parent
+      showingNewProject = true
+    }
   }
 
   // MARK: - Context menus
@@ -1909,9 +1929,18 @@ private struct SidebarNewAreaDropDelegate: DropDelegate {
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route
   let mutator: TaskMutator
+  @Environment(NavigationState.self) private var nav
+
   func body(content: Content) -> some View {
     if let kind = SidebarTaskDrop.Kind(route: route) {
-      content.modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
+      content
+        .modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
+        .magicPlusSectionDrop(id: "mp-sidebar-smart-\(route.id)",
+                              kind: .taskSection(label: "New Task in \(route.title)")) {
+          Haptics.tick()
+          nav.go(to: route)
+          nav.requestNewTask()
+        }
     } else {
       content
     }

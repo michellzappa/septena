@@ -193,3 +193,419 @@ extension View {
     frame(maxWidth: .infinity, alignment: .leading)
   }
 }
+
+// MARK: - Magic Plus interactive drag coordinator (iPhone compact)
+
+/// What kind of drop target the dragged Magic Plus orb is currently hovering.
+/// Drives the live visual morph (orb → ghost task row / contextual pill).
+enum MagicPlusDropKind: Equatable {
+  /// Between two rows in a reorderable list (parts a full ghost-row gap).
+  case taskRow(context: String?)
+  /// Onto a section/heading/group/day header or non-reorderable card.
+  case taskSection(label: String)
+  /// Onto an Area or Project on the Tasks index.
+  case newProject(label: String)
+  /// Onto the Tasks index background / between Area cards.
+  case newArea
+}
+
+/// Live coordinator for the iPhone Magic Plus finger-tracking & morphing drag.
+/// Injected optionally via `EnvironmentValues.magicPlusDrag` (nil on macOS,
+/// iPad split, sheets, and previews — making every drop modifier a zero-cost
+/// pass-through there with no launch-crash risk).
+@MainActor
+@Observable
+final class MagicPlusDragState {
+  struct ActiveTarget: Equatable {
+    let id: String
+    let kind: MagicPlusDropKind
+    let before: Bool
+    let frame: CGRect
+  }
+
+  private struct Zone {
+    let id: String
+    let kind: MagicPlusDropKind
+    let priority: Int
+    var frame: CGRect
+    let onDrop: (_ before: Bool) -> Void
+  }
+
+  var isDragging = false
+  /// Visual drag position in `.global` coordinates.
+  var fingerLocation: CGPoint = .zero
+  /// Center of the resting Magic Plus orb in `.global` coordinates (cancel zone).
+  var homeCenter: CGPoint = .zero
+  /// Currently targeted drop zone, if any.
+  var activeTarget: ActiveTarget? = nil
+
+  /// Non-observed registry so scrolling rows never trigger SwiftUI view invalidations.
+  @ObservationIgnored private var zones: [String: Zone] = [:]
+
+  func register(
+    id: String,
+    kind: MagicPlusDropKind,
+    priority: Int,
+    frame: CGRect,
+    onDrop: @escaping (_ before: Bool) -> Void
+  ) {
+    guard frame.width > 0, frame.height > 0 else { return }
+    zones[id] = Zone(id: id, kind: kind, priority: priority, frame: frame, onDrop: onDrop)
+  }
+
+  func unregister(id: String) {
+    zones.removeValue(forKey: id)
+    if activeTarget?.id == id {
+      activeTarget = nil
+    }
+  }
+
+  func beginDrag(at location: CGPoint) {
+    isDragging = true
+    fingerLocation = location
+    activeTarget = nil
+    Haptics.tap()
+    resolveTarget(for: location)
+  }
+
+  func updateDrag(at location: CGPoint) {
+    fingerLocation = location
+    resolveTarget(for: location)
+  }
+
+  func endDrag(at location: CGPoint) {
+    fingerLocation = location
+    resolveTarget(for: location)
+    let hit = activeTarget
+    let action = hit.flatMap { zones[$0.id]?.onDrop }
+    a11yAnimate(.snappy(duration: 0.22)) {
+      isDragging = false
+      activeTarget = nil
+    }
+    if let hit, let action {
+      action(hit.before)
+    }
+  }
+
+  /// Clear stale zones when switching tabs / navigation routes.
+  func reset() {
+    isDragging = false
+    activeTarget = nil
+    zones.removeAll()
+  }
+
+  private func resolveTarget(for location: CGPoint) {
+    // Dragging back onto the resting orb socket cancels cleanly.
+    let dx = location.x - homeCenter.x
+    let dy = location.y - homeCenter.y
+    if homeCenter != .zero && hypot(dx, dy) < 40 {
+      if activeTarget != nil {
+        a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
+      }
+      return
+    }
+
+    // Aim slightly above the fingertip where the floating ghost card sits.
+    let probe = CGPoint(x: location.x, y: location.y - 24)
+    let candidates = zones.values.filter { zone in
+      let padY: CGFloat = zone.priority >= 2 ? 4 : 0
+      return zone.frame.insetBy(dx: -8, dy: -padY).contains(probe)
+    }
+
+    let best = candidates.max { a, b in
+      if a.priority != b.priority { return a.priority < b.priority }
+      return abs(a.frame.midY - probe.y) > abs(b.frame.midY - probe.y)
+    }
+
+    guard let best else {
+      if activeTarget != nil {
+        a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
+      }
+      return
+    }
+
+    let before: Bool
+    if case .taskRow = best.kind {
+      // Hysteresis around midline so parting the row gap never oscillates.
+      if let current = activeTarget, current.id == best.id {
+        before = current.before
+          ? probe.y < best.frame.maxY - 8
+          : probe.y < best.frame.minY + 8
+      } else {
+        before = probe.y < best.frame.midY
+      }
+    } else {
+      before = true
+    }
+
+    let next = ActiveTarget(id: best.id, kind: best.kind, before: before, frame: best.frame)
+    if activeTarget?.id != next.id || activeTarget?.before != next.before {
+      Haptics.tap()
+      a11yAnimate(.snappy(duration: 0.18)) {
+        activeTarget = next
+      }
+    }
+  }
+}
+
+private struct MagicPlusDragKey: EnvironmentKey {
+  static let defaultValue: MagicPlusDragState? = nil
+}
+
+extension EnvironmentValues {
+  var magicPlusDrag: MagicPlusDragState? {
+    get { self[MagicPlusDragKey.self] }
+    set { self[MagicPlusDragKey.self] = newValue }
+  }
+}
+
+/// Registers a reorderable task row as a live Magic Plus gap-parting target.
+/// Opens a 48pt ghost-row slot above or below the row as the finger hovers.
+struct MagicPlusRowDropModifier: ViewModifier {
+  static let gapHeight: CGFloat = 48
+
+  @Environment(\.magicPlusDrag) private var drag
+  let id: String
+  let context: String?
+  let enabled: Bool
+  let onDrop: (_ before: Bool) -> Void
+
+  private var hoverBefore: Bool? {
+    guard let drag, drag.isDragging, let target = drag.activeTarget, target.id == id else {
+      return nil
+    }
+    return target.before
+  }
+
+  func body(content: Content) -> some View {
+    if enabled, let drag {
+      content
+        // Capture un-parted global frame before gap padding shifts it.
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+          drag.register(id: id, kind: .taskRow(context: context), priority: 2,
+                        frame: rect, onDrop: onDrop)
+        }
+        .onDisappear { drag.unregister(id: id) }
+        .padding(.top, hoverBefore == true ? Self.gapHeight : 0)
+        .padding(.bottom, hoverBefore == false ? Self.gapHeight : 0)
+        .overlay(alignment: .top) {
+          if hoverBefore == true { ghostSlotPlaceholder }
+        }
+        .overlay(alignment: .bottom) {
+          if hoverBefore == false { ghostSlotPlaceholder }
+        }
+        .a11yAnimation(.snappy(duration: 0.2), value: hoverBefore)
+    } else {
+      content
+    }
+  }
+
+  /// Subtle dashed-outline landing slot revealed in the parted row gap.
+  private var ghostSlotPlaceholder: some View {
+    RoundedRectangle(cornerRadius: 10, style: .continuous)
+      .strokeBorder(Color.accentColor.opacity(0.45),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+      .background(
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .fill(Color.accentColor.opacity(0.06))
+      )
+      .padding(.horizontal, TaskCardMetrics.margin)
+      .padding(.vertical, 4)
+      .frame(height: Self.gapHeight)
+  }
+}
+
+/// Registers a section header, heading, Upcoming day, or Tasks index row as a
+/// Magic Plus target with canonical `Theme.listSelectionFill` highlight.
+struct MagicPlusSectionDropModifier: ViewModifier {
+  @Environment(\.magicPlusDrag) private var drag
+  let id: String
+  let kind: MagicPlusDropKind
+  let priority: Int
+  let highlights: Bool
+  let onDrop: () -> Void
+
+  private var isTargeted: Bool {
+    guard let drag, drag.isDragging, let target = drag.activeTarget else { return false }
+    return target.id == id
+  }
+
+  func body(content: Content) -> some View {
+    if let drag {
+      content
+        .background {
+          if highlights {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+              .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
+              .a11yAnimation(.easeOut(duration: 0.14), value: isTargeted)
+          }
+        }
+        .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+          drag.register(id: id, kind: kind, priority: priority, frame: rect) { _ in
+            onDrop()
+          }
+        }
+        .onDisappear { drag.unregister(id: id) }
+    } else {
+      content
+    }
+  }
+}
+
+extension View {
+  func magicPlusRowDrop(
+    id: String,
+    context: String? = nil,
+    enabled: Bool,
+    onDrop: @escaping (_ before: Bool) -> Void
+  ) -> some View {
+    modifier(MagicPlusRowDropModifier(id: id, context: context, enabled: enabled, onDrop: onDrop))
+  }
+
+  func magicPlusSectionDrop(
+    id: String,
+    kind: MagicPlusDropKind,
+    priority: Int = 2,
+    highlights: Bool = true,
+    onDrop: @escaping () -> Void
+  ) -> some View {
+    modifier(MagicPlusSectionDropModifier(id: id, kind: kind, priority: priority,
+                                          highlights: highlights, onDrop: onDrop))
+  }
+}
+
+/// Pass-through wrapper that registers a `magicPlusSectionDrop` only when a
+/// non-nil `onDropIDs` closure is supplied.
+struct MagicPlusOptionalSectionDrop: ViewModifier {
+  let id: String
+  let label: String
+  let onDropIDs: (([String]) -> Bool)?
+
+  func body(content: Content) -> some View {
+    if let onDropIDs {
+      content.magicPlusSectionDrop(id: id, kind: .taskSection(label: label)) {
+        _ = onDropIDs(TaskDragIDs.newTask.ids)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+#if os(iOS)
+/// Full-screen non-hit-testing overlay that renders the finger-following Magic
+/// Plus orb and morphs it live into a ghost task card or contextual action pill
+/// as it glides over drop targets.
+struct MagicPlusFloatingOverlay: View {
+  let drag: MagicPlusDragState
+
+  var body: some View {
+    GeometryReader { geo in
+      if drag.isDragging {
+        let localOrigin = geo.frame(in: .global).origin
+        let rawX = drag.fingerLocation.x - localOrigin.x
+        let rawY = drag.fingerLocation.y - localOrigin.y - 36
+        let halfW = estimatedWidth / 2
+        let clampedX = min(max(rawX, halfW + 16), max(halfW + 16, geo.size.width - halfW - 16))
+        let clampedY = max(rawY, 64)
+
+        morphedContent
+          .position(x: clampedX, y: clampedY)
+          .a11yAnimation(.snappy(duration: 0.2), value: drag.activeTarget?.kind)
+          .transition(.scale(scale: 0.8).combined(with: .opacity))
+      }
+    }
+    .ignoresSafeArea()
+    .allowsHitTesting(false)
+  }
+
+  private var estimatedWidth: CGFloat {
+    switch drag.activeTarget?.kind {
+    case .taskRow:     return 280
+    case .taskSection: return 220
+    case .newProject:  return 220
+    case .newArea:     return 150
+    case nil:          return 62
+    }
+  }
+
+  @ViewBuilder
+  private var morphedContent: some View {
+    switch drag.activeTarget?.kind {
+    case .taskRow(let context):
+      // Morph into a crisp live ghost task row ready to land in the parted gap.
+      HStack(spacing: 12) {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+          .strokeBorder(Color.accentColor, lineWidth: 2)
+          .frame(width: 20, height: 20)
+        Text("New Task")
+          .font(.septenaTaskTitle)
+          .foregroundStyle(.primary)
+        Spacer(minLength: 8)
+        if let context, !context.isEmpty {
+          Text(context)
+            .font(.septenaCaption)
+            .foregroundStyle(Color.accentColor)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.accentColor.opacity(0.14), in: Capsule())
+        }
+      }
+      .padding(.horizontal, 14)
+      .frame(width: 280, height: 46)
+      .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+          .strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5)
+      )
+      .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
+
+    case .taskSection(let label):
+      morphPill(icon: "checkmark.circle.fill", title: label)
+
+    case .newProject(let label):
+      morphPill(icon: "number.circle.fill", title: label)
+
+    case .newArea:
+      morphPill(icon: "square.stack.3d.up.fill", title: "New Area")
+
+    case nil:
+      // Free-floating lifted blue "+" orb.
+      ZStack {
+        Circle()
+          .fill(Color.accentColor.gradient)
+          .overlay(
+            Circle()
+              .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+          )
+          .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
+        Image(systemName: "plus")
+          .scaledFont(size: 24, weight: .bold)
+          .foregroundStyle(Color.white)
+      }
+      .frame(width: 62, height: 62)
+    }
+  }
+
+  private func morphPill(icon: String, title: String) -> some View {
+    HStack(spacing: 8) {
+      Image(systemName: icon)
+        .scaledFont(size: 16, weight: .semibold)
+        .foregroundStyle(Color.white)
+      Text(title)
+        .font(.septenaButton)
+        .foregroundStyle(Color.white)
+        .lineLimit(1)
+    }
+    .padding(.horizontal, 16)
+    .frame(height: 44)
+    .background(Color.accentColor.gradient, in: Capsule())
+    .overlay(
+      Capsule()
+        .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+    )
+    .shadow(color: .black.opacity(0.3), radius: 14, y: 6)
+  }
+}
+#endif

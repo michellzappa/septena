@@ -1460,7 +1460,8 @@ struct TaskListView: View {
                        quickMenu: { model.filingSuggestions[$0.id] != nil },
                        appendQuickAdd: showsQuickAddInInbox,
                        quickAddShowsEditor: quickAddInInboxShowsEditor,
-                       moveDropTarget: .inbox)
+                       moveDropTarget: .inbox,
+                       magicContext: "Inbox")
           }
         } header: {
           inboxHeader(count: allInbox.count)
@@ -1477,6 +1478,9 @@ struct TaskListView: View {
       inboxCollapsed.toggle()
     }
     .modifier(todayMoveDrop(.inbox))
+    .magicPlusSectionDrop(id: "mp-inbox-header", kind: .taskSection(label: "New Task in Inbox")) {
+      _ = handleTodayMoveDrop(ids: TaskDragIDs.newTask.ids, target: .inbox)
+    }
   }
 
   /// A foldable section header — same anatomy as the area `groupHeader` (icon
@@ -2130,7 +2134,7 @@ struct TaskListView: View {
     ForEach(headings) { heading in
       headingRow(heading)
       let members = visibleItems.filter { $0.heading == heading.id }
-      cardedRows(members, reorderable: true, grouped: true)
+      cardedRows(members, reorderable: true, grouped: true, magicContext: heading.title)
     }
     addSectionButton
   }
@@ -2173,6 +2177,10 @@ struct TaskListView: View {
     .modifier(TaskReorderDrop(perform: { ids, before in
       handleHeadingDrop(ids: ids, targetHeading: heading, before: before)
     }))
+    .magicPlusSectionDrop(id: "mp-heading-\(heading.id)",
+                          kind: .taskSection(label: "New Task in \(heading.title)")) {
+      _ = handleHeadingDrop(ids: TaskDragIDs.newTask.ids, targetHeading: heading, before: true)
+    }
     .contextMenu { headingContextMenu(heading) }
   }
 
@@ -3612,7 +3620,8 @@ struct TaskListView: View {
                      appendQuickAdd: showsQuickAddInArea(area.id),
                      quickAddShowsEditor: true,
                      moveDropTarget: areaDropTarget,
-                     onDropIDs: areaCustomDrop)
+                     onDropIDs: areaCustomDrop,
+                     magicContext: area.title)
         } header: {
           groupHeader(icon: "square.stack.3d.up.fill",
                       title: area.title,
@@ -3624,7 +3633,8 @@ struct TaskListView: View {
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(areaId: area.id) } : nil,
                       moveDropTarget: areaDropTarget,
-                      onDropIDs: areaCustomDrop)
+                      onDropIDs: areaCustomDrop,
+                      magicDropId: "mp-area-\(area.id)")
         }
       }
       ForEach(projects.filter { $0.area == area.id }) { project in
@@ -3637,7 +3647,8 @@ struct TaskListView: View {
                        appendQuickAdd: showsQuickAddInProject(project.id),
                        quickAddShowsEditor: true,
                        moveDropTarget: projectDropTarget,
-                       onDropIDs: projectCustomDrop)
+                       onDropIDs: projectCustomDrop,
+                       magicContext: project.title)
           } header: {
             groupHeader(icon: nil,
                         title: project.title,
@@ -3649,7 +3660,8 @@ struct TaskListView: View {
                         onAdd: showsGroupedHeaderQuickAdd
                           ? { startCreate(projectId: project.id) } : nil,
                         moveDropTarget: projectDropTarget,
-                        onDropIDs: projectCustomDrop)
+                        onDropIDs: projectCustomDrop,
+                        magicDropId: "mp-proj-\(project.id)")
           }
         }
       }
@@ -3666,7 +3678,8 @@ struct TaskListView: View {
                      appendQuickAdd: showsQuickAddInProject(project.id),
                      quickAddShowsEditor: true,
                      moveDropTarget: projectDropTarget,
-                     onDropIDs: projectCustomDrop)
+                     onDropIDs: projectCustomDrop,
+                     magicContext: project.title)
         } header: {
           groupHeader(icon: nil,
                       title: project.title,
@@ -3678,7 +3691,8 @@ struct TaskListView: View {
                       onAdd: showsGroupedHeaderQuickAdd
                         ? { startCreate(projectId: project.id) } : nil,
                       moveDropTarget: projectDropTarget,
-                      onDropIDs: projectCustomDrop)
+                      onDropIDs: projectCustomDrop,
+                      magicDropId: "mp-proj-\(project.id)")
         }
       }
     }
@@ -3698,7 +3712,8 @@ struct TaskListView: View {
                           reorderable: Bool = false,
                           grouped: Bool = false,
                           moveDropTarget: TodayDropTarget? = nil,
-                          onDropIDs: (([String]) -> Bool)? = nil) -> some View {
+                          onDropIDs: (([String]) -> Bool)? = nil,
+                          magicContext: String? = nil) -> some View {
     let rows = excludingQuickAddCapture(tasks)
     let cardCount = rows.count + (appendQuickAdd ? 1 : 0)
     // Today rows reorder in Today's own order (#66). The row's reorder drop
@@ -3707,6 +3722,7 @@ struct TaskListView: View {
     let todayReorder = filter == .today
     let rowMoveDrop = onDropIDs.map { TaskMoveDrop(perform: $0) }
       ?? todayMoveDrop(todayReorder ? nil : moveDropTarget)
+    let canMagicRowDrop = reorderable || todayReorder
     ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
       let position = TaskCardPosition(index: idx, count: cardCount)
       taskRow(task, quickMenu: quickMenu?(task) ?? false)
@@ -3726,13 +3742,25 @@ struct TaskListView: View {
         // the full card slice the user sees, not just the inner row content.
         // In a project's grouped list a drop also re-files across headings
         // (`handleGroupedTaskDrop` reads the target row's group).
-        .modifier(TaskReorderDrop(perform: reorderable || todayReorder
+        .modifier(TaskReorderDrop(perform: canMagicRowDrop
           ? { ids, before in
               grouped
                 ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
                 : handleReorderDrop(ids: ids, target: task, before: before,
                                     refileTo: todayReorder ? moveDropTarget : nil) }
           : nil))
+        .magicPlusRowDrop(id: "mp-row-\(task.id)", context: magicContext, enabled: canMagicRowDrop) { before in
+          let ids = TaskDragIDs.newTask.ids
+          _ = grouped
+            ? handleGroupedTaskDrop(ids: ids, target: task, before: before)
+            : handleReorderDrop(ids: ids, target: task, before: before,
+                                refileTo: todayReorder ? moveDropTarget : nil)
+        }
+        .modifier(MagicPlusOptionalSectionDrop(
+          id: "mp-row-sec-\(task.id)",
+          label: magicContext.map { "New Task · \($0)" } ?? "New Task",
+          onDropIDs: canMagicRowDrop ? nil : onDropIDs
+        ))
     }
     if appendQuickAdd {
       quickAddLine(showsEditor: quickAddShowsEditor)
@@ -3789,14 +3817,23 @@ struct TaskListView: View {
                            onTap: (() -> Void)? = nil,
                            onAdd: (() -> Void)? = nil,
                            moveDropTarget: TodayDropTarget? = nil,
-                           onDropIDs: (([String]) -> Bool)? = nil) -> some View {
+                           onDropIDs: (([String]) -> Bool)? = nil,
+                           magicDropId: String? = nil) -> some View {
     let dropModifier = onDropIDs.map { TaskMoveDrop(perform: $0) }
       ?? todayMoveDrop(moveDropTarget)
+    let resolvedMagicDrop: (([String]) -> Bool)? = onDropIDs ?? moveDropTarget.map { target in
+      { ids in handleTodayMoveDrop(ids: ids, target: target) }
+    }
     return groupHeaderBody(icon: icon, title: title, areaEmoji: areaEmoji,
                            projectProgress: projectProgress, onTap: onTap, onAdd: onAdd)
       .textCase(nil)
       .selectionDisabled()
       .modifier(dropModifier)
+      .modifier(MagicPlusOptionalSectionDrop(
+        id: magicDropId ?? "mp-header-\(title)",
+        label: "New Task · \(title)",
+        onDropIDs: resolvedMagicDrop
+      ))
   }
 
   private func groupHeaderBody(icon: String?, title: String,
@@ -3953,9 +3990,10 @@ struct TaskListView: View {
         if !bucket.events.isEmpty {
           calendarEventsBlock(bucket.events).taskCardChrome(.solo)
         }
-        cardedRows(bucket.tasks, onDropIDs: dropOnDay)
+        cardedRows(bucket.tasks, onDropIDs: dropOnDay, magicContext: bucket.label)
       } header: {
-        groupHeader(icon: "calendar", title: bucket.label, onDropIDs: dropOnDay)
+        groupHeader(icon: "calendar", title: bucket.label,
+                    onDropIDs: dropOnDay, magicDropId: "mp-upcoming-\(bucket.key)")
       }
     }
   }

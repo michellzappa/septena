@@ -39,6 +39,7 @@ struct SeptaskRootView: View {
   @Environment(LogCommitCenter.self) private var logCommit
   @Environment(\.modelContext) private var modelContext
   @State private var selection: SeptaskTab = .today
+  @State private var magicPlusDrag = MagicPlusDragState()
   @State private var showingNewProjectSheet = false
   @State private var newProjectInitialAreaId: String? = nil
   @State private var showingNewAreaAlert = false
@@ -224,6 +225,7 @@ struct SeptaskRootView: View {
     Binding(
       get: { selection },
       set: { tapped in
+        magicPlusDrag.reset()
         if !nav.path.isEmpty {
           nav.path = []
         }
@@ -280,6 +282,7 @@ struct SeptaskRootView: View {
       .tabBarMinimizeBehavior(.onScrollDown)
 
       MagicPlusOrb(
+        drag: magicPlusDrag,
         isViewingProject: isViewingProject,
         onNewTask: { triggerInlineNewTask() },
         onNewSection: { nav.shouldCreateHeading = true },
@@ -295,6 +298,14 @@ struct SeptaskRootView: View {
       .padding(.trailing, 16)
       .padding(.bottom, 92)
       .ignoresSafeArea(.all, edges: .bottom)
+
+      MagicPlusFloatingOverlay(drag: magicPlusDrag)
+    }
+    .environment(\.magicPlusDrag, magicPlusDrag)
+    .onChange(of: nav.path) { _, _ in
+      if !magicPlusDrag.isDragging {
+        magicPlusDrag.reset()
+      }
     }
   }
 
@@ -334,10 +345,12 @@ struct SeptaskRootView: View {
 ///   grabbable object rather than a flat tap-only tab icon.
 /// - Tap opens a native popover quick menu (`New Task` inline, `New Section`
 ///   in projects, `New Project`, `New Area`).
-/// - Hold & drag carries `TaskDragIDs.newTask` through native iOS drag and
-///   drop into any row gap, heading, Today/Anytime group, Upcoming day, or
-///   Tasks index Project/Area drop target.
+/// - Instant drag (no hold delay) detaches the orb to follow the finger 1:1
+///   and morphs live into a ghost task card or contextual action pill over
+///   every row gap, heading, Today/Anytime group, Upcoming day, or Tasks
+///   index Area/Project drop zone.
 private struct MagicPlusOrb: View {
+  let drag: MagicPlusDragState
   @State private var showingMenu = false
 
   let isViewingProject: Bool
@@ -347,48 +360,55 @@ private struct MagicPlusOrb: View {
   let onNewArea: () -> Void
 
   var body: some View {
-    Button {
+    ZStack {
+      Circle()
+        .fill(Color.accentColor.gradient)
+        .overlay(
+          Circle()
+            .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+        )
+        .shadow(color: .black.opacity(drag.isDragging ? 0.08 : 0.28), radius: 10, y: 4)
+      VStack(spacing: 4) {
+        Image(systemName: "plus")
+          .scaledFont(size: 21, weight: .bold)
+          .foregroundStyle(Color.white)
+        gripDots
+      }
+      .offset(y: 2)
+    }
+    .frame(width: 58, height: 58)
+    .contentShape(Circle())
+    .opacity(drag.isDragging ? 0.22 : 1)
+    .scaleEffect(drag.isDragging ? 0.86 : 1)
+    .a11yAnimation(.snappy(duration: 0.2), value: drag.isDragging)
+    .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
+      drag.homeCenter = CGPoint(x: rect.midX, y: rect.midY)
+    }
+    .onTapGesture {
+      guard !drag.isDragging else { return }
       Haptics.tap()
       showingMenu = true
-    } label: {
-      ZStack {
-        Circle()
-          .fill(Color.accentColor.gradient)
-          .overlay(
-            Circle()
-              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
-          )
-          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
-        VStack(spacing: 4) {
-          Image(systemName: "plus")
-            .scaledFont(size: 21, weight: .bold)
-            .foregroundStyle(Color.white)
-          gripDots
-        }
-        .offset(y: 2)
-      }
-      .frame(width: 58, height: 58)
-      .contentShape(Circle())
     }
-    .buttonStyle(.plain)
-    .contentShape(.dragPreview, Circle())
+    .simultaneousGesture(
+      DragGesture(minimumDistance: 8, coordinateSpace: .global)
+        .onChanged { value in
+          if !drag.isDragging {
+            showingMenu = false
+            drag.beginDrag(at: value.location)
+          } else {
+            drag.updateDrag(at: value.location)
+          }
+        }
+        .onEnded { value in
+          drag.endDrag(at: value.location)
+        }
+    )
+    .accessibilityAddTraits(.isButton)
     .accessibilityLabel("New")
-    .accessibilityHint("Tap for create options, or hold and drag onto a list position.")
+    .accessibilityHint("Tap for create options, or drag onto a list position.")
     .popover(isPresented: $showingMenu, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
       quickMenu
         .presentationCompactAdaptation(.popover)
-    }
-    .draggable(TaskDragIDs.newTask) {
-      ZStack {
-        Circle()
-          .fill(Color.accentColor.gradient)
-          .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
-        Image(systemName: "plus")
-          .scaledFont(size: 22, weight: .bold)
-          .foregroundStyle(Color.white)
-      }
-      .frame(width: 56, height: 56)
-      .contentShape(.dragPreview, Circle())
     }
   }
 
