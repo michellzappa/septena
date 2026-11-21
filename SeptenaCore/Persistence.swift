@@ -33,6 +33,9 @@ final class TaskEntity {
   var scheduled: String?
   @Attribute(originalName: "due") var deadline: String?
   var today: Bool
+  /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
+  /// Default `= false` required for lightweight SwiftData migration.
+  var starred: Bool = false
   var todaySetOn: String?
   var completedAt: String?
   var area: String?
@@ -174,6 +177,7 @@ final class TaskEntity {
        scheduled: String? = nil,
        deadline: String? = nil,
        today: Bool = false,
+       starred: Bool = false,
        todaySetOn: String? = nil,
        completedAt: String? = nil,
        area: String? = nil,
@@ -215,6 +219,7 @@ final class TaskEntity {
     self.scheduled = scheduled
     self.deadline = deadline
     self.today = today
+    self.starred = starred
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -580,6 +585,7 @@ extension SeptenaTask {
       scheduled: e.scheduled,
       deadline: e.deadline,
       today: e.today,
+      starred: e.starred,
       todaySetOn: e.todaySetOn,
       completedAt: e.completedAt,
       area: e.area,

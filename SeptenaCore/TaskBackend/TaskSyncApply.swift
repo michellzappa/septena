@@ -472,6 +472,7 @@ extension TaskSyncEngine {
     take("scheduled") { t.scheduled = $0.stringValue }
     take("deadline") { t.deadline = $0.stringValue }
     take("today") { t.today = Self.bool($0) ?? false }
+    take("starred") { t.starred = Self.bool($0) ?? false }
     take("todaySetOn") { t.todaySetOn = $0.stringValue }
     take("completedAt") { t.completedAt = $0.stringValue }
     take("notes") { t.notes = $0.stringValue }

@@ -68,6 +68,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// `due` as a mirror for the transition window, so we read either.
   var deadline: String?
   var today: Bool
+  var starred: Bool = false
   var todaySetOn: String?      // YYYY-MM-DD
   var completedAt: String?     // YYYY-MM-DDTHH:MM:SS
   var area: String?
@@ -332,6 +333,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     scheduled: String?,
     deadline: String?,
     today: Bool,
+    starred: Bool = false,
     todaySetOn: String?,
     completedAt: String?,
     area: String?,
@@ -365,6 +367,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.scheduled = scheduled
     self.deadline = deadline
     self.today = today
+    self.starred = starred
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -393,7 +396,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, deadline, today
+    case id, title, status, created, scheduled, deadline, today, starred
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence, reminder
@@ -425,6 +428,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
       deadline = try legacy.decodeIfPresent(String.self, forKey: .due)
     }
     today = (try? c.decode(Bool.self, forKey: .today)) ?? false
+    starred = (try? c.decode(Bool.self, forKey: .starred)) ?? false
     todaySetOn = try c.decodeIfPresent(String.self, forKey: .todaySetOn)
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
     area = try c.decodeIfPresent(String.self, forKey: .area)

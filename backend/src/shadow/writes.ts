@@ -90,6 +90,7 @@ export const zWriteArgs = {
   tasks_create: z.object({
     title: z.string().min(1),
     today: z.boolean().optional(),
+    starred: z.boolean().optional(),
     scheduled: zDay.optional(),
     deadline: zDay.optional(),
     due: zDay.optional(),
@@ -108,6 +109,7 @@ export const zWriteArgs = {
     id: zId,
     title: z.string().optional(),
     today: z.boolean().optional(),
+    starred: z.boolean().optional(),
     scheduled: zDayOrClear.optional(),
     deadline: zDayOrClear.optional(),
     due: zDayOrClear.optional(),
@@ -319,6 +321,7 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
     source: "mcp",
     sourceClient: "Claude",
     today: input.today === true,
+    starred: input.starred === true,
     position,
   };
   if (input.today) fields.todaySetOn = today;
@@ -364,6 +367,7 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.today = p.today;
     fields.todaySetOn = p.today ? today : null;
   }
+  if (p.starred !== undefined) fields.starred = p.starred;
   if (p.scheduled !== undefined) {
     const nextSched = clear(p.scheduled);
     fields.scheduled = nextSched;
@@ -478,6 +482,7 @@ async function completeTask(ctx: WriteContext, id: string) {
           scheduled: next,
           // A deadline belonged to the completed occurrence.
           today: false,
+          starred: src.starred === true,
           ...recurrenceColumns({ unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday }),
           recurrenceSeriesID: str(src.recurrenceSeriesID) ?? id,
           recurrenceAnchorDate: afterCompletion ? null : next,

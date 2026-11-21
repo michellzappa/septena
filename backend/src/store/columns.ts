@@ -105,6 +105,7 @@ export const ENTITIES = {
       scheduled: day(),
       deadline: day(),
       today: bool(),
+      starred: bool(),
       todaySetOn: day(),
       completedAt: stamp(),
       notes: text(NOTES_MAX),

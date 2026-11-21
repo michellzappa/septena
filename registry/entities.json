@@ -64,6 +64,7 @@
         "scheduled": { "kind": "text", "format": "day", "nullable": true },
         "deadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
+        "starred": { "kind": "bool", "default": 0 },
         "todaySetOn": { "kind": "text", "format": "day", "nullable": true },
         "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "notes": { "kind": "text", "max": 100000, "nullable": true },
