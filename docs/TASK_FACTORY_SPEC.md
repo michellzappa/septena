@@ -63,6 +63,39 @@ Septask gets one smart list, **Agent**, grouped by these stages
 *(default)*. The Today list shows only **Your turn** and **Review** items, as
 today's ball-in-court dot already does.
 
+### 3.1 Review — canonical contract (shipped, `#87`)
+
+**Review** is the ONE surface by this name across the app, backend, MCP tools,
+and docs (Today rollover's default mode was renamed to **Ask** in ADR 0014, and
+the Faded sweep uses **Sweep**).
+
+- **Membership (single source of truth):** Open, non-heading, non-faded tasks
+  with `conversation.endState == "needs_verify"` (`TaskConvo.needsHumanReview`
+  in `SeptenaCore/ConvoDerived.swift`, mirrored by `TaskStore.readReviewTasks`
+  and MCP `tasks_list(view: "review")`).
+- **Sidebar visibility:** Progressive disclosure (`visibility: "whenNonEmpty"` in
+  `registry/destinations.json`). Appears right below **Today** when non-empty
+  (or while selected); always reachable via **Go ▸ Review** and **Quick Find**.
+- **Store enforcement (`human_accepts`, `TaskStore.ts`):** Agents cannot set
+  `status = "done"` on a task assigned to an agent (`claude`), already in
+  Review (`needs_verify`), or held under a live claim. The store rejects with
+  `human_accepts` and instructs the agent to call
+  `tasks_set_endstate("needs_verify", note)`. Setting `needs_verify`
+  automatically releases the agent's active claim. Plain tasks with no agent
+  assignment/claim stay completable by agents; humans can always complete any
+  task.
+- **Human actions:** Each Review row shows title, `endStateNote`, linked
+  issue/PR or artifact title, and two actions — **Accept** (completes task,
+  transitions `endState` to `agent_assisted_done` so reopening later does not
+  snap back into Review, with lossless `⌘Z` undo back to `needs_verify`) and
+  **Send back** (appends a user turn with a note, reopens `endState` to `open`,
+  assigns to `claude`, with lossless `⌘Z` undo).
+- **Fade exemption:** Tasks awaiting human review (`needs_verify`) or an open
+  choice card (`awaitsHuman`) never fade (`TaskFade.isEligible`).
+- **Explanation & Settings:** Zero toggles. Explained in-place via the empty
+  state (*"Work an agent finished appears here so you can check and accept
+  it."*) and one footer sentence under **Settings ▸ AI & Agents**.
+
 ## 4. Runner
 
 The runner is a process that drains the queue.

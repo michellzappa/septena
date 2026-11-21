@@ -86,7 +86,7 @@ These keys remain in `registry/settings.json` so `SYNCED_SETTING_KEYS` / `SETTIN
 
 | Upcoming Feature | Issue / ADR | Exact Registry Slot |
 |---|---|---|
-| Today rollover mode (`review` / `cleanSlate`) | ADR 0014 (`#139`, `#54`) | `lists` group (inline on iOS / `general` tab on desktop), `scope: synced` |
+| Today rollover mode (`ask` / `cleanSlate`) | ADR 0014 (`#139`, `#54`) | `lists` group (inline on iOS / `general` tab on desktop), `scope: synced` |
 | Day-start hour | `#140` | `lists` group, `scope: synced` |
 | iOS swipe action customization | `#132` (`IOS_SWIPE_ACTIONS_SPEC.md`) | `lists` group, `platforms: ["ios", "ipados"]`, `depth: 1` subpage |
 | Timed reminders / Notifications | `#97` (`TIMED_REMINDERS_SPEC.md`) | `lists` group (or promoted `notifications` section once ≥2 controls exist) |

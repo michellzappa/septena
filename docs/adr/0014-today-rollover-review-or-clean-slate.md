@@ -71,7 +71,7 @@ Today has two rollover modes. Silent carry-over is removed.
 
 ## Links
 
-- #139 (spec issue), #54 (Review, fade P3), #77 (Today tech debt), #140 (day
+- #139 (spec issue), #54 (Ask mode, fade P3), #77 (Today tech debt), #140 (day
   start time), #52 (To Do importer)
 - `docs/TASK_FADE_SPEC.md` §6, `docs/TRIAGE_BAND_SPEC.md`
 - ADR 0006
