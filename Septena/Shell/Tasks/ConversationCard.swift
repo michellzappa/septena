@@ -388,7 +388,7 @@ struct AIExplainerView: View {
           VStack(alignment: .leading, spacing: 6) {
             Label("It's your AI — we never see your data", systemImage: "lock.fill")
               .font(.subheadline).fontWeight(.semibold)
-            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations.")
+            Text("\(AppDisplayName.current) never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks stay on your device, and sync through Septena's private server only if you sign in. Turn the AI off and the app works exactly the same, minus the conversations.")
               .font(.callout).foregroundStyle(.secondary)
           }
           .padding(12)

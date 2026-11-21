@@ -3,172 +3,63 @@ import SwiftUI
 import UIKit
 #endif
 
-// The unified "Claude & AI" pane: the one place the user answers "what can AI
-// (and Claude) do with my data?" Combines the global reach dial (`AIMode`) and
-// on-device status board with the cloud MCP connection plus the MCP skill
-// briefs. The macOS developer provider-override moved to About ▸ Advanced.
+// Consumer AI Preferences (`ai_preferences`, docs/SETTINGS_UX_SPEC.md):
+// Apple Intelligence availability, the global reach dial (`AIMode`), and the
+// plain-language explainer. Beta/developer controls (`showModelLabels`, PCC
+// entitlement routing) and raw `MCP Skills` live in `About ▸ Advanced`.
 //
-// Apple Intelligence is a capability the app can only observe, never request,
-// so this pane is where the user learns whether it works here and why not.
-// Availability is a live system property (model downloads finish, the user
-// flips the toggle), so it's re-sampled on appear and on scene activation.
-//
-// `extra` appends sections to the same Form, so each app's "Connections & AI"
-// root row is ONE page (AI + Claude + connected apps) instead of a hub of links
-// (docs/SETTINGS_FLATTEN_SPEC.md). The Form, sheet and lifecycle modifiers stay
-// here, on a container that always exists.
-struct ClaudeAISettingsPane<Extra: View>: View {
-  private let extra: () -> Extra
-
-  init(@ViewBuilder extra: @escaping () -> Extra) {
-    self.extra = extra
-  }
+// `SeptaskAIPreferencesSections` renders as Form sections so macOS can inline
+// them directly inside `AI & Agents` (`desktopInline: true`), while iOS pushes
+// `SeptaskAIPreferencesPane` (1 tap from the root AI & Agents section).
+struct SeptaskAIPreferencesSections: View {
   @AppStorage(AIPolicy.modeKey) private var mode: AIMode = .auto
-  @AppStorage(AIModelTag.visibilityKey) private var showModelTags = true
-  @AppStorage(PCCConfig.routingEnabledKey) private var pccRouting = false
-  @AppStorage(PCCConfig.reasoningKey) private var pccReasoning = PCCConfig.Reasoning.balanced.rawValue
   @State private var showExplainer = false
   @State private var aiStatus: OnDeviceAI.Status = .unknown
-  #if !SEPTASK
-  @State private var claudeProvider = ClaudeGatewayProvider.shared
-  #endif
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openURL) private var openURL
 
   var body: some View {
-    Form {
-      appleIntelligenceSection
+    appleIntelligenceSection
 
-      Section {
-        ForEach(AIMode.allCases, id: \.self) { m in
-          let unsupported = (m == .onDeviceOnly && aiStatus == .deviceNotEligible)
-          Button { mode = m } label: {
-            HStack(alignment: .top, spacing: 12) {
-              VStack(alignment: .leading, spacing: 2) {
-                Text(m.title).foregroundStyle(.primary)
-                Text(m.blurb).font(.footnote).foregroundStyle(.secondary)
-                if unsupported {
-                  Text("Not supported on this device.")
-                    .font(.footnote).foregroundStyle(.orange)
-                }
+    Section {
+      ForEach(AIMode.allCases, id: \.self) { m in
+        let unsupported = (m == .onDeviceOnly && aiStatus == .deviceNotEligible)
+        Button { mode = m } label: {
+          HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+              Text(m.title).foregroundStyle(.primary)
+              Text(m.blurb).font(.footnote).foregroundStyle(.secondary)
+              if unsupported {
+                Text("Not supported on this device.")
+                  .font(.footnote).foregroundStyle(.orange)
               }
-              Spacer(minLength: 0)
-              if mode == m { Image(systemName: "checkmark").foregroundStyle(.tint) }
             }
-            .contentShape(Rectangle())
+            Spacer(minLength: 0)
+            if mode == m { Image(systemName: "checkmark").foregroundStyle(.tint) }
           }
-          .buttonStyle(.plain)
-          .disabled(unsupported)
-          .opacity(unsupported ? 0.5 : 1)
+          .contentShape(Rectangle())
         }
-      } header: {
-        Text("How far AI may reach")
-      } footer: {
-        Text("\(AppDisplayName.current) never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go.")
+        .buttonStyle(.plain)
+        .disabled(unsupported)
+        .opacity(unsupported ? 0.5 : 1)
       }
+    } header: {
+      Text("How far AI may reach")
+    } footer: {
+      Text("\(AppDisplayName.current) never runs AI on your data and never reads it — the intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets how far a request may go.")
+    }
 
-      Section {
-        Button { showExplainer = true } label: {
-          Label("How AI helps with your tasks", systemImage: "info.circle")
-        }
+    Section {
+      Button { showExplainer = true } label: {
+        Label("How AI helps with your tasks", systemImage: "info.circle")
       }
-
-      connectionsSection
-      skillsSection
-      extra()
+      .sheet(isPresented: $showExplainer) { AIExplainerView() }
     }
-    .formStyle(.grouped)
-    .sheet(isPresented: $showExplainer) { AIExplainerView() }
-    .onAppear {
-      aiStatus = OnDeviceAI.status
-      #if !SEPTASK
-      claudeProvider.reloadSharedState()
-      #endif
-    }
+    .onAppear { aiStatus = OnDeviceAI.status }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active { aiStatus = OnDeviceAI.status }
     }
   }
-
-  // MARK: - Connections (cloud MCP)
-
-  private var connectionsSection: some View {
-    Section {
-      #if SEPTASK
-      // Septask has no hosted-gateway connection (mcp.septena.app). Claude
-      // pairs with the task backend (api.septena.app/mcp), so this row opens
-      // that pane instead of a second pairing UI.
-      NavigationLink(value: SeptaskSettingsView.Destination.taskBackend) {
-        claudeRowLabel
-      }
-      #else
-      NavigationLink {
-        ClaudeGatewayDetail()
-          .navigationTitle("Claude")
-          #if os(iOS)
-          .navigationBarTitleDisplayMode(.inline)
-          #endif
-      } label: {
-        HStack {
-          claudeRowLabel
-          Spacer()
-          Text(claudeProvider.connectionDisplayState.label)
-            .font(.subheadline)
-            .foregroundStyle(claudeConnectionStatusColor(claudeProvider.connectionDisplayState))
-        }
-      }
-      #endif
-    } header: {
-      Text("Connections")
-    } footer: {
-      #if SEPTASK
-      Text("Claude reads your tasks through the task backend. Choose Claude above to pair it.")
-      #else
-      Text("Claude reads and writes your data through the hosted gateway at mcp.septena.app.")
-      #endif
-    }
-  }
-
-  private var claudeRowLabel: some View {
-    Label {
-      Text("Claude")
-    } icon: {
-      Image("ClaudeMark")
-        .renderingMode(.template)
-        .resizable()
-        .scaledToFit()
-        .frame(width: 20, height: 20)
-    }
-    .foregroundStyle(.primary)
-  }
-
-  // Septena's pane renders every section's brief via the SettingsView
-  // destination graph; Septask compiles no SectionRegistry, so it links the
-  // task brief directly (TasksSkill, shared with TasksPlugin).
-  @ViewBuilder
-  private var skillsSection: some View {
-    #if SEPTASK
-    Section {
-      NavigationLink {
-        TasksSkillPane()
-      } label: {
-        Label("MCP Skills", systemImage: "book.closed")
-      }
-    } footer: {
-      Text("The brief that teaches a model how to use your tasks through the connection — tools, conventions, examples.")
-    }
-    #else
-    Section {
-      NavigationLink(value: SettingsView.SettingsDestination.skills) {
-        Label("MCP Skills", systemImage: "book.closed")
-      }
-    } footer: {
-      Text("The briefs that teach a model how to use each section through the connection — tools, conventions, examples.")
-    }
-    #endif
-  }
-
-  // MARK: - Apple Intelligence status
 
   private var appleIntelligenceSection: some View {
     Section {
@@ -184,66 +75,14 @@ struct ClaudeAISettingsPane<Extra: View>: View {
         Spacer(minLength: 0)
         Circle().fill(statusColor).frame(width: 10, height: 10)
       }
-      // Private Cloud Compute — only present on iOS/macOS 27+ builds. Shows the
-      // system availability PLUS a routing switch: availability alone does NOT
-      // mean the app may use PCC (the entitlement must be granted first, or a
-      // PCC session traps), so routing is opt-in and off by default.
-      if let pcc = OnDeviceAI.pccStatus {
-        HStack(spacing: 12) {
-          Image(systemName: "cloud")
-            .font(.title3)
-            .foregroundStyle(.secondary)
-            .frame(width: 28)
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Private Cloud Compute")
-            Text(pccSublabel(pcc)).font(.footnote).foregroundStyle(.secondary)
-          }
-          Spacer(minLength: 0)
-          Circle().fill(pccDotColor(pcc)).frame(width: 10, height: 10)
-        }
-        Toggle(isOn: $pccRouting) {
-          VStack(alignment: .leading, spacing: 2) {
-            Text("Use Private Cloud Compute")
-            Text("Turn on only after the PCC entitlement is granted. Without it, requests fail and coaching falls back on-device.")
-              .font(.footnote).foregroundStyle(.secondary)
-          }
-        }
-        .disabled(!pcc.available)
-        Picker("Reasoning", selection: $pccReasoning) {
-          ForEach(PCCConfig.Reasoning.allCases, id: \.self) { r in
-            Text(r.title).tag(r.rawValue)
-          }
-        }
-        .disabled(!pccRouting)
-      }
       if aiStatus == .notEnabled {
         Button("Open Settings", action: openSystemSettings)
-      }
-      Toggle(isOn: $showModelTags) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("Show model labels")
-          Text("Label which model answers in each AI spot — a temporary beta aid.")
-            .font(.footnote).foregroundStyle(.secondary)
-        }
       }
     } header: {
       Text("On-device intelligence")
     } footer: {
       Text(statusFooter)
     }
-  }
-
-  /// PCC sublabel: reflects both system availability AND whether we route to it.
-  private func pccSublabel(_ pcc: (label: String, available: Bool)) -> String {
-    guard pcc.available else { return pcc.label }
-    return pccRouting ? "In use" : "Available — not in use"
-  }
-
-  /// Green only when available AND actually routed to; amber when available but
-  /// routing is off (the pre-entitlement state); gray when unavailable.
-  private func pccDotColor(_ pcc: (label: String, available: Bool)) -> Color {
-    guard pcc.available else { return .gray }
-    return pccRouting ? .green : .orange
   }
 
   private var statusLabel: String {
@@ -267,13 +106,13 @@ struct ClaudeAISettingsPane<Extra: View>: View {
   private var statusFooter: String {
     switch aiStatus {
     case .available:
-      return "The on-device model is ready. Coaches, exercises, and the welcome line run privately on this device."
+      return "The on-device model is ready. Task conversations and local filing help run privately on this device."
     case .notEnabled:
-      return "Apple Intelligence is turned off. Enable it under Apple Intelligence & Siri in Settings to use coaches and exercises."
+      return "Apple Intelligence is turned off. Enable it under Apple Intelligence & Siri in Settings to use on-device task conversations."
     case .modelNotReady:
       return "Apple Intelligence is on, but the on-device model is still downloading. Check back shortly."
     case .deviceNotEligible:
-      return "This device can't run Apple Intelligence, so coach chat and exercises aren't offered here. Everything else works normally."
+      return "This device can't run Apple Intelligence, so on-device task conversations aren't offered here. Everything else works normally."
     case .unknown:
       return "On-device intelligence is unavailable right now."
     }
@@ -288,6 +127,15 @@ struct ClaudeAISettingsPane<Extra: View>: View {
   }
 }
 
-extension ClaudeAISettingsPane where Extra == EmptyView {
-  init() { self.init(extra: { EmptyView() }) }
+struct SeptaskAIPreferencesPane: View {
+  var body: some View {
+    Form {
+      SeptaskAIPreferencesSections()
+    }
+    .formStyle(.grouped)
+    .navigationTitle("AI Preferences")
+    #if os(iOS)
+    .navigationBarTitleDisplayMode(.inline)
+    #endif
+  }
 }
