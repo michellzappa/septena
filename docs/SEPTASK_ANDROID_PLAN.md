@@ -4,8 +4,8 @@
 > stays the store and Android reaches it through the gateway. Septena leaves
 > iCloud ([ADR 0002](adr/0002-own-backend-replaces-icloud.md)): Android becomes
 > an ordinary client of `api.septena.app`, and Android-only users become
-> possible. The UI parity notes may still help. Rewrite before building
-> (`docs/ROADMAP.md`, "Later").
+> possible. Superseded by [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md)
+> (2026-11-21). The UI parity notes may still help.
 
 **Status:** Proposal / unstarted. Companion to `docs/SEPTASK.md` (the Apple
 Septask plan, P0–P4 landed). This doc covers (a) the backend work that makes

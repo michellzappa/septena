@@ -82,7 +82,8 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [NATIVE_PROJECT_SHARING_SPEC.md](NATIVE_PROJECT_SHARING_SPEC.md) | superseded by PROJECT_SHARING_SPEC |
-| [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded on architecture (ADR 0002) |
+| [ANDROID_CLIENT_SPEC.md](ANDROID_CLIENT_SPEC.md) | proposal (#20); shared Kotlin core for Windows |
+| [SEPTASK_ANDROID_PLAN.md](SEPTASK_ANDROID_PLAN.md) | superseded by ANDROID_CLIENT_SPEC.md |
 | [TASK_CONVERSATIONS_PLAN.md](TASK_CONVERSATIONS_PLAN.md) | shipped — historical, still the design rationale |
 | [TASK_CONVERSATIONS_PHASE0.md](TASK_CONVERSATIONS_PHASE0.md), [PHASE1](TASK_CONVERSATIONS_PHASE1.md), [SEPTASK_CONVERSATIONS_PLAN.md](SEPTASK_CONVERSATIONS_PLAN.md) | shipped — historical |
 | [AI_TASKS_EXPLAINER.md](AI_TASKS_EXPLAINER.md) | user copy; iCloud claims change at cutover |

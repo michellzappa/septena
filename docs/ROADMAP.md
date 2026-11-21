@@ -22,7 +22,7 @@ on a listed issue without the label). Feature IDs: Starlings Docs
 | Linked projects | `docs/LINKED_PROJECTS_SPEC.md`, ADR 0003 | `track:links` |
 | Task factory | `docs/TASK_FACTORY_SPEC.md`, ADR 0005, ADR 0008 | `track:factory` |
 | Project sharing | `docs/PROJECT_SHARING_SPEC.md`, ADR 0004 | `track:sharing` |
-| Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/SEPTASK_ANDROID_PLAN.md` | `track:clients` |
+| Switcher essentials, moving in & other clients (web, Android) | Starlings `/strategy/product-roadmap`, `docs/ANDROID_CLIENT_SPEC.md`, ADR 0016 sign-in | `track:clients` |
 | Task fade | `docs/TASK_FADE_SPEC.md`, ADR 0006 | `track:fade` |
 | Project notes as agent context | `docs/PROJECT_NOTES_SPEC.md`, ADR 0012 | `track:factory` |
 | Launch — Septena name, free tier, paid sync, rate lock | `docs/SYNC_SUBSCRIPTION_SPEC.md`, ADR 0007, ADR 0010 | `track:launch` |
@@ -163,8 +163,8 @@ GitHub milestone: `"M4 Sharing and Starlings"`.
 - #10 S0 project store, relay, local store-scoped keys
 - #11 S1 share / invite / accept UI
 - #12 L2 Starlings links, several workspaces, dedupe
-- #20 Android client on `api.septena.app` (rewrite `docs/SEPTASK_ANDROID_PLAN.md`
-  on the backend)
+- #20 Android client on `api.septena.app` (`docs/ANDROID_CLIENT_SPEC.md`,
+  sign-in per ADR 0016; its Kotlin core is Windows W0)
 - #119 Self-hostable backend on the user's own Cloudflare account (ADR 0011)
 
 Exit: a shared project with one other person, a Starlings project linked next
