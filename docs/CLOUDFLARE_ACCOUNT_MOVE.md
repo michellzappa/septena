@@ -70,9 +70,14 @@ with wrangler logged in as the new account's owner.
 3. **Agent:** create the KV namespaces, R2 bucket and D1 database on the new
    account. Put their ids in each `wrangler.toml` on a branch, with the new
    `account_id`.
-4. **mz:** give the old secret values, or confirm new ones for
-   `SESSION_SIGNING_KEY` and `ADMIN_DASHBOARD_TOKEN`. The two salts must be
-   the old values.
+4. **Agent:** set fresh secrets on the new account. Decided 2026-11-21: the
+   old salts were not saved anywhere, and the community database held 1 user
+   identity (mz), 2 support tickets, 2 feature requests, 2 votes, 1
+   testimonial and 6 telemetry installs. After mz signs in to the community
+   on the new account, one SQL update points mz's old rows at the new user
+   hash. Telemetry installs get new anonymous ids; daily rollups do not
+   depend on the salt. Back up the new salts: rotating `USER_HASH_SALT`
+   later disconnects every community identity.
 5. **Agent:** deploy all three workers to the new account on `workers.dev`
    addresses only (no custom domains yet).
 6. **Agent, write freeze:** deploy the old backend with writes answering 503.
