@@ -20,7 +20,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
 | [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | accepted |
 | [0014](0014-today-rollover-review-or-clean-slate.md) | Today rolls over by review or by clean slate; it never carries over silently | accepted |
-| [0015](0015-shared-registries-for-cross-platform-clients.md) | Keep cross-platform task-app contracts in shared JSON registries | proposed |
+| [0015](0015-shared-registries-for-cross-platform-clients.md) | Keep cross-platform task-app contracts in shared JSON registries | accepted |
 | [0016](0016-sign-in-beyond-apple.md) | Sign in beyond Apple: approve a new device, or use an email code | accepted |
 
 ## Template

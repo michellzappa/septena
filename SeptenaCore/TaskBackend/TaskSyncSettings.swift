@@ -22,8 +22,7 @@ import Foundation
 // Keep the two lists in lockstep.
 
 enum SeptaskSyncedSettings {
-  static let keys = ["welcomeName", "telemetryLevel", "calendarHiddenTitles", "rolledInDismissedOn", "homeTimezone",
-                     "agentsPaused", "getStartedDismissed", "getStartedSteps"]
+  static let keys = RegistrySettings.syncedKeys
 
   /// The blob. `v1`: the shape is `AppSettings`' own JSON.
   static let storeKey = "septask.syncedSettings.v1"

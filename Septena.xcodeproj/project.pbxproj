@@ -843,6 +843,7 @@
 		83D51A84E5045C1EC509EC83 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3DA6C707EA3988C90D573B /* SidebarView.swift */; };
 		8438CEB6FCC5D04CD5216D95 /* NutritionRingsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7184022A465622EEE08AD3CA /* NutritionRingsBuilder.swift */; };
 		8461BA56D29E32C34EA7FE90 /* ThingsImportSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DFB5D438977C9BCC02A5468 /* ThingsImportSupport.swift */; };
+		8464951F3840A657ACA555FE /* RegistryConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56AB4E1D350770FBB204C585 /* RegistryConstants.swift */; };
 		846F71B34106883861EE2215 /* TaskRecordNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEC52E838E893E9D37A00D6 /* TaskRecordNames.swift */; };
 		848CA09A2578C2DAD0AE9AC0 /* LocaleFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BCC1A109F5CA85CA8D3477 /* LocaleFormatting.swift */; };
 		8492BEC09B528D7E49D47C9B /* AdaptiveColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54EBDD344E387CF1C7B01D4 /* AdaptiveColor.swift */; };
@@ -4155,6 +4156,7 @@
 				0DADAF699FE5AF519A581AF8 /* NextWidgetViews.swift in Sources */,
 				2D9A15F704C5BD999706706B /* NextWire.swift in Sources */,
 				55B5863302F8B90D2E7DF92C /* OpenNewTaskControlIntent.swift in Sources */,
+				8464951F3840A657ACA555FE /* RegistryConstants.swift in Sources */,
 				BDB74D08C96CD63AD64F6B0A /* RhythmWidget.swift in Sources */,
 				881C31FAE6D190498F378B6C /* RhythmWidgetSnapshot.swift in Sources */,
 				F0F2E769DBBB44C62E66C4FB /* RhythmWire.swift in Sources */,

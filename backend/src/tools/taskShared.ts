@@ -1,4 +1,4 @@
-import { DOMAIN_RULES } from "../generated/registries.js";
+import { DOMAIN_RULES, VIEW_ALIASES } from "../generated/registries.js";
 
 // Pure task logic shared by the live CloudKit tools (listTasks.ts,
 // writeTasks.ts) and the read-only task-backend preview (src/shadow/). No
@@ -44,12 +44,12 @@ export interface TaskOut {
 }
 
 /// Retired view names stay accepted so existing agent calls keep working:
-/// "someday" → "anytime"; "triage" → "inbox" (the app shows one Inbox, never
-/// a separate triage pile). Default view is "today".
+/// aliases come from `registry/destinations.json` (`VIEW_ALIASES`). Default is "today".
 export function normalizeView(view: unknown): TaskView {
   const v = view as string | undefined;
-  if (v === "someday") return "anytime";
-  if (v === "triage") return "inbox";
+  if (v && v in VIEW_ALIASES) {
+    return VIEW_ALIASES[v as keyof typeof VIEW_ALIASES] as TaskView;
+  }
   return (v as TaskView | undefined) ?? "today";
 }
 

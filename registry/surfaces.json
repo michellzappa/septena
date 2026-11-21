@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "description": "Notices, destructive/fork prompts, toast contracts, and task composer/inspector attribute definitions (ADR 0015, docs/SEPTASK_APPKIT_SURFACES.md).",
+  "notices": {
+    "maxConcurrentExplainers": 1,
+    "items": [
+      {
+        "id": "signIn",
+        "kind": "actionNeeded",
+        "priority": 0,
+        "icon": "notice.sign_in",
+        "dismissScope": "device",
+        "dismissible": true,
+        "title": "Not signed in",
+        "primaryTitle": "Sign in…",
+        "featureId": "sync.backend"
+      },
+      {
+        "id": "rolledIn",
+        "kind": "info",
+        "priority": 1,
+        "icon": "notice.rolled_in",
+        "dismissScope": "accountDay",
+        "dismissible": true,
+        "featureId": "lists.today"
+      },
+      {
+        "id": "getStarted",
+        "kind": "info",
+        "priority": 2,
+        "explainerSlot": true,
+        "icon": "notice.get_started",
+        "dismissScope": "account",
+        "dismissible": true,
+        "title": "Get started with Septena",
+        "featureId": "lists.today",
+        "steps": [
+          { "id": "connectAI", "title": "Connect your AI", "detail": "Claude, ChatGPT, Claude Code and more" },
+          { "id": "importTasks", "title": "Bring in your tasks", "detail": "From Reminders or Things" },
+          { "id": "addTask", "title": "Add your first task", "detail": "It lands in your Inbox until you decide" }
+        ]
+      },
+      {
+        "id": "fadeIntro",
+        "kind": "info",
+        "priority": 3,
+        "explainerSlot": true,
+        "icon": "notice.fade_intro",
+        "dismissScope": "device",
+        "dismissible": true,
+        "title": "Tasks left on Today start to fade",
+        "detail": "A task fades a little each day it carries over. Check it off or move it to bring it back. You can turn this off in Settings.",
+        "featureId": "task.aging"
+      }
+    ]
+  },
+  "prompts": {
+    "safetyContract": {
+      "cancelIsDefaultButton": true,
+      "confirmCarriesDestructiveRole": true
+    },
+    "items": [
+      {
+        "id": "deletePermanently",
+        "kind": "destructive",
+        "title": "Delete Permanently?",
+        "message": "This cannot be undone.",
+        "confirmTitle": "Delete Permanently",
+        "featureId": "lists.recently-deleted"
+      },
+      {
+        "id": "deleteSection",
+        "kind": "destructive",
+        "title": "Delete this section?",
+        "message": "Its tasks stay in the project.",
+        "confirmTitle": "Delete Section",
+        "featureId": "places.sections"
+      },
+      {
+        "id": "deleteArea",
+        "kind": "destructive",
+        "title": "Delete this area?",
+        "message": "Its projects stay, detached from the area.",
+        "confirmTitle": "Delete Area",
+        "featureId": "places.areas"
+      },
+      {
+        "id": "deleteProject",
+        "kind": "destructive",
+        "title": "Delete this project?",
+        "message": "Its tasks move to Recently Deleted.",
+        "confirmTitle": "Delete Project",
+        "featureId": "places.projects"
+      },
+      {
+        "id": "deleteAccount",
+        "kind": "destructive",
+        "title": "Delete Account?",
+        "message": "Your tasks, areas, projects, and conversations are erased from the server and this device.",
+        "confirmTitle": "Delete Account",
+        "featureId": "account.delete"
+      },
+      {
+        "id": "rescheduleFixedRepeat",
+        "kind": "fork",
+        "title": "Reschedule repeating task?",
+        "message": "Move only this occurrence or shift the future schedule too?",
+        "options": [
+          { "id": "exception", "title": "Make Exception" },
+          { "id": "updateRule", "title": "Update Rule" }
+        ],
+        "featureId": "task.repeat"
+      }
+    ]
+  },
+  "toasts": {
+    "durationSeconds": 7,
+    "templates": {
+      "deferred": { "format": "Deferred to {date}", "undoable": false },
+      "moved": { "format": "Moved to {destination}", "undoable": true },
+      "deletedSingle": { "format": "\"{title}\" deleted", "emptyTitleFormat": "Task deleted", "undoable": true },
+      "deletedBulk": { "format": "{count} tasks deleted", "singularFormat": "Task deleted", "undoable": true }
+    }
+  },
+  "taskAttributes": [
+    { "id": "today", "label": "Today", "icon": "action.today_add", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "lists.today" },
+    { "id": "when", "label": "When", "icon": "action.when", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
+    { "id": "deadline", "label": "Deadline", "icon": "action.deadline", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "task.when-deadline" },
+    { "id": "list", "label": "List", "icon": "action.move", "commitContract": "pickCommits", "surfaceTier": "popover", "featureId": "places.projects" },
+    { "id": "repeat", "label": "Repeat", "icon": "action.repeat", "commitContract": "closeCommits", "surfaceTier": "popover", "featureId": "task.repeat" },
+    { "id": "notes", "label": "Notes", "icon": "action.notes", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "task.notes" },
+    { "id": "discuss", "label": "Discuss", "icon": "action.discuss", "commitContract": "closeCommits", "surfaceTier": "inline", "featureId": "ai.discuss" },
+    { "id": "attachments", "label": "Attachments", "icon": "action.attachment", "commitContract": "pickCommits", "surfaceTier": "inline", "featureId": "task.attachments" }
+  ]
+}

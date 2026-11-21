@@ -90,7 +90,7 @@ enum SelectableChipStyle {
   /// Selected chips carry a low-opacity wash of their own tint. Contrast-safe
   /// in both appearances for any hue *including* the monochrome app accent,
   /// because ink and fill share a hue and only differ in opacity.
-  static let selectedFillOpacity: Double = 0.22
+  static let selectedFillOpacity: Double = RegistryTokens.Selection.chipSelectedFillOpacity
 
   static func fill(tint: Color, isSelected: Bool) -> Color {
     isSelected ? tint.opacity(selectedFillOpacity) : Theme.mutedSurface

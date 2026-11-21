@@ -809,6 +809,7 @@ targets:
       - path: Septena/Shell/UI/ConsistencyHeatmap.swift
       - path: Septena/Shell/Dashboard/HeatmapTileRow.swift
       - path: Septena/Shell/UI/TimeOfDayWheel.swift
+      - path: SeptenaCore/Generated/RegistryConstants.swift
       - path: Septena/Shell/UI/Theme.swift
       - path: Septena/Shell/UI/SolarClock.swift
       # Control Center "Add Task" — intent type for ControlWidgetButton.

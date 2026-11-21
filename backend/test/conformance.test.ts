@@ -17,7 +17,18 @@ const {
   isOnToday,
   isUnfiled,
   matchesView,
+  normalizeView,
 } = await import("../src/tools/taskShared.ts");
+const {
+  ACTIONS_CATALOG,
+  CAPABILITIES,
+  DESIGN_TOKENS,
+  DESTINATIONS,
+  ICONS,
+  SURFACES_CATALOG,
+  SYNCED_SETTING_KEYS,
+  VIEW_ALIASES,
+} = await import("../src/generated/registries.ts");
 import type { TaskConvo, TaskOut } from "../src/tools/taskShared.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,4 +149,27 @@ describe("Conformance: convo-derived.json (backend awaitsReasoning)", () => {
       assert.equal(awaitsReasoning(convo), c.expected.pendingReasoning, "awaitsReasoning");
     });
   }
+});
+
+describe("Registry cross-cutting contracts (R1–R4)", () => {
+  it("normalizeView honors every alias in destinations.json", () => {
+    for (const [alias, canonical] of Object.entries(VIEW_ALIASES)) {
+      assert.equal(normalizeView(alias), canonical, `alias ${alias} -> ${canonical}`);
+    }
+    assert.equal(normalizeView(undefined), "today");
+  });
+
+  it("synced settings, destinations, actions, icons, tokens, surfaces, and capabilities are non-empty and consistent", () => {
+    assert.ok(SYNCED_SETTING_KEYS.includes("welcomeName"));
+    assert.ok(SYNCED_SETTING_KEYS.includes("agentsPaused"));
+    assert.ok(DESTINATIONS.length >= 8);
+    assert.ok(Object.keys(ICONS).length >= 40);
+    assert.equal(DESIGN_TOKENS.accentPalette.length, 16);
+    assert.equal(DESIGN_TOKENS.textScale.steps.length, 5);
+    assert.equal(SURFACES_CATALOG.notices.maxConcurrentExplainers, 1);
+    assert.equal(SURFACES_CATALOG.prompts.safetyContract.cancelIsDefaultButton, true);
+    assert.equal(CAPABILITIES["lists.today"].macos, "ships");
+    assert.ok(ACTIONS_CATALOG.contextMenus["sidebar.project"].some((i: { kind: string; id?: string }) => i.kind === "action" && i.id === "project.markDone"));
+    assert.ok(ACTIONS_CATALOG.contextMenus["task.row"].some((i: { kind: string; id?: string }) => i.kind === "submenu" && i.id === "schedule"));
+  });
 });

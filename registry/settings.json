@@ -1,0 +1,319 @@
+{
+  "version": 1,
+  "description": "Canonical Septena task-app settings: synced keys (backend SETTING_VALUES + Swift SeptaskSyncedSettings), device-local keys/defaults, and flattened Settings page taxonomy (docs/SETTINGS_FLATTEN_SPEC.md).",
+  "keys": {
+    "welcomeName": {
+      "scope": "synced",
+      "storageKey": "septena.homepage.welcomeName",
+      "type": "string",
+      "maxLength": 200,
+      "default": "",
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "sync.backend"
+    },
+    "telemetryLevel": {
+      "scope": "synced",
+      "storageKey": "septena.privacy.telemetryLevel",
+      "type": "enum",
+      "enum": "telemetryLevel",
+      "default": "balanced",
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "calendarHiddenTitles": {
+      "scope": "synced",
+      "type": "string[]",
+      "maxItems": 500,
+      "itemMaxLength": 500,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "calendar.events"
+    },
+    "rolledInDismissedOn": {
+      "scope": "synced",
+      "storageKey": "septena.newTodos.dismissedDate",
+      "type": "string",
+      "format": "day",
+      "default": null,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "lists.today"
+    },
+    "homeTimezone": {
+      "scope": "synced",
+      "type": "string",
+      "maxLength": 64,
+      "default": null,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "sync.backend"
+    },
+    "agentsPaused": {
+      "scope": "synced",
+      "type": "bool",
+      "default": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "agents.stop-pause"
+    },
+    "getStartedDismissed": {
+      "scope": "synced",
+      "type": "bool",
+      "default": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "lists.today"
+    },
+    "getStartedSteps": {
+      "scope": "synced",
+      "type": "string[]",
+      "maxItems": 32,
+      "itemMaxLength": 64,
+      "default": [],
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "lists.today"
+    },
+    "todayShowCompleted": {
+      "scope": "device",
+      "storageKey": "septena.today.showCompleted",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "lists.today"
+    },
+    "todayGroupByList": {
+      "scope": "device",
+      "storageKey": "septena.today.groupByList",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "lists.today"
+    },
+    "tasksShowAging": {
+      "scope": "device",
+      "storageKey": "septena.tasks.showAging",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "task.aging"
+    },
+    "tasksTitleLines": {
+      "scope": "device",
+      "storageKey": "septena.tasks.titleLines",
+      "type": "int",
+      "min": 1,
+      "max": 3,
+      "default": 2,
+      "platforms": ["ios", "ipados", "android"],
+      "featureId": "settings.display"
+    },
+    "tasksFilingSuggestions": {
+      "scope": "device",
+      "storageKey": "septena.tasks.filingSuggestions",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "android", "windows"],
+      "featureId": "edit.filing-suggestion"
+    },
+    "tasksShowCalendarEvents": {
+      "scope": "device",
+      "storageKey": "septena.tasks.showCalendarEvents",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "calendar.events"
+    },
+    "badgeShowOverdue": {
+      "scope": "device",
+      "storageKey": "septena.badge.showOverdue",
+      "sharedAppGroup": true,
+      "type": "bool",
+      "default": false,
+      "platforms": ["ios", "ipados", "macos", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "loggingAnimationsEnabled": {
+      "scope": "device",
+      "storageKey": "septena.ui.loggingAnimations",
+      "type": "bool",
+      "default": true,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "textSizeStep": {
+      "scope": "device",
+      "storageKey": "septena.display.textSizeStep",
+      "type": "int",
+      "min": -2,
+      "max": 2,
+      "default": 0,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    },
+    "sidebarCounts": {
+      "scope": "device",
+      "storageKey": "septena.septask.sidebarCounts",
+      "type": "bool",
+      "default": true,
+      "platforms": ["macos", "web", "windows"],
+      "featureId": "settings.display"
+    },
+    "aiMode": {
+      "scope": "device",
+      "storageKey": "septena.ai.mode",
+      "type": "enum",
+      "values": ["onDeviceOnly", "auto", "useMyClaude"],
+      "default": "auto",
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "ai.reach-dial"
+    },
+    "diagnosticsEnabled": {
+      "scope": "device",
+      "storageKey": "septask.diagnostics.enabled",
+      "type": "bool",
+      "default": false,
+      "platforms": ["ios", "ipados", "macos", "web", "android", "windows"],
+      "featureId": "settings.display"
+    }
+  },
+  "pages": [
+    {
+      "id": "account",
+      "title": "Account",
+      "icon": "settings.account",
+      "group": "identity",
+      "featureId": "sync.backend",
+      "sections": [
+        { "id": "profile", "items": [{ "kind": "customSurface", "surface": "account_profile_card" }] },
+        { "id": "sync", "items": [{ "kind": "customSurface", "surface": "sync_account_status" }] },
+        { "id": "store_health", "items": [{ "kind": "customSurface", "surface": "store_health" }] },
+        { "id": "delete_account", "items": [{ "kind": "customSurface", "surface": "delete_account", "featureId": "account.delete" }] }
+      ]
+    },
+    {
+      "id": "tasks",
+      "title": "Tasks",
+      "icon": "settings.tasks",
+      "group": "main",
+      "paletteSlot": 0,
+      "featureId": "lists.today",
+      "sections": [
+        {
+          "id": "today",
+          "header": "Today",
+          "items": [
+            { "kind": "setting", "key": "todayShowCompleted", "label": "Show completed tasks" },
+            { "kind": "setting", "key": "tasksShowAging", "label": "Show aging", "detail": "Fade a task a little more each day it carries over." },
+            { "kind": "setting", "key": "todayGroupByList", "label": "Group by area and project", "detail": "Off shows one flat list, with each task's list as a subtitle." }
+          ]
+        },
+        {
+          "id": "rows",
+          "header": "Task rows",
+          "platforms": ["ios", "ipados", "android"],
+          "items": [
+            { "kind": "setting", "key": "tasksTitleLines", "label": "Title lines" }
+          ]
+        },
+        {
+          "id": "adding",
+          "header": "Adding tasks",
+          "items": [
+            { "kind": "setting", "key": "tasksFilingSuggestions", "label": "Suggest where to file", "detail": "Learn where you usually file similar tasks." }
+          ]
+        },
+        {
+          "id": "calendar",
+          "header": "Calendar",
+          "items": [
+            { "kind": "setting", "key": "tasksShowCalendarEvents", "label": "Show calendar events" },
+            { "kind": "customSurface", "surface": "calendar_access", "label": "Calendar access", "icon": "settings.calendar", "featureId": "calendar.events" }
+          ]
+        },
+        {
+          "id": "badge",
+          "header": "Badge",
+          "platforms": ["ios", "ipados", "macos", "android", "windows"],
+          "items": [
+            { "kind": "setting", "key": "badgeShowOverdue", "label": "Show overdue indicator on app icon" }
+          ]
+        },
+        {
+          "id": "display",
+          "header": "Appearance",
+          "items": [
+            { "kind": "setting", "key": "textSizeStep", "label": "Text Size" },
+            { "kind": "setting", "key": "loggingAnimationsEnabled", "label": "Completion animations", "icon": "settings.animations" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "connectionsAI",
+      "title": "Connections & AI",
+      "icon": "settings.connections_ai",
+      "group": "main",
+      "paletteSlot": 4,
+      "featureId": "ai.reach-dial",
+      "sections": [
+        {
+          "id": "ai_policy",
+          "header": "How far AI may reach",
+          "items": [
+            { "kind": "setting", "key": "aiMode", "label": "AI Mode" },
+            { "kind": "customSurface", "surface": "claude_connector", "featureId": "agents.connector" }
+          ]
+        },
+        {
+          "id": "agents",
+          "header": "Agents",
+          "items": [
+            { "kind": "setting", "key": "agentsPaused", "label": "Pause all agents" }
+          ]
+        },
+        {
+          "id": "connected_apps",
+          "header": "Connected Apps",
+          "items": [
+            { "kind": "customSurface", "surface": "reminders_inbox", "label": "Reminders", "icon": "settings.reminders", "platforms": ["ios", "ipados", "macos"], "featureId": "import.reminders" },
+            { "kind": "customSurface", "surface": "calendar_access", "label": "Calendar", "icon": "settings.calendar", "featureId": "calendar.events" },
+            { "kind": "customSurface", "surface": "things_import", "label": "Things", "icon": "settings.import", "platforms": ["ios", "ipados", "macos"], "featureId": "import.things" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Import & Export",
+      "icon": "settings.data",
+      "group": "main",
+      "paletteSlot": 5,
+      "featureId": "sync.backend",
+      "sections": [
+        { "id": "transfer", "items": [{ "kind": "customSurface", "surface": "import_export" }] }
+      ]
+    },
+    {
+      "id": "privacy",
+      "title": "Privacy",
+      "icon": "settings.privacy",
+      "group": "main",
+      "paletteSlot": 6,
+      "featureId": "settings.display",
+      "sections": [
+        { "id": "data_locality", "header": "Where your data lives", "items": [{ "kind": "customSurface", "surface": "privacy_explainer" }] },
+        { "id": "telemetry", "header": "Anonymous usage data", "items": [{ "kind": "setting", "key": "telemetryLevel", "label": "Usage data" }] },
+        { "id": "diagnostics", "header": "Optional product diagnostics", "items": [{ "kind": "setting", "key": "diagnosticsEnabled", "label": "Share anonymous weekly diagnostics" }] }
+      ]
+    },
+    {
+      "id": "about",
+      "title": "About",
+      "icon": "settings.about",
+      "group": "about",
+      "featureId": "settings.display",
+      "sections": [
+        { "id": "version", "items": [{ "kind": "customSurface", "surface": "about_header" }] },
+        { "id": "updates", "items": [{ "kind": "customSurface", "surface": "check_updates", "platforms": ["macos", "windows"], "featureId": "mac.updates" }, { "kind": "customSurface", "surface": "reset_get_started" }] },
+        { "id": "feedback", "items": [{ "kind": "customSurface", "surface": "send_feedback", "icon": "settings.feedback" }] },
+        { "id": "advanced", "header": "Advanced", "items": [{ "kind": "customSurface", "surface": "task_backend", "label": "Task backend", "icon": "settings.backend", "featureId": "sync.backend" }] }
+      ]
+    }
+  ]
+}

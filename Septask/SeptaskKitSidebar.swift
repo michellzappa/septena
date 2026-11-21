@@ -1233,9 +1233,14 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
       menu.addItem(item(String(localized: "Delete Area…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(deleteSelected)))
     case .project(let project, _):
-      menu.addItem(item(String(localized: "Rename Project…", comment: "SeptaskKit: sidebar context menu"),
+      menu.addItem(item(String(localized: "Rename", comment: "SeptaskKit: sidebar context menu"),
                         #selector(renameSelected)))
       menu.addItem(moveToAreaItem(for: project))
+      menu.addItem(.separator())
+      menu.addItem(item(String(localized: "Mark Done", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(markSelectedProjectDone)))
+      menu.addItem(item(String(localized: "Cancel Project", comment: "SeptaskKit: sidebar context menu"),
+                        #selector(cancelSelectedProject)))
       menu.addItem(.separator())
       menu.addItem(item(String(localized: "Delete Project…", comment: "SeptaskKit: sidebar context menu"),
                         #selector(deleteSelected)))
@@ -1456,6 +1461,25 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let target = sender.representedObject as? String
     guard target != project.area else { return }
     moveProject(project, toArea: target, at: nil, snapshot: StructureCache.snapshot(in: context))
+  }
+
+  /// Matches `SidebarView.projectMenu` and `registry/actions.json` (`sidebar.project`).
+  @objc private func markSelectedProjectDone() {
+    setSelectedProjectStatus(.done)
+  }
+
+  @objc private func cancelSelectedProject() {
+    setSelectedProjectStatus(.cancelled)
+  }
+
+  private func setSelectedProjectStatus(_ status: ProjectStatus) {
+    guard case .project(let project, _) = selectedNode?.content else { return }
+    let mutator = projectsMutator
+    bounceToTodayIfShowing(key: "project:\(project.id)")
+    Task { [weak self] in
+      try? await mutator.setStatus(id: project.id, status: status)
+      self?.rebuild(preserving: self?.selectedKey())
+    }
   }
 
   /// If the item being deleted is the one currently on screen, don't leave

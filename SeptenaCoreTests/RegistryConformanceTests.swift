@@ -185,4 +185,25 @@ import Testing
       #expect(derived.pendingReasoning == c.expected.pendingReasoning, "pendingReasoning failed for: \(c.name)")
     }
   }
+
+  // MARK: - Generated registry sanity (R1–R4)
+
+  @Test func generatedRegistriesCoverCoreContracts() {
+    #expect(RegistrySettings.syncedKeys.contains("welcomeName"))
+    #expect(RegistrySettings.syncedKeys.contains("agentsPaused"))
+    #expect(RegistryDestinations.viewAliases["someday"] == "anytime")
+    #expect(RegistryDestinations.viewAliases["triage"] == "inbox")
+    #expect(RegistryDestinations.byNavigationKey["today"]?.sfSymbol == "sun.max.fill")
+    #expect(RegistryDestinations.byNavigationKey["review"]?.title == "Review")
+    #expect(RegistryTokens.accentPalette.count == 16)
+    #expect(RegistryTokens.textScaleFactors.count == 5)
+    #expect(RegistrySurfaces.maxConcurrentExplainers == 1)
+    #expect(RegistrySurfaces.prompts["deleteSection"]?.confirmTitle == "Delete Section")
+    #expect(RegistryCapabilities.isShipped("lists.today", on: "macos"))
+    #expect(!RegistryCapabilities.isShipped("lists.today", on: "web"))
+    // Ensure iPad excludes macOS-only ⌃⌘S sidebar shortcut
+    let sidebar = RegistryActions.shortcutsGeneral.first { $0.id == "app.toggleSidebar" }
+    #expect(sidebar?.keycaps == ["⌃", "⌘", "S"])
+    #expect(sidebar?.excludePlatforms.contains("ipados") == true)
+  }
 }

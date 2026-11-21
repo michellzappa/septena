@@ -152,13 +152,17 @@ enum SeptaskKitTheme {
       // The accent where the keyboard is, gray elsewhere: the standard Mac
       // focus cue (Finder, Mail). Decided 2026-11-19.
       if emphasized {
-        let alpha: CGFloat = isDark ? 0.34 : 0.22
+        let alpha: CGFloat = isDark
+          ? CGFloat(RegistryTokens.Selection.emphasizedAlphaDark)
+          : CGFloat(RegistryTokens.Selection.emphasizedAlphaLight)
         return systemAccentColor.withAlphaComponent(alpha)
       }
       // A tint over the background, not an opaque gray: white 0.93 at 0.5
       // matched the sidebar material, so an unfocused sidebar selection was
       // invisible (2026-11-20). Black in light, white in dark, like Finder.
-      return isDark ? NSColor(white: 1, alpha: 0.14) : NSColor(white: 0, alpha: 0.10)
+      return isDark
+        ? NSColor(white: 1, alpha: CGFloat(RegistryTokens.Selection.unemphasizedAlphaDark))
+        : NSColor(white: 0, alpha: CGFloat(RegistryTokens.Selection.unemphasizedAlphaLight))
     }
   }
 
@@ -180,20 +184,20 @@ enum SeptaskKitTheme {
 /// swell on wide windows and read as broken.
 @MainActor
 enum SeptaskKitLayout {
-  static let marginFraction: CGFloat = 0.10
-  static let minInset: CGFloat = 10
-  static let maxInset: CGFloat = 220
+  static let marginFraction: CGFloat = CGFloat(RegistryTokens.DesktopColumn.marginFraction)
+  static let minInset: CGFloat = CGFloat(RegistryTokens.DesktopColumn.minInset)
+  static let maxInset: CGFloat = CGFloat(RegistryTokens.DesktopColumn.maxInset)
   /// Top/bottom `NSScrollView.contentInsets` — fixed so the list doesn't
   /// grow a taller header band as the window widens (sides still flex).
   /// Generous on purpose (Things-style): the first card sits well clear of
   /// the title bar and the last one clears the toolbar.
-  static let verticalInset: CGFloat = 48
+  static let verticalInset: CGFloat = CGFloat(RegistryTokens.DesktopColumn.verticalInset)
 
   /// Clear space between the BOTTOM of the title bar and the first row. The
   /// bar now carries its own height (a unified toolbar), so the top gap is
   /// measured from the bar rather than from the window edge — `verticalInset`
   /// stays the bottom-of-list breathing room, which has no bar under it.
-  static let titleBarGap: CGFloat = 20
+  static let titleBarGap: CGFloat = CGFloat(RegistryTokens.DesktopColumn.titleBarGap)
 
   // MARK: Leading glyph column
   //

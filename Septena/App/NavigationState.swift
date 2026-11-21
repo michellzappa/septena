@@ -53,18 +53,14 @@ extension Route {
   }
 
   private static func filterIcon(_ f: TaskFilter) -> String {
+    if let dest = RegistryDestinations.byNavigationKey[f.navigationKey] {
+      return dest.sfSymbol
+    }
     switch f {
-    case .today:           return "sun.max.fill"
-    case .triage:          return "tray.full"
-    case .review:          return "eye"
-    case .upcoming:        return "calendar"
-    case .repeating:       return "arrow.clockwise"
-    case .unscheduled:     return "rectangle.stack.fill"
-    case .logbook:         return "checkmark"
-    case .faded:           return "circle.dashed"
-    case .recentlyDeleted: return "trash"
-    case .project:         return "number"
-    case .area:            return "folder"
+    case .triage:  return RegistryIcons.sfSymbol(for: "list.inbox")
+    case .project: return RegistryIcons.sfSymbol(for: "place.project")
+    case .area:    return RegistryIcons.sfSymbol(for: "place.area")
+    default:       return RegistryIcons.sfSymbol(for: "list.today")
     }
   }
 }

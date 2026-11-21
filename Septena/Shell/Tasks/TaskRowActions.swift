@@ -105,6 +105,18 @@ struct TaskRowActions: ViewModifier {
           onOpenDeadline: { target in
             whenSheet = .init(taskIds: target.ids, kind: .deadline)
           },
+          onClearSchedule: { ids in
+            Haptics.tick()
+            recordingSchedule(String(localized: "Clear Schedule", comment: "Undo action name"), ids) {
+              for id in ids {
+                mutator.schedule(id: id, date: nil)
+                mutator.setDeadline(id: id, date: nil)
+                mutator.moveToToday(id: id, today: false)
+                mutator.acknowledge(id: id)
+              }
+            }
+            onChange?()
+          },
           onOpenMove: { target in
             moveTargetIds = target.ids
             showingMoveSheet = true

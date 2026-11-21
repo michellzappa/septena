@@ -27,12 +27,11 @@ enum KeyboardShortcutsCatalogue {
   // Septask's plain ⌘1–4 smart lists (its Go menu — see SeptaskApp).
   private static var navigation: KeyboardShortcutGroup {
     #if SEPTASK
-    KeyboardShortcutGroup(title: "Navigation", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "1"], label: "Today"),
-      KeyboardShortcut2(keys: ["⌘", "2"], label: "Upcoming"),
-      KeyboardShortcut2(keys: ["⌘", "3"], label: "Anytime"),
-      KeyboardShortcut2(keys: ["⌘", "4"], label: "Logbook"),
-    ])
+    let items: [KeyboardShortcut2] = RegistryDestinations.all.compactMap { dest in
+      guard let caps = dest.shortcutKeycaps else { return nil }
+      return KeyboardShortcut2(keys: caps, label: dest.title)
+    }
+    return KeyboardShortcutGroup(title: "Navigation", shortcuts: items)
     #else
     KeyboardShortcutGroup(title: "Navigation", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "1"], label: "Week tab"),
@@ -48,11 +47,39 @@ enum KeyboardShortcutsCatalogue {
     #endif
   }
 
-  /// Row commands are GENERATED from `TaskRowCommands` — the same registry the
-  /// Task menu and the iPad shortcut buttons render from — so this sheet can no
-  /// longer advertise a binding the app doesn't have. Only the keys that
-  /// aren't row commands — the selection/navigation keys the list handles
-  /// itself — are listed by hand.
+  private static var currentPlatformKey: String {
+    #if os(macOS)
+    "macos"
+    #else
+    "ipados"
+    #endif
+  }
+
+  private static func fromRegistry(_ entries: [RegistryShortcutEntry]) -> [KeyboardShortcut2] {
+    let platform = currentPlatformKey
+    return entries
+      .filter { !$0.excludePlatforms.contains(platform) }
+      .map { KeyboardShortcut2(keys: $0.keycaps, label: $0.label) }
+  }
+
+  private static var generalGroup: KeyboardShortcutGroup {
+    #if SEPTASK
+    KeyboardShortcutGroup(title: "General", shortcuts: fromRegistry(RegistryActions.shortcutsGeneral))
+    #else
+    KeyboardShortcutGroup(title: "General", shortcuts: [
+      KeyboardShortcut2(keys: ["⌘", "I"], label: quickCaptureLabel),
+      KeyboardShortcut2(keys: ["⌘", "⇧", "F"], label: "Quick Find"),
+      KeyboardShortcut2(keys: ["⌃", "⌘", "S"], label: "Show / hide sidebar"),
+      KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
+      KeyboardShortcut2(keys: ["⌘", "⇧", "/"], label: "Keyboard shortcuts (this sheet)"),
+    ])
+    #endif
+  }
+
+  /// Row commands are GENERATED from `RegistryActions` / `TaskRowCommands` so
+  /// this sheet can no longer advertise a binding the app doesn't have. Only
+  /// the keys that aren't row commands — the selection/navigation keys the list
+  /// handles itself — are listed by hand.
   private static var taskList: KeyboardShortcutGroup {
     var shortcuts = [
       KeyboardShortcut2(keys: ["↑", "↓"], label: "Move selection"),
@@ -62,16 +89,14 @@ enum KeyboardShortcutsCatalogue {
       KeyboardShortcut2(keys: ["⌘", "N"], label: "New to-do"),
     ]
     #if SEPTASK
-    // AppKit-list only (Septask's table owns this key directly), so it isn't a
-    // `TaskRowCommands` entry — listing it there would advertise it in Septena.
-    shortcuts.append(KeyboardShortcut2(keys: ["⌥", "⌘", "M"],
-                                       label: "Move to suggested list"))
-    #endif
+    shortcuts += fromRegistry(RegistryActions.shortcutsTaskList)
+    #else
     shortcuts += TaskRowCommands.all.flatMap { command in
       command.allShortcuts.map { shortcut in
         KeyboardShortcut2(keys: TaskRowCommand.keycaps(for: shortcut), label: command.title)
       }
     }
+    #endif
     return KeyboardShortcutGroup(title: "Task list", shortcuts: shortcuts)
   }
 
@@ -85,13 +110,7 @@ enum KeyboardShortcutsCatalogue {
 
   static let groups: [KeyboardShortcutGroup] = [
     navigation,
-    KeyboardShortcutGroup(title: "General", shortcuts: [
-      KeyboardShortcut2(keys: ["⌘", "I"], label: quickCaptureLabel),
-      KeyboardShortcut2(keys: ["⌘", "⇧", "F"], label: "Quick Find"),
-      KeyboardShortcut2(keys: ["⌘", "/"], label: "Show / hide sidebar"),
-      KeyboardShortcut2(keys: ["⌘", ","], label: "Settings"),
-      KeyboardShortcut2(keys: ["⌘", "⇧", "/"], label: "Keyboard shortcuts (this sheet)"),
-    ]),
+    generalGroup,
     taskList,
     KeyboardShortcutGroup(title: "Edit & section sheets", shortcuts: [
       KeyboardShortcut2(keys: ["⌘", "N"], label: "Quick-add in an open section"),

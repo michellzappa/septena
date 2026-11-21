@@ -1,6 +1,6 @@
 # 0015. Keep cross-platform task-app contracts in shared JSON registries
 
-- Status: proposed
+- Status: accepted (2026-11-21), R0–R4 landed
 - Date: 2026-11-21
 - Deciders: mz
 

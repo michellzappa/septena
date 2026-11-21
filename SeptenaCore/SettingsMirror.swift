@@ -7,14 +7,9 @@ enum SettingsMirror {
   private static let decoder = JSONDecoder()
 
   /// Accent palette for auto-coloring a section the first time it's enabled,
-  /// so a freshly onboarded dashboard isn't a wall of neutral gray. Mirrors the
-  /// bright row of the app's `sectionPalette` (Tailwind-500); kept here as raw
-  /// hex so UI-free SeptenaCore can assign without reaching into the app layer.
-  static let autoAccentPalette: [String] = [
-    "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
-    "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
-    "#8b5cf6", "#a855f7", "#ec4899", "#f43f5e",
-  ]
+  /// so a freshly onboarded dashboard isn't a wall of neutral gray. Generated
+  /// from `registry/tokens.json` (`RegistryTokens.accentPalette`, ADR 0015).
+  static let autoAccentPalette: [String] = RegistryTokens.accentPalette
 
   /// Give a section a palette accent the first time it's enabled. No-op once it
   /// has any color (a real user pick, or a prior auto-assignment), so it never
@@ -325,7 +320,7 @@ enum SettingsMirror {
   /// the banner decision is instant and correct offline; both task surfaces
   /// (SwiftUI `TaskListView`, AppKit `SeptaskKitTaskList`) already read this
   /// key, so syncing through it leaves their read paths unchanged.
-  static let rolledInDismissedKey = "septena.newTodos.dismissedDate"
+  static let rolledInDismissedKey = RegistrySettings.StorageKey.rolledInDismissedOn
 
   /// The day the rolled-in banner was last dismissed — the LATER of the synced
   /// value and the device-local mirror.

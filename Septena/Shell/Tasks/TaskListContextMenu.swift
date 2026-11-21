@@ -109,6 +109,7 @@ struct TaskListRowContextMenu: View {
   let onMoveToToday: ([String], Bool) -> Void
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
+  var onClearSchedule: (([String]) -> Void)? = nil
   let onOpenMove: (TaskListView.ActionTarget) -> Void
   /// Move a task straight to a destination from the inline submenu, skipping the
   /// sheet. `areaId`/`projectId` follow `MovePickerSheet.onPick` semantics
@@ -174,6 +175,17 @@ struct TaskListRowContextMenu: View {
         Label(deadlineLabel, systemImage: "flag")
       }
       .keyboardShortcut(TaskRowShortcuts.deadline)
+
+      if let onClearSchedule,
+         target.tasks.contains(where: { $0.isOnToday || $0.scheduled != nil || $0.deadline != nil }) {
+        Divider()
+        Button {
+          onClearSchedule(target.ids)
+        } label: {
+          Label("Clear Schedule", systemImage: RegistryIcons.sfSymbol(for: "action.clear_schedule"))
+        }
+        .keyboardShortcut(TaskRowShortcuts.clearSchedule)
+      }
     } label: {
       Label(scheduleLabel, systemImage: "calendar")
     }

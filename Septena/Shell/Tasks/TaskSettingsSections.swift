@@ -33,22 +33,22 @@ struct TaskSettingsPane<Destination: Hashable>: View {
   // tasks, so two independent opt-ins showed two dock dots for one set of work
   // (see `BadgeManager`). One key, written by whichever app you happen to be in.
   @AppStorage(SettingsKey.badgeShowOverdue, store: SeptenaAppGroup.defaults)
-  private var taskBadge: Bool = false
-  @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = true
-  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = true
+  private var taskBadge: Bool = RegistrySettings.Defaults.badgeShowOverdue
+  @AppStorage(SettingsKey.todayShowCompleted) private var todayShowCompleted: Bool = RegistrySettings.Defaults.todayShowCompleted
+  @AppStorage(SettingsKey.todayGroupByList) private var todayGroupByList: Bool = RegistrySettings.Defaults.todayGroupByList
   #if !SEPTASK
   @AppStorage(SettingsKey.tasksOpenIn) private var tasksOpenInRaw: String = TasksOpenMode.drawer.rawValue
   #endif
-  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = true
-  @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = true
-  @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = true
-  @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = 2
+  @AppStorage(SettingsKey.tasksShowCalendarEvents) private var showCalendarEvents: Bool = RegistrySettings.Defaults.tasksShowCalendarEvents
+  @AppStorage(SettingsKey.tasksShowAging) private var showAging: Bool = RegistrySettings.Defaults.tasksShowAging
+  @AppStorage(SettingsKey.tasksFilingSuggestions) private var filingSuggestions: Bool = RegistrySettings.Defaults.tasksFilingSuggestions
+  @AppStorage(SettingsKey.tasksTitleLines) private var titleLines: Int = RegistrySettings.Defaults.tasksTitleLines
 
   #if SEPTASK
   @Environment(\.modelContext) private var modelContext
   @Environment(CKEngine.self) private var ckEngine
   @Environment(SectionTheme.self) private var theme
-  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations = true
+  @AppStorage(SettingsKey.loggingAnimationsEnabled) private var completionAnimations = RegistrySettings.Defaults.loggingAnimationsEnabled
   #endif
 
   var body: some View {

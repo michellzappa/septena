@@ -54,13 +54,7 @@ enum TextSizeStep: Int, CaseIterable, Identifiable {
   /// multiplier applied to the `.septena*` tokens (see `SeptenaTypeScale`).
   /// iOS ignores this and uses the `rawValue` as a `DynamicTypeSize` offset.
   var macFactor: CGFloat {
-    switch self {
-    case .xSmall: return 0.85
-    case .small:  return 0.92
-    case .normal: return 1.0
-    case .large:  return 1.10
-    case .xLarge: return 1.20
-    }
+    CGFloat(RegistryTokens.textScaleFactors[rawValue] ?? 1.0)
   }
 }
 

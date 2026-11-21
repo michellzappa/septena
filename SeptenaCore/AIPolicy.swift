@@ -51,7 +51,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Sendable {
 }
 
 enum AIPolicy {
-  static let modeKey = "septena.ai.mode"
+  static let modeKey = RegistrySettings.StorageKey.aiMode
   /// Developer-only (macOS debug): pin every reasoning step to one provider for
   /// testing. Empty string = off. Never surfaced in the consumer UI.
   static let devForceProviderKey = "septena.ai.devForceProvider"

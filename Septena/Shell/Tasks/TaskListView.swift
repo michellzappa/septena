@@ -3196,6 +3196,9 @@ struct TaskListView: View {
         onOpenDeadline: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .deadline)
         },
+        onClearSchedule: { ids in
+          for id in ids { applyWhen(id: id, kind: .scheduled, date: nil) }
+        },
         onOpenMove: { target in
           moveTargetIds = target.ids
           showingMoveSheet = true

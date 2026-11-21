@@ -227,18 +227,22 @@ enum Theme {
     let accent = systemAccentNSColor
     return Color(nsColor: NSColor(name: nil) { appearance in
       let isDark = appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
-      return accent.withAlphaComponent(isDark ? 0.34 : 0.22)
+      let alpha = isDark ? RegistryTokens.Selection.emphasizedAlphaDark : RegistryTokens.Selection.emphasizedAlphaLight
+      return accent.withAlphaComponent(alpha)
     })
     #else
     return Color(uiColor: UIColor { traits in
-      UIColor.systemBlue.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.34 : 0.2)
+      let alpha = traits.userInterfaceStyle == .dark
+        ? RegistryTokens.Selection.emphasizedAlphaDark
+        : RegistryTokens.Selection.emphasizedAlphaLight
+      return UIColor.systemBlue.withAlphaComponent(alpha)
     })
     #endif
   }
 
   /// Opacity of the primary-color wash painted under a pointer / Apple Pencil
   /// hover. Shared by task-card rows, grouped-list cells, and macOS tiles.
-  static let pointerHoverOpacity = 0.012
+  static let pointerHoverOpacity = RegistryTokens.Selection.pointerHoverOpacity
 
   /// Title ink on the gray list-selection capsule. Must NOT be `Color.primary`
   /// — UITableView's selected-cell traits flip primary to white.
@@ -289,8 +293,8 @@ enum Theme {
   // the tighter 10pt Reminders look. Small radius stays modest for
   // chips and pills.
 
-  static let cornerRadius: CGFloat = 22
-  static let cornerRadiusSmall: CGFloat = 6
+  static let cornerRadius: CGFloat = CGFloat(RegistryTokens.Radii.card)
+  static let cornerRadiusSmall: CGFloat = CGFloat(RegistryTokens.Radii.small)
 
   /// Horizontal inset from the screen edge to the floating "pill" cards in
   /// every scrolling page (section drawers, the Next feed, the home tile
@@ -298,14 +302,14 @@ enum Theme {
   /// match the Tasks list's row content inset (`hPadding`, 20pt on iOS) so
   /// the four top-level surfaces line up at the same edge instead of the
   /// dashboards drifting 4pt tighter than Tasks.
-  static let pageGutter: CGFloat = 20
+  static let pageGutter: CGFloat = CGFloat(RegistryTokens.Spacing.pageGutter)
 
   /// Vertical inset from the nav-bar edge to the first content block on the
   /// four top-level surfaces (Week, Tasks sidebar, Coach). The Next feed is
   /// the one exception: its sections pad their own tops with
   /// `sectionSpacing` so conditionally-hidden sections never leave gaps.
   /// Consumed by `septenaSurface()` — don't hand-type a page top padding.
-  static let pageTop: CGFloat = 12
+  static let pageTop: CGFloat = CGFloat(RegistryTokens.Spacing.pageTop)
 
   /// Scroll-past clearance after the last content block on a top-level
   /// surface — air above the floating tab bar on iOS; macOS has no floating

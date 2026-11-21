@@ -7,24 +7,24 @@ import Foundation
 // MARK: - Default keys
 
 enum SettingsKey {
-  static let badgeShowOverdue = "septena.badge.showOverdue"
+  static let badgeShowOverdue = RegistrySettings.StorageKey.badgeShowOverdue
   /// Master switch for local-notification nudges. Same string as
   /// `LocalNotificationScheduler.masterKey`. Absent → on (granting the
   /// permission prompt is the opt-in); flipping it off withdraws every
   /// pending nudge on the next reconcile.
   static let notificationsEnabled = "septena.notify.enabled"
-  static let todayShowCompleted = "septena.today.showCompleted"
+  static let todayShowCompleted = RegistrySettings.StorageKey.todayShowCompleted
   /// Whether Today groups open tasks under area / project headers. Absent → on
   /// (grouped). Off → a single flat list under Inbox with list name as each
   /// row's subtitle, sorted by due urgency (`SeptenaTask.compareNextPageOrder`).
   /// Read by `TaskListView` and `TasksDestinationView`.
-  static let todayGroupByList = "septena.today.groupByList"
+  static let todayGroupByList = RegistrySettings.StorageKey.todayGroupByList
   /// Whether the AppKit shell's sidebar shows its trailing count badges.
   /// Absent → on. Currently read only by `SeptaskKitSidebarController`
   /// (View ▸ Show Sidebar Counts) — kept in the shared registry rather than
   /// local to that file on the chance the SwiftUI sidebar wants the same
   /// toggle later.
-  static let septaskSidebarCounts = "septena.septask.sidebarCounts"
+  static let septaskSidebarCounts = RegistrySettings.StorageKey.sidebarCounts
   /// `Node.key`s of the AppKit sidebar's folded-shut areas (a `[String]`).
   /// Device-local view state, deliberately not synced — which areas you keep
   /// open is a per-window habit, not account data. NSOutlineView tracks
@@ -107,7 +107,7 @@ enum SettingsKey {
   static let dailyMessageReadwiseEnabled = "septena.dailyMessage.readwise.enabled"
   /// Optional first name used to personalise the homepage welcome greeting.
   /// Local-only (@AppStorage); not synced to CloudKit.
-  static let welcomeName = "septena.homepage.welcomeName"
+  static let welcomeName = RegistrySettings.StorageKey.welcomeName
   /// Device-local mirror of `AppSettings.units.weight` ("kg"/"lb") that the
   /// Training and Body display surfaces read via `@AppStorage` for instant,
   /// offline-safe formatting. The literal lives on `WeightUnit` so the helper
@@ -166,21 +166,21 @@ enum SettingsKey {
   /// Absent → on (events only ever show once calendar access is granted in
   /// Settings → Integrations, so the default can't surprise-prompt). Read by
   /// `TaskListView`.
-  static let tasksShowCalendarEvents = "septena.tasks.showCalendarEvents"
+  static let tasksShowCalendarEvents = RegistrySettings.StorageKey.tasksShowCalendarEvents
   /// Whether open Today tasks fade the longer they sit on Today undone
   /// (`SeptenaTask.todayTenureFill` → `TaskFade.rowOpacity`).
   /// Absent → on. Read by `TaskCheckboxModel`.
-  static let tasksShowAging = "septena.tasks.showAging"
+  static let tasksShowAging = RegistrySettings.StorageKey.tasksShowAging
   /// How many lines a task row's title may occupy before it truncates, on
   /// iPhone / iPad. 1 = the old single line, 2 = the default, 3 = long titles
   /// stay readable at the cost of taller rows. Absent → 2. Read by `TaskRow`.
   /// iOS only: the AppKit rows are a fixed-height table (`SeptaskKitTheme.rowHeight`)
   /// where titles truncate by design.
-  static let tasksTitleLines = "septena.tasks.titleLines"
+  static let tasksTitleLines = RegistrySettings.StorageKey.tasksTitleLines
   /// Whether the on-device classifier suggests where to file inbox tasks
   /// (`SuggestionEngine` → inbox chips, context-menu "Move to…", composer
   /// "Suggested list" chip). Absent → on. Read by `TaskListView` / composer.
-  static let tasksFilingSuggestions = "septena.tasks.filingSuggestions"
+  static let tasksFilingSuggestions = RegistrySettings.StorageKey.tasksFilingSuggestions
   /// Tasks sidebar column visibility on push-navigation surfaces (iPad
   /// regular / macOS). Persisted locally so ⌘/ and the system sidebar
   /// controls survive relaunch. Raw values: `all`, `detailOnly`.
@@ -190,7 +190,7 @@ enum SettingsKey {
   /// something). Absent → on. Off suppresses every logging animation
   /// app-wide; the commit haptic + VoiceOver confirmation still fire, exactly
   /// like Reduce Motion. Read by `CommitFlourish` and `LogCommitOverlay`.
-  static let loggingAnimationsEnabled = "septena.ui.loggingAnimations"
+  static let loggingAnimationsEnabled = RegistrySettings.StorageKey.loggingAnimationsEnabled
   /// Whether the user is a paying *supporter*. The whole app is free — this
   /// flag unlocks NOTHING functional; it only drives cosmetics (the avatar
   /// foil ring and the "Supporter" badge). It's a local @AppStorage *mirror*
@@ -215,5 +215,5 @@ enum SettingsKey {
   /// `TextSizeScale.swift`). Absent → 0 → text follows the system size
   /// unchanged. Device-local, like the other display preferences; read by the
   /// `.septenaTextSize()` root modifier in both app targets.
-  static let textSizeStep = "septena.display.textSizeStep"
+  static let textSizeStep = RegistrySettings.StorageKey.textSizeStep
 }
