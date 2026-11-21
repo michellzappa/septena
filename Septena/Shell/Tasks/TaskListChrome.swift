@@ -513,11 +513,11 @@ struct MagicPlusRowDropModifier: ViewModifier {
   /// Subtle dashed-outline landing slot revealed in the parted row gap.
   private var ghostSlotPlaceholder: some View {
     RoundedRectangle(cornerRadius: 10, style: .continuous)
-      .strokeBorder(Color.accentColor.opacity(0.45),
+      .strokeBorder(Theme.selectionAccent.opacity(0.45),
                     style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
       .background(
         RoundedRectangle(cornerRadius: 10, style: .continuous)
-          .fill(Color.accentColor.opacity(0.06))
+          .fill(Theme.selectionAccent.opacity(0.06))
       )
       .padding(.horizontal, TaskCardMetrics.margin)
       .padding(.vertical, 4)
@@ -646,7 +646,7 @@ struct MagicPlusFloatingOverlay: View {
       // Morph into a crisp live ghost task row ready to land in the parted gap.
       HStack(spacing: 12) {
         RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .strokeBorder(Color.accentColor, lineWidth: 2)
+          .strokeBorder(Theme.selectionAccent, lineWidth: 2)
           .frame(width: 20, height: 20)
         Text("New Task")
           .font(.septenaTaskTitle)
@@ -655,11 +655,11 @@ struct MagicPlusFloatingOverlay: View {
         if let context, !context.isEmpty {
           Text(context)
             .font(.septenaCaption)
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(Theme.selectionAccent)
             .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Color.accentColor.opacity(0.14), in: Capsule())
+            .background(Theme.selectionAccent.opacity(0.14), in: Capsule())
         }
       }
       .padding(.horizontal, 14)
@@ -667,7 +667,7 @@ struct MagicPlusFloatingOverlay: View {
       .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
       .overlay(
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5)
+          .strokeBorder(Theme.selectionAccent.opacity(0.7), lineWidth: 1.5)
       )
       .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
 
@@ -681,10 +681,10 @@ struct MagicPlusFloatingOverlay: View {
       morphPill(icon: "square.stack.3d.up.fill", title: "New Area")
 
     case nil:
-      // Free-floating lifted blue "+" orb.
+      // Free-floating lifted accent "+" orb.
       ZStack {
         Circle()
-          .fill(Color.accentColor.gradient)
+          .fill(Theme.selectionAccent.gradient)
           .overlay(
             Circle()
               .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
@@ -692,7 +692,7 @@ struct MagicPlusFloatingOverlay: View {
           .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
         Image(systemName: "plus")
           .scaledFont(size: 24, weight: .bold)
-          .foregroundStyle(Color.white)
+          .foregroundStyle(Theme.checkboxCheck)
       }
       .frame(width: 62, height: 62)
     }
@@ -702,15 +702,15 @@ struct MagicPlusFloatingOverlay: View {
     HStack(spacing: 8) {
       Image(systemName: icon)
         .scaledFont(size: 16, weight: .semibold)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(Theme.checkboxCheck)
       Text(title)
         .font(.septenaButton)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(Theme.checkboxCheck)
         .lineLimit(1)
     }
     .padding(.horizontal, 16)
     .frame(height: 44)
-    .background(Color.accentColor.gradient, in: Capsule())
+    .background(Theme.selectionAccent.gradient, in: Capsule())
     .overlay(
       Capsule()
         .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)

@@ -388,7 +388,7 @@ private struct MagicPlusOrb: View {
   var body: some View {
     ZStack {
       Circle()
-        .fill(Color.accentColor.gradient)
+        .fill(Theme.selectionAccent.gradient)
         .overlay(
           Circle()
             .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
@@ -397,7 +397,7 @@ private struct MagicPlusOrb: View {
       VStack(spacing: 4) {
         Image(systemName: "plus")
           .scaledFont(size: 21, weight: .bold)
-          .foregroundStyle(Color.white)
+          .foregroundStyle(Theme.checkboxCheck)
         gripDots
       }
       .offset(y: 2)
@@ -445,7 +445,7 @@ private struct MagicPlusOrb: View {
         HStack(spacing: 3) {
           ForEach(0..<3, id: \.self) { _ in
             Circle()
-              .fill(Color.white.opacity(0.55))
+              .fill(Theme.checkboxCheck.opacity(0.55))
               .frame(width: 2.5, height: 2.5)
           }
         }
