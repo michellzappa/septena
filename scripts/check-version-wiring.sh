@@ -25,12 +25,11 @@ cd "$(dirname "$0")/.."
 # Every bundle target with a hand-maintained Info.plist. Keep in step with the
 # `sources`/`configFiles` targets in project.yml when adding a new target.
 PLISTS=(
-  Septena/Info.plist
-  Septena/Info-Mac.plist
-  SeptenaWatch/Info.plist
-  SeptenaWatchComplication/Info.plist
-  SeptenaWidgets/Info.plist
-  SeptenaLiveActivitiesExtension/Info.plist
+  Septask/Info.plist
+  Septask/Info-Mac.plist
+  ShareExtension/SeptaskShare-Info.plist
+  SeptaskWatch/Info.plist
+  SeptaskWatchComplication/Info.plist
 )
 
 fail=0

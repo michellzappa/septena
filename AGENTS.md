@@ -8,11 +8,13 @@ non-obvious traps.
 
 ## What this is
 
-Septena: a private, local-first "life operating system" for Apple platforms
-(iOS / macOS / watchOS). Every life domain is a **section** that can be enabled
-or hidden without deleting data. Writes land in a local SwiftData mirror first,
-then sync through CloudKit (`CKSyncEngine`, private DB `iCloud.com.septena.cloud`,
-zone `septena-v1`). SwiftUI throughout; Swift 5.10; deployment target 26.0.
+Septena: a private, local-first task app for Apple platforms (iOS / macOS /
+watchOS) backed by its own sync & MCP backend (`backend/`, ADR 0002 / ADR 0007).
+Code targets still carry the working name `Septask` / `SeptaskMac` /
+`SeptaskWatch` (ships as "Septena"). The life OS (Septena Life) moved out to
+`michellzappa/septena-life` in ADR 0017 (`septena-life-archive` tag). SwiftUI
+on iOS/iPadOS/watchOS, native AppKit shell on macOS; Swift 5.10; deployment
+target 26.0.
 
 ## Build / generate
 
@@ -26,39 +28,36 @@ xcodegen generate
 Build from CLI (the destination/scheme pattern that works here):
 
 ```bash
-xcodebuild -scheme Septena    -destination 'generic/platform=iOS'   -configuration Debug build
-xcodebuild -scheme SeptenaMac -destination 'platform=macOS'         -configuration Debug build
-xcodebuild -scheme SeptenaWatch -destination 'generic/platform=watchOS' -configuration Debug build
+xcodebuild -scheme Septask      -destination 'generic/platform=iOS'     -configuration Debug build
+xcodebuild -scheme SeptaskMac   -destination 'platform=macOS'           -configuration Debug build
+xcodebuild -scheme SeptaskWatch -destination 'generic/platform=watchOS' -configuration Debug build
 ```
 
-Schemes: `Septena` (iOS, embeds Watch + widgets + live activity), `SeptenaMac`,
-`SeptenaWatch`. `*.entitlements` files are **hand-maintained** (XcodeGen
-references them but does not generate them) — container / app-group / bundle-id
-strings live there and are edited by hand.
+Schemes: `Septask` (iOS, embeds Watch + Share extension), `SeptaskMac`,
+`SeptaskWatch`, and `SeptenaCoreTests`. `*.entitlements` files are
+**hand-maintained** (XcodeGen references them but does not generate them) —
+container / app-group / bundle-id strings live there and are edited by hand.
 
 **Build once per logical unit, never concurrently.** Make a coherent change, then
 run **one** verifying build before leaving the tree green — not after every file
 touch. With 3–5 parallel sessions plus the hourly commit-cron, concurrent
 `xcodebuild`/`xcodegen` against shared state corrupts incremental builds, so
-**build through `scripts/build.sh`** (defaults to the iOS `Septena` scheme): it
+**build through `scripts/build.sh`** (defaults to the iOS `Septask` scheme): it
 takes a shared `mkdir` lock at `/tmp/auto-build.lock.d` so builds serialize
 across every session and the cron. The compile is the only green gate before the
 cron pushes — a tree that doesn't build must never be left behind.
 
-**Neither iOS scheme can build when no watchOS simulator runtime matches the
+**The iOS scheme cannot build when no watchOS simulator runtime matches the
 SDK the active Xcode ships** (e.g. Xcode 26.6 ships watchOS 26.5; runtimes
-installed are 26.2 + 27.0). `Septena` embeds `SeptenaWatch` and `Septask` embeds
-`SeptaskWatch`, so xcodebuild resolves a watch destination and dies — either at
-the scheme precondition ("watchOS 26.5 must be installed") or further down in
-`actool` on the complication's asset catalog. Same mismatch, two different-looking errors, neither self-explanatory.
+installed are 26.2 + 27.0). `Septask` embeds `SeptaskWatch`, so xcodebuild
+resolves a watch destination and dies — either at the scheme precondition
+("watchOS 26.5 must be installed") or further down in `actool` on the
+complication's asset catalog. Same mismatch, two different-looking errors,
+neither self-explanatory.
 **Nothing is wrong with the project** — Xcode.app builds fine because you pick a
-concrete destination it can resolve. `scripts/build.sh` now detects this before
+concrete destination it can resolve. `scripts/build.sh` detects this before
 taking the lock and exits 2 with guidance. When the change doesn't touch watch
-code, gate it on the Mac schemes instead — they compile the same shared sources:
-
-```bash
-scripts/build.sh SeptenaMac 'platform=macOS'
-```
+code, gate it on the Mac scheme instead — it compiles the same shared sources:
 
 ```bash
 scripts/build.sh SeptaskMac 'platform=macOS'
