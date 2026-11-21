@@ -68,6 +68,9 @@ private struct SeptaskKitRowCommands: View {
       Button("Toggle Star") { SeptaskKitCommands.row(.toggleStar) }
         .keyboardShortcut("s", modifiers: [.command, .option])
         .disabled(!SeptaskKitCommands.canRun(.toggleStar))
+      Button("Add Checklist Item") { SeptaskKitCommands.row(.addChecklistItem) }
+        .keyboardShortcut("c", modifiers: [.command, .shift])
+        .disabled(!SeptaskKitCommands.canRun(.addChecklistItem))
       Button("When…") { SeptaskKitCommands.row(.when) }
         .keyboardShortcut("s", modifiers: .command)
         .disabled(!SeptaskKitCommands.canRun(.when))

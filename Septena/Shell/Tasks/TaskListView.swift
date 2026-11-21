@@ -418,6 +418,7 @@ struct TaskListView: View {
   @State private var repeatTargetId: String?
   @State private var reminderTargetId: String?
   @State private var starredOnlyFilter = false
+  @State private var checklistCounts: [String: (done: Int, total: Int)] = [:]
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -3377,6 +3378,7 @@ struct TaskListView: View {
       showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
       accessory: accessory,
+      checklistSummary: checklistCounts[task.id],
       titleMatchID: "edit-title-\(task.id)",
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
@@ -4569,6 +4571,7 @@ struct TaskListView: View {
     // Cache was already painted in init(); only show the loading state when
     // we have literally nothing to render (first ever launch, cache miss).
     if items.isEmpty { isLoading = true }
+    checklistCounts = LocalCache.checklistSummaryByTask(in: modelContext)
     defer { isLoading = false }
 
     // CloudKit is the only backend. Pull fresh from CK via the engine

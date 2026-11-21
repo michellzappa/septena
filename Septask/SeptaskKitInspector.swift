@@ -20,6 +20,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   private let reminderButton = NSButton()
   private let repeatButton = NSButton()
   private let starButton = NSButton()
+  private let addChecklistButton = NSButton()
+  private let checklistLabel = NSTextField(labelWithString:
+    String(localized: "Checklist", comment: "SeptaskKit: inspector section"))
+  private let checklistView = KitChecklistView()
   private let listLabel = NSTextField(labelWithString: "")
   private let placeholder = NSTextField(labelWithString: String(localized: "No Selection",
                                                                  comment: "SeptaskKit: inspector empty"))
@@ -100,12 +104,14 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     for (button, action) in [(whenButton, #selector(editWhen)),
                              (deadlineButton, #selector(editDeadline)),
                              (reminderButton, #selector(editReminder)),
-                             (starButton, #selector(toggleStar))] {
+                             (starButton, #selector(toggleStar)),
+                             (addChecklistButton, #selector(addChecklistStep))] {
       button.bezelStyle = .rounded
       button.target = self
       button.action = action
       button.alignment = .left
     }
+    addChecklistButton.title = String(localized: "Add Checklist…", comment: "SeptaskKit: inspector add checklist")
     repeatButton.bezelStyle = .rounded
     repeatButton.target = self
     repeatButton.action = #selector(editRepeat)
@@ -125,8 +131,19 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     form.addArrangedSubview(reminderButton)
     form.addArrangedSubview(repeatButton)
     form.addArrangedSubview(starButton)
+    form.addArrangedSubview(addChecklistButton)
     form.addArrangedSubview(notesLabel)
     form.addArrangedSubview(notesScroll)
+    checklistLabel.font = SeptaskKitTheme.chip
+    checklistLabel.textColor = SeptaskKitTheme.iconMuted
+    checklistView.translatesAutoresizingMaskIntoConstraints = false
+    checklistView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.updateChecklistVisibility()
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    }
+    form.addArrangedSubview(checklistLabel)
+    form.addArrangedSubview(checklistView)
     conversationLabel.font = SeptaskKitTheme.chip
     conversationLabel.textColor = SeptaskKitTheme.iconMuted
     conversationView.translatesAutoresizingMaskIntoConstraints = false
@@ -142,8 +159,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       return snapshot.projects.first { $0.id == id }?.title ?? snapshot.areas.first { $0.id == id }?.title
     }
     form.addArrangedSubview(historyView)
-    form.setCustomSpacing(14, after: starButton)
+    form.setCustomSpacing(14, after: addChecklistButton)
     form.setCustomSpacing(14, after: notesScroll)
+    form.setCustomSpacing(14, after: checklistView)
     form.setCustomSpacing(14, after: conversationView)
 
     placeholder.textColor = SeptaskKitTheme.iconMuted
@@ -217,6 +235,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       closeButton.widthAnchor.constraint(equalToConstant: 20),
       closeButton.heightAnchor.constraint(equalToConstant: 20),
       notesScroll.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
+      checklistView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       conversationView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       historyView.widthAnchor.constraint(equalTo: form.widthAnchor, constant: -28),
       notesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
@@ -327,6 +346,8 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     textUndo.removeAllActions()
     loadTitle(next.title)
     loadNotes(next.notes ?? "")
+    checklistView.configure(taskID: next.id)
+    updateChecklistVisibility()
     refreshReadOnlyFields(next)
     refreshConversation(next)
     historyView.configure(taskID: next.id)
@@ -487,6 +508,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// Commit whatever is in the fields. Safe to call repeatedly — it only
   /// writes when a value actually differs from what was loaded.
   func flushPendingEdits() {
+    checklistView.flushPendingEdits()
     guard let current = task else { return }
     let beforeTitle = loadedTitle
     let beforeNotes = loadedNotes
@@ -632,6 +654,18 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
       before: before, context: context, mutator: mutator)
     NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     refresh()
+  }
+
+  @objc private func addChecklistStep() {
+    guard task != nil else { return }
+    checklistView.appendItemAndFocus()
+    updateChecklistVisibility()
+  }
+
+  private func updateChecklistVisibility() {
+    let hasItems = checklistView.summary.total > 0
+    checklistLabel.isHidden = !hasItems
+    addChecklistButton.isHidden = hasItems
   }
 
   @objc private func editReminder() {

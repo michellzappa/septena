@@ -577,6 +577,9 @@ struct TaskRow: View {
   /// "file here" capsule here so it sits left of the date (a variable-width
   /// element kept inboard of the fixed glyphs). Nil on every other surface.
   var accessory: AnyView? = nil
+  /// Optional 1-level checklist progress summary (`done/total`). Zero extra
+  /// chrome when nil or `total == 0` (docs/CHECKLISTS_SPEC.md §4).
+  var checklistSummary: (done: Int, total: Int)? = nil
   /// Hero-animation anchors forwarded to `CheckableRow` so the closed row's
   /// title + checkbox glide into the inline editor. See `CheckableRow`.
   var titleMatchID: String? = nil
@@ -676,6 +679,17 @@ struct TaskRow: View {
                      title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     }
     trailingDate
+    if let summary = checklistSummary, summary.total > 0 {
+      HStack(spacing: 3) {
+        Image(systemName: "checklist")
+          .scaledFont(size: 11)
+        Text("\(summary.done)/\(summary.total)")
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "\(summary.done) of \(summary.total) checklist items complete",
+                                 comment: "Task row checklist progress a11y"))
+    }
     if task.status == .open, task.deletedAt == nil,
        let badge = task.reminder?.badgeText() {
       HStack(spacing: 3) {

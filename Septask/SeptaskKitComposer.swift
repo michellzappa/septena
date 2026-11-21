@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import SwiftData
 
 // The inline composer: a task row that expands in place into an editor —
 // title, then notes (when the task has any, or the Notes pill reveals them),
@@ -72,8 +73,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let titleScroll = NSScrollView()
   private let notesView = KitComposerTextView()
   private let notesScroll = NSScrollView()
-  /// Title, notes, pills — stacked. A hidden notes scroll view detaches from
-  /// the stack, so the rail closes up under the title on its own.
+  private let checklistView = KitChecklistView()
+  /// Title, notes, checklist (when shown), pills — stacked. A hidden subview
+  /// detaches from the stack, so the rail closes up cleanly.
   private let column = NSStackView()
   private let pillRow = NSStackView()
 
@@ -84,6 +86,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let listPill = KitPillButton()
   private let repeatPill = KitPillButton()
   private let starPill = KitPillButton()
+  private let checklistPill = KitPillButton()
   private let discussPill = KitPillButton()
   private let notesPill = KitPillButton()
 
@@ -91,6 +94,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private var trailingConstraint: NSLayoutConstraint!
   private var titleHeightConstraint: NSLayoutConstraint!
   private var notesHeightConstraint: NSLayoutConstraint!
+  private var checklistHeightConstraint: NSLayoutConstraint!
   /// False only before `configure(with:)` has run — an open row always shows
   /// its notes. Kept as a guard so a cell the table measures before it is
   /// configured doesn't reserve notes height it isn't drawing yet.
@@ -144,25 +148,29 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   /// Row height for a one-line title with no notes — the controller's answer
   /// until the live cell has measured itself (`expandedHeight`).
-  static var baseHeight: CGFloat { height(titleHeight: titleLineHeight, notesHeight: nil) }
+  static var baseHeight: CGFloat { height(titleHeight: titleLineHeight, notesHeight: nil, checklistHeight: 0) }
 
   /// Layout: a closed-row-height band at the top (checkbox + first title line
   /// centered exactly as `SeptaskKitTaskCell`), any extra title lines, then
-  /// notes and pills hanging below. Enter only grows the row downward.
-  private static func height(titleHeight: CGFloat, notesHeight: CGFloat?) -> CGFloat {
+  /// notes, optional checklist, and pills hanging below. Enter only grows the
+  /// row downward.
+  private static func height(titleHeight: CGFloat, notesHeight: CGFloat?, checklistHeight: CGFloat) -> CGFloat {
     var height = SeptaskKitTheme.rowHeight + max(0, titleHeight - titleLineHeight) + interRowGap
     if let notesHeight { height += notesHeight + interRowGap }
+    if checklistHeight > 0 { height += checklistHeight + interRowGap }
     return height + pillRowHeight + bottomPadding
   }
 
   /// The row height the controller must return for this expanded row, from
-  /// the live title/notes measurements. Re-measures first when the cell has
-  /// a real width, so a caller that reads it right after the table sized the
+  /// the live title/notes/checklist measurements. Re-measures first when the cell
+  /// has a real width, so a caller that reads it right after the table sized the
   /// cell gets the wrapped-title answer without waiting for a layout pass.
   var expandedHeight: CGFloat {
     recomputeContentHeights(notify: false)
+    let checklistH = checklistView.isHidden ? 0 : checklistView.preferredHeight
     return Self.height(titleHeight: measuredTitleHeight,
-                       notesHeight: notesShown ? measuredNotesHeight : nil)
+                       notesHeight: notesShown ? measuredNotesHeight : nil,
+                       checklistHeight: checklistH)
   }
 
   init(identifier: NSUserInterfaceItemIdentifier) {
@@ -227,21 +235,32 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
     starPill.onPress = { [weak self] _ in self?.onAction?(.toggleStar) }
+    checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
+    checklistPill.onPress = { [weak self] _ in self?.addChecklistItemAndFocus() }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
     for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
-                 notesPill, discussPill] {
+                 checklistPill, notesPill, discussPill] {
       pillRow.addArrangedSubview(pill)
+    }
+
+    checklistView.translatesAutoresizingMaskIntoConstraints = false
+    checklistView.onChanged = { [weak self] in
+      guard let self else { return }
+      self.syncChecklistHeight(notify: true)
+      self.updateChecklistPill()
     }
 
     column.orientation = .vertical
     column.alignment = .leading
     column.spacing = Self.interRowGap
+    column.detachesHiddenViews = true
     column.translatesAutoresizingMaskIntoConstraints = false
     column.addArrangedSubview(titleScroll)
     column.addArrangedSubview(notesScroll)
+    column.addArrangedSubview(checklistView)
     column.addArrangedSubview(pillRow)
     // The one-line title ends `titleTop` short of the closed-row band's
     // bottom; add that back so the rail hangs `interRowGap` under the BAND
@@ -259,6 +278,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       equalToConstant: Self.titleLineHeight)
     notesHeightConstraint = notesScroll.heightAnchor.constraint(
       equalToConstant: Self.notesMinHeight)
+    checklistHeightConstraint = checklistView.heightAnchor.constraint(equalToConstant: 0)
     NSLayoutConstraint.activate([
       leadingConstraint,
       // Match `SeptaskKitTaskCell`: checkbox on the vertical center of a
@@ -276,6 +296,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       titleHeightConstraint,
       notesScroll.widthAnchor.constraint(equalTo: column.widthAnchor),
       notesHeightConstraint,
+      checklistView.widthAnchor.constraint(equalTo: column.widthAnchor),
+      checklistHeightConstraint,
       pillRow.heightAnchor.constraint(equalToConstant: Self.pillRowHeight),
       pillRow.widthAnchor.constraint(lessThanOrEqualTo: column.widthAnchor),
     ])
@@ -380,9 +402,39 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesPill.isOn = !notes.isEmpty
     titleView.needsDisplay = true
     notesView.needsDisplay = true
+    checklistView.configure(taskID: task.id)
+    syncChecklistHeight(notify: false)
     updateKeyChain()
     recomputeContentHeights(notify: false)
     refreshPills(with: task, listName: listName)
+  }
+
+  /// Reveal the checklist (if hidden), append a step, and move focus into it.
+  /// Driven by the Checklist pill and `⇧⌘C`.
+  func addChecklistItemAndFocus() {
+    checklistView.appendItemAndFocus()
+    syncChecklistHeight(notify: true)
+    updateChecklistPill()
+  }
+
+  private func syncChecklistHeight(notify: Bool) {
+    let h = checklistView.isHidden ? 0 : checklistView.preferredHeight
+    if abs(checklistHeightConstraint.constant - h) > 0.5 {
+      checklistHeightConstraint.constant = h
+      if notify { onContentHeightChanged?() }
+    }
+  }
+
+  private func updateChecklistPill() {
+    let summary = checklistView.summary
+    if summary.total > 0 {
+      checklistPill.title = String(localized: "Checklist \(summary.done)/\(summary.total)",
+                                   comment: "SeptaskKit: composer checklist pill progress")
+      checklistPill.isOn = true
+    } else {
+      checklistPill.title = String(localized: "Checklist", comment: "SeptaskKit: composer pill")
+      checklistPill.isOn = false
+    }
   }
 
   /// Pills + checkbox cues only — deliberately does NOT touch `titleView` or
@@ -449,6 +501,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       ? String(localized: "Starred", comment: "SeptaskKit: composer star pill active")
       : String(localized: "Star", comment: "SeptaskKit: composer star pill")
     starPill.isOn = task.starred
+    updateChecklistPill()
 
     // Same gate as SwiftUI's `showsDiscuss`: only before a conversation
     // exists, and only when a local model can actually answer. A pill that
@@ -630,6 +683,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// Report the typed title / notes when they differ from the last commit.
   /// Safe to call any number of times.
   func commit() {
+    checklistView.flushPendingEdits()
     let title = pendingTitle
     let notes = pendingNotes
     guard title != committedTitle || notes != committedNotes else { return }
@@ -951,5 +1005,397 @@ final class KitPillButton: NSButton {
   @objc private func pressed() { onPress?(self) }
 
   private static let horizontalPadding: CGFloat = 12
+}
+
+// MARK: - 1-level Checklist editor (CL1, docs/CHECKLISTS_SPEC.md)
+
+/// Reusable keyboard-fast 1-level checklist editor shared by `KitComposerCell`
+/// and `SeptaskKitInspectorController`. Hidden completely until the task has
+/// steps or the user clicks Checklist / presses `⇧⌘C` (progressive disclosure).
+@MainActor
+final class KitChecklistView: NSView {
+  var onChanged: (() -> Void)?
+
+  private var taskID: String?
+  private var items: [ChecklistItem] = []
+  private var rowViews: [KitChecklistItemRow] = []
+  private let stack = NSStackView()
+  private let addButton = NSButton()
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+  private var context: ModelContext { LocalStore.shared.container.mainContext }
+
+  private static let rowHeight: CGFloat = 24
+  private static let rowSpacing: CGFloat = 4
+
+  var summary: (done: Int, total: Int) {
+    (items.filter(\.checked).count, items.count)
+  }
+
+  var preferredHeight: CGFloat {
+    guard !isHidden else { return 0 }
+    let count = items.count
+    let rowsH = CGFloat(count) * Self.rowHeight + CGFloat(count) * Self.rowSpacing
+    return rowsH + Self.rowHeight
+  }
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = Self.rowSpacing
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+
+    addButton.isBordered = false
+    addButton.bezelStyle = .inline
+    addButton.imagePosition = .imageLeading
+    addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .medium))
+    addButton.title = String(localized: "Add step", comment: "Checklist add step button")
+    addButton.font = .systemFont(ofSize: SeptenaTypeScale.size(.footnote))
+    addButton.contentTintColor = SeptaskKitTheme.inkSecondary
+    addButton.target = self
+    addButton.action = #selector(addStepPressed)
+    addButton.translatesAutoresizingMaskIntoConstraints = false
+    addButton.heightAnchor.constraint(equalToConstant: Self.rowHeight).isActive = true
+
+    NSLayoutConstraint.activate([
+      stack.topAnchor.constraint(equalTo: topAnchor),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+      stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+      stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+    ])
+    isHidden = true
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitChecklistView is code-only") }
+
+  func configure(taskID: String) {
+    self.taskID = taskID
+    reload(focusItemID: nil)
+  }
+
+  func flushPendingEdits() {
+    for row in rowViews { row.flushIfDirty() }
+  }
+
+  func appendItemAndFocus() {
+    guard let taskID else { return }
+    flushPendingEdits()
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "") else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    reload(focusItemID: created.id)
+    onChanged?()
+  }
+
+  @objc private func addStepPressed() {
+    appendItemAndFocus()
+  }
+
+  func reload(focusItemID: String?) {
+    guard let taskID else {
+      items = []
+      isHidden = true
+      rebuildRows(focusItemID: nil)
+      return
+    }
+    items = LocalCache.checklistItems(forTaskID: taskID, in: context)
+    isHidden = items.isEmpty
+    rebuildRows(focusItemID: focusItemID)
+  }
+
+  private func rebuildRows(focusItemID: String?) {
+    for view in stack.arrangedSubviews {
+      stack.removeArrangedSubview(view)
+      view.removeFromSuperview()
+    }
+    rowViews = []
+
+    let total = items.count
+    for (idx, item) in items.enumerated() {
+      let row = KitChecklistItemRow(item: item, index: idx, total: total)
+      row.onToggle = { [weak self] current in self?.toggle(current) }
+      row.onCommitTitle = { [weak self] current, nextTitle in self?.commitTitle(current, nextTitle: nextTitle) }
+      row.onInsertBelow = { [weak self] current in self?.insertBelow(current) }
+      row.onDelete = { [weak self] current, focusPrevious in self?.delete(current, focusPrevious: focusPrevious) }
+      row.onMoveFocus = { [weak self] current, delta in self?.moveFocus(from: current.id, delta: delta) }
+      row.onMoveOrder = { [weak self] current, delta in self?.moveOrder(itemID: current.id, delta: delta) }
+      row.onPasteLines = { [weak self] current, lines in self?.splitPaste(current, lines: lines) }
+      stack.addArrangedSubview(row)
+      row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+      row.heightAnchor.constraint(equalToConstant: Self.rowHeight).isActive = true
+      rowViews.append(row)
+    }
+    if !items.isEmpty {
+      stack.addArrangedSubview(addButton)
+    }
+
+    if let focusItemID, let target = rowViews.first(where: { $0.itemID == focusItemID }) {
+      DispatchQueue.main.async { [weak target] in target?.focusTitle() }
+    }
+  }
+
+  private func toggle(_ item: ChecklistItem) {
+    flushPendingEdits()
+    var after = item
+    after.checked.toggle()
+    mutator.updateChecklistItem(id: item.id, checked: after.checked)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    reload(focusItemID: nil)
+    onChanged?()
+  }
+
+  private func commitTitle(_ item: ChecklistItem, nextTitle: String) {
+    let trimmed = nextTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed != item.title else { return }
+    var after = item
+    after.title = trimmed
+    mutator.updateChecklistItem(id: item.id, title: trimmed)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    if let i = items.firstIndex(where: { $0.id == item.id }) { items[i].title = trimmed }
+    onChanged?()
+  }
+
+  private func insertBelow(_ item: ChecklistItem) {
+    guard let taskID else { return }
+    flushPendingEdits()
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let pos: Double?
+    if idx + 1 < items.count {
+      let mid = (items[idx].position + items[idx + 1].position) / 2.0
+      pos = (mid > items[idx].position && mid < items[idx + 1].position) ? mid : nil
+    } else {
+      pos = nil
+    }
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "", position: pos) else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    reload(focusItemID: created.id)
+    onChanged?()
+  }
+
+  private func delete(_ item: ChecklistItem, focusPrevious: Bool) {
+    let idx = items.firstIndex(where: { $0.id == item.id })
+    let prevID: String? = focusPrevious ? idx.flatMap { $0 > 0 ? items[$0 - 1].id : nil } : nil
+    mutator.deleteChecklistItem(id: item.id)
+    TaskUndo.recordChecklistDelete(item, mutator: mutator)
+    reload(focusItemID: prevID)
+    onChanged?()
+  }
+
+  private func moveFocus(from itemID: String, delta: Int) {
+    guard let idx = rowViews.firstIndex(where: { $0.itemID == itemID }) else { return }
+    let next = idx + delta
+    guard rowViews.indices.contains(next) else { return }
+    rowViews[next].focusTitle()
+  }
+
+  private func moveOrder(itemID: String, delta: Int) {
+    guard let taskID,
+          let idx = items.firstIndex(where: { $0.id == itemID }) else { return }
+    let target = idx + delta
+    guard items.indices.contains(target) else { return }
+    let beforeIDs = items.map(\.id)
+    var afterIDs = beforeIDs
+    afterIDs.swapAt(idx, target)
+    mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs)
+    TaskUndo.recordChecklistReorder(taskID: taskID, beforeIDs: beforeIDs, afterIDs: afterIDs, mutator: mutator)
+    reload(focusItemID: itemID)
+    onChanged?()
+  }
+
+  private func splitPaste(_ item: ChecklistItem, lines: [String]) {
+    guard let taskID, let first = lines.first else { return }
+    commitTitle(item, nextTitle: first)
+    let rest = Array(lines.dropFirst())
+    guard !rest.isEmpty else { return }
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let belowPos = idx + 1 < items.count ? items[idx + 1].position : (items[idx].position + TaskOrder.gap * Double(rest.count + 1))
+    let span = belowPos - items[idx].position
+    var lastID = item.id
+    for (offset, text) in rest.enumerated() {
+      let pos = items[idx].position + span * Double(offset + 1) / Double(rest.count + 1)
+      if let created = mutator.addChecklistItem(taskID: taskID, title: text, position: pos) {
+        TaskUndo.recordChecklistAdd(created, mutator: mutator)
+        lastID = created.id
+      }
+    }
+    reload(focusItemID: lastID)
+    onChanged?()
+  }
+}
+
+@MainActor
+private final class KitChecklistItemRow: NSView, NSTextFieldDelegate {
+  private var item: ChecklistItem
+  var itemID: String { item.id }
+
+  var onToggle: ((ChecklistItem) -> Void)?
+  var onCommitTitle: ((ChecklistItem, String) -> Void)?
+  var onInsertBelow: ((ChecklistItem) -> Void)?
+  var onDelete: ((ChecklistItem, Bool) -> Void)?
+  var onMoveFocus: ((ChecklistItem, Int) -> Void)?
+  var onMoveOrder: ((ChecklistItem, Int) -> Void)?
+  var onPasteLines: ((ChecklistItem, [String]) -> Void)?
+
+  private let checkButton = NSButton()
+  private let field = NSTextField()
+  private let deleteButton = NSButton()
+
+  init(item: ChecklistItem, index: Int, total: Int) {
+    self.item = item
+    super.init(frame: .zero)
+    translatesAutoresizingMaskIntoConstraints = false
+
+    checkButton.isBordered = false
+    checkButton.bezelStyle = .inline
+    checkButton.imagePosition = .imageOnly
+    checkButton.refusesFirstResponder = true
+    checkButton.image = NSImage(
+      systemSymbolName: item.checked ? "checkmark.circle.fill" : "circle",
+      accessibilityDescription: nil
+    )?.withSymbolConfiguration(.init(pointSize: 13, weight: .regular))
+    checkButton.contentTintColor = item.checked ? SeptaskKitTheme.inkSecondary : SeptaskKitTheme.iconMuted
+    checkButton.target = self
+    checkButton.action = #selector(togglePressed)
+    checkButton.setAccessibilityLabel(
+      String(localized: "\(item.title.isEmpty ? "Step" : item.title), checklist item \(index + 1) of \(total), \(item.checked ? "checked" : "unchecked")",
+             comment: "Checklist item VoiceOver label")
+    )
+
+    field.isBordered = false
+    field.drawsBackground = false
+    field.focusRingType = .none
+    field.font = .systemFont(ofSize: SeptaskKitTheme.notesFontSize)
+    field.placeholderString = String(localized: "Checklist item", comment: "Checklist item placeholder")
+    field.lineBreakMode = .byTruncatingTail
+    field.delegate = self
+    applyFieldStyle()
+
+    deleteButton.isBordered = false
+    deleteButton.bezelStyle = .inline
+    deleteButton.imagePosition = .imageOnly
+    deleteButton.refusesFirstResponder = true
+    deleteButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+    deleteButton.contentTintColor = SeptaskKitTheme.iconMuted
+    deleteButton.target = self
+    deleteButton.action = #selector(deletePressed)
+    deleteButton.setAccessibilityLabel(String(localized: "Delete step", comment: "Checklist delete button a11y"))
+
+    let rowMenu = NSMenu()
+    if index > 0 {
+      let up = NSMenuItem(title: String(localized: "Move Up", comment: "Checklist context menu"),
+                          action: #selector(moveUpPressed), keyEquivalent: "")
+      up.target = self
+      rowMenu.addItem(up)
+    }
+    if index + 1 < total {
+      let down = NSMenuItem(title: String(localized: "Move Down", comment: "Checklist context menu"),
+                            action: #selector(moveDownPressed), keyEquivalent: "")
+      down.target = self
+      rowMenu.addItem(down)
+    }
+    let del = NSMenuItem(title: String(localized: "Delete Step", comment: "Checklist context menu"),
+                         action: #selector(deletePressed), keyEquivalent: "")
+    del.target = self
+    rowMenu.addItem(del)
+    self.menu = rowMenu
+
+    let row = NSStackView(views: [checkButton, field, deleteButton])
+    row.orientation = .horizontal
+    row.alignment = .centerY
+    row.spacing = 6
+    row.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(row)
+
+    checkButton.setContentHuggingPriority(.required, for: .horizontal)
+    deleteButton.setContentHuggingPriority(.required, for: .horizontal)
+    field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+    NSLayoutConstraint.activate([
+      row.topAnchor.constraint(equalTo: topAnchor),
+      row.leadingAnchor.constraint(equalTo: leadingAnchor),
+      row.trailingAnchor.constraint(equalTo: trailingAnchor),
+      row.bottomAnchor.constraint(equalTo: bottomAnchor),
+      checkButton.widthAnchor.constraint(equalToConstant: 18),
+      deleteButton.widthAnchor.constraint(equalToConstant: 18),
+    ])
+  }
+
+  required init?(coder: NSCoder) { fatalError("KitChecklistItemRow is code-only") }
+
+  private func applyFieldStyle() {
+    var attrs: [NSAttributedString.Key: Any] = [
+      .font: NSFont.systemFont(ofSize: SeptaskKitTheme.notesFontSize),
+      .foregroundColor: item.checked ? SeptaskKitTheme.inkSecondary : NSColor.labelColor,
+    ]
+    if item.checked {
+      attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+    }
+    field.attributedStringValue = NSAttributedString(string: item.title, attributes: attrs)
+  }
+
+  func focusTitle() {
+    window?.makeFirstResponder(field)
+    if let editor = field.currentEditor() {
+      editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
+    }
+  }
+
+  func flushIfDirty() {
+    let text = field.stringValue
+    if text != item.title {
+      onCommitTitle?(item, text)
+      item.title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+  }
+
+  @objc private func togglePressed() { onToggle?(item) }
+  @objc private func deletePressed() { onDelete?(item, false) }
+  @objc private func moveUpPressed() { onMoveOrder?(item, -1) }
+  @objc private func moveDownPressed() { onMoveOrder?(item, 1) }
+
+  func controlTextDidChange(_ obj: Notification) {
+    let text = field.stringValue
+    if text.contains("\n") || text.contains("\r") {
+      let lines = text
+        .components(separatedBy: .newlines)
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { !$0.isEmpty }
+      if lines.count > 1 {
+        onPasteLines?(item, lines)
+      }
+    }
+  }
+
+  func controlTextDidEndEditing(_ obj: Notification) {
+    flushIfDirty()
+  }
+
+  func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
+    switch sel {
+    case #selector(NSResponder.insertNewline(_:)):
+      flushIfDirty()
+      onInsertBelow?(item)
+      return true
+    case #selector(NSResponder.deleteBackward(_:)):
+      if textView.string.isEmpty {
+        onDelete?(item, true)
+        return true
+      }
+      return false
+    case #selector(NSResponder.moveUp(_:)):
+      flushIfDirty()
+      onMoveFocus?(item, -1)
+      return true
+    case #selector(NSResponder.moveDown(_:)):
+      flushIfDirty()
+      onMoveFocus?(item, 1)
+      return true
+    default:
+      return false
+    }
+  }
 }
 #endif

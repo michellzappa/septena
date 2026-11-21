@@ -260,6 +260,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// current selection (see `refreshPlacementMenuItems`).
   private let todayMenuItem = NSMenuItem()
   private let starMenuItem = NSMenuItem()
+  private var checklistCounts: [String: (done: Int, total: Int)] = [:]
   /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
   /// what ⌥⌘I will actually do next.
   private let infoMenuItem = NSMenuItem()
@@ -466,6 +467,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
     tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
     tableView.onToggleStar = { [weak self] in self?.toggleStarSelection() }
+    tableView.onAddChecklistItem = { [weak self] in self?.addChecklistItemToSelection() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -967,6 +969,7 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     heldReload = false
+    checklistCounts = LocalCache.checklistSummaryByTask(in: context)
 
     let locallyChanged = locallyChanged.union(takePendingReloadIDs())
     renderedDay = SeptenaDate.today
@@ -2863,6 +2866,26 @@ final class SeptaskKitTaskListController: NSViewController {
       before: before
     )
     onStoreChanged?()
+  }
+
+  /// ⇧⌘C — reveal the checklist on the selected/composing task, insert a step,
+  /// and move focus into it (docs/CHECKLISTS_SPEC.md §4).
+  func addChecklistItemToSelection() {
+    if let composingTaskId,
+       let row = rows.firstIndex(where: { $0.task?.id == composingTaskId }),
+       let composer = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitComposerCell {
+      composer.addChecklistItemAndFocus()
+      return
+    }
+    guard let task = actionableSelection.first else { NSSound.beep(); return }
+    beginComposing(id: task.id)
+    DispatchQueue.main.async { [weak self] in
+      guard let self,
+            let row = self.rows.firstIndex(where: { $0.task?.id == task.id }),
+            let composer = self.tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? KitComposerCell
+      else { return }
+      composer.addChecklistItemAndFocus()
+    }
   }
 
   func deleteSelection() {
@@ -5105,7 +5128,8 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? SeptaskKitTaskCell
         ?? SeptaskKitTaskCell(identifier: identifier)
       cell.configure(with: task, filter: filter, chip: chip,
-                     contextText: taskContextText(for: task))
+                     contextText: taskContextText(for: task),
+                     checklistSummary: checklistCounts[task.id])
       cell.configureSuggestion(suggestion) { [weak self] in
         self?.applyFilingSuggestion(taskID: task.id)
       }
@@ -5226,6 +5250,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let detail = NSTextField(labelWithString: "")
   private let reminderGlyph = NSImageView()
   private let reminderLabel = NSTextField(labelWithString: "")
+  private let checklistGlyph = NSImageView()
+  private let checklistLabel = NSTextField(labelWithString: "")
   private let repeatGlyph = NSImageView()
   private let starGlyph = NSImageView()
   private var taskId = ""
@@ -5310,6 +5336,25 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     reminderLabel.kitA11yIgnore()
     reminderLabel.isHidden = true
 
+    checklistGlyph.translatesAutoresizingMaskIntoConstraints = false
+    checklistGlyph.image = NSImage(systemSymbolName: "checklist", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    checklistGlyph.contentTintColor = SeptaskKitTheme.inkSecondary
+    checklistGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    checklistGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    checklistGlyph.kitA11yIgnore()
+    checklistGlyph.isHidden = true
+
+    checklistLabel.font = SeptaskKitTheme.meta
+    checklistLabel.textColor = SeptaskKitTheme.inkSecondary
+    checklistLabel.lineBreakMode = .byClipping
+    checklistLabel.isEditable = false
+    checklistLabel.isSelectable = false
+    checklistLabel.setContentHuggingPriority(.required, for: .horizontal)
+    checklistLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+    checklistLabel.kitA11yIgnore()
+    checklistLabel.isHidden = true
+
     // The repeat marker is the SAME SF Symbol the SwiftUI row uses, in its own
     // glyph view rather than a "↻" concatenated onto the date string — per the
     // DesignSpec, a glyph is a view, never baked into a formatted label.
@@ -5341,7 +5386,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
+                                      checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                                      scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5445,7 +5491,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
 
   func configure(with task: SeptenaTask, filter: TaskFilter,
                  chip chipValue: SeptaskKitTaskListController.Chip?,
-                 contextText: String?) {
+                 contextText: String?,
+                 checklistSummary: (done: Int, total: Int)? = nil) {
     taskId = task.id
     plainTitle = task.title
     editing = false
@@ -5458,7 +5505,13 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       chip.isHidden = true
       statusChip.isHidden = true
       issueChip.isHidden = true
+      checklistGlyph.isHidden = true
+      checklistLabel.isHidden = true
+      reminderGlyph.isHidden = true
+      reminderLabel.isHidden = true
       scheduleGlyph.isHidden = true
+      repeatGlyph.isHidden = true
+      starGlyph.isHidden = true
       detail.stringValue = ""
       title.font = SeptaskKitTheme.heading
       title.attributedStringValue = NSAttributedString(
@@ -5503,7 +5556,8 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
     for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
-                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
+                 checklistGlyph, checklistLabel, reminderGlyph, reminderLabel,
+                 scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5567,6 +5621,16 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
                            title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     } else {
       statusChip.isHidden = true
+    }
+
+    if let summary = checklistSummary, summary.total > 0 {
+      checklistLabel.stringValue = "\(summary.done)/\(summary.total)"
+      checklistGlyph.isHidden = false
+      checklistLabel.isHidden = false
+    } else {
+      checklistLabel.stringValue = ""
+      checklistGlyph.isHidden = true
+      checklistLabel.isHidden = true
     }
 
     configureDetail(with: task, filter: filter, done: done)
@@ -7119,6 +7183,7 @@ final class SeptaskKitTableView: NSTableView {
   var onFileSuggested: (() -> Void)?
   var onReminder: (() -> Void)?
   var onToggleStar: (() -> Void)?
+  var onAddChecklistItem: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7228,7 +7293,7 @@ final class SeptaskKitTableView: NSTableView {
       } else if (commandShift && key == "f") || (commandOption && key == "i") {
         allowed = true            // Quick Find, inspector: window-level, no row write
       } else if (command && ["k", "t", "s", "m"].contains(key))
-                  || (commandShift && ["m", "d"].contains(key))
+                  || (commandShift && ["m", "d", "c"].contains(key))
                   || (commandOption && ["r", "s"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
@@ -7273,6 +7338,8 @@ final class SeptaskKitTableView: NSTableView {
       case ".": onClearSchedule?(); return true
       case "f": onQuickFind?(); return true
       case "m": onMove?(); return true
+      // ⇧⌘C — reveal checklist & insert a step (docs/CHECKLISTS_SPEC.md §4).
+      case "c": onAddChecklistItem?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }

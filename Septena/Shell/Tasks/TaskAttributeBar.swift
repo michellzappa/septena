@@ -41,7 +41,7 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    case when, deadline, reminder, repeatRule, star, list, attachments
+    case when, deadline, reminder, repeatRule, star, list, checklist, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
@@ -57,6 +57,7 @@ struct TaskAttributeBar: View {
       case .repeatRule: "repeat"
       case .star:       "star"
       case .list:       "folder"
+      case .checklist:  "checklist"
       case .attachments:"paperclip"
       case .discuss:    "bubble.left.and.bubble.right"
       }
@@ -69,6 +70,7 @@ struct TaskAttributeBar: View {
       case .repeatRule: "Repeat"
       case .star:       "Star"
       case .list:       "List"
+      case .checklist:  "Checklist"
       case .attachments:"Attachments"
       case .discuss:    "Discuss"
       }
@@ -114,6 +116,16 @@ struct TaskAttributeBar: View {
             .focused($focus, equals: .pill(attr))
         }
         if let task = discussTask {
+          let steps = LocalCache.checklistItems(forTaskID: task.id, in: LocalStore.shared.container.mainContext)
+          let doneSteps = steps.filter(\.checked).count
+          AttributePill(icon: Attribute.checklist.icon, label: Attribute.checklist.label,
+                        value: steps.isEmpty ? nil : "\(doneSteps)/\(steps.count)",
+                        isSet: !steps.isEmpty, isActive: expanded == .checklist,
+                        isFocused: focus == .pill(.checklist), accent: accent, neutral: neutral) {
+            select(.checklist)
+          }
+          .focused($focus, equals: .pill(.checklist))
+
           let count = SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: task.id)
           AttributePill(icon: Attribute.attachments.icon, label: Attribute.attachments.label,
                         value: count == 0 ? nil : "\(count) file\(count == 1 ? "" : "s")",
@@ -167,6 +179,7 @@ struct TaskAttributeBar: View {
   private func value(for attr: Attribute) -> String? {
     switch attr {
     case .discuss: return nil
+    case .checklist: return nil
     case .attachments: return nil
     // "When" folds in Today: a task pinned to today (no date) reads "Today", a
     // future planning date reads its date, nothing set reads as Anytime (nil).
@@ -192,6 +205,7 @@ struct TaskAttributeBar: View {
   private func isSet(_ attr: Attribute) -> Bool {
     switch attr {
     case .discuss:    discussWorking
+    case .checklist:  discussTask.map { !LocalCache.checklistItems(forTaskID: $0.id, in: LocalStore.shared.container.mainContext).isEmpty } ?? false
     case .attachments: discussTask.map { SeptenaServices.shared.taskAttachmentStore.attachmentCount(taskID: $0.id) > 0 } ?? false
     case .when:       draft.scheduled != nil || draft.onToday
     case .deadline:   draft.deadline != nil
@@ -228,6 +242,10 @@ struct TaskAttributeBar: View {
                                           fill: panelFill) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
       }
+      case .checklist:
+        if let task = discussTask {
+          TaskChecklistPanel(taskID: task.id, accent: accent, fill: panelFill)
+        }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
       case .discuss, .star, .list, .none: EmptyView()
@@ -899,5 +917,255 @@ private struct InlineRepeatPanel: View {
     case .month: return String(localized: "\(n) months")
     case .year:  return String(localized: "\(n) years")
     }
+  }
+}
+
+// MARK: - Inline Checklist panel
+
+/// Progressive-disclosure inline checklist editor inside the SwiftUI task editor
+/// (iOS/iPadOS & SwiftUI Mac sheet). Stays quiet until opened; supports inline
+/// add, Return-to-insert-below, multi-line paste split, reorder, and delete with
+/// shared `TaskUndo` recording.
+private struct TaskChecklistPanel: View {
+  let taskID: String
+  let accent: Color
+  let fill: Color
+
+  @State private var items: [ChecklistItem] = []
+  @State private var drafts: [String: String] = [:]
+  @FocusState private var focusedItemID: String?
+
+  private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+        checklistRow(item: item, index: idx, total: items.count)
+      }
+
+      Button {
+        addStep()
+      } label: {
+        HStack(spacing: 6) {
+          Image(systemName: "plus")
+            .font(.system(size: 11, weight: .semibold))
+          Text("Add step")
+            .font(.septenaLabel)
+          Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.inkSecondary)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("Add checklist step"))
+    }
+    .padding(12)
+    .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .onAppear {
+      reload()
+      if items.isEmpty { addStep() }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .septenaTasksChanged)) { _ in
+      reload()
+    }
+    .onDisappear {
+      flushAllDrafts()
+    }
+  }
+
+  private func checklistRow(item: ChecklistItem, index: Int, total: Int) -> some View {
+    let binding = Binding<String>(
+      get: { drafts[item.id] ?? item.title },
+      set: { newValue in
+        // Multi-line paste splits into 1 step per non-empty line.
+        if newValue.contains("\n") || newValue.contains("\r") {
+          let lines = newValue
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+          if lines.count > 1 {
+            splitPaste(item, lines: lines)
+            return
+          }
+          drafts[item.id] = lines.first ?? ""
+        } else {
+          drafts[item.id] = newValue
+        }
+      }
+    )
+
+    let spokenTitle = item.title.isEmpty ? "Untitled step" : item.title
+    let spokenState = item.checked ? "checked" : "unchecked"
+
+    return HStack(spacing: 8) {
+      Button {
+        toggle(item)
+      } label: {
+        Image(systemName: item.checked ? "checkmark.circle.fill" : "circle")
+          .font(.system(size: 15, weight: .regular))
+          .foregroundStyle(item.checked ? accent : Theme.inkSecondary)
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
+
+      TextField("Step", text: binding)
+        .textFieldStyle(.plain)
+        .font(.septenaLabel)
+        .foregroundStyle(item.checked ? Theme.inkSecondary : Theme.inkPrimary)
+        .strikethrough(item.checked, color: Theme.inkSecondary)
+        .focused($focusedItemID, equals: item.id)
+        .onSubmit {
+          commitTitle(item)
+          insertBelow(item)
+        }
+        .onChange(of: focusedItemID) { oldID, newID in
+          if oldID == item.id, newID != item.id {
+            commitTitle(item)
+          }
+        }
+        .accessibilityLabel(Text("\(spokenTitle), checklist item \(index + 1) of \(total), \(spokenState)"))
+
+      Menu {
+        if index > 0 {
+          Button {
+            moveOrder(itemID: item.id, delta: -1)
+          } label: {
+            Label("Move Up", systemImage: "arrow.up")
+          }
+        }
+        if index + 1 < total {
+          Button {
+            moveOrder(itemID: item.id, delta: 1)
+          } label: {
+            Label("Move Down", systemImage: "arrow.down")
+          }
+        }
+        Button(role: .destructive) {
+          delete(item)
+        } label: {
+          Label("Delete Step", systemImage: "trash")
+        }
+      } label: {
+        Image(systemName: "ellipsis")
+          .font(.system(size: 12, weight: .medium))
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(width: 24, height: 24)
+          .contentShape(Rectangle())
+      }
+      #if os(macOS)
+      .menuStyle(.borderlessButton)
+      #endif
+      .fixedSize()
+      .accessibilityLabel(Text("Checklist item actions"))
+    }
+  }
+
+  private func reload() {
+    let loaded = LocalCache.checklistItems(forTaskID: taskID, in: LocalStore.shared.container.mainContext)
+    items = loaded
+    for item in loaded where focusedItemID != item.id {
+      drafts[item.id] = item.title
+    }
+  }
+
+  private func flushAllDrafts() {
+    for item in items { commitTitle(item) }
+  }
+
+  private func commitTitle(_ item: ChecklistItem) {
+    guard let raw = drafts[item.id] else { return }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed != item.title else { return }
+    var after = item
+    after.title = trimmed
+    mutator.updateChecklistItem(id: item.id, title: trimmed)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    if let i = items.firstIndex(where: { $0.id == item.id }) { items[i].title = trimmed }
+  }
+
+  private func addStep() {
+    flushAllDrafts()
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "") else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    drafts[created.id] = ""
+    reload()
+    focusedItemID = created.id
+  }
+
+  private func insertBelow(_ item: ChecklistItem) {
+    flushAllDrafts()
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let pos: Double?
+    if idx + 1 < items.count {
+      let mid = (items[idx].position + items[idx + 1].position) / 2.0
+      pos = (mid > items[idx].position && mid < items[idx + 1].position) ? mid : nil
+    } else {
+      pos = nil
+    }
+    guard let created = mutator.addChecklistItem(taskID: taskID, title: "", position: pos) else { return }
+    TaskUndo.recordChecklistAdd(created, mutator: mutator)
+    drafts[created.id] = ""
+    reload()
+    focusedItemID = created.id
+  }
+
+  private func toggle(_ item: ChecklistItem) {
+    flushAllDrafts()
+    Haptics.tick()
+    var after = item
+    after.checked.toggle()
+    mutator.updateChecklistItem(id: item.id, checked: after.checked)
+    TaskUndo.recordChecklistUpdate(before: item, after: after, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func moveOrder(itemID: String, delta: Int) {
+    flushAllDrafts()
+    guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return }
+    let target = idx + delta
+    guard items.indices.contains(target) else { return }
+    let beforeIDs = items.map(\.id)
+    var afterIDs = beforeIDs
+    afterIDs.swapAt(idx, target)
+    mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs)
+    TaskUndo.recordChecklistReorder(taskID: taskID, beforeIDs: beforeIDs, afterIDs: afterIDs, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+  }
+
+  private func delete(_ item: ChecklistItem) {
+    let idx = items.firstIndex(where: { $0.id == item.id })
+    let prevID = idx.flatMap { $0 > 0 ? items[$0 - 1].id : nil }
+    drafts.removeValue(forKey: item.id)
+    mutator.deleteChecklistItem(id: item.id)
+    TaskUndo.recordChecklistDelete(item, mutator: mutator)
+    a11yAnimate(.snappy(duration: 0.18)) { reload() }
+    if focusedItemID == item.id { focusedItemID = prevID }
+  }
+
+  private func splitPaste(_ item: ChecklistItem, lines: [String]) {
+    guard let first = lines.first else { return }
+    drafts[item.id] = first
+    commitTitle(item)
+    let rest = Array(lines.dropFirst())
+    guard !rest.isEmpty else { return }
+    let idx = items.firstIndex(where: { $0.id == item.id }) ?? (items.count - 1)
+    let belowPos = idx + 1 < items.count
+      ? items[idx + 1].position
+      : (items[idx].position + TaskOrder.gap * Double(rest.count + 1))
+    let span = belowPos - items[idx].position
+    var lastID = item.id
+    for (offset, text) in rest.enumerated() {
+      let pos = items[idx].position + span * Double(offset + 1) / Double(rest.count + 1)
+      if let created = mutator.addChecklistItem(taskID: taskID, title: text, position: pos) {
+        TaskUndo.recordChecklistAdd(created, mutator: mutator)
+        drafts[created.id] = text
+        lastID = created.id
+      }
+    }
+    reload()
+    focusedItemID = lastID
   }
 }
