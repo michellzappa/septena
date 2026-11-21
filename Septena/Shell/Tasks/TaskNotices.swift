@@ -292,14 +292,14 @@ enum TaskNotices {
         id: .connectAI,
         title: String(localized: "Connect your AI",
                       comment: "Get started step: connect an AI assistant or agent"),
-        detail: String(localized: "Let Claude work on tasks with you",
+        detail: String(localized: "Connect an assistant to your tasks",
                        comment: "Get started step detail: connect an AI assistant to your tasks"),
         done: done(.connectAI, source: TaskSource.mcp)),
       TaskNoticeStep(
         id: .importTasks,
         title: String(localized: "Bring in your tasks",
                       comment: "Get started step: import tasks from another app"),
-        detail: String(localized: "Import from Things or Reminders",
+        detail: String(localized: "Import from another app",
                        comment: "Get started step detail: import tasks from another app"),
         done: done(.importTasks, source: TaskSource.things)),
       TaskNoticeStep(
