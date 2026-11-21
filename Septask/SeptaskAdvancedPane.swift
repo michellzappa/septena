@@ -18,6 +18,15 @@ struct SeptaskAdvancedPane: View {
   @State private var diagnosticsPulse: SeptaskDiagnosticsPulse?
   @State private var loadingPulse = false
 
+  private static let page = RegistrySettings.PageID.advanced
+  private static let agentTools = RegistrySettings.section("agent_tools", page: page)
+  private static let betaAI = RegistrySettings.section("beta_ai", page: page)
+  private static let skills = RegistrySettings.itemBySurface["mcp_skills"]
+  private static let syncDiagnostics = RegistrySettings.itemBySurface["sync_diagnostics"]
+  private static let weeklyDiagnostics = RegistrySettings.itemBySurface["diagnostics_weekly"]
+  private static let modelLabels = RegistrySettings.itemByKey["showModelLabels"]
+  private static let pccRoutingItem = RegistrySettings.itemByKey["pccRoutingEnabled"]
+
   var body: some View {
     Form {
       // Agent tools
@@ -25,12 +34,12 @@ struct SeptaskAdvancedPane: View {
         NavigationLink {
           TasksSkillPane()
         } label: {
-          Label("MCP Skills", systemImage: RegistryIcons.sfSymbols["settings.skills"] ?? "book.closed")
+          Label(Self.skills?.label ?? "", systemImage: Self.skills?.sfSymbol ?? "book.closed")
         }
       } header: {
-        Text("Agent tools")
+        Text(Self.agentTools?.header ?? "")
       } footer: {
-        Text("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).")
+        if let footer = Self.agentTools?.footer { Text(footer) }
       }
 
       // Sync & storage diagnostics
@@ -50,9 +59,9 @@ struct SeptaskAdvancedPane: View {
           Button("Clear sync issues") { sync.clearIssues() }
         }
       } header: {
-        Text("Sync & storage diagnostics")
+        Text(Self.syncDiagnostics?.label ?? "")
       } footer: {
-        Text("Changes the server refused appear here, newest first. The server kept its own version of each.")
+        if let detail = Self.syncDiagnostics?.detail { Text(detail) }
       }
 
       // Only renders when at least one local SwiftData write rolled back this launch.
@@ -118,9 +127,9 @@ struct SeptaskAdvancedPane: View {
           }
         }
       } header: {
-        Text("Optional product diagnostics")
+        Text(Self.weeklyDiagnostics?.label ?? "")
       } footer: {
-        Text("An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support.")
+        if let detail = Self.weeklyDiagnostics?.detail { Text(detail) }
       }
 
       // Raw JSON paste utility (moved from consumer Import & Export).
@@ -130,8 +139,8 @@ struct SeptaskAdvancedPane: View {
       Section {
         Toggle(isOn: $showModelLabels) {
           VStack(alignment: .leading, spacing: 2) {
-            Text("Show model labels")
-            Text("Show which model answered next to each AI reply.")
+            Text(Self.modelLabels?.label ?? "")
+            Text(Self.modelLabels?.detail ?? "")
               .font(.footnote)
               .foregroundStyle(.secondary)
           }
@@ -157,15 +166,15 @@ struct SeptaskAdvancedPane: View {
 
           Toggle(isOn: $pccRouting) {
             VStack(alignment: .leading, spacing: 2) {
-              Text("Use Private Cloud Compute")
-              Text("Requires the PCC entitlement. Without it, requests fail and fall back on-device.")
+              Text(Self.pccRoutingItem?.label ?? "")
+              Text(Self.pccRoutingItem?.detail ?? "")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
           }
           .disabled(!pcc.available)
 
-          Picker("Reasoning", selection: $pccReasoning) {
+          Picker(RegistrySettings.label(key: "pccReasoning"), selection: $pccReasoning) {
             ForEach(PCCConfig.Reasoning.allCases, id: \.self) { r in
               Text(r.title).tag(r.rawValue)
             }
@@ -173,11 +182,11 @@ struct SeptaskAdvancedPane: View {
           .disabled(!pccRouting)
         }
       } header: {
-        Text("AI diagnostics")
+        Text(Self.betaAI?.header ?? "")
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("Advanced")
+    .navigationTitle(RegistrySettings.pageById[Self.page]?.title ?? "")
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif

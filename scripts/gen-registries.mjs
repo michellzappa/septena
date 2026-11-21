@@ -619,10 +619,24 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   const optStr = (v) => (v === undefined || v === null ? "nil" : swiftStr(v));
   const optInt = (v) => (v === undefined || v === null ? "nil" : String(v));
   const optArr = (arr) => (arr === undefined || arr === null ? "nil" : `[${arr.map(swiftStr).join(", ")}]`);
+  // A label or detail with `{name}` placeholders becomes a function
+  // (`RegistrySettings.<surface><Field>(name:)`); the item field is nil.
+  const settingsTemplates = [];
+  const camel = (id) => id.replace(/[_.-]([a-z0-9])/g, (_, c) => c.toUpperCase());
+  const itemText = (item, field) => {
+    const v = item[field];
+    if (typeof v === "string" && L10N.placeholdersOf(v).length > 0) {
+      const name = camel(item.surface ?? item.key ?? item.page) + field[0].toUpperCase() + field.slice(1);
+      const t = L10N.swiftTemplate(BY_KEY, item.l10nKeys?.[field] ?? v);
+      settingsTemplates.push(`  static func ${name}(${t.params}) -> String { ${t.body} }`);
+      return "nil";
+    }
+    return LOpt(v, item, field);
+  };
   const emitItem = (item) => {
     const iconId = item.icon ?? null;
     const sf = iconId ? icons.icons[iconId].sfSymbol : null;
-    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${LOpt(item.label, item, "label")}, detail: ${LOpt(item.detail, item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)})`;
+    return `RegistrySettingsItem(kind: ${swiftStr(item.kind)}, key: ${optStr(item.key)}, page: ${optStr(item.page)}, surface: ${optStr(item.surface)}, label: ${itemText(item, "label")}, detail: ${itemText(item, "detail")}, iconId: ${optStr(iconId)}, sfSymbol: ${optStr(sf)}, statusKey: ${optStr(item.statusKey)}, desktopInline: ${Boolean(item.desktopInline)}, visibility: ${swiftStr(item.visibility ?? "always")}, platforms: ${optArr(item.platforms)})`;
   };
 
   lines.push("/// Desktop Settings sidebar tab descriptor (`registry/settings.json`).");
@@ -674,6 +688,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("struct RegistrySettingsSection: Sendable, Hashable, Identifiable {");
   lines.push("  let id: String");
   lines.push("  let header: String?");
+  lines.push("  let footer: String?");
   lines.push("  let platforms: [String]?");
   lines.push("  let items: [RegistrySettingsItem]");
   lines.push("  func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }");
@@ -753,7 +768,7 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   for (const page of settings.pages) {
     lines.push(`    RegistrySettingsPage(id: ${swiftStr(page.id)}, title: ${L(page.title, page, "title")}, iconId: ${swiftStr(page.icon)}, sfSymbol: ${swiftStr(icons.icons[page.icon].sfSymbol)}, depth: ${page.depth}, platforms: ${optArr(page.platforms)}, featureId: ${swiftStr(page.featureId)}, sections: [`);
     for (const sec of page.sections) {
-      lines.push(`      RegistrySettingsSection(id: ${swiftStr(sec.id)}, header: ${LOpt(sec.header, sec, "header")}, platforms: ${optArr(sec.platforms)}, items: [`);
+      lines.push(`      RegistrySettingsSection(id: ${swiftStr(sec.id)}, header: ${LOpt(sec.header, sec, "header")}, footer: ${LOpt(sec.footer, sec, "footer")}, platforms: ${optArr(sec.platforms)}, items: [`);
       for (const item of sec.items) {
         lines.push(`        ${emitItem(item)},`);
       }
@@ -765,6 +780,18 @@ function generateSwift({ entities, rules, icons, tokens, caps, settings, dests, 
   lines.push("");
   lines.push("  static let pageById: [String: RegistrySettingsPage] = Dictionary(uniqueKeysWithValues: pages.map { ($0.id, $0) })");
   lines.push("  static let tabById: [String: RegistrySettingsTab] = Dictionary(uniqueKeysWithValues: desktopTabs.map { ($0.id, $0) })");
+  lines.push("  private static let allItems: [RegistrySettingsItem] = rootGroups.flatMap(\\.items) + pages.flatMap { $0.sections.flatMap(\\.items) }");
+  lines.push("  /// Item by `surface` id (custom surfaces and the account card link).");
+  lines.push("  static let itemBySurface: [String: RegistrySettingsItem] = Dictionary(allItems.compactMap { i in i.surface.map { ($0, i) } }, uniquingKeysWith: { a, _ in a })");
+  lines.push("  /// `setting` item by settings key.");
+  lines.push("  static let itemByKey: [String: RegistrySettingsItem] = Dictionary(allItems.compactMap { i in i.kind == \"setting\" ? i.key.map { ($0, i) } : nil }, uniquingKeysWith: { a, _ in a })");
+  lines.push("  /// Section `id` on page `page`.");
+  lines.push("  static func section(_ id: String, page: String) -> RegistrySettingsSection? { pageById[page]?.sections.first { $0.id == id } }");
+  lines.push("  /// Label of a surface item; the surface id when the registry has none.");
+  lines.push("  static func label(surface: String) -> String { itemBySurface[surface]?.label ?? surface }");
+  lines.push("  /// Label of a setting item; the key when the registry has none.");
+  lines.push("  static func label(key: String) -> String { itemByKey[key]?.label ?? key }");
+  for (const fn of settingsTemplates) lines.push(fn);
   lines.push("}");
   lines.push("");
 

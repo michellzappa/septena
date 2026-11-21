@@ -30,7 +30,7 @@ struct TaskViewOptions: View {
   /// `@AppStorage` and repaint themselves; Septask's AppKit list reads
   /// `UserDefaults` directly and would otherwise keep its stale rows until the
   /// next task mutation. Every writer of a task view option goes through this
-  /// — the menus here and the Settings row in `TaskSettingsPane`.
+  /// — the menus here and the registry-driven Settings rows in `SeptaskSettingsView`.
   static func announcing(_ storage: Binding<Bool>) -> Binding<Bool> {
     Binding(
       get: { storage.wrappedValue },

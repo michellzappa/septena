@@ -244,6 +244,9 @@ white discs, self-masking, same as Septena's.
   Each app passes a `TaskSettingsLink` → its own navigation value. Septena
   no longer shows task settings under Sections ▸ Tasks, and Septask's root
   has no Sections row.
+  Update (2026-11-21, #217): `TaskSettingsPane` had no caller and is
+  deleted. Settings renders from `registry/settings.json` in
+  `Septask/SeptaskSettingsView.swift`.
   Also extracted to shared files: the palette picker
   (`Shell/UI/PaletteSwatch.swift`), `ClaudeGatewayDetail` (+ its private
   timer — extract private helpers together), and `SkillCopy`

@@ -180,6 +180,8 @@ enum RegistryIcons {
     "settings.backend": "arrow.up.doc",
     "settings.animations": "party.popper",
     "settings.feedback": "paperplane",
+    "settings.paste": "doc.on.clipboard",
+    "settings.companion_app": "arrow.up.forward.app",
     "notice.sign_in": "person.crop.circle.badge.exclamationmark",
     "notice.rolled_in": "arrow.down.circle",
     "notice.get_started": "sparkles",
@@ -326,6 +328,7 @@ struct RegistrySettingsGroup: Sendable, Hashable, Identifiable {
 struct RegistrySettingsSection: Sendable, Hashable, Identifiable {
   let id: String
   let header: String?
+  let footer: String?
   let platforms: [String]?
   let items: [RegistrySettingsItem]
   func applies(to platform: String) -> Bool { platforms?.contains(platform) ?? true }
@@ -481,89 +484,89 @@ enum RegistrySettings {
 
   static let pages: [RegistrySettingsPage] = [
     RegistrySettingsPage(id: "account", title: RegistryL10n.t("Account"), iconId: "settings.account", sfSymbol: "person.crop.circle", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
-      RegistrySettingsSection(id: "profile", header: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "profile", header: nil, footer: RegistryL10n.t("Your name stays on this device, and syncs when you sign in."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "account_profile_editor", label: RegistryL10n.t("Your name"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "sync", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "sync", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_account_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "delete_account", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "delete_account", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "delete_account", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "signedIn", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "claude_pairing", title: RegistryL10n.t("Connect Claude"), iconId: "settings.claude", sfSymbol: "bubble.left.and.text.bubble.right", depth: 1, platforms: nil, featureId: "agents.connector", sections: [
-      RegistrySettingsSection(id: "connector", header: RegistryL10n.t("Connect Claude"), platforms: nil, items: [
+      RegistrySettingsSection(id: "connector", header: RegistryL10n.t("Connect Claude"), footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "claude_connector", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "ai_preferences", title: RegistryL10n.t("AI Preferences"), iconId: "settings.ai_agents", sfSymbol: "sparkles", depth: 1, platforms: nil, featureId: "ai.reach-dial", sections: [
-      RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("On-device intelligence"), platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
+      RegistrySettingsSection(id: "on_device", header: RegistryL10n.t("On-device intelligence"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: RegistryL10n.t("Apple Intelligence"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
       ]),
-      RegistrySettingsSection(id: "reach", header: RegistryL10n.t("Where AI runs"), platforms: nil, items: [
+      RegistrySettingsSection(id: "reach", header: RegistryL10n.t("Where AI runs"), footer: RegistryL10n.t("Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run."), platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: RegistryL10n.t("AI Mode"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "explainer", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "explainer", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "ai_explainer", label: RegistryL10n.t("How AI helps with your tasks"), detail: nil, iconId: "settings.about", sfSymbol: "info.circle", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "calendar", title: RegistryL10n.t("Calendar"), iconId: "settings.calendar", sfSymbol: "calendar", depth: 1, platforms: nil, featureId: "calendar.events", sections: [
-      RegistrySettingsSection(id: "calendars", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "calendars", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "calendar_detail", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "reminders", title: RegistryL10n.t("Reminders"), iconId: "settings.reminders", sfSymbol: "checklist", depth: 1, platforms: ["ios", "ipados", "macos"], featureId: "import.reminders", sections: [
-      RegistrySettingsSection(id: "reminders", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "reminders", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reminders_inbox", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
       ]),
     ]),
     RegistrySettingsPage(id: "import_export", title: RegistryL10n.t("Import & Export"), iconId: "settings.data", sfSymbol: "square.and.arrow.up", depth: 1, platforms: nil, featureId: "sync.backend", sections: [
-      RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), platforms: ["ios", "ipados", "macos"], items: [
+      RegistrySettingsSection(id: "move_in", header: RegistryL10n.t("Move from another app"), footer: RegistryL10n.t("Copy a Things database into Septena once. Nothing in Things is changed."), platforms: ["ios", "ipados", "macos"], items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "things_import", label: RegistryL10n.t("Import from Things"), detail: nil, iconId: "settings.import", sfSymbol: "square.and.arrow.down", statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
       ]),
-      RegistrySettingsSection(id: "transfer", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "transfer", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "import_export", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "privacy", title: RegistryL10n.t("Privacy"), iconId: "settings.privacy", sfSymbol: "hand.raised", depth: 1, platforms: nil, featureId: "settings.display", sections: [
-      RegistrySettingsSection(id: "data_locality", header: RegistryL10n.t("Your data"), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "data_locality", header: RegistryL10n.t("Your data"), footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "privacy_explainer", label: nil, detail: RegistryL10n.t("Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "telemetry", header: RegistryL10n.t("Anonymous usage data"), platforms: nil, items: [
+      RegistrySettingsSection(id: "telemetry", header: RegistryL10n.t("Anonymous usage data"), footer: RegistryL10n.t("Your task text and titles are never sent through analytics. This setting syncs across your devices."), platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "telemetryLevel", page: nil, surface: nil, label: RegistryL10n.t("Usage data"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "about", title: RegistryL10n.t("About"), iconId: "settings.about", sfSymbol: "info.circle", depth: 1, platforms: nil, featureId: "settings.display", sections: [
-      RegistrySettingsSection(id: "version", header: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "version", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "about_header", label: RegistryL10n.t("Tasks that think with you"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "actions", header: nil, platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"]),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "actions", header: nil, footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "check_updates", label: RegistryL10n.t("Check for Updates…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["macos", "windows"]),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_get_started", label: RegistryL10n.t("Show Get Started Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "reset_first_run", label: RegistryL10n.t("Show Welcome Again"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "send_feedback", label: nil, detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "send_feedback", label: RegistryL10n.t("Send feedback"), detail: nil, iconId: "settings.feedback", sfSymbol: "paperplane", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "companion", header: RegistryL10n.t("Septena Life"), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "septena_life_link", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "companion", header: RegistryL10n.t("Septena Life"), footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "septena_life_link", label: RegistryL10n.t("Open Septena Life"), detail: RegistryL10n.t("Septena Life is the companion app for habits, training, food, sleep, mood, and health."), iconId: "settings.companion_app", sfSymbol: "arrow.up.forward.app", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "advanced_link", header: nil, platforms: nil, items: [
+      RegistrySettingsSection(id: "advanced_link", header: nil, footer: nil, platforms: nil, items: [
         RegistrySettingsItem(kind: "pageLink", key: nil, page: "advanced", surface: nil, label: RegistryL10n.t("Advanced"), detail: nil, iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
     ]),
     RegistrySettingsPage(id: "advanced", title: RegistryL10n.t("Advanced"), iconId: "settings.advanced", sfSymbol: "wrench.and.screwdriver", depth: 2, platforms: nil, featureId: "settings.display", sections: [
-      RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), platforms: nil, items: [
+      RegistrySettingsSection(id: "agent_tools", header: RegistryL10n.t("Agent tools"), footer: RegistryL10n.t("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)."), platforms: nil, items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "mcp_skills", label: RegistryL10n.t("MCP Skills"), detail: nil, iconId: "settings.skills", sfSymbol: "book.closed", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "diagnostics", header: RegistryL10n.t("Diagnostics"), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: nil, iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "diagnostics_weekly", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "diagnostics", header: RegistryL10n.t("Diagnostics"), footer: nil, platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "sync_diagnostics", label: RegistryL10n.t("Sync & storage diagnostics"), detail: RegistryL10n.t("Changes the server refused appear here, newest first. The server kept its own version of each."), iconId: "settings.diagnostics", sfSymbol: "stethoscope", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "diagnostics_weekly", label: RegistryL10n.t("Optional product diagnostics"), detail: RegistryL10n.t("An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "data_tools", header: RegistryL10n.t("Data tools"), platforms: nil, items: [
-        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: RegistryL10n.t("Paste JSON Backup…"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsSection(id: "data_tools", header: RegistryL10n.t("Data tools"), footer: RegistryL10n.t("Paste raw Septena JSON directly from the clipboard to restore or merge records."), platforms: nil, items: [
+        RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: RegistryL10n.t("Paste JSON Backup…"), detail: nil, iconId: "settings.paste", sfSymbol: "doc.on.clipboard", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
-      RegistrySettingsSection(id: "beta_ai", header: RegistryL10n.t("AI diagnostics"), platforms: ["ios", "ipados", "macos"], items: [
+      RegistrySettingsSection(id: "beta_ai", header: RegistryL10n.t("AI diagnostics"), footer: nil, platforms: ["ios", "ipados", "macos"], items: [
         RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: RegistryL10n.t("Show model labels"), detail: RegistryL10n.t("Show which model answered next to each AI reply."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-        RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: RegistryL10n.t("Use Private Cloud Compute"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
+        RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: RegistryL10n.t("Use Private Cloud Compute"), detail: RegistryL10n.t("Requires the PCC entitlement. Without it, requests fail and fall back on-device."), iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
         RegistrySettingsItem(kind: "setting", key: "pccReasoning", page: nil, surface: nil, label: RegistryL10n.t("Private Cloud Compute reasoning"), detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
       ]),
     ]),
@@ -571,6 +574,18 @@ enum RegistrySettings {
 
   static let pageById: [String: RegistrySettingsPage] = Dictionary(uniqueKeysWithValues: pages.map { ($0.id, $0) })
   static let tabById: [String: RegistrySettingsTab] = Dictionary(uniqueKeysWithValues: desktopTabs.map { ($0.id, $0) })
+  private static let allItems: [RegistrySettingsItem] = rootGroups.flatMap(\.items) + pages.flatMap { $0.sections.flatMap(\.items) }
+  /// Item by `surface` id (custom surfaces and the account card link).
+  static let itemBySurface: [String: RegistrySettingsItem] = Dictionary(allItems.compactMap { i in i.surface.map { ($0, i) } }, uniquingKeysWith: { a, _ in a })
+  /// `setting` item by settings key.
+  static let itemByKey: [String: RegistrySettingsItem] = Dictionary(allItems.compactMap { i in i.kind == "setting" ? i.key.map { ($0, i) } : nil }, uniquingKeysWith: { a, _ in a })
+  /// Section `id` on page `page`.
+  static func section(_ id: String, page: String) -> RegistrySettingsSection? { pageById[page]?.sections.first { $0.id == id } }
+  /// Label of a surface item; the surface id when the registry has none.
+  static func label(surface: String) -> String { itemBySurface[surface]?.label ?? surface }
+  /// Label of a setting item; the key when the registry has none.
+  static func label(key: String) -> String { itemByKey[key]?.label ?? key }
+  static func aboutHeaderDetail(version: String) -> String { RegistryL10n.format("Version %@", english: "Version %@", args: [version]) }
 }
 
 /// Canonical smart-list metadata (`registry/destinations.json`).

@@ -1981,6 +1981,18 @@
         }
       }
     },
+    "An opt-in weekly summary that helps improve Septena. You don't need it for updates, sync, or support." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.diagnostics.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um resumo semanal opcional que ajuda a melhorar o Septena. Você não precisa dele para atualizações, sincronização ou suporte."
+          }
+        }
+      }
+    },
     "Analytics is processed by Septena Life on Cloudflare infrastructure. Your privacy level syncs across your own devices through iCloud." : {
 
     },
@@ -2104,7 +2116,14 @@
       }
     },
     "Apple Intelligence" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence"
+          }
+        }
+      }
     },
     "Archiving hides a medication from new dose logs but keeps its dose history and exports intact." : {
 
@@ -2759,11 +2778,35 @@
         }
       }
     },
+    "Changes the server refused appear here, newest first. The server kept its own version of each." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.diagnostics.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As alterações que o servidor recusou aparecem aqui, das mais recentes para as mais antigas. O servidor manteve a própria versão de cada uma."
+          }
+        }
+      }
+    },
     "Changing the unit doesn't rewrite past entries — history reads in the new unit." : {
 
     },
     "Check a few things off and your completion pattern shows up here." : {
 
+    },
+    "Check for Updates…" : {
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar atualizações…"
+          }
+        }
+      }
     },
     "Checkable rows celebrate at the box — four feels separated by rhythm: one beat, two spaced beats, fall-then-thud, thud-then-close — each with a CoreHaptics pattern timed to its visual. The full-screen canvas is reserved for milestones (habit streaks, PRs, goal rungs — Ignition / Milestone) and at-most-once-a-day completion moments: clearing your last Today task (Arc), hitting your hydration target (Fill), the first meal that breaks your fast (Bloom), and clearing your whole day's habits, supplements, or chores (Burst). Everyday logs — gut, symptoms, medications, repeat intake, groceries — confirm with haptic + VoiceOver only; Mood and a finished training session play inside their own sheet." : {
 
@@ -3322,6 +3365,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copie um prompt e cole em um LLM junto com os dados de origem que você quer importar. O modelo retorna um JSON que cola direto em Importar acima."
+          }
+        }
+      }
+    },
+    "Copy a Things database into Septena once. Nothing in Things is changed." : {
+      "comment" : "Generated from registry settings.pages.import_export.sections.move_in.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copie um banco de dados do Things para o Septena uma vez. Nada no Things é alterado."
           }
         }
       }
@@ -8035,6 +8090,18 @@
         }
       }
     },
+    "Open Septena Life" : {
+      "comment" : "Generated from registry settings.pages.about.sections.companion.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Septena Life"
+          }
+        }
+      }
+    },
     "Open tasks without a date live here." : {
       "comment" : "Generated from registry destinations.destinations.anytime.emptyState.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -8095,7 +8162,14 @@
 
     },
     "Optional product diagnostics" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnóstico opcional do produto"
+          }
+        }
+      }
     },
     "Optional. This Mac can't use App Attest, so Sign in with Apple is how the community features — Roadmap, Testimonials, and in-app Support — confirm you're a real person. That's the only thing it does: it ties those contributions to your Apple ID and nothing else. It doesn't touch your data, your iCloud sync, or your account, and you can sign out any time." : {
 
@@ -8214,6 +8288,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Colar backup JSON…"
+          }
+        }
+      }
+    },
+    "Paste raw Septena JSON directly from the clipboard to restore or merge records." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.data_tools.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cole o JSON bruto do Septena direto da área de transferência para restaurar ou mesclar registros."
           }
         }
       }
@@ -9067,6 +9153,18 @@
         }
       }
     },
+    "Requires the PCC entitlement. Without it, requests fail and fall back on-device." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.beta_ai.items.1.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requer a permissão PCC. Sem ela, as solicitações falham e voltam para o dispositivo."
+          }
+        }
+      }
+    },
     "Reschedule repeating task?" : {
       "comment" : "Generated from registry surfaces.prompts.items.rescheduleFixedRepeat.title. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
       "extractionState" : "manual",
@@ -9402,6 +9500,18 @@
     "Send" : {
 
     },
+    "Send feedback" : {
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.3.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enviar feedback"
+          }
+        }
+      }
+    },
     "Septena" : {
       "localizations" : {
         "pt-BR" : {
@@ -9449,6 +9559,18 @@
     },
     "Septena Life is open source. Read exactly what's collected and when, in the code:" : {
 
+    },
+    "Septena Life is the companion app for habits, training, food, sleep, mood, and health." : {
+      "comment" : "Generated from registry settings.pages.about.sections.companion.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena Life é o app parceiro para hábitos, treino, alimentação, sono, humor e saúde."
+          }
+        }
+      }
     },
     "Septena Life keeps all your data in your private iCloud, so it needs you signed in. Open Settings and sign in to iCloud to use the app and sync across your devices." : {
       "localizations" : {
@@ -9499,6 +9621,18 @@
     },
     "%@ never runs AI on your tasks and never reads them. The intelligence is your own — your Claude, or on-device — connected by you. Your tasks live only in your private iCloud. Turn the AI off and the app works exactly the same, minus the conversations." : {
 
+    },
+    "Septena never runs AI on your data and never reads it. The intelligence is your own (Apple on-device, Private Cloud Compute, or your Claude). This only sets where requests may run." : {
+      "comment" : "Generated from registry settings.pages.ai_preferences.sections.reach.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Septena nunca roda IA nos seus dados e nunca os lê. A inteligência é sua (Apple no dispositivo, Private Cloud Compute ou seu Claude). Isto só define onde as solicitações podem rodar."
+          }
+        }
+      }
     },
     "Septena open — gold" : {
 
@@ -9859,6 +9993,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mostra tarefas esmaecidas em projetos e áreas."
+          }
+        }
+      }
+    },
+    "Show Get Started Again" : {
+      "comment" : "Generated from registry settings.pages.about.sections.actions.items.1.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar Primeiros passos de novo"
           }
         }
       }
@@ -10797,6 +10943,18 @@
         }
       }
     },
+    "Tasks that think with you" : {
+      "comment" : "Generated from registry settings.pages.about.sections.version.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarefas que pensam com você"
+          }
+        }
+      }
+    },
     "Tasks Today" : {
 
     },
@@ -10915,6 +11073,18 @@
     },
     "The brief that teaches a model how to use your tasks through the connection — tools, conventions, examples." : {
 
+    },
+    "The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples)." : {
+      "comment" : "Generated from registry settings.pages.advanced.sections.agent_tools.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O guia que ensina um modelo a usar suas tarefas pela conexão (ferramentas, convenções e exemplos)."
+          }
+        }
+      }
     },
     "The briefs that teach a model how to use each section through the connection — tools, conventions, examples." : {
 
@@ -11708,7 +11878,14 @@
       }
     },
     "Version %@" : {
-
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versão %@"
+          }
+        }
+      }
     },
     "Version %@ (%@)" : {
       "extractionState" : "stale",
@@ -12396,12 +12573,36 @@
     "Your lines join the rotation alongside the packs you've enabled." : {
 
     },
+    "Your name" : {
+      "comment" : "Generated from registry settings.pages.account.sections.profile.items.0.label. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu nome"
+          }
+        }
+      }
+    },
     "Your name personalizes the home greeting and this profile. It syncs across your devices via iCloud." : {
       "localizations" : {
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seu nome personaliza a saudação inicial e este perfil. Ele sincroniza entre seus dispositivos pelo iCloud."
+          }
+        }
+      }
+    },
+    "Your name stays on this device, and syncs when you sign in." : {
+      "comment" : "Generated from registry settings.pages.account.sections.profile.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu nome fica neste dispositivo e sincroniza quando você entra."
           }
         }
       }
@@ -12433,6 +12634,18 @@
         }
       }
     },
+    "Your task text and titles are never sent through analytics. This setting syncs across your devices." : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.telemetry.footer. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O texto e os títulos das suas tarefas nunca são enviados pelas análises. Este ajuste sincroniza entre seus dispositivos."
+          }
+        }
+      }
+    },
     "Your tasks already sync privately through iCloud. Export and shareable project links will appear here when they are ready." : {
 
     },
@@ -12459,6 +12672,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suas tarefas, áreas, projetos e conversas são apagados do servidor e deste dispositivo."
+          }
+        }
+      }
+    },
+    "Your tasks, areas, projects, and conversations stay on this device until you sign in. When signed in, they sync through Septena's private server at api.septena.app, encrypted at rest (not end-to-end, so connected agents can read them when you choose). Apple's on-device intelligence runs locally; you can connect Claude under AI & Agents." : {
+      "comment" : "Generated from registry settings.pages.privacy.sections.data_locality.items.0.detail. Edit registry/*.json or registry/l10n; Xcode edits are overwritten.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suas tarefas, áreas, projetos e conversas ficam neste dispositivo até você entrar. Depois de entrar, elas sincronizam pelo servidor privado do Septena em api.septena.app, criptografadas em repouso (não de ponta a ponta, então agentes conectados podem lê-las quando você escolher). A inteligência no dispositivo da Apple roda localmente; você pode conectar o Claude em IA e agentes."
           }
         }
       }

@@ -156,11 +156,6 @@ enum SettingsKey {
   /// section keys (max 4). Applied to `UIApplication.shared.shortcutItems`
   /// at launch and whenever the selection changes.
   static let quickActionKeys = "septena.quickActions.keys"
-  /// Where the Tasks tile opens to from the homepage. Other section tiles
-  /// open as a bottom-sheet drawer; Tasks historically jumped straight to
-  /// the Tasks tab. Default `drawer` so Tasks matches the other sections;
-  /// users who prefer landing on the full Tasks tab can flip it.
-  static let tasksOpenIn      = "septena.tasks.openIn"
   /// Whether the Tasks lists weave in the day's calendar events — the day's
   /// agenda at the top of Today and under each Upcoming day, Things-style.
   /// Absent → on (events only ever show once calendar access is granted in
