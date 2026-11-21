@@ -82,8 +82,9 @@ Textures render **exclusively as a faded top header wash** extending **all the w
 |---|---|---|---|
 | `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
 | `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
-| `textureSeed` | int `1…9999` | `42` | User can tap **Shuffle** to pick a new terrain; deterministic everywhere |
 | `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial **3D slice morphing** (`z = t * speed` so shapes evolve in place rather than treadmill-scrolling; ~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
+
+**Daily deterministic seed (no user setting):** Smart lists (`Today`, `Upcoming`, `Anytime`, etc.) derive their seed automatically from **`FNV-1a(DayClock.today)`** (`"YYYY-MM-DD"`). Every morning produces a fresh procedural terrain that matches identically across all of a user's devices with zero synced seed state and no manual Shuffle button (honors `DayClock` day-rollover and time-travel automatically).
 
 ### 3.3 Per-Project Deterministic Identity (Phase C3)
 - When `projectHeaderTextures` is enabled (opt-in or automatic when a texture is active), opening a Project uses `headerWash` seeded deterministically from `FNV-1a(project.id)` (already in `registry/rules.json` for `occurrenceID`).
@@ -116,14 +117,13 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | `accentColor` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (8 IDs from `tokens.json`) | `"colorful"` | `septena.appearance.accentColor` |
 | `canvasTexture` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (texture IDs from `tokens.json`) | `"none"` | `septena.appearance.canvasTexture` |
 | `textureIntensity` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`15…100`) | `55` | `septena.appearance.textureIntensity` |
-| `textureSeed` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`1…9999`) | `42` | `septena.appearance.textureSeed` |
 | `textureMotion` | `synced` *(honored locally if `syncTheme == false`)* | `enum: ["still", "slowDrift"]` | `"still"` | `septena.appearance.textureMotion` |
 
 - **How `syncTheme` works (Todoist idiom):** Always stored device-local (`default: true`). When `true`, writes to the 6 appearance keys push to `api.septena.app` settings KV and remote updates apply locally. When `false`, this device keeps its own local appearance (e.g., bold Persimmon on iPhone, quiet Jabuticaba on Mac) without overwriting other devices.
 - **`accent_color` customSurface** in `docs/SETTINGS_UX_SPEC.md` evolves into the unified **Appearance** picker surface:
   - Mode segmented control (`Light` / `Dark` / `System`) + `Sync across devices` toggle
   - Mini-app preview card grid for `Colorful` + 7 exotic fruits (live-tinted sidebar + checkbox preview inside each card)
-  - Live-rendered procedural header-wash texture strip + intensity presets + Shuffle seed button + optional Slow Drift toggle
+  - Live-rendered procedural header-wash texture strip + intensity presets + optional Slow Drift toggle (seed refreshes daily automatically)
 
 ---
 
