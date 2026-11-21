@@ -24,7 +24,7 @@ Personalization in Septena (the task app) uses two lightweight, zero-asset primi
 
 - **Zero asset or CDN overhead:** Visual identity stays 100% local-first, offline-safe, and trivially synced via the existing `settings` KV path (opt-in cross-device via `syncTheme`).
 - **One canonical palette across apps and website:** `registry/tokens.json` feeds Swift, TypeScript, Kotlin, and `septena-site/components/task-ui/tokens.css`, keeping marketing/interactive previews in lockstep with shipped clients.
-- **Legibility and accessibility stay protected:** Rendering exclusively as a faded top header wash leaves scrolling task rows on crisp paper; `Reduce Transparency`, `Increase Contrast`, and `Reduce Motion` degrade textures gracefully (reduced opacity or static flat canvas).
+- **Legibility and accessibility stay protected:** Rendering exclusively as a faded top header wash behind Liquid Glass list cards lets textures breathe softly at the top while scrolling rows stay calm; OS-level `Reduce Transparency`, `Increase Contrast`, and `Reduce Motion` govern the opaque/static fallback with no redundant in-app material toggle.
 - **Trade-off:** Users cannot upload arbitrary personal photos as list wallpapers in v1; each platform needs a small procedural renderer (~150–250 lines) calibrated against shared golden parameters so textures look consistent across Apple, Web, Android, and Windows.
 
 ## Links

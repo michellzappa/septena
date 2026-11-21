@@ -14,7 +14,7 @@
 Give Septena tactile, unmistakable warmth and personal ownership—the part people loved about Wunderlist, Superlist, and Todoist—without importing their failure modes (clashing stock photos, dark-mode legibility breaks, bloated asset bundles, or per-platform drift).
 
 1. **Zero-asset & local-first:** Every surface texture is mathematically generated on-device from a tiny seed descriptor. Works 100% offline, adds ~0 KB to app binaries, and syncs in a few bytes.
-2. **Legibility first:** Textures live exclusively as a soft **header wash** at the top of the list surface (~180–220pt fading cleanly to 0% into the grouped canvas below), keeping scrolling task rows calm and uncluttered.
+2. **Legibility & Liquid Glass depth:** Textures live exclusively as a soft **header wash** at the top of the list surface (~200–245pt fading cleanly to 0% into the grouped canvas below). Grouped list cards and inline notices use **Liquid Glass translucency** (a light touch of blur ~`6–8pt` + subtle inner specular rim) so the header wash breathes softly behind top cards — with **no in-app material picker**, deferring opaque fallback directly to the user's OS `Reduce Transparency` and `Increase Contrast` settings (a scoped amendment to `DesignSpec.md` §5.5 for textured grouped lists).
 3. **Appearance-native:** Every accent and texture adapts automatically to Light Mode, Dark Mode, High Contrast, Reduce Transparency, and Reduce Motion.
 4. **One source of truth (ADR 0015):** The accent palette, Light/Dark hex pairs, texture catalog, defaults, and setting keys live in `registry/tokens.json` and `registry/settings.json` and generate code for Swift, TypeScript, Kotlin, and the website's canonical `components/task-ui/tokens.css`.
 
@@ -179,7 +179,6 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 
 | Topic | Decision | Default |
 |---|---|---|
-| **List card glass over texture** | Keep cards solid paper (`DesignSpec.md` §5.5), or allow frosted/Liquid Glass translucency (`5–8px` blur) when a canvas texture is active (auto-solid under Reduce Transparency)? | Frosted veil when textured; solid when `none` *(default)* |
 | **Default texture for new installs** | Start on `none` (pure canvas) or a whisper-subtle `washiPaper` / `topography`? | `none` — opt-in in Appearance *(default)* |
 | **Intensity control in UI** | 3 tactile presets (`Subtle` / `Balanced` / `Bold`) vs. continuous slider? | 3 presets (`35 / 55 / 80`) *(default)* |
 | **Milestone placement** | Keep in `M5 Breadth` (post-Launch/M2), or pull C0–C1 (exotic-fruit accents) forward into M3 polish? | `M5 Breadth` *(default)* |
