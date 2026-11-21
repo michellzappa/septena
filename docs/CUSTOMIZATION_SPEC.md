@@ -25,7 +25,7 @@ Give Septena tactile, unmistakable warmth and personal ownership—the part peop
 ### 2.1 Default: `colorful` (macOS Multicolor idiom, Septena sidebar discipline)
 - Primary interactive accent (row selection wash, done checkbox fill, active tab/chip tint, unread dot, composer Save CTA) leans **blue** (`#007AFF` light / `#0A84FF` dark), matching Apple's Multicolor default.
 - Preserves Septena's established **color-only-on-Today** sidebar grammar (`SidebarView.swift`, `SeptaskKitSidebar.swift`, `registry/destinations.json`):
-  - **Today:** Sunlit Gold (`#F5C721`) — the only colored smart-list glyph (the bucket you act on). There is no separate Inbox row in the sidebar (loose captures live in the Inbox triage band at the top of Today).
+  - **Today:** Sunlit Gold (`#F5C721`) in the **sidebar** — the only colored smart-list glyph (the bucket you act on). In the **list view's page header**, Today's sun stays quiet neutral gray (`--task-color-control` / `inkSecondary`). There is no separate Inbox row in the sidebar (loose captures live in the Inbox triage band at the top of Today).
   - **Review / Upcoming / Repeating / Anytime / Logbook:** Quiet neutral secondary gray — neutral filing locations never turn into a rainbow.
   - **Overdue deadlines:** System Red (`overdueRed`).
   - **Areas:** User-chosen emoji (or muted dot when unset), semibold weight, no section text header.
@@ -76,7 +76,7 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 
 ### 3.2 Texture Placement & Parameters (Header Wash Only — locked 2026-11-21)
 
-Textures render **exclusively as a faded top header wash** (~180–220pt tall, smoothly masked to transparent into the grouped canvas below). There is no placement setting (`behindCards`, `railAndCanvas`, and `full` were dropped to keep reading panes calm and settings minimal).
+Textures render **exclusively as a faded top header wash** extending **all the way to the top edge of the screen/window** (`ignoresSafeArea(edges: .top)` behind the iOS status bar / Dynamic Island and behind the macOS unified title bar / toolbar), fading smoothly over ~200–245pt to 0% into the grouped canvas below. There is no placement setting (`behindCards`, `railAndCanvas`, and `full` were dropped to keep reading panes calm and settings minimal).
 
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
@@ -135,10 +135,11 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 
 1. **No `(check) Septena` sidebar brand row** on macOS/iPad — sidebar starts straight into smart lists.
 2. **No separate `Inbox` smart list** — Inbox lives as the triage band at the top of Today; sidebar lists follow `registry/destinations.json` (`Today`, `Review`, `Upcoming`, `Repeating`, `Anytime`, `Logbook`).
-3. **Color only on Today** — Today's sun carries `#F5C721`; all other smart-list glyphs stay quiet secondary gray.
+3. **Color only on Today (sidebar only)** — Today's sun carries `#F5C721` in the sidebar and stays quiet gray in the list page heading; all other smart-list glyphs stay quiet secondary gray.
 4. **Emoji on Areas (no `"Area"` text header)** — Areas render as clickable semibold rows with their leading emoji (or muted dot), trailing fold chevron, and count.
 5. **Progress rings on Projects** — Projects render with `ProjectProgressIcon`-style completion pie rings on the same flush left glyph axis (regular weight, no indentation step).
-6. **Non-selectable demo chrome** — `.task-surface` (and all interactive app demo components) must set `user-select: none; -webkit-user-select: none; cursor: default;` (allowing `user-select: text; cursor: text;` only on actual `<input>` / `<textarea>` controls) so hovering or clicking never flashes an I-beam cursor or highlights mockup copy.
+6. **One leading-glyph vertical midline** — Every leading icon in the list column (page heading sun/ring, inline notice glyph, group tray/emoji, and task checkboxes) shares one exact horizontal center axis (`SeptaskKitLayout.leadingGlyphCenterX` parity), with larger header glyphs overflowing symmetrically around that midline.
+7. **Non-selectable demo chrome** — `.task-surface` (and all interactive app demo components) must set `user-select: none; -webkit-user-select: none; cursor: default;` (allowing `user-select: text; cursor: text;` only on actual `<input>` / `<textarea>` controls) so hovering or clicking never flashes an I-beam cursor or highlights mockup copy.
 
 - Extend `registry/tokens.json` with `fruitAccents` (light/dark hex + check ink + origin metadata) and `textures` (catalog IDs + defaults).
 - Update `septena-site/scripts/task-tokens.mjs` (in the site repo) to consume `registry/tokens.json` so `--task-color-accent`, `--task-color-accentWash`, and optional `[data-accent="<fruit>"]` / texture canvas layers stay 1:1 with the native apps.
@@ -181,7 +182,6 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | Topic | Decision | Default |
 |---|---|---|
 | **List card glass over texture** | Keep cards solid paper (`DesignSpec.md` §5.5), or allow frosted/Liquid Glass translucency (`5–8px` blur) when a canvas texture is active (auto-solid under Reduce Transparency)? | Frosted veil when textured; solid when `none` *(default)* |
-| **Today sidebar icon** | Keep Today's sidebar sun quiet gray (subdued), follow the chosen accent, or keep gold (`#F5C721`) under `Colorful` only? | Gray everywhere or Gold under `Colorful` only *(needs mz call)* |
 | **Default texture for new installs** | Start on `none` (pure canvas) or a whisper-subtle `washiPaper` / `topography`? | `none` — opt-in in Appearance *(default)* |
 | **Intensity control in UI** | 3 tactile presets (`Subtle` / `Balanced` / `Bold`) vs. continuous slider? | 3 presets (`35 / 55 / 80`) *(default)* |
 | **Milestone placement** | Keep in `M5 Breadth` (post-Launch/M2), or pull C0–C1 (exotic-fruit accents) forward into M3 polish? | `M5 Breadth` *(default)* |
