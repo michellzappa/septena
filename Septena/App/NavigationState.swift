@@ -140,6 +140,9 @@ final class NavigationState {
   /// so these stay false there.
   var shouldCreateProject = false
   var shouldCreateArea = false
+  /// One-shot trigger for the active Project's "Add Section" heading prompt
+  /// (used by the iPhone Magic Plus quick menu when viewing a project).
+  var shouldCreateHeading = false
 
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`

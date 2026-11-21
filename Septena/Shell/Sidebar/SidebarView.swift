@@ -344,6 +344,20 @@ struct SidebarRootView: View {
         }
         areaProjectSections()
       }
+      #if os(iOS) && SEPTASK
+      .onDrop(of: [.septenaTaskDragIDs],
+              delegate: SidebarNewAreaDropDelegate {
+                Haptics.tick()
+                newAreaName = ""
+                showingNewArea = true
+              })
+      .magicPlusSectionDrop(id: "mp-sidebar-new-area", kind: .newArea,
+                            priority: 1, highlights: false) {
+        Haptics.tick()
+        newAreaName = ""
+        showingNewArea = true
+      }
+      #endif
       .modifier(IOSSidebarListChrome())
       .septenaNeutralListSelection()
       .pageChrome(
@@ -822,13 +836,24 @@ struct SidebarRootView: View {
     #else
     .contextMenu { areaMenu(area) }
     #endif
-    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
-    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
-    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator))
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
+    // iPhone Septena, dropping Magic Plus on an Area creates a New Project in it.
+    .modifier(SidebarTaskDrop(kind: .area(area.id), mutator: taskMutator) {
+      newProjectInArea = area.id
+      showingNewProject = true
+    })
+    .magicPlusSectionDrop(id: "mp-sidebar-area-\(area.id)",
+                          kind: .newProject(label: "New Project in \(area.title)")) {
+      Haptics.tick()
+      newProjectInArea = area.id
+      showingNewProject = true
+    }
   }
 
   @ViewBuilder
   private func projectRow(_ project: Project, parent: String?) -> some View {
+    let parentTitle = parent.flatMap { pid in areas.first(where: { $0.id == pid })?.title }
+    let magicLabel = parentTitle.map { "New Project in \($0)" } ?? "New Project"
     navRow(.project(id: project.id)) {
       SidebarProjectRow(name: project.title,
                         progress: projectProgress[project.id] ?? 0,
@@ -847,9 +872,18 @@ struct SidebarRootView: View {
     #else
     .contextMenu { projectMenu(project) }
     #endif
-    // Drag-a-task-here re-home. Self-gates to the co-visible sidebar+list
-    // canvas (iPad full-screen + Mac); inert on iPhone/compact.
-    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator))
+    // Drag-a-task-here re-home on co-visible sidebar+list (iPad/Mac); on compact
+    // iPhone Septena, dropping Magic Plus on a Project creates a sibling Project.
+    .modifier(SidebarTaskDrop(kind: .project(project.id), mutator: taskMutator) {
+      newProjectInArea = parent
+      showingNewProject = true
+    })
+    .magicPlusSectionDrop(id: "mp-sidebar-proj-\(project.id)",
+                          kind: .newProject(label: magicLabel)) {
+      Haptics.tick()
+      newProjectInArea = parent
+      showingNewProject = true
+    }
   }
 
   // MARK: - Context menus
@@ -1753,12 +1787,19 @@ private struct SidebarTaskDrop: ViewModifier {
 
   let kind: Kind
   let mutator: TaskMutator
+  var onMagicPlusDrop: (() -> Void)? = nil
+  @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(\.modelContext) private var modelContext
   @State private var isTargeted = false
 
   func body(content: Content) -> some View {
-    if usesPushNavigation {
+    #if os(iOS) && SEPTASK
+    let active = true
+    #else
+    let active = usesPushNavigation
+    #endif
+    if active {
       content
         .background(
           // ONE canonical emphasis: a drop-hover reuses the SAME fill as a
@@ -1771,6 +1812,24 @@ private struct SidebarTaskDrop: ViewModifier {
         .onDrop(of: [.septenaTaskDragIDs],
                 delegate: SidebarTaskDropDelegate(isTargeted: $isTargeted) { ids in
                   guard !ids.isEmpty else { return false }
+                  if TaskDragIDs.isNewTaskPayload(ids) {
+                    Haptics.tick()
+                    if let onMagicPlusDrop {
+                      onMagicPlusDrop()
+                      return true
+                    }
+                    switch kind {
+                    case .area(let areaId):
+                      nav.go(to: .area(id: areaId))
+                    case .project(let projectId):
+                      nav.go(to: .project(id: projectId))
+                    case .today:
+                      nav.go(to: .filter(.today))
+                    }
+                    nav.requestNewTask()
+                    return true
+                  }
+                  guard usesPushNavigation else { return false }
                   // One drop = one undo step (shake / ⌘Z), covering every
                   // dragged row. Today rides in the filing snapshot, so a
                   // drop on Today undoes too.
@@ -1838,15 +1897,50 @@ private struct SidebarTaskDropDelegate: DropDelegate {
   }
 }
 
+/// Catches Magic Plus drops landing on the Tasks index background (between
+/// area cards or below the last section) to create a new Area.
+private struct SidebarNewAreaDropDelegate: DropDelegate {
+  let onDropNewArea: () -> Void
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    DropProposal(operation: .copy)
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
+            TaskDragIDs.isNewTaskPayload(payload.ids)
+      else { return }
+      DispatchQueue.main.async { onDropNewArea() }
+    }
+    return true
+  }
+}
+
 /// Installs `SidebarTaskDrop` on a smart-list row only when the route has a
 /// meaningful drop action (Today); other routes pass
 /// through so they don't show a misleading drop highlight.
 private struct SmartListTaskDrop: ViewModifier {
   let route: Route
   let mutator: TaskMutator
+  @Environment(NavigationState.self) private var nav
+
   func body(content: Content) -> some View {
     if let kind = SidebarTaskDrop.Kind(route: route) {
-      content.modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
+      content
+        .modifier(SidebarTaskDrop(kind: kind, mutator: mutator))
+        .magicPlusSectionDrop(id: "mp-sidebar-smart-\(route.id)",
+                              kind: .taskSection(label: "New Task in \(route.title)")) {
+          Haptics.tick()
+          nav.go(to: route)
+          nav.requestNewTask()
+        }
     } else {
       content
     }
