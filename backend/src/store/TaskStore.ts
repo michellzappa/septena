@@ -846,6 +846,23 @@ export class TaskStore extends DurableObject<Env> {
     return row ? { notes: row.body, noteRev: row.noteRev ?? 0 } : null;
   }
 
+  /// One project or area row, decoded, or null when missing or deleted.
+  readContainer(container: NoteContainer, id: string): Row | null {
+    const spec = ENTITIES[container];
+    const raw = this.sql.exec(`SELECT * FROM ${spec.table} WHERE id = ? AND deletedAt IS NULL`, id).toArray()[0];
+    return raw ? (decodeRow(spec, raw as Record<string, unknown>) as Row) : null;
+  }
+
+  /// Open tasks filed directly in a project or an area (headings excluded),
+  /// in list order.
+  readContainerTasks(container: NoteContainer, id: string, limit: number): Row[] {
+    const raws = this.sql.exec(
+      `SELECT * FROM tasks WHERE "${container}" = ? AND deletedAt IS NULL AND status = 'open' AND COALESCE(kind, '') != 'heading' ORDER BY position LIMIT ?`,
+      id, limit,
+    ).toArray();
+    return raws.map((r) => decodeRow(ENTITIES.task, r as Record<string, unknown>) as Row);
+  }
+
   /// A note's revisions, newest first. Paged by rev: pass the smallest rev
   /// seen as `before`. Bodies only when asked for (they can be long).
   noteRevisions(container: NoteContainer, id: string, before: number | null, limit: number, includeBody: boolean): NoteRevision[] {

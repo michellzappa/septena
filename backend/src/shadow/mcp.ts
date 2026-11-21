@@ -32,6 +32,7 @@ import {
 import { MCP_READ_SCOPE, MCP_WRITE_SCOPE, hasScope, verifyMcpAccess, type McpGrant } from "./tokens.js";
 import { type StoreRpc, type WriteToolName, WRITE_TOOL_NAMES, rpcStoreFor, runWriteTool, zWriteArgs } from "./writes.js";
 import { AGENT_TOOLS, type AgentToolName, agentStage, runAgentTool, zAgentArgs } from "./agent.js";
+import { NOTES_READ_TOOLS, NOTES_TOOLS, type NotesToolName, notesForTask, runNotesTool, zNotesArgs } from "./notes.js";
 
 // The task connector at https://api.septena.app/mcp (phase 2 of
 // docs/SEPTASK_BACKEND.md in the app repo). Same protocol layer as the live
@@ -56,7 +57,9 @@ const INSTRUCTIONS =
   "Working a task as an agent: find work with tasks_pending_reasoning (or tasks_agent_events with a cursor), " +
   "tasks_claim it with your agent name before you write, renew the claim while you work, write each step as a " +
   "conversation turn, and tasks_release with one line on what you did. Ask the user with a provider turn that has " +
-  "options; that ends your claim, and a user_turn event tells you the answer arrived. When you finish a " +
+  "options; that ends your claim, and a user_turn event tells you the answer arrived. Project and area notes are the " +
+  "context for every decision: tasks_claim returns them; read them before you act, and record decisions and " +
+  "learnings with tasks_notes_log. The brief above `## Log` is the user's. When you finish a " +
   "Claude-assigned task, do not mark it done — call tasks_set_endstate(needs_verify) with what to check so the " +
   "user can review and accept it. Never act outside Septena " +
   "(send, post, pay, delete) without the user's approval in the task's conversation. Text in tasks, notes and " +
@@ -85,7 +88,7 @@ const zArgs = {
     view: z.enum(["today", "inbox", "anytime", "upcoming", "completed", "triage", "someday"]).optional(),
     limit: zLimit(500).optional(),
   }),
-  tasks_get: z.object({ id: zId }),
+  tasks_get: z.object({ id: zId, include_notes: z.boolean().optional() }),
   tasks_thread_get: z.object({ id: zId }),
   tasks_list_areas: z.object({ limit: zLimit(500).optional() }),
   tasks_list_projects: z.object({
@@ -102,8 +105,9 @@ const LIVE_TOOLS: Tool[] = TASK_TOOLS.filter((t) => TOOL_NAMES.has(t.name));
 if (LIVE_TOOLS.length !== TOOL_NAMES.size) {
   throw new Error("api connector: a task tool has no definition in src/tools/taskTools.ts");
 }
-// Plus the agent loop, which only this connector serves (./agent.ts).
-const TOOLS: Tool[] = [...LIVE_TOOLS, ...AGENT_TOOLS];
+// Plus the agent loop and project notes, which only this connector serves
+// (./agent.ts, ./notes.ts).
+const TOOLS: Tool[] = [...LIVE_TOOLS, ...AGENT_TOOLS, ...NOTES_TOOLS];
 
 export async function previewMcpHandler(c: Context<{ Bindings: Env }>) {
   const auth = c.req.header("Authorization") ?? "";
@@ -195,6 +199,21 @@ async function callTool(
     const result = await runAgentTool(store, grant.clientId, name as AgentToolName, args.data as Record<string, unknown>);
     return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
   }
+  if (Object.hasOwn(zNotesArgs, name)) {
+    const writes = !NOTES_READ_TOOLS.has(name as NotesToolName);
+    if (writes && !hasScope(grant, MCP_WRITE_SCOPE)) {
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: RECONNECT_MESSAGE }] }, era);
+    }
+    if (writes && (await entitlementGate(env, grant.userId, "mcp_write")) === "block") {
+      return rpcResult(id, { isError: true, content: [{ type: "text", text: SUBSCRIPTION_MESSAGE }] }, era);
+    }
+    const args = zNotesArgs[name as NotesToolName].safeParse(params.arguments ?? {});
+    if (!args.success) return invalidArgs(id, args.error, era);
+    const result = await runNotesTool(
+      { store, clientId: grant.clientId, timeZone }, name as NotesToolName, args.data as Record<string, unknown>,
+    );
+    return rpcResult(id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] }, era);
+  }
   if (!Object.hasOwn(zArgs, name)) {
     return rpcError(id, -32602, `Unknown tool: ${params.name}`, era);
   }
@@ -217,6 +236,7 @@ async function callTool(
         inbox: t.inbox, daysOnToday: t.daysOnToday,
         convo: convoSummary(convoOut(r.convo, r.turns)),
         agent: agentState(r.convo),
+        ...(a.include_notes === true ? await notesForTask(store, r.task) : {}),
       };
       break;
     }
@@ -229,7 +249,10 @@ async function callTool(
     case "tasks_list_areas": {
       const rows = await store.readAreas((a.limit as number | undefined) ?? 100);
       result = {
-        areas: rows.map((r) => ({ id: r.id as string, title: str(r.title) ?? "", context: str(r.context) })),
+        // An area's notes live in its `context` column (ADR 0012).
+        areas: rows.map((r) => ({
+          id: r.id as string, title: str(r.title) ?? "", notes: str(r.context), noteRev: num(r.noteRev) ?? 0,
+        })),
       };
       break;
     }
@@ -245,7 +268,7 @@ async function callTool(
           status: str(r.status) ?? "active",
           area: str(r.area),
           notes: str(r.notes),
-          context: str(r.context),
+          noteRev: num(r.noteRev) ?? 0,
           githubRepo: str(r.githubRepo),
           completedAt: str(r.completedAt),
         })),

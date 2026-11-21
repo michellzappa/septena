@@ -4,6 +4,7 @@ import { zId } from "../store/columns.js";
 import type { ChangeEntry, ConvoCandidate } from "../store/TaskStore.js";
 import { AGENT_RUN_BUDGET, CLAIM_TTL_DEFAULT_MS, isAgentActor } from "../store/TaskStore.js";
 import type { StoreRpc } from "./writes.js";
+import { notesForTask } from "./notes.js";
 
 // The agent loop on the api.septena.app connector (docs/TASK_FACTORY_SPEC.md
 // §5, ADR 0008 in the app repo). These tools exist on this connector only:
@@ -54,7 +55,8 @@ export const AGENT_TOOLS: Tool[] = [
       "call tasks_release when you stop. A refusal names the rule that stopped you; respect it and do not retry: " +
       "paused (the user paused all agents), stopped (the user stopped this task), your_turn (a question waits for " +
       "the user), held (another agent holds it), budget (" + AGENT_RUN_BUDGET + " runs since the user last wrote: " +
-      "ask the user before you continue), terminal or closed.",
+      "ask the user before you continue), terminal or closed. A successful claim returns the task's project and area " +
+      "notes with their noteRev: read them before you act.",
     inputSchema: {
       type: "object",
       properties: {
@@ -186,7 +188,12 @@ export async function runAgentTool(
       const holder = holderFor(args.agent as string, clientId);
       const ttl = args.ttlMinutes !== undefined ? (args.ttlMinutes as number) * 60_000 : CLAIM_TTL_DEFAULT_MS;
       const r = await store.claim(args.id as string, holder, ttl, agentActor(holder), (args.why as string | undefined) ?? null);
-      if (r.ok) return { id: args.id, claimed: true, ...r };
+      if (r.ok) {
+        // The context an agent reads before it decides anything (ADR 0012).
+        const task = await store.readTask(args.id as string);
+        const notes = task ? await notesForTask(store, task.task) : { project: null, area: null };
+        return { id: args.id, claimed: true, ...r, ...notes };
+      }
       return { id: args.id, claimed: false, reason: r.reason, rule: REFUSAL_RULES[r.reason], holder: r.holder, claimUntil: r.claimUntil };
     }
     case "tasks_release": {

@@ -1,6 +1,6 @@
 # Project notes — spec
 
-**Status:** building. Accepted 2026-11-21 with every default in §10. N0 (#120) built 2026-11-21, not deployed.
+**Status:** building. Accepted 2026-11-21 with every default in §10. N0 (#120) and N1 (#121) built 2026-11-21, not deployed.
 **Decisions:** [ADR 0012](adr/0012-project-notes-are-agent-context.md),
 [ADR 0008](adr/0008-agent-loop-rules-live-in-the-store.md),
 [ADR 0005](adr/0005-tasks-as-factory-intake.md).

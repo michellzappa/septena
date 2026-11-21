@@ -14,6 +14,16 @@ The connector at `https://api.septena.app/mcp` exposes the user's tasks, areas, 
 
 ## Guidance
 
+### Context first: project and area notes
+- Every project and area has **notes**: what it is for, who is involved, what was decided, what holds. They are the context for every task inside. Read them before you decide anything about a task. `tasks_claim` returns the task's project and area notes; `tasks_get(id, include_notes: true)` and `tasks_project_get(id)` return them too.
+- Notes have two parts. The **brief** is everything above a line `## Log`; it is the user's. The **log** is under it; agents add to it.
+- Record each decision or learning with **`tasks_notes_log`** (one entry per call; the tool writes the date and your name). Do it before `tasks_release`.
+- Every notes write names the **`baseNoteRev`** you read. A `stale` refusal carries the current notes and noteRev: read them, then write again. Never retry with a guessed rev.
+- You may write a whole brief with `tasks_notes_write` only while it is empty (setting up a project with the user). Once it has text, suggest changes with **`tasks_notes_propose`**; the user accepts or rejects them in the app. A `brief_is_users` refusal means exactly this.
+- Never invent a brief. Write the user's own words; leave a brief empty when the user said nothing about the project.
+- `tasks_project_create` / `tasks_area_create` make containers, with optional notes. Ask first, and list existing ones first so you do not duplicate.
+- `tasks_notes_history` lists every saved version of a note, with who and why.
+
 ### Tasks
 - Views: `today`, `inbox`, `upcoming`, `anytime`, `completed`. `today` is the whole Today page: the **Inbox** section first, then the filed tasks due today. `inbox` is that Inbox section alone. `anytime` = open tasks with no date that are not on Today, the app's Anytime list (it absorbed the former `someday` bucket). No view returns "all open tasks"; use `tasks_get` to locate a known id.
 - **One Inbox.** The app shows a single Inbox at the top of Today. It holds unfiled tasks (no area, no project) and your proposals the user has not accepted. Never describe these as two piles ("triage" vs "unorganized"). `triage` is a retired view name and returns the Inbox.
@@ -122,6 +132,8 @@ tasks_list(view: "anytime")
 
 - 401 → the pairing expired or was revoked; the user re-pairs from Septask.
 - A write tool that says the connection can only read → the pairing predates write access; the user removes and re-adds the connector.
+- `stale` on a notes write → the notes changed since you read them; the reply's `current` has the new text and noteRev.
+- `brief_is_users` → you tried to change the user's brief; log under `## Log` or propose instead.
 - `recurrenceWarning` on a complete → the task IS done, but its next occurrence wasn't created. Say both parts.
 
 ## Don'ts

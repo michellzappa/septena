@@ -544,7 +544,10 @@ export const pendingReasoningJsonSchema = {
 export const getTaskJsonSchema = {
   type: "object",
   required: ["id"],
-  properties: { id: { type: "string" } },
+  properties: {
+    id: { type: "string" },
+    include_notes: { type: "boolean", description: "Also return the task's project and area notes with their noteRev. Default false." },
+  },
 } as const;
 
 export const setArtifactJsonSchema = {

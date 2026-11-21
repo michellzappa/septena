@@ -96,6 +96,7 @@
         "title": { "kind": "text", "max": 2000, "nullable": true },
         "context": { "kind": "text", "max": 100000, "nullable": true },
         "noteRev": { "kind": "int", "serverOwned": true },
+        "notesProposal": { "kind": "json", "maxJsonLength": 101000, "nullable": true },
         "emoji": { "kind": "text", "max": 16, "nullable": true },
         "attachment": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
         "position": { "kind": "int", "nullable": true }
@@ -114,6 +115,7 @@
         "notes": { "kind": "text", "max": 100000, "nullable": true },
         "context": { "kind": "text", "max": 100000, "nullable": true },
         "noteRev": { "kind": "int", "serverOwned": true },
+        "notesProposal": { "kind": "json", "maxJsonLength": 101000, "nullable": true },
         "githubRepo": { "kind": "text", "max": 200, "nullable": true },
         "attachment": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
         "position": { "kind": "int", "nullable": true }

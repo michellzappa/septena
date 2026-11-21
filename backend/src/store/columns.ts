@@ -34,6 +34,15 @@ const day = (): Column => ({ kind: "text", zod: zDay });
 const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
 const stamp = (): Column => ({ kind: "text", zod: zStamp });
 
+// An agent's proposed new brief for a project's or an area's notes (ADR 0012).
+// The user accepts or rejects it in the app, which clears it with null.
+const zNotesProposal = z.object({
+  body: z.string().max(NOTES_MAX),
+  agent: z.string().max(80),
+  at: z.string().regex(new RegExp(ENTITY_PATTERNS.stamp)).max(ENTITY_LIMITS.stampMax),
+  why: z.string().max(500).nullable(),
+}).strict();
+
 // `AreaAttachment` — opaque here; the app owns its shape. Size-capped only.
 const zAttachmentPointer = z.record(z.unknown()).refine(
   (v) => JSON.stringify(v).length <= ENTITY_LIMITS.attachmentPointerMax,
@@ -140,6 +149,7 @@ export const ENTITIES = {
       // Notes revision, bumped by the store on every notes change. Agents
       // name it as `baseNoteRev` so a stale write is refused. Never pushed.
       noteRev: { kind: "int", zod: z.never() },
+      notesProposal: json(zNotesProposal),
       emoji: text(16),
       attachment: json(zAttachmentPointer),
       position: int(),
@@ -160,6 +170,7 @@ export const ENTITIES = {
       context: text(NOTES_MAX),
       // Notes revision (see area.noteRev). Never pushed.
       noteRev: { kind: "int", zod: z.never() },
+      notesProposal: json(zNotesProposal),
       githubRepo: text(200),
       attachment: json(zAttachmentPointer),
       position: int(),
