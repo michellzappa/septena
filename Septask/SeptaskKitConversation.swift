@@ -424,6 +424,9 @@ final class KitConversationView: NSView {
   private func append(_ turn: ConvoTurn) {
     guard let taskID else { return }
     mutator.appendConvoTurn(id: taskID, turn)
+    // Answering a card is a user gesture: it stamps the fade clock
+    // (docs/TASK_FADE_SPEC.md §3).
+    mutator.touch(id: taskID)
     convo = mutator.conversation(id: taskID) ?? convo
     rebuild()
     onAppend?()

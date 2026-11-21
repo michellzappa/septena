@@ -1071,6 +1071,26 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "reorderToday")
   }
 
+  // MARK: Fade clock (docs/TASK_FADE_SPEC.md §3)
+
+  /// The ONE place `touchedAt` / `deferCount` are written. A user gesture
+  /// stamps `touchedAt`; a defer also adds 1 to `deferCount`, and any other
+  /// gesture resets it to 0. Local save only: the task backend has no column
+  /// for these fields until the cutover, so there is nothing to push and no
+  /// list to repaint (P1 has no UI). A failed save is logged by `StoreHealth`
+  /// and loses only the stamp.
+  func touch(ids: [String], deferredIDs: Set<String> = []) {
+    var changed = false
+    let now = Date()
+    for id in ids {
+      guard let entity = fetch(id: id), entity.deletedAt == nil else { continue }
+      entity.touchedAt = now
+      entity.deferCount = deferredIDs.contains(id) ? entity.deferCount + 1 : 0
+      changed = true
+    }
+    if changed { StoreHealth.save(context, op: "touch") }
+  }
+
   // MARK: Headings (project section dividers — docs/ORDERING_AND_HEADINGS_PLAN.md)
 
   /// Create a section-divider row inside a project. Modelled as a `TaskEntity`
