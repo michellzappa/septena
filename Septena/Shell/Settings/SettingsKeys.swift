@@ -202,11 +202,6 @@ enum SettingsKey {
   /// One-time gate for the "earned moment" support prompt (shown once, ever,
   /// after a milestone once the user is well-established). Local-only.
   static let supportMomentShown = "septena.support.momentShown"
-  /// macOS-only: run an in-process loopback MCP server so a local Claude Code
-  /// instance can read/write Septena without the hosted gateway. Off by
-  /// default. The key strings live in SeptenaCore (`MCPDefaultsKey`) so the
-  /// `LocalMCPServer` and this facade can't drift.
-  static let localMcpEnabled  = MCPDefaultsKey.enabled
   /// Whole-app privacy lock: require Face ID / Touch ID / device passcode to
   /// reopen Septena after it's been backgrounded past the grace window.
   /// Local-only @AppStorage — the lock is a per-device privacy gate, not

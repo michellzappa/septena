@@ -1,12 +1,11 @@
 import SwiftUI
 
 /// Educational diagram for the MCP "Connection & conventions" page. Explains
-/// that everything lives in one private place (your iCloud) and an AI reaches
-/// it one of two ways — the hosted gateway (Claude anywhere) or a local
-/// connection on your Mac (Claude Code). Both reach the same data.
+/// that your data lives in one private place and an AI reaches it through the
+/// cloud MCP connector.
 ///
-/// Drawn with plain stacks + a small connector `Shape` (not Canvas) so it stays
-/// legible and accessible, and reads correctly on iPhone width inside a Form.
+/// Drawn with plain stacks (not Canvas) so it stays legible and accessible,
+/// and reads correctly on iPhone width inside a Form.
 struct MCPConnectionDiagram: View {
   private let radius: CGFloat = 12
 
@@ -16,25 +15,18 @@ struct MCPConnectionDiagram: View {
       node(icon: "icloud", title: "Your iCloud",
            subtitle: "A private database only you can read", emphasized: true)
 
-      // Stem → MCP pill → branch into the two doors.
+      // Stem → MCP pill → cloud connector.
       Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1.5, height: 8)
       Text("MCP")
         .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
         .padding(.horizontal, 8).padding(.vertical, 2)
         .background(Capsule().fill(.secondary.opacity(0.12)))
-      BranchConnector()
-        .stroke(.secondary.opacity(0.4), style: .init(lineWidth: 1.5, lineJoin: .round))
-        .frame(height: 18)
+      Rectangle().fill(.secondary.opacity(0.4)).frame(width: 1.5, height: 12)
 
-      // Two doors.
-      HStack(alignment: .top, spacing: 10) {
-        node(icon: "antenna.radiowaves.left.and.right", title: "Hosted gateway",
-             subtitle: "mcp.septena.app · sign in", foot: "Claude, anywhere")
-        node(icon: "desktopcomputer", title: "On your Mac",
-             subtitle: "Local · private network", foot: "Claude Code")
-      }
+      node(icon: "antenna.radiowaves.left.and.right", title: "Cloud connector",
+           subtitle: "OAuth · revocable anytime", foot: "AI clients, anywhere")
 
-      Text("Either way, an AI reads and writes the same private data — and everything it touches is marked.")
+      Text("An AI reads and writes your private data through the cloud connector — and everything it touches is marked.")
         .font(.caption2).foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
         .padding(.top, 2)
@@ -43,9 +35,8 @@ struct MCPConnectionDiagram: View {
     .frame(maxWidth: .infinity)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(
-      "Everything you log lives in your private iCloud database. An AI connects one of two ways: "
-      + "the hosted gateway at mcp.septena.app for Claude anywhere, or a local connection on your Mac "
-      + "for Claude Code. Both reach the same private data, and everything an agent touches is marked.")
+      "Your data lives in a private database. AI clients connect through the cloud MCP connector "
+      + "using OAuth, and everything an agent touches is marked.")
   }
 
   @ViewBuilder
@@ -67,20 +58,5 @@ struct MCPConnectionDiagram: View {
       .fill(emphasized ? Color.accentColor.opacity(0.10) : .secondary.opacity(0.10)))
     .overlay(RoundedRectangle(cornerRadius: radius)
       .strokeBorder(emphasized ? Color.accentColor.opacity(0.55) : .secondary.opacity(0.18), lineWidth: 1))
-  }
-}
-
-/// An inverted-Y: a center stem that splits to two legs at 25% / 75% width,
-/// aligning over the two side-by-side door cards below it.
-private struct BranchConnector: Shape {
-  func path(in rect: CGRect) -> Path {
-    var p = Path()
-    let leftX = rect.width * 0.25, rightX = rect.width * 0.75
-    let topY = rect.minY, midY = rect.midY, botY = rect.maxY
-    p.move(to: .init(x: rect.midX, y: topY)); p.addLine(to: .init(x: rect.midX, y: midY))
-    p.move(to: .init(x: leftX, y: midY)); p.addLine(to: .init(x: rightX, y: midY))
-    p.move(to: .init(x: leftX, y: midY)); p.addLine(to: .init(x: leftX, y: botY))
-    p.move(to: .init(x: rightX, y: midY)); p.addLine(to: .init(x: rightX, y: botY))
-    return p
   }
 }

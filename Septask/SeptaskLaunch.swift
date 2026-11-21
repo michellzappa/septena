@@ -30,14 +30,6 @@ enum SeptaskLaunch {
       SeptaskLegacyClaudeCleanup.runOnce()
       SeptaskDiagnosticsCoordinator.shared.start()
       BadgeManager.shared.start(context: localStore.container.mainContext)
-      #if os(macOS)
-      // Resume the local MCP server if the user left it enabled. Mutators are
-      // bound now (start() above), so it can serve local reads and writes with
-      // no account and no network (docs/SYNC_SUBSCRIPTION_SPEC.md §3).
-      if UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled) {
-        try? LocalMCPServer.shared.start()
-      }
-      #endif
       #if os(iOS)
       // The next cold launch draws Today from this file (#82). macOS draws
       // its AppKit list without `TaskListView`, so it has no reader.
@@ -226,22 +218,6 @@ enum SeptaskMacRuntime {
 /// suppressed at launch and only opens on request.
 @MainActor
 final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
-  /// Set true only by "Quit Completely" (⌥⌘Q) before calling `terminate`, so
-  /// the soft-quit interception below lets the process exit.
-  private static var reallyQuit = false
-
-  /// True when the local MCP server is on and "Keep serving after quit" is
-  /// opted in (matching `MacAppLifecycle.softQuitEnabled`).
-  static var softQuitEnabled: Bool {
-    UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled)
-      && UserDefaults.standard.bool(forKey: MCPDefaultsKey.keepAlive)
-  }
-
-  static func quitCompletely() {
-    reallyQuit = true
-    NSApp.terminate(nil)
-  }
-
   func applicationDidFinishLaunching(_ notification: Notification) {
     // Global Quick Entry hotkey, ⌃⌥Space (Carbon RegisterEventHotKey: no
     // Accessibility permission, no event tap). ⌃Space is the system input
@@ -267,16 +243,6 @@ final class SeptaskMacAppDelegate: NSObject, NSApplicationDelegate {
       SeptaskKitWindowController.show()
     }
     return true
-  }
-
-  /// Intercept ⌘Q when the local MCP server is set to keep serving after quit:
-  /// commit open edits and hide the app so Claude Code keeps its loopback
-  /// connection; ⌥⌘Q ("Quit Completely") always exits.
-  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    if Self.reallyQuit || !Self.softQuitEnabled { return .terminateNow }
-    SeptaskKitWindowController.existing?.commitAllEdits()
-    NSApp.hide(nil)
-    return .terminateCancel
   }
 
   /// ⌘Q must not lose an open edit: the shell's text editors commit on blur,

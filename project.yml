@@ -292,10 +292,9 @@ targets:
       - path: Septena/Shell/Settings/SeptenaPlus.swift
       # P3: the AI/Claude pane (SettingsView deep links and the hosted
       # gateway row inside are #if !SEPTASK-gated; Septask's Claude row opens
-      # the task backend pane), the macOS local MCP pane, and the hex→Color
+      # the task backend pane), and the hex→Color
       # helper the shared palette picker rides.
       - path: Septena/Shell/Settings/AISettingsPane.swift
-      - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift
@@ -509,7 +508,6 @@ targets:
       - path: Septena/Shell/Settings/SettingsKeys.swift
       - path: Septena/Shell/Settings/SeptenaPlus.swift
       - path: Septena/Shell/Settings/AISettingsPane.swift
-      - path: Septena/Shell/Settings/LocalMCPSettingsPane.swift
       - path: Septena/Shell/Settings/SettingsChrome.swift
       - path: Septena/Shell/Settings/SettingsColor.swift
       - path: Septena/Shell/Settings/SettingsStore.swift

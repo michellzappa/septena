@@ -281,11 +281,6 @@ struct SeptenaApp: App {
           MacAppDelegate.navigation = navigation
           _ = OpenNewTaskRouting.consumePending(into: navigation)
           _ = TrainingStartRouting.consumePending(into: navigation)
-          // Resume the local MCP server if the user left it enabled. Mutators
-          // are bound now (start() above), so it's safe to serve writes.
-          if UserDefaults.standard.bool(forKey: MCPDefaultsKey.enabled) {
-            try? LocalMCPServer.shared.start()
-          }
           #endif
           // `SectionTheme.init` and `SettingsStore.init` already hydrated
           // tile order + accent colors from disk synchronously, so the
@@ -494,16 +489,6 @@ struct SeptenaApp: App {
         Button("Keyboard Shortcuts") { navigation.showKeyboardShortcuts = true }
           .keyboardShortcut("/", modifiers: [.command, .shift])
       }
-      #if os(macOS)
-      // When soft-quit is on (MCP server enabled + "keep serving after quit"),
-      // ⌘Q hides to the menu bar so the server keeps serving, and ⌥⌘Q forces a
-      // real exit. Otherwise plain ⌘Q quits as usual — soft-quit is gated off
-      // by default, so this is the redundant-but-harmless explicit quit.
-      CommandGroup(after: .appTermination) {
-        Button("Quit Septena Life Completely") { MacAppLifecycle.quitCompletely() }
-          .keyboardShortcut("q", modifiers: [.command, .option])
-      }
-      #endif
     }
 
     // macOS menu bar quick-entry. Click the checklist glyph in the status

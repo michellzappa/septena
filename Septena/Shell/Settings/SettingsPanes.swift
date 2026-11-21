@@ -177,9 +177,6 @@ struct ConnectionsAISettingsPane: View {
         NavigationLink(value: SettingsView.SettingsDestination.skills) {
           Label("MCP Skills", systemImage: "book.closed")
         }
-        NavigationLink(value: SettingsView.SettingsDestination.localMcp) {
-          Label("MCP Server", systemImage: "server.rack")
-        }
       } header: {
         Text("AI & MCP")
       } footer: {
@@ -191,21 +188,6 @@ struct ConnectionsAISettingsPane: View {
     .formStyle(.grouped)
   }
 }
-
-#if !os(macOS)
-struct MCPServerUnavailablePane: View {
-  var body: some View {
-    Form {
-      Section {
-        Label("MCP Server runs on Mac", systemImage: "server.rack")
-      } footer: {
-        Text("The local MCP server lets Claude Code connect directly to Septena Life through the Mac app. iPhone and iPad can still use the hosted Claude connection and MCP Skills, but they don't host the local server.")
-      }
-    }
-    .formStyle(.grouped)
-  }
-}
-#endif
 
 // MARK: - Sharing & Data
 
