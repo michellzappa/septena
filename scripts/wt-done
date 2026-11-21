@@ -10,7 +10,7 @@
 #
 # The gate builds the Mac schemes (WT_GATE, default "SeptenaMac SeptaskMac",
 # each on platform=macOS). Not the iOS schemes: they embed a watch app and stop
-# on the watchOS runtime gap (CLAUDE.md), which aborted every merge.
+# on the watchOS runtime gap (AGENTS.md), which aborted every merge.
 #   --prebuilt  the branch head already passed the gate. When the merged tree
 #               is byte-identical to the branch tree (main had not moved), the
 #               gate is skipped; otherwise it runs as usual.
