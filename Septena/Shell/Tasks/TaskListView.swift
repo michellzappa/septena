@@ -777,8 +777,8 @@ struct TaskListView: View {
     .modifier(TopLevelChromeModifier(showChrome: !embedded))
   }
 
-  // The modifier chain is split across `taskListChromed`, `taskListDialogs`
-  // and `taskList` so each one type-checks in reasonable time (one chain hit
+  // The modifier chain is split across `taskListChromed`, `taskListDialogs`,
+  // `taskListLoading` and `taskList` so each type-checks in reasonable time (one chain hit
   // the compiler's limit on iOS).
   private var taskListDialogs: some View {
     taskListChromed
@@ -849,7 +849,7 @@ struct TaskListView: View {
     }
   }
 
-  private var taskList: some View {
+  private var taskListLoading: some View {
     taskListDialogs
     // Re-load on every appearance so completed tasks (kept visible in-place
     // while the user is on the screen) drop off when they return.
@@ -921,6 +921,10 @@ struct TaskListView: View {
       guard filter == .today else { return }
       Task { await load() }
     }
+  }
+
+  private var taskList: some View {
+    taskListLoading
     // Filter swaps reuse this same view (no .id(route) at the App level for
     // .filter cases). `items` is a computed property that already returns
     // the right data for `filter` synchronously, so we only need to clear
