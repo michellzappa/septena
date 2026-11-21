@@ -206,6 +206,9 @@ struct SeptenaCompassIconView: View {
   private var isMono: Bool { color.isMono }
   private var accentCheck: Bool { !isColoredShell }
 
+  // The body is split into layers, and the ternary math lives in named
+  // properties: as one expression the Swift type checker gave up on it
+  // ("unable to type-check this expression in reasonable time", Xcode 26.3).
   var body: some View {
     GeometryReader { geo in
       let s = min(geo.size.width, geo.size.height)
@@ -214,137 +217,167 @@ struct SeptenaCompassIconView: View {
       let palette = resolvedColors
 
       ZStack {
-        // 1. Outer shell
-        LinearGradient(
-          colors: [palette.shellTop, palette.shellMid, palette.shellBot],
-          startPoint: UnitPoint(x: 0.16, y: 0.02),
-          endPoint: UnitPoint(x: 0.84, y: 1.0)
-        )
-
-        // Subtle top-left sheen
-        RadialGradient(
-          colors: [
-            Color.white.opacity(isWhiteShell ? 0.45 : (isStealth ? 0.11 : (isBlackShell ? 0.16 : 0.24))),
-            Color.white.opacity(0.02),
-            Color.black.opacity(isWhiteShell ? 0.06 : 0.14),
-          ],
-          center: UnitPoint(x: 0.28, y: 0.12),
-          startRadius: 0,
-          endRadius: s * 0.72
-        )
-
-        // 2. Bold recessed ring / moat (r = 416)
-        Circle()
-          .fill(
-            LinearGradient(
-              colors: [palette.wellTop, palette.wellMid, palette.wellBot],
-              startPoint: UnitPoint(x: 0.2, y: 0.0),
-              endPoint: UnitPoint(x: 0.8, y: 1.0)
-            )
-          )
-          .frame(width: 832 * scale, height: 832 * scale)
-          .overlay(
-            Circle()
-              .strokeBorder(palette.shadow.opacity(isWhiteShell ? 0.28 : 0.55), lineWidth: max(0.75, 8 * scale))
-          )
-
-        // 3. Elevated inner dial plate (r = 354)
-        Circle()
-          .fill(
-            RadialGradient(
-              colors: [palette.faceTop, palette.faceMid, palette.faceBot],
-              center: UnitPoint(x: 0.42, y: 0.30),
-              startRadius: 0,
-              endRadius: 354 * scale * 1.44
-            )
-          )
-          .frame(width: 708 * scale, height: 708 * scale)
-          .overlay(
-            Circle()
-              .strokeBorder(Color.white.opacity(isStealth ? 0.14 : (isDarkFace ? 0.18 : 0.94)), lineWidth: max(0.5, 5 * scale))
-          )
-          .shadow(color: palette.shadow.opacity(isWhiteShell ? 0.26 : 0.42), radius: max(1, 10 * scale), y: max(0.5, 8 * scale))
-
-        // 4. 6 machined ticks + upright North pointer + checkmark
-        Canvas { ctx, size in
-          let sc = min(size.width, size.height) / 1024.0
-          let cx = size.width / 2
-          let cy = size.height / 2
-          let step = 360.0 / 7.0
-
-          // 6 ticks at k = 1...6
-          let tickStyle = StrokeStyle(lineWidth: 24 * sc, lineCap: .round)
-          let tickColor = palette.mutedGlyph.opacity(isStealth ? 0.28 : (isDarkFace ? 0.34 : 0.28))
-          for i in 1..<7 {
-            let rad = (-90.0 + Double(i) * step) * .pi / 180.0
-            var p = Path()
-            p.move(to: CGPoint(x: cx + cos(rad) * 260 * sc, y: cy + sin(rad) * 260 * sc))
-            p.addLine(to: CGPoint(x: cx + cos(rad) * 310 * sc, y: cy + sin(rad) * 310 * sc))
-            ctx.stroke(p, with: .color(tickColor), style: tickStyle)
-          }
-
-          // Upright North compass pointer (-90°)
-          let a0 = -90.0 * .pi / 180.0
-          let aL = (-90.0 - 11.2) * .pi / 180.0
-          let aR = (-90.0 + 11.2) * .pi / 180.0
-          var north = Path()
-          north.move(to: CGPoint(x: cx + cos(a0) * 336 * sc, y: cy + sin(a0) * 336 * sc))
-          north.addLine(to: CGPoint(x: cx + cos(aR) * 238 * sc, y: cy + sin(aR) * 238 * sc))
-          north.addLine(to: CGPoint(x: cx + cos(a0) * 260 * sc, y: cy + sin(a0) * 260 * sc))
-          north.addLine(to: CGPoint(x: cx + cos(aL) * 238 * sc, y: cy + sin(aL) * 238 * sc))
-          north.closeSubpath()
-
-          let accGrad = Gradient(colors: [palette.accLight, palette.accMid, palette.accDeep])
-          ctx.fill(
-            north,
-            with: .linearGradient(
-              accGrad,
-              startPoint: CGPoint(x: cx - 40 * sc, y: cy - 336 * sc),
-              endPoint: CGPoint(x: cx + 40 * sc, y: cy - 238 * sc)
-            )
-          )
-
-          // Sculpted checkmark aligned to 2nd tick (-38.57°): M 377 511 L 460 598 L 639 426
-          var check = Path()
-          check.move(to: CGPoint(x: 377 * sc, y: 511 * sc))
-          check.addLine(to: CGPoint(x: 460 * sc, y: 598 * sc))
-          check.addLine(to: CGPoint(x: 639 * sc, y: 426 * sc))
-          let checkStyle = StrokeStyle(lineWidth: 64 * sc, lineCap: .round, lineJoin: .round)
-
-          if accentCheck {
-            ctx.stroke(
-              check,
-              with: .linearGradient(
-                accGrad,
-                startPoint: CGPoint(x: 377 * sc, y: 426 * sc),
-                endPoint: CGPoint(x: 639 * sc, y: 598 * sc)
-              ),
-              style: checkStyle
-            )
-          } else {
-            let inkGrad = Gradient(colors: [palette.checkInkTop, palette.checkInkBot])
-            ctx.stroke(
-              check,
-              with: .linearGradient(
-                inkGrad,
-                startPoint: CGPoint(x: 420 * sc, y: 426 * sc),
-                endPoint: CGPoint(x: 590 * sc, y: 598 * sc)
-              ),
-              style: checkStyle
-            )
-          }
-        }
+        shellLayer(size: s, palette: palette)
+        moatLayer(scale: scale, palette: palette)
+        dialLayer(scale: scale, palette: palette)
+        glyphLayer(palette: palette)
       }
       .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
       .overlay(
         RoundedRectangle(cornerRadius: corner, style: .continuous)
-          .strokeBorder(
-            isWhiteShell ? Color.black.opacity(0.08) : palette.shellRim.opacity(isStealth ? 0.24 : 0.30),
-            lineWidth: max(0.5, 4 * scale)
-          )
+          .strokeBorder(shellRimColor(palette), lineWidth: max(0.5, 4 * scale))
       )
     }
     .aspectRatio(1, contentMode: .fit)
+  }
+
+  private var sheenTopOpacity: Double {
+    if isWhiteShell { return 0.45 }
+    if isStealth { return 0.11 }
+    return isBlackShell ? 0.16 : 0.24
+  }
+  private var sheenBottomOpacity: Double { isWhiteShell ? 0.06 : 0.14 }
+  private var moatStrokeOpacity: Double { isWhiteShell ? 0.28 : 0.55 }
+  private var dialRimOpacity: Double {
+    if isStealth { return 0.14 }
+    return isDarkFace ? 0.18 : 0.94
+  }
+  private var dialShadowOpacity: Double { isWhiteShell ? 0.26 : 0.42 }
+  private var tickOpacity: Double {
+    if isStealth { return 0.28 }
+    return isDarkFace ? 0.34 : 0.28
+  }
+
+  private func shellRimColor(_ palette: ResolvedPalette) -> Color {
+    isWhiteShell ? Color.black.opacity(0.08) : palette.shellRim.opacity(isStealth ? 0.24 : 0.30)
+  }
+
+  // 1. Outer shell with a subtle top-left sheen.
+  @ViewBuilder
+  private func shellLayer(size s: CGFloat, palette: ResolvedPalette) -> some View {
+    LinearGradient(
+      colors: [palette.shellTop, palette.shellMid, palette.shellBot],
+      startPoint: UnitPoint(x: 0.16, y: 0.02),
+      endPoint: UnitPoint(x: 0.84, y: 1.0)
+    )
+    RadialGradient(
+      colors: [
+        Color.white.opacity(sheenTopOpacity),
+        Color.white.opacity(0.02),
+        Color.black.opacity(sheenBottomOpacity),
+      ],
+      center: UnitPoint(x: 0.28, y: 0.12),
+      startRadius: 0,
+      endRadius: s * 0.72
+    )
+  }
+
+  // 2. Bold recessed ring / moat (r = 416).
+  private func moatLayer(scale: CGFloat, palette: ResolvedPalette) -> some View {
+    Circle()
+      .fill(
+        LinearGradient(
+          colors: [palette.wellTop, palette.wellMid, palette.wellBot],
+          startPoint: UnitPoint(x: 0.2, y: 0.0),
+          endPoint: UnitPoint(x: 0.8, y: 1.0)
+        )
+      )
+      .frame(width: 832 * scale, height: 832 * scale)
+      .overlay(
+        Circle()
+          .strokeBorder(palette.shadow.opacity(moatStrokeOpacity), lineWidth: max(0.75, 8 * scale))
+      )
+  }
+
+  // 3. Elevated inner dial plate (r = 354).
+  private func dialLayer(scale: CGFloat, palette: ResolvedPalette) -> some View {
+    Circle()
+      .fill(
+        RadialGradient(
+          colors: [palette.faceTop, palette.faceMid, palette.faceBot],
+          center: UnitPoint(x: 0.42, y: 0.30),
+          startRadius: 0,
+          endRadius: 354 * scale * 1.44
+        )
+      )
+      .frame(width: 708 * scale, height: 708 * scale)
+      .overlay(
+        Circle()
+          .strokeBorder(Color.white.opacity(dialRimOpacity), lineWidth: max(0.5, 5 * scale))
+      )
+      .shadow(color: palette.shadow.opacity(dialShadowOpacity), radius: max(1, 10 * scale), y: max(0.5, 8 * scale))
+  }
+
+  // 4. 6 machined ticks + upright North pointer + checkmark.
+  private func glyphLayer(palette: ResolvedPalette) -> some View {
+    Canvas { ctx, size in
+      let sc = min(size.width, size.height) / 1024.0
+      let cx = size.width / 2
+      let cy = size.height / 2
+      let step = 360.0 / 7.0
+
+      // 6 ticks at k = 1...6
+      let tickStyle = StrokeStyle(lineWidth: 24 * sc, lineCap: .round)
+      let tickColor = palette.mutedGlyph.opacity(tickOpacity)
+      for i in 1..<7 {
+        let rad = (-90.0 + Double(i) * step) * .pi / 180.0
+        var p = Path()
+        p.move(to: CGPoint(x: cx + cos(rad) * 260 * sc, y: cy + sin(rad) * 260 * sc))
+        p.addLine(to: CGPoint(x: cx + cos(rad) * 310 * sc, y: cy + sin(rad) * 310 * sc))
+        ctx.stroke(p, with: .color(tickColor), style: tickStyle)
+      }
+
+      // Upright North compass pointer (-90°)
+      let a0 = -90.0 * .pi / 180.0
+      let aL = (-90.0 - 11.2) * .pi / 180.0
+      let aR = (-90.0 + 11.2) * .pi / 180.0
+      var north = Path()
+      north.move(to: CGPoint(x: cx + cos(a0) * 336 * sc, y: cy + sin(a0) * 336 * sc))
+      north.addLine(to: CGPoint(x: cx + cos(aR) * 238 * sc, y: cy + sin(aR) * 238 * sc))
+      north.addLine(to: CGPoint(x: cx + cos(a0) * 260 * sc, y: cy + sin(a0) * 260 * sc))
+      north.addLine(to: CGPoint(x: cx + cos(aL) * 238 * sc, y: cy + sin(aL) * 238 * sc))
+      north.closeSubpath()
+
+      let accGrad = Gradient(colors: [palette.accLight, palette.accMid, palette.accDeep])
+      ctx.fill(
+        north,
+        with: .linearGradient(
+          accGrad,
+          startPoint: CGPoint(x: cx - 40 * sc, y: cy - 336 * sc),
+          endPoint: CGPoint(x: cx + 40 * sc, y: cy - 238 * sc)
+        )
+      )
+
+      // Sculpted checkmark aligned to 2nd tick (-38.57°): M 377 511 L 460 598 L 639 426
+      var check = Path()
+      check.move(to: CGPoint(x: 377 * sc, y: 511 * sc))
+      check.addLine(to: CGPoint(x: 460 * sc, y: 598 * sc))
+      check.addLine(to: CGPoint(x: 639 * sc, y: 426 * sc))
+      let checkStyle = StrokeStyle(lineWidth: 64 * sc, lineCap: .round, lineJoin: .round)
+
+      if accentCheck {
+        ctx.stroke(
+          check,
+          with: .linearGradient(
+            accGrad,
+            startPoint: CGPoint(x: 377 * sc, y: 426 * sc),
+            endPoint: CGPoint(x: 639 * sc, y: 598 * sc)
+          ),
+          style: checkStyle
+        )
+      } else {
+        let inkGrad = Gradient(colors: [palette.checkInkTop, palette.checkInkBot])
+        ctx.stroke(
+          check,
+          with: .linearGradient(
+            inkGrad,
+            startPoint: CGPoint(x: 420 * sc, y: 426 * sc),
+            endPoint: CGPoint(x: 590 * sc, y: 598 * sc)
+          ),
+          style: checkStyle
+        )
+      }
+    }
   }
 
   private struct ResolvedPalette {
