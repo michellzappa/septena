@@ -1219,10 +1219,9 @@ struct TaskListView: View {
     quickAddGroupTarget = nil
   }
 
-  /// True on grouped Today when area / project headers should expose a "+".
-  private var showsGroupedHeaderQuickAdd: Bool {
-    filter == .today && todayGroupByList && allowsInlineCreate
-  }
+  /// Area / project group headers on Today stay clean (no trailing `+` button —
+  /// capture happens via Magic Plus / New task / ⌘N, matching AppKit).
+  private var showsGroupedHeaderQuickAdd: Bool { false }
 
   /// Compact iPhone Septena uses the floating Magic Plus orb instead of an idle
   /// "New task" trigger row in Inbox — the capture slot mounts only while an
