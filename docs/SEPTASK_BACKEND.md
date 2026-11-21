@@ -296,15 +296,16 @@ the pulled server state overwrites local fields that have no pending op.
 - **Dual-era protocol stays** (legacy `initialize` plus stateless
   `2026-07-28`). This spec does not change the protocol layer.
 - `ClaudeGatewayProvider` and the reconnect cue retire after cutover.
-- **Status (2026-11-19): phase 2 built, not deployed.** A read-only test
-  connector serves `https://api.septena.app/mcp` from the same Worker
+- **Status (2026-11-21): live.** The connector at `https://api.septena.app/mcp`
+  is deployed and is the only task connector (mcp.septena.app was
+  decommissioned on 2026-11-20). History below. It started as a read-only test
+  connector that served `https://api.septena.app/mcp` from the same Worker
   (`src/shadow/` in the gateway). Its OAuth uses **app pairing** instead of
   web Sign in with Apple (no Services ID needed): the authorize page shows an
   8-character code, and Septask ▸ Settings ▸ About ▸ Advanced ▸ Task backend ▸
   "Connect Claude (preview)" approves it through `POST /v1/pair/approve` with
   the app's own session. Today is ordered by `todayPosition`, then
-  `position`. mcp.septena.app is unchanged. **Read-write since 2026-11-19
-  (built, not deployed):** it serves every task tool of the live connector,
+  `position`. **Read-write since 2026-11-19:** it serves every task tool of the live connector,
   writes included, as TaskStore pushes with actor `mcp:claude`. New pairings
   get `tasks:read tasks:write`; an older read-only pairing must reconnect to
   write.
