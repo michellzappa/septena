@@ -32,6 +32,13 @@ struct RootTabView: View {
   @Environment(TrainingDraftStore.self) private var draftStore
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.verticalSizeClass) private var vSize
+  /// Matches `ResolveAdaptiveNavigation` (`usesPushNavigation`): the floating
+  /// iPad top bar only applies on a dual-regular canvas (iPad full-screen /
+  /// large multitasking, unfolded iPhone Duo). Gating on `hSize == .regular`
+  /// alone put the floating overlay on top of the compact nav bar on
+  /// compact-height landscape phones (`hSize == .regular && vSize == .compact`).
+  private var usesRegularChrome: Bool { hSize == .regular && vSize == .regular }
   #endif
   #if os(macOS)
   @Environment(\.openWindow) private var openWindow
@@ -229,7 +236,7 @@ struct RootTabView: View {
     // bar under our switcher), so we don't create one — each tab's nav-bar
     // switcher (`.pageChrome` → `.principal`) is the only switcher. iPhone keeps
     // the system `TabView` (bottom bar); macOS keeps it (title-bar tabs).
-    if hSize == .regular {
+    if usesRegularChrome {
       iPadTabless
     } else {
       systemTabView

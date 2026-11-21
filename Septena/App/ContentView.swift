@@ -6,7 +6,7 @@ struct ContentView: View {
   @Environment(SectionTheme.self) private var theme
 
   #if os(iOS)
-  @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   #endif
 
   var body: some View {
@@ -23,7 +23,7 @@ struct ContentView: View {
     #if os(macOS)
     splitLayout(path: path)
     #else
-    if hSize == .regular {
+    if usesPushNavigation {
       splitLayout(path: path)
     } else {
       stackLayout(path: path)
@@ -57,8 +57,10 @@ struct ContentView: View {
     } detail: {
       destination(for: route)
         .id(route.id)
-        #if os(iOS)
-        // Same as the sidebar column: one global overlay toggle on iPad Tasks.
+        #if os(iOS) && !SEPTASK
+        // Same as the sidebar column: one global overlay toggle on Septena's
+        // iPad Tasks tab. Septask has no window-level overlay bar, so it keeps
+        // the native system sidebar toggle on iPad and unfolded iPhone Duo.
         .toolbar(removing: .sidebarToggle)
         #endif
     }

@@ -39,8 +39,10 @@ struct HeatmapHomepageView<MenuContent: View>: View {
     // On compact (iPhone), always use the list layout regardless of width.
     guard hSize == .regular else { return 1 }
     // Default to 3 on first render (containerWidth == 0) so iPad shows a
-    // grid immediately; refines to 4 once the width probe fires for landscape.
+    // grid immediately; adapt to 2 on narrower regular canvases (unfolded
+    // iPhone Duo portrait) and 4 on wide landscape.
     if containerWidth > 900 { return 4 }
+    if containerWidth > 0 && containerWidth < 700 { return 2 }
     return 3
   }
 

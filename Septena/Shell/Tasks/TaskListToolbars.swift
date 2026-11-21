@@ -136,11 +136,35 @@ struct TaskListStandaloneChrome: ViewModifier {
   func body(content: Content) -> some View {
     #if os(iOS)
     if usesPushNavigation {
-      // iPad regular: the Tasks SIDEBAR publishes the window-level chrome
-      // (gear/···/+); the detail must NOT also publish (it would clobber the
-      // sidebar's entry). The bar inset lives on `SelectableScrollList`'s
+      #if SEPTASK
+      // Septask has no floating window-level overlay bar (unlike Septena's
+      // `RootTabView.iPadTabless`), so on iPad / unfolded iPhone Duo the
+      // standalone detail column owns its own trailing actions (Today's view
+      // options + New Task). The sidebar owns leading Quick Find / Settings,
+      // and `NavigationSplitView` supplies the native sidebar toggle.
+      if embedded {
+        content
+      } else {
+        content.toolbar {
+          if showsViewOptions {
+            ToolbarItem(placement: .topBarTrailing) {
+              OverflowMenu { TaskViewOptions() }
+            }
+          }
+          if !recentlyDeleted {
+            ToolbarItem(placement: .topBarTrailing) {
+              PageAddButton { newTask() }
+            }
+          }
+        }
+      }
+      #else
+      // Septena iPad regular: the Tasks SIDEBAR publishes the window-level
+      // chrome (gear/···/+); the detail must NOT also publish (it would clobber
+      // the sidebar's entry). The bar inset lives on `SelectableScrollList`'s
       // `ScrollView` via `iPadTabBarInsetOwnPadding`.
       content
+      #endif
     } else if embedded {
       content
     } else {

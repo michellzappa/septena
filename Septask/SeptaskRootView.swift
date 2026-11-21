@@ -39,6 +39,14 @@ struct SeptaskRootView: View {
   @State private var selection: SeptaskTab = .today
   #if os(iOS)
   @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.verticalSizeClass) private var vSize
+  /// Matches `ResolveAdaptiveNavigation` (`usesPushNavigation`): split layout
+  /// only when BOTH dimensions are regular (unfolded iPhone Duo, iPad full-
+  /// screen / large multitasking). Testing `== .regular` rather than
+  /// `!= .compact` keeps a transient `nil` size class during fold/unfold in
+  /// the safe compact branch, and keeps compact-height landscape phones out of
+  /// a cramped split view.
+  private var usesSplitLayout: Bool { hSize == .regular && vSize == .regular }
   #else
   @Environment(\.openWindow) private var openWindow
   #endif
@@ -110,11 +118,17 @@ struct SeptaskRootView: View {
   private var rootLayout: some View {
     #if os(iOS)
     Group {
-      if hSize == .compact {
-        systemTabView
-      } else {
+      if usesSplitLayout {
         ContentView()
+      } else {
+        systemTabView
       }
+    }
+    // Fold / unfold continuity (iPhone Duo) and iPad multitasking resize:
+    // preserve the exact surface the user is viewing across the TabView ↔
+    // NavigationSplitView boundary instead of snapping back to Today.
+    .onChange(of: usesSplitLayout) { _, isSplit in
+      syncRouteAcrossLayoutTransition(toSplit: isSplit)
     }
     // Shared task views navigate through the ONE NavigationState path
     // (project drill-ins, smart-list jumps); ContentView's stack renders it
@@ -128,7 +142,7 @@ struct SeptaskRootView: View {
     // a duplicate Today instead of the Tasks home, and that hidden copy could
     // consume a search reveal meant for the tab you were looking at.
     .onChange(of: nav.path) { _, path in
-      guard hSize == .compact, let last = path.last else { return }
+      guard !usesSplitLayout, let last = path.last else { return }
       switch last {
       case .filter(.today):
         selection = .today
@@ -144,6 +158,39 @@ struct SeptaskRootView: View {
     ContentView()
     #endif
   }
+
+  #if os(iOS)
+  /// Keep the user's active view aligned when crossing compact ↔ split
+  /// (folding/unfolding iPhone Duo or resizing an iPad window).
+  private func syncRouteAcrossLayoutTransition(toSplit: Bool) {
+    if toSplit {
+      switch selection {
+      case .today:
+        nav.path = [.filter(.today)]
+      case .upcoming:
+        nav.path = [.filter(.upcoming)]
+      case .tasks:
+        if nav.path.isEmpty { nav.path = [.filter(.today)] }
+      case .search:
+        if nav.path.isEmpty { nav.path = [.filter(.today)] }
+        nav.showQuickFind = true
+      }
+    } else {
+      switch nav.path.last {
+      case .filter(.today):
+        selection = .today
+        nav.path = []
+      case .filter(.upcoming):
+        selection = .upcoming
+        nav.path = []
+      case .some:
+        selection = .tasks
+      case nil:
+        break
+      }
+    }
+  }
+  #endif
 
   #if os(iOS)
   /// Standard iOS 26 `TabView`. The detached trailing slot is a real Search tab

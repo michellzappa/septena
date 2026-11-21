@@ -367,6 +367,7 @@ targets:
             UIWindowSceneSessionRoleApplication:
               - UISceneConfigurationName: Default
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SeptaskSceneDelegate
+        UIApplicationSupportsIndirectInputEvents: true
         # Always-present icon long-press actions. Types match
         # ShortcutAction's raw values.
         UIApplicationShortcutItems:

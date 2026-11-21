@@ -77,7 +77,7 @@ struct AreaDetailView: View {
   let area: Area
   @Environment(DayClock.self) private var clock
   @Environment(NavigationState.self) private var nav
-  @Environment(\.horizontalSizeClass) private var hSize
+  @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(AreasMutator.self) private var areasMutator
   @Environment(\.modelContext) private var modelContext
 
@@ -235,7 +235,7 @@ struct AreaDetailView: View {
     #if os(macOS)
     nav.go(to: .project(id: project.id))
     #else
-    nav.go(to: .project(id: project.id), push: hSize == .compact)
+    nav.go(to: .project(id: project.id), push: !usesPushNavigation)
     #endif
   }
 
@@ -524,13 +524,15 @@ struct ProjectDetailView: View {
     }
   }
 
-  /// Project actions overflow. On iPad regular the window-level chrome owns the
-  /// trailing buttons (a detail-page nav-bar "···" would float behind the global
-  /// "+"), so the overflow renders only in the iPhone compact nav bar and on
-  /// macOS. iPad reaches the same actions via the project's sidebar context menu.
+  /// Project actions overflow. On Septena Life's iPad regular canvas the
+  /// window-level chrome owns the trailing buttons (a detail-page nav-bar "···"
+  /// would float behind the global "+"), so the overflow renders only in the
+  /// iPhone compact nav bar there. Septask has no window-level overlay bar, so
+  /// it keeps the overflow in the detail nav bar on iPad and unfolded iPhone Duo
+  /// just like macOS.
   @ToolbarContentBuilder
   private var projectDetailToolbar: some ToolbarContent {
-    #if os(iOS)
+    #if os(iOS) && !SEPTASK
     if !usesPushNavigation {
       ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
     }

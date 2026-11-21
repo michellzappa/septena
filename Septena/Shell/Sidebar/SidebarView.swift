@@ -279,10 +279,13 @@ struct SidebarRootView: View {
     #if os(iOS)
     .navigationBarTitleDisplayMode(.inline)
     #endif
-    // iPad: the window-level overlay (`RootTabView`) owns the sole sidebar
-    // show/hide control — drop the system's auto-injected toggle so it doesn't
-    // duplicate beside Quick Find in this column's nav bar.
+    #if !SEPTASK
+    // Septena iPad: the window-level overlay (`RootTabView`) owns the sole
+    // sidebar show/hide control — drop the system's auto-injected toggle so it
+    // doesn't duplicate beside Quick Find in this column's nav bar. Septask
+    // has no overlay bar and keeps the native system toggle.
     .toolbar(removing: .sidebarToggle)
+    #endif
     .modifier(sidebarBehavior)
   }
 
@@ -347,7 +350,7 @@ struct SidebarRootView: View {
         id: "tasks",
         title: "Tasks",
         localActions: { AnyView(tasksMenuExtraRows) },
-        add: usesPushNavigation ? .action { nav.requestNewTask() } : nil
+        add: sidebarAddAction
       )
       #else
       // Let SwiftUI supply the macOS sidebar material, row metrics, active
@@ -446,14 +449,26 @@ struct SidebarRootView: View {
   }
   #endif
 
+  /// Septena Life's iPad split view publishes "+" from the sidebar into the
+  /// window-level overlay (`RootTabView.iPadTopBar`). Septask has no overlay
+  /// bar — its detail column owns "+" in its own nav bar so it stays visible
+  /// even when the sidebar collapses on unfolded iPhone Duo / iPad.
+  private var sidebarAddAction: PageAdd? {
+    #if SEPTASK
+    return nil
+    #else
+    return usesPushNavigation ? .action { nav.requestNewTask() } : nil
+    #endif
+  }
+
   @ViewBuilder
   private var tasksMenuExtraRows: some View {
-    #if os(iOS)
-    // iPad regular: the detail pane must not publish chrome (the sidebar owns
-    // the window's gear/···/+), so Today's view options ride here instead of
-    // in `TaskListStandaloneChrome`. Gated on Today being the current route
-    // for the same reason the detail gates on its filter. macOS gets these
-    // from the View menu, which is where a Mac user looks for them.
+    #if os(iOS) && !SEPTASK
+    // Septena iPad regular: the detail pane must not publish chrome (the
+    // sidebar owns the window's gear/···/+), so Today's view options ride here
+    // instead of in `TaskListStandaloneChrome`. Septask's split detail owns
+    // its own toolbar so Today's view options live on Today directly. macOS
+    // gets these from the View menu, which is where a Mac user looks for them.
     if usesPushNavigation,
        effectiveSidebarRoute.sameDestination(as: .filter(.today)) {
       TaskViewOptions()
