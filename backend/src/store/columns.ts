@@ -89,6 +89,7 @@ export const SETTING_KEYS = Object.keys(SETTING_VALUES) as SettingKey[];
 
 export const MAX_ATTACHMENT_BYTES = ENTITY_LIMITS.maxAttachmentBytes;
 export const MAX_USER_ATTACHMENT_BYTES = ENTITY_LIMITS.maxUserAttachmentBytes;
+export const MAX_CHECKLIST_ITEMS_PER_TASK = ENTITY_LIMITS.maxChecklistItemsPerTask;
 
 export interface EntitySpec {
   table: string;
@@ -202,6 +203,20 @@ export const ENTITIES = {
     // Bytes are bound to taskId/byteCount/contentType at upload; only the
     // display fields may change after that.
     updatable: ["filename", "position"],
+  },
+  // 1-level flat checklist items (subtasks) owned by a task (docs/CHECKLISTS_SPEC.md).
+  checklistItem: {
+    table: "checklist_items",
+    columns: {
+      taskId: { kind: "text", zod: zId },
+      title: { kind: "text", zod: z.string().max(ENTITY_LIMITS.textMax) },
+      checked: bool(),
+      checkedAt: stamp(),
+      position: real(),
+      createdAt: stamp(),
+    },
+    requiredOnInsert: ["taskId", "title"],
+    updatable: ["title", "checked", "checkedAt", "position"],
   },
   // The non-turn half of `TaskConvo` (SeptenaCore/TaskConvo.swift), keyed by
   // the task id. Turns are their own append-only table (§5.3).

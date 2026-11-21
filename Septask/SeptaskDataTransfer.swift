@@ -27,7 +27,7 @@ enum TaskJSONTransfer {
     var attachmentCount: Int { tables["task_attachment"]?.count ?? 0 }
     var supportedRowCount: Int { areaCount + projectCount + taskCount + attachmentCount }
     var skippedRowCount: Int {
-      let supported: Set<String> = ["area", "project", "task", "task_attachment"]
+      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item"]
       return tables.reduce(0) { acc, pair in
         supported.contains(pair.key) ? acc : acc + pair.value.count
       }
@@ -87,12 +87,14 @@ enum TaskJSONTransfer {
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let tasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let attachments = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
 
     let tables: [String: [[String: Any]]] = [
       "area": areas.map(areaDict),
       "project": projects.map(projectDict),
       "task": tasks.map(taskDict),
       "task_attachment": attachments.compactMap(attachmentDict),
+      "checklist_item": checklistItems.map(checklistItemDict),
     ]
 
     let envelope: [String: Any] = [
@@ -183,6 +185,19 @@ enum TaskJSONTransfer {
     ])
   }
 
+  private static func checklistItemDict(_ e: TaskChecklistItemEntity) -> [String: Any] {
+    let iso = ISO8601DateFormatter()
+    return compact([
+      "id": e.id,
+      "taskID": e.taskID,
+      "title": e.title,
+      "checked": e.checked,
+      "checkedAt": e.checkedAt.map { iso.string(from: $0) },
+      "position": e.position,
+      "createdAt": e.createdAt == .distantPast ? nil : iso.string(from: e.createdAt),
+    ])
+  }
+
   // MARK: - Parse
 
   static func parseEnvelope(_ data: Data) throws -> Envelope {
@@ -231,6 +246,7 @@ enum TaskJSONTransfer {
     var projectIDs: [String] = []
     var taskIDs: [String] = []
     var attachmentIDs: [String] = []
+    var checklistIDs: [String] = []
 
     // Order: areas → projects → tasks (headings first) → attachments so FK
     // references resolve cleanly if synced later.
@@ -265,6 +281,12 @@ enum TaskJSONTransfer {
         result.attachments += 1
       }
     }
+    if let rows = doc.tables["checklist_item"] {
+      for r in rows {
+        let id = try upsertChecklistItem(r, context: context)
+        checklistIDs.append(id)
+      }
+    }
 
     try StoreHealth.saveOrThrow(context, op: "TaskJSONTransfer.apply")
 
@@ -272,11 +294,12 @@ enum TaskJSONTransfer {
     for id in projectIDs { engine.noteProjectChange(id: id) }
     for id in taskIDs { engine.noteTaskChange(id: id) }
     for id in attachmentIDs { engine.noteTaskAttachmentChange(id: id) }
+    for id in checklistIDs { engine.noteChecklistItemChange(id: id) }
 
     if !areaIDs.isEmpty || !projectIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
     }
-    if !taskIDs.isEmpty || !attachmentIDs.isEmpty {
+    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
     return result
@@ -438,6 +461,30 @@ enum TaskJSONTransfer {
     return id
   }
 
+  private static func upsertChecklistItem(_ r: [String: Any], context: ModelContext) throws -> String {
+    guard let id = nonEmptyString(r["id"]),
+          let taskID = nonEmptyString(r["taskID"] ?? r["taskId"]),
+          let title = r["title"] as? String else {
+      throw TransferError.malformed("A checklist item row is missing id, taskID, or title.")
+    }
+    var desc = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    desc.fetchLimit = 1
+    let existing = try context.fetch(desc).first
+    let entity = existing ?? TaskChecklistItemEntity(id: id, taskID: taskID, title: title)
+    if existing == nil { context.insert(entity) }
+    entity.taskID = taskID
+    entity.title = title
+    entity.checked = (r["checked"] as? Bool) ?? false
+    let iso = ISO8601DateFormatter()
+    entity.checkedAt = (r["checkedAt"] as? String).flatMap { iso.date(from: $0) }
+    entity.position = doubleValue(r["position"]) ?? 0
+    if let stamp = r["createdAt"] as? String, let date = iso.date(from: stamp) {
+      entity.createdAt = date
+    }
+    entity.updatedAt = Date()
+    return id
+  }
+
   private static func nonEmptyString(_ raw: Any?) -> String? {
     guard let s = raw as? String, !s.isEmpty else { return nil }
     return s
@@ -567,6 +614,11 @@ enum TaskJSONTransfer {
         for noteLine in notes.components(separatedBy: .newlines) {
           lines.append("\(indent)  > \(noteLine)")
         }
+      }
+      let steps = LocalCache.checklistItems(forTaskID: t.id, in: context)
+      for step in steps {
+        let stepBox = step.checked ? "[x]" : "[ ]"
+        lines.append("\(indent)  - \(stepBox) \(step.title)")
       }
     }
 

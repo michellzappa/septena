@@ -46,6 +46,8 @@ export interface TaskOut {
   reminderAt?: string;
   reminderMode?: "floating" | "fixed";
   reminderSnoozedUntil?: string;
+  checklistCount?: number;
+  checklistDoneCount?: number;
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
   // `daysOnToday` = days the row has carried over on Today undone; the app

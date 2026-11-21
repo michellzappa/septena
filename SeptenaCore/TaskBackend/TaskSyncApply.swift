@@ -61,6 +61,7 @@ extension TaskSyncEngine {
     for p in (try? context.fetch(FetchDescriptor<ProjectEntity>())) ?? [] { context.delete(p) }
     // Attachment FILES stay on disk: re-pulled rows relink to them by id.
     for a in (try? context.fetch(FetchDescriptor<TaskAttachmentEntity>())) ?? [] { context.delete(a) }
+    for c in (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>())) ?? [] { context.delete(c) }
     _ = StoreHealth.save(context, op: "taskSync.reset")
     store.deleteAllShadows()
     since = 0
@@ -96,6 +97,13 @@ extension TaskSyncEngine {
                                        contentType: "application/octet-stream", byteCount: 0)
           main.insert(n)
           applyAttachmentFields(n, fields, skip: [])
+        }
+      case (TaskSyncOpKind.upsert, .checklistItem?):
+        if let item = fetchChecklistItem(op.rowID) { applyChecklistItemFields(item, fields, skip: []) }
+        else if let taskID = fields["taskId"]?.stringValue {
+          let n = TaskChecklistItemEntity(id: op.rowID, taskID: taskID, title: "")
+          main.insert(n)
+          applyChecklistItemFields(n, fields, skip: [])
         }
       case (TaskSyncOpKind.delete, .task?):
         if let t = fetchTask(op.rowID), t.deletedAt == nil { t.deletedAt = Self.localStamp(Date()) }
@@ -223,6 +231,21 @@ extension TaskSyncEngine {
             }
           }
           let mapped = (try? TaskBackendMapping.attachment(a).get())?.row.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
+      case .checklistItem:
+        if tombstone {
+          if let item = fetchChecklistItem(id) { main.delete(item) }
+          markGone(.checklistItem, id, shadow: shadows[key], store: store)
+        } else if !pendingDelete.contains(key) {
+          let item = fetchChecklistItem(id) ?? {
+            let n = TaskChecklistItemEntity(id: id, taskID: change.row["taskId"]?.stringValue ?? "", title: "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyChecklistItemFields(item, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.checklistItem(item).get())?.fields ?? [:]
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
         touchedTasks = true
@@ -360,6 +383,11 @@ extension TaskSyncEngine {
       }
       markGone(.attachment, id, shadow: store.shadow("attachment:\(id)"), store: store)
       addIssue(.attachment, id, "change refused: the attachment is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .checklistItem:
+      if let item = fetchChecklistItem(id) { main.delete(item) }
+      markGone(.checklistItem, id, shadow: store.shadow("checklistItem:\(id)"), store: store)
+      addIssue(.checklistItem, id, "change refused: the checklist item is deleted on the backend")
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     case .setting:
       // Settings are never deleted on the backend; nothing to undo.
@@ -611,6 +639,24 @@ extension TaskSyncEngine {
     take("byteCount") { a.byteCount = Int64(Self.int($0) ?? Int(a.byteCount)) }
     take("position") { a.position = Self.double($0) ?? 0 }
     take("createdAt") { a.createdAt = Self.parseStamp($0.stringValue) ?? a.createdAt }
+    return applied
+  }
+
+  @discardableResult
+  func applyChecklistItemFields(_ item: TaskChecklistItemEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("taskId") { item.taskID = $0.stringValue ?? item.taskID }
+    take("title") { item.title = $0.stringValue ?? item.title }
+    take("checked") { item.checked = Self.bool($0) ?? false }
+    take("checkedAt") { item.checkedAt = Self.parseStamp($0.stringValue) }
+    take("position") { item.position = Self.double($0) ?? 0 }
+    take("createdAt") { item.createdAt = Self.parseStamp($0.stringValue) ?? item.createdAt }
+    item.updatedAt = Date()
     return applied
   }
 

@@ -905,6 +905,7 @@ final class LocalStore {
   private init() {
     let schema = Schema([TaskEntity.self,
                          TaskAttachmentEntity.self,
+                         TaskChecklistItemEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
                          SettingsEntity.self,
@@ -1550,6 +1551,80 @@ enum LocalCache {
     let descriptor = FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.title)])
     let rows = StoreHealth.fetch(context, descriptor)
     return rows.map(Project.init)
+  }
+}
+
+@Model
+final class TaskChecklistItemEntity {
+  @Attribute(.unique) var id: String
+  var taskID: String
+  var title: String
+  var checked: Bool = false
+  var checkedAt: Date? = nil
+  var position: Double = 0
+  var createdAt: Date = Date()
+  var updatedAt: Date = Date()
+
+  init(id: String,
+       taskID: String,
+       title: String,
+       checked: Bool = false,
+       checkedAt: Date? = nil,
+       position: Double = 0,
+       createdAt: Date = Date(),
+       updatedAt: Date = Date()) {
+    self.id = id
+    self.taskID = taskID
+    self.title = title
+    self.checked = checked
+    self.checkedAt = checkedAt
+    self.position = position
+    self.createdAt = createdAt
+    self.updatedAt = updatedAt
+  }
+}
+
+extension ChecklistItem {
+  private static let isoFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+  }()
+
+  init(_ entity: TaskChecklistItemEntity) {
+    self.init(
+      id: entity.id,
+      taskId: entity.taskID,
+      title: entity.title,
+      checked: entity.checked,
+      checkedAt: entity.checkedAt.map { Self.isoFormatter.string(from: $0) },
+      position: entity.position,
+      createdAt: entity.createdAt == .distantPast ? nil : Self.isoFormatter.string(from: entity.createdAt)
+    )
+  }
+}
+
+extension LocalCache {
+  @MainActor
+  static func checklistItems(forTaskID taskID: String, in context: ModelContext) -> [ChecklistItem] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID },
+      sortBy: [SortDescriptor(\.position), SortDescriptor(\.createdAt), SortDescriptor(\.id)]
+    ))
+    return rows.map(ChecklistItem.init)
+  }
+
+  @MainActor
+  static func checklistSummaryByTask(in context: ModelContext) -> [String: (done: Int, total: Int)] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TaskChecklistItemEntity>())
+    var out: [String: (done: Int, total: Int)] = [:]
+    for r in rows {
+      var entry = out[r.taskID] ?? (0, 0)
+      entry.total += 1
+      if r.checked { entry.done += 1 }
+      out[r.taskID] = entry
+    }
+    return out
   }
 }
 

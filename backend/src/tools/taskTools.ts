@@ -1,5 +1,8 @@
 import type { Tool } from "../rpc.js";
 import {
+  checklistAddJsonSchema,
+  checklistDeleteJsonSchema,
+  checklistUpdateJsonSchema,
   completeTaskJsonSchema,
   createTaskJsonSchema,
   deferTaskJsonSchema,
@@ -176,5 +179,26 @@ export const TASK_TOOLS: Tool[] = [
     description: "List tasks awaiting reasoning: marked for Claude, or whose last provider turn was low-confidence, and not yet terminal.",
     inputSchema: pendingReasoningJsonSchema,
     annotations: { title: "List tasks awaiting reasoning", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_add",
+    title: "Add checklist items",
+    description: "Append one or more 1-level checklist steps to a task.",
+    inputSchema: checklistAddJsonSchema,
+    annotations: { title: "Add checklist items", readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_update",
+    title: "Update checklist item",
+    description: "Rename, check/uncheck, or reorder a checklist item on a task. Checking all items does not auto-complete the parent task.",
+    inputSchema: checklistUpdateJsonSchema,
+    annotations: { title: "Update checklist item", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_checklist_delete",
+    title: "Delete checklist item",
+    description: "Delete a checklist item from a task.",
+    inputSchema: checklistDeleteJsonSchema,
+    annotations: { title: "Delete checklist item", readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   },
 ];

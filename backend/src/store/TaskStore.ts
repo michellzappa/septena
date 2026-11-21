@@ -3,6 +3,7 @@ import type { Env } from "../env.js";
 import {
   ENTITIES,
   ENTITY_NAMES,
+  MAX_CHECKLIST_ITEMS_PER_TASK,
   MAX_USER_ATTACHMENT_BYTES,
   addMissingColumnsSQL,
   createTableSQL,
@@ -307,6 +308,7 @@ export class TaskStore extends DurableObject<Env> {
         originalTransactionId TEXT, status TEXT NOT NULL, environment TEXT, note TEXT,
         signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
     `);
   }
 
@@ -429,6 +431,7 @@ export class TaskStore extends DurableObject<Env> {
       if (op.entity === "task") {
         this.tombstoneConvo(op.id, now);
         purgedAttachmentIds.push(...this.tombstoneAttachments(op.id, now));
+        this.tombstoneChecklistItems(op.id, now);
       }
       return { clientOpId: op.clientOpId, status: "applied", rev };
     }
@@ -459,6 +462,17 @@ export class TaskStore extends DurableObject<Env> {
       if (op.entity === "attachment") {
         const quota = this.checkQuota(op.id, op.fields.byteCount as number);
         if (quota) return { clientOpId: op.clientOpId, status: "rejected", reason: quota };
+      }
+      if (op.entity === "checklistItem") {
+        const taskId = op.fields.taskId as string;
+        if (!this.liveTask(taskId)) return { clientOpId: op.clientOpId, status: "rejected", reason: "unknown_task" };
+        const count = this.sql.exec<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL",
+          taskId,
+        ).one().n;
+        if (count >= MAX_CHECKLIST_ITEMS_PER_TASK) {
+          return { clientOpId: op.clientOpId, status: "rejected", reason: "checklist_limit_exceeded" };
+        }
       }
     } else {
       const locked = spec.updatable ? names.filter((f) => !spec.updatable!.includes(f)) : [];
@@ -503,6 +517,7 @@ export class TaskStore extends DurableObject<Env> {
     const taskId = op.op === "appendTurn" ? op.taskId
       : (op.entity === "task" || op.entity === "convo") ? op.id
       : op.entity === "attachment" && op.op === "upsert" ? (op.fields.taskId as string | undefined) ?? null
+      : op.entity === "checklistItem" ? this.checklistItemTaskId(op)
       : null;
     if (taskId && this.convoStopped(taskId)) return "stopped";
     if (op.op === "upsert" && op.entity === "task" && op.fields.status === "done" && this.convoAssignedToClaude(op.id)) {
@@ -542,6 +557,30 @@ export class TaskStore extends DurableObject<Env> {
       this.sql.exec("UPDATE attachments SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
     }
     return ids;
+  }
+
+  /// A permanently deleted task takes its checklist items with it.
+  private tombstoneChecklistItems(taskId: string, now: string): void {
+    const ids = this.sql.exec<{ id: string }>(
+      "SELECT id FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL",
+      taskId,
+    ).toArray().map((r) => r.id);
+    for (const id of ids) {
+      const rev = this.nextRev();
+      this.sql.exec("UPDATE checklist_items SET deletedAt = ?, rev = ?, updatedAt = ? WHERE id = ?", now, rev, now, id);
+    }
+  }
+
+  private checklistItemTaskId(op: Op): string | null {
+    if (op.op === "upsert" && typeof op.fields.taskId === "string") return op.fields.taskId;
+    if (op.op === "upsert" || op.op === "delete") {
+      const row = this.sql.exec<{ taskId: string }>(
+        "SELECT taskId FROM checklist_items WHERE id = ?",
+        op.id,
+      ).toArray()[0];
+      return row?.taskId ?? null;
+    }
+    return null;
   }
 
   /// Returns a rejection reason, or null when the new attachment fits.
@@ -719,7 +758,7 @@ export class TaskStore extends DurableObject<Env> {
   /// `includeSettings`: the client syncs the `setting` entity. Clients built
   /// before it existed decode pulled entities strictly and would fail on it,
   /// so they get no setting rows (their cursor still moves past them).
-  pull(since: number, limit: number, includeSettings = false): PullResult {
+  pull(since: number, limit: number, includeSettings = false, includeChecklists = false): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -729,6 +768,7 @@ export class TaskStore extends DurableObject<Env> {
     const merged: Array<{ rev: number; entity: EntityName | "turn"; row: Record<string, unknown> }> = [];
     for (const name of ENTITY_NAMES) {
       if (name === "setting" && !includeSettings) continue;
+      if (name === "checklistItem" && !includeChecklists) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -780,6 +820,30 @@ export class TaskStore extends DurableObject<Env> {
       convo: convoRaw ? (decodeRow(ENTITIES.convo, convoRaw) as Row) : null,
       turns,
     };
+  }
+
+  readChecklistItems(taskId: string): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM checklist_items WHERE taskId = ? AND deletedAt IS NULL ORDER BY position IS NULL, position, createdAt, id",
+      taskId,
+    ).toArray().map((r) => decodeRow(ENTITIES.checklistItem, r) as Row);
+  }
+
+  readChecklistItem(id: string): Row | null {
+    const raw = this.sql.exec(
+      "SELECT * FROM checklist_items WHERE id = ? AND deletedAt IS NULL",
+      id,
+    ).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.checklistItem, raw) as Row) : null;
+  }
+
+  readChecklistCounts(): Record<string, { total: number; done: number }> {
+    const rows = this.sql.exec<{ taskId: string; total: number; done: number }>(
+      "SELECT taskId, COUNT(*) AS total, SUM(CASE WHEN checked = 1 THEN 1 ELSE 0 END) AS done FROM checklist_items WHERE deletedAt IS NULL GROUP BY taskId",
+    ).toArray();
+    const out: Record<string, { total: number; done: number }> = {};
+    for (const r of rows) out[r.taskId] = { total: r.total, done: r.done ?? 0 };
+    return out;
   }
 
   readAreas(limit: number): Row[] {

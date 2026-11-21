@@ -15,6 +15,7 @@
     "maxUserAttachmentBytes": 2147483648,
     "maxOpsPerPush": 500,
     "maxPull": 1000,
+    "maxChecklistItemsPerTask": 200,
     "maxSubtasks": 500,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
@@ -141,6 +142,20 @@
         "position": { "kind": "real", "nullable": true },
         "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "uploadedAt": { "kind": "text", "serverOwned": true }
+      }
+    },
+    "checklistItem": {
+      "table": "checklist_items",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "title"],
+      "updatable": ["title", "checked", "checkedAt", "position"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "title": { "kind": "text", "max": 2000, "nullable": false },
+        "checked": { "kind": "bool", "default": 0 },
+        "checkedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "position": { "kind": "real", "nullable": true },
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
       }
     },
     "convo": {

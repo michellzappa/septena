@@ -246,11 +246,24 @@ export function nextScheduledDate(input: {
  * (`recur-` + 16 lowercase hex digits).
  */
 export function occurrenceID(sourceTaskID: string, scheduled: string): string {
+  return `recur-${fnv1a64Hex(`${sourceTaskID}|${scheduled}`)}`;
+}
+
+/**
+ * Deterministic ID for a checklist item copied onto a recurring occurrence:
+ * FNV-1a 64 over "<newTaskID>|chk|<index>|<sourceItemID>" (`chk-` + 16 hex),
+ * LOCKSTEP with Swift `ChecklistItem.occurrenceItemID`.
+ */
+export function checklistOccurrenceID(newTaskID: string, index: number, sourceItemID: string): string {
+  return `chk-${fnv1a64Hex(`${newTaskID}|chk|${index}|${sourceItemID}`)}`;
+}
+
+function fnv1a64Hex(input: string): string {
   const MASK = (1n << 64n) - 1n;
   let hash = 14695981039346656037n;
-  for (const byte of new TextEncoder().encode(`${sourceTaskID}|${scheduled}`)) {
+  for (const byte of new TextEncoder().encode(input)) {
     hash = (hash ^ BigInt(byte)) & MASK;
     hash = (hash * 1099511628211n) & MASK;
   }
-  return `recur-${hash.toString(16).padStart(16, "0")}`;
+  return hash.toString(16).padStart(16, "0");
 }

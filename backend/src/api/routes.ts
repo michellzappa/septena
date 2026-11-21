@@ -145,9 +145,16 @@ api.get("/sync/pull", async (c) => {
     limit: z.coerce.number().int().min(1).max(1_000).default(500),
     // `settings=1`: the client syncs the `setting` entity (TaskStore.pull).
     settings: z.enum(["0", "1"]).default("0"),
+    // `checklists=1`: the client syncs the `checklistItem` entity (TaskStore.pull).
+    checklists: z.enum(["0", "1"]).default("0"),
   }).safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
-  return c.json(await storeFor(c.env, c.get("userId")).pull(q.data.since, q.data.limit, q.data.settings === "1"));
+  return c.json(await storeFor(c.env, c.get("userId")).pull(
+    q.data.since,
+    q.data.limit,
+    q.data.settings === "1",
+    q.data.checklists === "1",
+  ));
 });
 
 api.get("/sync/ws", async (c) => {

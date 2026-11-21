@@ -442,6 +442,55 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 }
 
+// MARK: - Checklist item (1-level subtask, docs/CHECKLISTS_SPEC.md)
+
+struct ChecklistItem: Identifiable, Codable, Hashable, Sendable {
+  let id: String
+  let taskId: String
+  var title: String
+  var checked: Bool
+  var checkedAt: String?
+  var position: Double
+  var createdAt: String?
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case taskId = "task_id"
+    case title, checked
+    case checkedAt = "checked_at"
+    case position
+    case createdAt = "created_at"
+  }
+
+  init(id: String,
+       taskId: String,
+       title: String,
+       checked: Bool = false,
+       checkedAt: String? = nil,
+       position: Double = 0,
+       createdAt: String? = nil) {
+    self.id = id
+    self.taskId = taskId
+    self.title = title
+    self.checked = checked
+    self.checkedAt = checkedAt
+    self.position = position
+    self.createdAt = createdAt
+  }
+
+  /// Deterministic ID for a checklist item copied onto a spawned recurring
+  /// occurrence: FNV-1a 64 over `"<newTaskID>|chk|<index>|<sourceItemID>"`
+  /// (`chk-` + 16 hex), LOCKSTEP with `backend/src/recurrence.ts` `checklistOccurrenceID`.
+  static func occurrenceItemID(newTaskID: String, index: Int, sourceItemID: String) -> String {
+    var hash: UInt64 = 14695981039346656037
+    for byte in "\(newTaskID)|chk|\(index)|\(sourceItemID)".utf8 {
+      hash ^= UInt64(byte)
+      hash &*= 1099511628211
+    }
+    return "chk-\(String(format: "%016llx", hash))"
+  }
+}
+
 // MARK: - Recurrence
 
 /// A recurring task spawns a new instance when completed. `afterCompletion`

@@ -229,6 +229,21 @@ enum TaskBackendMapping {
     }
   }
 
+  @MainActor
+  static func checklistItem(_ item: TaskChecklistItemEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(item.id)
+    let fields: [String: BackendJSON] = [
+      "taskId": c.id("taskId", item.taskID),
+      "title": c.text("title", item.title),
+      "checked": .bool(item.checked),
+      "checkedAt": item.checkedAt.map { .string(stamp($0)) } ?? .null,
+      "position": c.real("position", item.position),
+      "createdAt": item.createdAt == .distantPast ? .null : .string(stamp(item.createdAt)),
+    ]
+    return finish(.checklistItem, item.id, c, fields, deleted: false)
+  }
+
   /// The non-turn half of the conversation (`convos` table, keyed by task id).
   /// Nil when the task has no conversation.
   @MainActor

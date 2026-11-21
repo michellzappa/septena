@@ -244,10 +244,20 @@ async function callTool(
       const r = await store.readTask(a.id as string);
       if (!r || r.task.kind === "heading") throw new Error(`Task not found: ${a.id}`);
       const t = annotate(taskOut(r.task), todayYMD(timeZone), Date.now());
+      const checklistRows = await store.readChecklistItems(t.id);
+      const checklist = checklistRows.map((c) => ({
+        id: c.id as string,
+        title: str(c.title) ?? "",
+        checked: c.checked === true,
+        ...(str(c.checkedAt) ? { checkedAt: str(c.checkedAt) } : {}),
+        position: num(c.position) ?? 0,
+      }));
       result = {
         id: t.id, title: t.title, status: t.status, today: t.today,
+        ...(t.starred ? { starred: true } : {}),
         scheduled: t.scheduled, deadline: t.deadline, area: t.area, project: t.project,
         completedAt: t.completedAt, source: t.source, notes: t.notes,
+        ...(checklist.length > 0 ? { checklist } : {}),
         inbox: t.inbox, daysOnToday: t.daysOnToday,
         convo: convoSummary(convoOut(r.convo, r.turns)),
         agent: agentState(r.convo),
@@ -352,9 +362,15 @@ async function effectiveTimeZone(store: StoreRpc, grant: McpGrant): Promise<stri
 async function listTasks(store: StoreRpc, timeZone: string, rawView: unknown, rawLimit: number | undefined) {
   const view = normalizeView(rawView);
   const limit = rawLimit ?? 100;
+  const counts = await store.readChecklistCounts();
+  const withChecklist = (t: TaskOut): TaskOut => {
+    const c = counts[t.id];
+    if (!c || c.total <= 0) return t;
+    return { ...t, checklistCount: c.total, checklistDoneCount: c.done };
+  };
   if (view === "completed") {
     const { rows, total } = await store.readTasks("done", limit);
-    return { tasks: rows.map(taskOut).map(stripDays), total, truncated: total > rows.length };
+    return { tasks: rows.map(taskOut).map(withChecklist).map(stripDays), total, truncated: total > rows.length };
   }
   // Open rows arrive ordered by scheduled, then position. Today re-sorts by
   // its own manual order: todayPosition, falling back to position.
@@ -362,7 +378,7 @@ async function listTasks(store: StoreRpc, timeZone: string, rawView: unknown, ra
   const today = todayYMD(timeZone);
   const nowMs = Date.now();
   let matched = rows
-    .map((row) => ({ row, out: taskOut(row) }))
+    .map((row) => ({ row, out: withChecklist(taskOut(row)) }))
     .filter(({ out }) => matchesView(out, view, today, nowMs));
   let tasks = matched.map((m) => m.out);
   if (view === "today") {

@@ -629,6 +629,57 @@ enum TaskUndo {
              Task { @MainActor in try? await areas.delete(id: id) }
            })
   }
+
+  // MARK: - Checklists (1-level subtasks, docs/CHECKLISTS_SPEC.md)
+
+  static func recordChecklistAdd(_ item: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [item.taskId])
+    var live = item
+    record(name: String(localized: "Add Checklist Item", comment: "Undo action name"),
+           undo: { mutator.deleteChecklistItem(id: live.id) },
+           redo: {
+             if let restored = mutator.restoreChecklistItem(live) { live = restored }
+           })
+  }
+
+  static func recordChecklistUpdate(before: ChecklistItem, after: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [before.taskId])
+    record(name: before.checked != after.checked
+             ? (after.checked
+                ? String(localized: "Check Item", comment: "Undo action name")
+                : String(localized: "Uncheck Item", comment: "Undo action name"))
+             : String(localized: "Edit Checklist Item", comment: "Undo action name"),
+           undo: {
+             mutator.updateChecklistItem(id: before.id,
+                                         title: before.title,
+                                         checked: before.checked,
+                                         position: before.position)
+           },
+           redo: {
+             mutator.updateChecklistItem(id: after.id,
+                                         title: after.title,
+                                         checked: after.checked,
+                                         position: after.position)
+           })
+  }
+
+  static func recordChecklistDelete(_ item: ChecklistItem, mutator: TaskMutator) {
+    mutator.touch(ids: [item.taskId])
+    var live = item
+    record(name: String(localized: "Delete Checklist Item", comment: "Undo action name"),
+           undo: {
+             if let restored = mutator.restoreChecklistItem(live) { live = restored }
+           },
+           redo: { mutator.deleteChecklistItem(id: live.id) })
+  }
+
+  static func recordChecklistReorder(taskID: String, beforeIDs: [String], afterIDs: [String], mutator: TaskMutator) {
+    guard beforeIDs != afterIDs else { return }
+    mutator.touch(ids: [taskID])
+    record(name: String(localized: "Reorder Checklist", comment: "Undo action name"),
+           undo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: beforeIDs) },
+           redo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs) })
+  }
 }
 
 // MARK: - Delete confirmation copy

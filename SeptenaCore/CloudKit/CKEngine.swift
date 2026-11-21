@@ -282,6 +282,8 @@ func noteSectionChange(id: String) { noteChange(recordName: "section:\(id)", kin
 func noteSectionDeletion(id: String) { noteDeletion(recordName: "section:\(id)", kind: "section") }
 func noteTaskAttachmentChange(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteChange(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
 func noteTaskAttachmentDeletion(id: String) { if routeToTaskBackend(.attachment, id) { return }; noteDeletion(recordName: TaskAttachmentCloudKitSchema.recordName(for: id), kind: "taskAttachment") }
+func noteChecklistItemChange(id: String) { _ = routeToTaskBackend(.checklistItem, id) }
+func noteChecklistItemDeletion(id: String) { _ = routeToTaskBackend(.checklistItem, id) }
 
   private func noteChange(recordName: String, kind: String) {
     guard let engine else {

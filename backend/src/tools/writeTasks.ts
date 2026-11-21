@@ -107,6 +107,11 @@ export const createTaskJsonSchema = {
       enum: ["floating", "fixed"],
       description: "Timezone mode for reminder_at: floating (device local wall-clock, default) or fixed (exact UTC instant).",
     },
+    checklist: {
+      type: "array",
+      items: { type: "string", minLength: 1 },
+      description: "Optional 1-level checklist step titles created in order on the new task.",
+    },
     origin: {
       type: "string",
       enum: ["user_request", "agent_suggestion"],
@@ -177,6 +182,7 @@ export interface CreateTaskInput {
   reminderAt?: string | null;
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
+  checklist?: string[];
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -588,5 +594,39 @@ export const setHandoffJsonSchema = {
         payload: { type: "string", description: "URL / email / phone for the action" },
       },
     },
+  },
+} as const;
+
+export const checklistAddJsonSchema = {
+  type: "object",
+  required: ["task_id", "items"],
+  properties: {
+    task_id: { type: "string", description: "Owning task id." },
+    items: {
+      type: "array",
+      minItems: 1,
+      maxItems: 200,
+      items: { type: "string", minLength: 1 },
+      description: "Checklist step titles to append in order.",
+    },
+  },
+} as const;
+
+export const checklistUpdateJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: {
+    id: { type: "string", description: "Checklist item id." },
+    title: { type: "string", minLength: 1 },
+    checked: { type: "boolean" },
+    position: { type: "number" },
+  },
+} as const;
+
+export const checklistDeleteJsonSchema = {
+  type: "object",
+  required: ["id"],
+  properties: {
+    id: { type: "string", description: "Checklist item id." },
   },
 } as const;

@@ -14,6 +14,7 @@ enum RegistryEntityLimits {
   static let maxUserAttachmentBytes: Int64 = 2147483648
   static let maxOpsPerPush: Int = 500
   static let maxPull: Int = 1000
+  static let maxChecklistItemsPerTask: Int = 200
   static let maxSubtasks: Int = 500
   static let maxArtifactRefs: Int = 100
   static let turnProviderMax: Int = 32
@@ -52,8 +53,8 @@ enum RegistryEntityEnums {
   static let appIconColor: [String] = ["auto", "persimmon", "haskap", "tamarillo", "yuzu", "carambola", "acai", "pitaya", "mono"]
   static let canvasTexture: [String] = ["none", "topography", "fieldMatrix", "stippleDrift", "causticGlass", "ridges", "washiPaper"]
   static let textureMotion: [String] = ["still", "slowDrift"]
-  static let entityNames: [String] = ["task", "area", "project", "attachment", "convo", "setting"]
-  static let deletableEntities: [String] = ["task", "area", "project", "attachment"]
+  static let entityNames: [String] = ["task", "area", "project", "attachment", "checklistItem", "convo", "setting"]
+  static let deletableEntities: [String] = ["task", "area", "project", "attachment", "checklistItem"]
 }
 
 /// Domain thresholds and retention constants shared across platforms (`registry/rules.json`).

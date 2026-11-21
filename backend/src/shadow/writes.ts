@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Env } from "../env.js";
 import { randomId } from "../util.js";
 import { localServerTimestamp, todayYMD } from "../tz.js";
-import { nextScheduledDate, occurrenceID } from "../recurrence.js";
+import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
 import { storeFor } from "../api/session.js";
 import { zId } from "../store/columns.js";
@@ -58,6 +58,7 @@ const ORDER_GAP = 1024;
 /// declarations: the generated RPC stub type recurses too deep on JSON rows.
 type StoreMethod =
   | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
+  | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
@@ -102,6 +103,7 @@ export const zWriteArgs = {
     reminderAt: z.string().nullable().optional(),
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
+    checklist: z.array(z.string().min(1).max(2000)).max(200).optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -168,6 +170,19 @@ export const zWriteArgs = {
       payload: z.string().optional(),
     }),
   }),
+  tasks_checklist_add: z.object({
+    task_id: zId,
+    items: z.array(z.string().min(1).max(2000)).min(1).max(200),
+  }),
+  tasks_checklist_update: z.object({
+    id: zId,
+    title: z.string().min(1).max(2000).optional(),
+    checked: z.boolean().optional(),
+    position: z.number().finite().optional(),
+  }),
+  tasks_checklist_delete: z.object({
+    id: zId,
+  }),
 };
 export type WriteToolName = keyof typeof zWriteArgs;
 export const WRITE_TOOL_NAMES = Object.keys(zWriteArgs) as WriteToolName[];
@@ -220,6 +235,12 @@ export async function runWriteTool(ctx: WriteContext, name: WriteToolName, args:
       await writeConvo(ctx, args.id as string, { handoff: dropUndefined(normalizeHandoff(h)) });
       return { id: args.id, handoff: h.instruction };
     }
+    case "tasks_checklist_add":
+      return checklistAdd(ctx, args.task_id as string, args.items as string[]);
+    case "tasks_checklist_update":
+      return checklistUpdate(ctx, args as { id: string; title?: string; checked?: boolean; position?: number });
+    case "tasks_checklist_delete":
+      return checklistDelete(ctx, args.id as string);
   }
 }
 
@@ -343,9 +364,34 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   }
   if (onToday(fields, today)) fields.todayPosition = position;
 
-  const [r] = await push(store, [{ op: "upsert", entity: "task", id, fields }]);
+  const ops: NewOp[] = [{ op: "upsert", entity: "task", id, fields }];
+  const createdChecklist: Array<{ id: string; title: string; position: number }> = [];
+  if (input.checklist && input.checklist.length > 0) {
+    for (let i = 0; i < input.checklist.length; i++) {
+      const stepTitle = input.checklist[i].trim();
+      if (!stepTitle) continue;
+      const itemId = `chk-${randomId(10)}`;
+      const pos = (createdChecklist.length + 1) * ORDER_GAP;
+      ops.push({
+        op: "upsert",
+        entity: "checklistItem",
+        id: itemId,
+        fields: { taskId: id, title: stepTitle, checked: false, position: pos, createdAt: now },
+      });
+      createdChecklist.push({ id: itemId, title: stepTitle, position: pos });
+    }
+  }
+
+  const results = await push(store, ops);
+  const r = results[0];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
-  return { id, title: input.title, placement: plan.placement, ...plan.echo };
+  return {
+    id,
+    title: input.title,
+    placement: plan.placement,
+    ...plan.echo,
+    ...(createdChecklist.length > 0 ? { checklist: createdChecklist } : {}),
+  };
 }
 
 async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
@@ -509,6 +555,27 @@ async function completeTask(ctx: WriteContext, id: string) {
         if (onToday(fields, today)) fields.todayPosition = position;
         occurrenceOp = ops.length;
         ops.push({ op: "upsert", entity: "task", id: occId, fields });
+
+        // Copy active checklist items onto the spawned occurrence, reset to
+        // unchecked with deterministic IDs so phone + agent completions converge.
+        const sourceItems = await store.readChecklistItems(id);
+        for (let i = 0; i < sourceItems.length; i++) {
+          const item = sourceItems[i];
+          const itemId = checklistOccurrenceID(occId, i, item.id as string);
+          ops.push({
+            op: "upsert",
+            entity: "checklistItem",
+            id: itemId,
+            fields: {
+              taskId: occId,
+              title: str(item.title) ?? "",
+              checked: false,
+              checkedAt: null,
+              position: num(item.position) ?? (i + 1) * ORDER_GAP,
+              createdAt: now,
+            },
+          });
+        }
       }
     }
   }
@@ -529,6 +596,71 @@ async function completeTask(ctx: WriteContext, id: string) {
     recurrence = { recurrenceWarning: recurrenceWarning.createFailed(id, recurrence.nextOccurrence.scheduled) };
   }
   return { id, status: "done", completedAt, ...recurrence };
+}
+
+// ---- checklists ----
+
+async function checklistAdd(ctx: WriteContext, taskId: string, items: string[]) {
+  const { store } = ctx;
+  const current = await store.readTask(taskId);
+  if (!current) throw new Error(`Task not found: ${taskId}`);
+  const existing = await store.readChecklistItems(taskId);
+  let maxPos = 0;
+  for (const row of existing) {
+    const p = num(row.position);
+    if (p !== undefined && p > maxPos) maxPos = p;
+  }
+  const now = new Date().toISOString();
+  const ops: NewOp[] = [];
+  const added: Array<{ id: string; title: string; position: number }> = [];
+  for (const raw of items) {
+    const title = raw.trim();
+    if (!title) continue;
+    maxPos += ORDER_GAP;
+    const id = `chk-${randomId(10)}`;
+    ops.push({
+      op: "upsert",
+      entity: "checklistItem",
+      id,
+      fields: { taskId, title, checked: false, position: maxPos, createdAt: now },
+    });
+    added.push({ id, title, position: maxPos });
+  }
+  if (ops.length === 0) return { task_id: taskId, added: [] };
+  const results = await push(store, ops);
+  for (let i = 0; i < results.length; i++) {
+    requireApplied(results[i], added[i].id);
+  }
+  return { task_id: taskId, added };
+}
+
+async function checklistUpdate(
+  ctx: WriteContext,
+  input: { id: string; title?: string; checked?: boolean; position?: number },
+) {
+  const { store } = ctx;
+  const current = await store.readChecklistItem(input.id);
+  if (!current) throw new Error(`Checklist item not found: ${input.id}`);
+  const fields: Record<string, unknown> = {};
+  if (input.title !== undefined) fields.title = input.title.trim();
+  if (input.checked !== undefined) {
+    fields.checked = input.checked;
+    fields.checkedAt = input.checked ? new Date().toISOString() : null;
+  }
+  if (input.position !== undefined) fields.position = input.position;
+  if (Object.keys(fields).length === 0) return { id: input.id, updated: [] };
+  const [r] = await push(store, [{ op: "upsert", entity: "checklistItem", id: input.id, fields }]);
+  requireApplied(r, input.id);
+  return { id: input.id, updated: Object.keys(fields) };
+}
+
+async function checklistDelete(ctx: WriteContext, id: string) {
+  const { store } = ctx;
+  const current = await store.readChecklistItem(id);
+  if (!current) throw new Error(`Checklist item not found: ${id}`);
+  const [r] = await push(store, [{ op: "delete", entity: "checklistItem", id }]);
+  requireApplied(r, id);
+  return { id, deleted: true };
 }
 
 // ---- conversations ----

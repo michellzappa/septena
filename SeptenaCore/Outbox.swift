@@ -257,6 +257,48 @@ final class TaskMutator {
     cloudBackend.setStarred(id: id, starred: starred)
   }
 
+  @discardableResult
+  func addChecklistItem(taskID: String, title: String, position: Double? = nil) -> ChecklistItem? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] addChecklistItem called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.addChecklistItem(taskID: taskID, title: title, position: position)
+  }
+
+  func updateChecklistItem(id: String, title: String? = nil, checked: Bool? = nil, position: Double? = nil) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] updateChecklistItem called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.updateChecklistItem(id: id, title: title, checked: checked, position: position)
+  }
+
+  func reorderChecklistItems(taskID: String, orderedIDs: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] reorderChecklistItems called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.reorderChecklistItems(taskID: taskID, orderedIDs: orderedIDs)
+  }
+
+  func deleteChecklistItem(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] deleteChecklistItem called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.deleteChecklistItem(id: id)
+  }
+
+  @discardableResult
+  func restoreChecklistItem(_ item: ChecklistItem) -> ChecklistItem? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreChecklistItem called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.restoreChecklistItem(item)
+  }
+
   func setRecurrence(id: String, recurrence: Recurrence?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setRecurrence called before CK bound — dropping", nil)
@@ -401,6 +443,7 @@ final class TaskMutator {
       source: source
     )
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
+    if task.starred { setStarred(id: copy.id, starred: true) }
     if let rule = task.recurrence {
       setRecurrence(id: copy.id, recurrence: rule)
       // `setRecurrence` resets the pause across the series it writes, so a
@@ -411,6 +454,7 @@ final class TaskMutator {
       // re-asserted here rather than inherited.)
       if task.recurrencePaused { setRecurrencePaused(id: copy.id, paused: true) }
     }
+    cloudBackend?.copyChecklistItems(from: task.id, to: copy.id, deterministic: false)
     return copy
   }
 

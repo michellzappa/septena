@@ -194,6 +194,7 @@ final class CloudKitTasksBackend {
     context.insert(next)
     spawnedPositions[id] = next.position
     commitAndPush(next, op: "recurrence.create")
+    copyChecklistItems(from: entity.id, to: id, deterministic: true)
     return true
   }
 
@@ -616,6 +617,7 @@ final class CloudKitTasksBackend {
   func purge(id: String) {
     guard let entity = fetch(id: id) else { return }
     purgeAttachments(taskID: id)
+    purgeChecklistItems(taskID: id)
     let neverPushed = engine.taskNeverSynced(id: id, systemFields: entity.cloudKitSystemFields)
     let staged = entity     // capture before we tell SwiftData to remove
     context.delete(entity)
@@ -636,6 +638,159 @@ final class CloudKitTasksBackend {
       context.delete(attachment)
       engine.noteTaskAttachmentDeletion(id: attachment.id)
     }
+  }
+
+  private func purgeChecklistItems(taskID: String) {
+    let rows = ((try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID }
+    ))) ?? [])
+    for item in rows {
+      context.delete(item)
+      engine.noteChecklistItemDeletion(id: item.id)
+    }
+  }
+
+  // MARK: Checklists (1-level subtasks, docs/CHECKLISTS_SPEC.md)
+
+  private func fetchChecklistItem(id: String) -> TaskChecklistItemEntity? {
+    var d = FetchDescriptor<TaskChecklistItemEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return try? context.fetch(d).first
+  }
+
+  @discardableResult
+  func addChecklistItem(taskID: String, title: String, position: Double? = nil) -> ChecklistItem? {
+    guard fetch(id: taskID) != nil else { return nil }
+    let existing = LocalCache.checklistItems(forTaskID: taskID, in: context)
+    guard existing.count < RegistryEntityLimits.maxChecklistItemsPerTask else { return nil }
+    let nextPos = position ?? ((existing.map(\.position).max() ?? 0) + TaskOrder.gap)
+    let id = "chk-\(UUID().uuidString.lowercased().prefix(12))"
+    let entity = TaskChecklistItemEntity(
+      id: id,
+      taskID: taskID,
+      title: title,
+      checked: false,
+      checkedAt: nil,
+      position: nextPos,
+      createdAt: Date(),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "checklist.add") else { return nil }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(taskID)
+    return ChecklistItem(entity)
+  }
+
+  func updateChecklistItem(id: String, title: String? = nil, checked: Bool? = nil, position: Double? = nil) {
+    guard let entity = fetchChecklistItem(id: id) else { return }
+    var changed = false
+    if let title, entity.title != title {
+      entity.title = title
+      changed = true
+    }
+    if let checked, entity.checked != checked {
+      entity.checked = checked
+      entity.checkedAt = checked ? Date() : nil
+      changed = true
+    }
+    if let position, entity.position != position {
+      entity.position = position
+      changed = true
+    }
+    guard changed else { return }
+    entity.updatedAt = Date()
+    guard StoreHealth.save(context, op: "checklist.update") else { return }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(entity.taskID)
+  }
+
+  func reorderChecklistItems(taskID: String, orderedIDs: [String]) {
+    let rows = (try? context.fetch(FetchDescriptor<TaskChecklistItemEntity>(
+      predicate: #Predicate { $0.taskID == taskID }
+    ))) ?? []
+    let byID = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+    var touched: [String] = []
+    for (index, id) in orderedIDs.enumerated() {
+      guard let item = byID[id] else { continue }
+      let nextPos = Double(index + 1) * TaskOrder.gap
+      if item.position != nextPos {
+        item.position = nextPos
+        item.updatedAt = Date()
+        touched.append(id)
+      }
+    }
+    guard !touched.isEmpty else { return }
+    guard StoreHealth.save(context, op: "checklist.reorder") else { return }
+    for id in touched { engine.noteChecklistItemChange(id: id) }
+    TaskChange.post(taskID)
+  }
+
+  func deleteChecklistItem(id: String) {
+    guard let entity = fetchChecklistItem(id: id) else { return }
+    let taskID = entity.taskID
+    context.delete(entity)
+    guard StoreHealth.save(context, op: "checklist.delete") else { return }
+    engine.noteChecklistItemDeletion(id: id)
+    TaskChange.post(taskID)
+  }
+
+  /// Restores a deleted checklist item (used by `TaskUndo`). Reuses the same
+  /// ID when `TaskSyncEngine.canRevive(.checklistItem, item.id)` holds, else
+  /// mints a fresh ID so the backend never drops an upsert on a tombstoned row.
+  @discardableResult
+  func restoreChecklistItem(_ item: ChecklistItem) -> ChecklistItem? {
+    guard fetch(id: item.taskId) != nil else { return nil }
+    let canKeepID = TaskSyncEngine.shared.canRevive(.checklistItem, item.id)
+    let id = canKeepID ? item.id : "chk-\(UUID().uuidString.lowercased().prefix(12))"
+    if fetchChecklistItem(id: id) != nil { return item }
+    let iso = ISO8601DateFormatter()
+    let entity = TaskChecklistItemEntity(
+      id: id,
+      taskID: item.taskId,
+      title: item.title,
+      checked: item.checked,
+      checkedAt: item.checkedAt.flatMap { iso.date(from: $0) },
+      position: item.position,
+      createdAt: item.createdAt.flatMap { iso.date(from: $0) } ?? Date(),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "checklist.restore") else { return nil }
+    engine.noteChecklistItemChange(id: id)
+    TaskChange.post(item.taskId)
+    return ChecklistItem(entity)
+  }
+
+  /// Copies active checklist items from `sourceTaskID` onto `destinationTaskID`,
+  /// reset to unchecked. `deterministic: true` uses `ChecklistItem.occurrenceItemID`
+  /// so recurring completions on phone and agent converge without duplicates.
+  func copyChecklistItems(from sourceTaskID: String, to destinationTaskID: String, deterministic: Bool = false) {
+    let source = LocalCache.checklistItems(forTaskID: sourceTaskID, in: context)
+    guard !source.isEmpty else { return }
+    var createdIDs: [String] = []
+    for (idx, item) in source.enumerated() {
+      let id = deterministic
+        ? ChecklistItem.occurrenceItemID(newTaskID: destinationTaskID, index: idx, sourceItemID: item.id)
+        : "chk-\(UUID().uuidString.lowercased().prefix(12))"
+      guard fetchChecklistItem(id: id) == nil else { continue }
+      let entity = TaskChecklistItemEntity(
+        id: id,
+        taskID: destinationTaskID,
+        title: item.title,
+        checked: false,
+        checkedAt: nil,
+        position: item.position,
+        createdAt: Date(),
+        updatedAt: Date()
+      )
+      context.insert(entity)
+      createdIDs.append(id)
+    }
+    guard !createdIDs.isEmpty else { return }
+    guard StoreHealth.save(context, op: "checklist.copy") else { return }
+    for id in createdIDs { engine.noteChecklistItemChange(id: id) }
+    TaskChange.post(destinationTaskID)
   }
 
   /// 30-day auto-purge: permanently delete all Recently Deleted tasks whose
