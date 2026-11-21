@@ -208,6 +208,7 @@ struct TaskAttributeBar: View {
       case .deadline:   InlineDatePanel(date: $draft.deadline, fill: panelFill)
       case .repeatRule: InlineRepeatPanel(recurrence: $draft.recurrence,
                                           hasScheduledDate: draft.scheduled != nil,
+                                          scheduledDate: SeptenaDate.format(draft.scheduled),
                                           accent: accent,
                                           fill: panelFill) {
         a11yAnimate(.snappy(duration: 0.22)) { expanded = nil }
@@ -436,17 +437,42 @@ private struct InlineRepeatPanel: View {
   /// the completion day), so the toggle is held ON and explained rather than
   /// offering a choice that doesn't do what it says.
   let hasScheduledDate: Bool
+  var scheduledDate: String? = nil
   let accent: Color
   let fill: Color
   /// Collapse the rail's expanded panel. "Don't Repeat" calls it (clear + close);
   /// owned by `TaskAttributeBar.expanded`.
   var onStop: () -> Void = {}
 
+  private enum MonthlyMode: Int { case anchor = 0, dayOfMonth = 1, ordinal = 2 }
+
+  private static let weekdayPills: [(day: Int, short: String, full: String)] = [
+    (2, "M", "Monday"), (3, "T", "Tuesday"), (4, "W", "Wednesday"),
+    (5, "T", "Thursday"), (6, "F", "Friday"), (7, "S", "Saturday"),
+    (1, "S", "Sunday"),
+  ]
+
+  private static let ordinalChoices: [(value: Int, label: String)] = [
+    (1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (-1, "Last"),
+  ]
+
+  private static let fullWeekdays: [(value: Int, label: String)] = [
+    (1, "Sunday"), (2, "Monday"), (3, "Tuesday"), (4, "Wednesday"),
+    (5, "Thursday"), (6, "Friday"), (7, "Saturday"),
+  ]
+
+  private static let nextPreviewFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.setLocalizedDateFormatFromTemplate("EEEMMMd")
+    return f
+  }()
+
   /// True once the user actually picks a value here (or the task already
   /// repeated when the panel opened). A panel opened but left untouched reverts
   /// on close — so merely *peeking* at Repeat never commits a recurrence, and
   /// re-tapping the pill (or clicking away) cleanly undoes the open.
   @State private var confirmed = false
+  @State private var showCustom = false
 
   /// Every control write goes through here so any real interaction marks the
   /// recurrence as confirmed (and thus kept on close).
@@ -455,19 +481,47 @@ private struct InlineRepeatPanel: View {
   private var unit: Binding<Recurrence.Unit> {
     Binding(get: { recurrence?.unit ?? .week },
             set: { write(Recurrence(unit: $0, interval: recurrence?.interval ?? 1,
-                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
+                                    afterCompletion: recurrence?.afterCompletion ?? true,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
   }
   private var interval: Binding<Int> {
     Binding(get: { recurrence?.interval ?? 1 },
             set: { write(Recurrence(unit: recurrence?.unit ?? .week, interval: $0,
-                                    afterCompletion: recurrence?.afterCompletion ?? true)) })
+                                    afterCompletion: recurrence?.afterCompletion ?? true,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
   }
   private var afterCompletion: Binding<Bool> {
     // Reads ON with no date because that IS the behavior — showing a stored
     // OFF the engine can't honor would misreport what the rule will do.
     Binding(get: { !hasScheduledDate || (recurrence?.afterCompletion ?? true) },
             set: { write(Recurrence(unit: recurrence?.unit ?? .week,
-                                    interval: recurrence?.interval ?? 1, afterCompletion: $0)) })
+                                    interval: recurrence?.interval ?? 1,
+                                    afterCompletion: $0,
+                                    weekdays: recurrence?.weekdays,
+                                    monthDay: recurrence?.monthDay,
+                                    ordinalWeekday: recurrence?.ordinalWeekday)) })
+  }
+
+  private var currentMonthlyMode: MonthlyMode {
+    if recurrence?.ordinalWeekday != nil { return .ordinal }
+    if recurrence?.monthDay != nil { return .dayOfMonth }
+    return .anchor
+  }
+
+  private var supportsCustomOptions: Bool {
+    guard hasScheduledDate, let r = recurrence, !r.afterCompletion else { return false }
+    return r.unit == .week || r.unit == .month || r.unit == .year
+  }
+
+  private var nextPreview: String? {
+    guard let r = recurrence,
+          let wire = r.nextDate(completedOn: DayClock.appToday, scheduled: scheduledDate),
+          let date = SeptenaDate.parse(wire) else { return nil }
+    return Self.nextPreviewFormatter.string(from: date)
   }
 
   var body: some View {
@@ -480,6 +534,17 @@ private struct InlineRepeatPanel: View {
       }
       .pickerStyle(.segmented)
 
+      if hasScheduledDate {
+        let isWeekdays = recurrence?.afterCompletion == false
+          && recurrence?.unit == .week
+          && recurrence?.interval == 1
+          && Set(recurrence?.weekdays ?? []) == Set([2, 3, 4, 5, 6])
+        SelectableChip("Weekdays (Mon–Fri)", isSelected: isWeekdays, tint: accent) {
+          write(Recurrence(unit: .week, interval: 1, afterCompletion: false,
+                           weekdays: [2, 3, 4, 5, 6]))
+        }
+      }
+
       Stepper(value: interval, in: 1...99) {
         Text("Every \(intervalLabel())")
           .font(.septenaSidebarRow)
@@ -490,6 +555,151 @@ private struct InlineRepeatPanel: View {
         .font(.septenaSidebarRow)
         .tint(accent)
         .disabled(!hasScheduledDate)
+
+      if supportsCustomOptions {
+        Button {
+          a11yAnimate(.snappy(duration: 0.2)) { showCustom.toggle() }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: showCustom ? "chevron.down" : "chevron.right")
+              .font(.caption.weight(.semibold))
+            Text(showCustom ? "Hide custom options" : "Custom options…")
+              .font(.caption.weight(.medium))
+            Spacer(minLength: 0)
+          }
+          .foregroundStyle(Theme.inkSecondary)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+
+        if showCustom {
+          if recurrence?.unit == .week {
+            let selectedDays = Set(recurrence?.weekdays ?? [])
+            HStack(spacing: 4) {
+              ForEach(Self.weekdayPills, id: \.day) { item in
+                SelectableChip(item.short,
+                               isSelected: selectedDays.contains(item.day),
+                               tint: accent,
+                               shape: .roundedRect,
+                               fillsWidth: true) {
+                  var next = selectedDays
+                  if next.contains(item.day) { next.remove(item.day) } else { next.insert(item.day) }
+                  write(Recurrence(unit: .week,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   weekdays: next.isEmpty ? nil : next.sorted()))
+                }
+                .accessibilityLabel(item.full)
+              }
+            }
+          } else if recurrence?.unit == .month || recurrence?.unit == .year {
+            let anchor = scheduledDate.flatMap(SeptenaDate.parse) ?? DayClock.appNow
+            let cal = Calendar.current
+            let defaultDay = cal.component(.day, from: anchor)
+            let defaultOrd = min(4, max(1, (defaultDay - 1) / 7 + 1))
+            let defaultWeekday = cal.component(.weekday, from: anchor)
+
+            Picker("Monthly rule", selection: Binding(
+              get: { currentMonthlyMode },
+              set: { mode in
+                switch mode {
+                case .anchor:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false))
+                case .dayOfMonth:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   monthDay: recurrence?.monthDay ?? defaultDay))
+                case .ordinal:
+                  write(Recurrence(unit: recurrence?.unit ?? .month,
+                                   interval: recurrence?.interval ?? 1,
+                                   afterCompletion: false,
+                                   ordinalWeekday: recurrence?.ordinalWeekday
+                                     ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd,
+                                                                 weekday: defaultWeekday)))
+                }
+              }
+            )) {
+              Text("Same day").tag(MonthlyMode.anchor)
+              Text("On day").tag(MonthlyMode.dayOfMonth)
+              Text("Ordinal").tag(MonthlyMode.ordinal)
+            }
+            .pickerStyle(.segmented)
+
+            if currentMonthlyMode == .dayOfMonth {
+              HStack(spacing: 8) {
+                Text("Day")
+                  .font(.caption)
+                  .foregroundStyle(Theme.inkSecondary)
+                Picker("Day of month", selection: Binding(
+                  get: { recurrence?.monthDay ?? defaultDay },
+                  set: { day in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     monthDay: day))
+                  }
+                )) {
+                  ForEach(1...31, id: \.self) { d in Text("\(d)").tag(d) }
+                  Text("Last day").tag(-1)
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+              }
+            } else if currentMonthlyMode == .ordinal {
+              let currentOW = recurrence?.ordinalWeekday
+                ?? RecurrenceOrdinalWeekday(ordinal: defaultOrd, weekday: defaultWeekday)
+              HStack(spacing: 6) {
+                Text("On the")
+                  .font(.caption)
+                  .foregroundStyle(Theme.inkSecondary)
+                Picker("Ordinal", selection: Binding(
+                  get: { currentOW.ordinal },
+                  set: { ord in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: ord,
+                                                                              weekday: currentOW.weekday)))
+                  }
+                )) {
+                  ForEach(Self.ordinalChoices, id: \.value) { item in
+                    Text(item.label).tag(item.value)
+                  }
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+
+                Picker("Weekday", selection: Binding(
+                  get: { currentOW.weekday },
+                  set: { wd in
+                    write(Recurrence(unit: recurrence?.unit ?? .month,
+                                     interval: recurrence?.interval ?? 1,
+                                     afterCompletion: false,
+                                     ordinalWeekday: RecurrenceOrdinalWeekday(ordinal: currentOW.ordinal,
+                                                                              weekday: wd)))
+                  }
+                )) {
+                  ForEach(Self.fullWeekdays, id: \.value) { item in
+                    Text(item.label).tag(item.value)
+                  }
+                }
+                .pickerStyle(.menu)
+                .tint(Theme.inkPrimary)
+              }
+            }
+          }
+        }
+      }
+
+      if let next = nextPreview, let r = recurrence {
+        Text("\(r.shortLabel) · Next: \(next)")
+          .font(.caption)
+          .foregroundStyle(Theme.inkSecondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
 
       if !hasScheduledDate {
         Text("Give the task a date to repeat on a fixed schedule.")
@@ -517,13 +727,21 @@ private struct InlineRepeatPanel: View {
     // untouched panel reverts to "no repeat" on close (`onDisappear`). A task
     // that already repeated counts as confirmed, so editing never loses it.
     .onAppear {
-      if recurrence == nil { recurrence = Recurrence(unit: .week); confirmed = false }
-      else { confirmed = true }
+      if recurrence == nil {
+        recurrence = Recurrence(unit: .week)
+        confirmed = false
+        showCustom = false
+      } else {
+        confirmed = true
+        showCustom = recurrence?.weekdays != nil
+          || recurrence?.monthDay != nil
+          || recurrence?.ordinalWeekday != nil
+      }
     }
     .onDisappear { if !confirmed { recurrence = nil } }
   }
 
-  /// Pluralized "N days/weeks/months" via the String Catalog (one/other).
+  /// Pluralized "N days/weeks/months/years" via the String Catalog (one/other).
   private func intervalLabel() -> String {
     let n = interval.wrappedValue
     switch recurrence?.unit ?? .week {
