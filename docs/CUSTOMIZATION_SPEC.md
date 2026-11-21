@@ -93,6 +93,7 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 | `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
 | `textureSeed` | int `1…9999` | `42` | User can tap **Shuffle** to pick a new terrain; deterministic everywhere |
 | `textureTintWithAccent` | bool | `true` | Blends texture ink ~58% toward active accent + subtle radial glow; `false` uses pure neutral ink |
+| `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial height-field drift (~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
 
 ### 3.3 Per-Project Deterministic Identity (Phase C3)
 - When `projectHeaderTextures` is enabled (opt-in or automatic when a texture is active), opening a Project uses `headerWash` seeded deterministically from `FNV-1a(project.id)` (already in `registry/rules.json` for `occurrenceID`).
@@ -104,10 +105,11 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
   - macOS AppKit shell (`SeptaskKit`): `CALayer` / `CAMetalLayer` or cached `CGImage` backing on the scroll view's document backdrop behind `KitCardCell` views, re-rendered only on resize, appearance change, or setting change.
 - **Web (`#21`):** Offscreen `<canvas>` (or CSS `paint()` / cached blob URL) rendered once per viewport/theme change using the exact same Mulberry32 + value-noise fBm parameters as the conformance fixture.
 - **Android / Windows (`#20`, `#136`):** Compose `DrawScope` / AGSL `RuntimeShader` (Android 13+, Canvas fallback below) using the shared registry parameters.
-- **Accessibility invariants:**
-  - `Reduce Motion`: textures are already static (never animated continuously); seed/style transitions cross-fade only when Reduce Motion is off.
+- **Accessibility & battery invariants:**
+  - `Reduce Motion`: forces `textureMotion` to `still` (zero animation); seed/style transitions skip cross-fading.
+  - `Low Power Mode` & window inactivity: automatically pauses `slowDrift` (`TimelineView(.animation(minimumInterval: 1/20, paused: ...))` on Apple, `document.hidden` / window blur on Web & Desktop) so idle or battery-constrained sessions cost zero GPU frames.
   - `Increase Contrast`: automatically halves `textureIntensity` (cap `<= 30`) so separators and card edges dominate.
-  - `Reduce Transparency`: floating Liquid Glass chrome falls back to opaque `cardSurface` (`DesignSpec.md` §5.5), keeping legibility intact over textured canvases.
+  - `Reduce Transparency`: floating Liquid Glass chrome (and any frosted/glassy card material) falls back to opaque `cardSurface` (`DesignSpec.md` §5.5), keeping legibility intact over textured canvases.
 
 ---
 
@@ -127,6 +129,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | `textureIntensity` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`15…100`) | `55` | `septena.appearance.textureIntensity` |
 | `textureSeed` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`1…9999`) | `42` | `septena.appearance.textureSeed` |
 | `textureTintWithAccent` | `synced` *(honored locally if `syncTheme == false`)* | `bool` | `true` | `septena.appearance.textureTint` |
+| `textureMotion` | `synced` *(honored locally if `syncTheme == false`)* | `enum: ["still", "slowDrift"]` | `"still"` | `septena.appearance.textureMotion` |
 
 - **How `syncTheme` works (Todoist idiom):** Always stored device-local (`default: true`). When `true`, writes to the 6 appearance keys push to `api.septena.app` settings KV and remote updates apply locally. When `false`, this device keeps its own local appearance (e.g., bold Persimmon on iPhone, quiet Jabuticaba on Mac) without overwriting other devices.
 - **`accent_color` customSurface** in `docs/SETTINGS_UX_SPEC.md` evolves into the unified **Appearance** picker surface:
@@ -168,7 +171,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 ## 7. Non-Goals (v1)
 
 - Custom user-uploaded photo wallpapers or Unsplash integrations.
-- Animated / continuously moving background shaders (battery & distraction hazard).
+- Fast, high-frequency, or default-on animated shaders (motion stays strictly opt-in via `textureMotion: "slowDrift"` at a low ~20fps glacial cadence).
 - Per-task or per-section arbitrary custom hex pickers outside the curated exotic-fruit palette.
 - Custom font-family pickers (typography stays governed by `DesignSpec.md` §5 and the 5-step text scale).
 
