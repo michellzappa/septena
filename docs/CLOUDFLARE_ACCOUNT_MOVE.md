@@ -136,9 +136,12 @@ then.
 - Step 10 passed: mz's iPhone loads tasks against the new backend.
 - Step 11 done: Email Sending enabled for `septena.app` (records on
   `cf-bounce`, DKIM `cf-bounce._domainkey`). Cloudflare set `_dmarc` to
-  `p=reject`; mz set it to `p=none` because the Gandi mailbox has no DKIM
-  record in the zone, so forwarded Gandi mail could be rejected. Add Gandi
-  DKIM, then return `_dmarc` to `p=reject`.
+  `p=reject` and it stays there. Checked 2026-11-21: Gandi has no mailbox
+  and no forwarding for septena.app, and no code, app or site uses an
+  `@septena.app` address, so Cloudflare Email Sending is the only sender and
+  Gandi needs no DKIM. The Gandi MX records receive nothing. If an
+  `@septena.app` mailbox is ever added at Gandi, add Gandi's DKIM records
+  before sending from it, or DMARC rejects that mail.
 - Left: ~~step 10~~ ~~step 11~~, step 11 (Email Sending), the
   community re-link if mz signs in to the community again, step 12 after
   14 days (old workers, KV, R2, D1, the three stray namespaces and the
