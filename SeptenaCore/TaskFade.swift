@@ -10,15 +10,15 @@ import Foundation
 
 enum TaskFade {
   /// Default untouched window before an open task fades (days).
-  static let windowDays: Int = 14
+  static let windowDays: Int = RegistryRules.fadeWindowDays
   /// Fade window in seconds.
   static let windowInterval: TimeInterval = Double(windowDays) * 24 * 60 * 60
-  /// One day in seconds — a fresh task stays at full strength for its first day.
-  static let graceInterval: TimeInterval = 24 * 60 * 60
+  /// Grace period in seconds — a fresh task stays at full strength for its first day.
+  static let graceInterval: TimeInterval = Double(RegistryRules.fadeGraceDays) * 24 * 60 * 60
 
   /// The faintest a fading row gets. Label ink at 0.55 on the light background
   /// stays above a 4.5:1 contrast ratio, so a faded title is still readable.
-  static let minOpacity: Double = 0.55
+  static let minOpacity: Double = RegistryRules.fadeMinOpacity
 
   /// Shared UserDefaults key for the Settings toggle (`SettingsKey.tasksShowAging`).
   /// Absent → enabled by default (`docs/TASK_FADE_SPEC.md` §11).
@@ -31,7 +31,7 @@ enum TaskFade {
   static let dismissedSweepWeekKey = "septena.fade.dismissedSweepWeek"
 
   /// Gregorian weekday for the weekly sweep (1 = Sunday, default per §5 & §11).
-  static let sweepWeekday: Int = 1
+  static let sweepWeekday: Int = RegistryRules.fadeSweepWeekday
 
   /// Whether task fading (visual countdown + daily fade pass) is turned on.
   static var isEnabled: Bool {

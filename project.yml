@@ -865,6 +865,7 @@ targets:
       - path: SeptenaCore/TaskConvo.swift
       - path: SeptenaCore/ConvoDerived.swift
       - path: SeptenaCore/TaskFade.swift
+      - path: SeptenaCore/Generated/RegistryConstants.swift
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig

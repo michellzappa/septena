@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "patterns": {
+    "id": "^[A-Za-z0-9._:-]{1,128}$",
+    "clientOpId": "^[A-Za-z0-9_-]{8,64}$",
+    "day": "^\\d{4}-\\d{2}-\\d{2}$",
+    "stamp": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
+  },
+  "limits": {
+    "textMax": 2000,
+    "notesMax": 100000,
+    "attachmentPointerMax": 4000,
+    "stampMax": 40,
+    "maxAttachmentBytes": 26214400,
+    "maxUserAttachmentBytes": 2147483648,
+    "maxOpsPerPush": 500,
+    "maxPull": 1000,
+    "maxSubtasks": 500,
+    "maxArtifactRefs": 100,
+    "turnProviderMax": 32,
+    "turnQuestionMax": 10000,
+    "turnOptionMax": 500,
+    "turnMaxOptions": 20,
+    "turnChosenMax": 500,
+    "turnOtherTextMax": 10000,
+    "turnNoteMax": 100000
+  },
+  "enums": {
+    "taskStatus": ["open", "done", "cancelled"],
+    "projectStatus": ["active", "done", "cancelled"],
+    "taskKind": ["heading"],
+    "recurrenceUnit": ["day", "week", "month"],
+    "convoAssignee": ["me", "local", "claude"],
+    "convoEndState": [
+      "agent_done",
+      "human_done",
+      "agent_assisted_done",
+      "needs_verify",
+      "decomposed",
+      "reminder_set",
+      "promoted_to_today",
+      "wont_do",
+      "open"
+    ],
+    "convoHandoffActionType": ["open_url", "compose", "call", "none"],
+    "convoTurnRole": ["user", "provider"],
+    "convoTurnStep": ["confirm", "ground", "scope", "decide", "work"],
+    "telemetryLevel": ["none", "minimal", "balanced", "full"]
+  },
+  "entities": {
+    "task": {
+      "table": "tasks",
+      "deletable": true,
+      "requiredOnInsert": ["title", "status"],
+      "columns": {
+        "title": { "kind": "text", "max": 2000, "nullable": true },
+        "status": { "kind": "text", "max": 32, "nullable": true },
+        "kind": { "kind": "text", "max": 32, "nullable": true },
+        "heading": { "kind": "text", "format": "id", "nullable": true },
+        "area": { "kind": "text", "format": "id", "nullable": true },
+        "project": { "kind": "text", "format": "id", "nullable": true },
+        "created": { "kind": "text", "format": "day", "nullable": true },
+        "scheduled": { "kind": "text", "format": "day", "nullable": true },
+        "deadline": { "kind": "text", "format": "day", "nullable": true },
+        "today": { "kind": "bool", "default": 0 },
+        "todaySetOn": { "kind": "text", "format": "day", "nullable": true },
+        "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "notes": { "kind": "text", "max": 100000, "nullable": true },
+        "position": { "kind": "real", "nullable": true },
+        "todayPosition": { "kind": "real", "nullable": true },
+        "recurrenceUnit": { "kind": "text", "max": 16, "nullable": true },
+        "recurrenceInterval": { "kind": "int", "nullable": true },
+        "recurrenceAfterCompletion": { "kind": "bool", "default": 0 },
+        "recurrencePaused": { "kind": "bool", "default": 0 },
+        "recurrenceSeriesID": { "kind": "text", "max": 128, "nullable": true },
+        "recurrenceAnchorDate": { "kind": "text", "format": "day", "nullable": true },
+        "source": { "kind": "text", "max": 64, "nullable": true },
+        "sourceClient": { "kind": "text", "max": 64, "nullable": true },
+        "acknowledgedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
+      }
+    },
+    "area": {
+      "table": "areas",
+      "deletable": true,
+      "requiredOnInsert": ["title"],
+      "columns": {
+        "title": { "kind": "text", "max": 2000, "nullable": true },
+        "context": { "kind": "text", "max": 100000, "nullable": true },
+        "emoji": { "kind": "text", "max": 16, "nullable": true },
+        "attachment": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
+        "position": { "kind": "int", "nullable": true }
+      }
+    },
+    "project": {
+      "table": "projects",
+      "deletable": true,
+      "requiredOnInsert": ["title", "status"],
+      "columns": {
+        "title": { "kind": "text", "max": 2000, "nullable": true },
+        "status": { "kind": "text", "max": 32, "nullable": true },
+        "area": { "kind": "text", "format": "id", "nullable": true },
+        "created": { "kind": "text", "format": "day", "nullable": true },
+        "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "notes": { "kind": "text", "max": 100000, "nullable": true },
+        "context": { "kind": "text", "max": 100000, "nullable": true },
+        "githubRepo": { "kind": "text", "max": 200, "nullable": true },
+        "attachment": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
+        "position": { "kind": "int", "nullable": true }
+      }
+    },
+    "attachment": {
+      "table": "attachments",
+      "deletable": true,
+      "requiredOnInsert": ["taskId", "filename", "contentType", "byteCount"],
+      "updatable": ["filename", "position"],
+      "columns": {
+        "taskId": { "kind": "text", "format": "id", "nullable": false },
+        "filename": { "kind": "text", "max": 512, "nullable": true },
+        "contentType": { "kind": "text", "max": 200, "nullable": true },
+        "byteCount": { "kind": "int", "min": 0, "max": 26214400, "nullable": false },
+        "position": { "kind": "real", "nullable": true },
+        "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "uploadedAt": { "kind": "text", "serverOwned": true }
+      }
+    },
+    "convo": {
+      "table": "convos",
+      "deletable": false,
+      "requiredOnInsert": [],
+      "columns": {
+        "confirmedIntent": { "kind": "text", "max": 100000, "nullable": true },
+        "acceptance": { "kind": "text", "max": 100000, "nullable": true },
+        "subtasks": { "kind": "json", "nullable": true },
+        "artifact": { "kind": "json", "nullable": true },
+        "handoff": { "kind": "json", "nullable": true },
+        "endState": { "kind": "text", "max": 32, "nullable": true },
+        "endStateNote": { "kind": "text", "max": 100000, "nullable": true },
+        "assignee": { "kind": "text", "enum": "convoAssignee", "nullable": true },
+        "stoppedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
+        "claimedBy": { "kind": "text", "serverOwned": true },
+        "claimUntil": { "kind": "text", "serverOwned": true },
+        "runsSinceUser": { "kind": "int", "serverOwned": true }
+      }
+    },
+    "setting": {
+      "table": "settings",
+      "deletable": false,
+      "requiredOnInsert": [],
+      "columns": {
+        "value": { "kind": "json", "nullable": true }
+      }
+    }
+  }
+}

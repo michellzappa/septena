@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for TaskFade (rowOpacity, shouldFade, fadeFill). Run in Swift, TypeScript, and Kotlin.",
+  "rowOpacity": [
+    { "name": "nil fill stays opaque", "fill": null, "expected": 1.0 },
+    { "name": "zero fill stays opaque", "fill": 0.0, "expected": 1.0 },
+    { "name": "negative fill clamps to opaque", "fill": -0.5, "expected": 1.0 },
+    { "name": "midpoint fill interpolates linearly", "fill": 0.5, "expected": 0.775 },
+    { "name": "full fill hits minOpacity", "fill": 1.0, "expected": 0.55 },
+    { "name": "above-one fill clamps at minOpacity", "fill": 1.75, "expected": 0.55 }
+  ],
+  "shouldFade": [
+    {
+      "name": "untouched task under 14 days (13d 23h) does not fade",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": null, "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-11-01T10:00:00Z", "created": "2026-11-01",
+        "now": "2026-11-15T09:00:00Z", "today": "2026-11-15"
+      },
+      "expected": false
+    },
+    {
+      "name": "untouched task at exactly 14 days fades",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": null, "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-11-01T10:00:00Z", "created": "2026-11-01",
+        "now": "2026-11-15T10:00:00Z", "today": "2026-11-15"
+      },
+      "expected": true
+    },
+    {
+      "name": "touchedAt resets fade clock",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": null, "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": "2026-11-10T12:00:00Z", "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-20T12:00:00Z", "today": "2026-11-20"
+      },
+      "expected": false
+    },
+    {
+      "name": "task with deadline never fades even if overdue",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": "2026-11-01", "scheduled": null, "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-21T12:00:00Z", "today": "2026-11-21"
+      },
+      "expected": false
+    },
+    {
+      "name": "task scheduled today or in future does not fade",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": "2026-11-21", "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-21T12:00:00Z", "today": "2026-11-21"
+      },
+      "expected": false
+    },
+    {
+      "name": "task scheduled in the past can fade",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": "2026-11-10", "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-21T12:00:00Z", "today": "2026-11-21"
+      },
+      "expected": true
+    },
+    {
+      "name": "repeating task never fades",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": null, "hasRecurrence": true,
+        "isAgentTurn": false, "isAssignedToClaude": false,
+        "touchedAt": null, "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-21T12:00:00Z", "today": "2026-11-21"
+      },
+      "expected": false
+    },
+    {
+      "name": "claude-assigned task never fades",
+      "input": {
+        "isOpen": true, "isHeading": false, "isDeleted": false, "isFaded": false,
+        "deadline": null, "scheduled": null, "hasRecurrence": false,
+        "isAgentTurn": false, "isAssignedToClaude": true,
+        "touchedAt": null, "createdAt": "2026-10-01T12:00:00Z", "created": "2026-10-01",
+        "now": "2026-11-21T12:00:00Z", "today": "2026-11-21"
+      },
+      "expected": false
+    }
+  ]
+}

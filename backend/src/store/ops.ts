@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { ENTITIES, ENTITY_NAMES, SETTING_KEYS, SETTING_VALUES, pushableFields, zId, type EntityName } from "./columns.js";
+import { DELETABLE_ENTITIES, ENTITY_ENUMS, ENTITY_LIMITS, ENTITY_PATTERNS } from "../generated/registries.js";
 
 // Wire shapes for POST /v1/sync/push (docs/SEPTASK_BACKEND.md §6.1).
 // Validated in the Worker before anything reaches the Durable Object.
 
-const zClientOpId = z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/);
+const zClientOpId = z.string().regex(new RegExp(ENTITY_PATTERNS.clientOpId));
 
 const upsertOps = ENTITY_NAMES.filter((name) => name !== "setting").map((name) =>
   z.object({
@@ -33,21 +34,21 @@ const zDelete = z.object({
   op: z.literal("delete"),
   // Conversations are deleted with their task, never on their own. Settings
   // are never deleted (columns.ts).
-  entity: z.enum(["task", "area", "project", "attachment"]),
+  entity: z.enum(DELETABLE_ENTITIES),
   id: zId,
 }).strict();
 
 export const zTurn = z.object({
-  role: z.enum(["user", "provider"]),
-  step: z.enum(["confirm", "ground", "scope", "decide", "work"]),
-  provider: z.string().max(32).nullable().optional(),
+  role: z.enum(ENTITY_ENUMS.convoTurnRole),
+  step: z.enum(ENTITY_ENUMS.convoTurnStep),
+  provider: z.string().max(ENTITY_LIMITS.turnProviderMax).nullable().optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
-  question: z.string().max(10_000).nullable().optional(),
-  options: z.array(z.string().max(500)).max(20).nullable().optional(),
-  chosen: z.string().max(500).nullable().optional(),
-  otherText: z.string().max(10_000).nullable().optional(),
+  question: z.string().max(ENTITY_LIMITS.turnQuestionMax).nullable().optional(),
+  options: z.array(z.string().max(ENTITY_LIMITS.turnOptionMax)).max(ENTITY_LIMITS.turnMaxOptions).nullable().optional(),
+  chosen: z.string().max(ENTITY_LIMITS.turnChosenMax).nullable().optional(),
+  otherText: z.string().max(ENTITY_LIMITS.turnOtherTextMax).nullable().optional(),
   inReplyTo: z.number().int().positive().nullable().optional(),
-  note: z.string().max(100_000).nullable().optional(),
+  note: z.string().max(ENTITY_LIMITS.turnNoteMax).nullable().optional(),
   ts: z.string().datetime({ offset: true }),
 }).strict();
 export type Turn = z.infer<typeof zTurn>;
@@ -61,7 +62,7 @@ const zAppendTurn = z.object({
 
 const zOp = z.union([...upsertOps, ...settingOps, zDelete, zAppendTurn] as unknown as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]);
 
-export const MAX_OPS_PER_PUSH = 500;
+export const MAX_OPS_PER_PUSH = ENTITY_LIMITS.maxOpsPerPush;
 
 export const zPushBody = z.object({
   ops: z.array(zOp).min(1).max(MAX_OPS_PER_PUSH),

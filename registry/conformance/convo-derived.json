@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for deriveConvo and awaitsReasoning across Swift, TypeScript, and Kotlin.",
+  "cases": [
+    {
+      "name": "empty conversation with no assignee",
+      "convo": { "thread": [] },
+      "expected": { "stage": "open", "badge": null, "pendingReasoning": false }
+    },
+    {
+      "name": "empty conversation assigned to claude is pending reasoning",
+      "convo": { "assignee": "claude", "thread": [] },
+      "expected": { "stage": "open", "badge": null, "pendingReasoning": true }
+    },
+    {
+      "name": "provider turn with options awaits human",
+      "convo": {
+        "assignee": "claude",
+        "thread": [
+          { "seq": 1, "role": "provider", "step": "decide", "question": "Which option?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z" }
+        ]
+      },
+      "expected": { "stage": "awaitingHuman", "badge": "needsYou", "pendingReasoning": true }
+    },
+    {
+      "name": "user answered provider question -> clarifying/working",
+      "convo": {
+        "assignee": "claude",
+        "thread": [
+          { "seq": 1, "role": "provider", "step": "decide", "question": "Which option?", "options": ["A", "B"], "ts": "2026-11-20T10:00:00Z" },
+          { "seq": 2, "role": "user", "step": "decide", "chosen": "A", "inReplyTo": 1, "ts": "2026-11-20T10:05:00Z" }
+        ]
+      },
+      "expected": { "stage": "clarifying", "badge": "working", "pendingReasoning": true }
+    },
+    {
+      "name": "confirmed intent with user reply -> inProgress/working",
+      "convo": {
+        "assignee": "claude",
+        "confirmedIntent": "Draft and test",
+        "thread": [
+          { "seq": 1, "role": "user", "step": "work", "note": "Go ahead", "ts": "2026-11-20T10:05:00Z" }
+        ]
+      },
+      "expected": { "stage": "inProgress", "badge": "working", "pendingReasoning": true }
+    },
+    {
+      "name": "low-confidence local provider turn triggers pendingReasoning",
+      "convo": {
+        "assignee": "local",
+        "thread": [
+          { "seq": 1, "role": "provider", "step": "ground", "provider": "onDevice", "confidence": 0.3, "note": "Uncertain", "ts": "2026-11-20T10:00:00Z" }
+        ]
+      },
+      "expected": { "stage": "clarifying", "badge": "working", "pendingReasoning": true }
+    },
+    {
+      "name": "stoppedAt halts pendingReasoning and clears badge",
+      "convo": {
+        "assignee": "claude",
+        "stoppedAt": "2026-11-20T11:00:00Z",
+        "thread": [
+          { "seq": 1, "role": "user", "step": "work", "note": "Start", "ts": "2026-11-20T10:00:00Z" }
+        ]
+      },
+      "expected": { "stage": "inProgress", "badge": null, "pendingReasoning": false }
+    },
+    {
+      "name": "needs_verify awaits human review and stops agent queue",
+      "convo": {
+        "assignee": "claude",
+        "endState": "needs_verify",
+        "endStateNote": "Check PR #10",
+        "thread": []
+      },
+      "expected": { "stage": "awaitingHuman", "badge": "needsYou", "pendingReasoning": false }
+    },
+    {
+      "name": "agent_done is terminal done",
+      "convo": {
+        "assignee": "claude",
+        "endState": "agent_done",
+        "thread": []
+      },
+      "expected": { "stage": "terminal", "badge": "done", "pendingReasoning": false }
+    },
+    {
+      "name": "wont_do is terminal wontDo",
+      "convo": {
+        "assignee": "claude",
+        "endState": "wont_do",
+        "thread": []
+      },
+      "expected": { "stage": "terminal", "badge": "wontDo", "pendingReasoning": false }
+    }
+  ]
+}

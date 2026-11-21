@@ -46,8 +46,8 @@ enum TaskBackendMapping {
   static var idPattern: Regex<Substring> { #/[A-Za-z0-9._:-]{1,128}/# }
   static var dayPattern: Regex<Substring> { #/[0-9]{4}-[0-9]{2}-[0-9]{2}/# }
   static var stampPattern: Regex<Substring> { #/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/# }
-  static let notesMax = 100_000
-  static let maxAttachmentBytes: Int64 = 25 * 1_024 * 1_024
+  static let notesMax = RegistryEntityLimits.notesMax
+  static let maxAttachmentBytes: Int64 = RegistryEntityLimits.maxAttachmentBytes
 
   /// UTC ISO-8601 without fractions, e.g. `2026-11-19T10:00:00Z`. Passes both
   /// the stamp columns and the turn `ts` rule (`datetime({ offset: true })`).
@@ -64,7 +64,7 @@ enum TaskBackendMapping {
   struct Checker {
     var problems: [String] = []
 
-    mutating func text(_ name: String, _ v: String?, max: Int = 2_000) -> BackendJSON {
+    mutating func text(_ name: String, _ v: String?, max: Int = RegistryEntityLimits.textMax) -> BackendJSON {
       guard let v else { return .null }
       if v.utf16.count > max { problems.append("\(name) longer than \(max)") }
       return .string(v)
@@ -81,7 +81,7 @@ enum TaskBackendMapping {
     }
     mutating func stamp(_ name: String, _ v: String?) -> BackendJSON {
       guard let v else { return .null }
-      if v.prefixMatch(of: TaskBackendMapping.stampPattern) == nil || v.utf16.count > 40 {
+      if v.prefixMatch(of: TaskBackendMapping.stampPattern) == nil || v.utf16.count > RegistryEntityLimits.stampMax {
         problems.append("\(name) \"\(v)\" is not an ISO time")
       }
       return .string(v)
@@ -90,7 +90,7 @@ enum TaskBackendMapping {
       if !v.isFinite { problems.append("\(name) is not a finite number") }
       return .double(v)
     }
-    /// `AreaAttachment` JSON: must be an object, at most 4,000 characters.
+    /// `AreaAttachment` JSON: must be an object, at most `attachmentPointerMax` characters.
     mutating func pointer(_ name: String, _ json: String?) -> BackendJSON {
       guard let json, !json.isEmpty else { return .null }
       guard let data = json.data(using: .utf8),
@@ -99,7 +99,9 @@ enum TaskBackendMapping {
         problems.append("\(name) is not a JSON object")
         return .null
       }
-      if json.utf16.count > 4_000 { problems.append("\(name) longer than 4000") }
+      if json.utf16.count > RegistryEntityLimits.attachmentPointerMax {
+        problems.append("\(name) longer than \(RegistryEntityLimits.attachmentPointerMax)")
+      }
       return value
     }
     mutating func rowID(_ v: String) {
@@ -221,7 +223,9 @@ enum TaskBackendMapping {
       return .failure(TaskBackendIssue(entity: .convo, id: taskID, reason: "conversation JSON does not decode"))
     }
     var c = Checker()
-    if convo.subtasks.count > 500 { c.problems.append("more than 500 subtasks") }
+    if convo.subtasks.count > RegistryEntityLimits.maxSubtasks {
+      c.problems.append("more than \(RegistryEntityLimits.maxSubtasks) subtasks")
+    }
     var fields: [String: BackendJSON] = [
       "confirmedIntent": c.text("confirmedIntent", convo.confirmedIntent, max: notesMax),
       "acceptance": c.text("acceptance", convo.acceptance, max: notesMax),
@@ -241,7 +245,9 @@ enum TaskBackendMapping {
         "body": c.text("artifact.body", a.body, max: notesMax),
       ]
       if let refs = a.refs {
-        if refs.count > 100 { c.problems.append("artifact has more than 100 refs") }
+        if refs.count > RegistryEntityLimits.maxArtifactRefs {
+          c.problems.append("artifact has more than \(RegistryEntityLimits.maxArtifactRefs) refs")
+        }
         obj["refs"] = .array(refs.map { c.text("artifact.ref", $0) })
       }
       fields["artifact"] = .object(obj)
@@ -268,20 +274,22 @@ enum TaskBackendMapping {
         "ts": .string(stamp(turn.ts)),
       ]
       // Nil fields are left out: the server's pull drops null turn fields too.
-      if let v = turn.provider { t["provider"] = c.text("turn.provider", v.rawValue, max: 32) }
+      if let v = turn.provider { t["provider"] = c.text("turn.provider", v.rawValue, max: RegistryEntityLimits.turnProviderMax) }
       if let v = turn.confidence {
         if !(0...1).contains(v) { c.problems.append("turn \(turn.seq) confidence \(v) is outside 0...1") }
         t["confidence"] = .double(v)
       }
-      if let v = turn.question { t["question"] = c.text("turn.question", v, max: 10_000) }
+      if let v = turn.question { t["question"] = c.text("turn.question", v, max: RegistryEntityLimits.turnQuestionMax) }
       if let v = turn.options {
-        if v.count > 20 { c.problems.append("turn \(turn.seq) has more than 20 options") }
-        t["options"] = .array(v.map { c.text("turn.option", $0, max: 500) })
+        if v.count > RegistryEntityLimits.turnMaxOptions {
+          c.problems.append("turn \(turn.seq) has more than \(RegistryEntityLimits.turnMaxOptions) options")
+        }
+        t["options"] = .array(v.map { c.text("turn.option", $0, max: RegistryEntityLimits.turnOptionMax) })
       }
-      if let v = turn.chosen { t["chosen"] = c.text("turn.chosen", v, max: 500) }
-      if let v = turn.otherText { t["otherText"] = c.text("turn.otherText", v, max: 10_000) }
+      if let v = turn.chosen { t["chosen"] = c.text("turn.chosen", v, max: RegistryEntityLimits.turnChosenMax) }
+      if let v = turn.otherText { t["otherText"] = c.text("turn.otherText", v, max: RegistryEntityLimits.turnOtherTextMax) }
       if let v = turn.inReplyTo, let p = position[v] { t["inReplyTo"] = .int(Int64(p)) }
-      if let v = turn.note { t["note"] = c.text("turn.note", v, max: notesMax) }
+      if let v = turn.note { t["note"] = c.text("turn.note", v, max: RegistryEntityLimits.turnNoteMax) }
       turns.append(t)
     }
     return finish(.convo, taskID, c, fields, deleted: false).map {

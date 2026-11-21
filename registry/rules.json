@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "cueDecayDays": 7,
+  "fadeWindowDays": 14,
+  "fadeGraceDays": 1,
+  "fadeMinOpacity": 0.55,
+  "fadeSweepWeekday": 1,
+  "recentlyDeletedDays": 30,
+  "upcomingCalendarDays": 30,
+  "toastDurationSeconds": 7,
+  "agentRunBudget": 5,
+  "claimTtlDefaultSeconds": 1800,
+  "claimTtlMaxSeconds": 14400,
+  "tombstoneTtlDays": 90,
+  "clientOpTtlDays": 30,
+  "changeLogTtlDays": 365
+}

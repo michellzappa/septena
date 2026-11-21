@@ -13,6 +13,7 @@ import {
 } from "./columns.js";
 import type { Op, OpResult, PullResult, PushResult, Turn } from "./ops.js";
 import type { EntitlementRow } from "../entitlement/entitlement.js";
+import { DOMAIN_RULES, ENTITY_LIMITS } from "../generated/registries.js";
 
 /// Per changed field: [before, after]. `null` means absent / cleared.
 export type ChangeDiff = Record<string, [unknown, unknown]>;
@@ -64,10 +65,10 @@ export const AGENT_WRITE_RULES: Record<string, string> = {
 
 /// Lease bounds for a claim. An agent that stops writing loses the task when
 /// the lease ends; the maximum keeps a crashed run from holding it for long.
-export const CLAIM_TTL_DEFAULT_MS = 30 * 60 * 1000;
-export const CLAIM_TTL_MAX_MS = 4 * 60 * 60 * 1000;
+export const CLAIM_TTL_DEFAULT_MS = DOMAIN_RULES.claimTtlDefaultSeconds * 1000;
+export const CLAIM_TTL_MAX_MS = DOMAIN_RULES.claimTtlMaxSeconds * 1000;
 /// Fresh claims allowed between two human turns on one task.
-export const AGENT_RUN_BUDGET = 5;
+export const AGENT_RUN_BUDGET = DOMAIN_RULES.agentRunBudget;
 
 const LOG_TEXT_MAX = 4_000;
 
@@ -90,10 +91,10 @@ function clipForLog(v: unknown): unknown {
 // the fields the push carried. A deleted row stays deleted (§6.4).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const TOMBSTONE_TTL_MS = 90 * DAY_MS;
-const CLIENT_OP_TTL_MS = 30 * DAY_MS;
-const CHANGE_LOG_TTL_MS = 365 * DAY_MS;
-const MAX_PULL = 1_000;
+const TOMBSTONE_TTL_MS = DOMAIN_RULES.tombstoneTtlDays * DAY_MS;
+const CLIENT_OP_TTL_MS = DOMAIN_RULES.clientOpTtlDays * DAY_MS;
+const CHANGE_LOG_TTL_MS = DOMAIN_RULES.changeLogTtlDays * DAY_MS;
+const MAX_PULL = ENTITY_LIMITS.maxPull;
 const PAIR_FAIL_WINDOW_MS = 10 * 60 * 1000;
 
 const TURN_COLUMNS = [

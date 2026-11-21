@@ -1,3 +1,5 @@
+import { DOMAIN_RULES } from "../generated/registries.js";
+
 // Pure task logic shared by the live CloudKit tools (listTasks.ts,
 // writeTasks.ts) and the read-only task-backend preview (src/shadow/). No
 // I/O here: each data source maps its rows into these shapes, then both use
@@ -51,8 +53,8 @@ export function normalizeView(view: unknown): TaskView {
   return (v as TaskView | undefined) ?? "today";
 }
 
-// Agent-cue decay window — keep in lockstep with iOS AgentCue.decayWindow (7d).
-export const CUE_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
+// Agent-cue decay window — generated from `registry/rules.json` (ADR 0015).
+export const CUE_DECAY_MS = DOMAIN_RULES.cueDecayDays * 24 * 60 * 60 * 1000;
 
 /// THE Inbox rule — mirrors SeptenaCore `TaskInbox` (Models.swift); keep the
 /// two in lockstep. Inbox = open, not deleted, not a heading, no area, no

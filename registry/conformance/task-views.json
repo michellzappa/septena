@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for task view membership (isUnfiled, isInboxMember, inTriageBand, isOnToday, inInbox, daysOnToday, matchesView).",
+  "today": "2026-11-21",
+  "nowIso": "2026-11-21T12:00:00Z",
+  "cases": [
+    {
+      "name": "loose human capture with no dates sits in Inbox and Today",
+      "task": { "id": "t1", "title": "Buy milk", "status": "open", "today": false, "source": "app", "created": "2026-11-21", "createdAt": "2026-11-21T08:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": true, "inTriageBand": true, "isOnToday": false, "inInbox": true,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": true }
+      }
+    },
+    {
+      "name": "filed task pinned to Today 3 days ago",
+      "task": { "id": "t2", "title": "Review ADR", "status": "open", "today": true, "todaySetOn": "2026-11-18", "area": "work", "source": "app", "created": "2026-11-15", "createdAt": "2026-11-15T08:00:00Z" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 3,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false }
+      }
+    },
+    {
+      "name": "unfiled task pinned to Today shows in Inbox and Today, not triage band",
+      "task": { "id": "t3", "title": "Call GP", "status": "open", "today": true, "todaySetOn": "2026-11-20", "source": "app", "created": "2026-11-20", "createdAt": "2026-11-20T09:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": true, "inInbox": true,
+        "daysOnToday": 1,
+        "matchesView": { "today": true, "inbox": true, "upcoming": false, "anytime": false }
+      }
+    },
+    {
+      "name": "fresh MCP proposal scheduled for future stays in triage band until acknowledged",
+      "task": { "id": "t4", "title": "Agent suggestion", "status": "open", "today": false, "scheduled": "2026-11-25", "source": "mcp", "created": "2026-11-20", "createdAt": "2026-11-20T12:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": true, "inTriageBand": true, "isOnToday": false, "inInbox": true,
+        "daysOnToday": 0,
+        "matchesView": { "today": true, "inbox": true, "upcoming": true, "anytime": false }
+      }
+    },
+    {
+      "name": "acknowledged MCP proposal scheduled for future leaves triage band",
+      "task": { "id": "t5", "title": "Acked agent task", "status": "open", "today": false, "scheduled": "2026-11-25", "source": "mcp", "created": "2026-11-20", "createdAt": "2026-11-20T12:00:00Z", "acknowledgedAt": "2026-11-20T13:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": true, "anytime": false }
+      }
+    },
+    {
+      "name": "decayed MCP proposal past 7d cue window leaves triage band",
+      "task": { "id": "t6", "title": "Old MCP proposal", "status": "open", "today": false, "source": "mcp", "created": "2026-11-10", "createdAt": "2026-11-10T12:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": true, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": true }
+      }
+    },
+    {
+      "name": "filed task scheduled in past arrives on Today with daysOnToday floored at created",
+      "task": { "id": "t7", "title": "Backdated task", "status": "open", "today": false, "scheduled": "2026-11-10", "project": "p1", "source": "app", "created": "2026-11-19", "createdAt": "2026-11-19T08:00:00Z" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": true, "inInbox": false,
+        "daysOnToday": 2,
+        "matchesView": { "today": true, "inbox": false, "upcoming": false, "anytime": false }
+      }
+    },
+    {
+      "name": "project heading is excluded from every task view",
+      "task": { "id": "h1", "title": "Phase 1", "status": "open", "kind": "heading", "today": true, "project": "p1" },
+      "expected": {
+        "isUnfiled": false, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false }
+      }
+    },
+    {
+      "name": "completed task is excluded from active views",
+      "task": { "id": "t8", "title": "Shipped", "status": "done", "today": true, "completedAt": "2026-11-21T10:00:00Z" },
+      "expected": {
+        "isUnfiled": true, "isInboxMember": false, "inTriageBand": false, "isOnToday": false, "inInbox": false,
+        "daysOnToday": 0,
+        "matchesView": { "today": false, "inbox": false, "upcoming": false, "anytime": false }
+      }
+    }
+  ]
+}

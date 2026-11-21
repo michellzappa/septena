@@ -184,6 +184,21 @@ if [ -n "$reserved_model" ]; then
   printf '%s\n' "$OFF"
 fi
 
+# ── Shared cross-platform registries (ADR 0015) ──────────────────────────────
+# Generated Swift and TypeScript bindings must stay in lockstep with
+# `registry/*.json`. Run `node scripts/gen-registries.mjs` after editing any
+# registry file.
+if [ -f "scripts/gen-registries.mjs" ] && command -v node >/dev/null 2>&1; then
+  reg_out=$(node scripts/gen-registries.mjs --check 2>&1)
+  if [ $? -ne 0 ]; then
+    printf '%s✗ %s%s\n' "$RED" "registry-drift" "$OFF"
+    errors=$((errors + 1))
+    printf '  %s\n' 'Shared registries failed validation or generated files are out of date. Run: node scripts/gen-registries.mjs'
+    printf '%s' "$DIM"; printf '%s\n' "$reg_out" | sed 's/^/    /'
+    printf '%s\n' "$OFF"
+  fi
+fi
+
 # ── Typography (DesignSpec §5) — advisory, we are paying this down ───────────
 scan type-raw-mono note \
   '\.font\([^)]*(monospacedDigit\(\)|design: \.monospaced)' \

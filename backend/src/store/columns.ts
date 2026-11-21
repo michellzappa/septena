@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { isValidTz } from "../tz.js";
+import { ENTITY_ENUMS, ENTITY_LIMITS, ENTITY_PATTERNS } from "../generated/registries.js";
 
 // Column specs for the task backend (docs/SEPTASK_BACKEND.md in the app repo,
 // §5). ONE table per entity, and this file is the single source of truth for
 // its columns: the DDL, the push validation and the pull decoding all derive
-// from it, so they cannot drift.
+// from it, so they cannot drift. Shared limits, patterns, and enums come from
+// `registry/entities.json` via `../generated/registries.js` (ADR 0015).
 
 type Kind = "text" | "int" | "real" | "bool" | "json";
 
@@ -15,26 +17,26 @@ export interface Column {
   dflt?: string | number | null;
 }
 
-const ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+const ID_RE = new RegExp(ENTITY_PATTERNS.id);
 export const zId = z.string().regex(ID_RE, "invalid id");
 
-const text = (max = 2_000): Column => ({ kind: "text", zod: z.string().max(max).nullable() });
+const text = (max: number = ENTITY_LIMITS.textMax): Column => ({ kind: "text", zod: z.string().max(max).nullable() });
 const int = (): Column => ({ kind: "int", zod: z.number().int().nullable() });
 const real = (): Column => ({ kind: "real", zod: z.number().finite().nullable() });
 const bool = (dflt = 0): Column => ({ kind: "bool", zod: z.boolean(), dflt });
 const json = (schema: z.ZodTypeAny): Column => ({ kind: "json", zod: schema.nullable() });
 
-const NOTES_MAX = 100_000;
-const zDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD").nullable();
+const NOTES_MAX = ENTITY_LIMITS.notesMax;
+const zDay = z.string().regex(new RegExp(ENTITY_PATTERNS.day), "expected YYYY-MM-DD").nullable();
 const day = (): Column => ({ kind: "text", zod: zDay });
 // ISO-8601 instant. The app's existing `completedAt` string shape
 // (yyyy-MM-dd'T'HH:mm:ss, no zone) also passes.
-const zStamp = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, "expected ISO time").max(40).nullable();
+const zStamp = z.string().regex(new RegExp(ENTITY_PATTERNS.stamp), "expected ISO time").max(ENTITY_LIMITS.stampMax).nullable();
 const stamp = (): Column => ({ kind: "text", zod: zStamp });
 
 // `AreaAttachment` — opaque here; the app owns its shape. Size-capped only.
 const zAttachmentPointer = z.record(z.unknown()).refine(
-  (v) => JSON.stringify(v).length <= 4_000,
+  (v) => JSON.stringify(v).length <= ENTITY_LIMITS.attachmentPointerMax,
   "attachment pointer too large",
 );
 
@@ -48,11 +50,11 @@ export const SETTING_VALUES = {
   /// Profile name (Settings ▸ Account).
   welcomeName: z.string().max(200),
   /// Analytics level (`TelemetryClient.TelemetryLevel`).
-  telemetryLevel: z.enum(["none", "minimal", "balanced", "full"]),
+  telemetryLevel: z.enum(ENTITY_ENUMS.telemetryLevel),
   /// Calendars hidden from Today / Upcoming, by `EKCalendar.title`.
   calendarHiddenTitles: z.array(z.string().max(500)).max(500),
   /// The day the "rolled into Today" notice was last dismissed.
-  rolledInDismissedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD"),
+  rolledInDismissedOn: z.string().regex(new RegExp(ENTITY_PATTERNS.day), "expected YYYY-MM-DD"),
   /// IANA zone of the device that last opened the app. The MCP connector
   /// reads it for "today".
   homeTimezone: z.string().max(64).refine(isValidTz, "unknown time zone"),
@@ -68,8 +70,8 @@ export const SETTING_VALUES = {
 export type SettingKey = keyof typeof SETTING_VALUES;
 export const SETTING_KEYS = Object.keys(SETTING_VALUES) as SettingKey[];
 
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-export const MAX_USER_ATTACHMENT_BYTES = 2 * 1024 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = ENTITY_LIMITS.maxAttachmentBytes;
+export const MAX_USER_ATTACHMENT_BYTES = ENTITY_LIMITS.maxUserAttachmentBytes;
 
 export interface EntitySpec {
   table: string;
@@ -167,21 +169,21 @@ export const ENTITIES = {
     columns: {
       confirmedIntent: text(NOTES_MAX),
       acceptance: text(NOTES_MAX),
-      subtasks: json(z.array(zId).max(500)),
+      subtasks: json(z.array(zId).max(ENTITY_LIMITS.maxSubtasks)),
       artifact: json(z.object({
         kind: z.string().max(64),
-        title: z.string().max(2_000),
+        title: z.string().max(ENTITY_LIMITS.textMax),
         body: z.string().max(NOTES_MAX),
-        refs: z.array(z.string().max(2_000)).max(100).optional(),
+        refs: z.array(z.string().max(ENTITY_LIMITS.textMax)).max(ENTITY_LIMITS.maxArtifactRefs).optional(),
       })),
       handoff: json(z.object({
-        instruction: z.string().max(2_000),
-        actionType: z.enum(["open_url", "compose", "call", "none"]),
-        payload: z.string().max(2_000).optional(),
+        instruction: z.string().max(ENTITY_LIMITS.textMax),
+        actionType: z.enum(ENTITY_ENUMS.convoHandoffActionType),
+        payload: z.string().max(ENTITY_LIMITS.textMax).optional(),
       })),
       endState: text(32),
       endStateNote: text(NOTES_MAX),
-      assignee: { kind: "text", zod: z.enum(["me", "local", "claude"]).nullable() },
+      assignee: { kind: "text", zod: z.enum(ENTITY_ENUMS.convoAssignee).nullable() },
       // The human's stop on agent work for this task. Only an app actor may
       // set or clear it (TaskStore.apply refuses an agent write), so an agent
       // cannot restart itself. While set, agent writes to the task fail.

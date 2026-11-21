@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID) across Swift, TypeScript, and Kotlin.",
+  "nextScheduledDate": [
+    {
+      "name": "daily after completion advances from completedOn",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-18", "logicalScheduled": null, "unit": "day", "interval": 3, "afterCompletion": true },
+      "expected": "2026-11-24"
+    },
+    {
+      "name": "weekly fixed schedule catches up strictly past completedOn",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-01", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": false },
+      "expected": "2026-11-22"
+    },
+    {
+      "name": "monthly fixed schedule clamps Jan 31 -> Feb 28 (non-leap year)",
+      "input": { "completedOn": "2026-01-31", "scheduled": "2026-01-31", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false },
+      "expected": "2026-02-28"
+    },
+    {
+      "name": "monthly fixed schedule snaps Feb 28 -> Mar 31 (keepMonthEnd)",
+      "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false },
+      "expected": "2026-03-31"
+    },
+    {
+      "name": "monthly fixed schedule snaps Jan 31 -> Feb 29 (leap year 2028)",
+      "input": { "completedOn": "2028-01-31", "scheduled": "2028-01-31", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false },
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "monthly afterCompletion does NOT snap Feb 28 -> Mar 31",
+      "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": true },
+      "expected": "2026-03-28"
+    },
+    {
+      "name": "fixed schedule uses logicalScheduled when occurrence was rescheduled as an exception",
+      "input": { "completedOn": "2026-11-22", "scheduled": "2026-11-22", "logicalScheduled": "2026-11-20", "unit": "week", "interval": 1, "afterCompletion": false },
+      "expected": "2026-11-27"
+    },
+    {
+      "name": "fixed schedule with nil scheduled falls back to completedOn",
+      "input": { "completedOn": "2026-11-21", "scheduled": null, "logicalScheduled": null, "unit": "day", "interval": 2, "afterCompletion": false },
+      "expected": "2026-11-23"
+    },
+    {
+      "name": "interval <= 0 clamps to 1",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "day", "interval": 0, "afterCompletion": true },
+      "expected": "2026-11-22"
+    },
+    {
+      "name": "unknown unit returns null",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": true },
+      "expected": null
+    }
+  ],
+  "occurrenceID": [
+    { "sourceTaskID": "task-1", "scheduled": "2026-11-22", "expected": "recur-27f6e5d56dadf4cc" },
+    { "sourceTaskID": "abc123", "scheduled": "2026-02-28", "expected": "recur-12eaeca9871bdc73" },
+    { "sourceTaskID": "uuid:550e8400-e29b-41d4-a716-446655440000", "scheduled": "2028-02-29", "expected": "recur-ce4e773f079b1d92" }
+  ]
+}
