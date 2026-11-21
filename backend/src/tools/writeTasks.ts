@@ -91,6 +91,7 @@ export const createTaskJsonSchema = {
   properties: {
     title: { type: "string", minLength: 1 },
     today: { type: "boolean", default: false },
+    starred: { type: "boolean", default: false, description: "Optional simple Important / Star marker." },
     scheduled: { type: "string", description: "YYYY-MM-DD" },
     deadline: { type: "string", description: "YYYY-MM-DD (hard deadline)" },
     area: { type: "string", description: "Area id (e.g. 'envisioning')" },
@@ -128,6 +129,7 @@ export const updateTaskJsonSchema = {
     id: { type: "string" },
     title: { type: "string" },
     today: { type: "boolean" },
+    starred: { type: "boolean", description: "Set or clear the Important / Star marker." },
     scheduled: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     deadline: { type: ["string", "null"], description: "YYYY-MM-DD, or null to clear" },
     area: { type: ["string", "null"] },
@@ -162,6 +164,7 @@ export const moveToTodayJsonSchema = {
 export interface CreateTaskInput {
   title: string;
   today?: boolean;
+  starred?: boolean;
   scheduled?: string;
   deadline?: string;
   /** Legacy alias for `deadline` — still accepted on input for back-compat. */
@@ -186,6 +189,7 @@ export interface UpdateTaskInput {
   id: string;
   title?: string;
   today?: boolean;
+  starred?: boolean;
   scheduled?: string | null;
   deadline?: string | null;
   /** Legacy alias for `deadline` — still accepted on input for back-compat. */
@@ -366,6 +370,7 @@ export interface TaskUpdatePlan {
   fields: {
     title?: string;
     today?: boolean;
+    starred?: boolean;
     scheduled?: string | null;
     deadline?: string | null;
     area?: string | null;
@@ -401,6 +406,7 @@ export function planUpdate(input: UpdateTaskInput, storedScheduled?: string | nu
   const updated: string[] = [];
   if (input.title !== undefined) { f.title = input.title; updated.push("title"); }
   if (input.today !== undefined) { f.today = input.today; updated.push("today"); }
+  if (input.starred !== undefined) { f.starred = input.starred; updated.push("starred"); }
   if (input.scheduled !== undefined) { f.scheduled = input.scheduled ?? null; updated.push("scheduled"); }
   const updDeadline = input.deadline !== undefined ? input.deadline : input.due;
   if (updDeadline !== undefined) { f.deadline = updDeadline ?? null; updated.push("deadline"); }

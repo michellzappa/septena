@@ -139,7 +139,7 @@ enum TaskJSONTransfer {
     return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
       "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
-      "today": e.today, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
+      "today": e.today, "starred": e.starred ? true : nil, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
       "area": e.area, "project": e.project, "notes": e.notes,
       "conversationJSON": e.conversationJSON,
       "recurrenceUnit": e.recurrenceUnit,
@@ -341,6 +341,7 @@ enum TaskJSONTransfer {
     entity.scheduled = nonEmptyString(r["scheduled"])
     entity.deadline = nonEmptyString(r["deadline"])
     entity.today = (r["today"] as? Bool) ?? false
+    entity.starred = (r["starred"] as? Bool) ?? false
     entity.todaySetOn = nonEmptyString(r["todaySetOn"])
     entity.completedAt = nonEmptyString(r["completedAt"])
     entity.area = nonEmptyString(r["area"])
@@ -550,6 +551,7 @@ enum TaskJSONTransfer {
       }
       var meta: [String] = []
       if t.today && t.status == .open { meta.append("today") }
+      if t.starred { meta.append("★") }
       if let s = t.scheduled { meta.append("when: \(s)") }
       if let d = t.deadline { meta.append("deadline: \(d)") }
       if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
@@ -634,7 +636,7 @@ enum TaskJSONTransfer {
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
@@ -649,6 +651,7 @@ enum TaskJSONTransfer {
         projectName,
         sectionName,
         t.today ? "true" : "false",
+        t.starred ? "true" : "false",
         t.scheduled ?? "",
         t.deadline ?? "",
         t.reminderAt ?? "",

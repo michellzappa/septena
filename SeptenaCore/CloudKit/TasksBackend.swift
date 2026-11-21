@@ -156,6 +156,7 @@ final class CloudKitTasksBackend {
       // gets its next scheduled date instead of inheriting an expired deadline.
       deadline: nil,
       today: false,
+      starred: entity.starred,
       todaySetOn: nil,
       completedAt: nil,
       area: entity.area,
@@ -959,6 +960,13 @@ final class CloudKitTasksBackend {
     entity.reminderSnoozedUntil = nil
     entity.pendingSync = true
     commitAndPush(entity, op: "dismissReminder")
+  }
+
+  func setStarred(id: String, starred: Bool) {
+    guard let entity = fetch(id: id), entity.starred != starred else { return }
+    entity.starred = starred
+    entity.pendingSync = true
+    commitAndPush(entity, op: starred ? "setStarred(true)" : "setStarred(false)")
   }
 
   func setRecurrence(id: String, recurrence: Recurrence?) {

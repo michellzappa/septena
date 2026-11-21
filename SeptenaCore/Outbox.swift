@@ -249,6 +249,14 @@ final class TaskMutator {
     cloudBackend.dismissReminder(id: id, at: date)
   }
 
+  func setStarred(id: String, starred: Bool) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setStarred called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setStarred(id: id, starred: starred)
+  }
+
   func setRecurrence(id: String, recurrence: Recurrence?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setRecurrence called before CK bound — dropping", nil)

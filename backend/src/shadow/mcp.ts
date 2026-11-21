@@ -372,6 +372,7 @@ function taskOut(r: Row): TaskOut {
     title: str(r.title) ?? "",
     status: str(r.status) ?? "open",
     today: r.today === true,
+    ...(r.starred === true ? { starred: true } : {}),
     scheduled: str(r.scheduled),
     deadline: str(r.deadline),
     area: str(r.area),

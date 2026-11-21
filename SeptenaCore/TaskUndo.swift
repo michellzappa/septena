@@ -117,6 +117,7 @@ enum TaskUndo {
     let id: String
     let scheduled: Date?
     let today: Bool
+    let starred: Bool
     let deadline: Date?
     let recurrence: Recurrence?
     let recurrencePaused: Bool
@@ -126,6 +127,7 @@ enum TaskUndo {
       id = task.id
       scheduled = SeptenaDate.parse(task.scheduled)
       today = task.today
+      starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
       recurrence = task.recurrence
       recurrencePaused = task.recurrencePaused
@@ -157,6 +159,7 @@ enum TaskUndo {
         mutator.setRecurrencePaused(id: snapshot.id, paused: snapshot.recurrencePaused)
       }
       mutator.setReminder(id: snapshot.id, reminder: snapshot.reminder)
+      mutator.setStarred(id: snapshot.id, starred: snapshot.starred)
       mutator.moveToToday(id: snapshot.id, today: snapshot.today)
     }
   }

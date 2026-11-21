@@ -169,6 +169,7 @@ enum TaskBackendMapping {
       "scheduled": c.day("scheduled", t.scheduled),
       "deadline": c.day("deadline", t.deadline),
       "today": .bool(t.today),
+      "starred": .bool(t.starred),
       "todaySetOn": c.day("todaySetOn", t.todaySetOn),
       "completedAt": c.stamp("completedAt", t.completedAt),
       "notes": c.text("notes", t.notes, max: notesMax),
