@@ -145,7 +145,7 @@ GitHub milestone: `"M3 Factory ships code"`.
 - Sign-in beyond Apple (ADR 0016): #168 identity table, #169 email code,
   #170 device approval, #171 email on Apple accounts. Needed by every
   non-Apple client.
-- #21 Web client on `api.septena.app` (Rank 4 first wave — reaches Windows,
+- #21 Web client on `api.septena.app` (`docs/WEB_CLIENT_SPEC.md`, phases WB0 to WB5) (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
 - #133 natural-language capture in titles · #134 email-to-task address
 - #137 Sign in with Google, Microsoft or an email link (decided 2026-11-21):
