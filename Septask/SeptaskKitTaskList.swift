@@ -391,6 +391,11 @@ final class SeptaskKitTaskListController: NSViewController {
     }
   }
 
+  /// One toast per window (`SeptaskKitToast.swift`). A new one replaces the
+  /// current one; it never stacks.
+  private let toastStore = SeptenaToastStore()
+  private lazy var toastHost = KitToastHost(store: toastStore)
+
   override func loadView() {
     let column = NSTableColumn(identifier: .init("task"))
     tableView.addTableColumn(column)
@@ -534,6 +539,14 @@ final class SeptaskKitTaskListController: NSViewController {
       emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
     ])
     refreshEmptyLabel()
+    // The bottom toast (move / defer / delete confirmations), on top of the
+    // list like the SwiftUI shell's overlay. It sizes itself to the capsule.
+    view.addSubview(toastHost)
+    NSLayoutConstraint.activate([
+      toastHost.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      toastHost.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      toastHost.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor),
+    ])
     observeBootstrapState()
 
     // CloudKit batches post .septenaTasksChanged; mutations made in the
@@ -2049,6 +2062,19 @@ final class SeptaskKitTaskListController: NSViewController {
     // Redo is re-read from the store (`recordMove`), so the undo closures
     // hold only the mutator and outlive this window.
     TaskUndo.recordMove(before: previous, context: context, mutator: mutator)
+    // The toast's Undo reverses through the same stack entry (the ticket), so
+    // it and ⌘Z can never both fire — the SwiftUI row menu's contract.
+    let ticket = TaskUndoTicket()
+    let structure = StructureCache.snapshot(in: context)
+    let destinationName: String = switch destination {
+    case .none: "Inbox"
+    case .area(let areaId): structure.areas.first { $0.id == areaId }?.title ?? "Inbox"
+    case .project(let projectId): structure.projects.first { $0.id == projectId }?.title ?? "Inbox"
+    }
+    toastStore.show(SeptenaToastCopy.moved(to: destinationName)) { [weak self, mutator] in
+      ticket.undo { TaskUndo.restore(previous, using: mutator) }
+      self?.reload()
+    }
     // Each mutator posts synchronously, but `isApplyingMove` held every
     // intermediate reload back, so this is ONE diff against the final rows:
     // the moved rows animate out instead of the page blinking. The
@@ -2476,6 +2502,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                   relativeTo: anchor, of: tableView) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
+      var deferredTo: Date?
       for task in selection {
         switch kind {
         case .when:
@@ -2489,6 +2516,7 @@ final class SeptaskKitTaskListController: NSViewController {
             guard let mode = self.rescheduleMode(for: task, newDate: date) else { continue }
             self.mutator.reschedule(id: task.id, date: date, mode: mode)
             self.mutator.removeFromToday(id: task.id)
+            deferredTo = date
           }
         case .deadline:
           self.mutator.setDeadline(id: task.id, date: date)
@@ -2497,12 +2525,20 @@ final class SeptaskKitTaskListController: NSViewController {
         self.refreshComposerRow(taskId: task.id)
       }
       self.reload()
+      self.showDeferredToast(deferredTo)
       self.recordScheduleUndo(
         name: kind == .when
           ? String(localized: "Change When", comment: "SeptaskKit: undo action")
           : String(localized: "Change Deadline", comment: "SeptaskKit: undo action"),
         before: before)
     }
+  }
+
+  /// "Deferred to …" for a new date after today, as the SwiftUI row menu says
+  /// it. No Undo button there either: ⌘Z takes it back.
+  private func showDeferredToast(_ date: Date?) {
+    guard let date, !Calendar.current.isDateInToday(date) else { return }
+    toastStore.show(SeptenaToastCopy.deferred(to: date))
   }
 
   /// Fixed-schedule repeats get the same two-way decision as the iOS shell.
@@ -2583,7 +2619,15 @@ final class SeptaskKitTaskListController: NSViewController {
       return
     }
     TaskUndo.recordDelete(ids: ids, mutator: mutator)
+    let ticket = TaskUndoTicket()
     for id in ids { mutator.delete(id: id) }
+    let message = victims.count == 1
+      ? SeptenaToastCopy.deleted(title: victims[0].title)
+      : SeptenaToastCopy.deleted(count: victims.count)
+    toastStore.show(message) { [weak self, mutator] in
+      ticket.undo { for id in ids { mutator.restore(id: id) } }
+      self?.reload()
+    }
     // Selection falls to the next task by id (see `reload`), never to a raw
     // index that can land on a header, an event or the "New task" line.
     reload()
@@ -3444,6 +3488,7 @@ final class SeptaskKitTaskListController: NSViewController {
           } else {
             self.mutator.schedule(id: task.id, date: date)
             self.mutator.removeFromToday(id: task.id)
+            self.showDeferredToast(date)
           }
           self.mutator.acknowledge(id: task.id)
           self.refreshComposerRow(taskId: task.id)

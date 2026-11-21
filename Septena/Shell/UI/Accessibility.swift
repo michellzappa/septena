@@ -308,41 +308,79 @@ private struct SeptenaToastOverlay: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .overlay(alignment: .bottom) { snackbar }
-      .animation(.snappy, value: store.current?.id)
-      .task(id: store.current?.id) {
-        guard let seconds = store.current?.duration else { return }
-        try? await Task.sleep(for: .seconds(seconds))
-        guard !Task.isCancelled else { return }
-        store.dismiss()
+      .overlay(alignment: .bottom) { SeptenaToastCapsule(store: store) }
+  }
+}
+
+/// The snackbar itself: the glass capsule, its 7 s timer and its motion. ONE
+/// drawing for every shell — the SwiftUI lists attach it through
+/// `.septenaToastOverlay(store:)`, and Septask's AppKit shell hosts it in an
+/// `NSHostingView` (`KitToastHost`), so a toast reads the same everywhere.
+/// The `ZStack` always has a child (an empty frame when no toast shows), so
+/// the timer's `.task` always has something to attach to (see the `Group`
+/// lifecycle trap in `CLAUDE.md`).
+struct SeptenaToastCapsule: View {
+  let store: SeptenaToastStore
+
+  var body: some View {
+    ZStack {
+      if let toast = store.current {
+        capsule(toast)
+      } else {
+        Color.clear.frame(width: 0, height: 0)
       }
+    }
+    .a11yAnimation(.snappy, value: store.current?.id)
+    .task(id: store.current?.id) {
+      guard let seconds = store.current?.duration else { return }
+      try? await Task.sleep(for: .seconds(seconds))
+      guard !Task.isCancelled else { return }
+      store.dismiss()
+    }
   }
 
-  @ViewBuilder
-  private var snackbar: some View {
-    if let toast = store.current {
-      HStack(spacing: 12) {
-        Text(toast.message)
-          .font(.callout)
-          .foregroundStyle(.primary)
-          .lineLimit(1)
-        if let undo = toast.undo {
-          Spacer(minLength: 0)
-          Button("Undo") {
-            undo()
-            store.dismiss()
-          }
-          .font(.callout.weight(.semibold))
-          .tint(.accentColor)
+  private func capsule(_ toast: SeptenaToast) -> some View {
+    HStack(spacing: 12) {
+      Text(toast.message)
+        .font(.callout)
+        .foregroundStyle(.primary)
+        .lineLimit(1)
+      if let undo = toast.undo {
+        Spacer(minLength: 0)
+        Button("Undo") {
+          undo()
+          store.dismiss()
         }
+        .font(.callout.weight(.semibold))
+        .tint(.accentColor)
       }
-      .padding(.horizontal, 20)
-      .padding(.vertical, 14)
-      .glassCapsule()
-      .padding(.horizontal, 20)
-      .padding(.bottom, 16)
-      .transition(.move(edge: .bottom).combined(with: .opacity))
     }
+    .padding(.horizontal, 20)
+    .padding(.vertical, 14)
+    .glassCapsule()
+    .padding(.horizontal, 20)
+    .padding(.bottom, 16)
+    .transition(.move(edge: .bottom).combined(with: .opacity))
+  }
+}
+
+/// The toast copy, one wording for both shells (`TaskRowActions`, the
+/// AppKit task list). Plain strings, like the call sites always passed.
+enum SeptenaToastCopy {
+  static func deferred(to date: Date) -> String {
+    "Deferred to \(SeptenaDate.scheduleHeaderLabel(for: date))"
+  }
+
+  static func moved(to destination: String) -> String {
+    "Moved to \(destination)"
+  }
+
+  static func deleted(title: String) -> String {
+    title.isEmpty ? "Task deleted" : "\"\(title)\" deleted"
+  }
+
+  static func deleted(count: Int) -> String {
+    count == 1 ? "Task deleted" : "\(count) tasks deleted"
   }
 }
 

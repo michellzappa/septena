@@ -1081,6 +1081,7 @@
 		A64695EB2E96AEA85444D310 /* Fasting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5835F104E8DFAA668ACCF9A5 /* Fasting.swift */; };
 		A656A1AAAD5DE20253D6ABB7 /* AreasProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D44998956C28A061A4DBAE /* AreasProjectsView.swift */; };
 		A66E3A4EEA2689BA3959EF19 /* ThingsToSeptenaMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81972DBB932252387C43520 /* ThingsToSeptenaMapper.swift */; };
+		A6AB86AE360811FEBE8359D0 /* SeptaskKitToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5262C87F63C45F97739ABD9E /* SeptaskKitToast.swift */; };
 		A6CDD7A6959034273646A61C /* AmbientLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3E103B23A9C78BF9C29516 /* AmbientLight.swift */; };
 		A6D80B6B57734D9155888CC7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B0FAB25573797D6BF8C9482 /* ContentView.swift */; };
 		A70ABEB3376EB0DEB4567CFC /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB454D5630376DAFA9CBF9E1 /* TaskListView.swift */; };
@@ -1359,6 +1360,7 @@
 		CF4DB71F5996E0984F613D57 /* MilestoneUnits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CB0FEA3128C7486D772B3A6 /* MilestoneUnits.swift */; };
 		CF5B35E0C2E5E205F7A464B5 /* TasksWatchBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403F0406AA360607D8614AFC /* TasksWatchBuilder.swift */; };
 		CF828B2B85E25BA51C7ED3B4 /* ReasoningProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C641220AFE9A17115F46A97C /* ReasoningProvider.swift */; };
+		CF83110FEDE05A6595D21D2E /* SeptaskKitToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5262C87F63C45F97739ABD9E /* SeptaskKitToast.swift */; };
 		CFD3CECB5D7AA27753855B70 /* TrainingMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41EC8D4174F6931AC5BBEBB5 /* TrainingMetrics.swift */; };
 		D01136C3F62828F390C2ED45 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F911216C13CBFC7E330714A /* Theme.swift */; };
 		D01A5FF847D182F863CE4756 /* TaskKeyboardContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90855FEBFCEB8B3CC9343F88 /* TaskKeyboardContractTests.swift */; };
@@ -1970,6 +1972,7 @@
 		520E04C092F9CD8F83865655 /* TaskKeyboardContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskKeyboardContractTests.swift; sourceTree = "<group>"; };
 		522653F0A698B3733B4B544A /* AppDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDisplayName.swift; sourceTree = "<group>"; };
 		524A8C6C59FD79924C1EA333 /* AreaAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaAttachment.swift; sourceTree = "<group>"; };
+		5262C87F63C45F97739ABD9E /* SeptaskKitToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskKitToast.swift; sourceTree = "<group>"; };
 		52B5EEA9B508AB5AAB6152F8 /* GutBristolRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutBristolRecorder.swift; sourceTree = "<group>"; };
 		530B8FDCAE87F532F06C9F1F /* EditIntakeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditIntakeEntrySheet.swift; sourceTree = "<group>"; };
 		533ABAE12036AA623BE82B59 /* NutritionSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSearchSheet.swift; sourceTree = "<group>"; };
@@ -2473,6 +2476,7 @@
 				F23CC36450E728999075C2D6 /* SeptaskKitSurface.swift */,
 				A9FAB53CD698E384BCEB2D0E /* SeptaskKitTaskList.swift */,
 				46DFC676EC34F8162FF06A98 /* SeptaskKitTheme.swift */,
+				5262C87F63C45F97739ABD9E /* SeptaskKitToast.swift */,
 				8F00F31B7DD6B0E3BC0D347B /* SeptaskKitWindow.swift */,
 				E275C679B8C62C4DD87E9D23 /* SeptaskLaunch.swift */,
 				EB956EC9AB69D43ECF775E98 /* SeptaskNavigationCommands.swift */,
@@ -4342,6 +4346,7 @@
 				CA31B720FF2AC7AF77D837B2 /* SeptaskKitSurface.swift in Sources */,
 				61060A5270B0C7683C36E952 /* SeptaskKitTaskList.swift in Sources */,
 				0B0679B573624976C64E606C /* SeptaskKitTheme.swift in Sources */,
+				A6AB86AE360811FEBE8359D0 /* SeptaskKitToast.swift in Sources */,
 				19FBA26F43488C61050F1230 /* SeptaskKitWindow.swift in Sources */,
 				32F76FE55091EAB887F4D6E3 /* SeptaskLaunch.swift in Sources */,
 				0CFB810E7BAD2E4A01815BBD /* SeptaskNavigationCommands.swift in Sources */,
@@ -4655,6 +4660,7 @@
 				138625A66B600D54E59AF87D /* SeptaskKitSurface.swift in Sources */,
 				C3DF48E64A442CAD73FA1D2E /* SeptaskKitTaskList.swift in Sources */,
 				A077D6D3E12B3490775A10EE /* SeptaskKitTheme.swift in Sources */,
+				CF83110FEDE05A6595D21D2E /* SeptaskKitToast.swift in Sources */,
 				53401A017C87ADC3E632E44A /* SeptaskKitWindow.swift in Sources */,
 				2D15B582CA0EE5722C966E48 /* SeptaskLaunch.swift in Sources */,
 				EFFEF76A8572BBF7BFBD36B4 /* SeptaskNavigationCommands.swift in Sources */,
