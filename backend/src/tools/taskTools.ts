@@ -40,7 +40,20 @@ export const listTasksJsonSchema = {
       maximum: 500,
       default: 100,
     },
+    tag: {
+      oneOf: [
+        { type: "string", minLength: 1 },
+        { type: "array", items: { type: "string", minLength: 1 } },
+      ],
+      description:
+        "Optional tag name (or array of tag names) to filter by, case-insensitive, AND semantics (tasks must carry every listed tag).",
+    },
   },
+} as const;
+
+export const listTagsJsonSchema = {
+  type: "object",
+  properties: {},
 } as const;
 
 export const listAreasJsonSchema = {
@@ -88,6 +101,13 @@ export const TASK_TOOLS: Tool[] = [
     description: "List Septena areas available for task assignment (top-level containers like 'home', 'envisioning'). Each area carries its notes and noteRev.",
     inputSchema: listAreasJsonSchema,
     annotations: { title: "List areas", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "tasks_list_tags",
+    title: "List tags",
+    description: "List the user's existing tags with open task counts so you reuse their vocabulary instead of inventing synonyms.",
+    inputSchema: listTagsJsonSchema,
+    annotations: { title: "List tags", readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: "tasks_create",

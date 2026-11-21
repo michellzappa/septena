@@ -95,6 +95,8 @@ export const SETTING_KEYS = Object.keys(SETTING_VALUES) as SettingKey[];
 export const MAX_ATTACHMENT_BYTES = ENTITY_LIMITS.maxAttachmentBytes;
 export const MAX_USER_ATTACHMENT_BYTES = ENTITY_LIMITS.maxUserAttachmentBytes;
 export const MAX_CHECKLIST_ITEMS_PER_TASK = ENTITY_LIMITS.maxChecklistItemsPerTask;
+export const MAX_TAGS_PER_TASK = ENTITY_LIMITS.maxTagsPerTask;
+export const TAG_NAME_MAX = ENTITY_LIMITS.tagNameMax;
 
 export interface EntitySpec {
   table: string;
@@ -120,6 +122,7 @@ export const ENTITIES = {
       deadline: day(),
       today: bool(),
       starred: bool(),
+      tags: json(z.array(zId).max(MAX_TAGS_PER_TASK)),
       todaySetOn: day(),
       completedAt: stamp(),
       notes: text(NOTES_MAX),
@@ -224,6 +227,18 @@ export const ENTITIES = {
     },
     requiredOnInsert: ["taskId", "title"],
     updatable: ["title", "checked", "checkedAt", "position"],
+  },
+  // Flat tags catalog (docs/TAGS_SPEC.md). Tasks reference canonical `tag.id`s
+  // in `task.tags`; renaming updates one row, soft-deleting never storms tasks.
+  tag: {
+    table: "tags",
+    columns: {
+      name: { kind: "text", zod: z.string().trim().min(1).max(TAG_NAME_MAX) },
+      color: text(32),
+      position: int(),
+    },
+    requiredOnInsert: ["name"],
+    updatable: ["name", "color", "position"],
   },
   // The non-turn half of `TaskConvo` (SeptenaCore/TaskConvo.swift), keyed by
   // the task id. Turns are their own append-only table (§5.3).

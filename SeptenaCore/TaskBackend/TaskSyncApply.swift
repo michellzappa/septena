@@ -105,6 +105,13 @@ extension TaskSyncEngine {
           main.insert(n)
           applyChecklistItemFields(n, fields, skip: [])
         }
+      case (TaskSyncOpKind.upsert, .tag?):
+        if let tag = fetchTag(op.rowID) { applyTagFields(tag, fields, skip: []) }
+        else if let name = fields["name"]?.stringValue, !name.isEmpty {
+          let n = TagEntity(id: op.rowID, name: name)
+          main.insert(n)
+          applyTagFields(n, fields, skip: [])
+        }
       case (TaskSyncOpKind.delete, .task?):
         if let t = fetchTask(op.rowID), t.deletedAt == nil { t.deletedAt = Self.localStamp(Date()) }
       case (TaskSyncOpKind.appendTurn, _):
@@ -249,6 +256,21 @@ extension TaskSyncEngine {
           recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
         }
         touchedTasks = true
+      case .tag:
+        if tombstone {
+          if let tag = fetchTag(id) { main.delete(tag) }
+          markGone(.tag, id, shadow: shadows[key], store: store)
+        } else if !pendingDelete.contains(key) {
+          let tag = fetchTag(id) ?? {
+            let n = TagEntity(id: id, name: change.row["name"]?.stringValue ?? "")
+            main.insert(n)
+            return n
+          }()
+          let applied = applyTagFields(tag, change.row, skip: skip)
+          let mapped = (try? TaskBackendMapping.tag(tag).get())?.fields ?? [:]
+          recordApplied(key, applied: applied, mapped: mapped, raw: change.row, shadow: shadows[key], store: store)
+        }
+        touchedTasks = true
       case .setting:
         // Never deleted on the backend; a tombstone is ignored. Unknown keys
         // (a newer server) are ignored too.
@@ -389,6 +411,11 @@ extension TaskSyncEngine {
       markGone(.checklistItem, id, shadow: store.shadow("checklistItem:\(id)"), store: store)
       addIssue(.checklistItem, id, "change refused: the checklist item is deleted on the backend")
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    case .tag:
+      if let tag = fetchTag(id) { main.delete(tag) }
+      markGone(.tag, id, shadow: store.shadow("tag:\(id)"), store: store)
+      addIssue(.tag, id, "change refused: the tag is deleted on the backend")
+      NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     case .setting:
       // Settings are never deleted on the backend; nothing to undo.
       break
@@ -501,6 +528,13 @@ extension TaskSyncEngine {
     take("deadline") { t.deadline = $0.stringValue }
     take("today") { t.today = Self.bool($0) ?? false }
     take("starred") { t.starred = Self.bool($0) ?? false }
+    take("tags") { v in
+      if case .array(let arr) = v {
+        t.tagIDs = arr.compactMap(\.stringValue)
+      } else {
+        t.tagIDs = []
+      }
+    }
     take("todaySetOn") { t.todaySetOn = $0.stringValue }
     take("completedAt") { t.completedAt = $0.stringValue }
     take("notes") { t.notes = $0.stringValue }
@@ -655,6 +689,21 @@ extension TaskSyncEngine {
     take("position") { item.position = Self.double($0) ?? 0 }
     take("createdAt") { item.createdAt = Self.parseStamp($0.stringValue) ?? item.createdAt }
     item.updatedAt = Date()
+    return applied
+  }
+
+  @discardableResult
+  func applyTagFields(_ tag: TagEntity, _ fields: [String: BackendJSON], skip: Set<String>) -> [String] {
+    var applied: [String] = []
+    func take(_ name: String, _ write: (BackendJSON) -> Void) {
+      guard !skip.contains(name), let v = fields[name] else { return }
+      write(v)
+      applied.append(name)
+    }
+    take("name") { tag.name = $0.stringValue ?? tag.name }
+    take("color") { tag.color = $0.stringValue }
+    take("position") { tag.position = Self.int($0) }
+    tag.updatedAt = Date()
     return applied
   }
 

@@ -157,6 +157,7 @@ final class CloudKitTasksBackend {
       deadline: nil,
       today: false,
       starred: entity.starred,
+      tagIDsJSON: entity.tagIDsJSON,
       todaySetOn: nil,
       completedAt: nil,
       area: entity.area,
@@ -791,6 +792,108 @@ final class CloudKitTasksBackend {
     guard StoreHealth.save(context, op: "checklist.copy") else { return }
     for id in createdIDs { engine.noteChecklistItemChange(id: id) }
     TaskChange.post(destinationTaskID)
+  }
+
+  // MARK: - Flat tags (docs/TAGS_SPEC.md)
+
+  private func fetchTag(id: String) -> TagEntity? {
+    var d = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
+    d.fetchLimit = 1
+    return (try? context.fetch(d))?.first
+  }
+
+  /// Replace a task's tag IDs (deduped, capped at `RegistryEntityLimits.maxTagsPerTask`).
+  func setTaskTags(id: String, tagIDs: [String]) {
+    guard let entity = fetch(id: id) else { return }
+    entity.tagIDs = tagIDs
+    entity.pendingSync = true
+    commitAndPush(entity, op: "setTaskTags")
+  }
+
+  /// Create a tag (or return the existing live tag if a case-insensitive match
+  /// already exists — docs/TAGS_SPEC.md §2).
+  @discardableResult
+  func createTag(name rawName: String, color: String? = nil) -> TaskTag? {
+    let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    let clamped = String(trimmed.prefix(RegistryEntityLimits.tagNameMax))
+    if let existing = LocalCache.tag(named: clamped, in: context) {
+      return existing
+    }
+    let nextPos = (LocalCache.allTags(in: context).compactMap(\.position).max() ?? -1) + 1
+    let id = "tag-\(UUID().uuidString.lowercased())"
+    let entity = TagEntity(id: id, name: clamped, color: color, position: nextPos, updatedAt: Date())
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "tag.create") else { return nil }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return TaskTag(entity)
+  }
+
+  /// Update a tag's name, color, or position. Enforces case-insensitive name
+  /// uniqueness against other live tags.
+  @discardableResult
+  func updateTag(id: String, name: String? = nil, color: String?? = nil, position: Int?? = nil) -> Bool {
+    guard let entity = fetchTag(id: id) else { return false }
+    if let rawName = name {
+      let trimmed = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmed.isEmpty else { return false }
+      let clamped = String(trimmed.prefix(RegistryEntityLimits.tagNameMax))
+      if let other = LocalCache.tag(named: clamped, in: context), other.id != id {
+        return false
+      }
+      entity.name = clamped
+    }
+    if let color { entity.color = color }
+    if let position { entity.position = position }
+    entity.updatedAt = Date()
+    guard StoreHealth.save(context, op: "tag.update") else { return false }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return true
+  }
+
+  /// Delete a tag. Never storms tasks referencing it — readers silently skip
+  /// deleted tag IDs (`docs/TAGS_SPEC.md` §2).
+  func deleteTag(id: String) {
+    guard let entity = fetchTag(id: id) else { return }
+    context.delete(entity)
+    guard StoreHealth.save(context, op: "tag.delete") else { return }
+    engine.noteTagDeletion(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+  }
+
+  /// Restore a deleted tag for undo (reviving its original ID while the delete
+  /// is still held in `deleteGrace`).
+  @discardableResult
+  func restoreTag(_ tag: TaskTag) -> TaskTag? {
+    if let existing = fetchTag(id: tag.id) { return TaskTag(existing) }
+    let id = TaskSyncEngine.shared.canRevive(.tag, tag.id)
+      ? tag.id
+      : "tag-\(UUID().uuidString.lowercased())"
+    let entity = TagEntity(id: id, name: tag.name, color: tag.color, position: tag.position, updatedAt: Date())
+    context.insert(entity)
+    guard StoreHealth.save(context, op: "tag.restore") else { return nil }
+    engine.noteTagChange(id: id)
+    NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
+    return TaskTag(entity)
+  }
+
+  /// Merge `sourceID` into `targetID`: rewrites live tasks referencing
+  /// `sourceID` to `targetID` (deduped) and deletes `sourceID` (`docs/TAGS_SPEC.md` §4).
+  func mergeTag(sourceID: String, into targetID: String) {
+    guard sourceID != targetID, fetchTag(id: sourceID) != nil, fetchTag(id: targetID) != nil else { return }
+    let tasks = (try? context.fetch(FetchDescriptor<TaskEntity>(
+      predicate: #Predicate { $0.deletedAt == nil && $0.tagIDsJSON != nil }
+    ))) ?? []
+    for task in tasks {
+      let ids = task.tagIDs
+      guard ids.contains(sourceID) else { continue }
+      task.tagIDs = ids.map { $0 == sourceID ? targetID : $0 }
+      task.pendingSync = true
+      commitAndPush(task, op: "tag.merge.task")
+    }
+    deleteTag(id: sourceID)
   }
 
   /// 30-day auto-purge: permanently delete all Recently Deleted tasks whose

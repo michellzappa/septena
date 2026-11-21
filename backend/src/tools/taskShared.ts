@@ -15,6 +15,7 @@ export interface TaskOut {
   status: string;
   today: boolean;
   starred?: boolean;
+  tags?: string[];
   scheduled?: string;
   deadline?: string;
   area?: string;

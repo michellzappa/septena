@@ -16,6 +16,8 @@
     "maxOpsPerPush": 500,
     "maxPull": 1000,
     "maxChecklistItemsPerTask": 200,
+    "maxTagsPerTask": 20,
+    "tagNameMax": 64,
     "maxSubtasks": 500,
     "maxArtifactRefs": 100,
     "turnProviderMax": 32,
@@ -72,6 +74,7 @@
         "deadline": { "kind": "text", "format": "day", "nullable": true },
         "today": { "kind": "bool", "default": 0 },
         "starred": { "kind": "bool", "default": 0 },
+        "tags": { "kind": "json", "maxJsonLength": 4000, "nullable": true },
         "todaySetOn": { "kind": "text", "format": "day", "nullable": true },
         "completedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "notes": { "kind": "text", "max": 100000, "nullable": true },
@@ -156,6 +159,17 @@
         "checkedAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true },
         "position": { "kind": "real", "nullable": true },
         "createdAt": { "kind": "text", "format": "stamp", "max": 40, "nullable": true }
+      }
+    },
+    "tag": {
+      "table": "tags",
+      "deletable": true,
+      "requiredOnInsert": ["name"],
+      "updatable": ["name", "color", "position"],
+      "columns": {
+        "name": { "kind": "text", "max": 64, "nullable": false },
+        "color": { "kind": "text", "max": 32, "nullable": true },
+        "position": { "kind": "int", "nullable": true }
       }
     },
     "convo": {

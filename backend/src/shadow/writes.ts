@@ -5,7 +5,7 @@ import { localServerTimestamp, todayYMD } from "../tz.js";
 import { checklistOccurrenceID, nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { shiftReminderForRecurrence, shiftReminderOnReschedule } from "../reminders.js";
 import { storeFor } from "../api/session.js";
-import { zId } from "../store/columns.js";
+import { MAX_TAGS_PER_TASK, TAG_NAME_MAX, zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
 import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
@@ -59,6 +59,7 @@ const ORDER_GAP = 1024;
 type StoreMethod =
   | "readTasks" | "readTask" | "readAreas" | "readProjects" | "readConvoCandidates"
   | "readChecklistItems" | "readChecklistItem" | "readChecklistCounts"
+  | "readTags" | "readTagByName"
   | "readOrderTop" | "readSetting" | "push" | "claim" | "release" | "agentEvents" | "history" | "head"
   | "readNote" | "noteRevisions" | "readContainer" | "readContainerTasks";
 export type StoreRpc = {
@@ -104,6 +105,7 @@ export const zWriteArgs = {
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
     checklist: z.array(z.string().min(1).max(2000)).max(200).optional(),
+    tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).optional(),
     origin: z.enum(["user_request", "agent_suggestion"]).optional(),
   }),
   tasks_complete: z.object({ id: zId }),
@@ -124,6 +126,7 @@ export const zWriteArgs = {
     reminderAt: z.string().nullable().optional(),
     reminder_mode: z.enum(["floating", "fixed"]).nullable().optional(),
     reminderMode: z.enum(["floating", "fixed"]).nullable().optional(),
+    tags: z.array(z.string().trim().min(1).max(TAG_NAME_MAX)).max(MAX_TAGS_PER_TASK).nullable().optional(),
   }),
   tasks_defer: z.object({ id: zId, until: zDay }),
   tasks_move_to_today: z.object({ id: zId }),
@@ -289,6 +292,45 @@ async function assertKnownContainer(store: StoreRpc, kind: "area" | "project", i
   if (message) throw new Error(message);
 }
 
+/// Resolve human tag names case-insensitively against the store's live tags,
+/// producing `tag` upsert ops for any missing tags (unless `allowCreate` is
+/// false). Deduplicates case-insensitively and caps at `MAX_TAGS_PER_TASK`.
+async function resolveTagNames(
+  store: StoreRpc,
+  rawNames: string[],
+  allowCreate: boolean,
+): Promise<{ tagIds: string[]; tagNames: string[]; tagOps: NewOp[] }> {
+  const existing = await store.readTags();
+  const byLower = new Map<string, { id: string; name: string }>();
+  for (const r of existing) {
+    const name = str(r.name);
+    if (name) byLower.set(name.toLowerCase(), { id: r.id as string, name });
+  }
+  const tagIds: string[] = [];
+  const tagNames: string[] = [];
+  const tagOps: NewOp[] = [];
+  const seenIds = new Set<string>();
+  for (const raw of rawNames) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    let entry = byLower.get(key);
+    if (!entry) {
+      if (!allowCreate) continue;
+      const id = `tag-${randomId(10)}`;
+      entry = { id, name: trimmed };
+      byLower.set(key, entry);
+      tagOps.push({ op: "upsert", entity: "tag", id, fields: { name: trimmed } });
+    }
+    if (!seenIds.has(entry.id) && tagIds.length < MAX_TAGS_PER_TASK) {
+      seenIds.add(entry.id);
+      tagIds.push(entry.id);
+      tagNames.push(entry.name);
+    }
+  }
+  return { tagIds, tagNames, tagOps };
+}
+
 /// The app's `TaskEntity.isOnToday`: pinned, or scheduled / deadline arrived.
 function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }, today: string): boolean {
   const s = str(t.scheduled);
@@ -364,7 +406,17 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   }
   if (onToday(fields, today)) fields.todayPosition = position;
 
-  const ops: NewOp[] = [{ op: "upsert", entity: "task", id, fields }];
+  const ops: NewOp[] = [];
+  let resolvedTagNames: string[] = [];
+  if (input.tags && input.tags.length > 0) {
+    const paused = (await store.readSetting("agentsPaused")) === true;
+    const resolved = await resolveTagNames(store, input.tags, !paused);
+    ops.push(...resolved.tagOps);
+    if (resolved.tagIds.length > 0) fields.tags = resolved.tagIds;
+    resolvedTagNames = resolved.tagNames;
+  }
+  const taskOpIdx = ops.length;
+  ops.push({ op: "upsert", entity: "task", id, fields });
   const createdChecklist: Array<{ id: string; title: string; position: number }> = [];
   if (input.checklist && input.checklist.length > 0) {
     for (let i = 0; i < input.checklist.length; i++) {
@@ -383,13 +435,14 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   }
 
   const results = await push(store, ops);
-  const r = results[0];
+  const r = results[taskOpIdx];
   if (!applied(r)) throw new Error(`Task was not created: ${r?.status === "rejected" ? r.reason : r?.status ?? "no result"}`);
   return {
     id,
     title: input.title,
     placement: plan.placement,
     ...plan.echo,
+    ...(resolvedTagNames.length > 0 ? { tags: resolvedTagNames } : {}),
     ...(createdChecklist.length > 0 ? { checklist: createdChecklist } : {}),
   };
 }
@@ -403,7 +456,8 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
   const old = current.task;
   const storedScheduled = updateNeedsStoredSchedule(input) ? (str(old.scheduled) ?? null) : undefined;
   const { fields: p, updated } = planUpdate(input, storedScheduled);
-  if (updated.length === 0) return { id: input.id, updated: [] };
+  const hasTagChange = input.tags !== undefined;
+  if (updated.length === 0 && !hasTagChange) return { id: input.id, updated: [] };
 
   const today = todayYMD(ctx.timeZone);
   const clear = (v: string | null) => (v === "" ? null : v);
@@ -464,8 +518,25 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.todayPosition = (fields.position as number | undefined) ?? num(old.position) ?? (await topPosition(store));
   }
 
-  const [r] = await push(store, [{ op: "upsert", entity: "task", id: input.id, fields }]);
-  requireApplied(r, input.id);
+  const ops: NewOp[] = [];
+  if (input.tags !== undefined) {
+    updated.push("tags");
+    if (input.tags === null || input.tags.length === 0) {
+      fields.tags = null;
+    } else {
+      // Never auto-create tags when the task is stopped or agents are paused;
+      // the task op itself still hits TaskStore so the store refuses cleanly.
+      const allowCreate = !current.convo?.stoppedAt && (await store.readSetting("agentsPaused")) !== true;
+      const resolved = await resolveTagNames(store, input.tags, allowCreate);
+      if (allowCreate) ops.push(...resolved.tagOps);
+      fields.tags = resolved.tagIds.length > 0 ? resolved.tagIds : null;
+    }
+  }
+  const taskOpIdx = ops.length;
+  ops.push({ op: "upsert", entity: "task", id: input.id, fields });
+
+  const results = await push(store, ops);
+  requireApplied(results[taskOpIdx], input.id);
   return { id: input.id, updated };
 }
 
@@ -529,6 +600,7 @@ async function completeTask(ctx: WriteContext, id: string) {
           // A deadline belonged to the completed occurrence.
           today: false,
           starred: src.starred === true,
+          ...(Array.isArray(src.tags) && src.tags.length > 0 ? { tags: src.tags } : {}),
           ...recurrenceColumns({ unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday }),
           recurrenceSeriesID: str(src.recurrenceSeriesID) ?? id,
           recurrenceAnchorDate: afterCompletion ? null : next,

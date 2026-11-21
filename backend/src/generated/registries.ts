@@ -19,6 +19,8 @@ export const ENTITY_LIMITS = {
   maxOpsPerPush: 500,
   maxPull: 1000,
   maxChecklistItemsPerTask: 200,
+  maxTagsPerTask: 20,
+  tagNameMax: 64,
   maxSubtasks: 500,
   maxArtifactRefs: 100,
   turnProviderMax: 32,
@@ -50,7 +52,7 @@ export const ENTITY_ENUMS = {
   textureMotion: ["still","slowDrift"] as const,
 } as const;
 
-export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem"] as const;
+export const DELETABLE_ENTITIES = ["task","area","project","attachment","checklistItem","tag"] as const;
 
 export const DOMAIN_RULES = {
   cueDecayDays: 7,

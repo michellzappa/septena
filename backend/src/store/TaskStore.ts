@@ -4,6 +4,7 @@ import {
   ENTITIES,
   ENTITY_NAMES,
   MAX_CHECKLIST_ITEMS_PER_TASK,
+  MAX_TAGS_PER_TASK,
   MAX_USER_ATTACHMENT_BYTES,
   addMissingColumnsSQL,
   createTableSQL,
@@ -309,6 +310,7 @@ export class TaskStore extends DurableObject<Env> {
         signedAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS checklist_items_task ON checklist_items(taskId);
+      CREATE INDEX IF NOT EXISTS tags_name_ci ON tags(lower(name));
     `);
   }
 
@@ -479,6 +481,32 @@ export class TaskStore extends DurableObject<Env> {
       if (locked.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `immutable:${locked.join(",")}` };
       const cleared = spec.requiredOnInsert.filter((f) => op.fields[f] === null);
       if (cleared.length) return { clientOpId: op.clientOpId, status: "rejected", reason: `required:${cleared.join(",")}` };
+    }
+
+    if (op.entity === "task" && Array.isArray(op.fields.tags)) {
+      const seen = new Set<string>();
+      const deduped: string[] = [];
+      for (const id of op.fields.tags as string[]) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          deduped.push(id);
+        }
+      }
+      if (deduped.length > MAX_TAGS_PER_TASK) {
+        return { clientOpId: op.clientOpId, status: "rejected", reason: "tag_limit_exceeded" };
+      }
+      op.fields.tags = deduped;
+    }
+    if (op.entity === "tag" && typeof op.fields.name === "string") {
+      const trimmed = op.fields.name.trim();
+      op.fields.name = trimmed;
+      const conflict = this.sql.exec<{ id: string }>(
+        "SELECT id FROM tags WHERE lower(name) = lower(?) AND deletedAt IS NULL AND id != ?",
+        trimmed, op.id,
+      ).toArray()[0];
+      if (conflict) {
+        return { clientOpId: op.clientOpId, status: "rejected", reason: "duplicate_tag_name" };
+      }
     }
 
     const rev = this.nextRev();
@@ -758,7 +786,7 @@ export class TaskStore extends DurableObject<Env> {
   /// `includeSettings`: the client syncs the `setting` entity. Clients built
   /// before it existed decode pulled entities strictly and would fail on it,
   /// so they get no setting rows (their cursor still moves past them).
-  pull(since: number, limit: number, includeSettings = false, includeChecklists = false): PullResult {
+  pull(since: number, limit: number, includeSettings = false, includeChecklists = false, includeTags = false): PullResult {
     const n = Math.min(Math.max(limit, 1), MAX_PULL);
     if (since > 0 && since < this.meta("purgedThrough")) {
       return { resetRequired: true, changes: [], nextSince: 0, hasMore: true };
@@ -769,6 +797,7 @@ export class TaskStore extends DurableObject<Env> {
     for (const name of ENTITY_NAMES) {
       if (name === "setting" && !includeSettings) continue;
       if (name === "checklistItem" && !includeChecklists) continue;
+      if (name === "tag" && !includeTags) continue;
       const spec: EntitySpec = ENTITIES[name];
       for (const raw of this.sql.exec(`SELECT * FROM ${spec.table} WHERE rev > ? ORDER BY rev LIMIT ?`, since, n)) {
         merged.push({ rev: raw.rev as number, entity: name, row: decodeRow(spec, raw) });
@@ -844,6 +873,20 @@ export class TaskStore extends DurableObject<Env> {
     const out: Record<string, { total: number; done: number }> = {};
     for (const r of rows) out[r.taskId] = { total: r.total, done: r.done ?? 0 };
     return out;
+  }
+
+  readTags(): Row[] {
+    return this.sql.exec(
+      "SELECT * FROM tags WHERE deletedAt IS NULL ORDER BY position IS NULL, position, lower(name), id",
+    ).toArray().map((r) => decodeRow(ENTITIES.tag, r) as Row);
+  }
+
+  readTagByName(name: string): Row | null {
+    const raw = this.sql.exec(
+      "SELECT * FROM tags WHERE lower(name) = lower(?) AND deletedAt IS NULL",
+      name.trim(),
+    ).toArray()[0];
+    return raw ? (decodeRow(ENTITIES.tag, raw) as Row) : null;
   }
 
   readAreas(limit: number): Row[] {

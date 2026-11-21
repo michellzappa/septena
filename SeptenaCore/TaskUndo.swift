@@ -680,6 +680,48 @@ enum TaskUndo {
            undo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: beforeIDs) },
            redo: { mutator.reorderChecklistItems(taskID: taskID, orderedIDs: afterIDs) })
   }
+
+  // MARK: - Tags (docs/TAGS_SPEC.md)
+
+  static func recordTaskTags(name: String = String(localized: "Change Tags", comment: "Undo action name"),
+                             before: [String: [String]],
+                             after: [String: [String]],
+                             mutator: TaskMutator) {
+    guard before != after else { return }
+    mutator.touch(ids: Array(before.keys))
+    record(name: name,
+           undo: {
+             for (id, tags) in before { mutator.setTaskTags(id: id, tagIDs: tags) }
+           },
+           redo: {
+             for (id, tags) in after { mutator.setTaskTags(id: id, tagIDs: tags) }
+           })
+  }
+
+  static func recordTagCreate(_ tag: TaskTag, mutator: TaskMutator) {
+    var live = tag
+    record(name: String(localized: "Create Tag", comment: "Undo action name"),
+           undo: { mutator.deleteTag(id: live.id) },
+           redo: {
+             if let restored = mutator.restoreTag(live) { live = restored }
+           })
+  }
+
+  static func recordTagUpdate(before: TaskTag, after: TaskTag, mutator: TaskMutator) {
+    guard before != after else { return }
+    record(name: String(localized: "Edit Tag", comment: "Undo action name"),
+           undo: { mutator.updateTag(id: before.id, name: before.name, color: .some(before.color), position: .some(before.position)) },
+           redo: { mutator.updateTag(id: after.id, name: after.name, color: .some(after.color), position: .some(after.position)) })
+  }
+
+  static func recordTagDelete(_ tag: TaskTag, mutator: TaskMutator) {
+    var live = tag
+    record(name: String(localized: "Delete Tag", comment: "Undo action name"),
+           undo: {
+             if let restored = mutator.restoreTag(live) { live = restored }
+           },
+           redo: { mutator.deleteTag(id: live.id) })
+  }
 }
 
 // MARK: - Delete confirmation copy

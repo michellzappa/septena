@@ -36,6 +36,8 @@ final class TaskEntity {
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
   /// Default `= false` required for lightweight SwiftData migration.
   var starred: Bool = false
+  /// JSON-encoded `[String]` of canonical `TagEntity.id` values (max 20, docs/TAGS_SPEC.md).
+  var tagIDsJSON: String? = nil
   var todaySetOn: String?
   var completedAt: String?
   var area: String?
@@ -178,6 +180,7 @@ final class TaskEntity {
        deadline: String? = nil,
        today: Bool = false,
        starred: Bool = false,
+       tagIDsJSON: String? = nil,
        todaySetOn: String? = nil,
        completedAt: String? = nil,
        area: String? = nil,
@@ -220,6 +223,7 @@ final class TaskEntity {
     self.deadline = deadline
     self.today = today
     self.starred = starred
+    self.tagIDsJSON = tagIDsJSON
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -565,6 +569,7 @@ extension SeptenaTask {
       deadline: e.deadline,
       today: e.today,
       starred: e.starred,
+      tags: e.tagIDs,
       todaySetOn: e.todaySetOn,
       completedAt: e.completedAt,
       area: e.area,
@@ -883,6 +888,7 @@ final class LocalStore {
     let schema = Schema([TaskEntity.self,
                          TaskAttachmentEntity.self,
                          TaskChecklistItemEntity.self,
+                         TagEntity.self,
                          ProjectEntity.self,
                          AreaEntity.self,
                          SettingsEntity.self,
@@ -1602,6 +1608,103 @@ extension LocalCache {
       out[r.taskID] = entry
     }
     return out
+  }
+}
+
+// MARK: - TagEntity & Tag helpers (docs/TAGS_SPEC.md)
+
+extension TaskEntity {
+  /// Typed view over `tagIDsJSON` (deduplicated, capped at `RegistryEntityLimits.maxTagsPerTask`).
+  var tagIDs: [String] {
+    get {
+      guard let raw = tagIDsJSON, let data = raw.data(using: .utf8),
+            let decoded = try? JSONDecoder().decode([String].self, from: data)
+      else { return [] }
+      return decoded
+    }
+    set {
+      var seen = Set<String>()
+      var clean: [String] = []
+      for id in newValue where !id.isEmpty && seen.insert(id).inserted {
+        clean.append(id)
+        if clean.count >= RegistryEntityLimits.maxTagsPerTask { break }
+      }
+      if clean.isEmpty {
+        tagIDsJSON = nil
+      } else if let data = try? JSONEncoder().encode(clean),
+                let str = String(data: data, encoding: .utf8) {
+        tagIDsJSON = str
+      }
+    }
+  }
+}
+
+@Model
+final class TagEntity {
+  @Attribute(.unique) var id: String
+  var name: String
+  var color: String? = nil
+  var position: Int? = nil
+  var updatedAt: Date = Date()
+
+  init(id: String,
+       name: String,
+       color: String? = nil,
+       position: Int? = nil,
+       updatedAt: Date = Date()) {
+    self.id = id
+    self.name = name
+    self.color = color
+    self.position = position
+    self.updatedAt = updatedAt
+  }
+}
+
+extension TaskTag {
+  init(_ entity: TagEntity) {
+    self.init(
+      id: entity.id,
+      name: entity.name,
+      color: entity.color,
+      position: entity.position
+    )
+  }
+}
+
+extension LocalCache {
+  @MainActor
+  static func allTags(in context: ModelContext) -> [TaskTag] {
+    let rows = StoreHealth.fetch(context, FetchDescriptor<TagEntity>())
+    return rows
+      .map(TaskTag.init)
+      .sorted { lhs, rhs in
+        let lp = lhs.position ?? Int.max
+        let rp = rhs.position ?? Int.max
+        if lp != rp { return lp < rp }
+        let cmp = lhs.name.localizedCaseInsensitiveCompare(rhs.name)
+        if cmp != .orderedSame { return cmp == .orderedAscending }
+        return lhs.id < rhs.id
+      }
+  }
+
+  @MainActor
+  static func tagsByID(in context: ModelContext) -> [String: TaskTag] {
+    Dictionary(uniqueKeysWithValues: allTags(in: context).map { ($0.id, $0) })
+  }
+
+  @MainActor
+  static func tag(named name: String, in context: ModelContext) -> TaskTag? {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return allTags(in: context).first {
+      $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame
+    }
+  }
+
+  /// Resolves a task's tag IDs into live `TaskTag` values, silently skipping
+  /// deleted/dangling IDs per `docs/TAGS_SPEC.md` §2.
+  static func resolvedTags(for task: SeptenaTask, tagsByID: [String: TaskTag]) -> [TaskTag] {
+    task.tags.compactMap { tagsByID[$0] }
   }
 }
 

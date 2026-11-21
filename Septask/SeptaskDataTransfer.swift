@@ -27,7 +27,7 @@ enum TaskJSONTransfer {
     var attachmentCount: Int { tables["task_attachment"]?.count ?? 0 }
     var supportedRowCount: Int { areaCount + projectCount + taskCount + attachmentCount }
     var skippedRowCount: Int {
-      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item"]
+      let supported: Set<String> = ["area", "project", "task", "task_attachment", "checklist_item", "tag"]
       return tables.reduce(0) { acc, pair in
         supported.contains(pair.key) ? acc : acc + pair.value.count
       }
@@ -88,6 +88,7 @@ enum TaskJSONTransfer {
     let tasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let attachments = try context.fetch(FetchDescriptor<TaskAttachmentEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let checklistItems = try context.fetch(FetchDescriptor<TaskChecklistItemEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
+    let tags = try context.fetch(FetchDescriptor<TagEntity>(sortBy: [SortDescriptor(\.id)]))
 
     let tables: [String: [[String: Any]]] = [
       "area": areas.map(areaDict),
@@ -95,6 +96,7 @@ enum TaskJSONTransfer {
       "task": tasks.map(taskDict),
       "task_attachment": attachments.compactMap(attachmentDict),
       "checklist_item": checklistItems.map(checklistItemDict),
+      "tag": tags.map(tagDict),
     ]
 
     let envelope: [String: Any] = [
@@ -140,7 +142,9 @@ enum TaskJSONTransfer {
     return compact([
       "id": e.id, "title": e.title, "status": e.statusRaw,
       "created": e.created, "scheduled": e.scheduled, "deadline": e.deadline,
-      "today": e.today, "starred": e.starred ? true : nil, "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
+      "today": e.today, "starred": e.starred ? true : nil,
+      "tags": e.tagIDs.isEmpty ? nil : e.tagIDs,
+      "todaySetOn": e.todaySetOn, "completedAt": e.completedAt,
       "area": e.area, "project": e.project, "notes": e.notes,
       "conversationJSON": e.conversationJSON,
       "recurrenceUnit": e.recurrenceUnit,
@@ -246,9 +250,18 @@ enum TaskJSONTransfer {
     var taskIDs: [String] = []
     var attachmentIDs: [String] = []
     var checklistIDs: [String] = []
+    var tagIDs: [String] = []
+    var tagIDRemap: [String: String] = [:]
 
-    // Order: areas → projects → tasks (headings first) → attachments so FK
-    // references resolve cleanly if synced later.
+    // Order: tags → areas → projects → tasks (headings first) → attachments → checklist_item
+    // so FK references resolve cleanly and case-insensitive tag merges remap task.tags.
+    if let rows = doc.tables["tag"] {
+      for r in rows {
+        let (oldID, canonicalID) = try upsertTag(r, context: context)
+        tagIDRemap[oldID] = canonicalID
+        tagIDs.append(canonicalID)
+      }
+    }
     if let rows = doc.tables["area"] {
       for r in rows {
         let id = try upsertArea(r, context: context)
@@ -268,7 +281,7 @@ enum TaskJSONTransfer {
         (($0["kind"] as? String) == TaskKind.heading) && (($1["kind"] as? String) != TaskKind.heading)
       }
       for r in ordered {
-        let id = try upsertTask(r, context: context)
+        let id = try upsertTask(r, tagIDRemap: tagIDRemap, context: context)
         taskIDs.append(id)
         result.tasks += 1
       }
@@ -289,6 +302,7 @@ enum TaskJSONTransfer {
 
     try StoreHealth.saveOrThrow(context, op: "TaskJSONTransfer.apply")
 
+    for id in tagIDs { engine.noteTagChange(id: id) }
     for id in areaIDs { engine.noteAreaChange(id: id) }
     for id in projectIDs { engine.noteProjectChange(id: id) }
     for id in taskIDs { engine.noteTaskChange(id: id) }
@@ -298,7 +312,7 @@ enum TaskJSONTransfer {
     if !areaIDs.isEmpty || !projectIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaStructureChanged, object: nil)
     }
-    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty {
+    if !taskIDs.isEmpty || !attachmentIDs.isEmpty || !checklistIDs.isEmpty || !tagIDs.isEmpty {
       NotificationCenter.default.post(name: .septenaTasksChanged, object: nil)
     }
     return result
@@ -349,7 +363,9 @@ enum TaskJSONTransfer {
     return id
   }
 
-  private static func upsertTask(_ r: [String: Any], context: ModelContext) throws -> String {
+  private static func upsertTask(_ r: [String: Any],
+                                 tagIDRemap: [String: String] = [:],
+                                 context: ModelContext) throws -> String {
     guard let id = nonEmptyString(r["id"]), let title = r["title"] as? String else {
       throw TransferError.malformed("A task row is missing id or title.")
     }
@@ -366,6 +382,11 @@ enum TaskJSONTransfer {
     entity.deadline = nonEmptyString(r["deadline"])
     entity.today = (r["today"] as? Bool) ?? false
     entity.starred = (r["starred"] as? Bool) ?? false
+    if let rawTags = r["tags"] as? [Any] {
+      entity.tagIDs = rawTags.compactMap { nonEmptyString($0) }.map { tagIDRemap[$0] ?? $0 }
+    } else {
+      entity.tagIDs = []
+    }
     entity.todaySetOn = nonEmptyString(r["todaySetOn"])
     entity.completedAt = nonEmptyString(r["completedAt"])
     entity.area = nonEmptyString(r["area"])
@@ -482,6 +503,48 @@ enum TaskJSONTransfer {
     return id
   }
 
+  private static func tagDict(_ e: TagEntity) -> [String: Any] {
+    compact([
+      "id": e.id,
+      "name": e.name,
+      "color": e.color,
+      "position": e.position,
+    ])
+  }
+
+  private static func upsertTag(_ r: [String: Any], context: ModelContext) throws -> (oldID: String, canonicalID: String) {
+    guard let id = nonEmptyString(r["id"]),
+          let rawName = r["name"] as? String else {
+      throw TransferError.malformed("A tag row is missing id or name.")
+    }
+    let name = String(rawName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(RegistryEntityLimits.tagNameMax))
+    guard !name.isEmpty else {
+      throw TransferError.malformed("A tag row has an empty name.")
+    }
+    // Match by ID first, else case-insensitively by name to avoid duplicates on re-import.
+    var byID = FetchDescriptor<TagEntity>(predicate: #Predicate { $0.id == id })
+    byID.fetchLimit = 1
+    if let existing = try context.fetch(byID).first {
+      existing.name = name
+      existing.color = nonEmptyString(r["color"])
+      if let pos = intValue(r["position"]) { existing.position = pos }
+      existing.updatedAt = Date()
+      return (id, existing.id)
+    }
+    if let matched = LocalCache.tag(named: name, in: context) {
+      return (id, matched.id)
+    }
+    let entity = TagEntity(
+      id: id,
+      name: name,
+      color: nonEmptyString(r["color"]),
+      position: intValue(r["position"]),
+      updatedAt: Date()
+    )
+    context.insert(entity)
+    return (id, entity.id)
+  }
+
   private static func nonEmptyString(_ raw: Any?) -> String? {
     guard let s = raw as? String, !s.isEmpty else { return nil }
     return s
@@ -571,6 +634,7 @@ enum TaskJSONTransfer {
 
   static func exportMarkdown(context: ModelContext? = nil, includeCompleted: Bool = true) throws -> String {
     let context = context ?? LocalStore.shared.container.mainContext
+    let tagsByID = LocalCache.tagsByID(in: context)
     let areas = try context.fetch(FetchDescriptor<AreaEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
     let projects = try context.fetch(FetchDescriptor<ProjectEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
@@ -600,6 +664,11 @@ enum TaskJSONTransfer {
       var meta: [String] = []
       if t.today && t.status == .open { meta.append("today") }
       if t.starred { meta.append("★") }
+      let tagNames = t.tagIDs.compactMap { tagsByID[$0]?.name }
+      for tagName in tagNames {
+        let token = tagName.contains(" ") ? "#\"\(tagName)\"" : "#\(tagName)"
+        meta.append(token)
+      }
       if let s = t.scheduled { meta.append("when: \(s)") }
       if let d = t.deadline { meta.append("deadline: \(d)") }
       if let r = t.recurrence { meta.append("repeat: \(r.shortLabel)") }
@@ -683,19 +752,21 @@ enum TaskJSONTransfer {
     let context = context ?? LocalStore.shared.container.mainContext
     let areas = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<AreaEntity>()).map { ($0.id, $0.title) })
     let projects = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<ProjectEntity>()).map { ($0.id, $0) })
+    let tagsByID = LocalCache.tagsByID(in: context)
     let allTasks = try context.fetch(FetchDescriptor<TaskEntity>(sortBy: [SortDescriptor(\.position), SortDescriptor(\.id)]))
       .filter { $0.deletedAt == nil }
     let headings = Dictionary(uniqueKeysWithValues: allTasks.filter(\.isHeading).map { ($0.id, $0.title) })
     let rows = allTasks.filter { !$0.isHeading && (includeCompleted || $0.status == .open) }
 
     var out: [String] = [
-      "\u{FEFF}id,title,status,area,project,section,today,starred,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
+      "\u{FEFF}id,title,status,area,project,section,today,starred,tags,scheduled,deadline,reminder_at,recurrence,notes,created,completed_at"
     ]
     for t in rows {
       let projectEntity = t.project.flatMap { projects[$0] }
       let areaName = (t.area ?? projectEntity?.area).flatMap { areas[$0] } ?? ""
       let projectName = projectEntity?.title ?? ""
       let sectionName = t.heading.flatMap { headings[$0] } ?? ""
+      let tagList = t.tagIDs.compactMap { tagsByID[$0]?.name }.joined(separator: ", ")
       let cols: [String] = [
         t.id,
         t.title,
@@ -705,6 +776,7 @@ enum TaskJSONTransfer {
         sectionName,
         t.today ? "true" : "false",
         t.starred ? "true" : "false",
+        tagList,
         t.scheduled ?? "",
         t.deadline ?? "",
         t.reminderAt ?? "",

@@ -156,6 +156,7 @@ enum TaskBackendMapping {
       "deadline": c.day("deadline", t.deadline),
       "today": .bool(t.today),
       "starred": .bool(t.starred),
+      "tags": t.tagIDs.isEmpty ? .null : .array(t.tagIDs.map { .string($0) }),
       "todaySetOn": c.day("todaySetOn", t.todaySetOn),
       "completedAt": c.stamp("completedAt", t.completedAt),
       "notes": c.text("notes", t.notes, max: notesMax),
@@ -226,6 +227,18 @@ enum TaskBackendMapping {
       "createdAt": item.createdAt == .distantPast ? .null : .string(stamp(item.createdAt)),
     ]
     return finish(.checklistItem, item.id, c, fields, deleted: false)
+  }
+
+  @MainActor
+  static func tag(_ tag: TagEntity) -> Result<BackendRowPlan, TaskBackendIssue> {
+    var c = Checker()
+    c.rowID(tag.id)
+    let fields: [String: BackendJSON] = [
+      "name": c.text("name", tag.name, max: RegistryEntityLimits.tagNameMax),
+      "color": c.text("color", tag.color, max: 32),
+      "position": tag.position.map { .int(Int64($0)) } ?? .null,
+    ]
+    return finish(.tag, tag.id, c, fields, deleted: false)
   }
 
   /// The non-turn half of the conversation (`convos` table, keyed by task id).

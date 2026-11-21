@@ -299,6 +299,57 @@ final class TaskMutator {
     return cloudBackend.restoreChecklistItem(item)
   }
 
+  func setTaskTags(id: String, tagIDs: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] setTaskTags called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.setTaskTags(id: id, tagIDs: tagIDs)
+  }
+
+  @discardableResult
+  func createTag(name: String, color: String? = nil) -> TaskTag? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] createTag called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.createTag(name: name, color: color)
+  }
+
+  @discardableResult
+  func updateTag(id: String, name: String? = nil, color: String?? = nil, position: Int?? = nil) -> Bool {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] updateTag called before CK bound — dropping", nil)
+      return false
+    }
+    return cloudBackend.updateTag(id: id, name: name, color: color, position: position)
+  }
+
+  func deleteTag(id: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] deleteTag called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.deleteTag(id: id)
+  }
+
+  @discardableResult
+  func restoreTag(_ tag: TaskTag) -> TaskTag? {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreTag called before CK bound — dropping", nil)
+      return nil
+    }
+    return cloudBackend.restoreTag(tag)
+  }
+
+  func mergeTag(sourceID: String, into targetID: String) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] mergeTag called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.mergeTag(sourceID: sourceID, into: targetID)
+  }
+
   func setRecurrence(id: String, recurrence: Recurrence?) {
     guard let cloudBackend else {
       SeptenaLog.error("[TaskMutator] setRecurrence called before CK bound — dropping", nil)
@@ -444,6 +495,7 @@ final class TaskMutator {
     )
     if let heading = task.heading { setHeading(id: copy.id, heading: heading) }
     if task.starred { setStarred(id: copy.id, starred: true) }
+    if !task.tags.isEmpty { setTaskTags(id: copy.id, tagIDs: task.tags) }
     if let rule = task.recurrence {
       setRecurrence(id: copy.id, recurrence: rule)
       // `setRecurrence` resets the pause across the series it writes, so a

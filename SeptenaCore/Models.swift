@@ -69,6 +69,8 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   var deadline: String?
   var today: Bool
   var starred: Bool = false
+  /// Canonical `TagEntity.id` values assigned to this task (max 20, flat tags, docs/TAGS_SPEC.md).
+  var tags: [String] = []
   var todaySetOn: String?      // YYYY-MM-DD
   var completedAt: String?     // YYYY-MM-DDTHH:MM:SS
   var area: String?
@@ -334,6 +336,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     deadline: String?,
     today: Bool,
     starred: Bool = false,
+    tags: [String] = [],
     todaySetOn: String?,
     completedAt: String?,
     area: String?,
@@ -368,6 +371,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     self.deadline = deadline
     self.today = today
     self.starred = starred
+    self.tags = tags
     self.todaySetOn = todaySetOn
     self.completedAt = completedAt
     self.area = area
@@ -396,7 +400,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   }
 
   enum CodingKeys: String, CodingKey {
-    case id, title, status, created, scheduled, deadline, today, starred
+    case id, title, status, created, scheduled, deadline, today, starred, tags
     case todaySetOn = "today_set_on"
     case completedAt = "completed_at"
     case area, project, notes, recurrence, reminder
@@ -429,6 +433,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     }
     today = (try? c.decode(Bool.self, forKey: .today)) ?? false
     starred = (try? c.decode(Bool.self, forKey: .starred)) ?? false
+    tags = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
     todaySetOn = try c.decodeIfPresent(String.self, forKey: .todaySetOn)
     completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
     area = try c.decodeIfPresent(String.self, forKey: .area)
@@ -439,6 +444,22 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
     nextOccurrence = try c.decodeIfPresent(String.self, forKey: .nextOccurrence)
     updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     deletedAt = try c.decodeIfPresent(String.self, forKey: .deletedAt)
+  }
+}
+
+// MARK: - Flat tags (docs/TAGS_SPEC.md)
+
+struct TaskTag: Identifiable, Codable, Hashable, Sendable {
+  let id: String
+  var name: String
+  var color: String?
+  var position: Int?
+
+  init(id: String, name: String, color: String? = nil, position: Int? = nil) {
+    self.id = id
+    self.name = name
+    self.color = color
+    self.position = position
   }
 }
 

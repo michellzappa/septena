@@ -112,6 +112,12 @@ export const createTaskJsonSchema = {
       items: { type: "string", minLength: 1 },
       description: "Optional 1-level checklist step titles created in order on the new task.",
     },
+    tags: {
+      type: "array",
+      items: { type: "string", minLength: 1, maxLength: 64 },
+      maxItems: 20,
+      description: "Optional flat tag names (resolved case-insensitively to existing tags; missing tags are created).",
+    },
     origin: {
       type: "string",
       enum: ["user_request", "agent_suggestion"],
@@ -151,6 +157,12 @@ export const updateTaskJsonSchema = {
       enum: ["floating", "fixed", null],
       description: "Timezone mode for reminder_at: floating or fixed.",
     },
+    tags: {
+      type: ["array", "null"],
+      items: { type: "string", minLength: 1, maxLength: 64 },
+      maxItems: 20,
+      description: "Replace the task's tags by name (case-insensitive; creates missing tags). Pass [] or null to clear.",
+    },
   },
 } as const;
 
@@ -183,6 +195,7 @@ export interface CreateTaskInput {
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
   checklist?: string[];
+  tags?: string[];
   /**
    * Provenance (docs/TASK_ROW_LANGUAGE_SPEC.md §3.4). `user_request` commits the
    * task (placed where specified); `agent_suggestion` (or omitted — the gateway's
@@ -209,6 +222,7 @@ export interface UpdateTaskInput {
   reminderAt?: string | null;
   reminder_mode?: ReminderMode | null;
   reminderMode?: ReminderMode | null;
+  tags?: string[] | null;
 }
 
 /** Wire form of a repeat rule. `afterCompletion` is accepted as an alias for

@@ -147,6 +147,8 @@ api.get("/sync/pull", async (c) => {
     settings: z.enum(["0", "1"]).default("0"),
     // `checklists=1`: the client syncs the `checklistItem` entity (TaskStore.pull).
     checklists: z.enum(["0", "1"]).default("0"),
+    // `tags=1`: the client syncs the `tag` entity (TaskStore.pull).
+    tags: z.enum(["0", "1"]).default("0"),
   }).safeParse(c.req.query());
   if (!q.success) return c.json({ error: "invalid_request" }, 400);
   return c.json(await storeFor(c.env, c.get("userId")).pull(
@@ -154,6 +156,7 @@ api.get("/sync/pull", async (c) => {
     q.data.limit,
     q.data.settings === "1",
     q.data.checklists === "1",
+    q.data.tags === "1",
   ));
 });
 
@@ -166,7 +169,7 @@ api.get("/sync/ws", async (c) => {
 
 api.get("/changes", async (c) => {
   const q = z.object({
-    entity: z.enum(["task", "area", "project", "attachment", "convo", "setting", "turn"]).optional(),
+    entity: z.enum(["task", "area", "project", "attachment", "checklistItem", "tag", "convo", "setting", "turn"]).optional(),
     id: zId.optional(),
     before: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(500).default(100),
