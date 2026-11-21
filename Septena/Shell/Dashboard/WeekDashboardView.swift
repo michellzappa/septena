@@ -281,11 +281,12 @@ struct WeekDashboardView: View {
     #endif
   }
 
-  /// True where the iPad floating chrome bar reserves the top inset (iOS
-  /// regular), so the page's own `pageTop` would double it.
+  /// True where the iPad floating chrome bar reserves the top inset (dual-
+  /// regular iOS — iPad full-screen, unfolded iPhone Duo), so the page's own
+  /// `pageTop` would double it. Matches `RootTabView.usesRegularChrome`.
   private var chromeBarReservesTop: Bool {
     #if os(iOS)
-    hSize == .regular
+    usesPushNavigation
     #else
     false
     #endif

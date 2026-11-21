@@ -244,9 +244,6 @@ struct TaskListView: View {
   /// multi-select and manual reorder are gone — kept only so the few remaining
   /// `editMode`-clearing safety calls compile.
   @Environment(\.editMode) private var editMode
-  /// Compact (iPhone) vs regular (iPad) — picks the touch tap-to-edit model
-  /// vs the pointer+keyboard selection model in `usesSelectionModel`.
-  @Environment(\.horizontalSizeClass) private var hSize
   #endif
 
   // The full task editor — Things-style EXPAND-IN-PLACE. Opening a row
@@ -657,7 +654,7 @@ struct TaskListView: View {
   #endif
 
   private var showsEmbeddedNewTaskToolbar: Bool {
-    #if os(iOS)
+    #if os(iOS) && !SEPTASK
     embedded && filter != .recentlyDeleted && filter != .faded && !usesPushNavigation
     #else
     embedded && filter != .recentlyDeleted && filter != .faded
@@ -1333,12 +1330,13 @@ struct TaskListView: View {
   }
 
   /// Whether the list runs the pointer+keyboard selection model (Mac always;
-  /// iPad regular width) or the touch tap-to-edit model (iPhone compact).
+  /// dual-regular iPad / unfolded iPhone Duo) or the touch tap-to-edit model
+  /// (compact iPhone and compact-height landscape phone).
   private var usesSelectionModel: Bool {
     #if os(macOS)
     return true
     #else
-    return hSize == .regular
+    return usesPushNavigation
     #endif
   }
 
