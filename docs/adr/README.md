@@ -19,6 +19,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
 | [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | proposed |
+| [0014](0014-today-rollover-review-or-clean-slate.md) | Today rolls over by review or by clean slate; it never carries over silently | accepted |
 
 ## Template
 
