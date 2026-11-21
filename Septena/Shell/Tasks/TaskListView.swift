@@ -1177,10 +1177,25 @@ struct TaskListView: View {
     filter == .today && todayGroupByList && allowsInlineCreate
   }
 
-  /// Inbox foot quick-add: always visible on Today; only hosts the editor when
-  /// the capture draft targets Inbox (not a section opened from a header "+").
+  /// Compact iPhone Septena uses the floating Magic Plus orb instead of an idle
+  /// "New task" trigger row in Inbox — the capture slot mounts only while an
+  /// inline draft is actively open.
+  private var usesMagicPlusInsteadOfInboxTrigger: Bool {
+    #if os(iOS) && SEPTASK
+    !usesPushNavigation
+    #else
+    false
+    #endif
+  }
+
+  /// Inbox foot quick-add: always visible on Today (Mac/iPad); on iPhone
+  /// Septena, only mounts while an Inbox inline draft is actively open.
   private var showsQuickAddInInbox: Bool {
-    filter == .today && allowsInlineCreate
+    guard filter == .today && allowsInlineCreate else { return false }
+    if usesMagicPlusInsteadOfInboxTrigger {
+      return quickAddInInboxShowsEditor
+    }
+    return true
   }
 
   private var quickAddInInboxShowsEditor: Bool {
@@ -1380,13 +1395,19 @@ struct TaskListView: View {
   /// Inline quick-add under the title when a creatable list is empty. Today
   /// hosts capture in the Inbox section instead (see `triageSection`).
   private var showsQuickAddAtTop: Bool {
-    filter != .today && allowsInlineCreate && (showsEmptyTaskList || quickAddDraftAtTop)
+    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
+      return quickAddDraftAtTop && quickAddDraftId != nil
+    }
+    return filter != .today && allowsInlineCreate && (showsEmptyTaskList || quickAddDraftAtTop)
   }
 
   /// Things-style foot quick-add once the list has content. Today captures
   /// through the Inbox card, not at the foot of the full day list.
   private var showsQuickAddAtFoot: Bool {
-    filter != .today && allowsInlineCreate && !showsEmptyTaskList && !quickAddDraftAtTop
+    if usesMagicPlusInsteadOfInboxTrigger && filter == .triage {
+      return !quickAddDraftAtTop && quickAddDraftId != nil
+    }
+    return filter != .today && allowsInlineCreate && !showsEmptyTaskList && !quickAddDraftAtTop
   }
 
   /// Project / area / triage pages render one open-task card — the foot
@@ -1426,7 +1447,7 @@ struct TaskListView: View {
     // always lives at the foot of this card (capture drops into the band).
     if filter == .today {
       let allInbox = renderedTodayInboxRows
-      if allowsInlineCreate || !allInbox.isEmpty || quickAddDraftId != nil {
+      if showsQuickAddInInbox || !allInbox.isEmpty {
         Section {
           if !inboxCollapsed {
             cardedRows(allInbox,
@@ -2386,7 +2407,10 @@ struct TaskListView: View {
   /// sentinel id joins `keyboardOrderedTaskIds` at the trigger's render position
   /// so ↑/↓ can land on it and Return activates it (see `activateRow`).
   private var showsQuickAddTriggerRow: Bool {
-    allowsInlineCreate && quickAddDraftId == nil
+    if usesMagicPlusInsteadOfInboxTrigger && (filter == .today || filter == .triage) {
+      return false
+    }
+    return allowsInlineCreate && quickAddDraftId == nil
   }
 
   /// The sentinel id for the quick-add trigger, or empty when it isn't shown.
