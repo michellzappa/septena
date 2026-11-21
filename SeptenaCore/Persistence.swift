@@ -1726,11 +1726,15 @@ extension LocalCache {
 // MARK: - TagEntity & Tag helpers (docs/TAGS_SPEC.md)
 
 extension TaskEntity {
+  /// One decoder for every row: the row-object build reads `tagIDs` for each
+  /// task on every list repaint, and a new `JSONDecoder` per read is not free.
+  private static let tagIDsDecoder = JSONDecoder()
+
   /// Typed view over `tagIDsJSON` (deduplicated, capped at `RegistryEntityLimits.maxTagsPerTask`).
   var tagIDs: [String] {
     get {
       guard let raw = tagIDsJSON, let data = raw.data(using: .utf8),
-            let decoded = try? JSONDecoder().decode([String].self, from: data)
+            let decoded = try? Self.tagIDsDecoder.decode([String].self, from: data)
       else { return [] }
       return decoded
     }
