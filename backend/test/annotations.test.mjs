@@ -77,16 +77,19 @@ const taskToolsFile = parseFile("src/tools/taskTools.ts");
 const agentFile = parseFile("src/shadow/agent.ts");
 const shadowMcpFile = parseFile("src/shadow/mcp.ts");
 const shadowWritesFile = parseFile("src/shadow/writes.ts");
+const notesFile = parseFile("src/shadow/notes.ts");
 
 const taskTools = extractToolArray(findConstInitializer(taskToolsFile, "TASK_TOOLS"));
 const agentTools = extractToolArray(findConstInitializer(agentFile, "AGENT_TOOLS"));
-const allTools = [...taskTools, ...agentTools];
+const notesTools = extractToolArray(findConstInitializer(notesFile, "NOTES_TOOLS"));
+const allTools = [...taskTools, ...agentTools, ...notesTools];
 const byName = new Map(allTools.map((t) => [t.name, t]));
 
 test("every api.septena.app tool has unique name, title, and explicit MCP ToolAnnotations", () => {
   assert.equal(byName.size, allTools.length, "duplicate tool names detected");
-  assert.equal(taskTools.length, 17, `expected 17 task tools, got ${taskTools.length}`);
+  assert.equal(taskTools.length, 21, `expected 21 task tools, got ${taskTools.length}`);
   assert.equal(agentTools.length, 5, "expected 5 agent tools");
+  assert.equal(notesTools.length, 7, "expected 7 project notes tools (docs/PROJECT_NOTES_SPEC.md §5)");
 
   for (const tool of allTools) {
     assert.equal(typeof tool.name, "string", "tool.name must be string");
@@ -112,7 +115,8 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
   const shadowReads = objectKeys(shadowMcpFile, "zArgs");
   const shadowWrites = objectKeys(shadowWritesFile, "zWriteArgs");
   const shadowAgent = objectKeys(agentFile, "zAgentArgs");
-  const apiConnectorNames = new Set([...shadowReads, ...shadowWrites, ...shadowAgent]);
+  const shadowNotes = objectKeys(notesFile, "zNotesArgs");
+  const apiConnectorNames = new Set([...shadowReads, ...shadowWrites, ...shadowAgent, ...shadowNotes]);
 
   const expectedReadOnly = new Set([
     "tasks_list",
@@ -120,12 +124,15 @@ test("api.septena.app connector tools match issue #85 read-only and destructive 
     "tasks_thread_get",
     "tasks_list_areas",
     "tasks_list_projects",
+    "tasks_list_tags",
     "tasks_pending_reasoning",
+    "tasks_project_get",
+    "tasks_notes_history",
     "tasks_agent_events",
     "tasks_activity",
     "tasks_history",
   ]);
-  const expectedDestructive = new Set(["tasks_complete", "tasks_update"]);
+  const expectedDestructive = new Set(["tasks_complete", "tasks_update", "tasks_checklist_delete"]);
 
   assert.equal(apiConnectorNames.size, allTools.length, "tool definitions and handlers must match 1:1");
 
