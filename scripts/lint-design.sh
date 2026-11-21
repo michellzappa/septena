@@ -96,6 +96,15 @@ scan appkit-inferring-moves error \
   'inferringMoves\(\)' \
   'NSTableView batches apply incrementally — an inferred move offset is stale by the time it runs. Use a plain difference (remove+insert).'
 
+# ── Whole-store task reads (docs/LAUNCH_PERF.md "Interaction performance") ──
+# `allTasks` / `liveTasks` build a row object for EVERY live task, logbook
+# included, and each one decodes its conversation and recurrence JSON. Calling
+# one only to pick tasks by id put the whole table on the tap path (undo
+# snapshots, the attribute bar, a Mac move). Fetch the ids instead.
+scan whole-store-id-lookup error \
+  '(allTasks|liveTasks)\(in: [^)]*\)[[:space:]]*\.(first\(where: \{ *\$0\.id ==|filter \{ *(\$0\.id ==|[A-Za-z_.]+\.contains\(\$0\.id\)))' \
+  'Building every task to pick some by id scans the whole store. Use LocalCache.liveTasks(ids:in:).'
+
 # ── AppKit transient surfaces (docs/SEPTASK_APPKIT_SURFACES.md) ─────────────
 # Every popover, floating panel and filter list in the Septask AppKit shell is
 # built in Septask/SeptaskKitSurface.swift, so material, corner radius, field
