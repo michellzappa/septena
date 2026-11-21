@@ -22,14 +22,15 @@ Give Septena tactile, unmistakable warmth and personal ownership—the part peop
 
 ## 2. Accent System: `Colorful` Default + Global Exotic Fruits
 
-### 2.1 Default: `colorful` (macOS Multicolor idiom)
+### 2.1 Default: `colorful` (macOS Multicolor idiom, Septena sidebar discipline)
 - Primary interactive accent (row selection wash, done checkbox fill, active tab/chip tint, unread dot, composer Save CTA) leans **blue** (`#007AFF` light / `#0A84FF` dark), matching Apple's Multicolor default.
-- Smart list icons and semantic indicators retain their distinct hues:
-  - Inbox: Blue (`#007AFF` / `#0A84FF`)
-  - Today: Sunlit Gold (`#F5C721`)
-  - Upcoming / Overdue: Coral Red (`systemRed`)
-  - Anytime: Lagoon Teal (`#0D7E8A` / `#2DD4DF`)
-  - Next: Violet (`#7C3AED`)
+- Preserves Septena's established **color-only-on-Today** sidebar grammar (`SidebarView.swift`, `SeptaskKitSidebar.swift`, `registry/destinations.json`):
+  - **Today:** Sunlit Gold (`#F5C721`) — the only colored smart-list glyph (the bucket you act on). There is no separate Inbox row in the sidebar (loose captures live in the Inbox triage band at the top of Today).
+  - **Review / Upcoming / Repeating / Anytime / Logbook:** Quiet neutral secondary gray — neutral filing locations never turn into a rainbow.
+  - **Overdue deadlines:** System Red (`overdueRed`).
+  - **Areas:** User-chosen emoji (or muted dot when unset), semibold weight, no section text header.
+  - **Projects:** Completion pie/ring progress indicator (`ProjectProgressIcon` / `KitGlyph.progress`), regular weight, flush on the same leading glyph axis as Areas.
+  - **No brand logo/check row** in the sidebar header.
 - Swatch UI renders as a crisp multicolor conic ring (same mental model as macOS System Settings ▸ Appearance ▸ Multicolor).
 
 ### 2.2 Global Exotic-Fruit Overrides (11 curated colors)
@@ -53,8 +54,8 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 > Note on contrast: bright Dark-mode accents (`yuzu`, `carambola`, `feijoa`, `jagua`, `jabuticaba`) switch the check glyph inside a filled checkbox to `#141518` so the checkmark always clears WCAG AA against its fill.
 
 ### 2.3 Accent Reach
-- **`restrained`** *(default)*: Accent applies to selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional texture tint. Semantic indicators (Today gold star, overdue red) remain untouched.
-- **`expressive`** *(optional future toggle — deferred out of v1 by default)*: Also tints sidebar active icons, screen title, and adds a subtle 4–8% canvas/sidebar warmth tint.
+- **`restrained`** *(default)*: Accent applies to selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional texture tint. Today's gold sun, overdue red, and quiet gray filing-list icons remain untouched.
+- **`expressive`** *(optional future toggle — deferred out of v1 by default)*: Also tints Today's glyph, project progress rings, screen title, and adds a subtle 4–6% canvas/sidebar warmth tint. Filing-list icons (*Upcoming, Repeating, Anytime, Logbook*) still remain quiet gray.
 
 ### 2.4 Relationship to macOS System Accent
 - `registry/tokens.json` evolves `accentPolicy` from fixed `"platformSystemAccent"` to `"userAccentWithColorfulDefault"`.
@@ -135,13 +136,19 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 
 ---
 
-## 5. Canonical Website `task-ui` Parity
+## 5. Canonical Website `task-ui` Parity & Alignment
 
-`septena-site/components/task-ui/` (`tokens.css`, `task-ui.css`, `task-screen.tsx`) is the canonical HTML/CSS representation of Septena across `mac`, `web`, and `phone` layouts.
+`septena-site/components/task-ui/` (`tokens.css`, `task-ui.css`, `task-screen.tsx`) is the canonical HTML/CSS representation of Septena across `mac`, `web`, and `phone` layouts. A side-by-side audit against the native Apple shells (`SeptaskKitSidebar.swift`, `SidebarView.swift`, `registry/destinations.json`) identified five sidebar drifts in the current website component that should be aligned alongside the token work:
+
+1. **No `(check) Septena` sidebar brand row** on macOS/iPad — sidebar starts straight into smart lists.
+2. **No separate `Inbox` smart list** — Inbox lives as the triage band at the top of Today; sidebar lists follow `registry/destinations.json` (`Today`, `Review`, `Upcoming`, `Repeating`, `Anytime`, `Logbook`).
+3. **Color only on Today** — Today's sun carries `#F5C721`; all other smart-list glyphs stay quiet secondary gray.
+4. **Emoji on Areas (no `"Area"` text header)** — Areas render as clickable semibold rows with their leading emoji (or muted dot), trailing fold chevron, and count.
+5. **Progress rings on Projects** — Projects render with `ProjectProgressIcon`-style completion pie rings on the same flush left glyph axis (regular weight, no indentation step).
 
 - Extend `registry/tokens.json` with `fruitAccents` (light/dark hex + check ink + origin metadata) and `textures` (catalog IDs + defaults).
 - Update `septena-site/scripts/task-tokens.mjs` (in the site repo) to consume `registry/tokens.json` so `--task-color-accent`, `--task-color-accentWash`, and optional `[data-accent="<fruit>"]` / texture canvas layers stay 1:1 with the native apps.
-- Marketing pages (e.g., `/features` customization preview, App Store panels) can then render live interactive exotic-fruit + generative-texture demos directly on top of the canonical `TaskScreen` component.
+- Marketing pages (e.g., `/features` customization preview, App Store panels) can then render live interactive exotic-fruit + generative-texture demos directly on top of the aligned `TaskScreen` component.
 
 ---
 
