@@ -39,7 +39,7 @@ They replace the old ids at cutover (step 5).
 | `septena-mcp-gateway` | KV `STATE` | `4066d642849946a5bcdb5523b52a35d5` |
 | `septena-mcp-gateway` | KV `TOKENS` | `1b8f0af54763424190a01dcb85109852` |
 | `septena-mcp-gateway` | KV `CLIENTS` | `c6550511896e493aa5abd8685e9dd6a1` |
-| `septena-mcp-gateway` | R2 `septena-attachments` | not created: R2 must be enabled on the account first |
+| `septena-mcp-gateway` | R2 `septena-attachments` | same name, created on the new account |
 | `septena-community` | KV `ATTEST` | `1d3f2d0925804c01bb23b2d56e71e4d3` |
 | `septena-community` | KV `CHALLENGES` | `14504cb083914ff58cb7224649addb09` |
 | `septena-community` | KV `RL` | `4b24aa6a1dbf4b568a69b204286a1248` |
