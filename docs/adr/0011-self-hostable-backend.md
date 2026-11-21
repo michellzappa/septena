@@ -1,6 +1,6 @@
 # 0011. Keep the backend self-hostable on the user's own Cloudflare account
 
-- Status: proposed
+- Status: accepted (2026-11-21)
 - Date: 2026-11-21
 - Deciders: mz
 
