@@ -2,18 +2,16 @@ import SwiftUI
 
 /// Septask's top-level tabs (iPhone). Tasks hosts the full sidebar module —
 /// same label and checkmark as Septena's Tasks tab, so the ✓ means "the task
-/// module" in both apps; Today and Upcoming are first-class destinations; the
-/// trailing `newTask` slot uses `role: .search` so iOS 26 renders the native
-/// detached circular `+` button in the exact tab-bar baseline (both expanded
-/// and minimized on scroll). A transparent drag overlay directly on top of that
-/// circle adds native `.draggable(TaskDragIDs.newTask)` so you can press-and-
-/// drag `+` onto any row gap, heading, group, Upcoming day, or Tasks destination,
-/// while tap opens `SeptaskQuickAdd`. Search lives in the trailing nav bar.
+/// module" in both apps; Today and Upcoming are first-class destinations.
+/// Quick capture lives in the separate floating Magic Plus orb (`magicPlusOrb`)
+/// bottom-trailing above the tab bar — tap starts an inline task in place, and
+/// hold-and-drag drops a new inline task onto any row gap, heading, group,
+/// Upcoming day, or Tasks destination. Search lives in the trailing nav bar.
 ///
 /// Septask has no Next page (removed 2026-11-19: it showed life-OS content,
 /// not tasks; Today covers "what's next" for tasks).
 enum SeptaskTab: Hashable {
-  case tasks, today, upcoming, newTask
+  case tasks, today, upcoming
 }
 
 /// Septask's root, mirroring `RootTabView`'s shell shape: the standard
@@ -174,8 +172,6 @@ struct SeptaskRootView: View {
         nav.path = [.filter(.upcoming)]
       case .tasks:
         if nav.path.isEmpty { nav.path = [.filter(.today)] }
-      case .newTask:
-        if nav.path.isEmpty { nav.path = [.filter(.today)] }
       }
     } else {
       switch nav.path.last {
@@ -196,9 +192,6 @@ struct SeptaskRootView: View {
 
   #if os(iOS)
   /// User tab-bar selection bridge:
-  /// - Tapping the detached `+` (`newTask`) presents `SeptaskQuickAdd` without
-  ///   switching away from the active list (fallback if a tap hits the native
-  ///   tab directly, e.g. via VoiceOver or at the very outer edge).
   /// - Tapping `Tasks` (whether switching from Today/Upcoming or re-tapping
   ///   Tasks) always clears `nav.path` so the Tasks tab lands at its top-level
   ///   index rather than staying trapped inside a previously pushed folder.
@@ -212,8 +205,6 @@ struct SeptaskRootView: View {
       get: { selection },
       set: { tapped in
         switch tapped {
-        case .newTask:
-          triggerInlineNewTask()
         case .tasks:
           if !nav.path.isEmpty {
             nav.path = []
@@ -255,12 +246,10 @@ struct SeptaskRootView: View {
     nav.requestNewTask()
   }
 
-  /// Standard iOS 26 `TabView` with a detached `role: .search` slot (requires
-  /// `.searchable` on a `NavigationStack` so iOS 26 actually separates the
-  /// fourth slot and narrows the 3-tab pill to its left). Our own tactile
-  /// Magic Plus orb sits directly over that detached bottom-right slot so it is
-  /// visibly separate from the tab pill in both expanded and minimized states,
-  /// signals draggability, and supports native `.draggable(TaskDragIDs.newTask)`.
+  /// Standard iOS 26 3-tab `TabView` (`Tasks`, `Today`, `Upcoming`) paired with
+  /// the separate floating Magic Plus orb anchored just above the bottom-right
+  /// edge of the tab bar so it never overlaps `Upcoming` when expanded and
+  /// stays behind the keyboard when typing inline.
   private var systemTabView: some View {
     ZStack(alignment: .bottomTrailing) {
       TabView(selection: tabSelection) {
@@ -275,13 +264,6 @@ struct SeptaskRootView: View {
         Tab("Upcoming", systemImage: "calendar", value: SeptaskTab.upcoming) {
           NavigationStack { TaskListView(filter: .upcoming) }.tint(theme.accent)
         }
-        // `.searchable` on a `NavigationStack` is what makes iOS 26 detach this
-        // slot from the 3-tab pill; taps and drags are handled by `magicPlusOrb`.
-        Tab("New Task", systemImage: "plus",
-            value: SeptaskTab.newTask, role: .search) {
-          NavigationStack { Color.clear }
-            .searchable(text: .constant(""))
-        }
       }
       .tabBarMinimizeBehavior(.onScrollDown)
 
@@ -292,7 +274,7 @@ struct SeptaskRootView: View {
         magicPlusOrb
       }
       .padding(.trailing, 20)
-      .padding(.bottom, 21)
+      .padding(.bottom, 92)
       .ignoresSafeArea(.all, edges: .bottom)
     }
   }
@@ -354,7 +336,8 @@ struct SeptaskRootView: View {
     }
     .buttonStyle(.plain)
     .contentShape(.dragPreview, Circle())
-    .accessibilityHidden(true)
+    .accessibilityLabel("New Task")
+    .accessibilityHint("Tap to add a task inline, or hold and drag onto a list position.")
     .draggable(TaskDragIDs.newTask) {
       ZStack {
         Circle()
