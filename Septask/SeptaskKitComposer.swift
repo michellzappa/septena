@@ -231,25 +231,9 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    // Nine pills do not fit a narrow window. Without this the row's
-    // `≤ column` width squeezed every pill below its label, and the
-    // ambiguous layout left some of them as "…" slivers. A pill now never
-    // compresses; NSStackView DETACHES the lowest-visibility pills instead,
-    // and re-attaches them when the window grows. Every detached action
-    // keeps its keyboard command.
-    let visibility: [(KitPillButton, Float)] = [
-      (todayPill, 1000), (whenPill, 1000), (deadlinePill, 1000),
-      (listPill, 900), (reminderPill, 800), (repeatPill, 700),
-      (notesPill, 600), (starPill, 500), (discussPill, 400),
-    ]
     for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
                  notesPill, discussPill] {
-      pill.setContentCompressionResistancePriority(.required, for: .horizontal)
-      pill.setContentHuggingPriority(.required, for: .horizontal)
       pillRow.addArrangedSubview(pill)
-    }
-    for (pill, priority) in visibility {
-      pillRow.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: priority), for: pill)
     }
 
     column.orientation = .vertical
