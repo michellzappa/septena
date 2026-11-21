@@ -78,6 +78,9 @@ Set up 2026-11-19 so planned work keeps moving without mz.
 - Earlier questions: check your `ask_decision`s in Starlings HQ. An answered
   one: write the decision into the issue body, then label it
   `ready-for-agent`.
+- Septena tasks (`septena-tasks` MCP, when available): read `tasks_pending_reasoning`
+  plus open tasks in `area == "septena"` (`tasks_list` on `today`, `inbox`, `anytime`).
+  Inspect `tasks_thread_get` on any task with a thread, artifact, or no triage yet.
 
 ## 2. Housekeeping (every run, before building)
 
@@ -97,6 +100,22 @@ Set up 2026-11-19 so planned work keeps moving without mz.
 4. **Doc freshness.** A spec whose phases all closed → set its status to
    `shipped — historical` and update `docs/README.md`. A doc that the code
    now contradicts → open an issue, do not silently rewrite it.
+5. **Septena task intake (`area == "septena"`).** When `septena-tasks` MCP is
+   connected, process up to 5 open Septena-area tasks per run:
+   - **Answered threads:** if mz replied (`role == "user"`) to an earlier
+     provider question and no issue is linked yet, open the GitHub build ticket
+     incorporating mz's choice, attach it via `tasks_set_artifact`
+     (`kind: "github-issue"`, `refs: [url]`), and set `endState = "decomposed"`
+     with `endStateNote: "Tracked in <url>"`.
+   - **Untriaged tasks** (no `artifact`, no terminal `endState`, no open
+     question): check existing issues and current code first. If already
+     shipped on `main`, set `endState = "needs_verify"` with what to check; if
+     already tracked, attach the existing issue URL as `artifact`; if clear,
+     open a build ticket in the right milestone and attach it; if a product call
+     is needed, append one short question turn (`tasks_thread_append` with 2–4
+     short options).
+   - **Never close the task (`tasks_complete`).** Leave it open so mz sees the
+     `#N` chip in the app and closes it themselves.
 
 ## 3. Pick the work
 
