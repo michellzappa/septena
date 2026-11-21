@@ -383,27 +383,55 @@ private struct MagicPlusOrb: View {
   let onNewArea: () -> Void
 
   var body: some View {
+    // Keep both the resting "+" orb and the cancel socket inside one stable
+    // ZStack (toggling opacity/scale, never swapping container identity) so
+    // SwiftUI's active DragGesture never drops mid-drag.
     ZStack {
-      Circle()
-        .fill(Color.accentColor.gradient)
-        .overlay(
-          Circle()
-            .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
-        )
-        .shadow(color: .black.opacity(drag.isDragging ? 0.08 : 0.28), radius: 10, y: 4)
-      VStack(spacing: 4) {
-        Image(systemName: "plus")
-          .scaledFont(size: 21, weight: .bold)
-          .foregroundStyle(Color.white)
-        gripDots
+      // Resting "+" orb — hidden completely while dragging.
+      ZStack {
+        Circle()
+          .fill(Color.accentColor.gradient)
+          .overlay(
+            Circle()
+              .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+          )
+          .shadow(color: .black.opacity(0.28), radius: 10, y: 4)
+        VStack(spacing: 4) {
+          Image(systemName: "plus")
+            .scaledFont(size: 21, weight: .bold)
+            .foregroundStyle(Color.white)
+          gripDots
+        }
+        .offset(y: 2)
       }
-      .offset(y: 2)
+      .opacity(drag.isDragging ? 0 : 1)
+      .scaleEffect(drag.isDragging ? 0.75 : 1)
+
+      // Cancel drop socket — appears in the bottom-right spot during drag so
+      // dragging back here unmistakably cancels the action.
+      ZStack {
+        Circle()
+          .fill(drag.isOverCancelSocket ? Color.red.opacity(0.24) : Color.secondary.opacity(0.14))
+          .overlay(
+            Circle()
+              .strokeBorder(
+                drag.isOverCancelSocket ? Color.red.opacity(0.85) : Color.secondary.opacity(0.45),
+                style: StrokeStyle(lineWidth: drag.isOverCancelSocket ? 2 : 1.5,
+                                   dash: drag.isOverCancelSocket ? [] : [5, 4])
+              )
+          )
+        Image(systemName: "xmark")
+          .scaledFont(size: 18, weight: .semibold)
+          .foregroundStyle(drag.isOverCancelSocket ? Color.red : Color.secondary)
+      }
+      .glassCircle(tint: drag.isOverCancelSocket ? .red : nil)
+      .opacity(drag.isDragging ? 1 : 0)
+      .scaleEffect(drag.isDragging ? (drag.isOverCancelSocket ? 1.08 : 0.94) : 0.75)
     }
     .frame(width: 58, height: 58)
     .contentShape(Circle())
-    .opacity(drag.isDragging ? 0.22 : 1)
-    .scaleEffect(drag.isDragging ? 0.86 : 1)
     .a11yAnimation(.snappy(duration: 0.2), value: drag.isDragging)
+    .a11yAnimation(.snappy(duration: 0.18), value: drag.isOverCancelSocket)
     .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { rect in
       drag.homeCenter = CGPoint(x: rect.midX, y: rect.midY)
     }

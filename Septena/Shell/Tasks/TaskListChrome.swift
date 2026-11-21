@@ -321,6 +321,9 @@ final class MagicPlusDragState {
   }
 
   var isDragging = false
+  /// True while the finger is dragged back over the bottom-right home socket
+  /// (releasing here cancels the drag cleanly).
+  var isOverCancelSocket = false
   /// Visual drag position in `.global` coordinates.
   var fingerLocation: CGPoint = .zero
   /// Center of the resting Magic Plus orb in `.global` coordinates (cancel zone).
@@ -351,6 +354,7 @@ final class MagicPlusDragState {
 
   func beginDrag(at location: CGPoint) {
     isDragging = true
+    isOverCancelSocket = false
     fingerLocation = location
     activeTarget = nil
     Haptics.tap()
@@ -365,10 +369,11 @@ final class MagicPlusDragState {
   func endDrag(at location: CGPoint) {
     fingerLocation = location
     resolveTarget(for: location)
-    let hit = activeTarget
+    let hit = isOverCancelSocket ? nil : activeTarget
     let action = hit.flatMap { zones[$0.id]?.onDrop }
     a11yAnimate(.snappy(duration: 0.22)) {
       isDragging = false
+      isOverCancelSocket = false
       activeTarget = nil
     }
     if let hit, let action {
@@ -379,6 +384,7 @@ final class MagicPlusDragState {
   /// Clear stale zones when switching tabs / navigation routes.
   func reset() {
     isDragging = false
+    isOverCancelSocket = false
     activeTarget = nil
     zones.removeAll()
   }
@@ -387,11 +393,23 @@ final class MagicPlusDragState {
     // Dragging back onto the resting orb socket cancels cleanly.
     let dx = location.x - homeCenter.x
     let dy = location.y - homeCenter.y
-    if homeCenter != .zero && hypot(dx, dy) < 40 {
-      if activeTarget != nil {
-        a11yAnimate(.snappy(duration: 0.18)) { activeTarget = nil }
+    let inCancelZone = homeCenter != .zero && hypot(dx, dy) < 48
+    if inCancelZone {
+      if !isOverCancelSocket {
+        Haptics.tap()
+      }
+      if !isOverCancelSocket || activeTarget != nil {
+        a11yAnimate(.snappy(duration: 0.18)) {
+          isOverCancelSocket = true
+          activeTarget = nil
+        }
       }
       return
+    }
+    if isOverCancelSocket {
+      a11yAnimate(.snappy(duration: 0.18)) {
+        isOverCancelSocket = false
+      }
     }
 
     // Aim slightly above the fingertip where the floating ghost card sits.
@@ -601,6 +619,7 @@ struct MagicPlusFloatingOverlay: View {
         morphedContent
           .position(x: clampedX, y: clampedY)
           .a11yAnimation(.snappy(duration: 0.2), value: drag.activeTarget?.kind)
+          .a11yAnimation(.snappy(duration: 0.2), value: drag.isOverCancelSocket)
           .transition(.scale(scale: 0.8).combined(with: .opacity))
       }
     }
@@ -609,6 +628,7 @@ struct MagicPlusFloatingOverlay: View {
   }
 
   private var estimatedWidth: CGFloat {
+    if drag.isOverCancelSocket { return 116 }
     switch drag.activeTarget?.kind {
     case .taskRow:     return 280
     case .taskSection: return 220
@@ -620,60 +640,79 @@ struct MagicPlusFloatingOverlay: View {
 
   @ViewBuilder
   private var morphedContent: some View {
-    switch drag.activeTarget?.kind {
-    case .taskRow(let context):
-      // Morph into a crisp live ghost task row ready to land in the parted gap.
-      HStack(spacing: 12) {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-          .strokeBorder(Color.accentColor, lineWidth: 2)
-          .frame(width: 20, height: 20)
-        Text("New Task")
-          .font(.septenaTaskTitle)
-          .foregroundStyle(.primary)
-        Spacer(minLength: 8)
-        if let context, !context.isEmpty {
-          Text(context)
-            .font(.septenaCaption)
-            .foregroundStyle(Color.accentColor)
-            .lineLimit(1)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Color.accentColor.opacity(0.14), in: Capsule())
-        }
-      }
-      .padding(.horizontal, 14)
-      .frame(width: 280, height: 46)
-      .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-      .overlay(
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-          .strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5)
-      )
-      .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
-
-    case .taskSection(let label):
-      morphPill(icon: "checkmark.circle.fill", title: label)
-
-    case .newProject(let label):
-      morphPill(icon: "number.circle.fill", title: label)
-
-    case .newArea:
-      morphPill(icon: "square.stack.3d.up.fill", title: "New Area")
-
-    case nil:
-      // Free-floating lifted blue "+" orb.
-      ZStack {
-        Circle()
-          .fill(Color.accentColor.gradient)
-          .overlay(
-            Circle()
-              .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
-          )
-          .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
-        Image(systemName: "plus")
-          .scaledFont(size: 24, weight: .bold)
+    if drag.isOverCancelSocket {
+      HStack(spacing: 6) {
+        Image(systemName: "xmark")
+          .scaledFont(size: 13, weight: .bold)
+          .foregroundStyle(Color.white)
+        Text("Cancel")
+          .font(.septenaButton)
           .foregroundStyle(Color.white)
       }
-      .frame(width: 62, height: 62)
+      .padding(.horizontal, 14)
+      .frame(height: 40)
+      .background(Color.red.opacity(0.9), in: Capsule())
+      .overlay(
+        Capsule()
+          .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+      )
+      .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+    } else {
+      switch drag.activeTarget?.kind {
+      case .taskRow(let context):
+        // Morph into a crisp live ghost task row ready to land in the parted gap.
+        HStack(spacing: 12) {
+          RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .strokeBorder(Color.accentColor, lineWidth: 2)
+            .frame(width: 20, height: 20)
+          Text("New Task")
+            .font(.septenaTaskTitle)
+            .foregroundStyle(.primary)
+          Spacer(minLength: 8)
+          if let context, !context.isEmpty {
+            Text(context)
+              .font(.septenaCaption)
+              .foregroundStyle(Color.accentColor)
+              .lineLimit(1)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .background(Color.accentColor.opacity(0.14), in: Capsule())
+          }
+        }
+        .padding(.horizontal, 14)
+        .frame(width: 280, height: 46)
+        .background(Theme.cardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+          RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1.5)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
+
+      case .taskSection(let label):
+        morphPill(icon: "checkmark.circle.fill", title: label)
+
+      case .newProject(let label):
+        morphPill(icon: "number.circle.fill", title: label)
+
+      case .newArea:
+        morphPill(icon: "square.stack.3d.up.fill", title: "New Area")
+
+      case nil:
+        // Free-floating lifted blue "+" orb.
+        ZStack {
+          Circle()
+            .fill(Color.accentColor.gradient)
+            .overlay(
+              Circle()
+                .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
+          Image(systemName: "plus")
+            .scaledFont(size: 24, weight: .bold)
+            .foregroundStyle(Color.white)
+        }
+        .frame(width: 62, height: 62)
+      }
     }
   }
 
