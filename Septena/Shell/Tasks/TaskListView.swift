@@ -2555,7 +2555,7 @@ struct TaskListView: View {
     // `TaskUndo.undo()` would take back that newer action instead, so the
     // ticket restores the row directly.
     let ticket = TaskUndoTicket()
-    showToast(title.isEmpty ? "Task deleted" : "\"\(title)\" deleted") {
+    showToast(SeptenaToastCopy.deleted(title: title)) {
       ticket.undo { mutator.restore(id: id) }
       Task { await load() }
     }
@@ -3189,7 +3189,7 @@ struct TaskListView: View {
     let ticket = TaskUndoTicket()
     Task { await load() }
 
-    showToast("Moved to \(suggestion.title)") {
+    showToast(SeptenaToastCopy.moved(to: suggestion.title)) {
       ticket.undo { TaskUndo.restore(undoBefore, using: mutator) }
       Task { await load() }
     }
@@ -3752,7 +3752,7 @@ struct TaskListView: View {
         mutator.reschedule(id: id, date: d, mode: mode)
         // Deferring drops the row off Today; confirm where it landed. No
         // Undo — re-opening the When picker is the natural reversal.
-        showToast("Deferred to \(SeptenaDate.scheduleHeaderLabel(for: d))")
+        showToast(SeptenaToastCopy.deferred(to: d))
       }
     } else {
       mutator.reschedule(id: id, date: nil, mode: .makeException)
