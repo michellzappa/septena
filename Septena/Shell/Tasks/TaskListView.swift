@@ -417,6 +417,7 @@ struct TaskListView: View {
   @State private var showingRepeatSheet = false
   @State private var repeatTargetId: String?
   @State private var reminderTargetId: String?
+  @State private var starredOnlyFilter = false
 
   /// Pending Things-style choice when a fixed-schedule repeating task is
   /// moved. The date picker dismisses before this appears, so the decision is
@@ -1609,11 +1610,43 @@ struct TaskListView: View {
   /// stack at launch on iPhone (EXC_BAD_ACCESS in swift_getTypeByMangledName,
   /// 2026-11-19). `AnyView` at this one seam caps the depth; the rows inside
   /// keep their concrete types.
+  private var showsStarFilterPill: Bool {
+    switch filter {
+    case .starred, .logbook, .recentlyDeleted, .faded:
+      return false
+    default:
+      return items.contains(where: \.starred)
+    }
+  }
+
+  @ViewBuilder
+  private var starFilterBar: some View {
+    if showsStarFilterPill {
+      HStack {
+        SelectableChip(isSelected: starredOnlyFilter, tint: Theme.todayAccent) {
+          Haptics.tick()
+          a11yAnimate(.snappy(duration: 0.18)) { starredOnlyFilter.toggle() }
+        } label: {
+          HStack(spacing: 4) {
+            Image(systemName: "star.fill")
+              .scaledFont(size: 11)
+            Text("Starred")
+          }
+        }
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, TaskCardMetrics.margin)
+      .padding(.top, 4)
+      .padding(.bottom, 6)
+    }
+  }
+
   private var taskListRows: AnyView {
     switch filter {
     case .today:
       if todayGroupByList {
         return AnyView(Group {
+          AnyView(starFilterBar)
           AnyView(triageSection)
           AnyView(groupedOpenItems)
           AnyView(todaySkeleton)
@@ -1623,20 +1656,36 @@ struct TaskListView: View {
       // stack (AnyView forwards the view list), so laziness and per-row
       // identity hold. No lifecycle modifiers hang off this Group.
       return AnyView(Group {
+        AnyView(starFilterBar)
         AnyView(triageSection)
         AnyView(ungroupedOpenItems)
         AnyView(todaySkeleton)
       })
-    case .unscheduled:
-      return AnyView(groupedOpenItems)
+    case .unscheduled, .starred:
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedOpenItems)
+      })
     case .upcoming:
-      return AnyView(groupedUpcomingItems)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(groupedUpcomingItems)
+      })
     case .project:
-      return AnyView(projectGroupedRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(projectGroupedRows)
+      })
     case .review:
-      return AnyView(reviewRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(reviewRows)
+      })
     default:
-      return AnyView(visibleRows)
+      return AnyView(Group {
+        AnyView(starFilterBar)
+        AnyView(visibleRows)
+      })
     }
   }
 
@@ -2601,7 +2650,7 @@ struct TaskListView: View {
       }
       // The Get started steps sit above everything, under their notice.
       return todayNoticeSteps.map(\.selectionID) + todayInboxKeyboardIDs + classifiedIds
-    case .unscheduled:
+    case .unscheduled, .starred:
       return orderedFromGroupedOpen(pool: items) + quickAddOrderedIds
     case .upcoming:
       // Upcoming has no inline trigger (`allowsInlineCreate` false) → sentinel empty.
@@ -3489,6 +3538,16 @@ struct TaskListView: View {
             applyRemoveFromToday(ids)
           }
         },
+        onToggleStar: { ids, starred in
+          Haptics.tick()
+          recordingSchedule(starred
+                            ? String(localized: "Star", comment: "Undo action name")
+                            : String(localized: "Remove Star", comment: "Undo action name"),
+                            ids) {
+            for id in ids { mutator.setStarred(id: id, starred: starred) }
+          }
+          Task { await load() }
+        },
         onOpenWhen: { target in
           whenSheet = WhenSheet(taskIds: target.ids, kind: .scheduled)
         },
@@ -3946,6 +4005,9 @@ struct TaskListView: View {
     if hideHistoricalDone {
       result = result.filter { $0.status == .open || model.settle.isSettling($0.id) }
     }
+    if starredOnlyFilter && showsStarFilterPill {
+      result = result.filter(\.starred)
+    }
     return result
   }
 
@@ -3954,7 +4016,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review, .faded: return true
+    case .project, .area, .unscheduled, .starred, .upcoming, .triage, .repeating, .review, .faded: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false

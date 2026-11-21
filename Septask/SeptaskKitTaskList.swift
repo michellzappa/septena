@@ -259,6 +259,7 @@ final class SeptaskKitTaskListController: NSViewController {
   /// Placement items — titles / visibility refresh on every open from the
   /// current selection (see `refreshPlacementMenuItems`).
   private let todayMenuItem = NSMenuItem()
+  private let starMenuItem = NSMenuItem()
   /// Titled in `refreshPlacementMenuItems` — Show / Hide, so the row menu says
   /// what ⌥⌘I will actually do next.
   private let infoMenuItem = NSMenuItem()
@@ -464,6 +465,7 @@ final class SeptaskKitTaskListController: NSViewController {
     tableView.onMove = { [weak self] in self?.presentMoveMenu() }
     tableView.onFileSuggested = { [weak self] in self?.fileSuggestedSelection() }
     tableView.onReminder = { [weak self] in self?.presentReminderPopover() }
+    tableView.onToggleStar = { [weak self] in self?.toggleStarSelection() }
     tableView.onFocusSidebar = { [weak self] in self?.onFocusSidebar?() }
     tableView.onMoveSelection = { [weak self] up in self?.moveSelectionOneSlot(up: up) }
     tableView.isComposing = { [weak self] in self?.composingTaskId != nil }
@@ -1031,7 +1033,7 @@ final class SeptaskKitTaskListController: NSViewController {
         + todayLoggedRows()
     case .upcoming:
       newRows = titleRows + upcomingBuckets(pool)
-    case .unscheduled:
+    case .unscheduled, .starred:
       newRows = titleRows + groupedByList(pool)
     case .project, .area:
       // Scoped reads return every live status; capture the done subset for
@@ -1791,6 +1793,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .unscheduled:
       return .screenTitle(title: String(localized: "Anytime", comment: "Smart list title"),
                           icon: .symbol("rectangle.stack.fill"))
+    case .starred:
+      return .screenTitle(title: String(localized: "Starred", comment: "Smart list title"),
+                          icon: .symbol("star.fill"))
     case .logbook:
       return .screenTitle(title: String(localized: "Logbook", comment: "Smart list title"),
                           icon: .symbol("checkmark"))
@@ -2838,6 +2843,28 @@ final class SeptaskKitTaskListController: NSViewController {
                        before: before)
   }
 
+  /// ⌥⌘S — star or unstar the current selection (if all are starred, unstar
+  /// all; otherwise star all). Recorded on the shared `TaskUndo` stack.
+  func toggleStarSelection() {
+    commitComposerTextIfOpen()
+    let selection = actionableSelection
+    guard !selection.isEmpty else { NSSound.beep(); return }
+    let nextStarred = !selection.allSatisfy(\.starred)
+    let before = selection.map(scheduleSnapshot)
+    for task in selection {
+      mutator.setStarred(id: task.id, starred: nextStarred)
+      refreshComposerRow(taskId: task.id)
+    }
+    reload()
+    recordScheduleUndo(
+      name: nextStarred
+        ? String(localized: "Star", comment: "SeptaskKit: undo action")
+        : String(localized: "Remove Star", comment: "SeptaskKit: undo action"),
+      before: before
+    )
+    onStoreChanged?()
+  }
+
   func deleteSelection() {
     // A deleted row must not stay pinned open as a composer (`reload` keeps
     // the composing row on screen), so save and fold it first.
@@ -3017,6 +3044,9 @@ final class SeptaskKitTaskListController: NSViewController {
                               scheduled: context.scheduled, today: context.today,
                               deferPush: true,
                               atBottom: landsInInboxRun)
+    if filter == .starred {
+      mutator.setStarred(id: task.id, starred: true)
+    }
     pendingNewTaskId = task.id
     if let anchor { place(newTaskId: task.id, below: anchor, context: context) }
     // Not gated by the settle window any more (it pins its rows instead of
@@ -3096,7 +3126,7 @@ final class SeptaskKitTaskListController: NSViewController {
         area = focused.area
         project = focused.project
       }
-    case .unscheduled:
+    case .unscheduled, .starred:
       if let focused = focusedTaskForCreate() {
         area = focused.area
         project = focused.project
@@ -3757,6 +3787,9 @@ final class SeptaskKitTaskListController: NSViewController {
         self.presentReminderPopover(anchor: .rect(anchor.bounds, anchor))
         self.refreshComposerRow(taskId: task.id)
 
+      case .toggleStar:
+        self.toggleStarSelection()
+
       case .list(let anchor):
         // Reuses the exact destination list ⌘M / ⌘⇧M pops up — one picker, not a
         // second to keep in sync — anchored to the pill the user clicked. It
@@ -3816,6 +3849,12 @@ final class SeptaskKitTaskListController: NSViewController {
     todayMenuItem.keyEquivalent = "t"
     todayMenuItem.keyEquivalentModifierMask = [.command]
     menu.addItem(todayMenuItem)
+
+    starMenuItem.action = #selector(menuToggleStar)
+    starMenuItem.target = self
+    starMenuItem.keyEquivalent = "s"
+    starMenuItem.keyEquivalentModifierMask = [.command, .option]
+    menu.addItem(starMenuItem)
 
     // When and Deadline share one submenu, as in the SwiftUI menu. They open
     // separate popovers (one date each), so a submenu is the native way to
@@ -4006,10 +4045,14 @@ final class SeptaskKitTaskListController: NSViewController {
       for project in areaProjects { menu.addItem(projectItem(project)) }
     }
 
+    let hasStarred = !LocalCache.tasks(in: context, filter: .starred).isEmpty
     let hasFaded = !LocalCache.tasks(in: context, filter: .faded).isEmpty
     let hasDeleted = !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty
-    if hasFaded || hasDeleted {
+    if hasStarred || hasFaded || hasDeleted {
       menu.addItem(.separator())
+      if hasStarred {
+        menu.addItem(destItem(.filter(.starred, title: TaskFilter.starred.title)))
+      }
       if hasFaded {
         menu.addItem(destItem(.filter(.faded, title: TaskFilter.faded.title)))
       }
@@ -4115,6 +4158,7 @@ final class SeptaskKitTaskListController: NSViewController {
   @objc private func menuToggleComplete() { toggleCompleteSelection() }
   @objc private func menuCancel() { cancelSelection() }
   @objc private func menuToggleToday() { toggleTodaySelection() }
+  @objc private func menuToggleStar() { toggleStarSelection() }
   @objc private func menuRename() { beginEditSelectedRow() }
   @objc private func menuInspector() { onToggleInspector?() }
   @objc private func menuDuplicate() { duplicateSelection() }
@@ -4275,6 +4319,12 @@ extension SeptaskKitTaskListController: NSMenuDelegate {
       todayMenuItem.title = String(localized: "Move to Today",
                                    comment: "SeptaskKit: context menu")
     }
+
+    let allStarred = !selection.isEmpty && selection.allSatisfy(\.starred)
+    starMenuItem.isHidden = selection.isEmpty
+    starMenuItem.title = allStarred
+      ? String(localized: "Remove Star", comment: "SeptaskKit: context menu")
+      : String(localized: "Star", comment: "SeptaskKit: context menu")
 
     let canClear = selection.contains { $0.isOnToday || $0.scheduled != nil }
     clearScheduleMenuItem.isHidden = !canClear
@@ -4878,7 +4928,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
     let grouped: Bool
     switch filter {
     case .today: grouped = todayGroupsByList
-    case .unscheduled: grouped = true
+    case .unscheduled, .starred: grouped = true
     default: grouped = false
     }
     guard grouped else { return false }
@@ -5177,6 +5227,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
   private let reminderGlyph = NSImageView()
   private let reminderLabel = NSTextField(labelWithString: "")
   private let repeatGlyph = NSImageView()
+  private let starGlyph = NSImageView()
   private var taskId = ""
   private var plainTitle = ""
   private var editing = false
@@ -5271,6 +5322,15 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     repeatGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
     repeatGlyph.kitA11yIgnore()
 
+    starGlyph.translatesAutoresizingMaskIntoConstraints = false
+    starGlyph.contentTintColor = SeptaskKitTheme.todayAccent
+    starGlyph.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
+      .withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+    starGlyph.setContentHuggingPriority(.required, for: .horizontal)
+    starGlyph.setContentCompressionResistancePriority(.required, for: .horizontal)
+    starGlyph.kitA11yIgnore()
+    starGlyph.isHidden = true
+
     // Trailing cluster hugs the row's right edge. Order matches the row language
     // spec: variable meta inboard, micro-glyphs outboard
     // (chip · date · recurrence · notes). A leading spacer absorbs any extra
@@ -5281,7 +5341,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     trailingShove.setContentHuggingPriority(.defaultLow, for: .horizontal)
     trailingShove.setContentCompressionResistancePriority(.fittingSizeCompression, for: .horizontal)
     let trailing = NSStackView(views: [trailingShove, suggestionChip, issueChip, chip, statusChip,
-                                      reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, notesGlyph])
+                                      reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph, notesGlyph])
     trailing.orientation = .horizontal
     trailing.alignment = .centerY
     trailing.distribution = .fill
@@ -5443,7 +5503,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
     for view in [checkbox, title, notesGlyph, chip, statusChip, issueChip, suggestionChip,
-                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph] as [NSView] {
+                 reminderGlyph, reminderLabel, scheduleGlyph, detail, repeatGlyph, starGlyph] as [NSView] {
       view.alphaValue = fade
     }
     checkbox.cornerDot = !done && !isProposal && task.conversation.hasStarted
@@ -5533,6 +5593,7 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // a weekly task is in on its own day — hit the branch that hides the date
     // and lost its repeat marker entirely.
     repeatGlyph.isHidden = task.recurrence == nil
+    starGlyph.isHidden = !task.starred
 
     // Quiet trailing bell + time badge only when an open task has an active
     // reminder (progressive disclosure: zero chrome otherwise).
@@ -7057,6 +7118,7 @@ final class SeptaskKitTableView: NSTableView {
   /// ⌥⌘M — file the selection into its suggested list (the row capsule's pick).
   var onFileSuggested: (() -> Void)?
   var onReminder: (() -> Void)?
+  var onToggleStar: (() -> Void)?
   var onCopy: (() -> Void)?
   var canCopy: (() -> Bool)?
   var onPaste: (() -> Void)?
@@ -7167,7 +7229,7 @@ final class SeptaskKitTableView: NSTableView {
         allowed = true            // Quick Find, inspector: window-level, no row write
       } else if (command && ["k", "t", "s", "m"].contains(key))
                   || (commandShift && ["m", "d"].contains(key))
-                  || (commandOption && key == "r") {
+                  || (commandOption && ["r", "s"].contains(key)) {
         allowed = composer        // act on the composing row (text saved first)
       } else {
         allowed = false
@@ -7196,6 +7258,8 @@ final class SeptaskKitTableView: NSTableView {
       case "m": onFileSuggested?(); return true
       // ⌥⌘R — set/edit timed reminder (docs/TIMED_REMINDERS_SPEC.md §5).
       case "r": onReminder?(); return true
+      // ⌥⌘S — star / unstar selected tasks (docs/STAR_PRIORITY_SPEC.md §3).
+      case "s": onToggleStar?(); return true
       default: return super.performKeyEquivalent(with: event)
       }
     }

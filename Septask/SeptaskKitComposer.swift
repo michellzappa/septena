@@ -40,6 +40,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   /// only says what was asked for.
   enum Action {
     case toggleToday
+    case toggleStar
     case when(NSView)
     case deadline(NSView)
     case reminder(NSView)
@@ -82,6 +83,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
   private let reminderPill = KitPillButton()
   private let listPill = KitPillButton()
   private let repeatPill = KitPillButton()
+  private let starPill = KitPillButton()
   private let discussPill = KitPillButton()
   private let notesPill = KitPillButton()
 
@@ -224,12 +226,13 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     reminderPill.onPress = { [weak self] view in self?.onAction?(.reminder(view)) }
     listPill.onPress = { [weak self] view in self?.onAction?(.list(view)) }
     repeatPill.onPress = { [weak self] view in self?.onAction?(.repeatRule(view)) }
+    starPill.onPress = { [weak self] _ in self?.onAction?(.toggleStar) }
     notesPill.title = String(localized: "Notes", comment: "SeptaskKit: composer pill")
     notesPill.onPress = { [weak self] _ in self?.focusNotes() }
     discussPill.title = String(localized: "Discuss", comment: "SeptaskKit: composer pill")
     discussPill.onPress = { [weak self] _ in self?.onAction?(.discuss) }
-    for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, notesPill,
-                 discussPill] {
+    for pill in [todayPill, whenPill, deadlinePill, reminderPill, listPill, repeatPill, starPill,
+                 notesPill, discussPill] {
       pillRow.addArrangedSubview(pill)
     }
 
@@ -286,7 +289,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     deadlinePill.nextKeyView = reminderPill
     reminderPill.nextKeyView = listPill
     listPill.nextKeyView = repeatPill
-    repeatPill.nextKeyView = notesPill
+    repeatPill.nextKeyView = starPill
+    starPill.nextKeyView = notesPill
     notesPill.nextKeyView = discussPill
     discussPill.nextKeyView = titleView
     updateKeyChain()
@@ -440,6 +444,11 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
       reminderPill.title = String(localized: "Remind", comment: "SeptaskKit: composer pill")
       reminderPill.isOn = false
     }
+
+    starPill.title = task.starred
+      ? String(localized: "Starred", comment: "SeptaskKit: composer star pill active")
+      : String(localized: "Star", comment: "SeptaskKit: composer star pill")
+    starPill.isOn = task.starred
 
     // Same gate as SwiftUI's `showsDiscuss`: only before a conversation
     // exists, and only when a local model can actually answer. A pill that

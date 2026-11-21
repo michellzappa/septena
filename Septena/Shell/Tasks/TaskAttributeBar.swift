@@ -41,13 +41,13 @@ struct TaskAttributeBar: View {
   /// every pill is wired identically — one `ForEach`, one `select(_:)` — and the
   /// rail grows by adding a case, not another hand-written call.
   enum Attribute: Identifiable {
-    case when, deadline, reminder, repeatRule, list, attachments
+    case when, deadline, reminder, repeatRule, star, list, attachments
     /// Edit-mode AI kickoff — rendered separately, not part of `draftCases`.
     case discuss
     var id: Self { self }
 
     /// Scheduling / filing electives — the `ForEach` rail.
-    static let draftCases: [Attribute] = [.when, .deadline, .reminder, .repeatRule, .list]
+    static let draftCases: [Attribute] = [.when, .deadline, .reminder, .repeatRule, .star, .list]
 
     var icon: String {
       switch self {
@@ -55,6 +55,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "flag"
       case .reminder:   "bell"
       case .repeatRule: "repeat"
+      case .star:       "star"
       case .list:       "folder"
       case .attachments:"paperclip"
       case .discuss:    "bubble.left.and.bubble.right"
@@ -66,6 +67,7 @@ struct TaskAttributeBar: View {
       case .deadline:   "Deadline"
       case .reminder:   "Remind"
       case .repeatRule: "Repeat"
+      case .star:       "Star"
       case .list:       "List"
       case .attachments:"Attachments"
       case .discuss:    "Discuss"
@@ -177,6 +179,8 @@ struct TaskAttributeBar: View {
       return draft.reminder?.badgeText()?.text
     case .repeatRule:
       return draft.recurrence?.shortLabel
+    case .star:
+      return draft.starred ? "Starred" : nil
     // The List pill always names its destination — "Inbox" by default, the area
     // or project once filed (but tinted only when explicitly filed, see isSet).
     case .list:
@@ -193,6 +197,7 @@ struct TaskAttributeBar: View {
     case .deadline:   draft.deadline != nil
     case .reminder:   draft.reminder != nil
     case .repeatRule: draft.recurrence != nil
+    case .star:       draft.starred
     case .list:       draft.areaId != nil || draft.projectId != nil
     }
   }
@@ -225,7 +230,7 @@ struct TaskAttributeBar: View {
       }
       case .attachments:
         if let task = discussTask { TaskAttachmentsPanel(taskID: task.id) }
-      case .discuss, .list, .none: EmptyView()
+      case .discuss, .star, .list, .none: EmptyView()
       }
     }
     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -237,6 +242,12 @@ struct TaskAttributeBar: View {
   private func select(_ attr: Attribute) {
     if attr == .discuss {
       startDiscuss()
+      return
+    }
+    if attr == .star {
+      focus = .pill(.star)
+      Haptics.tick()
+      a11yAnimate(.snappy(duration: 0.18)) { draft.starred.toggle() }
       return
     }
     // Move the keyboard cursor onto the pill (also drops the title field's

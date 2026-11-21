@@ -125,6 +125,7 @@ struct TaskListRowContextMenu: View {
   let onOpenDetail: (SeptenaTask) -> Void
   let onApplySuggestion: (SeptenaTask, SuggestionEngine.Suggestion) -> Void
   let onMoveToToday: ([String], Bool) -> Void
+  var onToggleStar: (([String], Bool) -> Void)? = nil
   let onOpenWhen: (TaskListView.ActionTarget) -> Void
   let onOpenDeadline: (TaskListView.ActionTarget) -> Void
   var onOpenReminder: ((SeptenaTask) -> Void)? = nil
@@ -174,6 +175,18 @@ struct TaskListRowContextMenu: View {
         Label(todayAddLabel, systemImage: "sun.max.fill")
       }
       .keyboardShortcut(TaskRowShortcuts.toggleToday)
+    }
+
+    if let onToggleStar {
+      let allStarred = !target.tasks.isEmpty && target.tasks.allSatisfy(\.starred)
+      Button {
+        onToggleStar(target.ids, !allStarred)
+      } label: {
+        Label(allStarred
+              ? String(localized: "Remove Star", comment: "Context menu unstar")
+              : String(localized: "Star", comment: "Context menu star"),
+              systemImage: allStarred ? "star.slash" : "star.fill")
+      }
     }
 
     // When and Deadline share one submenu. The two pickers are separate

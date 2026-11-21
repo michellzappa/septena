@@ -100,6 +100,16 @@ struct TaskRowActions: ViewModifier {
             }
             onChange?()
           },
+          onToggleStar: { ids, starred in
+            Haptics.tick()
+            recordingSchedule(starred
+                              ? String(localized: "Star", comment: "Undo action name")
+                              : String(localized: "Remove Star", comment: "Undo action name"),
+                              ids) {
+              for id in ids { mutator.setStarred(id: id, starred: starred) }
+            }
+            onChange?()
+          },
           onOpenWhen: { target in
             whenSheet = .init(taskIds: target.ids, kind: .scheduled)
           },

@@ -65,6 +65,9 @@ private struct SeptaskKitRowCommands: View {
       Button("Toggle Today") { SeptaskKitCommands.row(.toggleToday) }
         .keyboardShortcut("t", modifiers: .command)
         .disabled(!SeptaskKitCommands.canRun(.toggleToday))
+      Button("Toggle Star") { SeptaskKitCommands.row(.toggleStar) }
+        .keyboardShortcut("s", modifiers: [.command, .option])
+        .disabled(!SeptaskKitCommands.canRun(.toggleStar))
       Button("When…") { SeptaskKitCommands.row(.when) }
         .keyboardShortcut("s", modifiers: .command)
         .disabled(!SeptaskKitCommands.canRun(.when))

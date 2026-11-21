@@ -693,6 +693,12 @@ struct TaskRow: View {
         .foregroundStyle(Theme.inkSecondary)
         .accessibilityLabel(TaskA11y.recurring)
     }
+    if task.starred {
+      Image(systemName: "star.fill")
+        .scaledFont(size: 11)
+        .foregroundStyle(Theme.todayAccent)
+        .accessibilityLabel(String(localized: "Starred", comment: "Task row star a11y"))
+    }
     if hasNotes { TaskNotesGlyph.view }
     agentSignal
   }

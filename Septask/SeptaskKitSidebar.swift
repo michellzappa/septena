@@ -456,6 +456,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     // Faded open tasks leave every list count and project ratio (docs/TASK_FADE_SPEC.md §4).
     let open = all.filter { $0.status == .open && !$0.isFaded }
     let fadedCount = all.filter(\.isFaded).count
+    let starredCount = open.filter(\.starred).count
     let today = SeptenaDate.today
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
@@ -515,7 +516,12 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
                                                           today: todayCount + inboxCount,
                                                           doneToday: doneTodayCount))
     }
-    // Faded pile & Recently Deleted: shown once non-empty, matching the SwiftUI sidebar.
+    // Starred, Faded & Recently Deleted: shown once non-empty (progressive disclosure).
+    if starredCount > 0 {
+      let starred = KitSidebarDestination.filter(.starred,
+                                                 title: TaskFilter.starred.title)
+      views.append(Node(starred.nodeContent, count: starredCount))
+    }
     if fadedCount > 0 {
       let faded = KitSidebarDestination.filter(.faded,
                                                title: TaskFilter.faded.title)
