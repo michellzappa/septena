@@ -128,7 +128,7 @@ enum TaskJSONTransfer {
     compact([
       "id": e.id, "title": e.title, "status": e.statusRaw, "area": e.area,
       "created": e.created, "completedAt": e.completedAt,
-      "notes": e.notes, "context": e.context, "githubRepo": e.githubRepo,
+      "notes": e.notes, "githubRepo": e.githubRepo,
       "attachmentJSON": e.attachmentJSON,
       "position": e.position, "updatedAt": e.updatedAt, "deletedAt": e.deletedAt,
     ])
@@ -315,8 +315,12 @@ enum TaskJSONTransfer {
     entity.area = nonEmptyString(r["area"])
     entity.created = r["created"] as? String
     entity.completedAt = r["completedAt"] as? String
-    entity.notes = r["notes"] as? String
-    entity.context = r["context"] as? String
+    // Files written before ADR 0012 carry a separate project "context":
+    // fold it into notes the way the backend's one-time merge did.
+    entity.notes = ContainerNotes.mergingLegacyContext(
+      notes: r["notes"] as? String, context: r["context"] as? String,
+      day: SeptenaDate.today)
+    entity.context = nil
     entity.githubRepo = r["githubRepo"] as? String
     entity.attachmentJSON = nonEmptyString(r["attachmentJSON"])
     if let pos = intValue(r["position"]) { entity.position = pos }

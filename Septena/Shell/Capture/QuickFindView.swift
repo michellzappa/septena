@@ -156,7 +156,7 @@ struct QuickFindView: View {
       ))
     }
     for p in projects {
-      let s = score(title: p.title, body: combine(p.notes, p.context), tokens: tokens)
+      let s = score(title: p.title, body: p.notes, tokens: tokens)
       guard s > 0 else { continue }
       out.append(QuickFindHit(
         id: "p:\(p.id)",
@@ -238,15 +238,6 @@ struct QuickFindView: View {
   private func areaTitle(forId id: String?) -> String? {
     guard let id, let a = areas.first(where: { $0.id == id }) else { return nil }
     return a.title
-  }
-
-  private func combine(_ a: String?, _ b: String?) -> String? {
-    switch (a, b) {
-    case let (x?, y?): return "\(x) \(y)"
-    case let (x?, nil): return x
-    case let (nil, y?): return y
-    default: return nil
-    }
   }
 
   private func activateSelected() {
