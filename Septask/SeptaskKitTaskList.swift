@@ -353,6 +353,7 @@ final class SeptaskKitTaskListController: NSViewController {
   }
 
   private var mutator: TaskMutator { SeptenaServices.shared.taskMutator }
+  private var sendBackPopover: KitSendBackPopover?
 
   /// "No Tasks" is a lie while the first pull from the task backend is still
   /// running for a signed-in account — the list is empty because the data
@@ -363,6 +364,9 @@ final class SeptaskKitTaskListController: NSViewController {
     if sync.signedIn && sync.isSyncing && sync.lastPull == nil {
       emptyLabel.stringValue = String(localized: "Syncing…",
                                       comment: "SeptaskKit: empty list during the first task-backend pull")
+    } else if filter == .review {
+      emptyLabel.stringValue = String(localized: "Nothing to review",
+                                      comment: "SeptaskKit: empty review list")
     } else {
       emptyLabel.stringValue = String(localized: "No Tasks", comment: "SeptaskKit: empty list")
     }
@@ -1662,6 +1666,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .triage:
       return .screenTitle(title: String(localized: "Inbox", comment: "Smart list title"),
                           icon: .symbol("tray"))
+    case .review:
+      return .screenTitle(title: String(localized: "Review", comment: "Smart list title"),
+                          icon: .symbol("eye"))
     case .upcoming:
       return .screenTitle(title: String(localized: "Upcoming", comment: "Smart list title"),
                           icon: .symbol("calendar"))
@@ -2889,7 +2896,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .repeating, .logbook, .recentlyDeleted: return nil
+    case .review, .repeating, .logbook, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -4065,6 +4072,9 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       if task.id == composingTaskId {
         return composerRowHeight ?? KitComposerCell.baseHeight
       }
+      if filter == .review {
+        return KitReviewTaskCell.height(for: task, width: tableView.bounds.width)
+      }
       return SeptaskKitTheme.rowHeight
     case .event: return SeptaskKitTheme.rowHeight
     // Blank band above it as tall as a group title, so the footer reads as
@@ -4223,7 +4233,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted: return false
+    case .review, .logbook, .recentlyDeleted: return false
     default: return true
     }
   }
@@ -4700,6 +4710,15 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
         wireComposer(cell, task: task)
         return cell
       }
+      if filter == .review, !task.isHeading {
+        let identifier = NSUserInterfaceItemIdentifier("reviewTaskCell")
+        let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? KitReviewTaskCell
+          ?? KitReviewTaskCell(identifier: identifier)
+        cell.configure(with: task, contextText: taskContextText(for: task))
+        cell.onAccept = { [weak self] id in self?.acceptReviewTask(id: id) }
+        cell.onSendBack = { [weak self] id, anchor in self?.presentSendBackPopover(taskID: id, anchor: anchor) }
+        return cell
+      }
       let identifier = NSUserInterfaceItemIdentifier("taskCell")
       let cell = tableView.makeView(withIdentifier: identifier, owner: nil) as? SeptaskKitTaskCell
         ?? SeptaskKitTaskCell(identifier: identifier)
@@ -4756,6 +4775,27 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
       return area.title
     }
     return nil
+  }
+
+  /// Accept a `needs_verify` task from the Review stage: completes it via the
+  /// normal completion path (undo + acknowledge + sync).
+  private func acceptReviewTask(id: String) {
+    guard let task = LocalCache.task(id: id, in: context), task.status == .open else { return }
+    apply(completing: [task], reopening: [])
+  }
+
+  /// Send a `needs_verify` task back to Claude with a user turn note.
+  private func presentSendBackPopover(taskID: String, anchor: NSView) {
+    sendBackPopover = KitSendBackPopover.present(
+      relativeTo: anchor,
+      onSend: { [weak self] note in
+        guard let self else { return }
+        self.mutator.sendBackConvo(id: taskID, note: note)
+        self.reload()
+      },
+      onClose: { [weak self] in
+        self?.sendBackPopover = nil
+      })
   }
 }
 

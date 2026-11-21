@@ -213,6 +213,8 @@ struct SeptaskCommandMenus: Commands {
       Button("Today") { go(.today) }
         .keyboardShortcut("1", modifiers: .command)
         .disabled(!canNavigate)
+      Button("Review") { go(.review) }
+        .disabled(!canNavigate)
       Button("Upcoming") { go(.upcoming) }
         .keyboardShortcut("2", modifiers: .command)
         .disabled(!canNavigate)

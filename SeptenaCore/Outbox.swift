@@ -172,6 +172,15 @@ final class TaskMutator {
     cloudBackend?.setConvoHandoff(id: id, handoff)
   }
 
+  @discardableResult
+  func sendBackConvo(id: String, note: String) -> Int {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] sendBackConvo called before CK bound — dropping", nil)
+      return 0
+    }
+    return cloudBackend.sendBackConvo(id: id, note: note)
+  }
+
   func pendingReasoning(limit: Int) -> [TaskEntity] {
     cloudBackend?.pendingReasoning(limit: limit) ?? []
   }

@@ -449,6 +449,7 @@ final class SeptaskKitSidebarController: NSViewController, NSOutlineViewDataSour
     let inboxCount = open.filter { $0.isInTriageBand }.count
     let todayCount = open.filter { $0.isOnToday && !$0.isInTriageBand }.count
     let smartCounts: [TaskFilter: Int] = [
+      .review: open.filter { $0.conversation.endState == .needsVerify }.count,
       .upcoming: open.filter { task in
         guard !task.today else { return false }
         return task.scheduled.map { $0 > today } == true

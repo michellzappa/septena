@@ -56,6 +56,7 @@ extension Route {
     switch f {
     case .today:           return "sun.max.fill"
     case .triage:          return "tray.full"
+    case .review:          return "eye"
     case .upcoming:        return "calendar"
     case .repeating:       return "arrow.clockwise"
     case .unscheduled:     return "rectangle.stack.fill"
@@ -77,6 +78,7 @@ enum TaskDestinations {
   /// Septena it's a top-level tab; Septask has no Next (removed 2026-11-19).
   static let smartListRoutes: [Route] = [
     .filter(.today),
+    .filter(.review),
     .filter(.upcoming),
     .filter(.repeating),
     .filter(.unscheduled),

@@ -6,7 +6,7 @@ import { nextScheduledDate, occurrenceID } from "../recurrence.js";
 import { storeFor } from "../api/session.js";
 import { zId } from "../store/columns.js";
 import { zPushBody, type Op, type OpResult } from "../store/ops.js";
-import type { Row, TaskStore } from "../store/TaskStore.js";
+import { AGENT_WRITE_RULES, type Row, type TaskStore } from "../store/TaskStore.js";
 import {
   type CreateTaskInput,
   type RecurrenceRuleInput,
@@ -230,6 +230,9 @@ function requireApplied(r: OpResult | undefined, id: string): void {
   if (r?.status === "rejected" && r.reason === "stopped") {
     throw new Error(`Task ${id} was not changed: the user stopped agent work on it. Only the user can resume it in Septask.`);
   }
+  if (r?.status === "rejected" && r.reason === "human_accepts") {
+    throw new Error(`Task ${id} was not completed (human_accepts): ${r.rule ?? AGENT_WRITE_RULES.human_accepts}`);
+  }
   throw new Error(`Task ${id} was not changed: ${r?.status === "rejected" ? r.reason : "no result"}`);
 }
 
@@ -379,7 +382,11 @@ async function completeTask(ctx: WriteContext, id: string) {
   let recurrence: { nextOccurrence?: { id: string; scheduled: string }; recurrenceWarning?: string } = {};
   let occurrenceOp = -1;
   const unit = str(src.recurrenceUnit);
-  if (unit && src.recurrencePaused !== true) {
+  // Don't batch a next-occurrence insert alongside a completion the store will
+  // refuse (stopped or Claude-assigned): `ops[0]` still hits TaskStore so the
+  // store remains the single enforcer, without leaving an orphan occurrence.
+  const canSpawnOccurrence = !current.convo?.stoppedAt && current.convo?.assignee !== "claude";
+  if (unit && src.recurrencePaused !== true && canSpawnOccurrence) {
     const interval = Number(src.recurrenceInterval ?? 1) || 1;
     const afterCompletion = src.recurrenceAfterCompletion === true;
     // Same date and id rule as the app (Recurrence.nextDate with the logical
@@ -429,6 +436,14 @@ async function completeTask(ctx: WriteContext, id: string) {
   }
 
   const results = await push(store, ops);
+  if (results[0]?.status === "rejected" && results[0].reason === "human_accepts") {
+    return {
+      id,
+      completed: false,
+      reason: "human_accepts",
+      rule: results[0].rule ?? AGENT_WRITE_RULES.human_accepts,
+    };
+  }
   requireApplied(results[0], id);
   if (occurrenceOp >= 0 && !applied(results[occurrenceOp]) && recurrence.nextOccurrence) {
     // Dropped: that occurrence was deleted before (for example by an undo in

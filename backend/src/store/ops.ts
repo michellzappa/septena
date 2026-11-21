@@ -76,7 +76,7 @@ export type OpResult =
   | { clientOpId: string; status: "applied"; rev: number; seq?: number }
   | { clientOpId: string; status: "noop" }
   | { clientOpId: string; status: "dropped"; rev: number; reason: "deleted" }
-  | { clientOpId: string; status: "rejected"; reason: string };
+  | { clientOpId: string; status: "rejected"; reason: string; rule?: string };
 
 export interface PushResult {
   appliedThrough: number;
