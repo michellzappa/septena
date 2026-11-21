@@ -137,7 +137,8 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
   // MARK: - Height
 
-  fileprivate static let pillRowHeight: CGFloat = 24
+  /// The iOS `AttributePill` circle diameter: both shells draw the same rail.
+  fileprivate static let pillRowHeight: CGFloat = 34
   /// Empty / short notes — two lines of room before the field grows. Things'
   /// open to-do shows about this much under the title.
   private static var notesMinHeight: CGFloat {
@@ -240,7 +241,7 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
     notesView.delegate = self
 
     pillRow.orientation = .horizontal
-    pillRow.spacing = 6
+    pillRow.spacing = 8
     pillRow.alignment = .centerY
     pillRow.translatesAutoresizingMaskIntoConstraints = false
 
@@ -904,16 +905,21 @@ final class KitComposerTextView: NSTextView {
 final class KitPillButton: NSButton {
   var onPress: ((NSView) -> Void)?
 
-  /// The registry attribute this pill stands for (`taskAttributes`). Sets the
-  /// label and the leading icon. Nil for free-text pills (conversation).
+  /// The registry attribute this pill stands for (`taskAttributes`). An
+  /// attribute pill is an icon-only circle, the iOS `AttributePill` design
+  /// (34pt circle, 14pt semibold symbol): the label and any value go to the
+  /// tooltip and VoiceOver, and "set" shows as the filled wash. So the rail
+  /// keeps one width whatever the values are, and never squeezes to "…".
+  /// Nil for free-text pills (conversation), which keep a text stadium.
   var attribute: RegistryTaskAttribute? {
     didSet {
       guard let attribute else { return }
       image = NSImage(systemSymbolName: attribute.sfSymbol, accessibilityDescription: nil)?
-        .withSymbolConfiguration(.init(pointSize: 11, weight: .medium))
-      imagePosition = .imageLeading
-      imageHugsTitle = true
+        .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
+      imagePosition = .imageOnly
+      heightConstraint.constant = KitComposerCell.pillRowHeight
       show(value: nil)
+      invalidateIntrinsicContentSize()
     }
   }
 
@@ -927,6 +933,10 @@ final class KitPillButton: NSButton {
     setAccessibilityLabel(summary)
   }
   private let glass = KitPassthroughGlassView()
+  /// Text stadiums stay 24pt (popovers, conversation options); an attribute
+  /// circle takes the rail height.
+  private static let textHeight: CGFloat = 24
+  private lazy var heightConstraint = heightAnchor.constraint(equalToConstant: Self.textHeight)
 
   var isOn: Bool {
     get { state == .on }
@@ -975,17 +985,20 @@ final class KitPillButton: NSButton {
     ])
     target = self
     action = #selector(pressed)
-    heightAnchor.constraint(equalToConstant: KitComposerCell.pillRowHeight).isActive = true
+    heightConstraint.isActive = true
     restyle()
   }
 
   required init?(coder: NSCoder) { fatalError("KitPillButton is code-only") }
 
   override var intrinsicContentSize: NSSize {
+    if attribute != nil {
+      return NSSize(width: KitComposerCell.pillRowHeight, height: KitComposerCell.pillRowHeight)
+    }
     let text = attributedTitle.size()
     let icon = image.map { $0.size.width + Self.iconGap } ?? 0
     return NSSize(width: ceil(text.width + icon) + Self.horizontalPadding * 2,
-                  height: KitComposerCell.pillRowHeight)
+                  height: Self.textHeight)
   }
 
   override func layout() {
