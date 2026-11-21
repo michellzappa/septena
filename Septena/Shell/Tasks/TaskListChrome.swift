@@ -791,22 +791,35 @@ struct TaskDragStackPreview: View {
   }
 }
 
-// MARK: - iOS swipe-to-select (pull-left toggle on SelectableScrollList)
+// MARK: - iOS task-row horizontal swipes (left = Select, right = Quick Action)
+
+/// Descriptor for the leading (swipe-right) quick action on a task row
+/// (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132).
+struct TaskRowLeadingSwipeAction {
+  let title: String
+  let symbol: String
+  let tint: Color
+  let perform: () -> Void
+}
 
 extension View {
-  /// Things-style horizontal pull-left gesture to toggle task selection on iOS
-  /// and iPadOS (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §3). Pass-through
-  /// on macOS or when `enabled` is false.
+  /// Unified scroll-safe horizontal swipe on iOS/iPadOS `SelectableScrollList` rows:
+  ///   • Swipe left  → toggle task selection (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §3).
+  ///   • Swipe right → run `leadingAction` (`docs/IOS_SWIPE_ACTIONS_SPEC.md` #132).
+  /// Pass-through on macOS or when neither direction is enabled.
   @ViewBuilder
-  func taskRowSwipeToSelect(
-    enabled: Bool,
+  func taskRowSwipe(
+    allowSelect: Bool,
     isSelected: Bool,
-    onToggleSelect: @escaping () -> Void
+    onToggleSelect: @escaping () -> Void,
+    leadingAction: TaskRowLeadingSwipeAction? = nil
   ) -> some View {
     #if os(iOS)
-    if enabled {
-      modifier(TaskRowSwipeToSelectModifier(isSelected: isSelected,
-                                            onToggleSelect: onToggleSelect))
+    if allowSelect || leadingAction != nil {
+      modifier(TaskRowHorizontalSwipeModifier(allowSelect: allowSelect,
+                                              isSelected: isSelected,
+                                              onToggleSelect: onToggleSelect,
+                                              leadingAction: leadingAction))
     } else {
       self
     }
@@ -817,33 +830,63 @@ extension View {
 }
 
 #if os(iOS)
-private struct TaskRowSwipeToSelectModifier: ViewModifier {
+private struct TaskRowHorizontalSwipeModifier: ViewModifier {
+  let allowSelect: Bool
   let isSelected: Bool
   let onToggleSelect: () -> Void
+  let leadingAction: TaskRowLeadingSwipeAction?
+
+  private enum Direction { case left, right }
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var dragOffset: CGFloat = 0
+  @State private var activeDirection: Direction? = nil
   @State private var armed = false
 
-  private static let commitThreshold: CGFloat = 36
-  private static let disarmThreshold: CGFloat = 28
-  private static let maxTravel: CGFloat = 56
+  private static let leftCommitThreshold: CGFloat = 36
+  private static let leftDisarmThreshold: CGFloat = 28
+  private static let leftMaxTravel: CGFloat = 56
 
-  private var progress: CGFloat {
-    min(1, max(0, -dragOffset / Self.commitThreshold))
+  private static let rightCommitThreshold: CGFloat = 44
+  private static let rightDisarmThreshold: CGFloat = 34
+  private static let rightMaxTravel: CGFloat = 66
+
+  private var leftProgress: CGFloat {
+    min(1, max(0, -dragOffset / Self.leftCommitThreshold))
+  }
+
+  private var rightProgress: CGFloat {
+    min(1, max(0, dragOffset / Self.rightCommitThreshold))
   }
 
   func body(content: Content) -> some View {
-    ZStack(alignment: .trailing) {
-      if dragOffset < -2 {
-        Image(systemName: indicatorSymbol)
-          .scaledFont(size: 18, weight: .semibold)
-          .foregroundStyle(armed ? Color.accentColor : Theme.inkSecondary)
-          .scaleEffect(armed ? 1.12 : 0.85 + 0.15 * progress)
-          .opacity(Double(min(1, progress * 1.25)))
-          .padding(.trailing, 14)
-          .a11yAnimation(.snappy(duration: 0.16), value: armed)
-          .accessibilityHidden(true)
+    ZStack {
+      if dragOffset < -2, allowSelect {
+        HStack {
+          Spacer(minLength: 0)
+          Image(systemName: selectIndicatorSymbol)
+            .scaledFont(size: 18, weight: .semibold)
+            .foregroundStyle(armed ? Color.accentColor : Theme.inkSecondary)
+            .scaleEffect(armed ? 1.12 : 0.85 + 0.15 * leftProgress)
+            .opacity(Double(min(1, leftProgress * 1.25)))
+            .padding(.trailing, 14)
+            .a11yAnimation(.snappy(duration: 0.16), value: armed)
+            .accessibilityHidden(true)
+        }
+      }
+
+      if dragOffset > 2, let leadingAction {
+        HStack {
+          Image(systemName: leadingAction.symbol)
+            .scaledFont(size: 18, weight: .semibold)
+            .foregroundStyle(armed ? leadingAction.tint : Theme.inkSecondary)
+            .scaleEffect(armed ? 1.14 : 0.85 + 0.15 * rightProgress)
+            .opacity(Double(min(1, rightProgress * 1.25)))
+            .padding(.leading, 14)
+            .a11yAnimation(.snappy(duration: 0.16), value: armed)
+            .accessibilityHidden(true)
+          Spacer(minLength: 0)
+        }
       }
 
       content
@@ -851,48 +894,98 @@ private struct TaskRowSwipeToSelectModifier: ViewModifier {
     }
     .clipped()
     .gesture(
-      HorizontalLeftPanGesture(
-        onChanged: { rawDx in
-          let pull = max(0, -rawDx)
-          let dampened: CGFloat
-          if pull <= Self.commitThreshold {
-            dampened = pull
-          } else {
-            let extra = pull - Self.commitThreshold
-            dampened = Self.commitThreshold + (Self.maxTravel - Self.commitThreshold) * (1 - exp(-extra / 36))
-          }
-          dragOffset = -dampened
-          if !armed, pull >= Self.commitThreshold {
-            armed = true
-            Haptics.tick()
-          } else if armed, pull < Self.disarmThreshold {
-            armed = false
-          }
-        },
-        onEnded: { _ in
-          let shouldToggle = armed
-          a11yAnimate(.snappy(duration: 0.22)) {
-            dragOffset = 0
-            armed = false
-          }
-          if shouldToggle {
-            onToggleSelect()
-          }
-        },
-        onCancelled: {
-          a11yAnimate(.snappy(duration: 0.22)) {
-            dragOffset = 0
-            armed = false
-          }
-        }
+      HorizontalPanGesture(
+        allowLeft: allowSelect,
+        allowRight: leadingAction != nil,
+        onChanged: handlePanChanged,
+        onEnded: handlePanEnded,
+        onCancelled: handlePanCancelled
       )
     )
-    .accessibilityAction(named: isSelected ? "Deselect" : "Select") {
-      onToggleSelect()
+    .modifier(TaskRowSwipeA11yActions(allowSelect: allowSelect,
+                                      isSelected: isSelected,
+                                      onToggleSelect: onToggleSelect,
+                                      leadingAction: leadingAction))
+  }
+
+  private func handlePanChanged(_ rawDx: CGFloat) {
+    if activeDirection == nil {
+      if rawDx < -1, allowSelect {
+        activeDirection = .left
+      } else if rawDx > 1, leadingAction != nil {
+        activeDirection = .right
+      } else {
+        return
+      }
+    }
+
+    switch activeDirection {
+    case .left:
+      let pull = max(0, -rawDx)
+      let dampened = rubberBand(pull: pull,
+                                threshold: Self.leftCommitThreshold,
+                                maxTravel: Self.leftMaxTravel)
+      dragOffset = -dampened
+      updateArmed(pull: pull,
+                  commit: Self.leftCommitThreshold,
+                  disarm: Self.leftDisarmThreshold)
+    case .right:
+      let pull = max(0, rawDx)
+      let dampened = rubberBand(pull: pull,
+                                threshold: Self.rightCommitThreshold,
+                                maxTravel: Self.rightMaxTravel)
+      dragOffset = dampened
+      updateArmed(pull: pull,
+                  commit: Self.rightCommitThreshold,
+                  disarm: Self.rightDisarmThreshold)
+    case nil:
+      break
     }
   }
 
-  private var indicatorSymbol: String {
+  private func handlePanEnded(_ rawDx: CGFloat) {
+    let dir = activeDirection
+    let shouldCommit = armed
+    a11yAnimate(.snappy(duration: 0.22)) {
+      dragOffset = 0
+      activeDirection = nil
+      armed = false
+    }
+    guard shouldCommit else { return }
+    switch dir {
+    case .left:
+      onToggleSelect()
+    case .right:
+      leadingAction?.perform()
+    case nil:
+      break
+    }
+  }
+
+  private func handlePanCancelled() {
+    a11yAnimate(.snappy(duration: 0.22)) {
+      dragOffset = 0
+      activeDirection = nil
+      armed = false
+    }
+  }
+
+  private func rubberBand(pull: CGFloat, threshold: CGFloat, maxTravel: CGFloat) -> CGFloat {
+    guard pull > threshold else { return pull }
+    let extra = pull - threshold
+    return threshold + (maxTravel - threshold) * (1 - exp(-extra / 36))
+  }
+
+  private func updateArmed(pull: CGFloat, commit: CGFloat, disarm: CGFloat) {
+    if !armed, pull >= commit {
+      armed = true
+      Haptics.tick()
+    } else if armed, pull < disarm {
+      armed = false
+    }
+  }
+
+  private var selectIndicatorSymbol: String {
     if isSelected {
       return armed ? "minus.circle.fill" : "checkmark.circle.fill"
     }
@@ -900,16 +993,50 @@ private struct TaskRowSwipeToSelectModifier: ViewModifier {
   }
 }
 
+private struct TaskRowSwipeA11yActions: ViewModifier {
+  let allowSelect: Bool
+  let isSelected: Bool
+  let onToggleSelect: () -> Void
+  let leadingAction: TaskRowLeadingSwipeAction?
+
+  func body(content: Content) -> some View {
+    content
+      .modifier(OptionalA11yAction(
+        title: allowSelect ? (isSelected ? "Deselect" : "Select") : nil,
+        perform: onToggleSelect
+      ))
+      .modifier(OptionalA11yAction(
+        title: leadingAction?.title,
+        perform: { leadingAction?.perform() }
+      ))
+  }
+}
+
+private struct OptionalA11yAction: ViewModifier {
+  let title: String?
+  let perform: () -> Void
+
+  func body(content: Content) -> some View {
+    if let title {
+      content.accessibilityAction(named: title, perform)
+    } else {
+      content
+    }
+  }
+}
+
 /// First-party SwiftUI wrapper over `UIPanGestureRecognizer` that claims only
-/// deliberate horizontal leftward pulls, immediately yielding vertical pans to
-/// `ScrollView` and leading-edge swipes to `NavigationStack`.
-private struct HorizontalLeftPanGesture: UIGestureRecognizerRepresentable {
+/// deliberate horizontal pans in allowed directions, immediately yielding
+/// vertical pans to `ScrollView` and leading-edge swipes to `NavigationStack`.
+private struct HorizontalPanGesture: UIGestureRecognizerRepresentable {
+  let allowLeft: Bool
+  let allowRight: Bool
   let onChanged: (CGFloat) -> Void
   let onEnded: (CGFloat) -> Void
   let onCancelled: () -> Void
 
   func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
-    Coordinator()
+    Coordinator(allowLeft: allowLeft, allowRight: allowRight)
   }
 
   func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
@@ -917,6 +1044,11 @@ private struct HorizontalLeftPanGesture: UIGestureRecognizerRepresentable {
     pan.maximumNumberOfTouches = 1
     pan.delegate = context.coordinator
     return pan
+  }
+
+  func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
+    context.coordinator.allowLeft = allowLeft
+    context.coordinator.allowRight = allowRight
   }
 
   func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
@@ -934,6 +1066,14 @@ private struct HorizontalLeftPanGesture: UIGestureRecognizerRepresentable {
   }
 
   final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    var allowLeft: Bool
+    var allowRight: Bool
+
+    init(allowLeft: Bool, allowRight: Bool) {
+      self.allowLeft = allowLeft
+      self.allowRight = allowRight
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
       guard let pan = gestureRecognizer as? UIPanGestureRecognizer,
             let view = pan.view else { return false }
@@ -942,9 +1082,283 @@ private struct HorizontalLeftPanGesture: UIGestureRecognizerRepresentable {
         return false
       }
       let velocity = pan.velocity(in: view)
-      // Require clearly horizontal leftward intent so vertical scrolling always wins.
-      return velocity.x < -20 && abs(velocity.x) > abs(velocity.y) * 1.4
+      guard abs(velocity.x) > abs(velocity.y) * 1.4 else { return false }
+      if velocity.x < -20 { return allowLeft }
+      if velocity.x > 20 { return allowRight }
+      return false
     }
+  }
+}
+
+// MARK: - Phase M3: One-handed iPhone spring-loaded Quick-Drop Project Tray
+
+/// Cancellable spring-load timer owned by `TaskSpringLoadMoveDrop` so hovering
+/// a dragged task stack over the Move button opens the in-window Project Tray
+/// after a short beat without fighting UIKit's active `UIDragSession`.
+@MainActor
+private final class SpringLoadTimer {
+  private var task: Task<Void, Never>?
+
+  func arm(delay: Duration = .milliseconds(350), onFire: @escaping @MainActor () -> Void) {
+    cancel()
+    task = Task { @MainActor in
+      try? await Task.sleep(for: delay)
+      guard !Task.isCancelled else { return }
+      onFire()
+    }
+  }
+
+  func cancel() {
+    task?.cancel()
+    task = nil
+  }
+}
+
+/// Drop modifier attached to the iOS touch selection bar's Move button:
+///   • Hovering a dragged `TaskDragIDs` for 0.35s springs open the in-window
+///     `QuickDropProjectTray` so the user can drop directly onto any project.
+///   • Releasing directly onto Move before 0.35s calls `onDirectDrop(ids)` to
+///     open `MovePickerSheet` for those exact tasks.
+struct TaskSpringLoadMoveDrop: ViewModifier {
+  let enabled: Bool
+  let onSpringLoad: () -> Void
+  let onDirectDrop: (_ ids: [String]) -> Void
+
+  @State private var isTargeted = false
+  @State private var timer = SpringLoadTimer()
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content
+        .background(
+          Circle()
+            .fill(isTargeted ? Theme.listSelectionFill : Color.clear)
+            .a11yAnimation(.easeOut(duration: 0.12), value: isTargeted)
+        )
+        .scaleEffect(isTargeted ? 1.12 : 1)
+        .a11yAnimation(.snappy(duration: 0.16), value: isTargeted)
+        .onDrop(
+          of: [.septenaTaskDragIDs],
+          delegate: TaskSpringLoadMoveDropDelegate(
+            isTargeted: $isTargeted,
+            timer: timer,
+            onSpringLoad: onSpringLoad,
+            onDirectDrop: onDirectDrop
+          )
+        )
+    } else {
+      content
+    }
+  }
+}
+
+private struct TaskSpringLoadMoveDropDelegate: DropDelegate {
+  @Binding var isTargeted: Bool
+  let timer: SpringLoadTimer
+  let onSpringLoad: () -> Void
+  let onDirectDrop: (_ ids: [String]) -> Void
+
+  func validateDrop(info: DropInfo) -> Bool {
+    info.hasItemsConforming(to: [.septenaTaskDragIDs])
+  }
+
+  func dropEntered(info: DropInfo) {
+    isTargeted = true
+    timer.arm {
+      Haptics.tick()
+      onSpringLoad()
+    }
+  }
+
+  func dropUpdated(info: DropInfo) -> DropProposal? {
+    isTargeted = true
+    return DropProposal(operation: .move)
+  }
+
+  func dropExited(info: DropInfo) {
+    isTargeted = false
+    timer.cancel()
+  }
+
+  func performDrop(info: DropInfo) -> Bool {
+    isTargeted = false
+    timer.cancel()
+    guard let provider = info.itemProviders(for: [.septenaTaskDragIDs]).first else { return false }
+    provider.loadDataRepresentation(forTypeIdentifier: UTType.septenaTaskDragIDs.identifier) { data, _ in
+      guard let data,
+            let payload = try? JSONDecoder().decode(TaskDragIDs.self, from: data),
+            !payload.ids.isEmpty,
+            !TaskDragIDs.isNewTaskPayload(payload.ids)
+      else { return }
+      DispatchQueue.main.async { onDirectDrop(payload.ids) }
+    }
+    return true
+  }
+}
+
+/// In-window floating Project / Area drop tray for compact iPhone
+/// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.3, Phase M3).
+/// Rendered as an in-window `ZStack` overlay (never a `.sheet`) so UIKit's live
+/// `UIDragSession` stays uninterrupted while the user glides onto a project.
+struct QuickDropProjectTray: View {
+  let areas: [Area]
+  let projects: [Project]
+  let projectProgress: [String: Double]
+  let onDropInbox: (_ ids: [String]) -> Bool
+  let onDropToday: (_ ids: [String]) -> Bool
+  let onDropArea: (_ ids: [String], _ areaId: String) -> Bool
+  let onDropProject: (_ ids: [String], _ projectId: String) -> Bool
+  let onDismiss: () -> Void
+
+  private var activeProjects: [Project] {
+    projects.filter { $0.status == .active }
+  }
+
+  private var looseProjects: [Project] {
+    activeProjects.filter { $0.area == nil }
+  }
+
+  var body: some View {
+    ZStack(alignment: .bottom) {
+      Color.black.opacity(0.24)
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .onTapGesture { onDismiss() }
+
+      VStack(spacing: 0) {
+        HStack {
+          Text("Drop into…")
+            .font(.septenaLabel.weight(.semibold))
+            .foregroundStyle(Theme.inkPrimary)
+          Spacer(minLength: 0)
+          Button("Cancel") { onDismiss() }
+            .font(.septenaMeta.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+
+        Divider()
+
+        ScrollView {
+          VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+              quickTargetChip(title: "Inbox", symbol: "tray", tint: Color.accentColor) { ids in
+                let ok = onDropInbox(ids)
+                onDismiss()
+                return ok
+              }
+              quickTargetChip(title: "Today", symbol: "sun.max.fill", tint: Theme.todayAccent) { ids in
+                let ok = onDropToday(ids)
+                onDismiss()
+                return ok
+              }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            ForEach(looseProjects) { project in
+              projectDropRow(project, indented: false)
+            }
+
+            ForEach(areas) { area in
+              let areaProjects = activeProjects.filter { $0.area == area.id }
+              areaDropRow(area)
+              ForEach(areaProjects) { project in
+                projectDropRow(project, indented: true)
+              }
+            }
+          }
+          .padding(.bottom, 14)
+        }
+        .frame(maxHeight: 340)
+      }
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+          .strokeBorder(Theme.border, lineWidth: 0.5)
+      )
+      .shadow(color: .black.opacity(0.22), radius: 20, y: 8)
+      .padding(.horizontal, 12)
+      .padding(.bottom, 12)
+    }
+    .transition(.opacity.combined(with: .move(edge: .bottom)))
+  }
+
+  private func quickTargetChip(
+    title: String,
+    symbol: String,
+    tint: Color,
+    perform: @escaping (_ ids: [String]) -> Bool
+  ) -> some View {
+    HStack(spacing: 6) {
+      Image(systemName: symbol)
+        .scaledFont(size: 13, weight: .semibold)
+        .foregroundStyle(tint)
+      Text(title)
+        .font(.septenaTaskTitle.weight(.medium))
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .frame(maxWidth: .infinity)
+    .background(Theme.cardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    .modifier(TaskMoveDrop(perform: perform))
+  }
+
+  private func areaDropRow(_ area: Area) -> some View {
+    HStack(spacing: 8) {
+      if let emoji = area.emoji, !emoji.isEmpty {
+        Text(emoji)
+          .scaledFont(size: 14)
+          .frame(width: 20, alignment: .center)
+      } else {
+        Image(systemName: "square.stack.3d.up")
+          .scaledFont(size: 13, weight: .medium)
+          .foregroundStyle(Theme.inkSecondary)
+          .frame(width: 20, alignment: .center)
+      }
+      Text(area.title)
+        .font(.septenaTaskTitle.weight(.semibold))
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+      Spacer(minLength: 0)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 9)
+    .contentShape(Rectangle())
+    .modifier(TaskMoveDrop(perform: { ids in
+      let ok = onDropArea(ids, area.id)
+      onDismiss()
+      return ok
+    }))
+    .padding(.horizontal, 6)
+  }
+
+  private func projectDropRow(_ project: Project, indented: Bool) -> some View {
+    HStack(spacing: 8) {
+      ProjectProgressIcon(progress: projectProgress[project.id] ?? 0,
+                          tint: Theme.inkSecondary, diameter: 14)
+        .frame(width: 20, alignment: .center)
+      Text(project.title)
+        .font(.septenaTaskTitle)
+        .foregroundStyle(Theme.inkPrimary)
+        .lineLimit(1)
+      Spacer(minLength: 0)
+    }
+    .padding(.leading, indented ? 30 : 14)
+    .padding(.trailing, 14)
+    .padding(.vertical, 8)
+    .contentShape(Rectangle())
+    .modifier(TaskMoveDrop(perform: { ids in
+      let ok = onDropProject(ids, project.id)
+      onDismiss()
+      return ok
+    }))
+    .padding(.horizontal, 6)
   }
 }
 #endif
