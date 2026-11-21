@@ -142,6 +142,9 @@ GitHub milestone: `"M3 Factory ships code"`.
   accepted; prerequisites to `#21`, `#20`, `#136`): `#141`–`#145` done (`registry/`
   with 9 JSON registries, Swift/TS codegen, `lint-design.sh` drift gate, and
   shared conformance fixtures)
+- Sign-in beyond Apple (ADR 0016): #168 identity table, #169 email code,
+  #170 device approval, #171 email on Apple accounts. Needed by every
+  non-Apple client.
 - #21 Web client on `api.septena.app` (Rank 4 first wave — reaches Windows,
   Linux and browsers first; #43 Stripe billing pairs here)
 - #133 natural-language capture in titles · #134 email-to-task address
@@ -163,7 +166,7 @@ GitHub milestone: `"M4 Sharing and Starlings"`.
 - #11 S1 share / invite / accept UI
 - #12 L2 Starlings links, several workspaces, dedupe
 - #20 Android client on `api.septena.app` (`docs/ANDROID_CLIENT_SPEC.md`,
-  sign-in per ADR 0016; its Kotlin core is Windows W0)
+  phases #172 to #176; its Kotlin core #173 is Windows W0)
 - #119 Self-hostable backend on the user's own Cloudflare account (ADR 0011)
 
 Exit: a shared project with one other person, a Starlings project linked next

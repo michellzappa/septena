@@ -103,7 +103,7 @@ Apple apps today.
 
 | Work | Phase |
 |---|---|
-| `AccountStore` identity table, email code flow, device approval flow (ADR 0016) | A0 |
+| `AccountStore` identity table (#168), email code flow (#169), device approval flow (#170), email on Apple accounts (#171) (ADR 0016) | A0 |
 | Google Play entitlement verifier and webhook | A4 |
 | Kotlin output from `scripts/gen-registries.mjs` (ADR 0015) | A0 |
 
@@ -111,11 +111,11 @@ Apple apps today.
 
 | Phase | Done when | Depends on |
 |---|---|---|
-| A0 Spike | A debug build signs in by device approval and by email code, pulls one account, creates a task offline and pushes it after reconnect. The same `core` and `store` modules pass their tests on the JVM. | ADR 0016 backend work, R0 registries |
-| A1 Core | Sync engine, outbox, shadows, mutators and store complete, with the conformance vectors passing on the JVM. This is phase W0 for Windows. | A0 |
-| A2 First release UI | The scope in §5, judged against the iPhone app per `docs/DesignSpec.md`. | A1, registries R1 to R3 |
-| A3 Distribution | Play Store internal test track, then production. | A2, mz: Play Console account |
-| A4 Billing | Google Play subscription writes the entitlement row. | A3, entitlements enforced |
+| A0 Spike (#172) | A debug build signs in by device approval and by email code, pulls one account, creates a task offline and pushes it after reconnect. The same `core` and `store` modules pass their tests on the JVM. | ADR 0016 backend work, R0 registries |
+| A1 Core (#173) | Sync engine, outbox, shadows, mutators and store complete, with the conformance vectors passing on the JVM. This is phase W0 for Windows. | A0 |
+| A2 First release UI (#174) | The scope in §5, judged against the iPhone app per `docs/DesignSpec.md`. | A1, registries R1 to R3 |
+| A3 Distribution (#175) | Play Store internal test track, then production. | A2, mz: Play Console account |
+| A4 Billing (#176) | Google Play subscription writes the entitlement row. | A3, entitlements enforced |
 
 Gate: Android CI builds and tests on the mini (`remote-build`). The laptop
 has no Android SDK. Device checks follow a written check list per build, as

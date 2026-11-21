@@ -88,6 +88,8 @@ Accepted by mz on 2026-11-21 with all defaults below.
 
 ## Links
 
+- Issues: #168 S1 identity table · #169 S2 email code · #170 S3 device approval · #171 S4 email on Apple accounts
+
 - #21 web client · #20 Android client · #136 Windows client
 - ADR 0002 own backend · ADR 0011 self-hostable backend · ADR 0013 Windows
 - `backend/src/api/appleIdentity.ts`, `backend/src/api/session.ts`,
