@@ -357,7 +357,7 @@
           "kind": "setting",
           "key": "todayGroupByList",
           "label": "Group Today by list",
-          "detail": "Off shows one flat list, with each task's list as a subtitle."
+          "detail": "When off, tasks appear in one list with their project or area underneath."
         },
         {
           "kind": "setting",
@@ -367,8 +367,8 @@
         {
           "kind": "setting",
           "key": "tasksShowAging",
-          "label": "Fade untouched tasks",
-          "detail": "Tasks untouched for 14 days fade out and move to Faded."
+          "label": "Fade inactive tasks",
+          "detail": "Tasks without activity for 14 days fade out and move to Faded."
         },
         {
           "kind": "setting",
@@ -498,7 +498,7 @@
         },
         {
           "id": "reach",
-          "header": "How far AI may reach",
+          "header": "Where AI runs",
           "items": [
             { "kind": "setting", "key": "aiMode", "label": "AI Mode" }
           ]
@@ -663,7 +663,7 @@
           "header": "AI diagnostics",
           "platforms": ["ios", "ipados", "macos"],
           "items": [
-            { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Label which model answers in each AI spot." },
+            { "kind": "setting", "key": "showModelLabels", "label": "Show model labels", "detail": "Show which model answered next to each AI reply." },
             { "kind": "setting", "key": "pccRoutingEnabled", "label": "Use Private Cloud Compute", "visibility": "minAppleOS27" },
             { "kind": "setting", "key": "pccReasoning", "label": "Private Cloud Compute reasoning", "visibility": "minAppleOS27" }
           ]

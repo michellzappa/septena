@@ -18,7 +18,7 @@ struct RemindersInboxDetail: View {
   var body: some View {
     Form {
       Section {
-        Text("Pick a Reminders list. Its pending items show in your Inbox; tap to import (originals are removed from Reminders).")
+        Text("Choose a Reminders list. Its pending items appear in your Inbox so you can import them (originals are removed from Reminders).")
           .font(.callout)
           .foregroundStyle(.secondary)
       }

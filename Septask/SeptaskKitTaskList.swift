@@ -1001,11 +1001,11 @@ final class SeptaskKitTaskListController: NSViewController {
       if !pool.isEmpty {
         fadedRows.append(.notice(TaskNotice(
           id: .weeklySweep, kind: .info, symbol: "circle.dashed",
-          title: String(localized: "Tasks untouched for 14 days wait here.",
+          title: String(localized: "Tasks without activity for 14 days",
                         comment: "Faded pile top notice title"),
-          detail: String(localized: "Open a task or choose Keep to bring it back, or run a sweep.",
+          detail: String(localized: "Open a task or choose Keep to bring it back, or review the list to let the rest go.",
                          comment: "Faded pile top notice detail"),
-          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
+          primaryTitle: String(localized: "Review…", comment: "Faded pile review button"),
           dismissible: false)))
       }
       newRows = fadedRows + pool.map(chipped)
@@ -2588,11 +2588,11 @@ final class SeptaskKitTaskListController: NSViewController {
       title: String(localized: "Reschedule Repeating Task?",
                     comment: "SeptaskKit: fixed recurrence move"),
       message: String(localized:
-        "Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.",
+        "Move only this task, or update the repeating schedule to the new date?",
         comment: "SeptaskKit: fixed recurrence move"),
-      options: [String(localized: "Make Exception",
+      options: [String(localized: "Only This Task",
                        comment: "SeptaskKit: fixed recurrence move"),
-                String(localized: "Update Rule",
+                String(localized: "Update Schedule",
                        comment: "SeptaskKit: fixed recurrence move")])
     switch chosen {
     case 0: return .makeException
@@ -6195,7 +6195,7 @@ final class KitImportAllRemindersCell: NSTableCellView {
   func configure(count: Int, importing: Bool) {
     let title = importing
       ? String(localized: "Importing…", comment: "SeptaskKit: reminders import in flight")
-      : String(localized: "Import all \(count) from Reminders — removes them there",
+      : String(localized: "Move all \(count) from Reminders (removes originals)",
                comment: "SeptaskKit: bulk import action line")
     label.stringValue = title
     hit.isEnabled = !importing

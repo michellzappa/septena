@@ -465,7 +465,7 @@ private final class KitRepeatBoard: NSView {
       tint: offerable ? SeptaskKitTheme.inkSecondary : SeptaskKitTheme.iconMuted,
       title: offerable
         ? String(localized: "On the scheduled date", comment: "Repeat anchor mode")
-        : String(localized: "On the scheduled date — needs a date",
+        : String(localized: "On the scheduled date (set a When date first)",
                  comment: "Repeat anchor mode, unavailable"),
       titleColor: offerable ? SeptaskKitTheme.inkPrimary : SeptaskKitTheme.iconMuted)
 
@@ -522,7 +522,7 @@ private final class KitRepeatBoard: NSView {
     let rows = selection.count
     guard let unit, let afterCompletion, let count = interval ?? selection.interval else {
       cadenceDescription.stringValue = String(
-        localized: "\(rows) tasks with different repeat settings. Only what you change is written.",
+        localized: "\(rows) tasks with different repeat settings. Only the settings you change will be updated.",
         comment: "Repeat editor summary, mixed selection")
       return
     }
@@ -546,9 +546,9 @@ private final class KitRepeatBoard: NSView {
         : String(localized: "years", comment: "Repeat cadence unit, plural")
     }
     let sentence = afterCompletion
-      ? String(localized: "A new copy \(count) \(unitName) after this one is checked off.",
+      ? String(localized: "A new copy appears \(count) \(unitName) after this one is checked off.",
                comment: "Repeat editor summary, after completion")
-      : String(localized: "A new copy \(count) \(unitName) after the previous scheduled date.",
+      : String(localized: "A new copy appears \(count) \(unitName) after the scheduled date.",
                comment: "Repeat editor summary, fixed schedule")
     cadenceDescription.stringValue = rows > 1
       ? sentence + " " + String(localized: "Applies to \(rows) tasks.",

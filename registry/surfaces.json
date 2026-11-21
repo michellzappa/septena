@@ -35,9 +35,9 @@
         "title": "Get started with Septena",
         "featureId": "lists.today",
         "steps": [
-          { "id": "connectAI", "title": "Connect your AI", "detail": "Connect an assistant to your tasks" },
-          { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from another app" },
-          { "id": "addTask", "title": "Add your first task", "detail": "It lands in your Inbox until you decide" }
+          { "id": "connectAI", "title": "Connect your AI", "detail": "Let Claude work on tasks with you" },
+          { "id": "importTasks", "title": "Bring in your tasks", "detail": "Import from Things or Reminders" },
+          { "id": "addTask", "title": "Add your first task", "detail": "It lands in your Inbox until you schedule or file it" }
         ]
       },
       {
@@ -48,8 +48,8 @@
         "icon": "notice.fade_intro",
         "dismissScope": "device",
         "dismissible": true,
-        "title": "Tasks left on Today start to fade",
-        "detail": "A task fades a little each day it carries over. Check it off or move it to bring it back. You can turn this off in Settings.",
+        "title": "Inactive tasks start to fade",
+        "detail": "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
         "featureId": "task.aging"
       }
     ]
@@ -104,10 +104,10 @@
         "id": "rescheduleFixedRepeat",
         "kind": "fork",
         "title": "Reschedule repeating task?",
-        "message": "Move only this occurrence or shift the future schedule too?",
+        "message": "Move only this task, or update the repeating schedule to the new date?",
         "options": [
-          { "id": "exception", "title": "Make Exception" },
-          { "id": "updateRule", "title": "Update Rule" }
+          { "id": "exception", "title": "Only This Task" },
+          { "id": "updateRule", "title": "Update Schedule" }
         ],
         "featureId": "task.repeat"
       }

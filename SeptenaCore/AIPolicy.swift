@@ -23,11 +23,11 @@ enum AIMode: String, CaseIterable, Codable, Sendable {
   var blurb: String {
     switch self {
     case .onDeviceOnly:
-      return "Everything stays on this device. Nothing leaves; a step that needs more pauses until you decide."
+      return "Everything stays on this device. If a step needs a larger model, it pauses and asks you."
     case .auto:
-      return "On-device first, escalating to Apple’s Private Cloud Compute or your own Claude only when a step needs more. Recommended."
+      return "On-device first, escalating to Apple’s Private Cloud Compute or your own Claude only when a step needs a larger model. Recommended."
     case .useMyClaude:
-      return "Prefer your connected Claude for the thinking — your account, your data. \(AppDisplayName.current) still never runs AI on your tasks."
+      return "Prefer your connected Claude for reasoning (your account, your data). \(AppDisplayName.current) still never runs AI on your tasks."
     }
   }
 }

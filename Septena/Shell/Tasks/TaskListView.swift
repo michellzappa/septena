@@ -555,14 +555,14 @@ struct TaskListView: View {
         ),
         titleVisibility: .visible
       ) {
-        Button("Make Exception") {
+        Button("Only This Task") {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
             applyScheduledWhen(id: id, date: prompt.date, mode: .makeException)
           }
         }
-        Button("Update Rule") {
+        Button("Update Schedule") {
           guard let prompt = reschedulePrompt else { return }
           reschedulePrompt = nil
           for id in prompt.taskIDs {
@@ -571,7 +571,7 @@ struct TaskListView: View {
         }
         Button("Cancel", role: .cancel) { reschedulePrompt = nil }
       } message: {
-        Text("Make Exception moves only this copy. Update Rule moves the repeating schedule to the new date.")
+        Text("Move only this task, or update the repeating schedule to the new date?")
       }
     // A rolled-back save is reported here, on the surface where a lost task is
     // noticed. NOT the snackbar below it: that is a one-line auto-dismissing
@@ -1626,13 +1626,13 @@ struct TaskListView: View {
       TaskListNotice(
         kind: .info,
         symbol: "circle.dashed",
-        title: Text(String(localized: "Tasks untouched for 14 days wait here.",
+        title: Text(String(localized: "Tasks without activity for 14 days",
                            comment: "Faded pile top notice title")),
-        detail: Text(String(localized: "Tap Keep or open a task to bring it back, or run a sweep.",
+        detail: Text(String(localized: "Open a task or choose Keep to bring it back, or review the list to let the rest go.",
                             comment: "Faded pile top notice detail")),
         onDismiss: nil
       ) {
-        Button(String(localized: "Sweep…", comment: "Faded pile sweep action")) {
+        Button(String(localized: "Review…", comment: "Faded pile review action")) {
           sweepSheetTasks = visibleItems
         }
         .buttonStyle(.bordered)
@@ -1848,7 +1848,7 @@ struct TaskListView: View {
         ContentUnavailableView(
           "No Faded Tasks",
           systemImage: titleIcon,
-          description: Text("Undated tasks untouched for 14 days appear here until you keep them or let them go.")
+          description: Text("Undated tasks without activity for 14 days appear here until you keep them or let them go.")
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 40)

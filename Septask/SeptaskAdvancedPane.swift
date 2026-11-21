@@ -30,7 +30,7 @@ struct SeptaskAdvancedPane: View {
       } header: {
         Text("Agent tools")
       } footer: {
-        Text("The brief that teaches a model how to use your tasks through the connection — tools, conventions, examples.")
+        Text("The brief that teaches a model how to use your tasks through the connection (tools, conventions, and examples).")
       }
 
       // Sync & storage diagnostics
@@ -131,7 +131,7 @@ struct SeptaskAdvancedPane: View {
         Toggle(isOn: $showModelLabels) {
           VStack(alignment: .leading, spacing: 2) {
             Text("Show model labels")
-            Text("Label which model answers in each AI spot.")
+            Text("Show which model answered next to each AI reply.")
               .font(.footnote)
               .foregroundStyle(.secondary)
           }
@@ -145,7 +145,7 @@ struct SeptaskAdvancedPane: View {
               .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
               Text("Private Cloud Compute")
-              Text(pcc.available ? (pccRouting ? "In use" : "Available — not in use") : pcc.label)
+              Text(pcc.available ? (pccRouting ? "In use" : "Available, not in use") : pcc.label)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }

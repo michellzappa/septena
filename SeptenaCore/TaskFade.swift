@@ -204,7 +204,7 @@ enum TaskFade {
     var parts: [String] = []
     if let clock = clockDate(touchedAt: touchedAt, createdAt: createdAt, created: created) {
       let days = max(windowDays, Int(now.timeIntervalSince(clock) / 86_400))
-      parts.append("Untouched \(days) days")
+      parts.append("\(days) days without activity")
     }
     if let scheduled, !scheduled.isEmpty {
       parts.append("Past date")

@@ -135,7 +135,7 @@
       "supportsInlineCreate": false,
       "dropBehavior": "none",
       "featureId": "lists.faded",
-      "emptyState": { "title": "Nothing faded", "detail": "Undated tasks untouched for 14 days quietly gather here." }
+      "emptyState": { "title": "No Faded Tasks", "detail": "Undated tasks without activity for 14 days appear here until you keep them or let them go." }
     },
     {
       "id": "recentlyDeleted",

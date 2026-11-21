@@ -107,7 +107,7 @@ struct ThingsImportView: View {
     } header: {
       Text("Options")
     } footer: {
-      Text("Things tags and headings are not first-class in \(AppDisplayName.current). Tasks filed in a project without a today, scheduled, or deadline date land in Inbox — preview shows where items will appear.")
+      Text("Tags are added to task notes when enabled above. Tasks filed in a project without a Today, scheduled, or deadline date land in Inbox; preview shows where items will appear.")
     }
     .onChange(of: options) { _, _ in
       if scratchpadURL != nil { rebuildPlanFromScratchpad() }

@@ -776,7 +776,7 @@ struct SeptaskImportExportPane: View {
     } header: {
       Text("Move from another app")
     } footer: {
-      Text("Move a Things database into Septena once. Things is not changed.")
+      Text("Copy a Things database into Septena once. Nothing in Things is changed.")
     }
   }
 

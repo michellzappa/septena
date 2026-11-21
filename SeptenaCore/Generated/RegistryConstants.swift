@@ -355,9 +355,9 @@ enum RegistrySettings {
       RegistrySettingsItem(kind: "pageLink", key: nil, page: "import_export", surface: nil, label: "Import & Export", detail: nil, iconId: "settings.data", sfSymbol: "square.and.arrow.up", statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
     ]),
     RegistrySettingsGroup(id: "lists_root", header: "Lists", mobilePresentation: "inline", desktopTab: "general", items: [
-      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: "Group Today by list", detail: "Off shows one flat list, with each task's list as a subtitle.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "setting", key: "todayGroupByList", page: nil, surface: nil, label: "Group Today by list", detail: "When off, tasks appear in one list with their project or area underneath.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "todayShowCompleted", page: nil, surface: nil, label: "Show completed tasks", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
-      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: "Fade untouched tasks", detail: "Tasks untouched for 14 days fade out and move to Faded.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+      RegistrySettingsItem(kind: "setting", key: "tasksShowAging", page: nil, surface: nil, label: "Fade inactive tasks", detail: "Tasks without activity for 14 days fade out and move to Faded.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "tasksFilingSuggestions", page: nil, surface: nil, label: "Suggest where to file", detail: "Learn where you usually file similar tasks.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       RegistrySettingsItem(kind: "setting", key: "badgeShowOverdue", page: nil, surface: nil, label: "Overdue app icon badge", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
     ]),
@@ -394,7 +394,7 @@ enum RegistrySettings {
       RegistrySettingsSection(id: "on_device", header: "On-device intelligence", platforms: ["ios", "ipados", "macos"], items: [
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "apple_intelligence_status", label: nil, detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: ["ios", "ipados", "macos"]),
       ]),
-      RegistrySettingsSection(id: "reach", header: "How far AI may reach", platforms: nil, items: [
+      RegistrySettingsSection(id: "reach", header: "Where AI runs", platforms: nil, items: [
         RegistrySettingsItem(kind: "setting", key: "aiMode", page: nil, surface: nil, label: "AI Mode", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
       RegistrySettingsSection(id: "explainer", header: nil, platforms: nil, items: [
@@ -455,7 +455,7 @@ enum RegistrySettings {
         RegistrySettingsItem(kind: "customSurface", key: nil, page: nil, surface: "paste_json_import", label: "Paste JSON Backup…", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
       ]),
       RegistrySettingsSection(id: "beta_ai", header: "AI diagnostics", platforms: ["ios", "ipados", "macos"], items: [
-        RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: "Show model labels", detail: "Label which model answers in each AI spot.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
+        RegistrySettingsItem(kind: "setting", key: "showModelLabels", page: nil, surface: nil, label: "Show model labels", detail: "Show which model answered next to each AI reply.", iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "always", platforms: nil),
         RegistrySettingsItem(kind: "setting", key: "pccRoutingEnabled", page: nil, surface: nil, label: "Use Private Cloud Compute", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
         RegistrySettingsItem(kind: "setting", key: "pccReasoning", page: nil, surface: nil, label: "Private Cloud Compute reasoning", detail: nil, iconId: nil, sfSymbol: nil, statusKey: nil, desktopInline: false, visibility: "minAppleOS27", platforms: nil),
       ]),
@@ -494,7 +494,7 @@ enum RegistryDestinations {
     RegistryDestination(id: "repeating", navigationKey: "repeating", serverView: "all", title: "Repeating", iconId: "list.repeating", sfSymbol: "arrow.clockwise", visibility: "always", shortcutKeycaps: nil, emptyTitle: "No repeating tasks", emptyDetail: "Give any task a Repeat rule and it will show up here."),
     RegistryDestination(id: "anytime", navigationKey: "unscheduled", serverView: "unscheduled", title: "Anytime", iconId: "list.anytime", sfSymbol: "rectangle.stack.fill", visibility: "always", shortcutKeycaps: ["⌘", "3"], emptyTitle: "Nothing in Anytime", emptyDetail: "Open tasks without a date live here."),
     RegistryDestination(id: "logbook", navigationKey: "logbook", serverView: "logbook", title: "Logbook", iconId: "list.logbook", sfSymbol: "checkmark", visibility: "always", shortcutKeycaps: ["⌘", "4"], emptyTitle: "Logbook is empty", emptyDetail: "Completed and let-go tasks are archived here."),
-    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: "Faded", iconId: "list.faded", sfSymbol: "circle.dashed", visibility: "whenNonEmpty", shortcutKeycaps: nil, emptyTitle: "Nothing faded", emptyDetail: "Undated tasks untouched for 14 days quietly gather here."),
+    RegistryDestination(id: "faded", navigationKey: "faded", serverView: "all", title: "Faded", iconId: "list.faded", sfSymbol: "circle.dashed", visibility: "whenNonEmpty", shortcutKeycaps: nil, emptyTitle: "No Faded Tasks", emptyDetail: "Undated tasks without activity for 14 days appear here until you keep them or let them go."),
     RegistryDestination(id: "recentlyDeleted", navigationKey: "recentlyDeleted", serverView: "all", title: "Recently Deleted", iconId: "list.recently_deleted", sfSymbol: "trash", visibility: "whenNonEmpty", shortcutKeycaps: nil, emptyTitle: "Recently Deleted is empty", emptyDetail: "Deleted tasks stay here for 30 days before they are removed."),
   ]
 
@@ -644,7 +644,7 @@ enum RegistrySurfaces {
     "deleteArea": RegistryPromptCopy(id: "deleteArea", title: "Delete this area?", message: "Its projects stay, detached from the area.", confirmTitle: "Delete Area"),
     "deleteProject": RegistryPromptCopy(id: "deleteProject", title: "Delete this project?", message: "Its tasks move to Recently Deleted.", confirmTitle: "Delete Project"),
     "deleteAccount": RegistryPromptCopy(id: "deleteAccount", title: "Delete Account?", message: "Your tasks, areas, projects, and conversations are erased from the server and this device.", confirmTitle: "Delete Account"),
-    "rescheduleFixedRepeat": RegistryPromptCopy(id: "rescheduleFixedRepeat", title: "Reschedule repeating task?", message: "Move only this occurrence or shift the future schedule too?", confirmTitle: nil),
+    "rescheduleFixedRepeat": RegistryPromptCopy(id: "rescheduleFixedRepeat", title: "Reschedule repeating task?", message: "Move only this task, or update the repeating schedule to the new date?", confirmTitle: nil),
   ]
 }
 

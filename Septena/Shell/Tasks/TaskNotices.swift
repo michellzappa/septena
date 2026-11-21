@@ -292,14 +292,14 @@ enum TaskNotices {
         id: .connectAI,
         title: String(localized: "Connect your AI",
                       comment: "Get started step: connect an AI assistant or agent"),
-        detail: String(localized: "Connect an assistant to your tasks",
+        detail: String(localized: "Let Claude work on tasks with you",
                        comment: "Get started step detail: connect an AI assistant to your tasks"),
         done: done(.connectAI, source: TaskSource.mcp)),
       TaskNoticeStep(
         id: .importTasks,
         title: String(localized: "Bring in your tasks",
                       comment: "Get started step: import tasks from another app"),
-        detail: String(localized: "Import from another app",
+        detail: String(localized: "Import from Things or Reminders",
                        comment: "Get started step detail: import tasks from another app"),
         done: done(.importTasks, source: TaskSource.things)),
       TaskNoticeStep(
@@ -330,7 +330,7 @@ enum TaskNotices {
     String(localized: "Or press ⌃⌥Space anywhere on your Mac",
            comment: "Get started step detail: the Quick Entry shortcut on Mac")
     #else
-    String(localized: "It lands in your Inbox until you decide",
+    String(localized: "It lands in your Inbox until you schedule or file it",
            comment: "Get started step detail: where a new task goes")
     #endif
   }
@@ -355,9 +355,9 @@ enum TaskNotices {
     return TaskNotice(
       id: .weeklySweep, kind: .info, symbol: "circle.dashed",
       title: count == 1
-        ? String(localized: "1 task faded this week. Still want it?",
+        ? String(localized: "1 task faded this week",
                  comment: "Weekly sweep notice title: singular")
-        : String(localized: "\(count) tasks faded this week. Still want any?",
+        : String(localized: "\(count) tasks faded this week",
                  comment: "Weekly sweep notice title: plural"),
       detail: nil,
       primaryTitle: String(localized: "Review", comment: "Weekly sweep notice action button"),
@@ -376,9 +376,9 @@ enum TaskNotices {
        pool.contains(where: { $0.fadeFill() != nil }) {
       out.append(TaskNotice(
         id: .fadeIntro, kind: .info, symbol: "circle.lefthalf.filled",
-        title: String(localized: "Untouched tasks start to fade",
+        title: String(localized: "Inactive tasks start to fade",
                       comment: "Explainer notice title: task fade, shown the first time a task fades"),
-        detail: String(localized: "An undated task fades over 14 days without a touch, then moves to Faded. Touch or edit it to restore full strength. You can turn this off in Settings.",
+        detail: String(localized: "Undated tasks fade after 14 days without activity and move to Faded. Open or edit a task to bring it back. You can turn this off in Settings.",
                        comment: "Explainer notice detail: how task fade works and how to undo or disable it"),
         primaryTitle: nil, dismissible: true))
     }

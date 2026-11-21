@@ -79,19 +79,19 @@ struct TaskSettingsPane<Destination: Hashable>: View {
       // AppKit Today reads the key from UserDefaults and must rebuild.
       Toggle("Show completed tasks", isOn: TaskViewOptions.announcing($todayShowCompleted))
       Toggle(isOn: TaskViewOptions.announcing($showAging)) {
-        rowLabel("Fade untouched tasks",
-                 detail: "Tasks untouched for 14 days fade out and move to Faded.")
+        rowLabel("Fade inactive tasks",
+                 detail: "Tasks without activity for 14 days fade out and move to Faded.")
       }
       // Same switch as View ▸ Group Today by List; `announcing` is what keeps
       // Septask's AppKit list in step when it's flipped from here.
       Toggle(isOn: TaskViewOptions.announcing($todayGroupByList)) {
         rowLabel("Group by area and project",
-                 detail: "Off shows one flat list, with each task's list as a subtitle.")
+                 detail: "When off, tasks appear in one list with their project or area underneath.")
       }
     } header: {
       Text("Today")
     } footer: {
-      Text("Undated, non-repeating tasks fade over 14 days without a touch and move to Faded until a weekly sweep lets you keep them or let them go. Touching a task restores full strength.")
+      Text("Undated, non-repeating tasks fade after 14 days without activity and move to Faded until you keep them or let them go. Open or edit a task to bring it back.")
     }
   }
 
@@ -106,7 +106,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Task rows")
     } footer: {
-      Text("How far a long title wraps before it is cut off. Taller rows fit fewer tasks on screen.")
+      Text("Maximum lines shown for long titles. Taller rows fit fewer tasks on screen.")
     }
   }
   #endif
@@ -161,7 +161,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Badge")
     } footer: {
-      Text("Marks the app icon while any task is overdue. Each device opts in on its own.")
+      Text("Marks the app icon while any task is overdue. Set separately on each device.")
     }
   }
 
@@ -189,7 +189,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
     } header: {
       Text("Import")
     } footer: {
-      Text("Move a Things database into Tasks once. Things is not changed.")
+      Text("Copy a Things database into Tasks once. Nothing in Things is changed.")
     }
   }
 
@@ -243,7 +243,7 @@ struct TaskSettingsPane<Destination: Hashable>: View {
         Label("Completion animations", systemImage: "party.popper")
       }
     } footer: {
-      Text("The flourish when you clear Today or check off a task. Off keeps the confirming haptic but skips the motion. Reduce Motion always overrides this.")
+      Text("Play a brief animation when you check off a task or clear Today. Off keeps haptic feedback only. Reduce Motion always overrides this.")
     }
     #else
     Section {

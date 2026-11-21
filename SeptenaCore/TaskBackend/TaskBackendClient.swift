@@ -22,9 +22,9 @@ enum TaskBackendError: LocalizedError, Equatable {
 
   var errorDescription: String? {
     switch self {
-    case .notSignedIn: return "Not signed in to the task backend."
-    case .http(let status, let code): return "The backend answered \(status) (\(code))."
-    case .badResponse(let what): return "The backend sent a reply the app can't read (\(what))."
+    case .notSignedIn: return "Not signed in to Septena sync."
+    case .http(let status, let code): return "The server answered \(status) (\(code))."
+    case .badResponse(let what): return "The server sent a reply the app couldn’t read (\(what))."
     case .network(let what): return "Network error: \(what)"
     }
   }

@@ -166,10 +166,10 @@ struct RecurrencePickerSheet: View {
               .labelsHidden()
 
             Picker("Unit", selection: $unit) {
-              Text("day").tag(Recurrence.Unit.day)
-              Text("week").tag(Recurrence.Unit.week)
-              Text("month").tag(Recurrence.Unit.month)
-              Text("year").tag(Recurrence.Unit.year)
+              Text(interval == 1 ? "day" : "days").tag(Recurrence.Unit.day)
+              Text(interval == 1 ? "week" : "weeks").tag(Recurrence.Unit.week)
+              Text(interval == 1 ? "month" : "months").tag(Recurrence.Unit.month)
+              Text(interval == 1 ? "year" : "years").tag(Recurrence.Unit.year)
             }
             .pickerStyle(.menu)
             .tint(Theme.inkPrimary)
@@ -245,16 +245,9 @@ struct RecurrencePickerSheet: View {
   }
 
   private func cadenceDescription() -> String {
-    let unitName: String
-    switch unit {
-    case .day: unitName = interval == 1 ? "day" : "days"
-    case .week: unitName = interval == 1 ? "week" : "weeks"
-    case .month: unitName = interval == 1 ? "month" : "months"
-    case .year: unitName = interval == 1 ? "year" : "years"
-    }
-    return afterCompletion
-      ? "\(unitName) after previous item is checked off."
-      : "\(unitName) after previous scheduled date."
+    afterCompletion
+      ? "after it’s checked off."
+      : "after the scheduled date."
   }
 }
 

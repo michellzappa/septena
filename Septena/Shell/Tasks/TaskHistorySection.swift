@@ -48,7 +48,7 @@ struct TaskHistorySection: View {
     if loadedFor != taskID {
       ProgressView().controlSize(.small)
     } else if failed {
-      Text("History did not load.").font(.caption).foregroundStyle(.secondary)
+      Text("Couldn’t load history.").font(.caption).foregroundStyle(.secondary)
     } else if rows.isEmpty {
       Text("No changes yet.").font(.caption).foregroundStyle(.secondary)
     } else {
