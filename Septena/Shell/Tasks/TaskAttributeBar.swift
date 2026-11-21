@@ -1,8 +1,9 @@
 import SwiftUI
 
-// The composer's elective-pill rail — the row of When / Deadline / Repeat /
-// List / Attachments / Discuss capsules under the title & notes — and the
-// inline panels a pill expands into. Split out of TaskComposer.swift.
+// The composer's elective-pill rail — a single row of circular icon buttons
+// (When / Deadline / Repeat / List / Attachments / Discuss) under the title &
+// notes — and the inline panels a button expands into. Split out of
+// TaskComposer.swift.
 //
 // `TaskAttributeBar` is the entry point; the pill and the three inline panels
 // are private to this file.
@@ -97,12 +98,10 @@ struct TaskAttributeBar: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Pills wrap onto extra rows as needed (FlowLayout) so every elective
-      // stays visible — no offscreen horizontal scroll. "Today" isn't its own
-      // pill: it's the same stored state as When=Today, so it lives inside the
-      // When control (quick chip) instead of duplicating the rail. Flat
-      // capsule fills (no floating glass) — these sit inline on the form card.
-      FlowLayout(spacing: 8) {
+      // Single horizontal row of circular icon buttons — all 6 fit comfortably
+      // on one row even on compact iPhone widths. "Today" lives inside the When
+      // control rather than duplicating the rail.
+      HStack(spacing: 8) {
         ForEach(Attribute.draftCases) { attr in
           AttributePill(icon: attr.icon, label: attr.label,
                         value: value(for: attr), isSet: isSet(attr),
@@ -124,6 +123,7 @@ struct TaskAttributeBar: View {
           AttributePill(icon: Attribute.discuss.icon, label: Attribute.discuss.label,
                         value: discussWorking ? "Thinking…" : nil,
                         isSet: discussWorking, isActive: false,
+                        isLoading: discussWorking,
                         isFocused: focus == .pill(.discuss),
                         accent: accent, neutral: neutral) { select(.discuss) }
             .focused($focus, equals: .pill(.discuss))
@@ -281,47 +281,59 @@ private struct AttributePill: View {
   let value: String?
   let isSet: Bool
   let isActive: Bool
+  var isLoading: Bool = false
   /// The keyboard cursor is on this pill — draw the focus ring (the system ring
   /// never shows with macOS keyboard navigation off).
   var isFocused: Bool = false
   let accent: Color
-  /// Monochrome rail (inline editor): filled/active pills wear a neutral gray
-  /// capsule and the focus ring goes gray, so no section accent leaks into the
+  /// Monochrome rail (inline editor): filled/active circles wear a neutral gray
+  /// tint and the focus ring goes gray, so no section accent leaks into the
   /// open editor. See `TaskAttributeBar.neutral`.
   var neutral: Bool = false
   let action: () -> Void
 
-  /// Capsule fill — flat surface, no floating-glass elevation shadow.
-  private var capsuleFill: Color {
+  private static let diameter: CGFloat = 34
+
+  /// Circular fill — flat surface, no floating-glass elevation shadow.
+  private var circleFill: Color {
     guard isSet || isActive else { return Theme.mutedSurface }
-    return neutral ? Theme.inkPrimary.opacity(0.10) : accent.opacity(0.42)
+    if neutral {
+      return Theme.inkPrimary.opacity(isActive ? 0.16 : 0.11)
+    }
+    return accent.opacity(isActive ? 0.42 : 0.30)
   }
   private var ringColor: Color { neutral ? Theme.selectionNeutral : accent }
 
+  private var accessibleSummary: String {
+    if let value { return "\(label): \(value)" }
+    return label
+  }
+
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 5) {
-        Image(systemName: icon)
-          .font(.system(size: 12, weight: .semibold))
-        // Text follows the value when one exists (so the List pill can read
-        // "Inbox" while still untinted); tint stays driven by `isSet`.
-        Text(value ?? label)
-          .font(.septenaLabel)
-          .lineLimit(1)
+      Group {
+        if isLoading {
+          ProgressView()
+            .controlSize(.mini)
+        } else {
+          Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+        }
       }
-      .foregroundStyle(isSet ? Theme.inkPrimary : Theme.inkSecondary)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
-      .contentShape(Capsule())
+      .foregroundStyle((isSet || isActive) ? Theme.inkPrimary : Theme.inkSecondary)
+      .frame(width: Self.diameter, height: Self.diameter)
+      .contentShape(Circle())
     }
     .buttonStyle(.plain)
-    .background(Capsule().fill(capsuleFill))
+    .background(Circle().fill(circleFill))
     .overlay {
-      Capsule()
+      Circle()
         .strokeBorder(ringColor, lineWidth: 2)
         .opacity(isFocused ? 1 : 0)
         .allowsHitTesting(false)
     }
+    .accessibilityLabel(accessibleSummary)
+    .help(accessibleSummary)
   }
 }
 // MARK: - Inline "When" editor
