@@ -261,8 +261,13 @@ final class TaskEntity {
   /// just `scheduled == today` and retire the `today` flag — at which point
   /// only the body of this one property changes. Centralized here so the
   /// `.today` filter (and anything else) reads from a single source.
+  /// True when this open task has faded into the Faded pile
+  /// (`docs/TASK_FADE_SPEC.md` §4). Faded tasks leave every other list, every
+  /// count, Next, and the badge.
+  var isFaded: Bool { status == .open && fadedAt != nil }
+
   var isOnToday: Bool {
-    guard status == .open, !isHeading else { return false }
+    guard status == .open, !isHeading, fadedAt == nil else { return false }
     if today { return true }
     if let s = scheduled, s <= SeptenaDate.today { return true }
     if let d = deadline, d <= SeptenaDate.today { return true }
@@ -272,11 +277,11 @@ final class TaskEntity {
   /// Filed nowhere: no area, no project. See `TaskInbox`.
   var isUnfiled: Bool { TaskInbox.isUnfiled(area: area, project: project) }
 
-  /// Inbox member: open, not deleted, not a heading, unfiled. The one Inbox
-  /// rule lives in `TaskInbox`; mirror of `SeptenaTask.isInInbox`.
+  /// Inbox member: open, not deleted, not faded, not a heading, unfiled. The
+  /// one Inbox rule lives in `TaskInbox`; mirror of `SeptenaTask.isInInbox`.
   var isInInbox: Bool {
     TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
-                       area: area, project: project)
+                       isFaded: isFaded, area: area, project: project)
   }
 
   /// The triage band: Inbox members not yet ratified — the layer rendered
@@ -4071,7 +4076,7 @@ enum LocalCache {
         done[project, default: 0] += 1
         total[project, default: 0] += 1
       case .open:
-        total[project, default: 0] += 1
+        if row.fadedAt == nil { total[project, default: 0] += 1 }
       case .cancelled:
         break
       }
@@ -4138,7 +4143,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .review, .upcoming, .repeating, .unscheduled:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled, .faded:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -4178,9 +4183,17 @@ enum LocalCache {
       .sorted { a, b in a.key != b.key ? a.key < b.key : a.id < b.id }
       .map(\.task)
     // The Completed (logbook) view reads as an archive — most-recently-completed
-    // first. Every other view keeps manual/creation order (TaskOrder.key).
+    // first. The Faded pile shows most-recently-faded first. Every other view
+    // keeps manual/creation order (TaskOrder.key).
     if case .logbook = filter {
       return result.sorted { ($0.completedAt ?? "") > ($1.completedAt ?? "") }
+    }
+    if case .faded = filter {
+      return result.sorted {
+        let a = $0.fadedAt ?? .distantPast
+        let b = $1.fadedAt ?? .distantPast
+        return a != b ? a > b : $0.id < $1.id
+      }
     }
     return result
   }
@@ -4248,6 +4261,13 @@ enum LocalCache {
     // any list — the post-pull sweep moves it to Recently Deleted
     // (`DeletedContainerLedger`, `TaskInbox`).
     if DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead) { return nil }
+    // Faded pile (`docs/TASK_FADE_SPEC.md` §4): faded open tasks show ONLY in
+    // `.faded` and leave every other list (Today, Inbox, Upcoming, Repeating,
+    // Anytime, projects, areas).
+    if filter == .faded {
+      return e.isFaded ? SeptenaTask(e) : nil
+    }
+    if e.isFaded { return nil }
     switch filter {
     case .today:
       // Today = ratified-and-due. An unratified row that happens to be due
@@ -4286,8 +4306,8 @@ enum LocalCache {
     case .area(let aid):
       guard e.area == aid else { return nil }
       return SeptenaTask(e)
-    case .recentlyDeleted:
-      // Handled by the early-return above; unreachable here.
+    case .faded, .recentlyDeleted:
+      // Handled by the early-returns above; unreachable here.
       return nil
     }
   }
@@ -4390,7 +4410,7 @@ enum LocalCache {
     let rows = StoreHealth.fetch(context, FetchDescriptor<TaskEntity>())
     return rows.reduce(0) { acc, e in
       guard e.deletedAt == nil, !e.pendingDeletion,
-            e.status == .open, let d = e.deadline, d <= today else { return acc }
+            e.status == .open, !e.isFaded, let d = e.deadline, d <= today else { return acc }
       return acc + 1
     }
   }

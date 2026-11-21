@@ -448,6 +448,43 @@ final class TaskMutator {
     }
     cloudBackend.unacknowledge(id: id)
   }
+
+  /// Daily idempotent fade pass (`docs/TASK_FADE_SPEC.md` §4). Stamps
+  /// `fadedAt` on untouched open tasks past the fade window.
+  @discardableResult
+  func runFadePass(now: Date? = nil, today: String? = nil) -> Int {
+    guard let cloudBackend else { return 0 }
+    return cloudBackend.runFadePass(now: now, today: today)
+  }
+
+  /// Keep faded task(s) out of the Faded pile (§4). Clears `fadedAt`, stamps
+  /// `touchedAt`, resets `deferCount`.
+  func keepFaded(ids: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] keepFaded called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.keepFaded(ids: ids)
+  }
+
+  /// Drop faded task(s) from the weekly sweep (§5): status `cancelled`,
+  /// `dropReason = "faded"`, `completedAt = now`.
+  func dropFaded(ids: [String]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] dropFaded called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.dropFaded(ids: ids)
+  }
+
+  /// Undo target for Keep / Sweep Drop: restores exact pre-action fields.
+  func restoreFaded(_ snapshots: [TaskUndo.FadedSnapshot]) {
+    guard let cloudBackend else {
+      SeptenaLog.error("[TaskMutator] restoreFaded called before CK bound — dropping", nil)
+      return
+    }
+    cloudBackend.restoreFaded(snapshots)
+  }
 }
 
 // MARK: - Title text

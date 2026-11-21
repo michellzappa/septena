@@ -342,6 +342,7 @@
 		336C3C95EF79C901C9107AE9 /* AddInfoRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3C4FD96F6113A7975BA394 /* AddInfoRouter.swift */; };
 		337A100739B30D1ACD59E7A2 /* GitHubDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4752E39BC337503CC5BAD76 /* GitHubDestinationView.swift */; };
 		338614EF21105A691BB7DC26 /* ChecklistMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D2A0C223ECB0DAA0D3EB12 /* ChecklistMirror.swift */; };
+		34347A71BB069AA9E5443041 /* TaskFadeSweepSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */; };
 		347685B09999072F2262EAF0 /* ThingsSQLiteReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75BBE36F4FDB38D97CC5132 /* ThingsSQLiteReader.swift */; };
 		34ADD467996667728E16E518 /* RemoteTaskSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04D24B12979F4CBB4175BA33 /* RemoteTaskSync.swift */; };
 		34C9978620E53BB6608AA846 /* IntakeKindPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F995B787672FC82CA5739FC1 /* IntakeKindPageView.swift */; };
@@ -420,6 +421,7 @@
 		40A0EE423552A4504E87DCC4 /* MoodDestinationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E14E48DFB87C5F1543BEA4 /* MoodDestinationView.swift */; };
 		40A48B907339E705C7B4F2ED /* ValuesFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA5A367598E8EAAD49252C9 /* ValuesFlowView.swift */; };
 		40A92682CA803F799D00CC2D /* ChoreIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C43983E27660C2E98E3424D /* ChoreIntents.swift */; };
+		40B86A4C72E2793BF8FB30EC /* TaskFadeSweepSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */; };
 		40DB56549C8D30F6975621CA /* SeptaskSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9250B1E8F9D8494F6C6C0A69 /* SeptaskSettingsView.swift */; };
 		40DE0B3EE352E4459E9C4DF6 /* TaskDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */; };
 		410FF6616D25E65806C97AC2 /* TasksWatchBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403F0406AA360607D8614AFC /* TasksWatchBuilder.swift */; };
@@ -745,6 +747,7 @@
 		713762038CBF75DAC8A73954 /* SectionGoalsStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A7117A7C0612C55CFF2CD2 /* SectionGoalsStrip.swift */; };
 		71678943B22806A1D2F2CD9D /* DemoSeedMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF00EC44C1E78BE7E1417CDF /* DemoSeedMode.swift */; };
 		71A9C3461F715FD55CF46C9B /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46077D40BFADE69BDE238E84 /* Changelog.swift */; };
+		722A373C190CC241CCD73F16 /* TaskFadeSweepSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */; };
 		723AFD3B37846F2DD283DB0C /* RhythmWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E807B4F41EC2581024D07E0B /* RhythmWire.swift */; };
 		726977B8AE616E5BE9B85B66 /* GoalMilestoneRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545368C5D91673E810519444 /* GoalMilestoneRecord.swift */; };
 		72A30C74C5703C1092BFB56A /* ThingsImportApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DE62CAD2CB81CF0A055BE30 /* ThingsImportApply.swift */; };
@@ -867,6 +870,7 @@
 		86159E5611439B7BDBDE918F /* CoachVoiceEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061EC1492AC575A632A4A686 /* CoachVoiceEditor.swift */; };
 		861CF9D8C7AD0B6D0CE51593 /* GutIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F44D5D94AD1AD13F2D0AC6F7 /* GutIntents.swift */; };
 		863CF29EE74C2A5927F3A143 /* FoundationModels.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E48AFEC976A22FEF321AE70 /* FoundationModels.framework */; };
+		8656B0258AEBD46E6A9B8278 /* TaskFadeSweepSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */; };
 		86B10FA26DC181024D121B3C /* ResponseCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9D6916E979E5B0D7497CAEF /* ResponseCache.swift */; };
 		86F5D51D3D254081AC71B211 /* SectionGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2EF490BDCD58EDC49B4FAC6 /* SectionGlyph.swift */; };
 		871595CFFB68167889744A0A /* ConnectionHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0E4D88567E5D9C02EBD801 /* ConnectionHealth.swift */; };
@@ -1548,6 +1552,7 @@
 		E9A55D9D943C72E84F2E0EC1 /* NutritionRingsBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7184022A465622EEE08AD3CA /* NutritionRingsBuilder.swift */; };
 		E9CA3C5EAD1B3DBAC3BDA24D /* MoodLogEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E574983CE59DCE0D6CB32E /* MoodLogEntity.swift */; };
 		E9D604A78C243E8ED46607A4 /* TaskReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBF0DAD74F9392D507229CE /* TaskReads.swift */; };
+		E9F84B23FF648640512D17C1 /* TaskFade.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD71B99BB832F620DA99B6C1 /* TaskFade.swift */; };
 		E9F99B7A66CD24B118A9E8E1 /* GutSymptomMigrationMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A752F956A678D4C282D192DE /* GutSymptomMigrationMap.swift */; };
 		E9FE8C1F55C7F682DDC5E73B /* MoodCommitAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB58A3A36A898E92890EBA /* MoodCommitAnimation.swift */; };
 		EA05D939110724F794BB9BBE /* DateParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E25F81FE5AA4B6BBC056275 /* DateParser.swift */; };
@@ -1589,6 +1594,7 @@
 		F0C1672EFEBA715B2830BC62 /* TrainingPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA54AD462A4486F31EBBDFC4 /* TrainingPlugin.swift */; };
 		F0F2E769DBBB44C62E66C4FB /* RhythmWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E807B4F41EC2581024D07E0B /* RhythmWire.swift */; };
 		F0FEBF1726404CCDEFDFE963 /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C7B41F8744B2EADC170EC8 /* Telemetry.swift */; };
+		F16973B670C0D239C7833D09 /* TaskFadeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0915B27ABB464AF9B858A74 /* TaskFadeTests.swift */; };
 		F17F64E7C6CA8C64D25E1EB8 /* ConsistencyStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E4AE35AB6070F3A880EC04 /* ConsistencyStats.swift */; };
 		F1F031D567DE6C81636396A0 /* SeptaskKitNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFE176FBF85AD27D2BE2C42 /* SeptaskKitNotice.swift */; };
 		F1FB2E785C980A22D4F7705C /* LogCommit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5E07B2C36076D991E0F0C1 /* LogCommit.swift */; };
@@ -1901,6 +1907,7 @@
 		2B3E066DC1C51CBAEDA71AB9 /* SectionTileWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionTileWidget.swift; sourceTree = "<group>"; };
 		2CDAE2C2761F6552979BD81A /* SiblingNudge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiblingNudge.swift; sourceTree = "<group>"; };
 		2E4B85E65CB1D53481420C4C /* GutPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GutPlugin.swift; sourceTree = "<group>"; };
+		2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFadeSweepSheet.swift; sourceTree = "<group>"; };
 		2F79B52B56CF74E2F11586CC /* TrainingQuickAddMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingQuickAddMenu.swift; sourceTree = "<group>"; };
 		2FEC52E838E893E9D37A00D6 /* TaskRecordNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRecordNames.swift; sourceTree = "<group>"; };
 		2FF14BD8D3F45837A2BC1849 /* EventFrequencySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFrequencySection.swift; sourceTree = "<group>"; };
@@ -2290,6 +2297,7 @@
 		CED676C371E5BCB0A607CF2E /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		CF16D9CDF344D10FEF6ECA07 /* SeptaskRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeptaskRootView.swift; sourceTree = "<group>"; };
 		CF2235080B8CCDA9426DAFD9 /* PurposePromptService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurposePromptService.swift; sourceTree = "<group>"; };
+		D0915B27ABB464AF9B858A74 /* TaskFadeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFadeTests.swift; sourceTree = "<group>"; };
 		D0DCABCAB9FB9AB08AE1A3B5 /* SelectableScrollList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectableScrollList.swift; sourceTree = "<group>"; };
 		D0EBCAFF8036A11B0BBEC06E /* AddTaskPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTaskPage.swift; sourceTree = "<group>"; };
 		D0EC1DA8956AB72A184A6844 /* SeptenaShare.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeptenaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -3174,6 +3182,7 @@
 				FD54B4876728BD8A34F0E248 /* GutSymptomMapTests.swift */,
 				17419338109BD8D053FEEC49 /* IntakeMigrationTests.swift */,
 				885D6BD88D7ECDFCC3C6B948 /* TaskChangeContractTests.swift */,
+				D0915B27ABB464AF9B858A74 /* TaskFadeTests.swift */,
 				0546FA3A26D7FAFC642688C5 /* ThingsImportTestFixtures.swift */,
 				6F457F532C98A765F6365C4C /* ThingsImportTests.swift */,
 				D41D72F30A2E56F86DC7AE6E /* TrainingHistoryImportTests.swift */,
@@ -3265,6 +3274,7 @@
 				41F8977A576F2BB747E8DBD7 /* TaskComponents.swift */,
 				D46BD49E9085E6317FFB26A4 /* TaskComposer.swift */,
 				58104223B8DF0EFE5EA8D46F /* TaskDraft.swift */,
+				2E62E6F065674B5C81C045EE /* TaskFadeSweepSheet.swift */,
 				03A3965263F7FB7B67F05447 /* TaskFilingSuggestions.swift */,
 				A6CCC268C8F2C024F0B38F85 /* TaskHistorySection.swift */,
 				F5E298F308656C2236B1CC5E /* TaskInlineRows.swift */,
@@ -4417,6 +4427,7 @@
 				E2D452333F772F9FC7D3FC2F /* TaskConvo.swift in Sources */,
 				C65BB6E955C310B07DF04E41 /* TaskDraft.swift in Sources */,
 				CD6344907F2BCF4AF9D9F924 /* TaskFade.swift in Sources */,
+				40B86A4C72E2793BF8FB30EC /* TaskFadeSweepSheet.swift in Sources */,
 				D7EC35B570E1C4B29FEA8C1E /* TaskFilingSuggestions.swift in Sources */,
 				C0095611815A4ED532A7F5F1 /* TaskHistory.swift in Sources */,
 				E67BA834742067C44ACC0152 /* TaskHistorySection.swift in Sources */,
@@ -4509,6 +4520,8 @@
 				38E799575ED55AAB2060FA74 /* SuggestionBlocks.swift in Sources */,
 				35FF10AC9217E45DDBFDF276 /* TaskChangeContractTests.swift in Sources */,
 				51B4D2D48D1717EB980ECF4F /* TaskConvo.swift in Sources */,
+				E9F84B23FF648640512D17C1 /* TaskFade.swift in Sources */,
+				F16973B670C0D239C7833D09 /* TaskFadeTests.swift in Sources */,
 				FA6ACC1A0B5AA5A3C72116E9 /* ThingsDateDecoder.swift in Sources */,
 				DD623697036959F9E186C788 /* ThingsImportMapping.swift in Sources */,
 				46AD501517F0473D34CC97B4 /* ThingsImportModels.swift in Sources */,
@@ -4737,6 +4750,7 @@
 				9269A8F1ED59FBBDADA15482 /* TaskConvo.swift in Sources */,
 				DA53A4B834BD56C1EBAD0123 /* TaskDraft.swift in Sources */,
 				CE14F52CC4E0B7A6ACBCAC7A /* TaskFade.swift in Sources */,
+				722A373C190CC241CCD73F16 /* TaskFadeSweepSheet.swift in Sources */,
 				64FA52A0388B054BA64AEB89 /* TaskFilingSuggestions.swift in Sources */,
 				ED09246C51387102FC1944F3 /* TaskHistory.swift in Sources */,
 				4F427C5FF3C750334A2C1C0F /* TaskHistorySection.swift in Sources */,
@@ -5219,6 +5233,7 @@
 				AD108B8FDAAED8D97264EDA4 /* TaskConvo.swift in Sources */,
 				77A510BB428BFD5266C208AE /* TaskDraft.swift in Sources */,
 				935D87311FBF0F6BFC6E73CC /* TaskFade.swift in Sources */,
+				8656B0258AEBD46E6A9B8278 /* TaskFadeSweepSheet.swift in Sources */,
 				87DF5D8ED8A653B317505898 /* TaskFilingSuggestions.swift in Sources */,
 				FF1A922E6C1838C726C344D1 /* TaskHistory.swift in Sources */,
 				9A7959506A4B2C744211C2CE /* TaskHistorySection.swift in Sources */,
@@ -5786,6 +5801,7 @@
 				9519DDD227BBBB80FF78C2D2 /* TaskConvo.swift in Sources */,
 				40DE0B3EE352E4459E9C4DF6 /* TaskDraft.swift in Sources */,
 				2EF95D60A465466098B7CD0A /* TaskFade.swift in Sources */,
+				34347A71BB069AA9E5443041 /* TaskFadeSweepSheet.swift in Sources */,
 				5DF1CCA334796890433C23DD /* TaskFilingSuggestions.swift in Sources */,
 				414206406B556CA998660F2F /* TaskHistory.swift in Sources */,
 				C9C5A93627C84AC64937518A /* TaskHistorySection.swift in Sources */,

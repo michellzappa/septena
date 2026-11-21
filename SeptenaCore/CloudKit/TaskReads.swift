@@ -186,8 +186,9 @@ enum TaskReads {
       if e.isHeading { continue }
       // Orphaned, awaiting delete (its area / project is gone): counts nowhere.
       if DeletedContainerLedger.hides(area: e.area, project: e.project, in: dead) { continue }
-      if e.status == .open { allOpen += 1 }
+      if e.status == .open, !e.isFaded { allOpen += 1 }
       guard !e.pendingDeletion else { continue }
+      if e.isFaded { continue }
 
       if e.isInTriageBand { triage += 1 }
       if e.isOnToday && !e.isInTriageBand { todayN += 1 }

@@ -413,6 +413,16 @@ struct SeptaskCommandMenus: Commands {
     }
 
     #if os(macOS)
+    SeptaskMacAppCommands()
+    #endif
+  }
+}
+
+#if os(macOS)
+/// Extracted so `SeptaskCommandMenus.body` stays within SwiftUI's 10-child
+/// `CommandsBuilder` limit.
+private struct SeptaskMacAppCommands: Commands {
+  var body: some Commands {
     CommandGroup(after: .appInfo) {
       Button("Check for Updates…") {
         Task { @MainActor in SeptaskUpdater.shared.checkForUpdates() }
@@ -430,9 +440,9 @@ struct SeptaskCommandMenus: Commands {
       }
       .keyboardShortcut("q", modifiers: [.command, .option])
     }
-    #endif
   }
 }
+#endif
 
 #if os(macOS)
 /// Edit ▸ Undo / Redo. SwiftUI's built-in items follow the SwiftUI scene's

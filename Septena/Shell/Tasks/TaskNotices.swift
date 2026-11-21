@@ -35,7 +35,9 @@ struct TaskNotice: Identifiable, Equatable {
   enum ID: String {
     case signIn
     case rolledIn
-    /// Explainer: tasks carried on Today fade (docs/TASK_FADE_SPEC.md §4).
+    /// Weekly sweep prompt: tasks faded since the last sweep (docs/TASK_FADE_SPEC.md §5).
+    case weeklySweep
+    /// Explainer: untouched tasks fade over 14 days (docs/TASK_FADE_SPEC.md §4).
     case fadeIntro
     /// The first-run checklist (Septask): steps drawn like task rows that
     /// tick off as the user does them.
@@ -92,6 +94,7 @@ enum TaskNotices {
                     today: String, context: ModelContext) -> [TaskNotice] {
     var out: [TaskNotice] = []
     if requiresSignIn, !hasSeen(.signIn) { out.append(signIn) }
+    if let sweep = weeklySweep(context: context) { out.append(sweep) }
     if let rolled = rolledIn(pool: pool, today: today, context: context) { out.append(rolled) }
     // Onboarding counts as the one explainer slot: never a tip and a
     // checklist at once.
@@ -116,6 +119,8 @@ enum TaskNotices {
       markSeen(id)
       SettingsMirror.dismissGetStarted(context: context,
                                        engine: SeptenaServices.shared.ckEngine)
+    case .weeklySweep:
+      TaskFade.dismissSweepForCurrentWeek(now: DayClock.appNow)
     case .fadeIntro:
       markSeen(id)
     }
@@ -321,6 +326,35 @@ enum TaskNotices {
     #endif
   }
 
+  /// Weekly sweep prompt (`docs/TASK_FADE_SPEC.md` §5): once a week on Sunday
+  /// (or the first day opened after Sunday), offers a one-tap review of tasks
+  /// that faded since the last sweep. Ignoring it drops nothing.
+  static func sweepCandidates(context: ModelContext) -> [SeptenaTask] {
+    let lastSweep = TaskFade.lastSweepAt
+    return LocalCache.tasks(in: context, filter: .faded)
+      .filter { TaskFade.isInCurrentSweep(fadedAt: $0.fadedAt, lastSweepAt: lastSweep) }
+  }
+
+  private static func weeklySweep(context: ModelContext) -> TaskNotice? {
+    let candidates = sweepCandidates(context: context)
+    let dates = candidates.compactMap(\.fadedAt)
+    guard TaskFade.isSweepDue(now: DayClock.appNow,
+                              lastSweepAt: TaskFade.lastSweepAt,
+                              dismissedWeek: TaskFade.dismissedSweepWeek,
+                              fadedDates: dates) else { return nil }
+    let count = candidates.count
+    return TaskNotice(
+      id: .weeklySweep, kind: .info, symbol: "circle.dashed",
+      title: count == 1
+        ? String(localized: "1 task faded this week. Still want it?",
+                 comment: "Weekly sweep notice title: singular")
+        : String(localized: "\(count) tasks faded this week. Still want any?",
+                 comment: "Weekly sweep notice title: plural"),
+      detail: nil,
+      primaryTitle: String(localized: "Review", comment: "Weekly sweep notice action button"),
+      dismissible: true)
+  }
+
   // MARK: - Explainers
   //
   // An explainer shows the first time the user meets a feature in the list,
@@ -330,13 +364,13 @@ enum TaskNotices {
   private static func explainers(pool: [SeptenaTask]) -> [TaskNotice] {
     var out: [TaskNotice] = []
     if !hasSeen(.fadeIntro), TaskRowFlags.agingEnabled,
-       pool.contains(where: { $0.todayTenureFill() != nil }) {
+       pool.contains(where: { $0.fadeFill() != nil }) {
       out.append(TaskNotice(
         id: .fadeIntro, kind: .info, symbol: "circle.lefthalf.filled",
-        title: String(localized: "Tasks left on Today start to fade",
-                      comment: "Explainer notice title: the Today fade, shown the first time a task fades"),
-        detail: String(localized: "A task fades a little each day it carries over. Check it off or move it to bring it back. You can turn this off in Settings.",
-                       comment: "Explainer notice detail: how the Today fade works and how to undo or disable it"),
+        title: String(localized: "Untouched tasks start to fade",
+                      comment: "Explainer notice title: task fade, shown the first time a task fades"),
+        detail: String(localized: "An undated task fades over 14 days without a touch, then moves to Faded. Touch or edit it to restore full strength. You can turn this off in Settings.",
+                       comment: "Explainer notice detail: how task fade works and how to undo or disable it"),
         primaryTitle: nil, dismissible: true))
     }
     return out

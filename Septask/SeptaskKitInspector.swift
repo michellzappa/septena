@@ -285,7 +285,7 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// (`reloadTextIfIdle`). A live edit is never overwritten — the old
   /// unconditional reload reverted typing mid-word and then lost the edit,
   /// because `loadedTitle` was reset along with the field.
-  func show(_ next: SeptenaTask?) {
+  func show(_ next: SeptenaTask?, isVisible: Bool = false) {
     guard next?.id != task?.id else {
       task = next
       if let next {
@@ -311,6 +311,10 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     // agent rows, so ratifying here would yank a proposal the moment it
     // became the selected row (even with this pane collapsed). Same
     // contract as SwiftUI `TaskComposer`. Disposition paths below ack.
+    // Opening a FADED task in a visible inspector keeps it (`docs/TASK_FADE_SPEC.md` §4).
+    if isVisible, next.isFaded {
+      keepFaded(next)
+    }
 
     textUndo.removeAllActions()
     loadTitle(next.title)
@@ -319,6 +323,19 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
     refreshConversation(next)
     historyView.configure(taskID: next.id)
     formScroll?.contentView.scroll(to: .zero)
+  }
+
+  /// Called when the inspector opens from collapsed state; keeps the loaded
+  /// task if it is faded (`docs/TASK_FADE_SPEC.md` §4).
+  func noteBecameVisible() {
+    guard let current = task, !current.isHeading, current.isFaded else { return }
+    keepFaded(current)
+  }
+
+  private func keepFaded(_ fadedTask: SeptenaTask) {
+    let snap = TaskUndo.FadedSnapshot(fadedTask)
+    mutator.keepFaded(ids: [fadedTask.id])
+    TaskUndo.recordKeepFaded(before: [snap], mutator: mutator)
   }
 
   private func loadTitle(_ title: String) {

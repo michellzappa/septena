@@ -61,6 +61,7 @@ extension Route {
     case .repeating:       return "arrow.clockwise"
     case .unscheduled:     return "rectangle.stack.fill"
     case .logbook:         return "checkmark"
+    case .faded:           return "circle.dashed"
     case .recentlyDeleted: return "trash"
     case .project:         return "number"
     case .area:            return "folder"

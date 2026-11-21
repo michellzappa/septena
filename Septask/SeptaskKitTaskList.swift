@@ -2,6 +2,7 @@
 import AppKit
 import EventKit
 import SwiftData
+import SwiftUI
 
 extension NSPasteboard.PasteboardType {
   /// Dragged task rows carry their stable task id — the same identity every
@@ -470,6 +471,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // manually from `rightMouseDown` bypasses that machinery entirely.
     let contextMenu = buildContextMenu()
     let recentlyDeletedMenu = buildRecentlyDeletedMenu()
+    let fadedMenu = buildFadedMenu()
     tableView.onRightClick = { [weak self, weak tableView] event in
       guard let self, let tableView else { return }
       let point = tableView.convert(event.locationInWindow, from: nil)
@@ -502,6 +504,8 @@ final class SeptaskKitTaskListController: NSViewController {
         menu = self.buildHeadingContextMenu()
       } else if self.filter == .recentlyDeleted {
         menu = recentlyDeletedMenu
+      } else if self.filter == .faded {
+        menu = fadedMenu
       } else {
         menu = contextMenu
       }
@@ -992,6 +996,19 @@ final class SeptaskKitTaskListController: NSViewController {
     case .logbook:
       // Already most-recent-first from LocalCache; cap what one screen needs.
       newRows = titleRows + pool.prefix(200).map(chipped)
+    case .faded:
+      var fadedRows = titleRows
+      if !pool.isEmpty {
+        fadedRows.append(.notice(TaskNotice(
+          id: .weeklySweep, kind: .info, symbol: "circle.dashed",
+          title: String(localized: "Tasks untouched for 14 days wait here.",
+                        comment: "Faded pile top notice title"),
+          detail: String(localized: "Open a task or choose Keep to bring it back, or run a sweep.",
+                         comment: "Faded pile top notice detail"),
+          primaryTitle: String(localized: "Sweep…", comment: "Faded pile sweep button"),
+          dismissible: false)))
+      }
+      newRows = fadedRows + pool.map(chipped)
     default:
       newRows = titleRows + pool.map(chipped)
     }
@@ -1358,7 +1375,7 @@ final class SeptaskKitTaskListController: NSViewController {
                                            freshIDs: Set<String>,
                                            excluding: Set<String>) -> Bool {
     switch filter {
-    case .logbook, .recentlyDeleted: return false
+    case .logbook, .faded, .recentlyDeleted: return false
     default: break
     }
     let vanished = Set(prior.compactMap { task in
@@ -1681,6 +1698,9 @@ final class SeptaskKitTaskListController: NSViewController {
     case .logbook:
       return .screenTitle(title: String(localized: "Logbook", comment: "Smart list title"),
                           icon: .symbol("checkmark"))
+    case .faded:
+      return .screenTitle(title: String(localized: "Faded", comment: "Smart list title"),
+                          icon: .symbol("circle.dashed"))
     case .recentlyDeleted:
       return .screenTitle(title: String(localized: "Recently Deleted", comment: "Smart list title"),
                           icon: .symbol("trash"))
@@ -2896,7 +2916,7 @@ final class SeptaskKitTaskListController: NSViewController {
     // Repeating lists the templates that already carry a recurrence rule;
     // a plain new task can't join it, so ⌘N stays off there — same as the
     // two read-only lists.
-    case .review, .repeating, .logbook, .recentlyDeleted: return nil
+    case .review, .repeating, .logbook, .faded, .recentlyDeleted: return nil
     }
     return (area, project, today, scheduled)
   }
@@ -3133,6 +3153,13 @@ final class SeptaskKitTaskListController: NSViewController {
     // agent rows (same contract as SwiftUI `TaskComposer`). Disposition
     // paths (complete / when / move / today) ratify.
     if composingTaskId != nil { collapseComposer(commit: true, animated: false) }
+    // Opening a faded task keeps it (`docs/TASK_FADE_SPEC.md` §4): clears
+    // `fadedAt`, stamps `touchedAt`, and records undo.
+    if let existing = LocalCache.task(id: id, in: context), existing.isFaded {
+      let snap = TaskUndo.FadedSnapshot(existing)
+      mutator.keepFaded(ids: [id])
+      TaskUndo.recordKeepFaded(before: [snap], mutator: mutator)
+    }
     composingTaskId = id
     guard let row = rows.firstIndex(where: { $0.task?.id == id }) else {
       composingTaskId = nil
@@ -3641,6 +3668,58 @@ final class SeptaskKitTaskListController: NSViewController {
 
   @objc private func menuRestore() { restoreTasks(actionableSelection.map(\.id)) }
 
+  private func buildFadedMenu() -> NSMenu {
+    let menu = NSMenu()
+    menu.addItem(item(String(localized: "Keep", comment: "SeptaskKit: faded context menu"),
+                      #selector(menuKeepFaded), "", []))
+    menu.addItem(item(String(localized: "Let Go", comment: "SeptaskKit: faded context menu"),
+                      #selector(menuDropFaded), "", []))
+    menu.addItem(.separator())
+    menu.addItem(item(String(localized: "Delete", comment: "SeptaskKit: context menu"),
+                      #selector(menuDelete), "\u{8}", [.command]))
+    return menu
+  }
+
+  @objc private func menuKeepFaded() {
+    let selected = actionableSelection.filter(\.isFaded)
+    guard !selected.isEmpty else { return }
+    let snapshots = selected.map(TaskUndo.FadedSnapshot.init)
+    mutator.keepFaded(ids: selected.map(\.id))
+    TaskUndo.recordKeepFaded(before: snapshots, mutator: mutator)
+    reload()
+  }
+
+  @objc private func menuDropFaded() {
+    let selected = actionableSelection.filter(\.isFaded)
+    guard !selected.isEmpty else { return }
+    let snapshots = selected.map(TaskUndo.FadedSnapshot.init)
+    mutator.dropFaded(ids: selected.map(\.id))
+    TaskUndo.recordSweepDrop(before: snapshots, mutator: mutator)
+    reload()
+  }
+
+  private func presentWeeklySweepSheet() {
+    let tasks: [SeptenaTask] = filter == .faded
+      ? LocalCache.tasks(in: context, filter: .faded)
+      : TaskNotices.sweepCandidates(context: context)
+    guard !tasks.isEmpty else { return }
+    let structure = StructureCache.snapshot(in: context)
+    var host: NSHostingController<AnyView>?
+    let sheet = TaskFadeSweepSheet(
+      tasks: tasks,
+      areas: structure.areas,
+      projects: structure.projects,
+      onClose: { [weak self] in
+        if let host { self?.dismiss(host) }
+        self?.reload()
+      }
+    )
+    .environment(mutator)
+    let controller = NSHostingController(rootView: AnyView(sheet))
+    host = controller
+    presentAsSheet(controller)
+  }
+
   // MARK: - Headings (project sections)
   //
   // A heading is a real task (`isHeading`, `kind == "heading"`) — creating,
@@ -3720,9 +3799,16 @@ final class SeptaskKitTaskListController: NSViewController {
       for project in areaProjects { menu.addItem(projectItem(project)) }
     }
 
-    if !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty {
+    let hasFaded = !LocalCache.tasks(in: context, filter: .faded).isEmpty
+    let hasDeleted = !LocalCache.tasks(in: context, filter: .recentlyDeleted).isEmpty
+    if hasFaded || hasDeleted {
       menu.addItem(.separator())
-      menu.addItem(destItem(.filter(.recentlyDeleted, title: TaskFilter.recentlyDeleted.title)))
+      if hasFaded {
+        menu.addItem(destItem(.filter(.faded, title: TaskFilter.faded.title)))
+      }
+      if hasDeleted {
+        menu.addItem(destItem(.filter(.recentlyDeleted, title: TaskFilter.recentlyDeleted.title)))
+      }
     }
 
     return menu
@@ -4233,7 +4319,7 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
   /// don't reorder.
   private var allowsReorder: Bool {
     switch filter {
-    case .review, .logbook, .recentlyDeleted: return false
+    case .review, .logbook, .faded, .recentlyDeleted: return false
     default: return true
     }
   }
@@ -4678,7 +4764,14 @@ extension SeptaskKitTaskListController: NSTableViewDataSource, NSTableViewDelega
 
     case .notice(let notice):
       let cell = noticeCell(KitNotice(notice))
-      cell.onPrimary = notice.id == .signIn ? { SeptaskAppKitSignIn.shared.start() } : nil
+      switch notice.id {
+      case .signIn:
+        cell.onPrimary = { SeptaskAppKitSignIn.shared.start() }
+      case .weeklySweep:
+        cell.onPrimary = { [weak self] in self?.presentWeeklySweepSheet() }
+      default:
+        cell.onPrimary = nil
+      }
       cell.onDismiss = notice.dismissible ? { [weak self] in self?.dismissNotice(notice.id) } : nil
       return cell
 
@@ -5078,10 +5171,11 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // Gated on Settings ▸ Tasks ▸ Today ▸ "Show aging on Today", the same
     // flag the SwiftUI row reads (`TaskCheckboxModel`) — without it the AppKit
     // Today list kept drawing gold after the user turned aging off.
-    // Aging shows on the Today list only: inside an area or project the same
-    // gray reads as noise about a list the row isn't being judged in.
-    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter != .today)
-      ? nil : task.todayTenureFill()
+    // Countdown toward the 14-day fade window in every open list
+    // (`docs/TASK_FADE_SPEC.md` §4). Already-faded tasks return nil from
+    // `fadeFill()` so rows in the Faded pile stay fully readable.
+    checkbox.tenureFill = (done || !TaskRowFlags.agingEnabled || filter == .recentlyDeleted || filter == .faded)
+      ? nil : task.fadeFill()
     // The whole row fades, checkbox included: same curve as `CheckableRow`.
     let fade = CGFloat(TaskFade.rowOpacity(checkbox.tenureFill))
     for view in [checkbox, title, notesGlyph, chip, suggestionChip, scheduleGlyph, detail, repeatGlyph] as [NSView] {
@@ -5155,11 +5249,25 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
     // and lost its repeat marker entirely.
     repeatGlyph.isHidden = task.recurrence == nil
 
-    if done, let completedAt = task.completedAt {
+    if task.status == .done, let completedAt = task.completedAt {
       let day = String(completedAt.prefix(10))
       guard !day.isEmpty else { return }
       configureScheduleGlyph(named: "checkmark", color: SeptaskKitTheme.iconMuted)
       detail.stringValue = KitDayFormat.taskDate(day)
+      detail.isHidden = false
+      return
+    }
+
+    if task.status == .cancelled {
+      let label = task.dropReason != nil
+        ? String(localized: "Let go", comment: "Logbook label for dropped task")
+        : String(localized: "Cancelled", comment: "Logbook label for cancelled task")
+      if let completedAt = task.completedAt {
+        let day = String(completedAt.prefix(10))
+        detail.stringValue = day.isEmpty ? label : "\(label) · \(KitDayFormat.taskDate(day))"
+      } else {
+        detail.stringValue = label
+      }
       detail.isHidden = false
       return
     }

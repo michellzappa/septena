@@ -37,6 +37,15 @@ public enum TaskKind {
   public static let heading = "heading"
 }
 
+/// Values stamped on a task's `dropReason` alongside status `cancelled`
+/// (`docs/TASK_FADE_SPEC.md` §3, §5).
+public enum TaskDropReason {
+  /// Dropped by the weekly sweep after fading.
+  public static let faded = "faded"
+  /// Dropped manually by the user.
+  public static let user = "user"
+}
+
 /// Tunables for the "agent created this" freshness cue. Provenance is
 /// permanent; the cue is transient and decays so a long-ignored agent row
 /// stops glowing even if never explicitly acknowledged.
@@ -120,6 +129,33 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// True when this DTO is a project section divider, not a to-do — the mirror
   /// of `TaskEntity.isHeading`. Headings are excluded from every feed/count.
   var isHeading: Bool { kind == TaskKind.heading }
+
+  /// True when this open task has faded into the Faded pile
+  /// (`docs/TASK_FADE_SPEC.md` §4). Faded tasks leave every other list, every
+  /// count, Next, and the badge.
+  var isFaded: Bool { status == .open && fadedAt != nil }
+
+  /// Countdown progress (0…1) toward the 14-day fade window (`TaskFade.fadeFill`).
+  /// Drives whole-row opacity in every open task list.
+  func fadeFill(today: String = SeptenaDate.today, now: Date = Date()) -> Double? {
+    TaskFade.fadeFill(
+      isOpen: status == .open,
+      isHeading: isHeading,
+      isDeleted: deletedAt != nil,
+      isFaded: isFaded,
+      deadline: deadline,
+      scheduled: scheduled,
+      hasRecurrence: recurrence != nil,
+      isAgentTurn: deriveConvo(conversation).badge == .working,
+      isAssignedToClaude: conversation.assignee == .claude,
+      showsAgentCue: showsAgentCue(now: now),
+      touchedAt: touchedAt,
+      createdAt: createdAt,
+      created: created,
+      now: now,
+      today: today
+    )
+  }
 
   /// The task's conversation (Task Conversations), decoded from the entity in
   /// `init(_:)`. Rides alongside, not the wire (excluded from CodingKeys), so the
@@ -221,7 +257,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// this rather than the raw `today` flag, or a scheduled-today task looks
   /// like it isn't in Today. Keep in lockstep with `TaskEntity.isOnToday`.
   var isOnToday: Bool {
-    guard status == .open, !isHeading else { return false }
+    guard status == .open, !isHeading, fadedAt == nil else { return false }
     if today { return true }
     if let s = scheduled, s <= SeptenaDate.today { return true }
     if let d = deadline, d <= SeptenaDate.today { return true }
@@ -265,7 +301,7 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
   /// `TaskEntity.isInInbox`.
   var isInInbox: Bool {
     TaskInbox.contains(status: status, isHeading: isHeading, isDeleted: deletedAt != nil,
-                       area: area, project: project)
+                       isFaded: isFaded, area: area, project: project)
   }
 
   /// Whether this task sits in the **triage band**: the Inbox members not yet
@@ -695,6 +731,8 @@ enum TaskFilter: Equatable, Hashable {
   case repeating
   case unscheduled
   case logbook
+  /// Tasks that faded untouched (`docs/TASK_FADE_SPEC.md` §4).
+  case faded
   case recentlyDeleted
   case project(String)
   case area(String)
@@ -708,6 +746,7 @@ enum TaskFilter: Equatable, Hashable {
     case .repeating: return "all"
     case .unscheduled: return "unscheduled"
     case .logbook: return "logbook"
+    case .faded: return "all"
     case .recentlyDeleted: return "all"
     case .project, .area: return "all"
     }
@@ -724,6 +763,7 @@ enum TaskFilter: Equatable, Hashable {
     case .repeating: return "repeating"
     case .unscheduled: return "unscheduled"
     case .logbook: return "logbook"
+    case .faded: return "faded"
     case .recentlyDeleted: return "recentlyDeleted"
     case .project(let id): return "project.\(id)"
     case .area(let id): return "area.\(id)"
@@ -742,6 +782,7 @@ enum TaskFilter: Equatable, Hashable {
     case .repeating: return String(localized: "Repeating", comment: "Task filter")
     case .unscheduled: return String(localized: "Anytime", comment: "Task filter")
     case .logbook: return String(localized: "Logbook", comment: "Task filter")
+    case .faded: return String(localized: "Faded", comment: "Task filter")
     case .recentlyDeleted: return String(localized: "Recently Deleted", comment: "Task filter")
     case .project: return String(localized: "Project", comment: "Task filter")
     case .area: return String(localized: "Area", comment: "Task filter")
@@ -2524,10 +2565,11 @@ enum TaskInbox {
     area == nil && project == nil
   }
 
-  /// Inbox membership: open, not deleted, not a heading, unfiled.
+  /// Inbox membership: open, not deleted, not faded, not a heading, unfiled.
   static func contains(status: TaskStatus, isHeading: Bool, isDeleted: Bool,
+                       isFaded: Bool = false,
                        area: String?, project: String?) -> Bool {
-    status == .open && !isHeading && !isDeleted && isUnfiled(area: area, project: project)
+    status == .open && !isHeading && !isDeleted && !isFaded && isUnfiled(area: area, project: project)
   }
 
   /// The triage band's ratification rule, applied to an Inbox member (the

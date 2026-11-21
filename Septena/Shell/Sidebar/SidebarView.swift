@@ -33,6 +33,7 @@ struct SidebarRootView: View {
   @State private var counts: TasksCounts? = nil
   /// Tasks completed today — drives the Logbook tile/row count.
   @State private var doneTodayCount: Int = 0
+  @State private var fadedCount: Int = 0
   @State private var recentlyDeletedCount: Int = 0
 
   // Sidebar order is now the synced `position` field (docs/DRAG_AND_DROP.md §5):
@@ -625,6 +626,7 @@ struct SidebarRootView: View {
     var routes = TaskDestinations.sidebarRoutes
     routes += areas.map { .area(id: $0.id) }
     routes += projects.filter { $0.status == .active }.map { .project(id: $0.id) }
+    if fadedCount > 0 { routes.append(.filter(.faded)) }
     if recentlyDeletedCount > 0 { routes.append(.filter(.recentlyDeleted)) }
     return routes
   }
@@ -731,15 +733,27 @@ struct SidebarRootView: View {
         }
       }
     }
-    // Recently Deleted — always last, only shown when there are trashed tasks.
-    if recentlyDeletedCount > 0 {
+    // Faded pile & Recently Deleted — shown at the foot when non-empty.
+    if fadedCount > 0 || recentlyDeletedCount > 0 {
       Section {
-        compactRow(route: .filter(.recentlyDeleted)) {
-          navRow(.filter(.recentlyDeleted)) {
-            SmartListRow(icon: "trash",
-                         iconColor: .secondary,
-                         title: "Recently Deleted",
-                         count: recentlyDeletedCount)
+        if fadedCount > 0 {
+          compactRow(route: .filter(.faded)) {
+            navRow(.filter(.faded)) {
+              SmartListRow(icon: "circle.dashed",
+                           iconColor: .secondary,
+                           title: "Faded",
+                           count: fadedCount)
+            }
+          }
+        }
+        if recentlyDeletedCount > 0 {
+          compactRow(route: .filter(.recentlyDeleted)) {
+            navRow(.filter(.recentlyDeleted)) {
+              SmartListRow(icon: "trash",
+                           iconColor: .secondary,
+                           title: "Recently Deleted",
+                           count: recentlyDeletedCount)
+            }
           }
         }
       }
@@ -1043,6 +1057,7 @@ struct SidebarRootView: View {
     var agg = Self.aggregate(tasks: LocalCache.liveTasks(in: modelContext), today: clock.today)
     agg.counts = stats.counts
     agg.doneTodayCount = stats.history.daily.last?.done ?? 0
+    let faded = LocalCache.tasks(in: modelContext, filter: .faded).count
     let deleted = LocalCache.tasks(in: modelContext, filter: .recentlyDeleted).count
     guard !StoreHealth.readsFailed(since: token) else {
       SeptenaLog.error("[Sidebar] load aborted — a store read failed; keeping the last good counts")
@@ -1052,6 +1067,7 @@ struct SidebarRootView: View {
     projects = structure.projects
     apply(aggregate: agg)
     SidebarSeed.aggregate = agg
+    fadedCount = faded
     recentlyDeletedCount = deleted
     reconcileSidebarSelection()
   }
@@ -1077,6 +1093,8 @@ struct SidebarRootView: View {
     var areaDirectOpen: [String: Int] = [:]
     var inbox = 0, triage = 0, todayN = 0, upcoming = 0, unscheduled = 0, open = 0
     for t in tasks {
+      // Faded open tasks leave every count and project ratio (docs/TASK_FADE_SPEC.md §4).
+      if t.isFaded { continue }
       if t.status == .open { open += 1 }
       if let pid = t.project {
         switch t.status {

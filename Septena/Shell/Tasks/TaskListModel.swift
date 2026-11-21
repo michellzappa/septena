@@ -197,7 +197,7 @@ final class TaskListModel {
     rankedTop: (SeptenaTask) -> SuggestionEngine.Suggestion?
   ) {
     guard TaskRowFlags.filingSuggestionsEnabled,
-          filter != .logbook, filter != .recentlyDeleted else {
+          filter != .logbook, filter != .faded, filter != .recentlyDeleted else {
       if !filingSuggestions.isEmpty { filingSuggestions = [:] }
       return
     }
