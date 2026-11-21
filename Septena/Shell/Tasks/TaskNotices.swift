@@ -291,9 +291,9 @@ enum TaskNotices {
       TaskNoticeStep(
         id: .connectAI,
         title: String(localized: "Connect your AI",
-                      comment: "Get started step: connect Claude or another agent"),
-        detail: String(localized: "Claude, ChatGPT, Claude Code and more",
-                       comment: "Get started step detail: which agents can connect"),
+                      comment: "Get started step: connect an AI assistant or agent"),
+        detail: String(localized: "Connect an assistant to your tasks",
+                       comment: "Get started step detail: connect an AI assistant to your tasks"),
         done: done(.connectAI, source: TaskSource.mcp)),
       TaskNoticeStep(
         id: .importTasks,
