@@ -206,9 +206,21 @@ queue for team work)*. Then all of mz's agent questions are in one app.
   question. The notification offers the options as actions on iOS and the
   watch *(default: up to 3 options as notification actions)*, so mz answers
   without opening the app.
-- **Wake:** when the backend commits a user turn that answers an open card on
-  an agent task, it calls the runner's wake hook. Without a wake hook, the
-  next scheduled run picks it up.
+- **Wake (multi-user transport, decided 2026-11-21):** the wake plumbing on
+  `api.septena.app` is built multi-user from day one, with `mz-mini` as the
+  first runner and Settings UI added later. Two transports share the same
+  `tasks_agent_events` event stream (`assigned`, `user_turn`, `resumed`):
+  1. **Outbound webhook URL** attached to an agent key or pairing (HMAC-signed
+     POST with event payload) — works for cloud routines, OpenClaw, n8n, and
+     tunneled hosts.
+  2. **Outbound SSE / WebSocket event stream** opened by the runner to
+     `api.septena.app` — works behind home NAT/firewalls (Macs / `mz-mini`)
+     with zero inbound ports or tunnels.
+  Without either connected, the next 15-minute scheduled run picks the task up.
+- **Onboarding vs. Settings (decided 2026-11-21):** first-run onboarding
+  (`#103`) stays focused on connecting an interactive agent. "Always-on /
+  Background agent" (webhooks, cloud routines, local runner setup) lives in
+  **Settings ▸ AI & Agents** later, never blocking initial setup.
 - **Batching:** the runner groups several questions on one task into one card
   when they do not depend on each other. At most one open card per task.
 - **Quiet hours:** notifications respect Focus. No custom quiet-hours logic.
@@ -252,7 +264,8 @@ links (issue, PR, commit).
 | Phase | What | Exit check |
 |---|---|---|
 | F0 | Claims (`tasks_claim` / `tasks_release`), stage derivation, Agent smart list. Runner as a manual command on the mini. | mz assigns a `research` task; a manual run produces an artifact; the stage moves Queued → Working → Done. |
-| F1 | Scheduled runner on the mini, push notification on questions, notification actions, wake on answer. | mz answers a card on the phone; the next turn appears without opening the Mac. |
+| F1a | Multi-user wake transport (signed webhook URL + SSE/WebSocket stream on `api.septena.app`) and scheduled/waking runner on `mz-mini` (15 min, max 2 parallel). | mz answers a card on the phone; `mz-mini` wakes immediately and posts the next turn with no interactive session open. |
+| F1b | APNs push notifications when a provider turn with options commits + up to 3 option actions on iOS and watch (requires mz's APNs `.p8` key in Cloudflare). | A question arrives as a notification on iPhone/watch; mz taps an option from the lock screen and the turn commits. |
 | F2 | Work profiles and approval cards. `errand` workflow. Kill switch. | An outward action waits for Approve; nothing outward happens without it. |
 | F3 | `code` workflow on linked repos (needs linked projects L0–L1). Run log and inspector list. | A note becomes an issue, a PR and a merge on this repo; mz tests from the `needs_verify` list. |
 | F4 | `factory-day` questions route to Septask; daily digest from the run log; cloud-routine host. | One morning report and one question inbox for all of mz's personal factories. |
@@ -269,3 +282,6 @@ links (issue, PR, commit).
 | Notification actions | Decided (default, 2026-11-21): Up to 3 options as actions. |
 | Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septask. Starlings stays for team work. |
 | Agent merges on `ship` | Decided (default, 2026-11-21): Yes, per your global merge rule. |
+| F1 runner scope & wake transport | Decided (2026-11-21): Multi-user transport on `api.septena.app` (signed outbound webhook URL + SSE/WebSocket stream for NAT'd Macs); `mz-mini` is the first runner. |
+| Background runner in onboarding | Decided (2026-11-21): Keep onboarding (`#103`) interactive-only; put "Always-on / Background agent" in Settings ▸ AI & Agents later. |
+| F1 split | Decided (2026-11-21): Split into F1a (wake transport + runner, `#5`) and F1b (APNs push + notification actions, gated on mz's APNs `.p8` key). |
