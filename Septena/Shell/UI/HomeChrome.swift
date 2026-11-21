@@ -37,7 +37,8 @@ struct OverflowMenu<Content: View>: View {
 }
 
 /// Opens the app-global Quick Find palette (`nav.showQuickFind`). Shared by
-/// Tasks chrome on iPhone (nav-bar leading) and iPad (overlay leading cluster).
+/// Tasks chrome on iPhone (nav-bar trailing on Septask, leading on Septena)
+/// and iPad (overlay leading cluster).
 struct QuickFindToolbarButton: View {
   @Environment(NavigationState.self) private var nav
 
@@ -46,6 +47,21 @@ struct QuickFindToolbarButton: View {
       Image(systemName: "magnifyingglass")
     }
     .accessibilityLabel("Search")
+    .tint(.primary)
+  }
+}
+
+/// Opens Settings (`nav.showSettings`). Used directly in the leading nav-bar
+/// slot on compact iPhone Septask so Settings is one tap rather than inside an
+/// overflow menu.
+struct SettingsToolbarButton: View {
+  @Environment(NavigationState.self) private var nav
+
+  var body: some View {
+    Button { nav.showSettings = true } label: {
+      Image(systemName: "gearshape")
+    }
+    .accessibilityLabel("Settings")
     .tint(.primary)
   }
 }

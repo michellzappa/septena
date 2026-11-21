@@ -193,6 +193,13 @@ struct AreaDetailView: View {
       }
     }
     .septenaInlineTitle()
+    #if os(iOS) && SEPTASK
+    .toolbar {
+      if !usesPushNavigation {
+        ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
+      }
+    }
+    #endif
     .sheet(isPresented: $showingAttachmentEditor) {
       AttachmentEditorSheet(initial: draftAttachment) { commitAttachment($0) }
         .presentationDetents([.height(340), .large])
@@ -534,6 +541,13 @@ struct ProjectDetailView: View {
   private var projectDetailToolbar: some ToolbarContent {
     #if os(iOS) && !SEPTASK
     if !usesPushNavigation {
+      ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
+    }
+    #elseif os(iOS) && SEPTASK
+    if !usesPushNavigation {
+      ToolbarItem(placement: .topBarTrailing) { projectOverflowMenu }
+      ToolbarItem(placement: .topBarTrailing) { QuickFindToolbarButton() }
+    } else {
       ToolbarItem(placement: .primaryAction) { projectOverflowMenu }
     }
     #else

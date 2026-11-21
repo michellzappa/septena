@@ -38,7 +38,10 @@ struct ContentView: View {
   private func stackLayout(path: Binding<[Route]>) -> some View {
     NavigationStack(path: path) {
       SidebarRootView()
-        .navigationDestination(for: Route.self) { destination(for: $0) }
+        .navigationDestination(for: Route.self) {
+          destination(for: $0)
+            .environment(\.isInPushedDetail, true)
+        }
     }
   }
 
