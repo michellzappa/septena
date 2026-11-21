@@ -318,7 +318,7 @@ Where the identity appears, which block, which repo/file, current state.
 | Patronage / Septena+ | cloud · `SettingsPanes.swift` (`SeptenaPlus.reasons` → "Pays the AI bill") | C | **done** (iOS+Mac green 2026-06-21) |
 | Support intro line | cloud · `SupportSettingsPane.swift` (ticket footer + email fallback) | F | **done** (iOS+Mac green 2026-06-21) |
 | Changelog voice | cloud · `Septena/Resources/changelog.json` | E | ongoing, tighten |
-| Website /about | site · `app/about/page.tsx` | B + D | **stale**: Block B rewritten 2026-11-21 (todo story); page not updated yet |
+| Website /about | site · `app/about/page.tsx` | B + D | **done** 2026-11-21 (site `bda5a91`): Block B, todo story |
 | Website /ownership | site · `app/ownership/page.tsx` | B + D | review vs. this doc |
 | Website /support | site · `app/support/page.tsx` | C + F | reframe |
 | Website /supporters | site · `app/supporters/page.tsx` | C | review |
