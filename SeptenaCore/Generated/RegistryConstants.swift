@@ -59,6 +59,7 @@ enum RegistryEntityPatterns {
   static let id = "^[A-Za-z0-9._:-]{1,128}$"
   static let clientOpId = "^[A-Za-z0-9_-]{8,64}$"
   static let day = "^\\d{4}-\\d{2}-\\d{2}$"
+  static let time24 = "^([01]\\d|2[0-3]):[0-5]\\d$"
   static let stamp = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}"
 }
 

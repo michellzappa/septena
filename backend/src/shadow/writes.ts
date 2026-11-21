@@ -70,6 +70,8 @@ export const rpcStoreFor = (env: Env, userId: string) => storeFor(env, userId) a
 // ---- argument schemas (validated before anything reaches the store) ----
 
 const zDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+const zTime24 = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "expected HH:MM");
+const zTime24OrClear = z.union([zTime24, z.literal("")]).nullable();
 /// "" clears, as on the live connector, which writes "" to CloudKit.
 const zDayOrClear = z.union([zDay, z.literal("")]).nullable();
 const zOrdinalWeekday = z.object({
@@ -94,6 +96,12 @@ export const zWriteArgs = {
     today: z.boolean().optional(),
     starred: z.boolean().optional(),
     scheduled: zDay.optional(),
+    start_time: zTime24.nullable().optional(),
+    startTime: zTime24.nullable().optional(),
+    duration_minutes: z.number().int().min(5).max(1440).nullable().optional(),
+    durationMinutes: z.number().int().min(5).max(1440).nullable().optional(),
+    time_zone: z.string().max(64).nullable().optional(),
+    timeZone: z.string().max(64).nullable().optional(),
     deadline: zDay.optional(),
     due: zDay.optional(),
     area: z.string().optional(),
@@ -115,6 +123,12 @@ export const zWriteArgs = {
     today: z.boolean().optional(),
     starred: z.boolean().optional(),
     scheduled: zDayOrClear.optional(),
+    start_time: zTime24OrClear.optional(),
+    startTime: zTime24OrClear.optional(),
+    duration_minutes: z.number().int().min(5).max(1440).nullable().optional(),
+    durationMinutes: z.number().int().min(5).max(1440).nullable().optional(),
+    time_zone: z.string().max(64).nullable().optional(),
+    timeZone: z.string().max(64).nullable().optional(),
     deadline: zDayOrClear.optional(),
     due: zDayOrClear.optional(),
     area: z.string().nullable().optional(),
@@ -390,6 +404,11 @@ async function createTask(ctx: WriteContext, input: CreateTaskInput) {
   if (input.today) fields.todaySetOn = today;
   if (plan.committed) fields.acknowledgedAt = now;
   if (input.scheduled) fields.scheduled = input.scheduled;
+  if (plan.startTime) {
+    fields.startTime = plan.startTime;
+    if (plan.durationMinutes !== null) fields.durationMinutes = plan.durationMinutes;
+    if (plan.timeZone) fields.timeZone = plan.timeZone;
+  }
   if (plan.deadline) fields.deadline = plan.deadline;
   // A project implies its area: the app stores one or the other.
   if (input.project) fields.project = input.project;
@@ -491,6 +510,9 @@ async function updateTask(ctx: WriteContext, input: UpdateTaskInput) {
     fields.reminderDismissedAt = null;
   }
   if (p.deadline !== undefined) fields.deadline = clear(p.deadline);
+  if (p.startTime !== undefined) fields.startTime = p.startTime;
+  if (p.durationMinutes !== undefined) fields.durationMinutes = p.durationMinutes;
+  if (p.timeZone !== undefined) fields.timeZone = p.timeZone;
   if (p.area !== undefined) fields.area = clear(p.area);
   if (p.project !== undefined) fields.project = clear(p.project);
   if (p.heading !== undefined) fields.heading = null;
@@ -607,9 +629,10 @@ async function completeTask(ctx: WriteContext, id: string) {
           position,
           createdAt: now,
         };
-        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient"] as const) {
+        for (const k of ["area", "project", "heading", "kind", "notes", "sourceClient", "startTime", "timeZone"] as const) {
           if (str(src[k])) fields[k] = src[k];
         }
+        if (typeof src.durationMinutes === "number") fields.durationMinutes = src.durationMinutes;
         const shiftedReminder = shiftReminderForRecurrence({
           sourceReminderAt: str(src.reminderAt),
           sourceScheduled: str(src.recurrenceAnchorDate) ?? str(src.scheduled),

@@ -116,6 +116,9 @@ enum TaskUndo {
   struct ScheduleSnapshot {
     let id: String
     let scheduled: Date?
+    let startTime: String?
+    let durationMinutes: Int?
+    let timeZone: String?
     let today: Bool
     let starred: Bool
     let deadline: Date?
@@ -126,6 +129,9 @@ enum TaskUndo {
     init(_ task: SeptenaTask) {
       id = task.id
       scheduled = SeptenaDate.parse(task.scheduled)
+      startTime = task.startTime
+      durationMinutes = task.durationMinutes
+      timeZone = task.timeZone
       today = task.today
       starred = task.starred
       deadline = SeptenaDate.parse(task.deadline)
@@ -153,6 +159,10 @@ enum TaskUndo {
                       using mutator: TaskMutator) {
     for snapshot in snapshots {
       mutator.schedule(id: snapshot.id, date: snapshot.scheduled)
+      mutator.setTimeSlot(id: snapshot.id,
+                          startTime: snapshot.startTime,
+                          durationMinutes: snapshot.durationMinutes,
+                          timeZone: snapshot.timeZone)
       mutator.setDeadline(id: snapshot.id, date: snapshot.deadline)
       mutator.setRecurrence(id: snapshot.id, recurrence: snapshot.recurrence)
       if snapshot.recurrence != nil {

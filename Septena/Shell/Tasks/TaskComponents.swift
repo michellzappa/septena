@@ -689,6 +689,17 @@ struct TaskRow: View {
                      title: String(localized: "Today", comment: "Task row trailing pill when task is on Today"))
     }
     trailingDate
+    if task.status == .open, task.deletedAt == nil,
+       let slot = task.timeSlotLabel {
+      HStack(spacing: 3) {
+        Image(systemName: "clock")
+          .scaledFont(size: 11)
+        Text(slot)
+          .font(.septenaMeta)
+      }
+      .foregroundStyle(Theme.inkSecondary)
+      .accessibilityLabel(String(localized: "Scheduled time \(slot)", comment: "Task row time slot a11y"))
+    }
     if let summary = checklistSummary, summary.total > 0 {
       HStack(spacing: 3) {
         Image(systemName: "checklist")

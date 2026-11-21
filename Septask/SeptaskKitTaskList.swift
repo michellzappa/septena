@@ -2866,8 +2866,31 @@ final class SeptaskKitTaskListController: NSViewController {
     case .deadline: KitDayFormat.date(fromWire: selection.first?.deadline)
     }
 
-    SeptaskKitDatePopover.present(kind: kind, initial: initial,
-                                  relativeTo: anchor, of: tableView) { [weak self] date, today in
+    SeptaskKitDatePopover.present(
+      kind: kind,
+      initial: initial,
+      initialStartTime: kind == .when && selection.count == 1 ? selection[0].startTime : nil,
+      initialDurationMinutes: kind == .when && selection.count == 1 ? selection[0].durationMinutes : nil,
+      relativeTo: anchor,
+      of: tableView,
+      onTimeSlotChange: kind == .when ? { [weak self] start, duration in
+        guard let self else { return }
+        let liveSel = selection.map { LocalCache.task(id: $0.id, in: self.context) ?? $0 }
+        let before = liveSel.map(self.scheduleSnapshot)
+        for task in liveSel {
+          self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+          if start != nil, !task.today, task.scheduled == nil {
+            self.mutator.moveToToday(id: task.id)
+          }
+          self.refreshComposerRow(taskId: task.id)
+        }
+        self.reload()
+        self.recordScheduleUndo(
+          name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+          before: before)
+        self.onStoreChanged?()
+      } : nil
+    ) { [weak self] date, today in
       guard let self else { return }
       let before = selection.map(self.scheduleSnapshot)
       var deferredTo: Date?
@@ -3894,9 +3917,30 @@ final class SeptaskKitTaskListController: NSViewController {
         self.toggleTodaySelection()
 
       case .when(let anchor):
-        SeptaskKitDatePopover.present(kind: .when,
-                                      initial: KitDayFormat.date(fromWire: task.scheduled),
-                                      relativeTo: anchor.bounds, of: anchor) { [weak self] date, today in
+        let liveTask = LocalCache.task(id: task.id, in: self.context) ?? task
+        SeptaskKitDatePopover.present(
+          kind: .when,
+          initial: KitDayFormat.date(fromWire: liveTask.scheduled),
+          initialStartTime: liveTask.startTime,
+          initialDurationMinutes: liveTask.durationMinutes,
+          relativeTo: anchor.bounds,
+          of: anchor,
+          onTimeSlotChange: { [weak self] start, duration in
+            guard let self else { return }
+            let current = LocalCache.task(id: task.id, in: self.context) ?? task
+            let before = [current].map(self.scheduleSnapshot)
+            self.mutator.setTimeSlot(id: task.id, startTime: start, durationMinutes: duration)
+            if start != nil, !current.today, current.scheduled == nil {
+              self.mutator.moveToToday(id: task.id)
+            }
+            self.refreshComposerRow(taskId: task.id)
+            self.reload()
+            self.recordScheduleUndo(
+              name: String(localized: "Change Time", comment: "SeptaskKit: undo action"),
+              before: before)
+            self.onStoreChanged?()
+          }
+        ) { [weak self] date, today in
           guard let self else { return }
           // Capture at the gesture (from the STORE: an earlier pill may have
           // moved the captured `task` on), record after: the same undo step
@@ -5977,9 +6021,18 @@ final class SeptaskKitTaskCell: NSTableCellView, NSTextFieldDelegate {
       let coveredByTodayPill = !done && task.isOnToday && filter != .today && task.deletedAt == nil && !task.isFaded && scheduledDay <= todayDay
       if !coveredByTodayPill && (filter != .today || scheduledDay > todayDay) {
         configureScheduleGlyph(named: "calendar", color: SeptaskKitTheme.inkSecondary)
-        detail.stringValue = KitDayFormat.taskDate(scheduled)
+        let dateText = KitDayFormat.taskDate(scheduled)
+        detail.stringValue = task.timeSlotLabel.map { "\(dateText) · \($0)" } ?? dateText
+        detail.isHidden = false
+      } else if let slot = task.timeSlotLabel, !done {
+        configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+        detail.stringValue = slot
         detail.isHidden = false
       }
+    } else if let slot = task.timeSlotLabel, !done {
+      configureScheduleGlyph(named: "clock", color: SeptaskKitTheme.inkSecondary)
+      detail.stringValue = slot
+      detail.isHidden = false
     }
   }
 

@@ -502,14 +502,19 @@ final class KitComposerCell: NSTableCellView, NSTextViewDelegate {
 
     todayPill.isOn = task.today
     whenPill.title = {
+      let slot = task.timeSlotLabel
       if let scheduled = task.scheduled {
         let display = KitDayFormat.display(scheduled)
-        return String(localized: "When: \(display)",
+        let combined = slot.map { "\(display) · \($0)" } ?? display
+        return String(localized: "When: \(combined)",
                       comment: "SeptaskKit: composer pill with date")
+      }
+      if let slot {
+        return String(localized: "Time: \(slot)", comment: "SeptaskKit: composer pill with time")
       }
       return String(localized: "When", comment: "SeptaskKit: composer pill")
     }()
-    whenPill.isOn = task.scheduled != nil
+    whenPill.isOn = task.scheduled != nil || task.startTime != nil
     deadlinePill.title = {
       if let deadline = task.deadline {
         let display = KitDayFormat.display(deadline)

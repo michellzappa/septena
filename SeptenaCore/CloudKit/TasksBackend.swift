@@ -152,6 +152,9 @@ final class CloudKitTasksBackend {
       statusRaw: TaskStatus.open.rawValue,
       created: DayClock.appToday,
       scheduled: scheduled,
+      startTime: entity.startTime,
+      durationMinutes: entity.durationMinutes,
+      timeZone: entity.timeZone,
       // A deadline belongs to the completed occurrence. The generated task
       // gets its next scheduled date instead of inheriting an expired deadline.
       deadline: nil,
@@ -1217,6 +1220,24 @@ final class CloudKitTasksBackend {
     entity.reminder = reminder
     entity.pendingSync = true
     commitAndPush(entity, op: reminder == nil ? "setReminder(nil)" : "setReminder")
+  }
+
+  /// Set or clear the optional wall-clock time slot (`startTime` `HH:MM`,
+  /// `durationMinutes` `5..1440`, optional `timeZone`). Clearing `startTime`
+  /// also clears `durationMinutes` and `timeZone`.
+  func setTimeSlot(id: String, startTime: String?, durationMinutes: Int?, timeZone: String? = nil) {
+    guard let entity = fetch(id: id) else { return }
+    if let start = startTime, !start.isEmpty {
+      entity.startTime = start
+      entity.durationMinutes = durationMinutes.map { min(1440, max(5, $0)) }
+      entity.timeZone = timeZone
+    } else {
+      entity.startTime = nil
+      entity.durationMinutes = nil
+      entity.timeZone = nil
+    }
+    entity.pendingSync = true
+    commitAndPush(entity, op: startTime == nil ? "setTimeSlot(nil)" : "setTimeSlot")
   }
 
   func snoozeReminder(id: String, until: Date) {

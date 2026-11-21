@@ -31,6 +31,12 @@ final class TaskEntity {
   var statusRaw: String
   var created: String?
   var scheduled: String?
+  /// Optional 24-hour wall-clock start time (`HH:MM`, docs/TASK_TIMES_AND_ICAL_SPEC.md).
+  var startTime: String? = nil
+  /// Optional duration in minutes (`5..1440`).
+  var durationMinutes: Int? = nil
+  /// Optional IANA time zone (nil = floating local time).
+  var timeZone: String? = nil
   @Attribute(originalName: "due") var deadline: String?
   var today: Bool
   /// Simple boolean Important / Star marker (docs/STAR_PRIORITY_SPEC.md, ST0).
@@ -177,6 +183,9 @@ final class TaskEntity {
        statusRaw: String = TaskStatus.open.rawValue,
        created: String? = nil,
        scheduled: String? = nil,
+       startTime: String? = nil,
+       durationMinutes: Int? = nil,
+       timeZone: String? = nil,
        deadline: String? = nil,
        today: Bool = false,
        starred: Bool = false,
@@ -220,6 +229,9 @@ final class TaskEntity {
     self.statusRaw = statusRaw
     self.created = created
     self.scheduled = scheduled
+    self.startTime = startTime
+    self.durationMinutes = durationMinutes
+    self.timeZone = timeZone
     self.deadline = deadline
     self.today = today
     self.starred = starred
@@ -568,6 +580,9 @@ extension SeptenaTask {
       status: e.status,
       created: e.created,
       scheduled: e.scheduled,
+      startTime: e.startTime,
+      durationMinutes: e.durationMinutes,
+      timeZone: e.timeZone,
       deadline: e.deadline,
       today: e.today,
       starred: e.starred,
