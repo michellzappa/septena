@@ -1,22 +1,9 @@
 // Settings-root chrome shared by both shells (docs/SEPTASK.md): the disc
-// tile for About rows, the top luminance wash, and the root-row accent
-// palette — extracted from SettingsView.swift so Septask's Settings can
-// mirror the full app's look without compiling its destination graph.
+// tile for About rows and the top luminance wash — extracted from
+// SettingsView.swift so Septask's Settings can mirror the full app's look
+// without compiling its destination graph.
 
 import SwiftUI
-
-/// The seven root-row tints, in row order — Septena's section rainbow.
-enum SettingsAccentPalette {
-  static let colors: [Color] = [
-    parseHexColor("#ef4444"), // red
-    parseHexColor("#f97316"), // orange
-    parseHexColor("#eab308"), // yellow
-    parseHexColor("#22c55e"), // green
-    parseHexColor("#06b6d4"), // cyan
-    parseHexColor("#3b82f6"), // blue
-    parseHexColor("#8b5cf6"), // purple
-  ]
-}
 
 /// The Settings-row and About-pane icon: renders the user's active Septena
 /// Upright Compass app icon (`AppearancePreferences.shared`) at any size,

@@ -218,16 +218,14 @@ struct SeptaskSettingsView: View {
     }
   }
 
+  /// Bare SF Symbol in the accent color, the platform sidebar standard. No
+  /// per-row rainbow tile.
   private func macSidebarRow(_ tab: RegistrySettingsTab) -> some View {
-    let color: Color = if let slot = tab.paletteSlot {
-      SettingsAccentPalette.colors[slot % SettingsAccentPalette.colors.count]
-    } else {
-      .gray
-    }
-    return Label {
+    Label {
       Text(tab.title)
     } icon: {
-      ColoredGlyph(icon: tab.sfSymbol, color: color, size: 20, glyphRatio: 0.48)
+      Image(systemName: tab.sfSymbol)
+        .foregroundStyle(Color.accentColor)
     }
   }
 
