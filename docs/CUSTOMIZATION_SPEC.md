@@ -29,7 +29,7 @@ Give Septena tactile, unmistakable warmth and personal ownership—the part peop
   - **Review / Upcoming / Repeating / Anytime / Logbook:** Quiet neutral secondary gray — neutral filing locations never turn into a rainbow.
   - **Overdue deadlines:** System Red (`overdueRed`).
   - **Areas:** User-chosen emoji (or muted dot when unset), semibold weight, no section text header.
-  - **Projects:** Completion pie/ring progress indicator (`ProjectProgressIcon` / `KitGlyph.progress`), regular weight, flush on the same leading glyph axis as Areas.
+  - **Projects:** House completion ring (`ProjectProgressIcon` / `KitGlyph.progress` — `14pt` diameter, `2.5pt` rounded stroke, `0.22` track opacity, clockwise from 12 o'clock; never a Things-style filled pie wedge), regular weight, flush on the same leading glyph axis as Areas.
   - **No brand logo/check row** in the sidebar header.
 - Swatch UI renders as a crisp multicolor conic ring (same mental model as macOS System Settings ▸ Appearance ▸ Multicolor).
 
@@ -135,7 +135,7 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 2. **No separate `Inbox` smart list** — Inbox lives as the triage band at the top of Today; sidebar lists follow `registry/destinations.json` (`Today`, `Review`, `Upcoming`, `Repeating`, `Anytime`, `Logbook`).
 3. **Color only on Today (sidebar only)** — Today's sun carries `#F5C721` in the sidebar and stays quiet gray in the list page heading; all other smart-list glyphs stay quiet secondary gray.
 4. **Emoji on Areas (no `"Area"` text header)** — Areas render as clickable semibold rows with their leading emoji (or muted dot), trailing fold chevron, and count.
-5. **Progress rings on Projects** — Projects render with `ProjectProgressIcon`-style completion pie rings on the same flush left glyph axis (regular weight, no indentation step).
+5. **Progress rings on Projects** — Projects render with Septena's house completion ring (`ProjectProgressIcon` / `KitGlyph.progress`: `14pt` diameter, `2.5pt` rounded stroke, `0.22` track opacity — not a plain circle and not a Things pie wedge) on the same flush left glyph axis (regular weight, no indentation step).
 6. **One leading-glyph vertical midline** — Every leading icon in the list column (page heading sun/ring, inline notice glyph, group tray/emoji, and task checkboxes) shares one exact horizontal center axis (`SeptaskKitLayout.leadingGlyphCenterX` parity), with larger header glyphs overflowing symmetrically around that midline.
 7. **Non-selectable demo chrome** — `.task-surface` (and all interactive app demo components) must set `user-select: none; -webkit-user-select: none; cursor: default;` (allowing `user-select: text; cursor: text;` only on actual `<input>` / `<textarea>` controls) so hovering or clicking never flashes an I-beam cursor or highlights mockup copy.
 
