@@ -882,7 +882,7 @@ struct TaskListView: View {
   /// composer still treats this as CREATE, not edit, so its behavior is in
   /// lockstep with the drawer composer. Upcoming falls back to the drawer.
   private func startCreate(areaId: String? = nil, projectId: String? = nil) {
-    guard filter != .recentlyDeleted, filter != .repeating else { return }
+    guard filter != .recentlyDeleted, filter != .repeating, filter != .review else { return }
     // One press: fold (and so save) whatever editor is open, then start the
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
@@ -999,7 +999,7 @@ struct TaskListView: View {
   /// the `+`/⌘N composer there (it lets you pick the day).
   private var allowsInlineCreate: Bool {
     switch filter {
-    case .logbook, .recentlyDeleted, .upcoming, .repeating: return false
+    case .logbook, .recentlyDeleted, .upcoming, .repeating, .review: return false
     default:                                    return true
     }
   }
@@ -1520,6 +1520,8 @@ struct TaskListView: View {
       return AnyView(groupedUpcomingItems)
     case .project:
       return AnyView(projectGroupedRows)
+    case .review:
+      return AnyView(reviewRows)
     default:
       return AnyView(visibleRows)
     }
@@ -1780,6 +1782,15 @@ struct TaskListView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
         .plainListChrome()
+      } else if filter == .review {
+        ContentUnavailableView(
+          "Nothing to review",
+          systemImage: titleIcon,
+          description: Text("Tasks Claude finishes appear here so you can check and accept them.")
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .plainListChrome()
       } else {
         ContentUnavailableView(
           "Nothing here yet",
@@ -1811,6 +1822,35 @@ struct TaskListView: View {
                quickMenu: { model.filingSuggestions[$0.id] != nil },
                appendQuickAdd: attachesQuickAddToVisibleCard,
                reorderable: isManuallyOrderedList)
+  }
+
+  /// Review stage rows (`needs_verify`, #87): each row carries Accept and Send
+  /// back right in the list, and expands into the full composer on tap.
+  @ViewBuilder
+  private var reviewRows: some View {
+    let rows = visibleItems
+    ForEach(Array(rows.enumerated()), id: \.element.id) { idx, task in
+      let position = TaskCardPosition(index: idx, count: rows.count)
+      if expandedEditId == task.id {
+        taskRow(task, quickMenu: false)
+          .taskCardChrome(position, isSelected: true)
+      } else {
+        ReviewTaskRow(
+          task: task,
+          isSelected: selection.contains(task.id),
+          onOpen: { beginEdit(task) },
+          onAccept: { toggle(task) },
+          onSendBack: { note in
+            Haptics.tick()
+            mutator.sendBackConvo(id: task.id, note: note)
+            Task { await load() }
+          }
+        )
+        .asListRow()
+        .taskCardChrome(position, isSelected: selection.contains(task.id))
+        .taskCardContextMenu(position) { taskContextMenu(for: task) }
+      }
+    }
   }
 
   /// True where the rendered order IS the manual `TaskOrder.key` order —
@@ -3434,7 +3474,7 @@ struct TaskListView: View {
     // Every open-work list hides done tasks (a just-completed one lingers via
     // the settle exception in `visibleItems`, then fades). Only the Logbook and
     // Recently Deleted — whose whole job is showing finished/trashed tasks — keep them.
-    case .project, .area, .unscheduled, .upcoming, .triage, .repeating: return true
+    case .project, .area, .unscheduled, .upcoming, .triage, .repeating, .review: return true
     case .today:
       return !todayShowCompleted
     case .logbook, .recentlyDeleted: return false

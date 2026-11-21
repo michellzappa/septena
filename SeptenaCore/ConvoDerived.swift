@@ -31,7 +31,9 @@ extension TaskConvo {
   }
 
   /// There's a conversation worth surfacing at all.
-  var hasStarted: Bool { !thread.isEmpty || confirmedIntent != nil }
+  var hasStarted: Bool {
+    !thread.isEmpty || confirmedIntent != nil || isTerminal || artifact != nil || handoff != nil
+  }
 
   /// SINGLE source of truth for the reasoning queue, shared by the in-app
   /// backend filter and the badge (the gateway mirrors this rule in TS): marked
@@ -47,6 +49,12 @@ extension TaskConvo {
 /// Pure projection of a conversation into UI/queue state.
 func deriveConvo(_ convo: TaskConvo) -> ConvoDerived {
   let pending = convo.isPendingReasoning()
+
+  if convo.endState == .needsVerify {
+    return ConvoDerived(stage: .awaitingHuman, badge: .needsYou,
+                        nextAction: convo.endStateNote ?? "Needs review",
+                        pendingReasoning: false)
+  }
 
   if convo.isTerminal {
     let badge: ConvoBadge = (convo.endState == .wontDo) ? .wontDo : .done

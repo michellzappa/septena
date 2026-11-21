@@ -14,17 +14,21 @@ struct ConversationCard: View {
   let accent: Color
 
   @State private var convo: TaskConvo
+  @State private var isTaskOpen: Bool = true
   @State private var showOther = false
   @State private var otherText = ""
+  @State private var showSendBack = false
+  @State private var sendBackNote = ""
   @State private var showInfo = false
 
   /// Seed `convo` from the already-loaded task so the card paints on the FIRST
   /// frame (no fetch-on-open lag); `onAppear`/`.septenaTasksChanged` then refresh
   /// it (a single by-id read) to pick up turns appended after open.
-  init(taskID: String, initial: TaskConvo = TaskConvo(), accent: Color = .accentColor) {
+  init(taskID: String, initial: TaskConvo = TaskConvo(), isTaskOpen: Bool = true, accent: Color = .accentColor) {
     self.taskID = taskID
     self.accent = accent
     _convo = State(initialValue: initial)
+    _isTaskOpen = State(initialValue: isTaskOpen)
   }
 
   var body: some View {
@@ -43,6 +47,8 @@ struct ConversationCard: View {
 
           if let q = openQuestion {
             questionBlock(q)
+          } else if convo.endState == .needsVerify {
+            reviewBlock
           } else if let handoff = convo.handoff {
             handoffButton(handoff)            // human last-mile — show even when the agent's side is done
           } else if convo.isTerminal {
@@ -81,7 +87,7 @@ struct ConversationCard: View {
       } else if let note = t.note {
         row(icon: "bubble.left", tint: .secondary, text: note, font: .caption, dim: true)
       }
-    } else if let answer = t.chosen ?? t.otherText {
+    } else if let answer = t.chosen ?? t.otherText ?? t.note {
       row(icon: "checkmark.circle.fill", tint: .green, text: answer, font: .subheadline, weight: .medium)
     }
   }
@@ -161,6 +167,45 @@ struct ConversationCard: View {
     }
   }
 
+  /// Agent finished and asked the human to verify (`needs_verify`, #87).
+  @ViewBuilder private var reviewBlock: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .top, spacing: 6) {
+        Image(systemName: isTaskOpen ? "eye" : "checkmark.seal.fill")
+          .font(.septenaCaption)
+          .foregroundStyle(isTaskOpen ? Color.yellow : Color.green)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(isTaskOpen ? "Needs review" : "Accepted")
+            .font(.septenaLabel)
+          if let note = convo.endStateNote, !note.isEmpty {
+            Text(note).font(.septenaMeta).foregroundStyle(.secondary)
+          }
+        }
+      }
+      if isTaskOpen {
+        HStack(spacing: 8) {
+          Button("Accept") { acceptReview() }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+          Button("Send back") { a11yAnimate { showSendBack.toggle() } }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        if showSendBack {
+          HStack(spacing: 6) {
+            TextField("What needs another pass?", text: $sendBackNote)
+              .textFieldStyle(.roundedBorder)
+              .onSubmit { submitSendBack() }
+            Button("Send") { submitSendBack() }
+              .buttonStyle(.borderedProminent)
+              .controlSize(.small)
+              .disabled(sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          }
+        }
+      }
+    }
+  }
+
   @ViewBuilder private var terminalRow: some View {
     let wontDo = convo.endState == .wontDo
     HStack(alignment: .top, spacing: 6) {
@@ -235,7 +280,33 @@ struct ConversationCard: View {
   // MARK: Actions
 
   private func reload() {
-    convo = SeptenaServices.shared.taskMutator.conversation(id: taskID) ?? TaskConvo()
+    let ctx = LocalStore.shared.container.mainContext
+    if let task = LocalCache.task(id: taskID, in: ctx) {
+      convo = task.conversation
+      isTaskOpen = task.status == .open
+    } else {
+      convo = SeptenaServices.shared.taskMutator.conversation(id: taskID) ?? TaskConvo()
+    }
+  }
+
+  private func acceptReview() {
+    let mutator = SeptenaServices.shared.taskMutator
+    mutator.complete(id: taskID)
+    mutator.acknowledge(id: taskID)
+    TaskUndo.recordCompletion(ids: [taskID], wasDone: false, mutator: mutator)
+    Haptics.tick()
+    showSendBack = false
+    reload()
+  }
+
+  private func submitSendBack() {
+    let text = sendBackNote.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return }
+    SeptenaServices.shared.taskMutator.sendBackConvo(id: taskID, note: text)
+    Haptics.tick()
+    sendBackNote = ""
+    showSendBack = false
+    reload()
   }
 
   private func choose(_ label: String, replyTo: Int, step: ConvoTurn.Step) {
@@ -273,7 +344,7 @@ struct ConversationSection: View {
   let accent: Color
 
   var body: some View {
-    ConversationCard(taskID: task.id, initial: task.conversation, accent: accent)
+    ConversationCard(taskID: task.id, initial: task.conversation, isTaskOpen: task.status == .open, accent: accent)
   }
 }
 

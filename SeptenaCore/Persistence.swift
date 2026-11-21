@@ -4121,7 +4121,7 @@ enum LocalCache {
           e.deletedAt == nil && !e.pendingDeletion && e.area == areaId
         }
       ))
-    case .today, .triage, .upcoming, .repeating, .unscheduled:
+    case .today, .triage, .review, .upcoming, .repeating, .unscheduled:
       return StoreHealth.fetch(context, FetchDescriptor<TaskEntity>(
         predicate: #Predicate { e in
           e.deletedAt == nil && !e.pendingDeletion && e.statusRaw == "open"
@@ -4241,6 +4241,10 @@ enum LocalCache {
     case .triage:
       // Unratified layer above Today — see `TaskEntity.isInTriageBand`.
       return e.isInTriageBand ? SeptenaTask(e) : nil
+    case .review:
+      // Agent-worked tasks awaiting the human's verification and acceptance (#87).
+      guard e.status == .open, e.conversation.endState == .needsVerify else { return nil }
+      return SeptenaTask(e)
     case .upcoming:
       guard e.status == .open, !e.today else { return nil }
       if let s = e.scheduled, s > today { return SeptenaTask(e) }

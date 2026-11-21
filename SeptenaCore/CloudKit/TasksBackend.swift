@@ -264,6 +264,27 @@ final class CloudKitTasksBackend {
     commitAndPush(entity, op: "convo.handoff")
   }
 
+  /// Sends a task in Review (`needs_verify`) back to Claude with a note:
+  /// appends a user turn carrying the note, reopens `endState` to `.open`,
+  /// clears `endStateNote` and `stoppedAt`, and assigns to `.claude`.
+  @discardableResult
+  func sendBackConvo(id: String, note: String) -> Int {
+    guard let entity = fetch(id: id) else { return 0 }
+    let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return 0 }
+    var convo = entity.conversation
+    let turn = ConvoTurn(seq: convo.nextSeq, role: .user, step: .work,
+                         note: trimmed, ts: Date())
+    convo.thread.append(turn)
+    convo.endState = .open
+    convo.endStateNote = nil
+    convo.stoppedAt = nil
+    convo.assignee = .claude
+    entity.conversation = convo
+    commitAndPush(entity, op: "convo.sendBack")
+    return turn.seq
+  }
+
   /// Tasks awaiting reasoning: explicitly marked for Claude, OR whose last
   /// provider turn was low-confidence — and not yet terminal. Client-side
   /// filter (the CK schema is auto-managed; no server query on the blob).

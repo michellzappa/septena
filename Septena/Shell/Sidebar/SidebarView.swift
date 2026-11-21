@@ -585,6 +585,9 @@ struct SidebarRootView: View {
     // Today total = pinned-today + scheduled/due rolling in. Both buckets live
     // on Today, so the user-facing count is the sum.
     case .filter(.today):       return counts.map { $0.todayCount + $0.reviewCount }
+    case .filter(.review):
+      let n = LocalCache.tasks(in: modelContext, filter: .review).count
+      return n > 0 ? n : nil
     case .filter(.upcoming):    return counts?.upcomingCount
     case .filter(.repeating):   return LocalCache.tasks(in: modelContext, filter: .repeating).count
     case .filter(.unscheduled): return counts?.unscheduledCount

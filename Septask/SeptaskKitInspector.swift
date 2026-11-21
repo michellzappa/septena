@@ -397,7 +397,9 @@ final class SeptaskKitInspectorController: NSViewController, NSTextViewDelegate,
   /// would yank a proposal out of the Inbox merely because it became the
   /// selected row. Disposition paths ack; looking does not.
   private func refreshConversation(_ next: SeptenaTask) {
-    let shown = conversationView.configure(taskID: next.id, convo: next.conversation)
+    let shown = conversationView.configure(taskID: next.id,
+                                           convo: next.conversation,
+                                           isTaskOpen: next.status == .open)
     conversationLabel.isHidden = !shown
   }
 
