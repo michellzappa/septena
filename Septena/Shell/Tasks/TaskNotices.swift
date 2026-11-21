@@ -299,8 +299,8 @@ enum TaskNotices {
         id: .importTasks,
         title: String(localized: "Bring in your tasks",
                       comment: "Get started step: import tasks from another app"),
-        detail: String(localized: "From Reminders or Things",
-                       comment: "Get started step detail: where tasks can be imported from"),
+        detail: String(localized: "Import from another app",
+                       comment: "Get started step detail: import tasks from another app"),
         done: done(.importTasks, source: TaskSource.things)),
       TaskNoticeStep(
         id: .addTask,
