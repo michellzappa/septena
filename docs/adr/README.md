@@ -18,6 +18,7 @@ a new ADR and set the old one to `superseded by NNNN`.
 | [0010](0010-free-server-tier-with-limits.md) | Offer a free server tier with limits; paid lifts them | accepted |
 | [0011](0011-self-hostable-backend.md) | Keep the backend self-hostable on the user's own Cloudflare account | accepted |
 | [0012](0012-project-notes-are-agent-context.md) | Project notes are the context agents read first | accepted |
+| [0013](0013-native-windows-app-on-the-android-code.md) | Build the Windows app on the Android client's Kotlin code | proposed |
 
 ## Template
 
