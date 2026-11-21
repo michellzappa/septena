@@ -903,6 +903,11 @@ struct TaskListView: View {
     // new task. This used to stop after the fold, so "+" while editing took
     // two presses.
     closeActiveEditIfNeeded()
+    if filter == .upcoming {
+      let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: clock.now) ?? clock.now
+      _ = createInlineDraftAtDrop(scheduledDate: tomorrow, fromDrag: false)
+      return
+    }
     guard allowsInlineCreate else {
       a11yAnimate(.snappy(duration: 0.25)) {
         expandedEditId = nil
@@ -1990,7 +1995,8 @@ struct TaskListView: View {
     headingId: String? = nil,
     scheduledDate: Date? = nil,
     insertInto sequence: [SeptenaTask]? = nil,
-    at insertion: Int? = nil
+    at insertion: Int? = nil,
+    fromDrag: Bool = true
   ) -> Bool {
     closeActiveEditIfNeeded()
     var seed = TaskDraft(filter: filter)
@@ -2013,7 +2019,9 @@ struct TaskListView: View {
     }
     model.noteCreated(draft.id)
     draftEditIds.insert(draft.id)
-    UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
+    if fromDrag {
+      UserDefaults.standard.set(true, forKey: "septena.magicPlusDragHintSeen")
+    }
     Haptics.tick()
     AddInfoSection.tasks.notifyTilesChanged()
     Task {
@@ -2023,6 +2031,8 @@ struct TaskListView: View {
       } else {
         beginEdit(draft)
       }
+      scrollToTargetID = draft.id
+      scrollToTargetTick += 1
     }
     return true
   }

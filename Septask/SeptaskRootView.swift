@@ -213,8 +213,7 @@ struct SeptaskRootView: View {
       set: { tapped in
         switch tapped {
         case .newTask:
-          Haptics.tap()
-          nav.presentAddInfo(section: .tasks)
+          triggerInlineNewTask()
         case .tasks:
           if !nav.path.isEmpty {
             nav.path = []
@@ -228,6 +227,32 @@ struct SeptaskRootView: View {
         }
       }
     )
+  }
+
+  /// Start a new task inline (never a modal sheet/drawer):
+  /// - On Today, Upcoming, Project, Area, Anytime, or Inbox: opens the inline
+  ///   composer right in the active list via `nav.requestNewTask()`.
+  /// - On the Tasks index (no list mounted) or read-only history smart lists:
+  ///   switches to Today (Inbox) and opens the inline composer there.
+  private func triggerInlineNewTask() {
+    Haptics.tap()
+    if selection == .tasks {
+      let canCreateInPlace: Bool = {
+        guard let last = nav.path.last else { return false }
+        switch last {
+        case .project, .area, .filter(.unscheduled), .filter(.triage),
+             .filter(.today), .filter(.upcoming):
+          return true
+        default:
+          return false
+        }
+      }()
+      if !canCreateInPlace {
+        if !nav.path.isEmpty { nav.path = [] }
+        selection = .today
+      }
+    }
+    nav.requestNewTask()
   }
 
   /// Standard iOS 26 `TabView` with a detached `role: .search` slot (requires
@@ -301,13 +326,12 @@ struct SeptaskRootView: View {
   /// tab-bar slot:
   /// - Solid accent orb + subtle 6-dot grip beneath `+` communicates a
   ///   grabbable object rather than a flat tap-only tab icon.
-  /// - Tap: opens `SeptaskQuickAdd` without leaving the active tab.
+  /// - Tap: starts a new inline task in the active list (never a modal/drawer).
   /// - Hold & drag: carries `TaskDragIDs.newTask` through native iOS drag and
   ///   drop into any `TaskReorderDrop`, `TaskMoveDrop`, or `SidebarTaskDrop`.
   private var magicPlusOrb: some View {
     Button {
-      Haptics.tap()
-      nav.presentAddInfo(section: .tasks)
+      triggerInlineNewTask()
     } label: {
       ZStack {
         Circle()
