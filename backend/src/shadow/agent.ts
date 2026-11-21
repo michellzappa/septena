@@ -47,6 +47,7 @@ export const AGENT_TOOL_NAMES = Object.keys(zAgentArgs) as AgentToolName[];
 export const AGENT_TOOLS: Tool[] = [
   {
     name: "tasks_claim",
+    title: "Claim task",
     description:
       "Claim a task before you work on it, so no other agent works it at the same time. The claim is a lease " +
       "(default 30 minutes, at most 240): call again with the same agent name to renew it while you work, and " +
@@ -64,9 +65,17 @@ export const AGENT_TOOLS: Tool[] = [
       },
       required: ["id", "agent"],
     },
+    annotations: {
+      title: "Claim task",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
   },
   {
     name: "tasks_release",
+    title: "Release task claim",
     description:
       "End your claim on a task. `why` is one line on what this run did; the user reads it in the task's activity. " +
       "Asking a question (a provider turn with options) ends the claim on its own.",
@@ -79,9 +88,17 @@ export const AGENT_TOOLS: Tool[] = [
       },
       required: ["id", "agent", "why"],
     },
+    annotations: {
+      title: "Release task claim",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: "tasks_agent_events",
+    title: "Get agent events",
     description:
       "What changed for agents since your cursor: a task assigned to Claude, a user answer or note on a task, a " +
       "task stopped or resumed, all agents paused or unpaused. Events are pointers (task id and kind), never " +
@@ -94,9 +111,17 @@ export const AGENT_TOOLS: Tool[] = [
         limit: { type: "integer", minimum: 1, maximum: 500 },
       },
     },
+    annotations: {
+      title: "Get agent events",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: "tasks_activity",
+    title: "Get task activity",
     description:
       "Who changed what and why, newest first: for one task (its fields, conversation and claims), or for all " +
       "tasks when id is omitted. Use it to see what earlier runs did before you continue a task.",
@@ -107,9 +132,17 @@ export const AGENT_TOOLS: Tool[] = [
         limit: { type: "integer", minimum: 1, maximum: 200, description: "Default 50." },
       },
     },
+    annotations: {
+      title: "Get task activity",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
   },
   {
     name: "tasks_history",
+    title: "Get task history",
     description:
       "One task's change history, newest first, with the values before and after each change. `actor` is " +
       "\"you\" for the user's own edits in the app and \"Claude\" for changes made through this connector. " +
@@ -121,6 +154,13 @@ export const AGENT_TOOLS: Tool[] = [
         limit: { type: "integer", minimum: 1, maximum: 200, description: "Default 50." },
       },
       required: ["id"],
+    },
+    annotations: {
+      title: "Get task history",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
   },
 ];

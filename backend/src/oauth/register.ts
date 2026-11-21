@@ -14,10 +14,6 @@ import { validateRedirectUri } from "./redirects.js";
 const MAX_REDIRECT_URIS = 5;
 const MAX_CLIENT_NAME_LENGTH = 100;
 
-export async function register(c: Context<{ Bindings: Env }>) {
-  return registerClient(c, (env, rec) => putClient(env, rec), "oauth_register");
-}
-
 /// The registration logic, shared with the api.septena.app preview
 /// (src/shadow/oauth.ts), which stores its clients under its own KV prefix.
 export async function registerClient(

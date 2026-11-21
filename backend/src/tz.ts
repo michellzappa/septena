@@ -5,11 +5,8 @@
 // (EventTimestamp uses TimeZone.current). So any "today" / "now" / "N days ago"
 // the gateway computes must be in the user's timezone, not UTC — otherwise
 // writes near local midnight land on the wrong day and default ranges are off
-// by one. The effective tz comes from the user's Settings record.
-
-import { getSettings } from "./tools/getSettings.js";
-import { logEvent } from "./util.js";
-import type { CloudKitClient } from "./cloudkit.js";
+// by one. The effective tz is the `homeTimezone` setting the app syncs
+// (src/shadow/mcp.ts effectiveTimeZone).
 
 const DEFAULT_TZ = "UTC";
 
@@ -20,41 +17,6 @@ export function isValidTz(tz: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Effective IANA timezone for the user: the travel tz when travel_mode is on
- * (and set), else the home tz, else UTC. Reads the `app` Settings record's
- * `time` block (home_timezone / travel_mode / travel_timezone).
- *
- * The UTC fallback is a correctness hazard, not a benign default: it silently
- * stamps every event in UTC and shifts default day-ranges. The iOS app now
- * publishes the device's `home_timezone` on launch, so a populated record is
- * the norm — any fallback means the user has never opened the app, or the
- * record is malformed. We emit `tz_fallback_utc` with a precise `reason` so
- * that's observable in `wrangler tail` instead of failing invisibly.
- */
-export async function getEffectiveTimezone(client: CloudKitClient): Promise<string> {
-  let reason = "no_settings_record";
-  try {
-    const { settings } = await getSettings(client);
-    const time = (settings as Record<string, unknown> | undefined)?.time as
-      | { home_timezone?: unknown; travel_mode?: unknown; travel_timezone?: unknown }
-      | undefined;
-    if (time && typeof time === "object") {
-      const travel = typeof time.travel_timezone === "string" ? time.travel_timezone : "";
-      if (time.travel_mode === "on" && travel && isValidTz(travel)) return travel;
-      const home = typeof time.home_timezone === "string" ? time.home_timezone : "";
-      if (home && isValidTz(home)) return home;
-      reason = home ? "invalid_home_tz" : "no_home_tz";
-    } else {
-      reason = "no_time_block";
-    }
-  } catch {
-    reason = "settings_error";
-  }
-  logEvent("tz_fallback_utc", { reason });
-  return DEFAULT_TZ;
 }
 
 /** Wall-clock parts of instant `d` as seen in `tz`. */

@@ -1,0 +1,14 @@
+{
+  "name": "septena",
+  "version": "0.1.0",
+  "description": "Connect Gemini CLI to Septena tasks over MCP and follow the Septena agent loop.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "septena": {
+      "httpUrl": "https://api.septena.app/mcp",
+      "oauth": {
+        "enabled": true
+      }
+    }
+  }
+}

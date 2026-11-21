@@ -16,12 +16,9 @@ import {
   validateModernHeaders,
 } from "./protocol.js";
 
-// The MCP JSON-RPC envelope, shared by every MCP endpoint this Worker serves:
-// the live CloudKit connector (src/mcp.ts, mcp.septena.app) and the read-only
-// task-backend preview (src/shadow/mcp.ts, api.septena.app). One copy of the
-// dual-era rules (src/protocol.ts) and the envelope around them, so the two
-// endpoints cannot drift on protocol behavior. Data sources and tool sets stay
-// in the endpoint modules.
+// The MCP JSON-RPC envelope of the tasks connector (src/shadow/mcp.ts,
+// api.septena.app): the dual-era rules (src/protocol.ts) and the envelope
+// around them. The data source and tool set stay in the endpoint module.
 
 // Single source of truth for the server version — the MCP `serverInfo.version`
 // must always match package.json so a deployed Worker maps to a tagged release.
@@ -37,11 +34,21 @@ export interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-export type Tool = { name: string; description: string; inputSchema: unknown };
+export interface ToolAnnotations {
+  title: string;
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
 
-/// The live connector's protected-resource document. Default for
-/// `unauthorized()` so the live 401 stays byte-identical.
-export const LIVE_RESOURCE_METADATA = "https://mcp.septena.app/.well-known/oauth-protected-resource";
+export type Tool = {
+  name: string;
+  title: string;
+  description: string;
+  inputSchema: unknown;
+  annotations: ToolAnnotations;
+};
 
 /// Parse the JSON-RPC body and run the per-request protocol checks: reply 202
 /// to notifications, pick the era, and for modern requests validate the
@@ -194,7 +201,7 @@ export function rpcError(
   return Response.json({ jsonrpc: "2.0", id, error }, { status: era === "modern" ? status : 200 });
 }
 
-export function unauthorized(reason?: string, resourceMetadata = LIVE_RESOURCE_METADATA): Response {
+export function unauthorized(reason: string | undefined, resourceMetadata: string): Response {
   // RFC 9728 / MCP 2025-06: the `resource_metadata` parameter points clients
   // at the endpoint's /.well-known/oauth-protected-resource doc, from which
   // they learn the authorization server. Without it, Claude's MCP client

@@ -1,14 +1,15 @@
 {
   "name": "@septena/mcp-gateway",
   "version": "0.2.0",
-  "description": "Hosted MCP server bridging Claude.ai to Septena's CloudKit data.",
+  "description": "Septask task backend and tasks MCP connector (api.septena.app).",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "hono": "^4.6.13",
