@@ -259,13 +259,13 @@ links (issue, PR, commit).
 
 ## 12. Open questions for mz
 
-| Question | Default in this spec |
+| Question | Decision |
 |---|---|
-| Runner host | Mac mini first; cloud routines later for non-toolchain work. |
-| Run cadence | Every 15 minutes, plus wake on answer. |
-| Parallel tasks per run | 2. |
-| Profile scope | Project, with area as fallback. |
-| Auto-intake without assigning | Off in v1. |
-| Notification actions | Up to 3 options as actions. |
-| Where `factory-day` asks for personal projects | Septask. Starlings stays for team work. |
-| Agent merges on `ship` | Yes, per your global merge rule. |
+| Runner host | Decided (default, 2026-11-21): Mac mini first; cloud routines later for non-toolchain work. |
+| Run cadence | Decided (default, 2026-11-21): Every 15 minutes, plus wake on answer. |
+| Parallel tasks per run | Decided (default, 2026-11-21): 2. |
+| Profile scope | Decided (default, 2026-11-21): Project, with area as fallback. |
+| Auto-intake without assigning | Decided (default, 2026-11-21): Off in v1. |
+| Notification actions | Decided (default, 2026-11-21): Up to 3 options as actions. |
+| Where `factory-day` asks for personal projects | Decided (default, 2026-11-21): Septask. Starlings stays for team work. |
+| Agent merges on `ship` | Decided (default, 2026-11-21): Yes, per your global merge rule. |
