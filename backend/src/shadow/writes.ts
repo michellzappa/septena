@@ -68,11 +68,20 @@ export const rpcStoreFor = (env: Env, userId: string) => storeFor(env, userId) a
 const zDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 /// "" clears, as on the live connector, which writes "" to CloudKit.
 const zDayOrClear = z.union([zDay, z.literal("")]).nullable();
+const zOrdinalWeekday = z.object({
+  ordinal: z.number(),
+  weekday: z.number(),
+});
 const zRecurrence = z.object({
   unit: z.string().optional(),
   interval: z.number().optional(),
   after_completion: z.boolean().optional(),
   afterCompletion: z.boolean().optional(),
+  weekdays: z.array(z.number()).nullable().optional(),
+  month_day: z.number().nullable().optional(),
+  monthDay: z.number().nullable().optional(),
+  ordinal_weekday: zOrdinalWeekday.nullable().optional(),
+  ordinalWeekday: zOrdinalWeekday.nullable().optional(),
 }).nullable();
 
 export const zWriteArgs = {
@@ -255,12 +264,25 @@ function onToday(t: { today?: unknown; scheduled?: unknown; deadline?: unknown }
 }
 
 function recurrenceColumns(rule: RecurrenceRuleInput | null): Record<string, unknown> {
-  if (!rule) return { recurrenceUnit: null, recurrenceInterval: 1, recurrenceAfterCompletion: true, recurrencePaused: false };
+  if (!rule) {
+    return {
+      recurrenceUnit: null,
+      recurrenceInterval: 1,
+      recurrenceAfterCompletion: true,
+      recurrencePaused: false,
+      recurrenceWeekdays: null,
+      recurrenceMonthDay: null,
+      recurrenceOrdinalWeekday: null,
+    };
+  }
   return {
     recurrenceUnit: rule.unit,
     recurrenceInterval: rule.interval,
     recurrenceAfterCompletion: rule.afterCompletion,
     recurrencePaused: false,
+    recurrenceWeekdays: rule.weekdays && rule.weekdays.length > 0 ? rule.weekdays : null,
+    recurrenceMonthDay: rule.monthDay ?? null,
+    recurrenceOrdinalWeekday: rule.ordinalWeekday ?? null,
   };
 }
 
@@ -389,6 +411,13 @@ async function completeTask(ctx: WriteContext, id: string) {
   if (unit && src.recurrencePaused !== true && canSpawnOccurrence) {
     const interval = Number(src.recurrenceInterval ?? 1) || 1;
     const afterCompletion = src.recurrenceAfterCompletion === true;
+    const weekdays = Array.isArray(src.recurrenceWeekdays) && src.recurrenceWeekdays.length > 0
+      ? (src.recurrenceWeekdays as number[])
+      : undefined;
+    const monthDay = typeof src.recurrenceMonthDay === "number" ? src.recurrenceMonthDay : undefined;
+    const ordinalWeekday = src.recurrenceOrdinalWeekday && typeof src.recurrenceOrdinalWeekday === "object"
+      ? (src.recurrenceOrdinalWeekday as { ordinal: number; weekday: number })
+      : undefined;
     // Same date and id rule as the app (Recurrence.nextDate with the logical
     // slot, Recurrence.occurrenceID), so a completion here and one in the app
     // converge on ONE occurrence row.
@@ -396,7 +425,7 @@ async function completeTask(ctx: WriteContext, id: string) {
       completedOn: completedAt.slice(0, 10),
       scheduled: str(src.scheduled) ?? null,
       logicalScheduled: str(src.recurrenceAnchorDate) ?? null,
-      rule: { unit, interval, afterCompletion },
+      rule: { unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday },
     });
     if (!next) {
       recurrence = { recurrenceWarning: recurrenceWarning.noNextDate(id, unit) };
@@ -414,7 +443,7 @@ async function completeTask(ctx: WriteContext, id: string) {
           scheduled: next,
           // A deadline belonged to the completed occurrence.
           today: false,
-          ...recurrenceColumns({ unit, interval, afterCompletion }),
+          ...recurrenceColumns({ unit, interval, afterCompletion, weekdays, monthDay, ordinalWeekday }),
           recurrenceSeriesID: str(src.recurrenceSeriesID) ?? id,
           recurrenceAnchorDate: afterCompletion ? null : next,
           position,

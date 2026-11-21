@@ -1,6 +1,6 @@
 // Recurrence arithmetic — LOCKSTEP with the app's
 // `RecurrenceDateCalculator` (septena/SeptenaCore/DateParser.swift) and
-// `Recurrence.occurrenceID`.
+// `Recurrence.occurrenceID`. Verified by `registry/conformance/recurrence.json`.
 //
 // Both surfaces can now complete a recurring task, and both derive the next
 // occurrence's record name from (source task id + next scheduled date). That
@@ -9,13 +9,34 @@
 // on one — so if these two implementations ever disagree about the date, they
 // disagree about the id, and the convergence silently stops working.
 //
-// This is therefore a literal port, including the month-overflow clamping and
-// the catch-up loop. Change it only alongside the Swift original.
+// This is therefore a literal port, including month-overflow clamping,
+// ISO-week weekday stepping, ordinal monthly/yearly resolution, and the
+// catch-up loop. Change it only alongside the Swift original and
+// `registry/conformance/recurrence.json`.
 
 interface CivilDate {
   y: number;
   m: number; // 1-based
   d: number;
+}
+
+export interface OrdinalWeekday {
+  /** 1..4 for 1st..4th, or -1 for last occurrence in the month. */
+  ordinal: number;
+  /** 1 = Sunday .. 7 = Saturday (matches Swift Calendar.component(.weekday)). */
+  weekday: number;
+}
+
+export interface RecurrenceRule {
+  unit: string; // "day" | "week" | "month" | "year"
+  interval: number; // 1+
+  afterCompletion: boolean;
+  /** Specific weekdays (1 = Sun .. 7 = Sat) for fixed weekly rules. */
+  weekdays?: number[] | null;
+  /** Specific day of month (1..31, or -1 for last day) for fixed monthly/yearly rules. */
+  monthDay?: number | null;
+  /** Specific ordinal weekday (e.g. last Friday) for fixed monthly/yearly rules. */
+  ordinalWeekday?: OrdinalWeekday | null;
 }
 
 function parseYMD(ymd: string): CivilDate | null {
@@ -45,6 +66,23 @@ function addDays(p: CivilDate, n: number): CivilDate {
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
 }
 
+/** 1 = Sunday .. 7 = Saturday (matches Swift Calendar.component(.weekday)). */
+function weekdayOf(p: CivilDate): number {
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay() + 1;
+}
+
+/** ISO Monday-first offset: Mon=0, Tue=1, ..., Sat=5, Sun=6. */
+function isoOffsetFromWeekday(weekday: number): number {
+  return (weekday + 5) % 7;
+}
+
+function addMonthsRaw(y: number, m: number, n: number): { y: number; m: number } {
+  const total = y * 12 + (m - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nm = ((total % 12) + 12) % 12 + 1;
+  return { y: ny, m: nm };
+}
+
 // Swift's Calendar clamps a month overflow (Jan 31 + 1 month = Feb 28/29).
 // Plain JS `setMonth` rolls over into the following month instead (Mar 3), so
 // the clamp is explicit here.
@@ -56,22 +94,60 @@ function addDays(p: CivilDate, n: number): CivilDate {
 // anchor to the target month's last day keeps the chain stable
 // (Jan 31 → Feb 28 → Mar 31 → Apr 30).
 function addMonths(p: CivilDate, n: number, keepMonthEnd: boolean): CivilDate {
-  const total = p.y * 12 + (p.m - 1) + n;
-  const y = Math.floor(total / 12);
-  const m = ((total % 12) + 12) % 12 + 1;
+  const { y, m } = addMonthsRaw(p.y, p.m, n);
   const dim = daysInMonth(y, m);
   if (keepMonthEnd && p.d === daysInMonth(p.y, p.m)) return { y, m, d: dim };
   return { y, m, d: Math.min(p.d, dim) };
 }
 
-function toComparable(p: CivilDate): number {
-  return Date.UTC(p.y, p.m - 1, p.d);
+function resolveMonthDay(y: number, m: number, monthDay: number): CivilDate | null {
+  const dim = daysInMonth(y, m);
+  if (monthDay === -1) return { y, m, d: dim };
+  if (monthDay >= 1 && monthDay <= 31) return { y, m, d: Math.min(monthDay, dim) };
+  return null;
 }
 
-export interface RecurrenceRule {
-  unit: string; // "day" | "week" | "month"
-  interval: number; // 1+
-  afterCompletion: boolean;
+function resolveOrdinalWeekday(y: number, m: number, ow: OrdinalWeekday): CivilDate | null {
+  if (ow.weekday < 1 || ow.weekday > 7) return null;
+  if (ow.ordinal !== -1 && (ow.ordinal < 1 || ow.ordinal > 4)) return null;
+  const dim = daysInMonth(y, m);
+  if (ow.ordinal === -1) {
+    const lastWd = weekdayOf({ y, m, d: dim });
+    const back = (lastWd - ow.weekday + 7) % 7;
+    return { y, m, d: dim - back };
+  }
+  const firstWd = weekdayOf({ y, m, d: 1 });
+  const delta = (ow.weekday - firstWd + 7) % 7;
+  const day = 1 + delta + (ow.ordinal - 1) * 7;
+  if (day > dim) return null;
+  return { y, m, d: day };
+}
+
+function normalizeIsoWeekdays(weekdays: number[] | null | undefined): number[] {
+  if (!weekdays || weekdays.length === 0) return [];
+  const valid = new Set<number>();
+  for (const w of weekdays) {
+    if (Number.isInteger(w) && w >= 1 && w <= 7) valid.add(w);
+  }
+  return [...valid].sort((a, b) => isoOffsetFromWeekday(a) - isoOffsetFromWeekday(b));
+}
+
+function advanceWeeklyByWeekdays(p: CivilDate, step: number, isoOrderedWeekdays: number[]): CivilDate {
+  const curOffset = isoOffsetFromWeekday(weekdayOf(p));
+  for (const w of isoOrderedWeekdays) {
+    const off = isoOffsetFromWeekday(w);
+    if (off > curOffset) {
+      return addDays(p, off - curOffset);
+    }
+  }
+  const weekMonday = addDays(p, -curOffset);
+  const nextWeekMonday = addDays(weekMonday, step * 7);
+  const firstOffset = isoOffsetFromWeekday(isoOrderedWeekdays[0]);
+  return addDays(nextWeekMonday, firstOffset);
+}
+
+function toComparable(p: CivilDate): number {
+  return Date.UTC(p.y, p.m - 1, p.d);
 }
 
 /**
@@ -101,20 +177,47 @@ export function nextScheduledDate(input: {
   const anchor = input.rule.afterCompletion ? completed : (scheduled ?? completed);
   const step = Math.max(1, input.rule.interval);
 
-  // Month-end is preserved only on a FIXED schedule, where the anchor is the
-  // previous scheduled date and the error compounds. An after-completion rule
-  // anchors on whatever day the box was ticked, so snapping there would invent
-  // a month-end intent the user never expressed. LOCKSTEP with Swift.
-  const keepMonthEnd = !input.rule.afterCompletion;
+  const isFixed = !input.rule.afterCompletion;
+  const isoWeekdays = isFixed ? normalizeIsoWeekdays(input.rule.weekdays) : [];
+  const monthDay = isFixed ? (input.rule.monthDay ?? null) : null;
+  const ordinalWeekday = isFixed ? (input.rule.ordinalWeekday ?? null) : null;
+
+  // Legacy month-end snap applies ONLY on fixed monthly rules without an
+  // explicit `monthDay` or `ordinalWeekday`.
+  const keepMonthEnd = isFixed && monthDay === null && ordinalWeekday === null;
 
   const advance = (p: CivilDate): CivilDate | null => {
     switch (input.rule.unit) {
       case "day":
         return addDays(p, step);
       case "week":
+        if (isoWeekdays.length > 0) {
+          return advanceWeeklyByWeekdays(p, step, isoWeekdays);
+        }
         return addDays(p, step * 7);
-      case "month":
+      case "month": {
+        if (ordinalWeekday) {
+          const { y, m } = addMonthsRaw(p.y, p.m, step);
+          return resolveOrdinalWeekday(y, m, ordinalWeekday);
+        }
+        if (monthDay !== null) {
+          const { y, m } = addMonthsRaw(p.y, p.m, step);
+          return resolveMonthDay(y, m, monthDay);
+        }
         return addMonths(p, step, keepMonthEnd);
+      }
+      case "year": {
+        const y = p.y + step;
+        const m = p.m;
+        if (ordinalWeekday) {
+          return resolveOrdinalWeekday(y, m, ordinalWeekday);
+        }
+        if (monthDay !== null) {
+          return resolveMonthDay(y, m, monthDay);
+        }
+        const dim = daysInMonth(y, m);
+        return { y, m, d: Math.min(p.d, dim) };
+      }
       default:
         return null;
     }

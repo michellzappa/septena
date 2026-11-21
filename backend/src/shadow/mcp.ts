@@ -366,6 +366,13 @@ function taskOut(r: Row): TaskOut {
           unit,
           interval: Number(r.recurrenceInterval ?? 1) || 1,
           after_completion: r.recurrenceAfterCompletion === true,
+          ...(Array.isArray(r.recurrenceWeekdays) && r.recurrenceWeekdays.length > 0
+            ? { weekdays: r.recurrenceWeekdays as number[] }
+            : {}),
+          ...(typeof r.recurrenceMonthDay === "number" ? { month_day: r.recurrenceMonthDay } : {}),
+          ...(r.recurrenceOrdinalWeekday && typeof r.recurrenceOrdinalWeekday === "object"
+            ? { ordinal_weekday: r.recurrenceOrdinalWeekday as { ordinal: number; weekday: number } }
+            : {}),
         }
       : undefined,
   };

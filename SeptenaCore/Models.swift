@@ -440,57 +440,132 @@ struct SeptenaTask: Identifiable, Codable, Hashable {
 /// = true advances from today (e.g. "every 3 days after completion");
 /// false advances from the prior scheduled date (e.g. "every Friday").
 struct Recurrence: Codable, Hashable {
-  enum Unit: String, Codable, Hashable { case day, week, month }
+  enum Unit: String, Codable, Hashable { case day, week, month, year }
   var unit: Unit
   var interval: Int        // 1+
   var afterCompletion: Bool
+  /// Optional specific weekdays (1 = Sun ... 7 = Sat) for fixed weekly rules.
+  var weekdays: [Int]?
+  /// Optional day of month (1..31, or -1 for last day) for fixed monthly/yearly rules.
+  var monthDay: Int?
+  /// Optional ordinal weekday (e.g. last Friday) for fixed monthly/yearly rules.
+  var ordinalWeekday: RecurrenceOrdinalWeekday?
 
   enum CodingKeys: String, CodingKey {
-    case unit, interval
+    case unit, interval, weekdays
     case afterCompletion = "after_completion"
+    case monthDay = "month_day"
+    case ordinalWeekday = "ordinal_weekday"
   }
 
-  init(unit: Unit, interval: Int = 1, afterCompletion: Bool = true) {
+  init(unit: Unit,
+       interval: Int = 1,
+       afterCompletion: Bool = true,
+       weekdays: [Int]? = nil,
+       monthDay: Int? = nil,
+       ordinalWeekday: RecurrenceOrdinalWeekday? = nil) {
     self.unit = unit
     self.interval = max(1, interval)
     self.afterCompletion = afterCompletion
+    if !afterCompletion && unit == .week, let w = weekdays {
+      let clean = Array(Set(w.filter { (1...7).contains($0) })).sorted()
+      self.weekdays = clean.isEmpty ? nil : clean
+    } else {
+      self.weekdays = nil
+    }
+    if !afterCompletion && (unit == .month || unit == .year) {
+      if let ow = ordinalWeekday,
+         (1...7).contains(ow.weekday),
+         ow.ordinal == -1 || (1...4).contains(ow.ordinal) {
+        self.ordinalWeekday = ow
+        self.monthDay = nil
+      } else if let md = monthDay, md == -1 || (1...31).contains(md) {
+        self.monthDay = md
+        self.ordinalWeekday = nil
+      } else {
+        self.monthDay = nil
+        self.ordinalWeekday = nil
+      }
+    } else {
+      self.monthDay = nil
+      self.ordinalWeekday = nil
+    }
   }
 
   init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: CodingKeys.self)
-    unit = try c.decode(Unit.self, forKey: .unit)
-    interval = max(1, (try? c.decode(Int.self, forKey: .interval)) ?? 1)
-    afterCompletion = (try? c.decode(Bool.self, forKey: .afterCompletion)) ?? true
+    let unit = try c.decode(Unit.self, forKey: .unit)
+    let interval = max(1, (try? c.decode(Int.self, forKey: .interval)) ?? 1)
+    let afterCompletion = (try? c.decode(Bool.self, forKey: .afterCompletion)) ?? true
+    let weekdays = try? c.decodeIfPresent([Int].self, forKey: .weekdays)
+    let monthDay = try? c.decodeIfPresent(Int.self, forKey: .monthDay)
+    let ordinalWeekday = try? c.decodeIfPresent(RecurrenceOrdinalWeekday.self, forKey: .ordinalWeekday)
+    self.init(unit: unit,
+              interval: interval,
+              afterCompletion: afterCompletion,
+              weekdays: weekdays,
+              monthDay: monthDay,
+              ordinalWeekday: ordinalWeekday)
   }
 
-  /// Short human-readable summary for the pill label ("Daily", "Weekly", "Every 3 days").
+  /// Short human-readable summary for the pill label ("Daily", "Weekdays", "Last Friday", "Yearly").
   var shortLabel: String {
+    if !afterCompletion && unit == .week, let w = weekdays, !w.isEmpty {
+      let set = Set(w)
+      if interval == 1 {
+        if set == Set([2, 3, 4, 5, 6]) { return String(localized: "Weekdays", comment: "Recurrence cadence") }
+        if set == Set([1, 7]) { return String(localized: "Weekends", comment: "Recurrence cadence") }
+      }
+      let shortNames = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      let isoOrder = w.sorted { ($0 + 5) % 7 < ($1 + 5) % 7 }
+      let joined = isoOrder.map { shortNames[$0] }.joined(separator: ", ")
+      return interval == 1 ? joined : "Every \(interval) wks (\(joined))"
+    }
+    if !afterCompletion && unit == .month {
+      if let ow = ordinalWeekday {
+        let ord = Self.ordinalName(ow.ordinal)
+        let day = Self.weekdayName(ow.weekday)
+        return interval == 1 ? "\(ord) \(day)" : "Every \(interval) mos (\(ord) \(day))"
+      }
+      if monthDay == -1 {
+        return interval == 1
+          ? String(localized: "Last day of month", comment: "Recurrence cadence")
+          : "Every \(interval) mos (last day)"
+      }
+    }
     if interval == 1 {
       switch unit {
       case .day: return String(localized: "Daily", comment: "Recurrence cadence")
       case .week: return String(localized: "Weekly", comment: "Recurrence cadence")
       case .month: return String(localized: "Monthly", comment: "Recurrence cadence")
+      case .year: return String(localized: "Yearly", comment: "Recurrence cadence")
       }
     }
     return "Every \(interval) \(unit.rawValue)s"
   }
 
+  private static func ordinalName(_ ordinal: Int) -> String {
+    switch ordinal {
+    case 1: return "1st"
+    case 2: return "2nd"
+    case 3: return "3rd"
+    case 4: return "4th"
+    default: return "Last"
+    }
+  }
+
+  private static func weekdayName(_ weekday: Int) -> String {
+    let names = ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    return (1...7).contains(weekday) ? names[weekday] : "Day"
+  }
+
   /// Calculates the scheduled date for the next occurrence.
-  ///
-  /// `afterCompletion` controls the anchor: true means the interval starts
-  /// from the day the task was completed; false means it advances from the
-  /// task's prior scheduled date. A fixed-schedule task that is completed
-  /// late advances until it reaches the next future occurrence, rather than
-  /// creating another already-overdue copy.
   func nextDate(completedOn: String, scheduled: String?) -> String? {
     nextDate(completedOn: completedOn, scheduled: scheduled, logicalScheduled: nil)
   }
 
   /// Calculates the next occurrence using the series' logical slot rather
-  /// than necessarily the date currently shown on the task. A fixed-schedule
-  /// occurrence can be moved as a one-off exception; in that case `scheduled`
-  /// is the exception date while `logicalScheduled` remains on the original
-  /// cadence. Completion must advance from the latter.
+  /// than necessarily the date currently shown on the task.
   func nextDate(completedOn: String,
                 scheduled: String?,
                 logicalScheduled: String?) -> String? {
@@ -500,7 +575,10 @@ struct Recurrence: Codable, Hashable {
       logicalScheduled: logicalScheduled,
       unit: unit.rawValue,
       interval: interval,
-      afterCompletion: afterCompletion
+      afterCompletion: afterCompletion,
+      weekdays: weekdays,
+      monthDay: monthDay,
+      ordinalWeekday: ordinalWeekday
     )
   }
 

@@ -144,6 +144,9 @@ enum TaskJSONTransfer {
       "recurrencePaused": e.recurrencePaused ? true : nil,
       "recurrenceSeriesID": e.recurrenceSeriesID,
       "recurrenceAnchorDate": e.recurrenceAnchorDate,
+      "recurrenceWeekdays": e.recurrence?.weekdays,
+      "recurrenceMonthDay": e.recurrence?.monthDay,
+      "recurrenceOrdinalWeekday": e.recurrence?.ordinalWeekday.map { ["ordinal": $0.ordinal, "weekday": $0.weekday] },
       "position": e.position, "todayPosition": e.todayPosition,
       "kind": e.kind.isEmpty ? nil : e.kind,
       "heading": e.heading,
@@ -330,6 +333,28 @@ enum TaskJSONTransfer {
     entity.recurrencePaused = (r["recurrencePaused"] as? Bool) ?? false
     entity.recurrenceSeriesID = nonEmptyString(r["recurrenceSeriesID"])
     entity.recurrenceAnchorDate = nonEmptyString(r["recurrenceAnchorDate"])
+    if let rawWeekdays = r["recurrenceWeekdays"] as? [Any] {
+      let nums = rawWeekdays.compactMap(intValue).filter { (1...7).contains($0) }
+      if !nums.isEmpty,
+         let data = try? JSONEncoder().encode(Array(Set(nums)).sorted()),
+         let s = String(data: data, encoding: .utf8) {
+        entity.recurrenceWeekdaysJSON = s
+      } else {
+        entity.recurrenceWeekdaysJSON = nil
+      }
+    } else {
+      entity.recurrenceWeekdaysJSON = nil
+    }
+    entity.recurrenceMonthDay = intValue(r["recurrenceMonthDay"])
+    if let rawOrd = r["recurrenceOrdinalWeekday"] as? [String: Any],
+       let ord = intValue(rawOrd["ordinal"]),
+       let wd = intValue(rawOrd["weekday"]),
+       let data = try? JSONEncoder().encode(RecurrenceOrdinalWeekday(ordinal: ord, weekday: wd)),
+       let s = String(data: data, encoding: .utf8) {
+      entity.recurrenceOrdinalWeekdayJSON = s
+    } else {
+      entity.recurrenceOrdinalWeekdayJSON = nil
+    }
     if let pos = doubleValue(r["position"]) { entity.position = pos }
     entity.todayPosition = doubleValue(r["todayPosition"])
     if let sort = intValue(r["sortIndex"]) { entity.sortIndex = sort }

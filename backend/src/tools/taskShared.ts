@@ -34,7 +34,14 @@ export interface TaskOut {
   kind?: string;
   // Emitted in the SAME shape tasks_create/tasks_update accept, so a read
   // round-trips into a write unchanged.
-  recurrence?: { unit: string; interval: number; after_completion: boolean };
+  recurrence?: {
+    unit: string;
+    interval: number;
+    after_completion: boolean;
+    weekdays?: number[];
+    month_day?: number;
+    ordinal_weekday?: { ordinal: number; weekday: number };
+  };
   // Derived on output by `annotate` (absent = false / 0):
   // `inbox` = the row sits in Today's Inbox section in the app.
   // `daysOnToday` = days the row has carried over on Today undone; the app

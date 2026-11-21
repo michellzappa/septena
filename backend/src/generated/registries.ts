@@ -33,7 +33,7 @@ export const ENTITY_ENUMS = {
   taskStatus: ["open","done","cancelled"] as const,
   projectStatus: ["active","done","cancelled"] as const,
   taskKind: ["heading"] as const,
-  recurrenceUnit: ["day","week","month"] as const,
+  recurrenceUnit: ["day","week","month","year"] as const,
   convoAssignee: ["me","local","claude"] as const,
   convoEndState: ["agent_done","human_done","agent_assisted_done","needs_verify","decomposed","reminder_set","promoted_to_today","wont_do","open"] as const,
   convoHandoffActionType: ["open_url","compose","call","none"] as const,

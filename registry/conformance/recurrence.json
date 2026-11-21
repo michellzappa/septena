@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID) across Swift, TypeScript, and Kotlin.",
+  "description": "Golden conformance vectors for recurrence arithmetic (nextScheduledDate, occurrenceID) across Swift, TypeScript, and Kotlin (docs/RECURRENCE_V2_SPEC.md).",
   "nextScheduledDate": [
     {
       "name": "daily after completion advances from completedOn",
@@ -18,7 +18,7 @@
       "expected": "2026-02-28"
     },
     {
-      "name": "monthly fixed schedule snaps Feb 28 -> Mar 31 (keepMonthEnd)",
+      "name": "monthly fixed schedule snaps Feb 28 -> Mar 31 (legacy keepMonthEnd without monthDay)",
       "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false },
       "expected": "2026-03-31"
     },
@@ -49,8 +49,138 @@
     },
     {
       "name": "unknown unit returns null",
-      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": true },
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "decade", "interval": 1, "afterCompletion": true },
       "expected": null
+    },
+    {
+      "name": "yearly fixed schedule advances 1 year",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": false },
+      "expected": "2027-11-21"
+    },
+    {
+      "name": "yearly fixed schedule every 2 years",
+      "input": { "completedOn": "2026-03-15", "scheduled": "2026-03-15", "logicalScheduled": null, "unit": "year", "interval": 2, "afterCompletion": false },
+      "expected": "2028-03-15"
+    },
+    {
+      "name": "yearly fixed Feb 29 clamps to Feb 28 in non-leap year",
+      "input": { "completedOn": "2028-02-29", "scheduled": "2028-02-29", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": false },
+      "expected": "2029-02-28"
+    },
+    {
+      "name": "yearly fixed Feb 28 without monthDay does NOT drift to Feb 29 in leap year",
+      "input": { "completedOn": "2027-02-28", "scheduled": "2027-02-28", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": false },
+      "expected": "2028-02-28"
+    },
+    {
+      "name": "yearly fixed with monthDay 29 returns to Feb 29 in leap year",
+      "input": { "completedOn": "2027-02-28", "scheduled": "2027-02-28", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": false, "monthDay": 29 },
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "yearly afterCompletion clamps Feb 29 -> Feb 28",
+      "input": { "completedOn": "2028-02-29", "scheduled": "2028-02-29", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": true },
+      "expected": "2029-02-28"
+    },
+    {
+      "name": "yearly ordinal weekday (4th Thursday of November)",
+      "input": { "completedOn": "2026-11-26", "scheduled": "2026-11-26", "logicalScheduled": null, "unit": "year", "interval": 1, "afterCompletion": false, "ordinalWeekday": { "ordinal": 4, "weekday": 5 } },
+      "expected": "2027-11-25"
+    },
+    {
+      "name": "weekdays (Mon-Fri) Thursday advances to Friday",
+      "input": { "completedOn": "2026-11-19", "scheduled": "2026-11-19", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": false, "weekdays": [2, 3, 4, 5, 6] },
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "weekdays (Mon-Fri) Friday advances to Monday",
+      "input": { "completedOn": "2026-11-20", "scheduled": "2026-11-20", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": false, "weekdays": [2, 3, 4, 5, 6] },
+      "expected": "2026-11-23"
+    },
+    {
+      "name": "weekly Mon/Wed/Fri Monday advances to Wednesday",
+      "input": { "completedOn": "2026-11-23", "scheduled": "2026-11-23", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": false, "weekdays": [2, 4, 6] },
+      "expected": "2026-11-25"
+    },
+    {
+      "name": "biweekly Mon/Thu stays in same ISO week Monday -> Thursday",
+      "input": { "completedOn": "2026-11-23", "scheduled": "2026-11-23", "logicalScheduled": null, "unit": "week", "interval": 2, "afterCompletion": false, "weekdays": [2, 5] },
+      "expected": "2026-11-26"
+    },
+    {
+      "name": "biweekly Mon/Thu jumps 2 ISO weeks Thursday -> Monday",
+      "input": { "completedOn": "2026-11-26", "scheduled": "2026-11-26", "logicalScheduled": null, "unit": "week", "interval": 2, "afterCompletion": false, "weekdays": [2, 5] },
+      "expected": "2026-12-07"
+    },
+    {
+      "name": "biweekly weekend (Sat/Sun) keeps Saturday -> Sunday in same ISO week",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "week", "interval": 2, "afterCompletion": false, "weekdays": [1, 7] },
+      "expected": "2026-11-22"
+    },
+    {
+      "name": "biweekly weekend (Sat/Sun) jumps 2 ISO weeks Sunday -> Saturday",
+      "input": { "completedOn": "2026-11-22", "scheduled": "2026-11-22", "logicalScheduled": null, "unit": "week", "interval": 2, "afterCompletion": false, "weekdays": [1, 7] },
+      "expected": "2026-12-05"
+    },
+    {
+      "name": "weekly Mon/Wed/Fri catches up past overdue completed date",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-02", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": false, "weekdays": [2, 4, 6] },
+      "expected": "2026-11-23"
+    },
+    {
+      "name": "weekly afterCompletion ignores weekdays list",
+      "input": { "completedOn": "2026-11-21", "scheduled": "2026-11-21", "logicalScheduled": null, "unit": "week", "interval": 1, "afterCompletion": true, "weekdays": [2, 4, 6] },
+      "expected": "2026-11-28"
+    },
+    {
+      "name": "monthly explicit monthDay 31 clamps Jan 31 -> Feb 28",
+      "input": { "completedOn": "2026-01-31", "scheduled": "2026-01-31", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "monthDay": 31 },
+      "expected": "2026-02-28"
+    },
+    {
+      "name": "monthly explicit monthDay 31 recovers Feb 28 -> Mar 31",
+      "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "monthDay": 31 },
+      "expected": "2026-03-31"
+    },
+    {
+      "name": "monthly explicit monthDay 28 stays on 28th (Feb 28 -> Mar 28)",
+      "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "monthDay": 28 },
+      "expected": "2026-03-28"
+    },
+    {
+      "name": "monthly monthDay -1 (last day) Feb 28 -> Mar 31",
+      "input": { "completedOn": "2026-02-28", "scheduled": "2026-02-28", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "monthDay": -1 },
+      "expected": "2026-03-31"
+    },
+    {
+      "name": "monthly monthDay -1 (last day) Jan 31 -> Feb 29 (leap year 2028)",
+      "input": { "completedOn": "2028-01-31", "scheduled": "2028-01-31", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "monthDay": -1 },
+      "expected": "2028-02-29"
+    },
+    {
+      "name": "monthly ordinal 1st Monday",
+      "input": { "completedOn": "2026-11-02", "scheduled": "2026-11-02", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "ordinalWeekday": { "ordinal": 1, "weekday": 2 } },
+      "expected": "2026-12-07"
+    },
+    {
+      "name": "monthly ordinal last Friday",
+      "input": { "completedOn": "2026-11-27", "scheduled": "2026-11-27", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "ordinalWeekday": { "ordinal": -1, "weekday": 6 } },
+      "expected": "2026-12-25"
+    },
+    {
+      "name": "monthly ordinal last Friday crosses year boundary",
+      "input": { "completedOn": "2026-12-25", "scheduled": "2026-12-25", "logicalScheduled": null, "unit": "month", "interval": 1, "afterCompletion": false, "ordinalWeekday": { "ordinal": -1, "weekday": 6 } },
+      "expected": "2027-01-29"
+    },
+    {
+      "name": "monthly ordinal 3rd Wednesday every 2 months",
+      "input": { "completedOn": "2026-11-18", "scheduled": "2026-11-18", "logicalScheduled": null, "unit": "month", "interval": 2, "afterCompletion": false, "ordinalWeekday": { "ordinal": 3, "weekday": 4 } },
+      "expected": "2027-01-20"
+    },
+    {
+      "name": "monthly ordinal last Friday respects logicalScheduled exception",
+      "input": { "completedOn": "2026-11-28", "scheduled": "2026-11-28", "logicalScheduled": "2026-11-27", "unit": "month", "interval": 1, "afterCompletion": false, "ordinalWeekday": { "ordinal": -1, "weekday": 6 } },
+      "expected": "2026-12-25"
     }
   ],
   "occurrenceID": [
