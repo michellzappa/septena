@@ -50,7 +50,7 @@ Selecting any fruit overrides `selectionAccent`, `listSelectionFill`, `checkboxF
 > Note on contrast: bright Dark-mode accents (`yuzu`, `carambola`, `jabuticaba`) switch the check glyph inside a filled checkbox to `#141518` so the checkmark always clears WCAG AA against its fill.
 
 ### 2.3 Accent Reach (Restrained Only — locked 2026-11-21)
-- Accent applies **strictly in restrained scope** (no expressive/chrome-tinting mode): row selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and optional header-wash tint. Overdue red, quiet gray filing-list icons, page headers, and canvas neutrality remain untouched.
+- Accent applies **strictly in restrained scope** (no expressive/chrome-tinting mode): row selection wash (`emphasizedAlphaLight: 0.22`, `emphasizedAlphaDark: 0.34`), done checkboxes, active chips/pills, active iOS tab, primary modal CTA, unread context dot, and header-wash geometry ink (always harmonized with the active accent; `jabuticaba` naturally produces monochrome ink). Overdue red, quiet gray filing-list icons, page headers, and canvas neutrality remain untouched.
 
 ### 2.4 Relationship to macOS System Accent
 - `registry/tokens.json` evolves `accentPolicy` from fixed `"platformSystemAccent"` to `"userAccentWithColorfulDefault"`.
@@ -76,14 +76,13 @@ Selected by mz (2026-11-21); `relief`, `isoFlow`, and `terrainMesh` were dropped
 
 ### 3.2 Texture Placement & Parameters (Header Wash Only — locked 2026-11-21)
 
-Textures render **exclusively as a faded top header wash** extending **all the way to the top edge of the screen/window** (`ignoresSafeArea(edges: .top)` behind the iOS status bar / Dynamic Island and behind the macOS unified title bar / toolbar), fading smoothly over ~200–245pt to 0% into the grouped canvas below. There is no placement setting (`behindCards`, `railAndCanvas`, and `full` were dropped to keep reading panes calm and settings minimal).
+Textures render **exclusively as a faded top header wash** extending **all the way to the top edge of the screen/window** (`ignoresSafeArea(edges: .top)` behind the iOS status bar / Dynamic Island and behind the macOS unified title bar / toolbar), fading smoothly over ~200–245pt to 0% into the grouped canvas below. Pure geometry ink **always harmonizes with the active accent** (~58% blend toward accent, zero background gradient blobs; `jabuticaba` naturally renders neutral monochrome ink). There is no placement or tint toggle.
 
 | Parameter | Type / Range | Default | Notes |
 |---|---|---|---|
 | `canvasTexture` | enum (`none`, `topography`, `fieldMatrix`, `stippleDrift`, `causticGlass`, `ridges`, `washiPaper`) | `"none"` *(default; could preview `"topography"` in onboarding)* | |
 | `textureIntensity` | int `15…100` (exposed as 3 presets in UI: `Subtle` 35 / `Balanced` 55 / `Bold` 80, or continuous slider) | `55` | Clamped so high values never hurt contrast |
 | `textureSeed` | int `1…9999` | `42` | User can tap **Shuffle** to pick a new terrain; deterministic everywhere |
-| `textureTintWithAccent` | bool | `true` | Pure geometry only (no background gradient blobs or radial haze): blends the line/dot/filament ink toward the active accent; `false` uses pure neutral ink |
 | `textureMotion` | enum (`still`, `slowDrift`) | `"still"` | Optional glacial **3D slice morphing** (`z = t * speed` so shapes evolve in place rather than treadmill-scrolling; ~20fps GPU cadence, auto-pauses under Reduce Motion, Low Power Mode, and inactive/background windows) |
 
 ### 3.3 Per-Project Deterministic Identity (Phase C3)
@@ -118,7 +117,6 @@ Follows `docs/SETTINGS_UX_SPEC.md` (single canonical home in **Appearance**; zer
 | `canvasTexture` | `synced` *(honored locally if `syncTheme == false`)* | `enum` (texture IDs from `tokens.json`) | `"none"` | `septena.appearance.canvasTexture` |
 | `textureIntensity` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`15…100`) | `55` | `septena.appearance.textureIntensity` |
 | `textureSeed` | `synced` *(honored locally if `syncTheme == false`)* | `int` (`1…9999`) | `42` | `septena.appearance.textureSeed` |
-| `textureTintWithAccent` | `synced` *(honored locally if `syncTheme == false`)* | `bool` | `true` | `septena.appearance.textureTint` |
 | `textureMotion` | `synced` *(honored locally if `syncTheme == false`)* | `enum: ["still", "slowDrift"]` | `"still"` | `septena.appearance.textureMotion` |
 
 - **How `syncTheme` works (Todoist idiom):** Always stored device-local (`default: true`). When `true`, writes to the 6 appearance keys push to `api.septena.app` settings KV and remote updates apply locally. When `false`, this device keeps its own local appearance (e.g., bold Persimmon on iPhone, quiet Jabuticaba on Mac) without overwriting other devices.
