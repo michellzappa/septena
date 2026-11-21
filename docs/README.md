@@ -76,7 +76,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [LINKED_PROJECTS_SPEC.md](LINKED_PROJECTS_SPEC.md) | accepted |
 | [PROJECT_SHARING_SPEC.md](PROJECT_SHARING_SPEC.md) | accepted |
 | [TASK_FACTORY_SPEC.md](TASK_FACTORY_SPEC.md) | accepted |
-| [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted |
+| [TASK_FADE_SPEC.md](TASK_FADE_SPEC.md) | accepted (§6 amended by ADR 0014) |
 | [PROJECT_NOTES_SPEC.md](PROJECT_NOTES_SPEC.md) | accepted (ADR 0012) |
 | [TIMED_REMINDERS_SPEC.md](TIMED_REMINDERS_SPEC.md) | proposal (#97) |
 | [RECURRENCE_V2_SPEC.md](RECURRENCE_V2_SPEC.md) | proposal (#126) |

@@ -3,7 +3,8 @@
 **Status:** accepted. Written and accepted 2026-11-19. Defaults marked *(default)* stand
 until mz overrules them in §11.
 **Decisions:** [ADR 0006](adr/0006-tasks-fade-by-default.md),
-[ADR 0002](adr/0002-own-backend-replaces-icloud.md).
+[ADR 0014](adr/0014-today-rollover-review-or-clean-slate.md) (§6, added
+2026-11-21), [ADR 0002](adr/0002-own-backend-replaces-icloud.md).
 **Builds on:** the triage band (`docs/TRIAGE_BAND_SPEC.md`), the task
 conversation loop (`SeptenaCore/TaskConvo.swift`,
 `docs/TASK_CONVERSATIONS_PLAN.md`), the Next feed
@@ -38,7 +39,7 @@ user got done.
 | A count of how often a task was pushed later | §3 |
 | A fade rule and a Faded pile | §4 |
 | The weekly sweep | §5 |
-| Carry-over prompt at day rollover | §6 |
+| Rollover modes for Today pins: Review and Clean slate | §6 |
 | The stuck question | §7 |
 | A done-first weekly view | §8 |
 | An effort estimate and readiness-ordered Next | §9 |
@@ -121,17 +122,122 @@ faded this week. Still want any?". Tapping it opens the sweep sheet.
 
 Dropped tasks show in the logbook with a "let go" label, distinct from done.
 
-## 6. Carry-over at rollover
+## 6. Today at rollover
 
-At day rollover, each task with `today == true`, `todaySetOn` before today,
-and status `open` gets `isInTriageBand = true` with a carry-over label. Today
-starts with only ratified tasks.
+ADR 0006 removes silent carry-over. ADR 0014 gives Today two rollover modes,
+one per account: **Review** (default) and **Clean slate** (My Day).
+
+### 6.1 Scope: pins only
+
+A task is on Today for one of three reasons (`isOnToday`): a pin
+(`today == true`), a When date that has arrived, or a deadline that has
+arrived. The rollover modes act on **pins only**. A task on Today because of
+a date stays on Today in both modes.
+
+A pin is **stale** when all of these are true:
+
+- `today == true`
+- `todaySetOn` is before the current day key, or `todaySetOn` is nil
+  (legacy pins written before `todaySetOn` existed)
+- status `open`, not deleted, not faded, not a heading
+
+A task with a stale pin and a When date or deadline that has arrived is not
+stale for this rule: the date keeps it on Today.
+
+### 6.2 Rollover is a read rule, not a write *(default)*
+
+Nothing runs at midnight. Each surface reads the rule against the current day
+key (`DayClock.today`) and the account mode:
+
+| Mode | A stale pin shows |
+|---|---|
+| `review` | in the Inbox band as a carry-over row, and not in Today |
+| `cleanSlate` | not in Today and not in the band; the task shows only in its area or project |
+
+Reasons:
+
+- **Idempotent by construction.** Two devices, a device that was offline, and
+  the store all compute the same result from the same fields. There is no
+  rollover write to race, duplicate or replay.
+- **Not a user gesture.** The rollover records no undo entry, does not stamp
+  `touchedAt` and does not count a defer (§3, `CLAUDE.md` undo invariant),
+  because it writes nothing.
+- **Reversible.** Switching mode changes what the user sees at once, and
+  loses no data.
+
+The rule lives in one place in `SeptenaCore` (with the `isOnToday` union,
+see #77) and has one mirror in `backend/` for the MCP connector's Today read.
+Every other surface (Today, Next, widgets, the watch, Septask) calls it.
+
+**Cleanup.** A stale pin keeps `today == true` in storage. Clean slate may
+clear it lazily on the next user write to that task, through the mutator.
+It never runs a sweep that writes every stale pin.
+
+### 6.3 Review (default)
+
+A carry-over row is a stale pin, shown in the Inbox band with a carry-over
+label. It is a second membership rule for the band, next to
+`TaskInbox.isUnratified`: a carry-over row can be filed in an area or
+project, unlike an Inbox row. Today excludes carry-over rows. Today starts
+with only ratified tasks.
 
 A carry-over row offers the standard row actions plus one inline pair:
-**Today** (ratify, stamps `touchedAt`, no defer) and **Not today** (clears
-`today`, counts a defer). Completing it from the band works as today.
+
+- **Today**: ratifies the pin. Sets `todaySetOn` to the current day key,
+  stamps `touchedAt`, no defer.
+- **Not today**: clears `today` and `todaySetOn`, counts a defer.
+
+Completing it from the band works as on Today. Both taps are user gestures and
+record undo at the gesture.
 
 This reuses the band. No new container, no second selection style.
+
+### 6.4 Clean slate (My Day)
+
+A stale pin leaves Today at the day key change and goes nowhere visible: the
+task stays in its area, project or Inbox, with its other fields unchanged. It
+is not deleted, completed, faded or moved to the band, and it counts no
+defer. The user pins it again to bring it back.
+
+### 6.5 The setting
+
+| | |
+|---|---|
+| Key | `todayRollover` in the synced settings registry (`SETTING_VALUES`, `backend/src/store/columns.ts`) |
+| Values | `"review"`, `"cleanSlate"` |
+| Default | `null` reads as `"review"` |
+| Sync | Per account, through the `settings` table, so every device shows the same Today |
+| Septena | Settings ▸ Tasks, "At the start of each day" |
+| Septask | Settings ▸ General, "At the start of each day" |
+| Labels | "Ask me about unfinished tasks" (`review`), "Start with an empty Today" (`cleanSlate`) *(default copy, goes through the humanizer before it ships)* |
+
+Device-only storage is wrong for this key: two devices with different modes
+would show two different Todays.
+
+### 6.6 The first day after the update
+
+Existing users have pins with `todaySetOn` from earlier days, or nil. On the
+first day key after the update, all of them are stale at once:
+
+- In Review, they all arrive in the band. A user with many old pins gets one
+  long band, once.
+- A one-time notice above the band explains it *(default)*: one line, a
+  link to the setting, dismissed per account. Reuse the notice slot in
+  `TaskNotices.swift` and the dismissed-day pattern of `rolledInDismissedOn`.
+  No new notice style.
+
+### 6.7 Related decisions kept separate
+
+- **Day start time** (#140). The rule reads the day key. If #140 moves the
+  day key to start at 1 to 4 am, the rollover moves with it. This section does
+  not depend on #140.
+- **Microsoft To Do import** (#52). Microsoft Graph does not expose My Day
+  membership, so the importer cannot pin My Day tasks. The import preview
+  says so, and names Clean slate as the closest Septena mode.
+- **Agents.** The MCP connector's Today read (`tasks_list`, Next) uses the
+  same rule and the synced mode, so an agent never sees a stale pin as
+  today's work. `tasks_move_to_today` sets `todaySetOn` to the current day
+  key, the same as the app.
 
 ## 7. The stuck question
 
@@ -221,7 +327,9 @@ a year).
 |---|---|---|
 | P1 | §3 fields, `TaskMutator.touch`, defer counting. No UI change. | — |
 | P2 | §4 fade pass + Faded pile, §5 sweep. | P1 |
-| P3 | §6 carry-over at rollover. | P1 |
+| R0 | §6.2 rule in `SeptenaCore` + `backend/` mirror, §6.5 `todayRollover` setting key, legacy-pin handling. Reads only; no UI change. Collapses the `isOnToday` copies (#77). | P1 |
+| R1 | §6.3 Review: carry-over rows in the band, Today / Not today pair, §6.6 one-time notice. Replaces P3. | R0 |
+| R2 | §6.4 Clean slate, §6.5 setting UI in Septena and Septask, §6.7 MCP Today read on both servers. | R0 |
 | P4 | §7 stuck question. | P1 |
 | P5 | §8 done-first view. | P2 |
 | P6 | §9 capture cleanup + effort, §9.1 readiness Next. | P1 |
@@ -245,6 +353,10 @@ Each phase touches shared task code: build all four schemes (`CLAUDE.md`,
 | What a dropped task becomes | status `cancelled` + `dropReason`, shown in the logbook |
 | Defers before the stuck question | 3 |
 | Carry-over on Saturday and Sunday too | Yes |
+| Rollover mode default for new and existing users | Review (ADR 0014, decided) |
+| Rollover as a read rule (no midnight write) | Yes (§6.2) |
+| One-time notice for the first long band | Yes (§6.6) |
+| Clean slate clears stale pins in storage | Lazily, on the next user write only |
 | Readiness source when both Oura and HealthKit exist | Oura |
 | Fade on by default for new users | Yes, with a Settings toggle to turn it off |
 | Resurfaced tasks per week | 3 |
