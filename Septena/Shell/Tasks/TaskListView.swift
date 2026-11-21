@@ -243,6 +243,29 @@ struct TaskListView: View {
   /// ⇧-click / ↑↓) on a container that can also host the inline editor. NOT a
   /// native `List` — see the header of `SelectableScrollList.swift` for why.
   @State private var selection: Set<String> = []
+  #if os(iOS)
+  /// Active when the user enters multi-select via swipe-to-select on touch
+  /// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §4). Kept distinct from
+  /// `!selection.isEmpty` so a single iPad trackpad cursor click doesn't flip
+  /// taps into multi-select toggles.
+  @State private var isTouchSelecting = false
+  #endif
+
+  private var touchSelectionActive: Bool {
+    #if os(iOS)
+    isTouchSelecting
+    #else
+    false
+    #endif
+  }
+
+  private var allowsTouchMultiSelect: Bool {
+    #if os(iOS)
+    filter != .recentlyDeleted && expandedEditId == nil
+    #else
+    false
+    #endif
+  }
 
   #if os(iOS)
   /// iOS edit-mode environment key (unavailable on macOS). Vestigial now that
@@ -548,7 +571,10 @@ struct TaskListView: View {
 
   /// Bumped when a notice is dismissed, so `noticesRow` re-reads
   /// `TaskNotices` (which owns the dismissal state).
+  /// Bumped after a dismiss or a ticked checklist step so `cachedTodayNotices`
+  /// re-evaluates without running SwiftData queries inside `body`.
   @State private var noticeEpoch = 0
+  @State private var cachedTodayNotices: [TaskNotice] = []
   /// Non-nil presents the Weekly Sweep sheet (`docs/TASK_FADE_SPEC.md` §5).
   @State private var sweepSheetTasks: [SeptenaTask]? = nil
   /// One group-title line of space above the logged footer (scales with
@@ -857,6 +883,7 @@ struct TaskListView: View {
       // Synced notice state (Get started, rolled-in dismissal) arrived from
       // another device — re-evaluate Today's notices immediately.
       noticeEpoch += 1
+      refreshTodayNotices()
     }
     // The moment an inline editor / quick-add / composer folds, catch up on any
     // background refresh we held back so the list never reshuffles under a
@@ -914,6 +941,8 @@ struct TaskListView: View {
       // frame is the "weird rebuild between screens". Mirrors the synchronous
       // correctness the `items`/`storageFilter` getter already gives the rows.
       refreshCalendarEvents()
+      hydrateFilterStorageIfNeeded()
+      refreshTodayNotices()
       Task { await load() }
     }
     .onChange(of: nav.pendingTaskReveal) { _, _ in
@@ -936,7 +965,27 @@ struct TaskListView: View {
       headingCreateProject = pid
     }
     .onAppear(perform: didAppearOnScreen)
-    .onDisappear { isOnScreen = false }
+    .onDisappear {
+      isOnScreen = false
+      #if os(iOS)
+      if isTouchSelecting {
+        nav.isTaskMultiSelectActive = false
+      }
+      #endif
+    }
+    #if os(iOS)
+    .toolbar {
+      if isTouchSelecting {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Done") { clearSelection() }
+            .fontWeight(.semibold)
+        }
+      }
+    }
+    .onChange(of: isTouchSelecting) { _, _ in
+      syncMultiSelectChrome()
+    }
+    #endif
     .onChange(of: scenePhase) { _, phase in handleScenePhase(phase) }
     // The composer — used for BOTH create (tab + / ⌘N / sidebar) and edit (row
     // tap / (i) button). The app's standard adaptive edit drawer (sheet on
@@ -1053,8 +1102,39 @@ struct TaskListView: View {
   /// visible list (see `isOnScreen`).
   private func didAppearOnScreen() {
     isOnScreen = true
+    hydrateFilterStorageIfNeeded()
+    refreshTodayNotices()
+    flushDeferredReloadIfNeeded()
+    syncMultiSelectChrome()
     consumeStartCreatingRequest()
     consumePendingTaskReveal()
+  }
+
+  /// Hydrates `itemsStorage` once on filter arrival so the `items` getter never
+  /// re-runs `LocalCache.tasks(...)` multiple times per frame while waiting for
+  /// the coalesced async `load()`. Preserves the cold-launch Today snapshot (#82).
+  private func hydrateFilterStorageIfNeeded() {
+    guard storageFilter != filter else { return }
+    if filter == .today, !embedded, !LaunchPhase.shared.firstFrameDrawn,
+       let snap = TodaySnapshotStore.launchRows(day: clock.today) {
+      itemsStorage = snap.today
+      storageFilter = filter
+      return
+    }
+    itemsStorage = localTasks()
+    storageFilter = filter
+  }
+
+  private func refreshTodayNotices() {
+    guard filter == .today else {
+      if !cachedTodayNotices.isEmpty { cachedTodayNotices = [] }
+      return
+    }
+    let next = TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
+                                 today: clock.today, context: modelContext)
+    if next != cachedTodayNotices {
+      cachedTodayNotices = next
+    }
   }
 
   /// Backgrounding is where an empty inline-create placeholder gets stranded
@@ -1321,7 +1401,8 @@ struct TaskListView: View {
       // whenever a field owns the keyboard: the open composer, an inline rename,
       // or the quick-add line.
       inputActive: listInputActive,
-      selectable: usesSelectionModel,
+      selectable: usesSelectionModel || touchSelectionActive,
+      toggleOnTap: touchSelectionActive,
       onActivate: activateRow,
       onClear: { closeEditOrClearSelection() },
       onMoveShortcut: openMoveForSelected,
@@ -1350,6 +1431,12 @@ struct TaskListView: View {
     // arrow keys are suppressed (`listInputActive`), so selection only moves via
     // an explicit click on a different row.
     .onChange(of: selection) { _, sel in
+      #if os(iOS)
+      if sel.isEmpty && isTouchSelecting {
+        isTouchSelecting = false
+      }
+      syncMultiSelectChrome()
+      #endif
       if let suppressed = suppressActivationAfterSelectionCloseId,
          !sel.contains(suppressed) {
         suppressActivationAfterSelectionCloseId = nil
@@ -1384,18 +1471,142 @@ struct TaskListView: View {
     }
     #endif
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      if usesSelectionModel, selectionScope.isMulti, filter != .recentlyDeleted {
+      if filter != .recentlyDeleted &&
+          ((touchSelectionActive && selectionScope.count > 0) ||
+           (usesSelectionModel && selectionScope.isMulti)) {
         taskBatchActionBar
       }
     }
   }
 
+  private var allSelectedAreToday: Bool {
+    let tasks = orderedActionIDs().compactMap { currentTask(id: $0) }
+    return !tasks.isEmpty && tasks.allSatisfy(\.isOnToday)
+  }
+
+  private var allSelectableVisibleSelected: Bool {
+    let selectableIDs = selectableVisibleTaskIDs
+    return !selectableIDs.isEmpty && selectableIDs.allSatisfy { selection.contains($0) }
+  }
+
+  private var selectableVisibleTaskIDs: [String] {
+    keyboardOrderedTaskIds.filter { id in
+      id != Self.quickAddScrollID && TaskNoticeStep.stepID(fromSelection: id) == nil
+    }
+  }
+
+  @ViewBuilder
   private var taskBatchActionBar: some View {
+    #if os(iOS)
+    if touchSelectionActive {
+      touchMultiSelectBar
+    } else {
+      desktopBatchActionBar
+    }
+    #else
+    desktopBatchActionBar
+    #endif
+  }
+
+  #if os(iOS)
+  private var touchMultiSelectBar: some View {
+    HStack(spacing: 4) {
+      Text("\(selectionScope.count) selected")
+        .font(.septenaMeta.weight(.semibold))
+        .monospacedDigit()
+        .foregroundStyle(Theme.inkSecondary)
+        .lineLimit(1)
+        .padding(.leading, 4)
+
+      Spacer(minLength: 4)
+
+      Button { openWhenForSelected() } label: {
+        Label("When", systemImage: "calendar")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Schedule selected tasks")
+
+      Button { openMoveForSelected() } label: {
+        Label("Move", systemImage: "arrow.right.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Move selected tasks")
+
+      Button { toggleSelected() } label: {
+        Label("Complete", systemImage: "checkmark.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Complete selected tasks")
+
+      Button(role: .destructive) { deleteSelected() } label: {
+        Label("Delete", systemImage: "trash")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("Delete selected tasks")
+
+      Menu {
+        Button {
+          toggleTodayForSelected()
+        } label: {
+          Label(allSelectedAreToday ? "Remove from Today" : "Move to Today",
+                systemImage: allSelectedAreToday ? "sun.max" : "sun.max.fill")
+        }
+        Button {
+          copyTasks(orderedActionIDs())
+          clearSelection()
+        } label: {
+          Label("Copy", systemImage: "doc.on.doc")
+        }
+        Button {
+          selectAllOrClearVisibleTasks()
+        } label: {
+          Label(allSelectableVisibleSelected ? "Deselect All" : "Select All",
+                systemImage: allSelectableVisibleSelected ? "checklist.unchecked" : "checklist")
+        }
+        Divider()
+        Button(role: .destructive) {
+          cancelSelected()
+        } label: {
+          Label("Cancel Tasks", systemImage: "xmark.circle")
+        }
+      } label: {
+        Label("More", systemImage: "ellipsis.circle")
+          .labelStyle(.iconOnly)
+          .frame(width: 40, height: 38)
+          .contentShape(Rectangle())
+      }
+      .accessibilityLabel("More batch actions")
+    }
+    .font(.system(size: 18, weight: .regular))
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.regularMaterial, in: Capsule())
+    .overlay(
+      Capsule()
+        .strokeBorder(Theme.border, lineWidth: 0.5)
+    )
+    .shadow(color: .black.opacity(0.14), radius: 12, y: 4)
+    .padding(.horizontal, Theme.pageGutter)
+    .padding(.bottom, 8)
+    .transition(.move(edge: .bottom).combined(with: .opacity))
+  }
+  #endif
+
+  private var desktopBatchActionBar: some View {
     HStack(spacing: 16) {
       Text("\(selectionScope.count) selected")
         .font(.septenaMeta)
         .foregroundStyle(Theme.inkSecondary)
       Spacer(minLength: 0)
+      Button("When") { openWhenForSelected() }
       Button("Copy") { copyTasks(orderedActionIDs()) }
       Button("Move") { openMoveForSelected() }
       Button("Complete") { toggleSelected() }
@@ -1896,13 +2107,11 @@ struct TaskListView: View {
     }
   }
 
-  /// Today's notices, read once per render. `noticeEpoch` re-reads them after
-  /// a dismiss, a ticked step or a load.
+  /// Today's notices, cached outside `body` so rendering never runs synchronous
+  /// SwiftData queries on the main thread.
   private var todayNotices: [TaskNotice] {
     guard filter == .today else { return [] }
-    let _ = noticeEpoch
-    return TaskNotices.today(pool: items, requiresSignIn: requiresSignIn,
-                             today: clock.today, context: modelContext)
+    return cachedTodayNotices
   }
 
   /// The Get started steps on screen, in render order.
@@ -1991,7 +2200,7 @@ struct TaskListView: View {
   private func toggleNoticeStep(_ step: TaskNoticeStep) {
     Haptics.tick()
     TaskNotices.toggleStep(step)
-    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
   }
 
   /// Does a Get started step: opens the Settings page that sets it up, or
@@ -2013,7 +2222,7 @@ struct TaskListView: View {
 
   private func dismissNotice(_ id: TaskNotice.ID) {
     TaskNotices.dismiss(id, today: clock.today, context: modelContext)
-    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+    motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
   }
 
   @ViewBuilder
@@ -2322,6 +2531,7 @@ struct TaskListView: View {
                      at: before ? targetIdx : targetIdx + 1)
     TaskUndo.recordReorder(undoBefore, context: modelContext, mutator: mutator)
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2504,6 +2714,7 @@ struct TaskListView: View {
     applyManualOrder(ids: ids, into: groupRows,
                      at: before ? targetIdx : targetIdx + 1)
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2540,6 +2751,7 @@ struct TaskListView: View {
       TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
     }
     Haptics.tick()
+    if touchSelectionActive { clearSelection() }
     Task { await load() }
     return true
   }
@@ -2905,7 +3117,7 @@ struct TaskListView: View {
       for step in steps {
         if reopen { TaskNotices.reopenStep(step.id) } else { TaskNotices.completeStep(step.id) }
       }
-      motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1 }
+      motion.run(.easeOut(duration: 0.2)) { noticeEpoch += 1; refreshTodayNotices() }
     }
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
@@ -2913,6 +3125,7 @@ struct TaskListView: View {
       guard let t = currentTask(id: id) else { continue }
       toggle(t)
     }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// Resolve the row a single-target keyboard shortcut should act on: a
@@ -2944,6 +3157,7 @@ struct TaskListView: View {
       for id in ids { mutator.acknowledge(id: id) }
       Task { await load() }
     }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// Context menu / ⌘T "Remove from Today" — clears every arrived Today signal
@@ -3024,6 +3238,7 @@ struct TaskListView: View {
     let ids = orderedActionIDs()
     guard !ids.isEmpty else { return }
     for id in ids { applyCancel(id) }
+    if touchSelectionActive { clearSelection() }
   }
 
   /// ⌘. — clear schedule + today, sending the row back to Anytime.
@@ -3167,11 +3382,19 @@ struct TaskListView: View {
     guard !ids.isEmpty else { return }
     Haptics.tick()
     let before = filingSnapshots(ids)
-    let moved = ids.filter { applyMoveCore(id: $0, areaId: areaId, projectId: projectId) }
+    // Apply in reverse so `TaskOrder.topPosition` lands `ids[0]` at the very
+    // top followed by `ids[1]`, `ids[2]`, ... preserving visible selection order.
+    var movedSet: Set<String> = []
+    for id in ids.reversed() {
+      if applyMoveCore(id: id, areaId: areaId, projectId: projectId) {
+        movedSet.insert(id)
+      }
+    }
+    let moved = ids.filter { movedSet.contains($0) }
     guard !moved.isEmpty else { return }
-    let movedSet = Set(moved)
     let undoBefore = before.filter { movedSet.contains($0.id) }
     TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: mutator)
+    if touchSelectionActive { clearSelection() }
     let ticket = TaskUndoTicket()
     Task { await load() }
     let destName = destinationName(areaId: areaId, projectId: projectId)
@@ -3262,6 +3485,7 @@ struct TaskListView: View {
     guard !ids.isEmpty else { return }
     guard kind == .scheduled, let date else {
       for id in ids { applyWhen(id: id, kind: kind, date: date) }
+      if touchSelectionActive { clearSelection() }
       return
     }
 
@@ -3272,9 +3496,11 @@ struct TaskListView: View {
     }
     if !movedFixedIDs.isEmpty {
       reschedulePrompt = FixedReschedulePrompt(taskIDs: ids, date: date)
+      if touchSelectionActive { clearSelection() }
       return
     }
     for id in ids { applyWhen(id: id, kind: kind, date: date) }
+    if touchSelectionActive { clearSelection() }
   }
 
   // MARK: - Row
@@ -3376,29 +3602,25 @@ struct TaskListView: View {
     staticRow(task, accessory: filter == .faded
               ? keepFadedCapsule(for: task)
               : (quickMenu ? suggestionCapsule(for: task) : nil))
+    .taskRowSwipeToSelect(
+      enabled: allowsTouchMultiSelect,
+      isSelected: selection.contains(task.id)
+    ) {
+      toggleTouchSelection(task.id)
+    }
     // Drag a row (or the whole selection) to a sidebar area/project to re-home
-    // it, or between rows of a manually-ordered list to reorder. `.draggable`
-    // pairs with the sidebar's `.dropDestination(for:)` and `TaskReorderDrop`;
-    // the explicit preview is a compact title pill. On iOS the lift starts
-    // from the system long-press drag (UIKit arbitrates it against the tap
-    // and context-menu gestures).
+    // it, onto an Area's project card, or between rows of a manually-ordered
+    // list to reorder. `.draggable` pairs with `SidebarTaskDrop`, `TaskMoveDrop`,
+    // and `TaskReorderDrop`. On iOS the lift starts from the system long-press
+    // drag (UIKit arbitrates it against tap, horizontal swipe-to-select, and
+    // context-menu gestures).
     .draggable(dragPayload(for: task)) {
       let payload = dragPayload(for: task)
-      if payload.ids.count > 1 {
-        Text("\(payload.ids.count) tasks")
-          .scaledFont(size: 13, weight: .medium)
-          .lineLimit(1)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-      } else {
-        Text(task.title)
-          .scaledFont(size: 13)
-          .lineLimit(1)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-      }
+      TaskDragStackPreview(
+        title: task.title,
+        count: payload.ids.count,
+        accent: theme.color(for: "tasks")
+      )
     }
   }
 
@@ -3507,6 +3729,7 @@ struct TaskListView: View {
       showsTodayIndicator: filter != .today,
       showsFadedIndicator: filter != .faded,
       isListSelected: selection.contains(task.id),
+      checkboxDimmed: touchSelectionActive,
       accessory: accessory,
       checklistSummary: checklistCounts[task.id],
       tagChips: LocalCache.resolvedTags(for: task, tagsByID: tagsByID),
@@ -3514,7 +3737,14 @@ struct TaskListView: View {
       checkboxMatchID: "edit-checkbox-\(task.id)",
       heroMatchNS: nil, // hero-glide removed — see note by former `editTitleNS`
       heroMatchIsSource: expandedEditId != task.id,
-      onToggle: { toggle(task) },
+      onToggle: {
+        if touchSelectionActive {
+          Haptics.tap()
+          toggleTouchSelection(task.id)
+        } else {
+          toggle(task)
+        }
+      },
       onTap: nil
     )
     // Fade on insert/removal. The fade only plays inside an animated
@@ -3971,12 +4201,55 @@ struct TaskListView: View {
     selection = [id]
   }
 
+  /// Swipe-to-select (or checkbox/row tap while touch-selecting): toggles `id`
+  /// in `selection`, entering touch multi-select mode if not already active and
+  /// auto-exiting when the last selected row is deselected.
+  private func toggleTouchSelection(_ id: String) {
+    #if os(iOS)
+    _ = closeActiveEditIfNeeded()
+    if selection.contains(id) {
+      selection.remove(id)
+      if selection.isEmpty {
+        isTouchSelecting = false
+      }
+    } else {
+      isTouchSelecting = true
+      selection.insert(id)
+    }
+    syncMultiSelectChrome()
+    #endif
+  }
+
+  private func selectAllOrClearVisibleTasks() {
+    let all = selectableVisibleTaskIDs
+    guard !all.isEmpty else { return }
+    if all.allSatisfy({ selection.contains($0) }) {
+      clearSelection()
+    } else {
+      #if os(iOS)
+      isTouchSelecting = true
+      #endif
+      selection = Set(all)
+      syncMultiSelectChrome()
+    }
+  }
+
+  private func syncMultiSelectChrome() {
+    #if os(iOS)
+    if isOnScreen {
+      nav.isTaskMultiSelectActive = isTouchSelecting && !selection.isEmpty
+    }
+    #endif
+  }
+
   /// Deselect everything — the single "clear selection" entry point used by
   /// every deselect path.
   private func clearSelection() {
     selection.removeAll()
     #if os(iOS)
+    isTouchSelecting = false
     editMode?.wrappedValue = .inactive
+    nav.isTaskMultiSelectActive = false
     #endif
   }
 
@@ -4825,7 +5098,9 @@ struct TaskListView: View {
   /// `coalescing` waits the longer notification window (`notificationCoalesce`)
   /// so a burst of sync posts costs one rebuild.
   private func reloadOrDeferWhileEditing(coalescing: Bool = false) {
-    guard !listInputActive else { pendingReloadWhileEditing = true; return }
+    // Hidden tabs (e.g. Upcoming/Tasks while viewing Today) stay quiet until
+    // they return on screen (`didAppearOnScreen` flushes the deferred load).
+    guard isOnScreen, !listInputActive else { pendingReloadWhileEditing = true; return }
     Task { await load(delay: coalescing ? Self.notificationCoalesce : Self.loadCoalesce) }
   }
 
@@ -4918,8 +5193,22 @@ struct TaskListView: View {
     fadedScopeStorage = (showFadedInLists && scopeLoggedFilterId != nil)
       ? LocalCache.fadedTasks(in: modelContext, scope: filter)
       : []
+    // Prune stale selection IDs (e.g. tasks moved out of this list via
+    // SidebarTaskDrop or AreaDetailView project drop) so selection chrome
+    // never lingers over vanished rows.
+    if !selection.isEmpty {
+      let visible = Set(keyboardOrderedTaskIds)
+      let pruned = selection.intersection(visible)
+      if pruned != selection {
+        selection = pruned
+        if pruned.isEmpty {
+          clearSelection()
+        }
+      }
+    }
     // A synced dismissal from another device lands on the next read.
     noticeEpoch &+= 1
+    refreshTodayNotices()
     // Filing suggestions and the calendar agenda come one frame after the
     // rows (scheduleDecorationPass, docs/LAUNCH_PERF.md).
     consumePendingTaskReveal()

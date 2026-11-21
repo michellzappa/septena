@@ -1843,13 +1843,13 @@ private struct SidebarTaskDrop: ViewModifier {
                     nav.requestNewTask()
                     return true
                   }
-                  guard usesPushNavigation else { return false }
                   // One drop = one undo step (shake / ⌘Z), covering every
                   // dragged row. Today rides in the filing snapshot, so a
-                  // drop on Today undoes too.
+                  // drop on Today undoes too. Allowed on compact iPhone too
+                  // so two-finger cross-tab/back task drags land on projects.
                   let before = ids.compactMap { LocalCache.task(id: $0, in: modelContext) }
                     .map(TaskUndo.FilingSnapshot.init)
-                  for id in ids { rehome(id) }
+                  rehome(ids)
                   TaskUndo.recordMove(before: before, context: modelContext, mutator: mutator)
                   return true
                 })
@@ -1858,20 +1858,19 @@ private struct SidebarTaskDrop: ViewModifier {
     }
   }
 
-  private func rehome(_ id: String) {
+  private func rehome(_ ids: [String]) {
     Haptics.tick()
     switch kind {
-    // One save per task, the same call the list and the AppKit sidebar make.
-    // A drop is a disposition, like filing from the list, so it also clears
-    // the agent cue (parity with `SeptaskKitSidebar`).
+    // Batch move preserves the selection's relative order at the top of the
+    // destination and clears the agent cue (parity with `SeptaskKitSidebar`).
     case .area(let areaId):
-      mutator.moveToList(id: id, area: areaId, project: nil)
-      mutator.acknowledge(id: id)
+      mutator.moveToList(ids: ids, area: areaId, project: nil, acknowledge: true)
     case .project(let projectId):
-      mutator.moveToList(id: id, area: nil, project: projectId)
-      mutator.acknowledge(id: id)
+      mutator.moveToList(ids: ids, area: nil, project: projectId, acknowledge: true)
     case .today:
-      mutator.moveToToday(id: id, today: true)
+      for id in ids {
+        mutator.moveToToday(id: id, today: true)
+      }
     }
   }
 }

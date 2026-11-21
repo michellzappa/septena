@@ -83,6 +83,7 @@ See [ADR 0007](adr/0007-septena-is-the-task-app.md).
 | [CHECKLISTS_SPEC.md](CHECKLISTS_SPEC.md) | proposal (#76) |
 | [DATA_EXPORT_SPEC.md](DATA_EXPORT_SPEC.md) | proposal (#130) |
 | [IOS_SWIPE_ACTIONS_SPEC.md](IOS_SWIPE_ACTIONS_SPEC.md) | proposal (#132) |
+| [MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md](MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md) | proposal (touch swipe-to-select & multi-task drag to project) |
 | [TAGS_SPEC.md](TAGS_SPEC.md) | proposal (#96) |
 | [TASK_WIDGETS_SPEC.md](TASK_WIDGETS_SPEC.md) | proposal (#129) |
 | [STAR_PRIORITY_SPEC.md](STAR_PRIORITY_SPEC.md) | proposal (#127) |

@@ -144,6 +144,11 @@ final class NavigationState {
   /// (used by the iPhone Magic Plus quick menu when viewing a project).
   var shouldCreateHeading = false
 
+  /// True while the on-screen iOS `TaskListView` is in touch multi-select mode
+  /// (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §5.2). Used by `SeptaskRootView`
+  /// to hide the floating Magic Plus orb while the bottom selection bar is up.
+  var isTaskMultiSelectActive = false
+
   /// One-shot trigger from a Home Screen Quick Action (long-press app
   /// icon). ContentView dispatches the route change + `shouldStartCreating`
   /// flip, then resets this to nil. nil means "no pending shortcut".

@@ -90,6 +90,7 @@ struct AreaDetailView: View {
   @Environment(NavigationState.self) private var nav
   @Environment(\.usesPushNavigation) private var usesPushNavigation
   @Environment(AreasMutator.self) private var areasMutator
+  @Environment(TaskMutator.self) private var taskMutator
   @Environment(\.modelContext) private var modelContext
 
   @State private var draftName: String
@@ -102,6 +103,7 @@ struct AreaDetailView: View {
   @State private var projects: [Project]
   @State private var projectProgress: [String: Double] = [:]
   @State private var errorMessage: String?
+  @State private var toastStore = SeptenaToastStore()
   @FocusState private var notesFocused: Bool
   /// Global task sort — read/written here so flipping it from this menu
   /// re-renders the embedded TaskListView, which reads the same key.
@@ -194,11 +196,15 @@ struct AreaDetailView: View {
               projectRow(project)
             }
             .buttonStyle(PlainHoverRowButtonStyle())
+            .modifier(TaskMoveDrop(perform: { ids in
+              handleProjectDrop(ids: ids, project: project)
+            }))
             .taskCardChrome(TaskCardPosition(index: idx, count: areaProjects.count))
           }
         }
       }
     }
+    .septenaToastOverlay(store: toastStore)
     .septenaInlineTitle()
     #if os(iOS) && SEPTASK
     .toolbar {
@@ -246,6 +252,40 @@ struct AreaDetailView: View {
     #else
     nav.go(to: .project(id: project.id), push: !usesPushNavigation)
     #endif
+  }
+
+  /// Drop 1 or more dragged tasks onto one of this area's project rows:
+  /// re-home them in relative order, record one shared undo step, and show an
+  /// undoable confirmation toast (`docs/MULTI_SELECT_SWIPE_AND_DRAG_SPEC.md` §6.2).
+  private func handleProjectDrop(ids: [String], project: Project) -> Bool {
+    guard !ids.isEmpty else { return false }
+    if TaskDragIDs.isNewTaskPayload(ids) {
+      Haptics.tick()
+      openProject(project)
+      nav.requestNewTask()
+      return true
+    }
+    let moving: [SeptenaTask] = ids.compactMap { id in
+      guard let task = LocalCache.task(id: id, in: modelContext),
+            !task.isHeading,
+            task.project != project.id else { return nil }
+      return task
+    }
+    guard !moving.isEmpty else { return false }
+    Haptics.tick()
+    let undoBefore = moving.map(TaskUndo.FilingSnapshot.init)
+    taskMutator.moveToList(ids: moving.map(\.id), area: nil, project: project.id, acknowledge: true)
+    TaskUndo.recordMove(before: undoBefore, context: modelContext, mutator: taskMutator)
+    let ticket = TaskUndoTicket()
+    let message = moving.count == 1
+      ? "Moved to \(project.title)"
+      : "Moved \(moving.count) tasks to \(project.title)"
+    toastStore.show(message) {
+      ticket.undo { TaskUndo.restore(undoBefore, using: taskMutator) }
+      Task { await load() }
+    }
+    Task { await load() }
+    return true
   }
 
   /// Quiet "Projects" header over the project card — matches the group-header

@@ -47,6 +47,9 @@ struct SelectableRowActions {
   /// Whether rows should wire click-selection at all (false on iPhone compact,
   /// which has no multi-select chrome — there a tap just activates).
   var selectable: Bool = true
+  /// iOS touch multi-select mode: tapping any row toggles its membership in
+  /// `selection` instead of opening the inline editor.
+  var toggleOnTap: Bool = false
 }
 
 private struct SelectableRowActionsKey: EnvironmentKey {
@@ -220,6 +223,11 @@ private struct TouchOrPointerTap: ViewModifier {
           }
         }
         .onTapGesture {
+          if actions.toggleOnTap {
+            Haptics.tap()
+            actions.click(id, .command)
+            return
+          }
           if isSelected || !pointerOver {
             actions.activate(id)
           } else {
@@ -229,7 +237,12 @@ private struct TouchOrPointerTap: ViewModifier {
     } else {
       // Compact iPhone: skip `onContinuousHover` (no per-row UIHoverGestureRecognizer).
       content.onTapGesture {
-        actions.activate(id)
+        if actions.toggleOnTap {
+          Haptics.tap()
+          actions.click(id, .command)
+        } else {
+          actions.activate(id)
+        }
       }
     }
   }
@@ -258,6 +271,8 @@ struct SelectableScrollList<Content: View>: View {
   var isActive: Bool = true
   /// Whether rows wire click-selection (false on iPhone compact).
   var selectable: Bool = true
+  /// iOS touch multi-select mode: tapping a row toggles membership in `selection`.
+  var toggleOnTap: Bool = false
   /// Return / double-click / single-tap(iOS) on a row.
   var onActivate: (String) -> Void = { _ in }
   /// Esc with a selection, or a click on the empty paper behind the rows.
@@ -372,7 +387,8 @@ struct SelectableScrollList<Content: View>: View {
       .environment(\.selectableRowActions, SelectableRowActions(
         click: handleClick,
         activate: onActivate,
-        selectable: selectable
+        selectable: selectable,
+        toggleOnTap: toggleOnTap
       ))
       // Focusable for native key delivery; the blue focus ring is suppressed —
       // the selection capsule is indicator enough (same call the List makes).
