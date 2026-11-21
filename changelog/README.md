@@ -37,10 +37,18 @@ refs: [septena#66]
 A change nobody sees (docs, tools, a refactor, the factory, Septena Life)
 needs no update.
 
+## Keep it current
+
+The page goes stale when work lands without an update. Before you end a
+session that shipped something visible, run `--behind` and write an update
+for each visible change it lists. The site build prints the same warning.
+
 ## Commands
 
 ```sh
 node tools/changelog.mjs           # the updates, newest first
 node tools/changelog.mjs --check   # every file is well formed
 node tools/changelog.mjs --json    # what septena.app/changelog renders
+node tools/changelog.mjs --behind  # feat/fix/polish commits after the newest update
+node tools/changelog.mjs --activity  # commit counts per day for the Development panel
 ```
