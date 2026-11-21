@@ -119,6 +119,33 @@ final class AppearancePreferences {
       guard oldValue != accentColorID else { return }
       UserDefaults.standard.set(accentColorID, forKey: RegistrySettings.StorageKey.accentColor)
       pushSyncedIfEnabled()
+      if !isAdoptingSynced, appIconColorOverride == nil {
+        applyAppIconIfNeeded()
+      }
+      notifyChanged()
+    }
+  }
+
+  var appIconFinish: AppIconFinish {
+    didSet {
+      guard oldValue != appIconFinish else { return }
+      UserDefaults.standard.set(appIconFinish.rawValue, forKey: AppIconCatalog.finishStorageKey)
+      applyAppIconIfNeeded()
+      notifyChanged()
+    }
+  }
+
+  /// `nil` means "Default" (follows `accentColorID`). Non-nil overrides the
+  /// Home Screen icon color independently of the in-app accent.
+  var appIconColorOverride: AppIconColor? {
+    didSet {
+      guard oldValue != appIconColorOverride else { return }
+      if let appIconColorOverride {
+        UserDefaults.standard.set(appIconColorOverride.rawValue, forKey: AppIconCatalog.colorStorageKey)
+      } else {
+        UserDefaults.standard.removeObject(forKey: AppIconCatalog.colorStorageKey)
+      }
+      applyAppIconIfNeeded()
       notifyChanged()
     }
   }
@@ -177,6 +204,15 @@ final class AppearancePreferences {
       ? accentRaw
       : RegistrySettings.Defaults.accentColor
 
+    let iconFinishRaw = ud.string(forKey: AppIconCatalog.finishStorageKey) ?? AppIconFinish.obsidian.rawValue
+    self.appIconFinish = AppIconFinish(rawValue: iconFinishRaw) ?? .obsidian
+
+    if let iconColorRaw = ud.string(forKey: AppIconCatalog.colorStorageKey) {
+      self.appIconColorOverride = AppIconColor(rawValue: iconColorRaw)
+    } else {
+      self.appIconColorOverride = nil
+    }
+
     let texRaw = ud.string(forKey: RegistrySettings.StorageKey.canvasTexture)
       ?? RegistrySettings.Defaults.canvasTexture
     self.canvasTexture = HeaderTextureStyle(rawValue: texRaw) ?? .none
@@ -218,6 +254,34 @@ final class AppearancePreferences {
   var hasActiveTexture: Bool { canvasTexture != .none }
   var isSlowDrift: Bool { hasActiveTexture && textureMotion == .slowDrift }
   var preferredColorScheme: ColorScheme? { appearanceMode.colorScheme }
+
+  // MARK: - Resolved App Icon
+
+  var resolvedAppIconColor: AppIconColor {
+    AppIconCatalog.resolvedColor(
+      finish: appIconFinish,
+      colorOverride: appIconColorOverride,
+      accentColorID: accentColorID
+    )
+  }
+
+  var resolvedAppIconFinish: AppIconFinish {
+    AppIconCatalog.effectiveFinish(finish: appIconFinish, color: resolvedAppIconColor)
+  }
+
+  var resolvedAppIconAssetName: String {
+    AppIconCatalog.assetName(finish: appIconFinish, color: resolvedAppIconColor)
+  }
+
+  var resolvedAlternateIconName: String? {
+    AppIconCatalog.alternateIconName(finish: appIconFinish, color: resolvedAppIconColor)
+  }
+
+  func applyAppIconIfNeeded() {
+    #if os(iOS)
+    AppIconCatalog.applyAlternateIcon(named: resolvedAlternateIconName)
+    #endif
+  }
 
   /// Today icon color in the sidebar: gold in Colorful mode (matching the
   /// macOS Multicolor idiom), and active accent or gold per locked spec.
